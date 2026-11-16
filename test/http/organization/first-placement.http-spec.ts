@@ -54,6 +54,7 @@ describe('first placement HTTP', () => {
       workEmail: null,
       employmentType: 'STAFF',
       hireDate: '2026-01-01',
+      contractEndDate: null,
       status: 'ACTIVE',
       workState: 'WORKING',
       memberSince: body.effectiveFrom,

@@ -14,6 +14,10 @@ export interface DeviceWire {
   registrationId: string | null;
   registeredFrom: string | null;
   state: 'RETIRED' | 'UNREGISTERED' | 'COLLECTION_STOPPED' | 'ACTIVE' | 'AWAITING_ACKNOWLEDGEMENT';
+  collection: {
+    state: 'RETIRED' | 'UNREGISTERED' | 'COLLECTION_STOPPED' | 'ACTIVE' | 'AWAITING_ACKNOWLEDGEMENT';
+    lastAcceptedAt: string | null;
+  };
   signatureRecorded: boolean;
   retiredAt: string | null;
   acknowledgedFrom?: string | null;
@@ -82,8 +86,8 @@ export class DevicesHarness extends DocumentHarness {
    * The enrollment route allows ten exchanges a minute from one address, and every case of a file comes from the same one: the
    * limit of the route is lifted for the suite, the global limit having been raised already. The limit itself is read off the route.
    */
-  override async start(): Promise<void> {
-    await super.start();
+  override async start(options: Parameters<DocumentHarness['start']>[0] = {}): Promise<void> {
+    await super.start(options);
     const route = Object.getOwnPropertyDescriptor(DeviceEnrollmentController.prototype, 'create')?.value as object;
     Reflect.defineMetadata('THROTTLER:LIMITdefault', 100_000, route);
   }
@@ -161,6 +165,8 @@ export class DevicesHarness extends DocumentHarness {
       .post('/api/v1/ai-tool-status-snapshots')
       .set({ Authorization: `Bearer ${token}` })
       .send(body);
+  deviceRegistrations = (deviceId: string, query = '', account: ApiAccount = this.it1) =>
+    request(this.server()).get(`/api/v1/devices/${deviceId}/registrations${query}`).set(this.as(account));
   deviceUsage = (deviceId: string, query = '', account: ApiAccount = this.it1) =>
     request(this.server()).get(`/api/v1/devices/${deviceId}/usage${query}`).set(this.as(account));
   deviceStatus = (deviceId: string, query = '', account: ApiAccount = this.it1) =>
@@ -172,14 +178,25 @@ export class DevicesHarness extends DocumentHarness {
   myStatus = (account: ApiAccount, deviceId: string, query = '') =>
     request(this.server()).get(`/api/v1/me/devices/${deviceId}/tool-status${query}`).set(this.as(account));
 
-  /** An application of the catalog as the IT Admin declares it; `communication` makes it a messaging or meeting service. */
+  /**
+   * An application of the catalog as the IT Admin declares it; `communication` puts it in the functional group Liên lạc, which is what makes it
+   * a messaging or meeting service (`QĐ-111e`: the group, not an answer about messaging, decides).
+   */
   async catalogApplication(kind: 'SAAS' | 'LICENSED' | 'INTERNAL' = 'SAAS', communication = false): Promise<string> {
+    const group = communication
+      ? (
+          await this.ctx.sql.query<{ id: string }>(
+            `SELECT id FROM functional_groups WHERE system_key = 'COMMUNICATION'`,
+          )
+        ).rows[0].id
+      : undefined;
+
     return declareApplication(this.ctx, this.it1.accessToken, {
       name: this.unique('Tool'),
       kind,
       ...(kind === 'INTERNAL' ? {} : { vendorName: this.unique('Vendor') }),
       dataSensitivity: 'LOW',
-      communication: { personToPersonMessaging: communication, callsOrMeetings: false, mailbox: false },
+      ...(group === undefined ? {} : { functionalGroupId: group }),
     });
   }
 

@@ -94,6 +94,8 @@ export interface IssuePatch {
 
 export interface IssueFilter {
   reporterEmployeeId?: string;
+  /** Only the reports of these people (the ones placed in a department): none when empty. */
+  reporterEmployeeIds?: readonly string[];
   assignedItAdminEmployeeId?: string;
   state?: SaasIssueState;
   /** Only the new reports whose first answer was due before this day. */
@@ -238,6 +240,7 @@ export class SaasIssueRepo {
   /** One page of reports, the newest first, and the total for the same filter, from one snapshot. */
   async page(filter: IssueFilter): Promise<{ items: SaasIssueRecord[]; total: number }> {
     const where: Prisma.SaasIssueWhereInput = {
+      ...(filter.reporterEmployeeIds ? { AND: [{ reporterEmployeeId: { in: [...filter.reporterEmployeeIds] } }] } : {}),
       ...(filter.reporterEmployeeId ? { reporterEmployeeId: filter.reporterEmployeeId } : {}),
       ...(filter.assignedItAdminEmployeeId ? { assignedItAdminEmployeeId: filter.assignedItAdminEmployeeId } : {}),
       ...(filter.overdueBefore

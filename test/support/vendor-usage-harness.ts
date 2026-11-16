@@ -1,11 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { ApiAccount } from './api-accounts';
+import { DecisionChecklists } from './decision-checklist';
 import { pretendBusinessToday } from './pretend-today';
 import { declareApplication, declarePlan, declareSubscription } from './builders/catalog.builder';
 import { SeatHarness } from './seat-baseline-harness';
-
-const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
 
 export interface SourceWire {
   id: string;
@@ -72,8 +71,22 @@ export const EVENT_SOURCE = {
 /** The seat harness with the sources and the reports of vendor usage (`SBF-04a`) a suite needs. */
 export class UsageHarness extends SeatHarness {
   private machines = 0;
+  /** The checklists of the seven decision steps, read once the installation exists (`QĐ-111ap`). */
+  readonly checklists = new DecisionChecklists();
 
-  /** An application of the catalog with a plan and a subscription of 100 seats; `communication` makes it a messaging service. */
+  override async start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
+    await super.start(options);
+    await this.checklists.load(this.ctx.sql, this.seed.organizationId);
+  }
+
+  /** The fixed group Liên lạc of the organization (`QĐ-111bf`). */
+  async communicationGroupId(): Promise<string> {
+    return (
+      await this.ctx.sql.query<{ id: string }>(`SELECT id FROM functional_groups WHERE system_key = 'COMMUNICATION'`)
+    ).rows[0].id;
+  }
+
+  /** An application of the catalog with a plan and a subscription of 100 seats; `communication` makes it a messaging service (it stands in Liên lạc). */
   async usageApp(options: { communication?: boolean; kind?: 'SAAS' | 'INTERNAL' } = {}) {
     const kind = options.kind ?? 'SAAS';
     const applicationId = await declareApplication(this.ctx, this.it1.accessToken, {
@@ -81,7 +94,8 @@ export class UsageHarness extends SeatHarness {
       kind,
       ...(kind === 'INTERNAL' ? {} : { vendorName: this.unique('Vendor') }),
       dataSensitivity: 'LOW',
-      communication: options.communication ? { ...NO, personToPersonMessaging: true } : NO,
+      // QĐ-111e: a messaging service is one that stands in the group Liên lạc.
+      ...(options.communication ? { functionalGroupId: await this.communicationGroupId() } : {}),
     });
     if (kind === 'INTERNAL') return { applicationId, planId: null, subscriptionId: null };
     const planId = await declarePlan(this.ctx, this.it1.accessToken, {

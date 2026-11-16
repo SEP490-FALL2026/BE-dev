@@ -10,6 +10,7 @@ import { HeadHandoverRefusedError } from './organization.errors';
 import { OrganizationReadApi } from './organization-read.api';
 import type {
   DepartmentBrief,
+  EmployeePlacementSpan,
   EmployeeWorkState,
   HeadHandoverInput,
   HeadHandoverRecord,
@@ -82,6 +83,19 @@ export class OrganizationHistoryApi {
    */
   getPlacementInForce(tx: DbTx, employeeId: string, onDate: BusinessDate): Promise<PlacementInForce | null> {
     return this.employees.placementInForce(tx, employeeId, onDate);
+  }
+
+  /**
+   * Where each of these people was placed over `[from, to)`, one read for any number of people: the stretches of days that touch it, by person
+   * then first day, so the department of a person on any day of the range is the stretch that covers it (`SM-1`, `QĐ-103k`).
+   */
+  getPlacementsBetween(
+    employeeIds: readonly string[],
+    from: BusinessDate,
+    to: BusinessDate,
+    tx?: DbTx,
+  ): Promise<EmployeePlacementSpan[]> {
+    return this.employees.placementsBetween(employeeIds, from, to, tx);
   }
 
   /** The first day of a placement the caller wrote earlier; null when it is gone. */

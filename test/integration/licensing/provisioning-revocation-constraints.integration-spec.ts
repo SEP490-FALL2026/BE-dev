@@ -92,6 +92,19 @@ describe('the tasks of a revocation (integration, PostgreSQL constraints)', () =
 
     return { id, code };
   };
+  /** An extension task (a renewal the IT Admin extends), with an id the test knows: it answers for a request, as a grant does. */
+  const extensionWithId = async (assignmentId: string): Promise<{ id: string; code: string | null }> => {
+    const id = randomUUID();
+    const code = await sqlState(
+      sql,
+      `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, request_id, max_attempts,
+         created_by_app_user_id)
+       VALUES ($1, $2, $3, 'EXTEND', 'MANUAL', $4, 4, $5)`,
+      [id, organizationId, assignmentId, randomUUID(), person()],
+    );
+
+    return { id, code };
+  };
   const claimed = async (assignmentId?: string) => {
     const made = await revocation({ ...(assignmentId ? { assignmentId } : {}) });
     await sql.query(
@@ -401,7 +414,7 @@ describe('the tasks of a revocation (integration, PostgreSQL constraints)', () =
     });
   });
 
-  describe('the checklist of a K1 revocation (QĐ-111az)', () => {
+  describe('the checklist of a K1 task (QĐ-111az)', () => {
     const renewal = { completion: 'RENEWAL_CANCELLED', paid_through_on: '2026-11-30', access_state: 'UNTIL_PAID_END' };
     const checklist = JSON.stringify({
       variant: 'STILL_EMPLOYED',
@@ -431,14 +444,23 @@ describe('the tasks of a revocation (integration, PostgreSQL constraints)', () =
       expect(await set(id)).toBe('55000');
     });
 
-    it('belongs to a revocation: a grant has none, and a revocation made before it has NULL', async () => {
-      const { id, code } = await grantWithId(await newAssignment());
+    it('belongs to a revocation or to a grant (K1-GR): an extension has none, and a revocation made before it has NULL', async () => {
+      const assignmentId = await newAssignment();
+      const { id: granted, code } = await grantWithId(assignmentId);
+      const { id: extended, code: extensionCode } = await extensionWithId(assignmentId);
       const { id: revoked } = await revocation();
+      const set = (target: string, value: string) =>
+        sqlState(sql, `UPDATE provisioning_tasks SET k1_checklist = $2::jsonb WHERE id = $1`, [target, value]);
+      const forGrant = JSON.stringify({
+        variant: 'GRANT',
+        items: [{ code: 'COMPANY_EMAIL_REGISTERED', order: 1, doneAt: '2026-11-15T08:00:00.000Z' }],
+      });
 
       expect(code).toBeNull();
-      expect(
-        await sqlState(sql, `UPDATE provisioning_tasks SET k1_checklist = $2::jsonb WHERE id = $1`, [id, checklist]),
-      ).toBe('23514');
+      expect(extensionCode).toBeNull();
+      expect(await set(granted, forGrant)).toBeNull();
+      expect(await set(granted, '[1]')).toBe('23514');
+      expect(await set(extended, forGrant)).toBe('23514');
       const { rows } = await sql.query<{ k1_checklist: unknown }>(
         `SELECT k1_checklist FROM provisioning_tasks WHERE id = $1`,
         [revoked],

@@ -34,9 +34,9 @@ export class NeedDecisionEffects {
     outcome: NeedDecisionOutcome,
     decidedAt: Date,
   ): Promise<AccessRequestRecord> {
-    const { approved, requestState } = outcome;
-    // A refusal ends the request for the person it was for, without a grant.
-    if (!approved) await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, decidedAt);
+    const { approved, returned, requestState } = outcome;
+    // A refusal ends the request for the person it was for, without a grant; a return ends nothing: the sender adds what is missing and sends it again.
+    if (!approved && !returned) await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, decidedAt);
 
     // A renewal approved in full is extended by the IT Admin (`BR-MF1-08d`): its task is opened here, in the transaction of the decision.
     if (approved && request.type === 'RENEWAL' && requestState === 'AWAITING_EXECUTION') {

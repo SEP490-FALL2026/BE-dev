@@ -196,12 +196,13 @@ export class SeatHarness {
   ): Promise<string> {
     const planId = await this.plan(type, quantity === null ? 'FLAT_RATE' : 'PER_SEAT');
 
+    // A K4 plan is bought once (B-5): what is written for it is a perpetual purchase, which has no billing cycle.
     return declareSubscription(this.ctx, this.it1.accessToken, {
       ownerDepartmentId,
       planId,
-      kind: 'TERM',
+      kind: type === 'K4' ? 'PERPETUAL' : 'TERM',
       unitPrice: { amount: '1000000', currency: 'VND' },
-      billingCycle: 'MONTHLY',
+      ...(type === 'K4' ? {} : { billingCycle: 'MONTHLY' }),
       startDate: '2026-01-05',
       ...(quantity === null ? {} : { purchasedQuantity: quantity }),
     });
@@ -214,7 +215,7 @@ export class SeatHarness {
     return declareSubscription(this.ctx, this.it1.accessToken, {
       ownerDepartmentId: this.seed.departmentId,
       planId,
-      kind: 'TERM',
+      kind: type === 'K4' ? 'PERPETUAL' : 'TERM',
       purchasedQuantity: 10,
     });
   }

@@ -5,20 +5,37 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
 const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
 
 /** What Finance may narrow the commitments by (`US-06-07` AC-1, AC-7; `US-06-09` AC-2). */
-export const commitmentListQuerySchema = z.strictObject({
-  /** `false` lists the commitments that wait for a budget, the input of the proposal of the next year. */
-  attached: z
-    .enum(['true', 'false'])
-    .transform((value) => value === 'true')
-    .optional(),
-  year: z.coerce.number().int().min(2000).max(2200).optional(),
-  costCenterId: z.uuid().optional(),
-  requestId: z.uuid().optional(),
-  /** `HELD` lists what is still held, `EXPENSED` what became an expense, `RELEASED` what went back to the budget. */
-  state: z.enum(['HELD', 'RELEASED', 'EXPENSED']).optional(),
-  page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(100).default(20),
-});
+export const commitmentListQuerySchema = z
+  .strictObject({
+    /** `false` lists the commitments that wait for a budget, the input of the proposal of the next year. */
+    attached: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .optional(),
+    year: z.coerce.number().int().min(2000).max(2200).optional(),
+    costCenterId: z.uuid().optional(),
+    /**
+     * `true` lists the long-term commitments of the quarterly review (`QĐ-111aj`, US-12-21 AC-8): every commitment of the year of the review that is still held, the rights that are running, whenever
+     * it was made; `year` is asked for with it. The review never shortens the term of a request and shows no action of taking a seat back.
+     */
+    longTerm: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .optional()
+      .meta({
+        description:
+          'true lists the long-term commitments of the quarterly review: every commitment of the year that is still held, whenever it was made; year is required with it. The term of the request is never shortened by it.',
+      }),
+    requestId: z.uuid().optional(),
+    /** `HELD` lists what is still held, `EXPENSED` what became an expense, `RELEASED` what went back to the budget. */
+    state: z.enum(['HELD', 'RELEASED', 'EXPENSED']).optional(),
+    page: z.coerce.number().int().positive().default(1),
+    pageSize: z.coerce.number().int().positive().max(100).default(20),
+  })
+  .refine((query) => query.longTerm !== true || query.year !== undefined, {
+    message: 'year is required with longTerm=true',
+    path: ['year'],
+  });
 
 /** The request a commitment is held for, as far as Finance needs it to know what the money is for. */
 const commitmentRequestSchema = z.strictObject({

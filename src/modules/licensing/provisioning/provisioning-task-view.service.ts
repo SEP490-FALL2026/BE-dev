@@ -99,6 +99,8 @@ export interface TaskSummaryView {
   revocation: RevocationSummaryView | null;
   /** What was bought with the grant when the pool had nothing free; null when the seat came from the pool (`BR-MF1-09b`). */
   purchase: ProvisioningTaskRecord['purchase'];
+  /** On a grant: the last day of the contract of the holder when the seat ends on it, because their time of use was cut there (R-38); null otherwise. */
+  termCutAt: string | null;
   /** Seconds from the making of the task to its end, or to now while it is open: the same measure on both channels. */
   elapsedSeconds: number;
 }
@@ -126,7 +128,10 @@ export interface TaskDetailFields {
 export type TaskView = Omit<TaskSummaryView, 'revocation'> & TaskDetailFields;
 
 interface ViewContext {
-  employees: Map<string, { id: string; employeeCode: string; fullName: string; status: string }>;
+  employees: Map<
+    string,
+    { id: string; employeeCode: string; fullName: string; status: string; contractEndDate?: string | null }
+  >;
   plans: Map<string, SeatTarget>;
   /** The note of each plan of a revocation about what to do before the seat is taken away (`QĐ-110g`: read only, nobody confirms it). */
   notes: Map<string, string | null>;
@@ -138,6 +143,16 @@ interface ViewContext {
 }
 
 /** The plan on a card: its names and kind of provisioning, and, on a revocation, what the plan says to do before the seat goes. */
+/** The seat of a grant that ends on the last day of the contract of its holder: the time of use was cut there (R-38, `INV-07`). */
+function termCutAtOf(
+  task: ProvisioningTaskRecord,
+  holder: { contractEndDate?: string | null } | undefined,
+): string | null {
+  const { validUntil } = task.assignment;
+
+  return task.kind === 'GRANT' && validUntil !== null && validUntil === holder?.contractEndDate ? validUntil : null;
+}
+
 function planCardOf(plan: SeatTarget | undefined, note: string | null | undefined): TaskSummaryView['plan'] {
   return plan
     ? {
@@ -177,11 +192,14 @@ export class ProvisioningTaskViewService {
     const context = await this.contextOf(records, true);
     const checklists = await this.checklists.cardsOf(
       records
+        // The grant of a K1 seat and the revocation of one have a checklist; an extension, and every other kind of seat, have none.
         .filter(
-          (task) => task.kind === 'REVOKE' && context.plans.get(task.assignment.planId)?.provisioningType === 'K1',
+          (task): task is ProvisioningTaskRecord & { kind: 'GRANT' | 'REVOKE' } =>
+            task.kind !== 'EXTEND' && context.plans.get(task.assignment.planId)?.provisioningType === 'K1',
         )
         .map((task) => ({
           id: task.id,
+          kind: task.kind,
           assignmentId: task.assignmentId,
           status: task.status,
           employeeId: task.assignment.employeeId,
@@ -342,6 +360,7 @@ export class ProvisioningTaskViewService {
           }
         : null,
       purchase: task.purchase,
+      termCutAt: termCutAtOf(task, beneficiary),
       elapsedSeconds: Math.max(0, Math.floor(((ended ? ended.getTime() : now) - task.createdAt.getTime()) / 1000)),
     };
   }

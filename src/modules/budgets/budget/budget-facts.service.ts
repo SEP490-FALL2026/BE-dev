@@ -18,7 +18,6 @@ import {
   BudgetNotFinanceError,
   BudgetCostCenterRequiredError,
   BudgetNotYourCostCenterError,
-  BudgetPlanNotFoundError,
 } from './budget.errors';
 
 export interface CostCenterRef {
@@ -113,24 +112,6 @@ export class BudgetFactsService {
     throw new BudgetNotAReaderError();
   }
 
-  /** Throws BudgetPlanNotFoundError when a line names a plan the catalog does not have: a line points at a plan, it never makes one. */
-  async requirePlans(planIds: readonly (string | null | undefined)[]): Promise<void> {
-    const wanted = [...new Set(planIds.filter((id): id is string => typeof id === 'string'))];
-    if (wanted.length === 0) return;
-    const found = new Set((await this.catalog.getPlanSummaries(wanted)).map((plan) => plan.planId));
-    const missing = wanted.filter((id) => !found.has(id));
-    if (missing.length > 0) throw new BudgetPlanNotFoundError(missing);
-  }
-
-  /** The name a line takes when only its plan is given: the plan and its application (`QĐ-101n`). */
-  async planNames(planIds: readonly (string | null | undefined)[]): Promise<Map<string, string>> {
-    const wanted = [...new Set(planIds.filter((id): id is string => typeof id === 'string'))];
-    if (wanted.length === 0) return new Map();
-    const found = await this.catalog.getPlanSummaries(wanted);
-
-    return new Map(found.map((plan) => [plan.planId, `${plan.applicationName} - ${plan.planName}`.slice(0, 200)]));
-  }
-
   /** The share of the base a new version sets aside as its reserve when Finance gives none (`QĐ-98`); read before a transaction opens. */
   async reserveDefaultPercent(): Promise<number> {
     return Number(await this.parameters.getValue('BUDGET_RESERVE_DEFAULT_PERCENT'));
@@ -138,6 +119,11 @@ export class BudgetFactsService {
 
   today(now: Date, tx?: DbTx): Promise<BusinessDate> {
     return this.organizationReads.businessToday(now, tx);
+  }
+
+  /** The days the organization does not work from `from` up to but not including `to`: what the days of a deadline are counted without. */
+  nonWorkingDates(from: BusinessDate, to: BusinessDate): Promise<Set<BusinessDate>> {
+    return this.parameters.getNonWorkingDates(from, to);
   }
 
   async organizationId(tx?: DbTx): Promise<string> {
@@ -342,11 +328,6 @@ export class BudgetFactsService {
     if (parsed.amountMinor < 0n) throw new MoneyOutOfRangeError();
 
     return parsed.amountMinor;
-  }
-
-  /** Reads an amount in the minor units of a given currency, as an invoice states it in the currency of its commitment. Throws the money errors. */
-  async moneyIn(input: { amount: string }, currency: string, tx?: DbTx): Promise<bigint> {
-    return (await this.finance.parseMoney({ amount: input.amount, currency }, tx)).amountMinor;
   }
 
   /** `money` for a threshold: it must be more than nothing, since a threshold of nothing would flag every line. */

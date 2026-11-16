@@ -39,7 +39,6 @@ const HISTORY_ROW = {
   requester: PERSON,
   department: DEPARTMENT,
   reserveUsed: false,
-  flags: { manyPaidSoftware: null },
 };
 const pageWith = <T>(items: T[]) => ({
   items,

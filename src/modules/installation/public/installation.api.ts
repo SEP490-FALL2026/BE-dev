@@ -7,6 +7,7 @@ import { IdentityAccessApi } from '../../identity-access/public/identity-access.
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AlreadyInstalledError, InstallationInputError } from './installation.errors';
+import { InstallationInitialDataService } from '../installation-initial-data.service';
 import { InstallationInput, installationInputSchema } from '../installation.dto';
 import { InstallationRepo } from '../installation.repo';
 
@@ -36,6 +37,7 @@ export class InstallationApi {
     private readonly audit: AuditApi,
     private readonly repo: InstallationRepo,
     private readonly finance: FinanceApi,
+    private readonly initialData: InstallationInitialDataService,
   ) {}
 
   async install(rawInput: unknown, password: string): Promise<InstallationResult> {
@@ -46,8 +48,8 @@ export class InstallationApi {
       );
     }
     const input = parsed.data;
-    // The reporting currency must be one finance has a minor-unit table for (DB-02): a code outside it would only fail
-    // later, at the first conversion, with no way back once rates and prices are recorded in it.
+    // The input schema takes dong only (`QĐ-111an`); dong must also be one finance has a minor-unit table for (DB-02): a code
+    // outside it would only fail later, at the first price, with no way back once prices are recorded in it.
     if (!(await this.finance.findCurrency(input.reportingCurrency))) {
       throw new InstallationInputError([
         `reportingCurrency: ${input.reportingCurrency} is not in the currency table of this installation`,
@@ -90,10 +92,15 @@ export class InstallationApi {
         timeZone: input.timeZone,
         reportingCurrency: input.reportingCurrency,
       });
+      // QĐ-111bf, QĐ-112b: every application stands in a functional group and every decision step has a policy, so the organization
+      // starts with the seven standard groups and the eight policies with their first version in force.
+      const { standardFunctionalGroups, initialPolicies } = await this.initialData.seed(tx, org.id);
       await record(org.id, 'INSTALLATION.ORGANIZATION_CREATED', 'Organization', org.id, {
         timeZone: input.timeZone,
         reportingCurrency: input.reportingCurrency,
         environment: input.environment,
+        standardFunctionalGroups,
+        initialPolicies,
       });
 
       const department = await this.organization.createDepartment(tx, {

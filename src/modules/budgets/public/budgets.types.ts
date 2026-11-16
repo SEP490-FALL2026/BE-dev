@@ -4,10 +4,14 @@ export interface YearBudgetFacts {
   currency: string;
   /** Base and reserve together. */
   totalMinor: bigint;
-  /** The base of the approved version: what the department may spend without the reserve (`BR-MF1-06e`). */
+  /** The EFFECTIVE base: the base of the approved version plus the adjustments approved for the year (`AD-1`, `QĐ-111bh`): what the department may spend without the reserve (`BR-MF1-06e`). */
   baseMinor: bigint;
   /** The reserve of the approved version: what is left to use, with the head's confirmation, once the base is gone. */
   reserveMinor: bigint;
+  /** The base of the approved version itself, before the adjustments: the starting point that is kept. */
+  versionBaseMinor: bigint;
+  /** What the adjustments approved for the year added to (positive) or took from (negative) the base of the version. */
+  adjustmentMinor: bigint;
   /** What the commitments attached to the budget hold now. */
   heldMinor: bigint;
   /** What has become an expense in the year. */
@@ -138,9 +142,85 @@ export interface CommittedAmount {
   currency: string;
 }
 
+/** A commitment a request holds, with what is left of it to be invoiced against (`PI-1`): nothing once it is let go or became an expense. */
+export interface RequestCommitment {
+  id: string;
+  year: number;
+  costCenterId: string;
+  state: 'HELD' | 'RELEASED' | 'EXPENSED';
+  amountMinor: bigint;
+  remainingMinor: bigint;
+}
+
 /** What a request still holds and has not spent or given back, in one currency: the part of a commitment that going back to the budget would free. */
 export interface HeldAmount {
   requestId: string;
   currency: string;
   heldMinor: bigint;
+}
+
+/**
+ * What Finance signed for a purchase invoice (`PI-1`, `D3`): the one invoice the budgets write, booked to the month the purchase pays for. The
+ * figures are in the reporting currency (VND, `QĐ-111an`) and are what was taken out of the company (`R-4`).
+ */
+export interface PurchaseInvoiceRecordInput {
+  organizationId: string;
+  /** The purchase invoice of the requests context; it comes once. */
+  purchaseInvoiceId: string;
+  /** The request the commitment is held for; null for an invoice of a subscription. */
+  requestId: string | null;
+  /** Set for an invoice of a subscription (a renewal): it is booked as a line of the subscription, with no commitment. */
+  subscriptionId: string | null;
+  vendorId: string;
+  number: string;
+  issuedOn: string;
+  /** The first day of the month the purchase pays for: the month and the year the expense belongs to. */
+  serviceMonth: string;
+  netMinor: bigint;
+  deductibleTaxMinor: bigint;
+  nonDeductibleTaxMinor: bigint;
+  /** What the purchase invoice already says about the count and the price of one (`R-44`). */
+  matchResult: 'MATCHED' | 'PRICE_QUANTITY_EXCEPTION';
+  /** The Cost Center of the department that held the right in the service month (`R-51`); null for an invoice of a subscription. */
+  chargedCostCenterId: string | null;
+  /**
+   * Set for the invoice of a `K1` the IT Admin bought and whose grant then failed (`QĐ-104k`(4), `US-12-17` AC-11): it is a line of the Cost Center not
+   * allocated, shown with the department of the user, and no expense of any Cost Center; no commitment is taken down by it.
+   */
+  unallocated: { reason: 'K1_GRANT_FAILED'; departmentId: string } | null;
+  now: Date;
+}
+
+export interface PurchaseInvoiceRecorded {
+  invoiceId: string;
+  /** Where it was booked: into a commitment, as an expense of a Cost Center with no commitment, as a line of a subscription or as a line not allocated. */
+  booking: 'COMMITMENT' | 'COST_CENTER' | 'SUBSCRIPTION' | 'UNALLOCATED';
+  commitmentId: string | null;
+  costCenterId: string | null;
+  subscriptionId: string | null;
+  /** The price before tax and the tax that cannot be deducted. */
+  actualCostMinor: bigint;
+  /** What of the price took the commitment down. */
+  appliedMinor: bigint;
+  matchResult: 'MATCHED' | 'TAX_ONLY' | 'PRICE_QUANTITY_EXCEPTION';
+}
+
+/** The money Finance or the IT Admin records for a case outside the process (`SBF-07a`, R-45): spent with a proof of payment, in dong, with no commitment. */
+export interface OutOfProcessSpendInput {
+  organizationId: string;
+  /** The case of the usage context; its money is the one invoice of the case. */
+  caseId: string;
+  vendorId: string;
+  amountMinor: bigint;
+  /** The Cost Center that bears it; null = not allocated to a department yet. */
+  costCenterId: string | null;
+  /** The day the money is recorded: the month of it is the month and the year the expense belongs to. */
+  recordedOn: string;
+  now: Date;
+}
+
+export interface OutOfProcessSpendRecorded {
+  invoiceId: string;
+  /** Where it was booked: as an expense of a Cost Center, or of no Cost Center yet. */
+  booking: 'COST_CENTER' | 'UNALLOCATED';
 }

@@ -479,6 +479,7 @@ export class AssignmentRepo {
       ...(filter.employeeId ? { employeeId: filter.employeeId } : {}),
       ...(filter.source ? { source: filter.source } : {}),
       ...(filter.kind ? { kind: filter.kind } : {}),
+      ...(filter.holdingOn ? HOLDING(filter.holdingOn) : {}),
     };
 
     return this.prisma.$transaction(

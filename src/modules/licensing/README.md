@@ -37,7 +37,7 @@ dashboards; gốc `src/app/app.module.ts`.
   - `LicensingRenewalApi` ([public/licensing-renewal.api.ts](public/licensing-renewal.api.ts)) — trả ghế và gia hạn
     (US-05-14): `getAssignmentFacts`, `renewAssignment`, `hasPendingRenewal`.
   - `LicensingOpenGrantsApi` ([public/licensing-open-grants.api.ts](public/licensing-open-grants.api.ts)) —
-    `listOpenGrantTasksOfBeneficiary`, `listHeldSeatsOfRequests` (seat của Request còn giữ ngày `on`, đi theo chuỗi `predecessor_id` — `HANDOVER`,
+    `listOpenGrantTasksOfBeneficiary`, `listGrantExecutionsOfRequests` (tác vụ cấp chưa hủy của từng người trong Request, mới nhất trước: hàng cấp của IT Admin), `listHeldSeatsOfRequests` (seat của Request còn giữ ngày `on`, đi theo chuỗi `predecessor_id` — `HANDOVER`,
     gia hạn quyền, `RENEWAL_CARRY` — tới bản ghi đang chạy, từ grant của Request hoặc bản ghi Request nêu; trả phòng sở hữu hiện tại và các bản
     ghi sau gốc; là thứ khoản 01/01 đếm, `BR-MF1-09e`).
   - `LicensingDashboardApi` ([public/licensing-dashboard.api.ts](public/licensing-dashboard.api.ts)) — số đếm cho trang tổng
@@ -83,6 +83,7 @@ dashboards; gốc `src/app/app.module.ts`.
 - Đăng ký vào: `catalog.seat-occupancy` — `assignment/assignment-seat-occupancy.listener.ts`;
   `organization.department-service-account-reader` — `assignment/assignment-service-account.listener.ts`;
   `organization.department-use-readers` — `provisioning/department-use/department-open-work.listener.ts`.
+- Đăng ký vào (thêm): `license-key/license-key-template.listener.ts` góp định nghĩa cột của lô khóa vào `ImportTemplateContributions` của `policies` (file mẫu `license-keys`).
 
 ## Hướng phụ thuộc giữa capability (R6)
 
@@ -96,7 +97,12 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 ## Capability → file chính
 
 - `assignment/` — assignment ghế (đọc danh sách) và ghế của subscription; `assignments.controller.ts`,
-  `subscription-seats.controller.ts`; `AssignmentService`. Con: `renewal/` (US-05-14). Không còn tài khoản dịch vụ (`QĐ-110m`): các dòng
+  `subscription-seats.controller.ts`; `AssignmentService`. `GET /license-assignments` (IT Admin, `QĐ-111n`/`QĐ-111p`): lọc `subscriptionId`, `planId`,
+  `employeeId`, `activeOnly=true` (quyền đang giữ hôm nay: chưa kết thúc, chưa hỏng/hủy, kể cả quyền bắt đầu sau; một câu `HOLDING` như đếm ghế) — danh sách người giữ của
+  một thuê bao, mỗi khóa `K4` đã cấp là một dòng người giữ (không có route `holders` riêng); mỗi dòng có `plan.logoUrl` và `revocation { taskId, status, claimableNow } | null` =
+  tác vụ thu hồi đang mở của quyền đó (`AssignmentRevocationRepo.openOf`: chưa `COMPLETED`/`CLOSED_FAILED`/`CANCELLED`, cùng nghĩa với số ghế đang thu hồi; một câu cho
+  cả trang), `claimableNow` = `notBefore` đã tới (`revocationOf`, `assignment.policy.ts`). FE bật "Thu hồi" chỉ khi `revocation` khác null; hoàn tất qua
+  `POST /provisioning-tasks/{id}/revocation-completion` (K4 kèm `keyDisposition`). Con: `renewal/` (US-05-14). Không còn tài khoản dịch vụ (`QĐ-110m`): các dòng
   `kind = 'SERVICE'` cũ chỉ còn là lịch sử (hoặc đợi chuyển, xem `…_licensing_service_accounts_converted`).
 - `machine-account/` — cờ _dùng cho tài khoản máy_ trên seat cá nhân của IT Admin (`QĐ-110m`, R-9): `POST /license-assignments/{id}/machine-account`;
   `machine-account.controller.ts`, `MachineAccountService`, `machine-account.policy.ts` (thuần: loại seat, đang mở, người giữ là IT Admin dùng
@@ -117,20 +123,28 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   đang làm trưởng, thân không nêu phòng; chỉ chỗ trong danh mục ⟹ 422 `NOT_IN_CATALOG`; đã có trong danh sách ⟹ 409 `ALREADY_LISTED`; đã có đề xuất mở ⟹ 409
   `PROPOSAL_ALREADY_OPEN` do partial unique), `GET` (IT Admin theo phạm vi phòng, trưởng phòng theo phòng mình; ngoài phạm vi ⟹ trang rỗng),
   `POST …/{id}/acceptance` (thêm vào danh sách ngay, một lần; đã có do IT thêm tay ⟹ lấy dòng đó) và `…/rejection { reason }` (`@RequireRoles('IT_ADMIN')`; đề xuất của phòng
-  mình không phụ trách ⟹ 404; đã quyết ⟹ 409 `PROPOSAL_NOT_PENDING`; hai người quyết cùng lúc ⟹ `UPDATE … WHERE state = 'PENDING'` chỉ một thắng).
+  mình không phụ trách ⟹ 404; chính người đã đề xuất (nay giữ vai IT Admin) không quyết đề xuất của mình ⟹ 403 `OWN_PROPOSAL` (`SoD-4`, `decidedByRefusal`); đã quyết ⟹ 409 `PROPOSAL_NOT_PENDING`; hai người quyết cùng lúc ⟹ `UPDATE … WHERE state = 'PENDING'` chỉ một thắng).
   `DepartmentSoftwareProposalService` (một transaction mỗi bước: Audit + thông báo), `DepartmentSoftwareNotice` (`DEPARTMENT_SOFTWARE_PROPOSED` tới IT phụ trách, hoặc mọi IT Admin dùng
   được khi chưa có; `DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED` tới trưởng phòng đã đề xuất, kèm lý do khi từ chối).
 - `seat-baseline/` — xem/đóng baseline ghế (US-02-05 AC-6); `seat-baseline.controller.ts`; `SeatBaselineService`.
+- `stock-summary/` — `GET /stock-summary` (IT Admin, `QĐ-111n`): kho đếm theo kiểu cấp, một dòng cho mỗi gói chứ không cho mỗi bản ghi thuê bao. `stock.kind`
+  `SEATS` (K2: `purchased`, `assigned`, `free`, `revoking`; `purchased` và `free` là null khi một thuê bao chưa có số lượng), `KEYS` (K4: `inStore`, `assigned`, `withdrawn`
+  đếm khóa), `HOLDERS` (K1: số quyền đang giữ). Đếm trên thuê bao cấp được hôm nay (`CatalogApi.getStockPlans`), cùng nghĩa với kho của hàng cấp: ghế qua
+  `SharedPoolCapacityRepo.occupancyOfMany`, khóa qua `LicenseKeyRepo.countsOfSubscriptions`, quyền qua `AssignmentRepo.countHoldingOfSubscriptions` (mỗi loại một câu lệnh
+  cho cả trang). `mine=true` giữ gói có thuê bao mình phụ trách và chỉ đếm các thuê bao đó; không lọc theo phòng (kho không của phòng, `FR-1.12`). `stock-summary.policy.ts` thuần.
 - `provisioning/` — task grant và thu hồi; `revocation.service.ts` (mở thu hồi) với `RevocationTaskFactory`,
   `RevocationRecorder`, `revocation-open.policy.ts`; `provisioning.policy.ts`. Con: `tasks/`
   (`provisioning-tasks.controller.ts`; grant: `ProvisioningGrantService` → `ProvisioningGrantPlanner` (xét trước khóa) +
   `ProvisioningGrantWriter` (ghi trong transaction; Request xin lại trong ân hạn điều chuyển có `replacesAssignmentId` ⟹ `AssignmentService.endReplacedByGrant` kết thúc quyền cũ cùng thuê bao
   `valid_until` = ngày cấp trước khi chèn quyền mới, R-49; cấp hỏng/hủy ⟹ `giveBackReplaced` mở lại; `LicensingApi.listRegrantedAssignments`), `provisioning-grant.policy.ts`; `ProvisioningService` giữ danh sách,
-  claim, hoàn tất, báo lỗi; `ProvisioningDecisionService`), `revocation-completion/`
-  (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`, `k1-checklist/` (checklist thu hồi `K1`,
-  `QĐ-111az`: biến thể `DEPARTURE` 6 mục / `STILL_EMPLOYED` 2 mục suy từ các lý do còn đứng, kiểm đủ tick + bằng chứng + `doneAt` không giảm theo
-  `order`; cột `provisioning_tasks.k1_checklist`, codec `provisioning-k1-checklist.json.ts`; `RevocationAftermath.keepChecklist` gọi lúc hoàn tất).
-- `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts`.
+  claim, hoàn tất, báo lỗi; `ProvisioningDecisionService`; người bấm "Cấp" tự nhận tác vụ ngay trong giao dịch cấp (`IN_PROGRESS`, sự kiện `CLAIMED` sau `CREATED`, QĐ-111m); bấm lại hoặc IT khác bấm cho cùng Request và người trả về tác vụ đã có (`takenBy`, không cấp lần hai); `public/licensing-grant-execution.policy.ts` nói nút nào bật ở mỗi trạng thái tác vụ), `revocation-completion/`
+  (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`, `k1-checklist/` (checklist `K1`,
+  `QĐ-111az`: thu hồi — biến thể `DEPARTURE` 6 mục / `STILL_EMPLOYED` 2 mục suy từ các lý do còn đứng; cấp — biến thể `GRANT` 2 mục; kiểm đủ tick + bằng chứng + `doneAt` không giảm theo
+  `order`; cột `provisioning_tasks.k1_checklist`, codec `provisioning-k1-checklist.json.ts`; `RevocationAftermath.keepChecklist` và `ProvisioningGrantCompletion` gọi lúc hoàn tất).
+- `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts` (không nhắc quyền có Request tiếp tục
+  đã duyệt đang chờ IT kéo dài: ngày kết thúc sắp dời, R-27). Đầu ngày sau ngày kết thúc `expiry-revocation.job.ts` mở tác vụ thu hồi
+  `TIME_LIMITED_EXPIRY` do hệ thống tạo (`SystemActor`, `created_by_system`) qua cổng `RevocationService.open`: một lần cho mỗi quyền (khóa là dòng
+  lý do của tác vụ), bỏ qua quyền đang có Request tiếp tục chờ (R-13), IT Admin vẫn mở sớm được ở `POST /assignment-expiry-queue/{id}/revocation`.
   Cửa sổ Request tiếp tục (BR-MF1-08a): `expiry-renewal-window.job.ts` mỗi giờ ghi `assignment_renewal_windows` (số ngày lúc mở, bất biến)
   và báo người giữ + trưởng phòng một lần (`RENEWAL_WINDOW_OPENED`). Tác vụ `EXTEND` (`provisioning/tasks/provisioning-extension.service.ts`,
   mở qua `LicensingRenewalApi.openExtension`) hoàn tất ⟹ `GrantRequestGate.reportExtended`.
@@ -169,6 +183,9 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   Assignment chưa kết thúc có tác vụ thu hồi chưa đóng.
 - `provisioningTaskGrant`: `subscriptionId` tùy chọn (không có ⟹ `chooseSubscription`: thuê bao chính, ưu tiên cái còn chỗ Trống; K5 không được có);
   có mà không thuộc `getGrantableSubscriptions` của gói hôm nay (kỳ đã hết, hoặc kỳ kế tiếp đã chạy) ⟹ 422 `PROVISIONING.SUBSCRIPTION_NOT_GRANTABLE`.
+  Seat vừa cấp trên thuê bao có kỳ kế tiếp `ACTIVE` ghi trước ngày bắt đầu được mang sang kỳ đó ngay trong transaction của lệnh cấp (`RENEWAL_CARRY`, luật `seatsToCarry` và
+  SQL `AssignmentCarryRepo.carry` của `assignment/renewal/`, cùng đường với `outcome/` lúc ghi gia hạn; seat hết hạn trước ngày đó thì không mang); kỳ kế tiếp không đủ ghế ⟹ 422
+  `PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS`, không ghi gì (sửa số ghế kỳ kế tiếp trước); lệnh cấp thất bại hoặc bị hủy thu lại cả bản ghi sang kỳ sau (`takeBackCarry`).
   `purchase?: { reason? }` chỉ K2/K4 (K khác ⟹ 422 `PURCHASE_NOT_APPLICABLE`): còn Trống ⟹ 409 `PURCHASE_NOT_ALLOWED` (audit
   `PROVISIONING_TASK.PURCHASE_REFUSED` ghi ở transaction riêng sau rollback); hết kho + còn seat đang thu hồi + thiếu lý do ⟹ 422
   `PURCHASE_REASON_REQUIRED`; ngược lại `CatalogApi.addPoolSeat` (+1 seat/lần) rồi ghi Assignment, task có `purchase_kind` (`POOL_TOP_UP`/`KEY_PURCHASE`).
@@ -185,8 +202,11 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   nên không vòng). `requests` giải phóng toàn bộ cam kết của Request K4 cấp từ kho (`GRANTED_FROM_POOL`); thu hồi K4 không đổi cam kết (giá một lần).
   Chưa làm: gắn thiết bị công ty đã đăng ký (`deviceId`, `DeviceRegistryHook`).
 - `grantQueueList` (module `requests`) đọc `stock { kind, free, inRevocation }` qua `LicensingPoolStockApi.getStockOfPlans` (số lần đọc cố định, không N+1).
-- Thu hồi hoàn tất phát `RevocationTaskFacts.completed` (`grantRequestId` qua chuỗi `predecessor_id` — `assignment-chain.repo.ts`, `provisioningType`, `endedOn`,
-  `paidThroughOn`, `sources`) để module cam kết giải phóng theo ngày (`public/seat-month-cost.policy.ts`: RV-07, M-10). Phần ghi vào cam kết thuộc `budgets`/`requests`, chưa nối.
+- Thu hồi hoàn tất phát `RevocationTaskFacts.completed` (`grantRequestId` qua chuỗi `predecessor_id` — `assignment-chain.repo.ts`, `grantedStartDate` và `grantedEndDate` là ngày bắt đầu
+  (`valid_from`) và ngày kết thúc (`expected_end_date`) của seat do lệnh cấp của Request làm ra, `provisioningType`, `endedOn`, `paidThroughOn`, `sources`) để module cam kết giải phóng theo ngày
+  (`public/seat-month-cost.policy.ts`: RV-07, M-10). `LicensingApi.listRightChainsOf` (`RightChain`) trả cùng hai ngày cho điều chuyển, và kết quả cấp (`GrantOutcomeFacts`) mang
+  `effectiveFrom` và `expectedEndDate` của seat đã cấp (sau khi cắt một năm): Request có _Thời gian dùng_ không ghi ngày kết thúc, nên ngày cuối nó trả tiền là ngày kết thúc của seat do lệnh cấp làm
+  ra, và các tháng của nó bắt đầu vào các ngày tính từ ngày bắt đầu seat (R-39). Phần ghi vào cam kết thuộc `requests` (`grant/seat-release.*`).
 - Thứ tự khóa của grant: request → thuê bao `FOR UPDATE` → plan `FOR SHARE` → người; đếm `free` không khóa thuê bao khác của plan.
 
 ## Bất biến quan trọng
@@ -210,6 +230,13 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   khi người đó còn tác vụ thu hồi `K1` khác chưa `COMPLETED`/`CANCELLED`/`CLOSED_FAILED` (kể cả `FAILED`), thẻ chỉ có 5 mục và gửi mục 6 ⟹ `COMPLETION_NOT_ALLOWED`;
   tác vụ cuối có 6 mục và `doneCodes` chứa `MAILBOX_LOCKED` chỉ khi đã tick. Hai tác vụ của một người hoàn tất cùng lúc được xét lần lượt bằng khóa advisory
   theo người (`k1-checklist:<employeeId>`, lấy sau khóa task và khóa ghế): đúng một tác vụ là cuối.
+- Hoàn tất cấp `K1` (`QĐ-111az`, R-19, `US-07-01` AC-7; K1-GR): cùng nhóm `k1-checklist/`, biến thể `GRANT` hai mục `COMPANY_EMAIL_REGISTERED` → `NO_PERSONAL_DEVICE_MFA`
+  (đăng ký bằng email công ty của chính người dùng; không bật MFA bằng thiết bị cá nhân). `POST /provisioning-tasks/{id}/complete` của tác vụ `GRANT` loại `K1` đòi
+  `k1Checklist { items[{ code, done, doneAt }], evidence? }` (bằng chứng trong checklist hoặc `evidence` ngoài): thiếu mục/tick/thời điểm/bằng chứng hoặc không gửi ⟹ 422
+  `PROVISIONING.K1_CHECKLIST_INCOMPLETE`, `doneAt` giảm theo `order` ⟹ `K1_CHECKLIST_OUT_OF_ORDER`, mục ngoài biến thể/trùng, hoặc `k1Checklist` cho loại ghế khác
+  hay tác vụ `EXTEND` ⟹ `K1_CHECKLIST_NOT_ALLOWED` (hai mã đầu mang `details { variant, codes }`). Cùng hàm xét `judgeChecklist` với thu hồi; ghi vào cột `k1_checklist`
+  trong giao dịch hoàn tất, trước khi tác vụ `COMPLETED` (CHECK nới thành `REVOKE` hoặc `GRANT`, migration `20261113004100`). Thẻ trả `k1Checklist { variant: GRANT, items }`
+  từ lúc IT bấm "Cấp" cho tới khi tác vụ kết thúc, cái đã tick khi `COMPLETED`.
 - **Lý do đã gỡ không được đọc ở đâu** (chỉ `listAllOf` cho lịch sử trên thẻ tác vụ): `find`, `listOf`, `countOf`,
   `listRevocationsOpenedFor`, `listPersonalSeatsOf` (đang thu hồi) đều lọc `withdrawn_at IS NULL`; index
   duy nhất lý do là partial `WHERE withdrawn_at IS NULL` nên mở lại cùng `(source, reference)` trên cùng tác vụ được.

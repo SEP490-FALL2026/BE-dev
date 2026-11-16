@@ -54,15 +54,16 @@ describe('the commitment of 01/01 of a right a renewal extended over PostgreSQL 
         [requestId, h.next],
       )
     ).rows;
-  /** The months of the next year a right that ends on `end` runs, the month of the end whole. */
-  const monthsOfNextYear = (end: string): bigint => {
-    const year = Number(end.slice(0, 4));
-    if (year < h.next) return 0n;
+  /** What the approval of the request kept of the next year (`QĐ-111k`): the months of the new term that begin in it, at the price of the approval. */
+  const keptOf = async (requestId: string): Promise<string | null> =>
+    (
+      await h.ctx.sql.query<{ next_year_amount_minor: string | null }>(
+        `SELECT next_year_amount_minor::text FROM access_requests WHERE id = $1`,
+        [requestId],
+      )
+    ).rows[0].next_year_amount_minor;
 
-    return year > h.next ? 12n : BigInt(Number(end.slice(5, 7)));
-  };
-
-  it('BR-MF1-09e: the renewal holds the year of the record that follows the renewed one, at the price of 01/01, for the months of its new term', async () => {
+  it('BR-MF1-09e, QĐ-111ak: the renewal holds the year of the record that follows the renewed one: what its approval kept of the months of its new term that begin in that year', async () => {
     counter += 1;
     const unit = await h.departmentWithHead(`P-YR${counter}`);
     await h.budgetFor(unit, { total: 100 * M });
@@ -88,9 +89,11 @@ describe('the commitment of 01/01 of a right a renewal extended over PostgreSQL 
     pretendBusinessToday(h.ctx.app, `${h.next}-01-01`);
     await h.ctx.app.get(YearStartCommitmentsService, { strict: false }).run(new Date());
 
-    const months = monthsOfNextYear(renewal.new_expected_end_date);
-    expect(await rows(request.id)).toEqual(
-      months === 0n ? [] : [{ amount_minor: String(months * MONTH), origin: 'YEAR_START', currency: h.reporting }],
-    );
+    // The months that begin in the year (R-39), not the months up to the month of the end: a term of 11 months from the day after the
+    // old end is 9 months of the next year here, whatever the day of the end of the last month is.
+    const kept = await keptOf(request.id);
+    expect(kept).not.toBeNull();
+    expect(Number(kept) % Number(MONTH)).toBe(0);
+    expect(await rows(request.id)).toEqual([{ amount_minor: kept, origin: 'YEAR_START', currency: h.reporting }]);
   });
 });

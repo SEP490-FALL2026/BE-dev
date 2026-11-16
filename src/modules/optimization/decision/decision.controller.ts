@@ -12,6 +12,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { CHECKLIST_ERROR_EXAMPLES, toChecklistApiException } from '../../policies/public/policy-checklist.http-errors';
 import { DecisionReturnService } from './decision-return.service';
 import {
   GhostSeatDecisionBodyDto,
@@ -124,7 +125,7 @@ export class DecisionController {
     status: HttpStatus.CREATED,
     message: 'GHOST_SEAT_DECISION.CREATED',
     description:
-      'The choice was saved for every recommendation of the batch: kept or exempted ones are closed, a reclaim opens the revocation with its grace (or is left to expire when the right ends within a month).',
+      'The choice was saved for every recommendation of the batch: kept or exempted ones are closed, a reclaim opens the revocation with its grace (or is left to expire when the right ends within a month). The checklist of the policy in force is answered once for the batch and kept for each recommendation; an answer No leaves only the reclaim.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -137,14 +138,19 @@ export class DecisionController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (NOT_DECIDABLE) or its seat cannot be revoked (SEAT_NOT_REVOCABLE); `details.items` names each; nothing was saved.',
-      examples: [EXAMPLES.PAUSED],
+        'A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (NOT_DECIDABLE) or its seat cannot be revoked (SEAT_NOT_REVOCABLE), `details.items` names each; or the policy of the checklist was changed since the head was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE). Nothing was saved.',
+      examples: [EXAMPLES.PAUSED, CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED, CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR) or an exemption has no end day (EXEMPTION_REQUIRED) or lasts beyond 12 months or into the past (EXEMPTION_TOO_LONG).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.EXEMPTION_TOO_LONG],
+        'The body is invalid (VALIDATION_ERROR), an exemption has no end day (EXEMPTION_REQUIRED) or lasts beyond 12 months or into the past (EXEMPTION_TOO_LONG), the checklist lacks an answer (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the choice is to keep or exempt (POLICY.CHECKLIST_HAS_NO, with the questions answered No in details.items): the head can only reclaim.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.EXEMPTION_TOO_LONG,
+        CHECKLIST_ERROR_EXAMPLES.INCOMPLETE,
+        CHECKLIST_ERROR_EXAMPLES.HAS_NO,
+      ],
     },
   )
   async decide(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: GhostSeatDecisionBodyDto) {
@@ -153,12 +159,13 @@ export class DecisionController {
         recommendationIds: body.items.map((item) => item.recommendationId),
         choice: body.choice,
         reason: body.reason,
+        checklist: body.checklist,
         ...(body.exemptUntil ? { exemptUntil: body.exemptUntil } : {}),
       });
 
       return { items };
     } catch (error) {
-      throw toDecisionApiException(error);
+      throw toChecklistApiException(error) ?? toDecisionApiException(error);
     }
   }
 

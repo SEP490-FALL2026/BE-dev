@@ -24,6 +24,57 @@ export const OUTCOME_RULES: Readonly<Record<string, StatusRule>> = {
       ];
     },
   },
+  // The head, or whoever held the need step, sent it back to its sender with the reason of the checklist (`QĐ-111ap`, R-24): only the sender is told,
+  // who adds what is missing and sends it again.
+  'ACCESS_REQUEST.NEED_RETURNED': {
+    subject: 'ACCESS_REQUEST',
+    needs: ['REQUEST', 'DECISION'],
+    build: (_event, facts): NotificationIntent[] => {
+      const request = requestOf(facts);
+
+      return [
+        {
+          recipients: [request.requesterEmployeeId],
+          code: 'REQUEST_RETURNED',
+          params: { requestId: request.id, by: 'NEED', reason: facts.decision?.reason ?? null },
+        },
+      ];
+    },
+  },
+  // The spending approver sent it back with the reason of the checklist (`QĐ-111ap`, R-24): the sender is told and so is the head, who sends it on
+  // again (a request of one step goes back to its sender).
+  'ACCESS_REQUEST.SPEND_RETURNED': {
+    subject: 'ACCESS_REQUEST',
+    needs: ['REQUEST', 'DECISION', 'DEPARTMENT_HEAD'],
+    build: (_event, facts): NotificationIntent[] => {
+      const request = requestOf(facts);
+
+      return [
+        {
+          recipients: [request.requesterEmployeeId, facts.departmentHeadEmployeeId],
+          code: 'REQUEST_RETURNED',
+          params: { requestId: request.id, by: 'SPEND', reason: facts.decision?.reason ?? null },
+        },
+      ];
+    },
+  },
+  // The IT Admin sent the proposal back with the reason of the checklist (`QĐ-111ap`, R-24): only the sender is told, who adds what is missing and
+  // sends it again. The reason is the one the IT Admin typed or the questions answered No gave, on the event, as the assessment keeps no record of approval.
+  'ACCESS_REQUEST.ASSESSMENT_RETURNED': {
+    subject: 'ACCESS_REQUEST',
+    needs: ['REQUEST'],
+    build: (event, facts): NotificationIntent[] => {
+      const request = requestOf(facts);
+
+      return [
+        {
+          recipients: [request.requesterEmployeeId],
+          code: 'REQUEST_RETURNED',
+          params: { requestId: request.id, by: 'IT_ASSESSMENT', reason: text(event.after, 'reason') },
+        },
+      ];
+    },
+  },
   // 4: the IT Admin refused it at the gate of the assessment; the head of the department is told, the spending approver is not.
   'ACCESS_REQUEST.ASSESSMENT_REJECTED': {
     subject: 'ACCESS_REQUEST',

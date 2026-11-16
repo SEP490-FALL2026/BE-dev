@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import { changeRoleTo } from '../../support/builders/account.builder';
 import { RequestHarness, type Department, type Person } from '../../support/request-harness';
 
 const h = new RequestHarness();
@@ -388,6 +389,46 @@ describe('the proposals for the list of software of a department over HTTP (inte
       const inList = (await listed(design.id)).some((entry) => entry.applicationId === here.applicationId);
       expect(inList).toBe(final === 'ACCEPTED');
       expect(await notices('DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED', proposal.proposalId)).toHaveLength(1);
+    });
+  });
+
+  describe('deciding the proposal you made (SoD-4, D-122)', () => {
+    it('is refused with 403 DEPARTMENT_SOFTWARE.OWN_PROPOSAL to the head who proposed and holds the IT Admin role now, to accept or to reject, and another IT Admin decides it', async () => {
+      counter += 1;
+      const unit = await h.departmentWithUnit(`P-DSP-S${counter}`);
+      const head = await h.staff(unit, `DSP-S-H${counter}`);
+      const other = await h.staff(unit, `DSP-S-IT${counter}`, 'IT_ADMIN');
+      await h.makeHead(unit, head);
+      await h.setItAdminInCharge(unit, other);
+      const here = await place();
+      const proposal = await proposedBy(head, here);
+      // The one account holds one role: once the head period ends the Super Admin can change the account to IT Admin, and that person is
+      // the IT Admin in charge of the department, deciding the proposal they made as its head.
+      await request(h.server())
+        .post(`/api/v1/departments/${unit.id}/head-vacancies`)
+        .set({ Authorization: `Bearer ${h.admin}` })
+        .send({ effectiveFrom: h.today() })
+        .expect(200);
+      await changeRoleTo(h.ctx, h.admin, head.employeeId, 'IT_ADMIN');
+      await h.setItAdminInCharge(unit, head);
+
+      for (const refused of [
+        await accept(proposal.proposalId, h.as(head.account)).expect(403),
+        await reject(proposal.proposalId, h.as(head.account)).expect(403),
+      ]) {
+        expect(h.codeOf(refused)).toBe('DEPARTMENT_SOFTWARE.OWN_PROPOSAL');
+      }
+
+      // Nothing was decided, listed, told or audited.
+      expect(await state(proposal.proposalId)).toBe('PENDING');
+      expect((await listed(unit.id)).some((entry) => entry.applicationId === here.applicationId)).toBe(false);
+      expect(await notices('DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED', proposal.proposalId)).toEqual([]);
+      expect(await auditActions(proposal.proposalId)).toEqual(['DEPARTMENT_SOFTWARE.PROPOSED']);
+
+      // Another IT Admin in charge decides it, as always.
+      await h.setItAdminInCharge(unit, other);
+      await accept(proposal.proposalId, h.as(other.account)).expect(200);
+      expect(await state(proposal.proposalId)).toBe('ACCEPTED');
     });
   });
 });

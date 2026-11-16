@@ -327,6 +327,35 @@ describe('what the database refuses for the lines of a group request (g5-group-r
     });
   });
 
+  describe('the part of the year after that a share keeps (QĐ-111k)', () => {
+    it('is held or not from the day it is written: a share that no commitment holds is never turned into one that is, nor the other way round', async () => {
+      const made = await committed('AWAITING_NEED', 1);
+      await sqlState(
+        `INSERT INTO access_request_line_amounts (request_id, employee_id, budget_year, amount_minor, currency, held)
+         VALUES ($1, $2, 2026, 1500, $3, true), ($1, $2, 2027, 4500, $3, false)`,
+        [made.requestId, people[0].employeeId, currency],
+      );
+      const update = (set: string, year: number) =>
+        sqlState(`UPDATE access_request_line_amounts SET ${set} WHERE request_id = $1 AND budget_year = $2`, [
+          made.requestId,
+          year,
+        ]);
+
+      expect(await update('held = true', 2027)).toBe(OBJECT_STATE);
+      expect(await update('held = false', 2026)).toBe(OBJECT_STATE);
+      // Giving a held share back is still the one thing that may happen to it.
+      expect(await update('released_at = now()', 2026)).toBeNull();
+      const rows = await h.ctx.sql.query<{ budget_year: number; held: boolean }>(
+        `SELECT budget_year, held FROM access_request_line_amounts WHERE request_id = $1 ORDER BY budget_year`,
+        [made.requestId],
+      );
+      expect(rows.rows).toEqual([
+        { budget_year: 2026, held: true },
+        { budget_year: 2027, held: false },
+      ]);
+    });
+  });
+
   describe('the supplementary file that leaves people out', () => {
     const supplement = async (made: Made, number: number, over: Record<string, unknown> = {}) => {
       const row = {

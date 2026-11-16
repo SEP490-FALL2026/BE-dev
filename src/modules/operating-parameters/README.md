@@ -3,8 +3,7 @@
 Mục đích: tham số vận hành do Super Admin đặt (ngưỡng, hạn, lịch) có lịch sử, ngày không làm việc và tiền tệ báo cáo của
 tổ chức. Story chính: US-01-04.
 
-Tầng: T3 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit, finance (chỉ `OperatingParametersHttpModule`,
-để biết tiền tệ hợp lệ), organization. Được dùng bởi: budgets, catalog, licensing, personnel, requests
+Tầng: T3 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit, organization. Được dùng bởi: budgets, catalog, licensing, personnel, requests
 ([module-graph](../../../docs/generated/module-graph.md)).
 
 ## Public API (`public/`)
@@ -23,7 +22,7 @@ Tầng: T3 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit,
 
 - `parameter_values`, `non_working_dates`
   ([prisma/models/operating-parameters.prisma](../../../prisma/models/operating-parameters.prisma)).
-- Tiền tệ báo cáo là cột của `organizations` (bảng của organization), đổi qua `OrganizationApi.setReportingCurrency`.
+- Tiền tệ báo cáo là cột của `organizations` (bảng của organization), cố định VND (`QĐ-111an`): chỉ đọc, không route đổi.
 
 ## Extension point
 
@@ -44,8 +43,8 @@ Module nhỏ, chưa chia capability; mọi file ở gốc module.
 - `constraints` chỉ tả miền của **từng** tham số. Một luật xuyên tham số chưa có trong `constraints`: `INVITATION_WITHDRAW_DAYS` >
   `INVITATION_REMINDER_DAYS` (`INCONSISTENT`); client vẫn nhận chúng dưới dạng lỗi của `PUT`.
 - Ngày không làm việc: cùng controller (`/non-working-dates*`) → `non-working-dates.service.ts`.
-- Tiền tệ báo cáo: `reporting-currency.controller.ts` (`GET`, `PUT /reporting-currency`) →
-  `reporting-currency.service.ts`.
+- Tiền tệ báo cáo: `reporting-currency.controller.ts` (`GET /reporting-currency`, Super Admin) →
+  `reporting-currency.service.ts`. Không có `PUT`: route đã xóa.
 - Nest: `operating-parameters.module.ts` (mọi graph), `operating-parameters-http.module.ts` (controller, chỉ API mount).
 
 ## Bất biến quan trọng
@@ -55,8 +54,7 @@ Module nhỏ, chưa chia capability; mọi file ở gốc module.
 - Đổi tham số chỉ áp cho thứ tạo sau đó: module khác đọc `getValueAt` theo thời điểm tạo (US-01-04 AC-12, AC-13, AC-15).
 - Giá trị ngoài miền, hoặc làm hai tham số sai thứ tự, bị từ chối và không đổi gì (`validateParameterValue`, AC-3).
 - Ngày không làm việc đã qua không bao giờ đổi; một dòng cho mỗi (tổ chức, ngày).
-- Tiền tệ báo cáo khóa khi đã có tỷ giá hoặc giá đã quy đổi: khóa là trigger `organizations_reporting_currency_locked`
-  của DB, service chỉ đọc lỗi `55000` (AC-9, `QĐ-42c`).
+- Tiền tệ báo cáo là VND và không đổi qua API; trigger `organizations_reporting_currency_locked` của DB vẫn nằm đó (không drop).
 - Năm tài chính là năm dương lịch, không có tham số tháng bắt đầu (`QĐ-104e`(1)); migration `drop_fiscal_year_start_month` đã đóng giá trị cũ.
 - Chỉ `SUPER_ADMIN` đặt; mỗi lần đổi tham số ghi audit `PARAMETER.CHANGED` trong cùng transaction.
 

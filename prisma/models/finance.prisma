@@ -12,6 +12,8 @@ model Currency {
   subscriptions        Subscription[]            @relation("SubscriptionPriceCurrency")
   accessRequestAmounts AccessRequest[]           @relation("AccessRequestAmountCurrency")
   assessmentQuotes     AccessRequestAssessment[] @relation("AssessmentQuoteCurrency")
+  assessmentQuoteOriginals AccessRequestAssessment[] @relation("AssessmentQuoteOriginalCurrency")
+  subscriptionOriginals Subscription[]           @relation("SubscriptionOriginalCurrency")
   requestBudgetChecks  RequestBudgetCheck[]      @relation("RequestBudgetCheckCurrency")
   requestSupplements   RequestSupplement[]       @relation("RequestSupplementCurrency")
   lineAmounts          AccessRequestLineAmount[] @relation("LineAmountCurrency")

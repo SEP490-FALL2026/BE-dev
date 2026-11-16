@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
-import type { Prisma } from '../../../generated/prisma/client';
+import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { UsageIdentifierType } from '../vendor-source/vendor-source.types';
@@ -13,6 +13,8 @@ import {
   type CoverageBasis,
   type EventClass,
   type ImportFormat,
+  type ImportListFilter,
+  type ImportListRow,
   type ImportRecord,
   type ImportResult,
   type ImportSummary,
@@ -57,6 +59,43 @@ const toStoredRow = (row: Prisma.UsageImportRowGetPayload<object>): StoredRow =>
   employeeId: row.employeeId,
   matchMethod: row.matchMethod,
   errors: usageImportRowErrorsJson.decode(row.errors),
+});
+
+interface RawListRow {
+  id: string;
+  source_id: string;
+  source_name: string;
+  application_id: string;
+  status: ImportListRow['status'];
+  format: ImportListRow['format'];
+  coverage_from: string;
+  coverage_to: string;
+  total_rows: number;
+  matched: number;
+  unmatched: number;
+  ambiguous: number;
+  created_at: Date;
+  confirmed_at: Date | null;
+  duplicate_of: string | null;
+  total: bigint;
+}
+
+const toListRow = (row: RawListRow): ImportListRow => ({
+  id: row.id,
+  sourceId: row.source_id,
+  sourceName: row.source_name,
+  applicationId: row.application_id,
+  status: row.status,
+  format: row.format,
+  coverageFrom: row.coverage_from,
+  coverageTo: row.coverage_to,
+  totalRows: row.total_rows,
+  matched: row.matched,
+  unmatched: row.unmatched,
+  ambiguous: row.ambiguous,
+  createdAt: row.created_at,
+  confirmedAt: row.confirmed_at,
+  duplicateOfImportId: row.duplicate_of,
 });
 
 /** One day of a confirmed report as it is written: who it is is read through the mapping in force, never kept here. */
@@ -145,9 +184,16 @@ export class VendorImportRepo {
 
   async pageRows(
     importId: string,
-    filter: { outcome?: RowOutcome; skip: number; take: number },
+    filter: { outcome?: RowOutcome; visibleEmployeeIds?: readonly string[]; skip: number; take: number },
   ): Promise<{ items: StoredRow[]; total: number }> {
-    const where = { importId, ...(filter.outcome ? { outcome: filter.outcome } : {}) };
+    const where: Prisma.UsageImportRowWhereInput = {
+      importId,
+      ...(filter.outcome ? { outcome: filter.outcome } : {}),
+      // A line tied to a person is shown only when that person is one the reader works; the lines nobody was tied to are shown to all.
+      ...(filter.visibleEmployeeIds
+        ? { OR: [{ outcome: { not: 'MATCHED' as const } }, { employeeId: { in: [...filter.visibleEmployeeIds] } }] }
+        : {}),
+    };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.usageImportRow.findMany({
         where,
@@ -169,6 +215,47 @@ export class VendorImportRepo {
     });
 
     return found !== null;
+  }
+
+  /** The first confirmed import of the source whose file is exactly this one (by its hash), if any: the same file uploaded again (`US-08-02`). */
+  async findConfirmedWithHash(sourceId: string, contentHash: string, tx?: DbTx): Promise<string | null> {
+    const found = await (tx ?? this.prisma).usageImport.findFirst({
+      where: { sourceId, contentHash, status: 'COMPLETED' },
+      orderBy: [{ confirmedAt: 'asc' }, { id: 'asc' }],
+      select: { id: true },
+    });
+
+    return found?.id ?? null;
+  }
+
+  /**
+   * A page of the history of imports, the newest first, with the total of the same statement. Each import says whether an earlier confirmed import of the
+   * same source holds exactly its file (`duplicateOfImportId`); the counts are the ones of its preview, no row of the report is read.
+   */
+  async pageList(filter: ImportListFilter): Promise<{ rows: ImportListRow[]; total: number }> {
+    const conditions = [
+      filter.sourceId ? Prisma.sql`i.source_id = ${filter.sourceId}::uuid` : Prisma.sql`true`,
+      filter.applicationId ? Prisma.sql`s.application_id = ${filter.applicationId}::uuid` : Prisma.sql`true`,
+      filter.status ? Prisma.sql`i.status::text = ${filter.status}` : Prisma.sql`true`,
+    ];
+    const raw = await this.prisma.$queryRaw<RawListRow[]>`
+      SELECT i.id, i.source_id, s.name AS source_name, s.application_id, i.status::text AS status, i.format::text AS format,
+             to_char(i.coverage_from, 'YYYY-MM-DD') AS coverage_from, to_char(i.coverage_to, 'YYYY-MM-DD') AS coverage_to,
+             coalesce((i.summary->>'totalRows')::int, 0) AS total_rows, coalesce((i.summary->>'matched')::int, 0) AS matched,
+             coalesce((i.summary->>'unmatched')::int, 0) AS unmatched, coalesce((i.summary->>'ambiguous')::int, 0) AS ambiguous,
+             i.created_at, i.confirmed_at,
+             (SELECT p.id FROM usage_imports p
+               WHERE p.source_id = i.source_id AND p.content_hash = i.content_hash AND p.status = 'COMPLETED' AND p.id <> i.id
+                 AND p.confirmed_at < i.created_at
+               ORDER BY p.confirmed_at, p.id LIMIT 1) AS duplicate_of,
+             count(*) OVER() AS total
+        FROM usage_imports i
+        JOIN usage_sources s ON s.id = i.source_id
+       WHERE ${Prisma.join(conditions, ' AND ')}
+       ORDER BY i.created_at DESC, i.id
+       LIMIT ${filter.take} OFFSET ${filter.skip}`;
+
+    return { total: Number(raw[0]?.total ?? 0n), rows: raw.map(toListRow) };
   }
 
   /** The confirmed imports of the source whose windows meet `[from, to]`, other than `exceptId`. */

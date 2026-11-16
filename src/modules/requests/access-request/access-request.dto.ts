@@ -1,8 +1,8 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { READABLE_CANCEL_CAUSES } from './group-request.types';
+import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 import { LIMIT_EXEMPTIONS } from './access-request.types';
 
 /**
@@ -15,20 +15,24 @@ export const limitExemptionSchema = z.enum(LIMIT_EXEMPTIONS);
 export const REASON_MAX_LENGTH = 1000;
 
 /**
- * `BM-01` as the person sending it fills it (`US-01-12` AC-1, `US-05-02` AC-6): the plan and the reason are required, the day the
- * right ends is optional (a right has no end unless the sender gives one, at most a year away, and a contractor, a freelancer or an
- * intern must give it, `QĐ-104a`, `FR-2.8`). Nothing here chooses the branch, the Cost Center or who decides: the system fixes
- * them from the plan and the department.
+ * The time of use, in whole months (`QĐ-111i`, `FR-2.8`): a plan bought by the month (`K1`) needs it, 1 to 9; a plan of seats (`K2`) or
+ * internal software (`K5`) takes 1 to 12, or null for a right with no end (_Dùng lâu dài_), which a contractor, a freelancer or an intern
+ * never gets; a plan bought once (`K4`) takes none. The rule of the kind of plan is judged when the request is sent or looked at.
+ */
+export const termMonthsSchema = z.number().int().nullable().meta({
+  description:
+    'The time of use in whole months: required for a plan bought by the month (1 to 9); 1 to 12, or null for a right with no end, for a plan of seats or internal software (not for a contractor, a freelancer or an intern); none for a plan bought once.',
+});
+
+/**
+ * `BM-01` as the person sending it fills it (`US-01-12` AC-1, `US-05-02` AC-6): the plan and the reason are required, and the time of use
+ * in months when the kind of plan asks for it (`QĐ-111i`): there is no end date to give. Nothing here chooses the branch, the Cost Center
+ * or who decides: the system fixes them from the plan and the department.
  */
 export const submitBodySchema = z.strictObject({
   planId: z.uuid(),
   businessReason: z.string().trim().min(1).max(REASON_MAX_LENGTH),
-  expectedEndDate: businessDate.optional(),
-  /**
-   * GH-3 (`BR-MF1-01g`): why the person asks for one more paid application when they already use as many as the threshold. Required
-   * only then (422 `ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED`); ignored and not stored otherwise.
-   */
-  manyPaidSoftwareReason: z.string().trim().min(1).max(REASON_MAX_LENGTH).optional(),
+  termMonths: termMonthsSchema.optional(),
 });
 /**
  * The decision of the need step: a refusal gives its reason (`BR-07.5`), and nothing else is accepted: there is no signature or certificate to attach
@@ -36,16 +40,13 @@ export const submitBodySchema = z.strictObject({
  */
 export const needDecisionBodySchema = z
   .strictObject({
-    decision: z.enum(['APPROVE', 'REJECT']),
+    decision: z.enum(['APPROVE', 'REJECT', 'RETURN']),
     reason: z.string().trim().min(1).max(REASON_MAX_LENGTH).optional(),
-  })
-  .superRefine((body, ctx) => {
-    if (body.decision === 'REJECT' && body.reason === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['reason'], message: 'A refusal gives its reason.' });
-    }
+    checklist: checklistBodySchema,
   })
   .meta({
-    description: 'A refusal (REJECT) gives its reason. An approval (APPROVE) gives none.',
+    description:
+      'The checklist of the policy in force at this step, and the decision: approve, refuse (REJECT) or send back to the person who asked (RETURN). A refusal and a return give their reason, or leave it to be filled in from the questions answered No. An approval is locked while an answer is No.',
   });
 const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -75,7 +76,7 @@ const needStepSchema = z.strictObject({
 
 /** The decision of the need step; one object, not a list. */
 const needDecisionSchema = z.strictObject({
-  decision: z.enum(['APPROVED', 'REJECTED']),
+  decision: z.enum(['APPROVED', 'REJECTED', 'RETURNED']),
   decidedBy: employeeRef,
   deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER']),
   reason: z.string().nullable(),
@@ -97,6 +98,30 @@ export const costEstimateSchema = z.strictObject({
   estimatedCost: moneySchema,
   totalPayable: moneySchema,
 });
+/**
+ * What a request costs by the year, before tax (`QĐ-111j`, `QĐ-111k`): the months that begin in the year it is judged in, and the part of
+ * the year after, an estimate that is kept when the spend is approved. Null when nothing is priced by the month. This is never a budget
+ * figure: nobody but the spending approver and Finance sees what is left of a budget.
+ */
+export const costViewSchema = z.strictObject({
+  currentYear: z.strictObject({ year: z.number().int(), months: z.number().int().nullable(), amount: moneySchema }),
+  nextYear: z
+    .strictObject({
+      from: z.string().meta({ description: 'The first day of the year after, YYYY-MM-DD.' }),
+      months: z.number().int().nullable(),
+      amount: moneySchema,
+      estimate: z.literal(true),
+    })
+    .nullable(),
+  termCutAt: z
+    .string()
+    .nullable()
+    .meta({ description: 'The last day of the contract of a person with a term, when it cut the time of use short.' }),
+  months: z.number().int().nullable().meta({
+    description: 'The months that have begun by the end of the term, each counted whole; null for a right with no end.',
+  }),
+});
+
 export const pricingSchema = z.strictObject({
   status: z.enum(['NOT_APPLICABLE', 'PRICED', 'MISSING']),
   missingReason: z.enum(['NO_PRICED_SUBSCRIPTION', 'CYCLE_UNKNOWN', 'AMOUNT_TOO_LARGE', 'AWAITING_QUOTE']).nullable(),
@@ -153,6 +178,8 @@ export const requestSchema = z.strictObject({
       purpose: z.string(),
       dataDescription: z.string(),
       expectedUsers: z.number().int().positive(),
+      /** The application of the catalog the software is already in, when only the plan asked for is missing (case B, short); null for software that is new. */
+      existingApplicationId: z.uuid().nullable(),
     })
     .nullable(),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
@@ -189,10 +216,6 @@ export const requestSchema = z.strictObject({
     .nullable(),
   /** Why the request was left out of the count of the limits when it was sent (`TRANSFER_GRACE` is not left out of the duplicate of GH-1); null for every other request (P10, `QĐ-110q`). */
   limitExemption: limitExemptionSchema.nullable(),
-  /** GH-3 (`BR-MF1-01g`): the person uses many paid applications, how many and why they ask for more; null when not flagged. */
-  flags: z.strictObject({
-    manyPaidSoftware: z.strictObject({ count: z.number().int().nonnegative(), reason: z.string() }).nullable(),
-  }),
   /**
    * What a request for the renewal of a right adds: the seat it renews, the end it had, the end it asks for, the months the right
    * would run on without a break and, once approved, the record that follows the old one. Null for any other request.
@@ -201,7 +224,7 @@ export const requestSchema = z.strictObject({
     .strictObject({
       assignmentId: z.uuid(),
       previousExpectedEndDate: z.string(),
-      newExpectedEndDate: z.string(),
+      newExpectedEndDate: z.string().nullable(),
       consecutiveMonths: z.number().int().positive(),
       applied: z.strictObject({ successorAssignmentId: z.uuid(), appliedAt: z.iso.datetime() }).nullable(),
     })
@@ -222,9 +245,7 @@ export const requestSchema = z.strictObject({
         'REFUSED',
       ]),
       /** Why the request is blocked, every reason that applies; empty unless the stage is `BLOCKED`. */
-      blockedReasons: z
-        .array(z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING', 'RATE_MISSING']))
-        .max(3),
+      blockedReasons: z.array(z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING'])).max(3),
       /** How far over the base (it waits for the reserve to be confirmed) or over the reserve (blocked for that); null otherwise. */
       overBy: moneySchema.nullable(),
       /** What the spending approver wrote when they refused the request. */
@@ -234,6 +255,8 @@ export const requestSchema = z.strictObject({
   /** The fiscal year the cost is charged to: a provisional year from today until the spend is decided; null for internal software. */
   budgetYear: z.number().int().nullable(),
   pricing: pricingSchema,
+  /** The cost by the year before tax, with the part of the year after (`QĐ-111j`, `QĐ-111k`); null when nothing is priced by the month. */
+  cost: costViewSchema.nullable(),
   policy: z.strictObject({
     version: z.number().int().positive(),
     hasSpendStep: z.boolean(),

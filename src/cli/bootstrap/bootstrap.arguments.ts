@@ -24,7 +24,7 @@ Required
   --environment <env>          LOCAL_TEST or SHARED
 
 Optional
-  --currency <iso4217>         Reporting currency (default VND)
+  --currency <iso4217>         Reporting currency: VND only, which is also the default
   --login-email <email>        Sign-in email (default: the Super Admin's work email)
   --admin-type <type>          STAFF (default), CONTRACTOR, FREELANCER, INTERN
   --password-stdin             Read the Super Admin password from standard input instead of the hidden prompt. Standard

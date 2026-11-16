@@ -12,6 +12,7 @@ const page = {
 export const idParamSchema = z.strictObject({ id: z.uuid() });
 export const unmatchedListQuerySchema = z.strictObject({
   applicationId: z.uuid().optional(),
+  importId: z.uuid().optional(),
   status: z.enum(['OPEN', 'DISMISSED', 'RESOLVED']).optional(),
   ...page,
 });

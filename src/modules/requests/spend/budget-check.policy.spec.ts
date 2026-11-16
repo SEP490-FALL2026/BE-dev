@@ -1,4 +1,4 @@
-import { checkBudget, codesOf, wireRouteOf, type YearBudget, type YearSlice } from './budget-check.policy';
+import { checkBudget, codesOf, costInDong, wireRouteOf, type YearBudget, type YearSlice } from './budget-check.policy';
 
 /** Base 100, reserve 10, spent 40, held 20 and 15 waiting to be decided: 25 left of the base and 35 with the reserve. */
 const budget = (over: Partial<YearBudget> = {}): YearBudget => ({
@@ -131,5 +131,15 @@ describe('the route of a check on the wire: the review by Finance is gone (AUDIT
   it('keeps the two routes of today as they are', () => {
     expect(wireRouteOf('BLOCKED', 'BLOCKED')).toBe('BLOCKED');
     expect(wireRouteOf('SPEND_APPROVAL', 'USES_RESERVE')).toBe('SPEND_APPROVAL');
+  });
+});
+
+describe('QĐ-111an, S-1: the cost of a request is its amount in dong, as it stands', () => {
+  it('takes an amount in dong as the cost, with nothing to convert', () => {
+    expect(costInDong({ amountMinor: 254_000n, currency: 'VND' })).toEqual({ amountMinor: 254_000n, currency: 'VND' });
+  });
+
+  it('judges no amount left in another currency: nothing converts it, so the request has no cost to check', () => {
+    expect(costInDong({ amountMinor: 1_000n, currency: 'USD' })).toBeNull();
   });
 });

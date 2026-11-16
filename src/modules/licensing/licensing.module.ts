@@ -10,12 +10,14 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { AssignmentEndService } from './assignment/assignment-end.service';
+import { AssignmentCarryRepo } from './assignment/assignment-carry.repo';
 import { AssignmentFactsRepo } from './assignment/renewal/assignment-facts.repo';
 import { AssignmentRenewalService } from './assignment/renewal/assignment-renewal.service';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
 import { RevocationCompletedFactsReader } from './provisioning/revocation-completion/revocation-completed-facts.service';
 import { AssignmentChainRepo } from './assignment/assignment-chain.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
+import { AssignmentRevocationRepo } from './assignment/assignment-revocation.repo';
 import { UsageFactsRepo } from './assignment/usage-facts.repo';
 import { RuleSeatsFactsService } from './assignment/rule-seats-facts.service';
 import { RuleSeatsRepo } from './assignment/rule-seats.repo';
@@ -50,6 +52,9 @@ import { ExpiryReminderSweeper } from './expiry/expiry-reminder.job';
 import { ExpiryRenewalWindowSweeper } from './expiry/expiry-renewal-window.job';
 import { ExpiryRenewalWindowRepo } from './expiry/expiry-renewal-window.repo';
 import { ExpiryRenewalWindowService } from './expiry/expiry-renewal-window.service';
+import { ExpiryRevocationRepo } from './expiry/expiry-revocation.repo';
+import { ExpiryRevocationService } from './expiry/expiry-revocation.service';
+import { ExpiryRevocationSweeper } from './expiry/expiry-revocation.job';
 import { ProvisioningExtensionService } from './provisioning/tasks/provisioning-extension.service';
 import { LicensingAlerts } from './licensing-alerts.service';
 import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-key-cipher.service';
@@ -76,6 +81,8 @@ import { LicensingUsageApi } from './public/licensing-usage.api';
 import { LicensingDepartmentToolsApi } from './public/licensing-department-tools.api';
 import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
 import { LicensingPoolStockApi } from './public/licensing-pool-stock.api';
+import { LicensingSeatMonthApi } from './public/licensing-seat-month.api';
+import { AssignmentSeatMonthRepo } from './assignment/assignment-seat-month.repo';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
 import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
 import { ProvisioningCancellationService } from './provisioning/grant-cancellation/provisioning-cancellation.service';
@@ -125,6 +132,8 @@ import { SharedPoolCapacityRepo } from './shared-pool/shared-pool-capacity.repo'
 import { SharedPoolService } from './shared-pool/shared-pool.service';
 import { SeatBaselineRepo } from './seat-baseline/seat-baseline.repo';
 import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
+import { StockSummaryController } from './stock-summary/stock-summary.controller';
+import { StockSummaryQueryService } from './stock-summary/stock-summary-query.service';
 import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
 import { RenewalDeadlineService } from './subscription-renewal/deadline/renewal-deadline.service';
 import { RenewalDecisionTrail } from './subscription-renewal/decision/renewal-decision-trail.service';
@@ -140,6 +149,8 @@ import { RenewalViewService } from './subscription-renewal/subscription-renewal-
 import { SubscriptionRenewalSweeper } from './subscription-renewal/subscription-renewal.job';
 import { SubscriptionRenewalRepo } from './subscription-renewal/subscription-renewal.repo';
 import { SubscriptionRenewalsController } from './subscription-renewal/subscription-renewals.controller';
+import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
+import { LicenseKeyTemplateListener } from './license-key/license-key-template.listener';
 
 /**
  * The licensing context (C3, ADR-0013): the assignments of seats, the closing of the seat baseline, the queue of
@@ -150,6 +161,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
  */
 @Module({
   imports: [
+    PoliciesTemplateFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
@@ -174,10 +186,13 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     SaasIssuesController,
     MySoftwareController,
     SubscriptionRenewalsController,
+    StockSummaryController,
   ],
   providers: [
+    LicenseKeyTemplateListener,
     LicensingAlerts,
     AssignmentRepo,
+    AssignmentRevocationRepo,
     AssignmentChainRepo,
     RevocationCompletedFactsReader,
     AssignmentDepartmentRepo,
@@ -187,6 +202,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     ProvisioningDepartmentUseRepo,
     AssignmentService,
     AssignmentEndService,
+    AssignmentCarryRepo,
     AssignmentFactsRepo,
     AssignmentRenewalService,
     RenewalHoldHook,
@@ -207,6 +223,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     SharedPoolCapacityRepo,
     SharedPoolAvoidedCostRepo,
     SharedPoolService,
+    StockSummaryQueryService,
     ProvisioningTaskRepo,
     ProvisioningTaskFrame,
     ProvisioningHolderService,
@@ -241,6 +258,9 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     ExpiryRenewalWindowRepo,
     ExpiryRenewalWindowService,
     ExpiryRenewalWindowSweeper,
+    ExpiryRevocationRepo,
+    ExpiryRevocationService,
+    ExpiryRevocationSweeper,
     ProvisioningExtensionService,
     ExpiryQueueRepo,
     ExpiryQueueService,
@@ -304,6 +324,8 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     SharedPoolVacancyService,
     LicensingOpenGrantsApi,
     LicensingPoolStockApi,
+    AssignmentSeatMonthRepo,
+    LicensingSeatMonthApi,
     LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
@@ -316,6 +338,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingUsageApi,
     LicensingOpenGrantsApi,
     LicensingPoolStockApi,
+    LicensingSeatMonthApi,
     LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,

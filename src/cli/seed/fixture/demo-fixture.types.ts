@@ -28,13 +28,17 @@ export interface DemoPerson {
   employmentType: 'STAFF' | 'CONTRACTOR' | 'FREELANCER' | 'INTERN';
   /** The one direct role of the person's sign-in account; null: no account (the Super Admin can create one to test). */
   account: DemoRole | null;
+  /**
+   * A person with a term (not `STAFF`): the contract ends this many days from today. The Super Admin writes it on the employee (D-21) and a
+   * request, which names months, is cut there (`QĐ-111i`, R-38); a staff member has none (the API refuses one).
+   */
+  contractEndInDays?: number;
 }
 
 export interface DemoPlan {
   key: string;
   name: string;
   provisioningType: 'K1' | 'K2' | 'K4' | 'K5';
-  pricingModel?: 'PER_SEAT';
   controlLevel?: 'FULL' | 'PARTIAL';
   dataLossOnRemoval: boolean;
   revocationNote?: string;
@@ -50,9 +54,12 @@ export interface DemoPlan {
 export interface DemoApplication {
   key: string;
   name: string;
-  kind: 'SAAS' | 'LICENSED' | 'INTERNAL';
+  /** What the application becomes: the system works it out from the plan (K5 internal, the others `SAAS`), the fixture only says what it expects. */
+  kind: 'SAAS' | 'INTERNAL';
   vendorName?: string;
   dataSensitivity: 'LOW' | 'MEDIUM' | 'HIGH';
+  /** The functional group the application stands in, by the name of one of the seven groups the installation writes (C-O5). */
+  functionalGroup: string;
   plans: DemoPlan[];
 }
 
@@ -61,8 +68,10 @@ export interface DemoSubscription {
   key: string;
   plan: string;
   kind: 'TERM' | 'PERPETUAL';
-  /** The price of one seat for one billing period, major units of `currency`. */
-  unitPrice: { amount: string; currency: string };
+  /** The price of one seat for one billing period, in dong (`QĐ-111an`: a price is written in the currency of the company only). */
+  unitPrice: { amount: string; currency: 'VND' };
+  /** The price the vendor quotes, when it is not in dong: kept beside `unitPrice` (FX-1), never used to work anything out. */
+  originalPrice?: { amount: string; currency: string };
   billingCycle: 'MONTHLY' | 'ANNUAL';
   /** The commitment of the period: 1 month for a monthly plan, 12 for an annual one. */
   termMonths: 1 | 12;
@@ -90,49 +99,40 @@ export interface DemoSeat {
   endInDays?: number;
 }
 
-export interface DemoBudgetLine {
-  description: string;
-  plan: string;
-  seats: number;
-  amount: string;
-  /** What kind of purchase the line is (`QĐ-101n`); the order of the lines in the fixture is their priority rank, from 1. */
-  lineType: 'RENEW' | 'CHANGE' | 'NEW' | 'CANCEL';
-  /** The reduced zero-based-budget explanation, required of a `NEW` line (`QĐ-94l`). */
-  zbb?: { purpose: string; alternatives: string; consequenceIfNot: string; usageIndicator: string };
-  note?: string;
-}
-
 /**
- * The budget cycle of a year (`QĐ-103i`): the annual ceiling of the software budget, the shared-pool reserve and what each department
- * may ask for. Without `ceilings` the rest is divided evenly among the departments. The sum must stay within the annual ceiling.
+ * The budget cycle of a year (`QĐ-111z`): the annual ceiling of the software budget and the shared-pool reserve (there is no ceiling per
+ * department any more). The submission deadline is `submissionOffsetDays` after the day the seed runs (0 = that very day: the cycle is open
+ * on that day and locked from the next); the decision deadline `decisionOffsetDays` after it. `open: false` leaves the cycle a draft.
  */
 export interface DemoCycle {
   annualCeiling: string;
   sharedPoolReserve: string;
-  /** Days before the first of January of the year that the proposals and the decisions fall due. */
-  submissionDaysBefore: number;
-  decisionDaysBefore: number;
-  /** Ceiling of each department by code; a department of the installation that is not named gets 0. */
-  ceilings?: Record<string, string>;
+  submissionOffsetDays: number;
+  decisionOffsetDays: number;
+  open: boolean;
 }
 
-/** The approved budget of the current year of a department: through the head's proposal, or from the baseline when it has no head. */
+/** The approved budget of the current year of a department: `BM-10` of its head (one amount, one file), then Finance's version. */
 export interface DemoBudget {
   department: string;
-  /** The base of the year; the reserve is the default share of it (10 %) the server works out. */
+  /** The amount of `BM-10` and the base of the version; the reserve is the default share of it (10 %) the server works out. */
   base: string;
-  origin: 'PROPOSAL' | 'BASELINE';
-  lines: DemoBudgetLine[];
+  note?: string;
 }
 
 /** Where the budget of the next year of a department is left for the demo to carry on from. */
 export interface DemoNextYear {
   department: string;
-  lines: DemoBudgetLine[];
-  /** The proposal waits for Finance; a version is sent and waits for the spending approver; or the approver asked for changes. */
-  stage: 'PROPOSAL_SUBMITTED' | 'VERSION_SENT' | 'CHANGES_REQUESTED';
+  /** The amount the head asks in `BM-10`. */
+  requestedAmount: string;
+  note?: string;
+  /**
+   * The proposal waits for Finance; a version is sent and waits for the spending approver; the approver returned it to Finance with a
+   * reason (`RETURN`); or the version is approved.
+   */
+  stage: 'PROPOSAL_SUBMITTED' | 'VERSION_SENT' | 'VERSION_RETURNED' | 'APPROVED';
   base: string;
-  /** The reason of the request for changes. */
+  /** The reason of the return. */
   reason?: string;
 }
 
@@ -150,9 +150,6 @@ export type DemoRequestTarget =
   | 'BLOCKED'
   | 'COMPLETED';
 
-/** How the request ends: no end date, the last day of the month of today, or a number of days from today. */
-export type DemoRequestEnd = 'NONE' | 'EOM' | { inDays: number };
-
 export interface DemoRequestScenario {
   key: string;
   requester: string;
@@ -160,8 +157,23 @@ export interface DemoRequestScenario {
   beneficiaries?: string[];
   /** A plan of the catalog, or a proposal of software that is not in it. */
   plan?: string;
-  proposal?: { softwareName: string; homepageUrl: string; dataDescription: string; expectedUsers: number };
-  end: DemoRequestEnd;
+  /**
+   * A proposal of software outside the catalog (case B). With `existingApplication` (the key of an application of the catalog) and
+   * `plannedPlanName` it is the short case B: the application is known, the plan is not (DEMO-1).
+   */
+  proposal?: {
+    softwareName: string;
+    homepageUrl: string;
+    dataDescription: string;
+    expectedUsers: number;
+    existingApplication?: string;
+    plannedPlanName?: string;
+  };
+  /**
+   * The time of use the request asks for, in whole months (`QĐ-111i`, RQ-2): `K1` 1 to 9, `K2`/`K5` 1 to 12 (a person with a term must give
+   * months), null for a right with no end (`K2`/`K5` of a staff member) and for `K4`, which asks for none. The end date follows from it.
+   */
+  termMonths: number | null;
   target: DemoRequestTarget;
   /** The head confirms the use of the reserve with the batch, so the request goes on to the spending approver. */
   confirmReserve?: boolean;
@@ -250,17 +262,16 @@ export interface DemoFixture {
   applications: DemoApplication[];
   subscriptions: DemoSubscription[];
   seats: DemoSeat[];
-  /** The exchange rate of a foreign currency to the reporting one, recorded by Finance for today. */
-  exchangeRates: { currency: string; rate: string }[];
   /** A Finance-declared tax profile for the vendor of one application. */
   taxProfile: {
     application: string;
     group: 'T2';
     lines: { taxType: string; ratePercent: string; deductible: boolean }[];
   };
-  /** The budget cycle of the year, then of the next one, opened and published before any proposal (`Q-02`). */
+  /** The budget cycle of the year, then of the next one, each opened before any proposal (`QĐ-111z`); the year after stays a draft. */
   cycle: DemoCycle;
   nextCycle: DemoCycle;
+  draftCycle: DemoCycle;
   /** The approved budgets of the year, one per department with a Cost Center. */
   budgets: DemoBudget[];
   /** The budgets of the next year, each left at the stage a demo carries on from. */
@@ -273,7 +284,7 @@ export interface DemoFixture {
   departmentSoftware: DemoDepartmentSoftware[];
   softwareProposals: DemoSoftwareProposal[];
   /** A draft that is saved and never sent (its department has no Cost Center, so it cannot be sent). */
-  draft: { requester: string; plan: string; end: DemoRequestEnd };
+  draft: { requester: string; plan: string; termMonths: number | null };
   /** A report of an error in the seat the request of this key granted. */
   saasIssue: { request: string; description: string };
   /** A notice (BM-09) a head sends; it changes nothing until the Super Admin handles it. */

@@ -26,13 +26,6 @@ export class ApplicationTooManyDomainsError extends Error {
   }
 }
 
-export class ApplicationNoteInvalidError extends Error {
-  constructor() {
-    super('The communication note is at most 1000 characters.');
-    this.name = 'ApplicationNoteInvalidError';
-  }
-}
-
 export class ApplicationVendorRequiredError extends Error {
   constructor() {
     super('A SaaS or licensed application names its vendor or a dictionary service line.');
@@ -94,6 +87,22 @@ export class ApplicationNotFoundError extends Error {
   constructor() {
     super('The application does not exist.');
     this.name = 'ApplicationNotFoundError';
+  }
+}
+
+/** The application is the same software as one the catalog already has (`QĐ-111b`): the same name or a domain they share. `existing` is that entry. */
+export class ApplicationDuplicateError extends Error {
+  constructor(
+    readonly existing: {
+      id: string;
+      name: string;
+      vendorName: string | null;
+      functionalGroup: { id: string; name: string } | null;
+    },
+    readonly by: 'NAME' | 'DOMAIN',
+  ) {
+    super('The catalog already has this software.');
+    this.name = 'ApplicationDuplicateError';
   }
 }
 

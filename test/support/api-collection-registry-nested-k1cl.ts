@@ -10,10 +10,10 @@ export const NESTED_ARRAYS_K1CL: readonly NestedArrayEntry[] = [
     businessMaximum: {
       maxItems: 10,
       source:
-        'K1_CHECKLIST_MAX_ITEMS in provisioning.dto.ts, the maxItems of the card of the checklist: a departure has six steps and a person who still works two (CODES_OF in provisioning-k1-checklist.policy.ts)',
+        'K1_CHECKLIST_MAX_ITEMS in provisioning.dto.ts, the maxItems of the card of the checklist: a departure has six steps, a person who still works two and the grant of a seat two (CODES_OF in provisioning-k1-checklist.policy.ts)',
     },
     rationale:
-      'The steps the IT Admin ticks to complete the revocation of a K1 seat, each with the instant it was ticked.',
+      'The steps the IT Admin ticks to complete the grant or the revocation of a K1 seat, each with the instant it was ticked.',
     removeWhen: 'Review when the steps of a variant change (CODES_OF in provisioning-k1-checklist.policy.ts).',
   },
 ];

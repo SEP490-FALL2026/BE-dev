@@ -17,19 +17,14 @@ const BUDGET = {
   base: money('100'),
   reserve: money('20'),
   total: money('120'),
+  effectiveBudget: { base: money('100'), reserve: money('20'), total: money('120'), adjustment: money('0') },
   committed: money('20'),
   spent: money('10'),
   pendingSpend: money('30'),
   remainingBase: money('40'),
   remainingWithReserve: money('60'),
   overBudget: false,
-  departmentCeiling: {
-    total: money('120'),
-    signedCommitments: money('20'),
-    plannedSeats: money('90'),
-    priority: money('10'),
-  },
-  cycle: { submissionDeadline: '2026-12-01', decisionDeadline: '2026-12-15', published: true },
+  cycle: { submissionDeadline: '2026-12-01', decisionDeadline: '2026-12-15', status: 'OPEN' },
   version: { id: ID, number: 1 },
   latestRefusal: null,
   proposal: null,
@@ -60,10 +55,10 @@ describe('BR-MF4-05 budgetMine HTTP contract', () => {
   });
 
   it.each([
-    ['never published', { departmentCeiling: null, cycle: { ...BUDGET.cycle, published: false } }],
-    ['awaiting republication', { departmentCeiling: null, cycle: { ...BUDGET.cycle, published: false } }],
-    ['no cycle', { departmentCeiling: null, cycle: null }],
-  ])('serializes %s without a department ceiling', async (_label, patch) => {
+    ['a draft cycle', { cycle: { ...BUDGET.cycle, status: 'DRAFT' } }],
+    ['a locked cycle', { cycle: { ...BUDGET.cycle, status: 'LOCKED' } }],
+    ['no cycle', { cycle: null }],
+  ])('serializes %s, and never a department ceiling', async (_label, patch) => {
     mine.mockResolvedValue({ ...BUDGET, ...patch });
     expect(budgetOf(await get().expect(200))).toEqual({ ...BUDGET, ...patch });
   });

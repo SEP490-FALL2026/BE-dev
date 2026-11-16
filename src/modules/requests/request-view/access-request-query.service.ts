@@ -4,7 +4,8 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import type { ProposalRecord } from '../access-request/assessment-record.types';
-import { PricingViewService, type MoneyView, type PricingView } from './pricing-view.service';
+import { PricingViewService, type CostView, type MoneyView, type PricingView } from './pricing-view.service';
+import { RequestCostViewService } from './request-cost-view.service';
 import type { BlockReason } from '../spend/budget-check.policy';
 import type { SpendStage } from '../access-request/access-request.types';
 import { SpendStatusService, type SpendStatusView } from '../spend/spend-status.service';
@@ -38,7 +39,7 @@ export interface NeedStepView extends Omit<
 /** Where the request stands on its way to the spending approver, as the wire writes it (`BR-MF1-06g`). */
 export interface SpendView {
   stage: SpendStage;
-  blockedReasons: (BlockReason | 'PRICE_MISSING' | 'RATE_MISSING')[];
+  blockedReasons: (BlockReason | 'PRICE_MISSING')[];
   /** How far over the base (waiting for the reserve to be confirmed) or over the reserve (blocked for that); null otherwise. */
   overBy: MoneyView | null;
   refusalReason: string | null;
@@ -83,6 +84,8 @@ export interface AccessRequestView extends Omit<
   policy: { version: number; hasSpendStep: boolean; slaWorkingDays: number };
   budgetYear: number | null;
   pricing: PricingView;
+  /** The cost by the year before tax, with the part of the year after (`QĐ-111j`, `QĐ-111k`); null when nothing is priced by the month. */
+  cost: CostView | null;
   /** Where the request stands on its way to the spending approver, for a request that costs money; never what is left of the budget. */
   spend: SpendView | null;
   needStep: NeedStepView;
@@ -96,11 +99,6 @@ export interface AccessRequestView extends Omit<
   renewal: RenewalView | null;
   /** What a request for a service account adds; null for any other request. */
   serviceAccount: ServiceAccountView | null;
-  /**
-   * What the head and the spending approver are shown of the request (`BR-MF1-01g`): GH-3, the person uses many paid applications,
-   * with how many and why they ask for more; null when it is not flagged. A request for a group carries it on its lines.
-   */
-  flags: { manyPaidSoftware: { count: number; reason: string } | null };
   /** Why the request was left out of GH-1/GH-2 when it was sent (`QĐ-110q`); null for every other request. */
   limitExemption: LimitExemption | null;
 }
@@ -108,7 +106,7 @@ export interface AccessRequestView extends Omit<
 export interface RenewalView {
   assignmentId: string;
   previousExpectedEndDate: string;
-  newExpectedEndDate: string;
+  newExpectedEndDate: string | null;
   consecutiveMonths: number;
   /** The record approval wrote after the old one; null until the request is approved. */
   applied: { successorAssignmentId: string; appliedAt: Date } | null;
@@ -151,6 +149,7 @@ export class AccessRequestQueryService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly pricing: PricingViewService,
+    private readonly costs: RequestCostViewService,
     private readonly assessments: AssessmentReadRepo,
     private readonly spendStatus: SpendStatusService,
     private readonly readAccess: RequestReadAccessService,
@@ -245,6 +244,7 @@ export class AccessRequestQueryService {
       spend: spendView,
       budgetYear: record.pricing.budgetYear,
       pricing: await this.pricing.view(record.pricing),
+      cost: await this.costs.of(record, record.pricing),
       policy: {
         version: record.policy.version,
         hasSpendStep: hasSpendStep(record.policy),
@@ -273,7 +273,6 @@ export class AccessRequestQueryService {
               note: record.cancellation.note,
             },
       serviceAccount: this.serviceAccountOf(record.serviceAccount, person),
-      flags: { manyPaidSoftware: record.manyPaidSoftware ?? null },
       limitExemption: record.limitExemption ?? null,
       renewal: this.renewalOf(record.renewal),
       needStep: {

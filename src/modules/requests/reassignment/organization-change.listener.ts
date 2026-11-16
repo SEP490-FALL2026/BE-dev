@@ -54,7 +54,7 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
       change.id,
       new Date(),
     );
-    // A department left without a head keeps its requests waiting for one (`QĐ-110i`): nothing turns them into one-step, and the Super Admin is told.
+    // A department left without a head keeps its paid requests waiting for one (`QĐ-110i`) and the Super Admin is told; free internal software already went on to the IT Admin in the reconciliation above (`QĐ-111bc`).
     if (change.kind === 'HEAD_PERIOD_END') await this.withoutHead.tellIfLeftWithoutHead(tx, change, new Date());
   }
 

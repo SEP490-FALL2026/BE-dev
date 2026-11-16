@@ -1,3 +1,4 @@
+import { SeedStorage } from '../../support/flows/seed-storage';
 import { relative } from 'node:path';
 import { Readable } from 'node:stream';
 import type { AddressInfo, Server } from 'node:net';
@@ -137,15 +138,23 @@ if (process.argv[2] === '--runtime-seed-driver') {
     let ctx: HttpTestApp;
     let cwd: string;
     let apiUrl: string;
+    // The bytes the seed (a child process) puts at upload links land in the storage the application reads (BM-10, files of a version).
+    const seedStorage = new SeedStorage();
     beforeAll(async () => {
+      await seedStorage.start();
       cwd = cliWorkingDirectory('slm-seed-apply-runtime');
       database = await prepareRoleDatabase();
-      ctx = await createHttpTestApp({ database: database.bootstrapHandle, appDatabaseUrl: () => database.runtime.url });
+      ctx = await createHttpTestApp({
+        database: database.bootstrapHandle,
+        appDatabaseUrl: () => database.runtime.url,
+        providerOverrides: [seedStorage.override],
+      });
       apiUrl = `http://127.0.0.1:${((ctx.app.getHttpServer() as unknown as Server).address() as AddressInfo).port}`;
     }, 300000);
     afterAll(async () => {
       stopCliProcesses();
       await ctx?.close();
+      await seedStorage.stop();
       if (database) await dropRoleSeparatedDatabase(database);
     });
     it('bootstraps and applies as the runtime role without migration-history privileges, then reruns unchanged', async () => {

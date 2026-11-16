@@ -1,9 +1,11 @@
 import type { RouteErrorStatus } from './openapi-example-manifest';
+import { ROUTE_ERROR_CODES_POLICIES } from './openapi-example-route-codes-policies';
 
-/** Part of ROUTE_ERROR_CODES (identity access), traced on BE `ea73c2f` (25/10/2026): see openapi-example-manifest.ts. */
+/** Part of ROUTE_ERROR_CODES (identity access, with the policies of PL-1), traced on BE `ea73c2f` (25/10/2026): see openapi-example-manifest.ts. */
 export const ROUTE_ERROR_CODES_IDENTITY_ACCESS: Readonly<
   Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
 > = {
+  ...ROUTE_ERROR_CODES_POLICIES,
   appUserCreate: {
     '404': ['ORGANIZATION.EMPLOYEE_NOT_FOUND'],
     '409': [

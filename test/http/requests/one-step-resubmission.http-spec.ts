@@ -32,7 +32,6 @@ const view = {
   expectedEndDate: null,
   serviceAccount: null,
   renewal: null,
-  flags: { manyPaidSoftware: null },
   limitExemption: null,
   spend: { stage: 'RETURNED_TO_REQUESTER', blockedReasons: ['PRICE_MISSING'], overBy: null, refusalReason: null },
   budgetYear: 2026,
@@ -47,6 +46,7 @@ const view = {
     monthlyPrice: null,
     nextYearAmount: null,
   },
+  cost: null,
   policy: { version: 2, hasSpendStep: true, slaWorkingDays: 2 },
   submittedAt: date,
   needStep: {

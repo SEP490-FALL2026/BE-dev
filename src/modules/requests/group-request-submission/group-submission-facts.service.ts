@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
+import { checkTermMonths, termRunOf, type TermRefusal, type TermRun } from '../../../core/term-limit';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { RequestPartyEligibilityApi } from '../../identity-access/public/request-party-eligibility.api';
 import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
@@ -8,8 +9,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { PricingRecord } from '../access-request/access-request.types';
 import { RequestFactsService, type Assessment, type RequestSettings } from '../access-request/request-facts.service';
-import type { ManyPaidSoftwareFlag } from '../access-request/access-request.types';
-import { manyPaidSoftwareReasonOf, type LimitVerdict } from '../request-limits/request-limits.policy';
+import type { LimitVerdict } from '../request-limits/request-limits.policy';
 import { RequestLimitsService, type LimitSettings } from '../request-limits/request-limits.service';
 import {
   checkGroupPlan,
@@ -21,23 +21,28 @@ import {
   type RefusedLine,
 } from '../group-request/group-request.policy';
 
+/**
+ * What a request that is fine for the plan can still refuse a person for: they have a term and the group gives no months, or none for a right
+ * with no end, or their contract ended before the term begins.
+ */
+const personTermRefusal = (refusal: TermRefusal | null): LineFacts['termRefusal'] =>
+  refusal === 'TERM_REQUIRED' || refusal === 'TERM_LONG_TERM_NOT_ALLOWED' || refusal === 'TERM_CONTRACT_ENDED'
+    ? refusal
+    : null;
+
 export interface GroupLineInput {
   employeeId: string;
-  /** GH-3 (`BR-MF1-01g`): why this person asks for one more paid application, as the sender gave it. */
-  manyPaidSoftwareReason?: string;
-  /** The day the access of this person ends: the one the group names, for every person of it (`US-05-17` AC-8). */
-  expectedEndDate?: BusinessDate | null;
 }
 
 export interface GroupSubmissionInput {
   senderEmployeeId: string;
   planId: string;
-  /** The day the access of every person named ends; null for no end. */
-  expectedEndDate: BusinessDate | null;
+  /** The time of use of every person named, in months; null for no end, undefined when the form says nothing (`QĐ-111i`). */
+  termMonths: number | null | undefined;
   lines: readonly GroupLineInput[];
   now: Date;
   settings: RequestSettings;
-  /** GH-2 and GH-3 as read before the transaction opened. */
+  /** GH-2 as read before the transaction opened. */
   limitSettings: LimitSettings;
   /** Sending locks the department of the sender and the people named against change until commit; checking locks nothing. */
   lockPeople: boolean;
@@ -56,12 +61,16 @@ export interface GroupJudgement {
   refused: RefusedLine[];
   /** The people named, each once, in the order they were named. */
   lines: GroupLineInput[];
-  /** What the request costs for the people named. */
+  /** What the request costs for the people named, each priced for their own end: a person with a term is cut at the end of the contract (R-38). */
   pricing: PricingRecord;
-  /** GH-1/GH-2/GH-3 of each person named (`BR-MF1-01`, `QĐ-106g`). */
+  /** What is wrong with the time of use for the request as a whole (the kind of plan); the person who has a term is judged on their line. */
+  termRefusal: TermRefusal | null;
+  /** The time of use that is kept on the request: the months, or null for no end. */
+  termMonths: number | null;
+  /** The run the time of use has for each person named, from today (R-38, R-39). */
+  runs: Map<string, TermRun>;
+  /** GH-1/GH-2 of each person named (`BR-MF1-01`, `QĐ-106g`). */
   limits: Map<string, LimitVerdict>;
-  /** The lines flagged by GH-3 that carry a reason: what the sending writes on them. */
-  manyPaidSoftware: Map<string, ManyPaidSoftwareFlag>;
 }
 
 /**
@@ -99,12 +108,18 @@ export class GroupSubmissionFactsService {
     const assessed = await this.assessment.assess(tx, {
       employeeId: input.senderEmployeeId,
       planId: input.planId,
-      expectedEndDate: input.expectedEndDate,
       now: input.now,
       settings: input.settings,
       lockDepartment: input.lockPeople,
     });
     const { today, unit, target, routing } = assessed;
+    // The kind of plan decides the time of use of the request; the sender's own employment is not what a group is judged by.
+    const termRefusal = checkTermMonths({
+      kind: target.provisioningType,
+      termMonths: input.termMonths,
+      fixedTermPerson: false,
+    });
+    const termMonths = termRefusal === null && typeof input.termMonths === 'number' ? input.termMonths : null;
     const headEmployeeId = routing.departmentHeadEmployeeId;
     const senderIsHead = headEmployeeId === input.senderEmployeeId;
     if (senderIsHead && !assessed.policy.chain.includes('NEED'))
@@ -115,11 +130,7 @@ export class GroupSubmissionFactsService {
     const count = checkLineCount({ senderIsHead, requested });
     const lines = input.lines
       .filter((line, index) => requested.indexOf(line.employeeId) === index)
-      .map((line) => ({
-        employeeId: line.employeeId,
-        expectedEndDate: input.expectedEndDate,
-        manyPaidSoftwareReason: line.manyPaidSoftwareReason,
-      }));
+      .map((line) => ({ employeeId: line.employeeId }));
     const ids = lines.map((line) => line.employeeId);
 
     const people = await this.organizationReads.getEmployees(ids, tx);
@@ -136,18 +147,12 @@ export class GroupSubmissionFactsService {
     const limits = await this.limits.judge(tx, {
       employeeIds: ids,
       planId: input.planId,
-      applicationId: target.applicationId,
-      today,
+      now: input.now,
       settings: input.limitSettings,
     });
-    const manyPaidSoftware = new Map<string, ManyPaidSoftwareFlag>();
     const facts: LineFacts[] = [];
     for (const line of lines) {
       const verdict = limits.get(line.employeeId);
-      const given = verdict ? manyPaidSoftwareReasonOf(verdict, line.manyPaidSoftwareReason) : null;
-      if (verdict?.manyPaidSoftware && given?.reason) {
-        manyPaidSoftware.set(line.employeeId, { count: verdict.manyPaidSoftware.count, reason: given.reason });
-      }
       const person = known.get(line.employeeId);
       const own = units.get(line.employeeId);
       facts.push({
@@ -160,14 +165,33 @@ export class GroupSubmissionFactsService {
         holdsAccess: person ? await this.holds(line.employeeId, input.planId) : false,
         hasOpenRequest: open.has(line.employeeId) || verdict?.refusal === 'HAS_OPEN_REQUEST',
         openLimitReached: verdict?.refusal === 'OPEN_LIMIT_REACHED',
-        manyPaidSoftwareReasonMissing: given?.missing ?? false,
         isDepartmentHead: headEmployeeId !== null && line.employeeId === headEmployeeId,
-        termRequired: input.expectedEndDate === null && (person?.employmentType ?? 'STAFF') !== 'STAFF',
+        termRefusal: personTermRefusal(
+          termRefusal === null
+            ? checkTermMonths({
+                kind: target.provisioningType,
+                termMonths: input.termMonths,
+                fixedTermPerson: (person?.employmentType ?? 'STAFF') !== 'STAFF',
+                contractEndDate: person?.contractEndDate ?? null,
+                termStart: today,
+              })
+            : null,
+        ),
         spendingApprover: party.get(line.employeeId) === 'SPENDING_APPROVER',
       });
     }
 
-    // The price is of the people named, and only a plan a group may take is priced as one (`AC-5`).
+    const runs = new Map<string, TermRun>(
+      lines.map((line) => [
+        line.employeeId,
+        termRunOf({
+          start: today,
+          months: termMonths,
+          contractEndDate: known.get(line.employeeId)?.contractEndDate ?? null,
+        }),
+      ]),
+    );
+    // The price is of the people named, each for their own end, and only a plan a group may take is priced as one (`AC-5`).
     const pricing =
       planRefusal === null
         ? await this.assessment.priceFor(tx, {
@@ -175,7 +199,9 @@ export class GroupSubmissionFactsService {
             free: false,
             beneficiaries: lines.length,
             checkDate: today,
-            endDate: input.expectedEndDate,
+            endDate: null,
+            endsByPerson: lines.map((line) => runs.get(line.employeeId)?.end ?? null),
+            endIsDerived: true,
           })
         : assessed.pricing;
 
@@ -189,8 +215,10 @@ export class GroupSubmissionFactsService {
       refused: checkLines(unit.departmentId, facts),
       lines,
       pricing,
+      termRefusal,
+      termMonths,
+      runs,
       limits,
-      manyPaidSoftware,
     };
   }
 

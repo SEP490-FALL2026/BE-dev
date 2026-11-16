@@ -1,28 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { isBusinessDate, type BusinessDate } from '../../../core/business-date';
-import { convertToReporting } from '../../../core/money/convert';
 import { parseDecimalAmount, type Money } from '../../../core/money/money';
-import { CurrencyNotSupportedError, ReportingCurrencyNotSupportedError } from '../../../core/money/money.errors';
+import { CurrencyNotSupportedError } from '../../../core/money/money.errors';
 import { RATE_DECIMALS, type ScaledRate } from '../../../core/money/rate';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { CurrencyService } from '../currency/currency.service';
-import { ExchangeRateLedgerService } from '../exchange-rate/exchange-rate-ledger.service';
-import type { CurrencyRecord, SnapshotResult, TaxEstimateResult, TaxGroup, TaxLineInput } from './finance.types';
+import type { ConversionSnapshot, CurrencyRecord, TaxEstimateResult, TaxGroup, TaxLineInput } from './finance.types';
 import { TaxProfileService } from '../tax-profile/tax-profile.service';
 
 const RATE_ONE: ScaledRate = 10n ** BigInt(RATE_DECIMALS);
 
 /**
- * The finance facade other modules use. Money is read and converted here and nowhere else (ADR-0007): a caller hands
+ * The finance facade other modules use. Money is read and frozen here and nowhere else (ADR-0007): a caller hands
  * in text and gets minor units, and hands in minor units and gets a frozen snapshot — it never does the arithmetic.
  */
 @Injectable()
 export class FinanceApi {
   constructor(
     private readonly currencies: CurrencyService,
-    private readonly rates: ExchangeRateLedgerService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly taxProfiles: TaxProfileService,
   ) {}
@@ -44,48 +41,28 @@ export class FinanceApi {
   }
 
   /**
-   * What `money` is worth in the organization's reporting currency on `rateDate`, frozen for the caller to store. The
-   * reporting currency itself converts at rate 1 (`SAME_CURRENCY`); any other needs a rate entered for exactly that
-   * day, else `MISSING_RATE` — never the latest or the nearest rate (`QĐ-42b`).
+   * What `money` is worth in the organization's reporting currency on `rateDate`, frozen for the caller to store. Every amount is in the
+   * reporting currency, dong (`QĐ-111an`, ADR-0007 as amended), so the snapshot is always the one of the same currency: rate 1,
+   * `SAME_CURRENCY`, no rate row. Nothing converts: money in any other currency is a programming error of the caller, not an answer.
    */
-  async snapshotMoney(tx: DbTx, money: Money, rateDate: BusinessDate): Promise<SnapshotResult> {
+  async snapshotMoney(tx: DbTx, money: Money, rateDate: BusinessDate): Promise<ConversionSnapshot> {
     if (!isBusinessDate(rateDate)) throw new RangeError('The rate date is not a business date');
     // Held shared until the caller commits: the reporting currency read here is still the one when the snapshot is stored.
     const organization = await this.organizationReads.getOrganizationShared(tx);
-    if (!organization) throw new Error('Money was converted before installation');
-
-    const from = await this.currencies.find(money.currency, tx);
-    if (!from) throw new CurrencyNotSupportedError(money.currency);
-    const to = await this.currencies.find(organization.reportingCurrency, tx);
-    if (!to) throw new ReportingCurrencyNotSupportedError(organization.reportingCurrency);
-
-    if (from.code === to.code) {
-      return {
-        status: 'CONVERTED',
-        snapshot: {
-          rate: RATE_ONE,
-          rateDate,
-          rateSource: 'SAME_CURRENCY',
-          reportingAmountMinor: money.amountMinor,
-          reportingCurrency: to.code,
-          exchangeRateId: null,
-        },
-      };
+    if (!organization) throw new Error('Money was frozen before installation');
+    if (money.currency !== organization.reportingCurrency) {
+      throw new Error(
+        `Money in ${money.currency} cannot be frozen: nothing converts, and the reporting currency ${organization.reportingCurrency} is the only one.`,
+      );
     }
 
-    const rate = await this.rates.find(organization.id, from.code, rateDate, tx);
-    if (!rate) return { status: 'MISSING_RATE' };
-
     return {
-      status: 'CONVERTED',
-      snapshot: {
-        rate: rate.rate,
-        rateDate,
-        rateSource: 'MANUAL',
-        reportingAmountMinor: convertToReporting(money.amountMinor, rate.rate, from.minorUnit, to.minorUnit),
-        reportingCurrency: to.code,
-        exchangeRateId: rate.id,
-      },
+      rate: RATE_ONE,
+      rateDate,
+      rateSource: 'SAME_CURRENCY',
+      reportingAmountMinor: money.amountMinor,
+      reportingCurrency: money.currency,
+      exchangeRateId: null,
     };
   }
 

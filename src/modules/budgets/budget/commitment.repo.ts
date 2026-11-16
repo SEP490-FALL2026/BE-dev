@@ -8,6 +8,7 @@ import type {
   CommitmentHoldInput,
   CommitmentReleaseReason,
   HeldCommitment,
+  RequestCommitment,
   SeatCommitment,
 } from '../public/budgets.types';
 import { BudgetCommitmentNotHoldableError } from './budget.errors';
@@ -140,6 +141,7 @@ export class CommitmentRepo {
       costCenterId: row.costCenterId,
       origin: row.origin,
       seatMonthlyMinor: row.seatMonthlyMinor,
+      attachedVersionId: row.attachedVersionId,
     }));
   }
 
@@ -358,6 +360,41 @@ export class CommitmentRepo {
     if (changed.count !== 1) throw new Error(`The commitment ${row.id} changed while an invoice was applied to it.`);
   }
 
+  /**
+   * Gives back to a commitment what seat-months applied and apply no more (`SM1-06`): the reversals are written first (`SeatMonthRepo.insertReversals`), then
+   * `applied_minor` goes down by exactly their sum and the running total `seat_month_reversed_minor` goes up by it, and the commitment is held again; the guard of
+   * the table refuses any other decrease. The caller holds the lock of the row.
+   */
+  async giveBackApplied(tx: DbTx, row: CommitmentRow, returnMinor: bigint): Promise<void> {
+    if (returnMinor === 0n) return;
+    const changed = await tx.budgetCommitment.updateMany({
+      where: { id: row.id, releasedMinor: row.releasedMinor, appliedMinor: row.appliedMinor },
+      data: {
+        appliedMinor: row.appliedMinor - returnMinor,
+        seatMonthReversedMinor: { increment: returnMinor },
+        state: 'HELD',
+      },
+    });
+    if (changed.count !== 1) throw new Error(`The commitment ${row.id} changed while a seat-month gave back to it.`);
+  }
+
+  /** The commitments of the request, the oldest year first, with what is left of each to be invoiced against; locks nothing. */
+  async ofRequest(requestId: string, tx?: DbTx): Promise<RequestCommitment[]> {
+    const rows = await (tx ?? this.prisma).budgetCommitment.findMany({
+      where: { requestId },
+      orderBy: { year: 'asc' },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      year: row.year,
+      costCenterId: row.costCenterId,
+      state: row.state,
+      amountMinor: row.amountMinor,
+      remainingMinor: row.state === 'HELD' ? row.amountMinor - row.releasedMinor - row.appliedMinor : 0n,
+    }));
+  }
+
   /** What went back to the budget from one commitment, the oldest first. */
   async pageReleases(commitmentId: string, skip: number, take: number) {
     const where = { commitmentId };
@@ -432,6 +469,10 @@ export class CommitmentRepo {
     attached?: boolean;
     year?: number;
     costCenterId?: string;
+    /** Only the commitments of these Cost Centers (a head reads those of the department they head); an empty list is none. */
+    costCenterIds?: readonly string[];
+    /** Only what is still held: the long-term commitments of the quarterly review (`QĐ-111aj`), of the `year` asked for. */
+    heldOnly?: boolean;
     requestId?: string;
     state?: 'HELD' | 'RELEASED' | 'EXPENSED';
     skip: number;
@@ -444,15 +485,17 @@ export class CommitmentRepo {
       ...(filter.costCenterId ? { costCenterId: filter.costCenterId } : {}),
       ...(filter.requestId ? { requestId: filter.requestId } : {}),
       ...(filter.id ? { id: filter.id } : {}),
+      ...(filter.costCenterIds ? { AND: [{ costCenterId: { in: [...filter.costCenterIds] } }] } : {}),
     };
+    const longTerm = filter.heldOnly ? { state: 'HELD' as const } : {};
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.budgetCommitment.findMany({
-        where,
+        where: { AND: [where, longTerm] },
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: filter.skip,
         take: filter.take,
       }),
-      this.prisma.budgetCommitment.count({ where }),
+      this.prisma.budgetCommitment.count({ where: { AND: [where, longTerm] } }),
     ]);
 
     return { rows, total };
@@ -497,6 +540,49 @@ export class CommitmentRepo {
   }
 
   /**
+   * The commitments still held in these Cost Centers and years that know what one seat costs a month, with what each still holds: what the review of the
+   * price increase already known reads (`RV-1`, `R-52`). A commitment of a price that is not by the month has no seat price and is not here.
+   */
+  async heldWithSeatPrice(
+    pairs: readonly { costCenterId: string; year: number }[],
+    tx?: DbTx,
+  ): Promise<HeldWithSeatPrice[]> {
+    if (pairs.length === 0) return [];
+    const rows = await (tx ?? this.prisma).budgetCommitment.findMany({
+      where: {
+        state: 'HELD',
+        seatMonthlyMinor: { gt: 0n },
+        OR: pairs.map((pair) => ({ costCenterId: pair.costCenterId, year: pair.year })),
+      },
+      select: {
+        costCenterId: true,
+        year: true,
+        requestId: true,
+        amountMinor: true,
+        releasedMinor: true,
+        appliedMinor: true,
+        seatMonthlyMinor: true,
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.flatMap((row) => {
+      const heldMinor = row.amountMinor - row.releasedMinor - row.appliedMinor;
+      return heldMinor > 0n && row.seatMonthlyMinor !== null
+        ? [
+            {
+              costCenterId: row.costCenterId,
+              year: row.year,
+              requestId: row.requestId,
+              heldMinor,
+              seatMonthlyMinor: row.seatMonthlyMinor,
+            },
+          ]
+        : [];
+    });
+  }
+
+  /**
    * The first `limit` commitments of the Cost Center that are still held, by id, and how many there are: a Cost Center with one
    * cannot be retired (`QĐ-87d(2)`). A commitment is held until nothing of it is left; one that became an expense or was released
    * keeps nothing in use.
@@ -528,6 +614,17 @@ export interface CommitmentOfRequest extends CommitmentRow {
 export interface LockedCommitmentOfRequest extends CommitmentOfRequest {
   origin: 'APPROVAL' | 'YEAR_START';
   seatMonthlyMinor: bigint | null;
+  /** The version it is attached to; null while it waits for a budget (R-48). */
+  attachedVersionId: string | null;
+}
+
+/** A commitment still held that knows what one seat costs a month, with what it still holds. */
+export interface HeldWithSeatPrice {
+  costCenterId: string;
+  year: number;
+  requestId: string;
+  heldMinor: bigint;
+  seatMonthlyMinor: bigint;
 }
 
 /** What a commitment total says about the budget of a Cost Center and year. */

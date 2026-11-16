@@ -1,11 +1,11 @@
 import type { AssessmentWire } from '../../src/modules/requests/assessment/assessment.dto';
 import type { PreviewWire } from '../../src/modules/requests/request-submission/request-preview.dto';
 import request from 'supertest';
-import { addDays } from '../../src/core/business-date';
-import { addMonths } from '../../src/core/fiscal-year';
 import { ApiAccount } from './api-accounts';
 import { clearSpendingApprover, insertEmployeeWithoutPlacement, setSpendingApprover } from './builders/account.builder';
+import type { DecisionStepCode } from '../../src/modules/policies/public/policy-checklist.types';
 import { assignHead } from './builders/organization.builder';
+import { DecisionChecklists, postAssessment, postDecision } from './decision-checklist';
 import { ProvisioningHarness } from './provisioning-harness';
 import { SeatHarness } from './seat-baseline-harness';
 
@@ -105,6 +105,12 @@ export interface Department {
 export class RequestHarness extends ProvisioningHarness {
   private titleName: string | null = null;
 
+  /** The checklist of each decision step, as the policies in force ask it (`QĐ-111ap`): every decision a suite makes sends one. */
+  readonly checklists = new DecisionChecklists();
+  /** Posts the decision of a step with the checklist all Yes, unless the body has its own. */
+  decisionPost = (path: string, account: ApiAccount, step: DecisionStepCode, body: object) =>
+    postDecision(this, path, account, step, body);
+
   /**
    * Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. The suites of
    * other rules send many requests for one person, often for the same plan while the first is still open, so the disposable database of the
@@ -136,6 +142,7 @@ export class RequestHarness extends ProvisioningHarness {
       await this.ctx.sql.query(`CREATE TRIGGER test_harness_exempt_from_request_limits BEFORE INSERT ON ${table}
         FOR EACH ROW EXECUTE FUNCTION test_harness_exempt_from_request_limits()`);
     }
+    await this.checklists.load(this.ctx.sql, this.seed.organizationId);
   }
 
   /** Judges GH-1, GH-2 and GH-3 as the product does: the exemption of `start` is no longer written on new rows. */
@@ -210,7 +217,10 @@ export class RequestHarness extends ProvisioningHarness {
 
   /** The decision of the need step: the head approves or refuses, and no line of the plan is chosen (`QĐ-101n`). */
   decide = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/need-decision`).set(this.as(account)).send(body);
+    request(this.server())
+      .post(`/api/v1/access-requests/${id}/need-decision`)
+      .set(this.as(account))
+      .send(this.checklists.withYes('1.2', body));
   fetch = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/access-requests/${id}`).set(this.as(account));
 
@@ -249,10 +259,9 @@ export class RequestHarness extends ProvisioningHarness {
     request(this.server()).get(`/api/v1/access-requests/${id}/assessment`).set(this.as(account));
   saveAssessment = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).put(`/api/v1/access-requests/${id}/assessment`).set(this.as(account)).send(body);
-  completeAssessment = (id: string, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/assessment/completion`).set(this.as(account));
+  completeAssessment = (id: string, account: ApiAccount) => postAssessment(this, id, 'completion', account);
   rejectAssessment = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/assessment/rejection`).set(this.as(account)).send(body);
+    postAssessment(this, id, 'rejection', account, body);
   registerInternal = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/access-requests/${id}/internal-registration`).set(this.as(account)).send(body);
   linkPlan = (id: string, planId: string, account: ApiAccount) =>
@@ -278,7 +287,7 @@ export class RequestHarness extends ProvisioningHarness {
     controlLevel: 'PARTIAL',
     controlRiskNote: 'No export of usage',
     quote: {
-      unitPrice: { amount: '8.00', currency: 'USD' },
+      unitPrice: { amount: '200000', currency: 'VND' },
       billingCycle: 'MONTHLY',
       validFrom: '2026-01-01',
       validUntil: null,
@@ -312,21 +321,15 @@ export class RequestHarness extends ProvisioningHarness {
       .send({ group: 'T2', lines });
 
   /**
-   * A test that still says how long in months, said in the way the API takes it: the last day of the `termMonths`th month from the month
-   * of today (`QĐ-104a`; the month of today and the month of the end are counted whole, `BR-MF1-06`). No `termMonths` is no end date.
+   * A test says how long in months, as the API takes it: `termMonths` goes in the body as it is (`QĐ-111i`); there is no end date to give.
+   * Kept as one place so a test names the time of use the same way for every form.
    */
-  endDated = <T extends object>(extra: T): Record<string, unknown> => {
-    const { termMonths, ...rest } = extra as Record<string, unknown>;
-
-    return typeof termMonths === 'number'
-      ? { ...rest, expectedEndDate: addDays(addMonths(`${this.today().slice(0, 8)}01`, termMonths), -1) }
-      : rest;
-  };
+  endDated = <T extends object>(extra: T): Record<string, unknown> => ({ ...(extra as Record<string, unknown>) });
 
   /** The months of the amount of a request that runs `months` months from the month of today: the months left of the year at most (`BR-MF1-06`). */
   monthsOf = (months: number): number => Math.min(months, 12 - Number(this.today().slice(5, 7)) + 1);
 
-  /** A form of `BM-01` for the plan, complete: a right with no end unless `extra` gives an end date or `termMonths`. */
+  /** A form of `BM-01` for the plan, complete: a right with no end unless `extra` gives `termMonths`. */
   form = (planId: string, extra: Record<string, unknown> = {}) => ({
     planId,
     businessReason: 'Design the new brand',

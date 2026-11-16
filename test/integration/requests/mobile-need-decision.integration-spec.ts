@@ -36,7 +36,10 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
   const get = (path: string, account: ApiAccount, label?: Label) =>
     request(h.server()).get(`/api/v1${path}`).set(headers(account, label));
   const decide = (id: string, body: object, account: ApiAccount, label?: Label) =>
-    request(h.server()).post(`/api/v1/access-requests/${id}/need-decision`).set(headers(account, label)).send(body);
+    request(h.server())
+      .post(`/api/v1/access-requests/${id}/need-decision`)
+      .set(headers(account, label))
+      .send(h.checklists.withYes('1.2', body));
   const sentBy = async (unit: Unit, planId: string, extra: Record<string, unknown> = {}) => {
     counter += 1;
     const member = await h.staff(unit.department, `${unit.department.code}-M${counter}`, 'EMPLOYEE');
@@ -79,7 +82,8 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
 
       expect(read).toMatchObject({
         businessReason: 'The project needs a wiki',
-        expectedEndDate: h.endDated({ termMonths: 1 }).expectedEndDate,
+        termMonths: 1,
+        expectedEndDate: null,
         pricing: { status: 'PRICED' },
         needStep: { state: 'PENDING', assignee: { employeeId: design.head.employeeId } },
       });
@@ -153,12 +157,10 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
       ).expect(422);
 
       // An end date past a year from today is refused as the domain says it (`US-05-23` AC-9); the confirmation in words is a field that is gone.
-      expect(h.codeOf(long)).toBe('ACCESS_REQUEST.END_DATE_OUT_OF_RANGE');
+      expect(h.codeOf(long)).toBe('ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE');
       expect(h.codeOf(confirmed)).toBe('VALIDATION_ERROR');
       expect(await records(r1.id)).toEqual([]);
-      expect((await wire(r1.id, design.head.account)).expectedEndDate).toBe(
-        h.endDated({ termMonths: 12 }).expectedEndDate,
-      );
+      expect(await wire(r1.id, design.head.account)).toMatchObject({ termMonths: 12, expectedEndDate: null });
     });
   });
 

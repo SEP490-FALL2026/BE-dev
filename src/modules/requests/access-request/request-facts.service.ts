@@ -2,6 +2,7 @@ import type { HeldAccess } from './access-request.types';
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
+import { checkTermMonths, termRunOf, type TermKind, type TermRefusal, type TermRun } from '../../../core/term-limit';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
@@ -14,7 +15,7 @@ import {
 } from './access-request.errors';
 import { hasSpendStep, policyFor, proposalPolicy, type RequestPolicy } from './access-request.policy';
 import type { PricingRecord } from './access-request.types';
-import { maxEndDateOf, pricingRecordFor, type RequestPriceInput } from './pricing.policy';
+import { pricingRecordFor, type RequestPriceInput } from './pricing.policy';
 import { RoutingFactsService, type GatheredRouting } from './routing-facts.service';
 import { routeNeedStep, requestRoutingOf, type RoutingDecision } from './routing.policy';
 import { TransferGraceHoldContributions, type TransferGraceHolding } from '../public/requests.extension-points';
@@ -52,10 +53,11 @@ export interface Assessment {
    * held and the count of the limits (GH-2; a duplicate of the plan stays refused), and the request replaces that right. Null when nothing is held, or the seat is not one of those.
    */
   graceHold: TransferGraceHolding | null;
-  /** The last day a right asked for may end, and whether the end date asked for breaks it or is missing (`FR-2.8`, `US-05-23` AC-9). */
-  maxEndDate: BusinessDate;
-  endDateOutOfRange: boolean;
-  termRequired: boolean;
+  /** What is wrong with the time of use asked for, or null (`QĐ-111i`, `FR-2.8`); and the run it has for the person from today (R-38, R-39). */
+  termRefusal: TermRefusal | null;
+  term: TermRun;
+  /** The last day of the contract of the person with a term; null for anybody else or a contract not known (`TERM_CONTRACT_ENDED` says it). */
+  contractEndDate: BusinessDate | null;
 }
 
 /** What a proposal of software that is not in the catalog is judged by: there is no plan, so no price or seat. */
@@ -67,10 +69,10 @@ export interface ProposalAssessment {
   /** Missing until the IT Admin records a quote (`US-05-06` AC-11): the request is not yet priced. */
   pricing: PricingRecord;
   routing: GatheredRouting & { decision: RoutingDecision };
-  /** The last day the right asked for may end, and whether the end date asked for breaks it or is missing (`FR-2.8`, `US-05-23` AC-9). */
-  maxEndDate: BusinessDate;
-  endDateOutOfRange: boolean;
-  termRequired: boolean;
+  /** What is wrong with the time of use asked for, or null; and the run it has for the person from today (`QĐ-111i`). */
+  termRefusal: TermRefusal | null;
+  term: TermRun;
+  contractEndDate: BusinessDate | null;
 }
 
 export interface AssessmentInput {
@@ -79,10 +81,17 @@ export interface AssessmentInput {
   /** Who sends it, when it is not the person it is for (`US-03-02`); the need step is routed from them. */
   requesterEmployeeId?: string;
   planId: string;
-  /** The day the right ends, as the sender chose it; null or absent for a right with no end (`QĐ-104a`). */
-  expectedEndDate?: BusinessDate | null;
-  /** The day the new period begins for a request to go on using, when it is not today (`QĐ-109b`). */
-  pricingFrom?: BusinessDate;
+  /**
+   * The time of use in months (`QĐ-111i`); null for _Dùng lâu dài_, a right with no end; absent when the form says nothing, which a plan
+   * asked by the month refuses.
+   */
+  termMonths?: number | null;
+  /**
+   * The day the time of use begins when it is not today: a request to go on using begins the day after the right ends (`QĐ-98`, `QĐ-109b`). Given,
+   * the request is for the renewal of a right: the months are judged and run from that day as for any request (`QĐ-111l`), a plan bought once is
+   * refused (it has no end to move), and the end is kept as the end of the new period; a start in a year after today costs nothing in this one.
+   */
+  termStart?: BusinessDate;
   now: Date;
   settings: RequestSettings;
   /** Sending locks the department of the sender against change until commit; showing a preview locks nothing. */
@@ -140,15 +149,24 @@ export class RequestFactsService {
         : this.organizationReads.requireUnitCostCenter(found);
     if (input.lockDepartment) await this.organizationReads.lockDepartmentShared(tx, unit.departmentId);
 
+    const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
+    const renewing = input.termStart !== undefined;
+    const judged = this.termOf({
+      today: input.termStart ?? today,
+      kind: target.provisioningType,
+      termMonths: input.termMonths,
+      employee,
+      renewing,
+    });
     const pricing = await this.priceFor(tx, {
       planId: input.planId,
       free: policy.branch === 'INTERNAL_FREE',
       beneficiaries: 1,
       checkDate: today,
-      endDate: input.expectedEndDate ?? null,
-      from: input.pricingFrom,
+      endDate: judged.term.end,
+      endIsDerived: !renewing,
+      from: input.termStart,
     });
-    const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
     const gathered = await this.routing.gather(tx, {
       requesterEmployeeId: input.requesterEmployeeId ?? input.employeeId,
       departmentId: unit.departmentId,
@@ -171,11 +189,7 @@ export class RequestFactsService {
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
       heldAccess,
       graceHold: heldAccess ? await this.graceHoldOf(tx, input.employeeId, heldAccess, today) : null,
-      ...this.termCheck({
-        today,
-        expectedEndDate: input.expectedEndDate,
-        employmentType: employee?.employmentType ?? 'STAFF',
-      }),
+      ...judged,
     };
   }
 
@@ -186,7 +200,7 @@ export class RequestFactsService {
    */
   async assessProposal(
     tx: DbTx,
-    input: Pick<AssessmentInput, 'employeeId' | 'expectedEndDate' | 'now' | 'settings' | 'lockDepartment'>,
+    input: Pick<AssessmentInput, 'employeeId' | 'termMonths' | 'now' | 'settings' | 'lockDepartment'>,
   ): Promise<ProposalAssessment> {
     const today = await this.organizationReads.businessToday(input.now, tx);
     const found = (await this.organizationReads.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
@@ -211,7 +225,7 @@ export class RequestFactsService {
         status: 'MISSING',
         missingReason: 'AWAITING_QUOTE',
         kind: null,
-        expectedEndDate: input.expectedEndDate ?? null,
+        expectedEndDate: null,
         amountMonths: null,
         budgetYear: fiscalYearOf(today),
         amount: null,
@@ -220,30 +234,41 @@ export class RequestFactsService {
         nextYearAmount: null,
       },
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
-      ...this.termCheck({
-        today,
-        expectedEndDate: input.expectedEndDate,
-        employmentType: employee?.employmentType ?? 'STAFF',
-      }),
+      // The kind of plan of a proposal is not known until the IT Admin registers it: the rule that takes the most (1 to 12 months, or none) judges it.
+      ...this.termOf({ today, kind: 'K2', termMonths: input.termMonths, employee }),
     };
   }
 
   /**
-   * The last day a right may end and whether the end date asked for fits: not before today and not past a year from today
-   * (`US-05-23` AC-9, `QĐ-104a`); a person who is not staff has a term, so no end date is a refusal for them (`FR-2.8`).
+   * The time of use judged for the person (`QĐ-111i`, `FR-2.8`): what is wrong with it, if anything, and the run it has from `today`: its end,
+   * cut at the end of the contract of a person with a term, and the months that begin by it (R-38, R-39). A term that is refused has no
+   * months, so nothing is counted on it.
    */
-  termCheck(facts: {
+  termOf(facts: {
     today: BusinessDate;
-    expectedEndDate: BusinessDate | null | undefined;
-    employmentType: string;
-  }): Pick<Assessment, 'maxEndDate' | 'endDateOutOfRange' | 'termRequired'> {
-    const maxEndDate = maxEndDateOf(facts.today);
-    const end = facts.expectedEndDate ?? null;
+    kind: TermKind;
+    termMonths: number | null | undefined;
+    employee: { employmentType: string; contractEndDate?: BusinessDate | null } | null;
+    /** The time of use is the one of a request to go on using a right: a plan bought once has no end to move, so it is never renewed (`QĐ-111l`). */
+    renewing?: boolean;
+  }): Pick<Assessment, 'termRefusal' | 'term' | 'contractEndDate'> {
+    const fixedTermPerson = (facts.employee?.employmentType ?? 'STAFF') !== 'STAFF';
+    const contractEndDate = facts.employee?.contractEndDate ?? null;
+    const termRefusal = checkTermMonths({
+      kind: facts.kind,
+      termMonths: facts.termMonths,
+      fixedTermPerson,
+      contractEndKnown: contractEndDate !== null,
+      renewing: facts.renewing === true,
+      contractEndDate,
+      termStart: facts.today,
+    });
+    const months = termRefusal === null && typeof facts.termMonths === 'number' ? facts.termMonths : null;
 
     return {
-      maxEndDate,
-      endDateOutOfRange: end !== null && (end < facts.today || end > maxEndDate),
-      termRequired: end === null && facts.employmentType !== 'STAFF',
+      termRefusal,
+      term: termRunOf({ start: facts.today, months, contractEndDate }),
+      contractEndDate,
     };
   }
 

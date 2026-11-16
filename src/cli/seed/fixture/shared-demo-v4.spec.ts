@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { dayOffset, endOfMonth } from '../demo-dates';
-import { evenShareOf } from '../steps/finance.steps';
 import { INSTALLATION } from './shared-demo-v4/installation';
 import { SHARED_DEMO_V4 as F } from './shared-demo-v4';
 
@@ -68,13 +67,31 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
     expect(F.keys.some((k) => k.subscription === 'datagrip')).toBe(false);
   });
 
-  it('has one annual subscription with a commitment, and one priced in a foreign currency with a rate for it', () => {
+  it('has one annual subscription with a commitment, and prices every subscription in dong (the dollar price of Cursor stays beside it as the original price)', () => {
     const annual = F.subscriptions.filter((s) => s.billingCycle === 'ANNUAL');
     expect(annual).toHaveLength(1);
     expect(annual[0]).toMatchObject({ termMonths: 12, renewalInDays: 50 });
-    const foreign = F.subscriptions.filter((s) => s.unitPrice.currency !== F.currency);
-    expect(foreign).toHaveLength(1);
-    expect(F.exchangeRates.map((r) => r.currency)).toContain(foreign[0].unitPrice.currency);
+    // QĐ-111an: a price is written in dong only; no rate is recorded any more (the route is gone), so the fixture holds none.
+    expect(F.subscriptions.filter((s) => s.unitPrice.currency !== F.currency)).toEqual([]);
+    expect(F).not.toHaveProperty('exchangeRates');
+    // 20 USD at the 25.400 the dataset once recorded for the day: the same price, in dong.
+    expect(F.subscriptions.filter((s) => s.originalPrice !== undefined).map((s) => s.key)).toEqual(['cursor']);
+    expect(subscriptionOf('cursor-pro')).toMatchObject({
+      unitPrice: { amount: '508000', currency: 'VND' },
+      originalPrice: { amount: '20', currency: 'USD' },
+    });
+  });
+
+  it('declares no application of the old kind and no pricing model: the system works both out from the plan (CT-1, B-5)', () => {
+    expect(F.applications.map((app) => app.kind)).not.toContain('LICENSED');
+    for (const declared of F.applications.flatMap((app) => app.plans))
+      expect(declared).not.toHaveProperty('pricingModel');
+  });
+
+  it('buys a plan of one purchase (K4) once and every other plan over a term: only a perpetual subscription is written for K4 (B-5)', () => {
+    for (const declared of F.subscriptions) {
+      expect(declared.kind === 'PERPETUAL').toBe(plan(declared.plan).provisioningType === 'K4');
+    }
   });
 
   it('holds only seats of declared people and subscriptions, one seat of a person per subscription', () => {
@@ -111,23 +128,39 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
   });
 });
 
+describe('shared dataset v4: the functional groups', () => {
+  it('puts at least one application in each of the seven groups the installation writes (C-O5)', () => {
+    expect(new Set(F.applications.map((application) => application.functionalGroup))).toEqual(
+      new Set([
+        'Trợ lý AI',
+        'Thiết kế & sáng tạo',
+        'Lập trình & kỹ thuật',
+        'Văn phòng & cộng tác',
+        'Chuyên ngành',
+        'Khác',
+        'Liên lạc (email, chat, họp)',
+      ]),
+    );
+  });
+});
+
 describe('shared dataset v4: the budgets', () => {
-  it('has an approved budget of the year for every department with a Cost Center, and only for them', () => {
+  it('has an approved budget of the year for every department with a Cost Center and a head, and only for them', () => {
+    // A department with no head sends no BM-10; its version from the baseline waits for the deadline (D-Z2-2).
     expect(F.budgets.map((b) => b.department).sort()).toEqual(
       F.departments
-        .filter((d) => d.costCenter !== null)
+        .filter((d) => d.costCenter !== null && d.head !== null)
         .map((d) => d.code)
         .sort(),
     );
-    expect(F.budgets.find((b) => b.department === 'LGL')?.origin).toBe('BASELINE');
     expect(department('LGL').head).toBeNull();
   });
 
   it('makes the three outcomes of the budget check come out whatever the day', () => {
-    // A request that ends on the last day of the month costs one month of the price, whichever day it is sent on.
+    // A request for one month costs one month of the price, whichever day it is sent on.
     const cost = (key: string) => {
       const request = F.requests.find((r) => r.key === key)!;
-      expect(request.end).toBe('EOM');
+      expect(request.termMonths).toBe(1);
 
       return BigInt(subscriptionOf(request.plan!).unitPrice.amount);
     };
@@ -151,32 +184,29 @@ describe('shared dataset v4: the budgets', () => {
     }
   });
 
-  it('opens the next year with a ceiling for each department, within the annual ceiling', () => {
-    const { annualCeiling, sharedPoolReserve, ceilings } = F.nextCycle;
-    const total = Object.values(ceilings ?? {}).reduce((sum, value) => sum + BigInt(value), BigInt(sharedPoolReserve));
-    expect(total).toBeLessThanOrEqual(BigInt(annualCeiling));
-    for (const next of F.nextYear) expect(Object.keys(ceilings ?? {})).toContain(next.department);
+  it('keeps the versions of every year within the annual ceiling less the reserve of the shared pool (10 % reserve each)', () => {
+    const withReserve = (base: string) => (BigInt(base) * 11n) / 10n;
+    const sum = (bases: string[]) => bases.reduce((total, base) => total + withReserve(base), 0n);
+    const room = (cycle: typeof F.cycle) => BigInt(cycle.annualCeiling) - BigInt(cycle.sharedPoolReserve);
+    expect(sum(F.budgets.map((b) => b.base))).toBeLessThanOrEqual(room(F.cycle));
+    const versions = F.nextYear.filter((n) => n.stage !== 'PROPOSAL_SUBMITTED');
+    expect(sum(versions.map((n) => n.base))).toBeLessThanOrEqual(room(F.nextCycle));
   });
 
-  it('leaves the next year at every stage, with a proposal over its ceiling that has all four kinds of line', () => {
+  it('leaves the next year at every stage (DEMO-15), opens the year and the next, and keeps the year after a draft', () => {
     expect(new Set(F.nextYear.map((n) => n.stage))).toEqual(
-      new Set(['PROPOSAL_SUBMITTED', 'VERSION_SENT', 'CHANGES_REQUESTED']),
+      new Set(['PROPOSAL_SUBMITTED', 'VERSION_SENT', 'VERSION_RETURNED', 'APPROVED']),
     );
-    const eng = F.nextYear.find((n) => n.department === 'ENG')!;
-    expect(new Set(eng.lines.map((l) => l.lineType))).toEqual(new Set(['RENEW', 'CHANGE', 'NEW', 'CANCEL']));
-    const counted = eng.lines.filter((l) => l.lineType !== 'CANCEL').reduce((sum, l) => sum + BigInt(l.amount), 0n);
-    expect(counted).toBeGreaterThan(BigInt(F.nextCycle.ceilings!.ENG));
-    for (const line of eng.lines.filter((l) => l.lineType === 'NEW')) expect(line.zbb).toBeDefined();
-    expect(F.nextYear.find((n) => n.stage === 'CHANGES_REQUESTED')?.reason).toBeTruthy();
-  });
-
-  it('divides the annual ceiling so that the departments and the reserve never add up to more, whatever their number', () => {
-    const { annualCeiling, sharedPoolReserve } = F.cycle;
-    for (const departments of [1, 7, 19, 200, 5000]) {
-      const share = BigInt(evenShareOf(annualCeiling, sharedPoolReserve, departments));
-      expect(share * BigInt(departments) + BigInt(sharedPoolReserve)).toBeLessThanOrEqual(BigInt(annualCeiling));
+    expect(F.nextYear.find((n) => n.stage === 'VERSION_RETURNED')?.reason).toBeTruthy();
+    // Some departments with a head send nothing for the next year: the flag of no proposal.
+    const heads = F.departments.filter((d) => d.costCenter !== null && d.head !== null).map((d) => d.code);
+    expect(heads.filter((code) => !F.nextYear.some((n) => n.department === code)).length).toBeGreaterThan(0);
+    expect([F.cycle.open, F.nextCycle.open, F.draftCycle.open]).toEqual([true, true, false]);
+    // The cycle of the year is open on the day of the seed and locked from the next (adjustments, FIX-AD1-Q2).
+    expect(F.cycle.submissionOffsetDays).toBe(0);
+    for (const cycle of [F.cycle, F.nextCycle, F.draftCycle]) {
+      expect(cycle.decisionOffsetDays).toBeGreaterThanOrEqual(cycle.submissionOffsetDays);
     }
-    expect(evenShareOf(annualCeiling, sharedPoolReserve, 0)).toBe('0');
   });
 });
 
@@ -236,11 +266,31 @@ describe('shared dataset v4: the requests of MF-1', () => {
   });
 
   it('gives a time-limited right to the contractor inside the 30-day window and another outside it', () => {
-    const ends = F.requests.filter((r) => typeof r.end === 'object').map((r) => (r.end as { inDays: number }).inDays);
-    expect(Math.min(...ends)).toBeLessThanOrEqual(30);
-    expect(Math.max(...ends)).toBeGreaterThan(30);
-    expect(person('NV-CTR1').employmentType).toBe('CONTRACTOR');
-    expect(F.requests.find((r) => r.requester === 'NV-CTR1')?.end).toEqual({ inDays: 20 });
+    // RQ-2 (QĐ-111i): a request names months, not a date. The contractor's right is cut at the end of the contract the Super Admin
+    // recorded for the person, so it is the contract that puts the end 20 days away; the other right runs its two months.
+    const contractor = person('NV-CTR1');
+    expect(contractor.employmentType).toBe('CONTRACTOR');
+    expect(contractor.contractEndInDays).toBe(20);
+    expect(contractor.contractEndInDays).toBeLessThanOrEqual(30);
+    expect(F.requests.find((r) => r.requester === 'NV-CTR1')?.termMonths).toBeGreaterThanOrEqual(1);
+    expect(F.requests.find((r) => r.key === 'R17')?.termMonths).toBe(2);
+  });
+
+  it('asks for the time of use the kind of plan wants (QĐ-111i): K1 1 to 9 months, K2/K5 1 to 12 or none, K4 none, and months for a person with a term', () => {
+    const typeOf = (key: string) => (key ? plan(key).provisioningType : null);
+    const withTerm = new Set(F.people.filter((p) => p.employmentType !== 'STAFF').map((p) => p.code));
+    for (const request of [...F.requests, { ...F.draft, key: 'draft' }]) {
+      const type = typeOf(request.plan ?? '');
+      if (type === 'K1') expect(request.termMonths).toBeGreaterThanOrEqual(1);
+      if (type === 'K1') expect(request.termMonths).toBeLessThanOrEqual(9);
+      if (type === 'K4') expect(request.termMonths).toBeNull();
+      if (typeof request.termMonths === 'number') {
+        expect(request.termMonths).toBeGreaterThanOrEqual(1);
+        expect(request.termMonths).toBeLessThanOrEqual(12);
+      }
+      // A person with a term never gets a right with no end: 422 TERM_LONG_TERM_NOT_ALLOWED.
+      if (withTerm.has(request.requester) && type !== 'K4') expect(request.termMonths).not.toBeNull();
+    }
   });
 
   it('saves a draft in a department with no Cost Center, which can only stay a draft', () => {

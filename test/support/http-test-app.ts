@@ -3,6 +3,8 @@ import { Test } from '@nestjs/testing';
 import { Client } from 'pg';
 import { App } from 'supertest/types';
 import { configureApplication } from '../../src/app/configure-application';
+import { FunctionalGroupRepo } from '../../src/modules/catalog/functional-group/functional-group.repo';
+import { PoliciesBootstrapApi } from '../../src/modules/policies/public/policies-bootstrap.api';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../src/modules/identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
@@ -131,6 +133,10 @@ export async function seedInstallation(app: INestApplication): Promise<SeededIns
       timeZone: 'Asia/Ho_Chi_Minh',
       reportingCurrency: 'VND',
     });
+    // The installation command starts every organization with the seven standard functional groups (`QĐ-111bf`).
+    await app.get(FunctionalGroupRepo, { strict: false }).insertStandard(tx, org.id);
+    // ... and the eight policies with their first version in force (`QĐ-112b`): a decision step that asks a checklist finds its policy.
+    await app.get(PoliciesBootstrapApi, { strict: false }).seedInitialPolicies(tx, org.id);
     // The department first, then the Cost Center created for it (`QĐ-87d(1)`), as the installation command does.
     const department = await organization.createDepartment(tx, {
       organizationId: org.id,

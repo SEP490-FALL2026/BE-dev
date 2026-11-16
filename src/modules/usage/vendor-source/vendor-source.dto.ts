@@ -43,12 +43,14 @@ export const usageSourceUpdateBodySchema = z
   .partial()
   .refine((body) => Object.keys(body).length > 0, 'at least one field must change');
 
+/** The identifier in the path: of a source, or of the contract for the sources a contract shows. */
 export const usageSourceIdParamSchema = z.strictObject({ id: z.uuid() });
 export const usageSourceListQuerySchema = z.strictObject({
   applicationId: z.uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
+export const usageSourceContractListQuerySchema = usageSourceListQuerySchema.omit({ applicationId: true });
 
 const sourceSchema = z.strictObject({
   id: z.uuid(),
@@ -69,6 +71,14 @@ const sourceSchema = z.strictObject({
   updatedAt: z.iso.datetime(),
 });
 
+/** A source as a contract shows it: its name, its application and its status, and nothing of how it reads a report. */
+const contractSourceSchema = z.strictObject({
+  id: z.uuid(),
+  name: z.string(),
+  application: z.strictObject({ id: z.uuid(), name: z.string() }),
+  status: z.enum(['ACTIVE', 'RETIRED']),
+});
+
 /** A source in a list: without its template, which only the source itself shows. */
 const sourceItemSchema = sourceSchema.omit({ template: true });
 
@@ -76,11 +86,25 @@ export class UsageSourceCreateBodyDto extends createZodDto(usageSourceCreateBody
 export class UsageSourceUpdateBodyDto extends createZodDto(usageSourceUpdateBodySchema) {}
 export class UsageSourceIdParamDto extends createZodDto(usageSourceIdParamSchema) {}
 export class UsageSourceListQueryDto extends createZodDto(usageSourceListQuerySchema) {}
+export class UsageSourceContractListQueryDto extends createZodDto(usageSourceContractListQuerySchema) {}
 export class UsageSourceResponseDto extends createZodDto(successEnvelopeSchema(sourceSchema)) {}
 export class UsageSourcePageResponseDto extends createZodDto(
   successEnvelopeSchema(
     z.strictObject({
       items: z.array(sourceItemSchema),
+      pagination: z.strictObject({
+        page: z.number().int().positive(),
+        pageSize: z.number().int().positive(),
+        totalItems: z.number().int().nonnegative(),
+        totalPages: z.number().int().nonnegative(),
+      }),
+    }),
+  ),
+) {}
+export class UsageSourceContractPageResponseDto extends createZodDto(
+  successEnvelopeSchema(
+    z.strictObject({
+      items: z.array(contractSourceSchema),
       pagination: z.strictObject({
         page: z.number().int().positive(),
         pageSize: z.number().int().positive(),

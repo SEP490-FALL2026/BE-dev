@@ -4,6 +4,13 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { DeciderRole as ReadDeciderRole } from '../access-request/access-request.types';
 import type { LineStage } from '../access-request/group-request.types';
 
+/** A line is approved or refused, never "returned": the return of a group is on the approval record of the step and the checklist, and a check of the table keeps it so. */
+function settled(decision: 'APPROVED' | 'REJECTED' | 'RETURNED'): 'APPROVED' | 'REJECTED' {
+  if (decision === 'RETURNED') throw new Error('The decision of a line is never returned.');
+
+  return decision;
+}
+
 export interface NewLineDecision {
   requestId: string;
   employeeId: string;
@@ -38,6 +45,7 @@ export class LineDecisionRepo {
     });
     return rows.map((row) => ({
       ...row,
+      decision: settled(row.decision),
       deciderRole: row.deciderRole === 'MANAGER' ? 'MANAGER' : 'SPENDING_APPROVER',
     }));
   }

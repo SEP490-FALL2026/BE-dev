@@ -9,8 +9,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { CatalogApi } from './public/catalog.api';
+import { CatalogContractApi } from './public/catalog-contract.api';
 import { CatalogResponsibilityApi } from './public/catalog-responsibility.api';
 import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
+import { ApplicationIntakeController } from './application-intake/application-intake.controller';
+import { ApplicationIntakeService } from './application-intake/application-intake.service';
 import { ApplicationFactsService } from './catalog-entry/application-facts.service';
 import { ApplicationRetirementController } from './application-retirement/application-retirement.controller';
 import { ApplicationResponsibilityController } from './application-responsibility/application-responsibility.controller';
@@ -26,6 +29,10 @@ import { ApplicationPlans } from './catalog-entry/application-plans.types';
 import { ApplicationViewService } from './catalog-entry/application-view.service';
 import { ApplicationVendorLinkService } from './catalog-entry/application-vendor-link.service';
 import { ApplicationsController } from './catalog-entry/applications.controller';
+import { ContractQueryService } from './contract/contract-query.service';
+import { ContractSubscriptionRepo } from './contract/contract-subscription.repo';
+import { ContractSubscriptionService } from './contract/contract-subscription.service';
+import { ContractSubscriptionsController } from './contract/contract-subscriptions.controller';
 import { ContractRepo } from './contract/contract.repo';
 import { ContractService } from './contract/contract.service';
 import { ContractsController } from './contract/contracts.controller';
@@ -105,6 +112,7 @@ import { VendorRepo } from './vendor/vendor.repo';
   controllers: [
     VendorDictionaryController,
     ApplicationsController,
+    ApplicationIntakeController,
     FunctionalGroupsController,
     PlansController,
     PlanTermsController,
@@ -113,6 +121,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRetirementController,
     ApplicationResponsibilityController,
     ContractsController,
+    ContractSubscriptionsController,
     DocumentsController,
     RequestableSoftwareController,
   ],
@@ -135,6 +144,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     FunctionalGroupFactsService,
     ApplicationWriteGuards,
     ApplicationService,
+    ApplicationIntakeService,
     ApplicationViewService,
     ApplicationListService,
     ApplicationVendorLinkService,
@@ -171,6 +181,9 @@ import { VendorRepo } from './vendor/vendor.repo';
     SeatBaselinePhaseHook,
     ContractRepo,
     ContractService,
+    ContractQueryService,
+    ContractSubscriptionRepo,
+    ContractSubscriptionService,
     DocumentRepo,
     DocumentService,
     DocumentExpirySweeper,
@@ -178,6 +191,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRetirementRepo,
     ApplicationRetirementService,
     CatalogApi,
+    CatalogContractApi,
     CatalogResponsibilityApi,
     SubscriptionPeriodApi,
     RequestableSoftwareRepo,
@@ -185,7 +199,14 @@ import { VendorRepo } from './vendor/vendor.repo';
   ],
   // The facade licensing reads the seat targets through (ADR-0013), and the hook licensing binds its reader of occupied seats to
   // (`public/catalog.extension-points.ts`), and the facade the hand-over of an IT Admin who leaves moves their subscriptions and applications through
-  // (`public/catalog-responsibility.api.ts`); the capability services and repos stay private.
-  exports: [CatalogApi, CatalogResponsibilityApi, SubscriptionPeriodApi, SeatOccupancyHook, SeatBaselinePhaseHook],
+  // (`public/catalog-responsibility.api.ts`), and the facade `usage` reads the applications of a contract through (`public/catalog-contract.api.ts`); the capability services and repos stay private.
+  exports: [
+    CatalogApi,
+    CatalogContractApi,
+    CatalogResponsibilityApi,
+    SubscriptionPeriodApi,
+    SeatOccupancyHook,
+    SeatBaselinePhaseHook,
+  ],
 })
 export class CatalogModule {}

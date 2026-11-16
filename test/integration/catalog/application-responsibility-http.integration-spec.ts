@@ -6,6 +6,7 @@ import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } 
 import { waitForLockWaiters } from '../../support/lock-wait';
 import { PgRelay } from '../../support/pg-relay';
 import { QueryCounter, dataStatements } from '../../support/query-count';
+import { intakeBodyOf } from '../../support/application-body';
 
 interface ApplicationWire {
   id: string;
@@ -76,7 +77,14 @@ describe('the responsible IT Admin of an application over HTTP (integration, rea
       await request(server())
         .post('/api/v1/applications')
         .set(as(by))
-        .send({ name: `Responsibility app ${counter}`, kind: 'INTERNAL', dataSensitivity: 'LOW', communication: NO })
+        .send(
+          intakeBodyOf({
+            name: `Responsibility app ${counter}`,
+            kind: 'INTERNAL',
+            dataSensitivity: 'LOW',
+            communication: NO,
+          }),
+        )
         .expect(201),
     );
   };

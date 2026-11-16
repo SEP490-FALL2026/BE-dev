@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { SubscriptionHttpHarness, type SubscriptionWire, USD_1200 } from '../../support/subscription-http-harness';
+import { SubscriptionHttpHarness, type SubscriptionWire, VND_30M } from '../../support/subscription-http-harness';
 
 describe('subscriptions and perpetual purchases over HTTP (integration, real PostgreSQL): the owner department and the milestone for a cancellation', () => {
   const h = new SubscriptionHttpHarness();
-  const { server, as, unique, dataOf, codeOf, today, rate, plan, create, patch, get, subscription, n, auditOf } = h;
+  const { server, as, unique, dataOf, codeOf, today, plan, create, patch, get, subscription, n, auditOf } = h;
 
   beforeAll(async () => {
     await h.start();
@@ -129,11 +129,10 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
     it('AC-1: Figma, 100 seats, renewing 31/12, deadline 01/12, auto renewal: the deadline is used, the alerts count back from it', async () => {
       const { planId } = await plan({ vendorName: 'Figma Inc' });
       today('2026-09-01');
-      await rate('USD', '2026-09-01', '25000');
 
       const created = await subscription(planId, {
         purchasedQuantity: 100,
-        unitPrice: USD_1200,
+        unitPrice: VND_30M,
         billingCycle: 'ANNUAL',
         startDate: '2026-01-01',
         renewalDate: '2026-12-31',

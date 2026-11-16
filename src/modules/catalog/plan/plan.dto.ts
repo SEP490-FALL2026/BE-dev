@@ -67,6 +67,19 @@ export const workspaceProfileBodySchema = z.strictObject({
 export const listPlansQuerySchema = z.strictObject({
   applicationId: z.uuid().optional(),
   provisioningType: provisioningType.optional(),
+  functionalGroupId: z
+    .uuid()
+    .optional()
+    .meta({ description: 'Only the plans of the applications in this functional group.' }),
+  status: z
+    .enum(['APPROVED', 'RETIRED'])
+    .optional()
+    .meta({ description: 'Only the plans of the applications in this catalog status.' }),
+  search: z
+    .string()
+    .max(100)
+    .optional()
+    .meta({ description: 'Text in the name of the plan or of its application, ignoring case and accents.' }),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
@@ -96,6 +109,10 @@ const planSummarySchema = z.strictObject({
   id: z.uuid(),
   applicationId: z.uuid(),
   applicationName: z.string(),
+  applicationLogoUrl: z.string().nullable().meta({
+    description:
+      'The https link to the logo image of the application, or null. It may be broken: show the first letter of the application name when the image does not load.',
+  }),
   name: z.string(),
   provisioningType,
   pricingModel: pricingModel.nullable(),
@@ -108,7 +125,7 @@ const planSummarySchema = z.strictObject({
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
-const planSchema = planSummarySchema.extend({ revocationNote: z.string().nullable() });
+export const planSchema = planSummarySchema.extend({ revocationNote: z.string().nullable() });
 const planDetailSchema = planSchema.extend({ workspaceProfile: workspaceProfileSchema.nullable() });
 
 export class DeclarePlanBodyDto extends createZodDto(declarePlanBodySchema) {}

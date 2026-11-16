@@ -5,7 +5,9 @@ import { NestFactory } from '@nestjs/core';
 import type { AddressInfo, Server } from 'node:net';
 import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
 import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
+import { SHARED_DEMO_V4 } from '../../../src/cli/seed/fixture/shared-demo-v4';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
+import { SeedStorage } from '../../support/flows/seed-storage';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
 import { SHARED_DEMO_V4_REQUEST_STATES } from '../../support/seed-demo-v4-states';
 
@@ -15,6 +17,8 @@ import { SHARED_DEMO_V4_REQUEST_STATES } from '../../support/seed-demo-v4-states
  * work as usual. The database keeps its own clock, which no rule of the scenarios reads.
  */
 describe('ops:seed at the edges of the year (integration, real API and PostgreSQL, controlled date)', () => {
+  // The bytes the seed puts at upload links land in the storage the application reads (BM-10, files of a version).
+  const seedStorage = new SeedStorage();
   let ctx: HttpTestApp;
   let demo: INestApplicationContext;
   let baseUrl: string;
@@ -80,7 +84,8 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
       ],
       now: new Date('2026-12-01T03:00:00Z'),
     });
-    ctx = await createHttpTestApp();
+    await seedStorage.start();
+    ctx = await createHttpTestApp({ providerOverrides: [seedStorage.override] });
     const install = await NestFactory.createApplicationContext(
       (await import('../../../src/modules/installation/installation.module')).InstallationModule,
       { logger: false },
@@ -100,6 +105,7 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
   afterAll(async () => {
     await demo?.close();
     await ctx?.close();
+    await seedStorage.stop();
     jest.useRealTimers();
   });
 
@@ -118,19 +124,21 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
     const budgets = await ctx.sql.query<{ year: number; n: number }>(
       'SELECT year, count(*)::int AS n FROM budget_versions GROUP BY year ORDER BY year',
     );
-    // Shared demo v4: every department with a Cost Center holds an approved version of 2026; of 2027 Marketing's waits for the spending
-    // approver and Sales' was sent back for changes (Engineering and IT stay at a proposal).
+    // Shared demo v4: every department with a Cost Center and a head holds an approved version of 2026 (Legal has no head, D-Z2-2); of
+    // 2027 Engineering's is approved, Marketing's waits for the spending approver and Sales' was returned (IT stays at its BM-10).
     expect(budgets.rows).toEqual([
-      { year: 2026, n: 8 },
-      { year: 2027, n: 2 },
+      { year: 2026, n: SHARED_DEMO_V4.budgets.length },
+      { year: 2027, n: SHARED_DEMO_V4.nextYear.filter((n) => n.stage !== 'PROPOSAL_SUBMITTED').length },
     ]);
-    // The seed opened and published the cycle of the year and of the next one (a head proposes only once it was published).
-    const cycles = await ctx.sql.query<{ year: number; published: boolean }>(
-      'SELECT year, first_published_at IS NOT NULL AS published FROM budget_cycles ORDER BY year',
+    // The seed opened the cycle of the year (deadline the day of the seed) and of the next one; the one after stays a draft.
+    const cycles = await ctx.sql.query<{ year: number; opened: boolean; deadline: string }>(
+      `SELECT year, opened_at IS NOT NULL AS opened, to_char(submission_deadline, 'YYYY-MM-DD') AS deadline
+         FROM budget_cycles ORDER BY year`,
     );
     expect(cycles.rows).toEqual([
-      { year: 2026, published: true },
-      { year: 2027, published: true },
+      { year: 2026, opened: true, deadline: '2026-12-01' },
+      { year: 2027, opened: true, deadline: '2026-12-31' },
+      { year: 2028, opened: false, deadline: '2027-12-01' },
     ]);
 
     expect(await requestStates()).toEqual(SHARED_DEMO_V4_REQUEST_STATES);

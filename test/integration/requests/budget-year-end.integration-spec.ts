@@ -75,7 +75,7 @@ describe('the closure of the fiscal year of the budgets (integration, real Postg
       const returned = await h.budgetProposed(givenBack.head, givenBack.department.unitId);
       await h.giveBack(returned.id, { reason: 'Add the quotes' }, h.finance).expect(200);
       const refused = await sentVersion();
-      await h.decideVersion(refused.version.id, { decision: 'REJECT', reason: 'Too high' }, boss.account).expect(200);
+      await h.refusedBefore(refused.version.id, boss.account, 'Too high');
 
       const done = await h.closeYears(h.inTwoYears());
 
@@ -160,8 +160,6 @@ describe('the closure of the fiscal year of the budgets (integration, real Postg
       expect(table.items.find((row) => row.costCenter.id === b.department.unitId)).toBeUndefined();
       expect(mineA).toMatchObject({ status: 'ACTIVE', total: { amount: '80000000' } });
       expect(mineB).toMatchObject({ status: 'NO_ACTIVE_BUDGET', total: null, latestRefusal: null });
-      const lines = h.dataOf<Pageable<unknown>>(await h.mineLines(b.head.account, h.next).expect(200));
-      expect(lines.pagination.totalItems).toBe(0);
     });
   });
 

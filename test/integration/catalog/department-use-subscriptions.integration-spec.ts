@@ -2,6 +2,7 @@ import request from 'supertest';
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { SeatHarness } from '../../support/seat-baseline-harness';
+import { intakeBodyOf } from '../../support/application-body';
 
 const h = new SeatHarness();
 
@@ -34,13 +35,15 @@ describe('what keeps a department in use: its subscriptions and purchases (integ
       await request(h.server())
         .post('/api/v1/applications')
         .set(h.as(h.it1))
-        .send({
-          name: h.unique('Office'),
-          kind: 'LICENSED',
-          vendorName: h.unique('Vendor'),
-          dataSensitivity: 'LOW',
-          communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
-        })
+        .send(
+          intakeBodyOf({
+            name: h.unique('Office'),
+            kind: 'LICENSED',
+            vendorName: h.unique('Vendor'),
+            dataSensitivity: 'LOW',
+            communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
+          }),
+        )
         .expect(201),
     );
     const planId = h.dataOf<{ id: string }>(
@@ -51,7 +54,6 @@ describe('what keeps a department in use: its subscriptions and purchases (integ
           applicationId: application.id,
           name: h.unique('Plan'),
           provisioningType: 'K4',
-          pricingModel: 'PER_SEAT',
           controlLevel: 'FULL',
         })
         .expect(201),

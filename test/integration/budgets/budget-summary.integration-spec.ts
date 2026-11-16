@@ -63,6 +63,12 @@ describe('the company-wide budget figures over PostgreSQL (US-12-01)', () => {
       base: { amount: String(150 * M), currency: h.reporting },
       reserve: { amount: '0', currency: h.reporting },
       total: { amount: String(150 * M), currency: h.reporting },
+      effectiveBudget: {
+        base: { amount: String(150 * M), currency: h.reporting },
+        reserve: { amount: '0', currency: h.reporting },
+        total: { amount: String(150 * M), currency: h.reporting },
+        adjustment: { amount: '0', currency: h.reporting },
+      },
       committed: { amount: String(80 * M), currency: h.reporting },
       spent: { amount: '0', currency: h.reporting },
       remaining: { amount: String(70 * M), currency: h.reporting },

@@ -9,8 +9,7 @@ import {
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
-  AccessRequestEndDateOutOfRangeError,
-  AccessRequestTermRequiredError,
+  AccessRequestTermRefusedError,
 } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -44,7 +43,7 @@ export interface SubmitOptions {
   toleratedSeatId?: string;
   /** The draft this request is sent from: it is locked first, judged again under the lock, and becomes the request. */
   draftId?: string;
-  /** GH-2 and GH-3 as read before the transaction opened; read here when the caller did not. */
+  /** GH-2 as read before the transaction opened; read here when the caller did not. */
   limitSettings?: LimitSettings;
 }
 
@@ -97,21 +96,20 @@ export class AccessRequestService {
     const assessed = await this.assessment.assess(tx, {
       employeeId: actor.employeeId,
       planId: body.planId,
-      expectedEndDate: body.expectedEndDate ?? null,
+      termMonths: body.termMonths,
       now,
       settings,
       lockDepartment: true,
     });
     this.requireNotHeld(assessed, options.toleratedSeatId);
-    if (assessed.endDateOutOfRange) throw new AccessRequestEndDateOutOfRangeError(assessed.maxEndDate);
-    if (assessed.termRequired) throw new AccessRequestTermRequiredError();
-    const manyPaidSoftware = await this.limits.requireForOne(tx, {
+    if (assessed.termRefusal !== null) {
+      throw new AccessRequestTermRefusedError(assessed.termRefusal, assessed.contractEndDate);
+    }
+    await this.limits.requireForOne(tx, {
       employeeId: actor.employeeId,
       planId: body.planId,
-      applicationId: assessed.target.applicationId,
-      today: assessed.today,
+      now,
       settings: options.limitSettings ?? (await this.limits.settings()),
-      reason: body.manyPaidSoftwareReason,
       exemptions: assessed.graceHold ? new Map([[actor.employeeId, 'TRANSFER_GRACE' as const]]) : undefined,
     });
     const sent: SubmittedRequest = {
@@ -121,7 +119,6 @@ export class AccessRequestService {
       assessed,
       now,
       draftId: options.draftId,
-      manyPaidSoftware,
       graceHold: assessed.graceHold,
     };
     const created = await this.repo.insert(tx, newRequestOf(sent));

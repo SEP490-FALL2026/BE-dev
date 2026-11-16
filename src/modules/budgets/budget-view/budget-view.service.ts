@@ -8,27 +8,18 @@ import { BudgetTableViewService } from './budget-table-view.service';
 import { budgetNumbers } from './budget-view.mapper';
 import { DecisionRepo } from '../budget/decision.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
-import { VersionLineRepo } from '../budget/version-line.repo';
+import { cycleStateOf } from '../cycle/cycle.policy';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
-import { VersionViewService } from '../budget/version-view.service';
-import type {
-  BudgetSummaryWire,
-  MineVersionSummaryWire,
-  MineWire,
-  TableRowWire,
-  VersionLineWire,
-} from '../budget/budget.dto';
+import type { BudgetSummaryWire, MineVersionSummaryWire, MineWire, TableRowWire } from '../budget/budget.dto';
 
 /** The department head reads their own figures; Finance and the spending approver read the company views. */
 @Injectable()
 export class BudgetViewService {
   constructor(
     private readonly versions: VersionRepo,
-    private readonly lineRepo: VersionLineRepo,
     private readonly proposals: ProposalRepo,
     private readonly numbers: BudgetViewNumbersService,
     private readonly decisions: DecisionRepo,
-    private readonly views: VersionViewService,
     private readonly facts: BudgetFactsService,
     private readonly tableView: BudgetTableViewService,
   ) {}
@@ -69,55 +60,21 @@ export class BudgetViewService {
     const format = await this.facts.formatter(current?.currency ?? (await this.facts.reportingCurrency()));
     const totals = (await this.numbers.totals([{ costCenterId: ownId, year }])).get(`${ownId}:${year}`)!;
     const cycle = await this.numbers.cycle(year);
-    const departmentId = (await this.facts.departmentsOf([ownId])).get(ownId);
-    // The head reads the ceiling they were told when the cycle was published (S4-01), never the figure Finance may be editing.
-    const ceiling = cycle?.publishedAt
-      ? cycle.ceilings.find((entry) => entry.departmentId === departmentId && entry.publishedTotalMinor !== null)
-      : null;
-    const ceilingMoney = cycle ? await this.facts.formatter(cycle.currency) : null;
+    const adjustmentMinor = current ? await this.numbers.adjustmentOf(ownId, year) : null;
     return {
-      ...budgetNumbers(current ?? { baseMinor: null, reserveMinor: null, totalMinor: null }, totals, format),
-      departmentCeiling:
-        ceiling && ceilingMoney
-          ? {
-              total: ceilingMoney(ceiling.publishedTotalMinor!),
-              signedCommitments: ceilingMoney(ceiling.signedCommitmentsMinor),
-              plannedSeats: ceilingMoney(ceiling.plannedSeatsMinor),
-              priority: ceilingMoney(ceiling.priorityMinor),
-            }
-          : null,
+      ...budgetNumbers(
+        current ? { ...current, adjustmentMinor } : { baseMinor: null, reserveMinor: null, totalMinor: null },
+        totals,
+        format,
+      ),
       cycle: cycle
         ? {
             submissionDeadline: cycle.submissionDeadline,
             decisionDeadline: cycle.decisionDeadline,
-            published: cycle.publishedAt !== null,
+            status: cycleStateOf(cycle, await this.facts.today(new Date())),
           }
         : null,
     };
-  }
-
-  async mineLines(
-    actor: AuthenticatedPrincipal,
-    year: number,
-    query: { page: number; pageSize: number; costCenterId?: string },
-  ): Promise<Page<VersionLineWire>> {
-    const costCenterId = await this.ownCostCenter(actor, { year, costCenterId: query.costCenterId });
-    const current = await this.versions.reference(costCenterId, year);
-    if (!current) return pageOf([], 0, query.page, query.pageSize);
-    const { items, total } = await this.lineRepo.pageLines(
-      current.id,
-      (query.page - 1) * query.pageSize,
-      query.pageSize,
-    );
-    // The head sees what is planned, not what Finance thought of it.
-    const lines = await this.views.lineWires(current.currency, items);
-
-    return pageOf(
-      lines.map((line) => ({ ...line, financeComment: null, adjustmentReason: null })),
-      total,
-      query.page,
-      query.pageSize,
-    );
   }
 
   table(query: { year?: number; page: number; pageSize: number }): Promise<Page<TableRowWire>> {

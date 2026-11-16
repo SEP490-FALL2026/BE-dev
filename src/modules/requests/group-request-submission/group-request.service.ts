@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { TermRefusal } from '../../../core/term-limit';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -7,6 +8,7 @@ import {
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
+  AccessRequestTermRefusedError,
 } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -18,7 +20,6 @@ import {
   GroupRequestDuplicateLineError,
   GroupRequestLinesRefusedError,
   GroupRequestPlanNotEligibleError,
-  GroupRequestTermBeyondLimitError,
   GroupRequestTooFewLinesError,
   GroupRequestTooManyLinesError,
 } from '../group-request/group-request.errors';
@@ -35,8 +36,8 @@ export interface GroupBody {
   planId: string;
   lines: readonly GroupLineInput[];
   businessReason: string;
-  /** The day the access of every person named ends; absent for no end. */
-  expectedEndDate?: string;
+  /** The time of use of every person named, in months; null for no end, absent when the form says nothing (`QĐ-111i`). */
+  termMonths?: number | null;
 }
 
 /** What `POST /group-requests/check` says: every reason at once, and nothing written. */
@@ -44,13 +45,12 @@ export interface GroupCheck {
   plan: { eligible: boolean; reason: PlanRefusal | null };
   tooManyLines: { max: number } | null;
   tooFewLines: { min: number } | null;
-  maxEndDate: string;
-  endDateOutOfRange: boolean;
+  /** What is wrong with the time of use for the plan as a whole, or null; a person with a term is refused on their own line. */
+  termRefusal: TermRefusal | null;
   lines: {
     employeeId: string;
     ok: boolean;
     reason: LineReason | 'DUPLICATE_LINE' | null;
-    manyPaidSoftware: { count: number; threshold: number } | null;
   }[];
   pricing: PricingRecord;
   lineCount: number;
@@ -91,8 +91,7 @@ export class GroupRequestService {
         plan: { eligible: judged.planRefusal === null, reason: judged.planRefusal },
         tooManyLines: judged.count.tooMany,
         tooFewLines: judged.count.tooFew,
-        maxEndDate: judged.assessed.maxEndDate,
-        endDateOutOfRange: judged.assessed.endDateOutOfRange,
+        termRefusal: judged.termRefusal,
         lines: judged.lines.map((line) => {
           const duplicate = judged.count.duplicates.includes(line.employeeId);
           const reason = duplicate ? ('DUPLICATE_LINE' as const) : (refused.get(line.employeeId) ?? null);
@@ -101,7 +100,6 @@ export class GroupRequestService {
             employeeId: line.employeeId,
             ok: reason === null,
             reason,
-            manyPaidSoftware: judged.limits.get(line.employeeId)?.manyPaidSoftware ?? null,
           };
         }),
         pricing: judged.pricing,
@@ -175,7 +173,7 @@ export class GroupRequestService {
       limitSettings,
       senderEmployeeId: actor.employeeId,
       planId: body.planId,
-      expectedEndDate: body.expectedEndDate ?? null,
+      termMonths: body.termMonths,
       lines: body.lines,
       now: new Date(),
       settings,
@@ -196,7 +194,7 @@ export class GroupRequestService {
   private refuse(judged: GroupJudgement): void {
     if (judged.planRefusal !== null) throw new GroupRequestPlanNotEligibleError(judged.planRefusal);
     if (judged.count.tooMany !== null) throw new GroupRequestTooManyLinesError(judged.count.tooMany.max);
-    if (judged.assessed.endDateOutOfRange) throw new GroupRequestTermBeyondLimitError(judged.assessed.maxEndDate);
+    if (judged.termRefusal !== null) throw new AccessRequestTermRefusedError(judged.termRefusal);
     if (judged.count.tooFew !== null) throw new GroupRequestTooFewLinesError(judged.count.tooFew.min);
     if (judged.count.duplicates.length > 0) throw new GroupRequestDuplicateLineError(judged.count.duplicates);
     if (judged.refused.length > 0) throw new GroupRequestLinesRefusedError(judged.refused);

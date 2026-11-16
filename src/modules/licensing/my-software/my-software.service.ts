@@ -12,7 +12,7 @@ import { MySoftwareRepo, type MyRightRow } from './my-software.repo';
 /** One right of the person as the list answers it: what it is, how it is granted, where it stands and until when. */
 export interface MySoftwareRight {
   assignmentId: string;
-  application: { id: string; name: string };
+  application: { id: string; name: string; logoUrl: string | null };
   plan: { id: string; name: string };
   provisioningType: ProvisioningKind;
   status: MySoftwareStatus;
@@ -71,6 +71,7 @@ function toRight(
     planName: string;
     applicationId: string;
     applicationName: string;
+    applicationLogoUrl: string | null;
     provisioningType: ProvisioningKind;
   },
   today: BusinessDate,
@@ -79,7 +80,7 @@ function toRight(
 
   return {
     assignmentId: row.assignmentId,
-    application: { id: plan.applicationId, name: plan.applicationName },
+    application: { id: plan.applicationId, name: plan.applicationName, logoUrl: plan.applicationLogoUrl },
     plan: { id: plan.planId, name: plan.planName },
     provisioningType: plan.provisioningType,
     status,

@@ -1,24 +1,57 @@
 import { Injectable } from '@nestjs/common';
 import { formatAmount } from '../../../core/money/money';
-import { formatRate } from '../../../core/money/rate';
 import { FinanceApi } from '../../finance/public/finance.api';
 import type { TaxEstimateResult } from '../../finance/public/finance.types';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import type { BusinessDate } from '../../../core/business-date';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { SeatOccupancyHook } from '../public/catalog.extension-points';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { needsVendorAdmins } from '../plan/plan-vendor-admins.policy';
+import { adjustmentPointOf, expiryReading, runsAPeriod } from './obligation/subscription-obligation.policy';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
+import { isPricedInDong } from './price/subscription-price.policy';
 import { liveIdsByPlan, liveSiblingsOf, poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
+import { SubscriptionGrantingRepo } from './subscription-granting.repo';
 import { SubscriptionRepo } from './subscription.repo';
-import type { SubscriptionRecord, SubscriptionView, TaxEstimateSummary, VendorAdminView } from './subscription.types';
+import type {
+  DeadlineKind,
+  ExpiryState,
+  SubscriptionRecord,
+  SubscriptionView,
+  TaxEstimateSummary,
+  VendorAdminView,
+} from './subscription.types';
 
 type LiveOfPlans = { byPlan: Map<string, string[]>; has: (id: string) => boolean };
+type SeatCounts = ReadonlyMap<string, { occupied: number; inRevocation: number }>;
+
+/** Where a subscription stands against its point of adjustment today (`QĐ-111o`). */
+export interface ExpiryReadingView {
+  state: ExpiryState | null;
+  daysLeft: number | null;
+  deadlineKind: DeadlineKind | null;
+}
 
 /** The most live subscriptions of one plan an answer names: duplicates exist only while the seat baseline is open, a few at most. */
 const MERGE_CANDIDATES_MAX = 20;
 
 const mergeCandidatesOf = (live: LiveOfPlans, record: SubscriptionRecord): string[] =>
   live.has(record.id) ? liveSiblingsOf(live.byPlan, record.planId, record.id).slice(0, MERGE_CANDIDATES_MAX) : [];
+
+/** The seats of a shared pool: only a K2 plan has them (a key, a personal right and an internal tool are counted by what they are, `IA-2`). */
+const seatsOfPool = (record: SubscriptionRecord, counts: SeatCounts): SubscriptionView['seats'] => {
+  if (record.planProvisioningType !== 'K2') return null;
+  const taken = counts.get(record.id);
+  const assigned = taken?.occupied ?? 0;
+
+  return {
+    purchased: record.purchasedQuantity,
+    assigned,
+    free: record.purchasedQuantity === null ? null : Math.max(0, record.purchasedQuantity - assigned),
+    inRevocation: taken?.inRevocation ?? 0,
+  };
+};
 
 const mergeWarnings = (mergeCandidateIds: readonly string[]): 'SHOULD_MERGE'[] =>
   mergeCandidateIds.length > 0 ? ['SHOULD_MERGE'] : [];
@@ -36,7 +69,71 @@ export class SubscriptionViewService {
     private readonly subscriptions: SubscriptionRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly planFacts: PlanFactsService,
+    private readonly occupancy: SeatOccupancyHook,
+    private readonly periods: SubscriptionGrantingRepo,
   ) {}
+
+  /**
+   * Where each of these subscriptions stands against its point of adjustment today: near it, past it while seats are still held, or
+   * neither. One read of the seats for any number of subscriptions; what the filter by expiry of a list is found with, and what a row says.
+   */
+  async expiryReadings(records: readonly SubscriptionRecord[]): Promise<Map<string, ExpiryReadingView>> {
+    const today = await this.organizationReads.businessToday();
+    const [seats, continued] = await Promise.all([this.seatsOf(records, today), this.continuedAmong(records)]);
+
+    return this.readingsOf(records, today, seats, continued);
+  }
+
+  /** Which of these subscriptions a later period continues: one read for all of them. */
+  private continuedAmong(records: readonly SubscriptionRecord[]): Promise<ReadonlySet<string>> {
+    return this.periods.idsWithSuccessor(records.map((record) => record.id));
+  }
+
+  private readingsOf(
+    records: readonly SubscriptionRecord[],
+    today: BusinessDate,
+    seats: SeatCounts,
+    continued: ReadonlySet<string>,
+  ): Map<string, ExpiryReadingView> {
+    return new Map(
+      records.map((record) => {
+        // Only a subscription that runs a period has a point: the rule of the filter by expiry, so a badge and the filter never disagree.
+        const point = runsAPeriod({ ...record, hasSuccessor: continued.has(record.id) })
+          ? adjustmentPointOf(record, today)
+          : null;
+
+        return [record.id, expiryReading(point, today, (seats.get(record.id)?.occupied ?? 0) > 0)];
+      }),
+    );
+  }
+
+  /** The seats each of these subscriptions holds from today on, and how many of them are being taken back: one read for all of them. */
+  private seatsOf(records: readonly SubscriptionRecord[], today: BusinessDate): Promise<SeatCounts> {
+    return records.length === 0
+      ? Promise.resolve(new Map())
+      : this.occupancy.get().seatsOfSubscriptions(
+          records.map((record) => record.id),
+          today,
+        );
+  }
+
+  /** The people who answer for these subscriptions, by name, in one read. */
+  private async answerersOf(records: readonly SubscriptionRecord[]) {
+    const ids = [
+      ...new Set(
+        records.flatMap((record) => (record.responsibleItAdminEmployeeId ? [record.responsibleItAdminEmployeeId] : [])),
+      ),
+    ];
+    const people = new Map(
+      (ids.length === 0 ? [] : await this.organizationReads.getEmployees(ids)).map((person) => [person.id, person]),
+    );
+
+    return (record: SubscriptionRecord): SubscriptionView['responsibleItAdmin'] => {
+      const person = record.responsibleItAdminEmployeeId ? people.get(record.responsibleItAdminEmployeeId) : undefined;
+
+      return person ? { employeeId: person.id, employeeCode: person.employeeCode, fullName: person.fullName } : null;
+    };
+  }
 
   /** The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. */
   async viewAll(records: SubscriptionRecord[]): Promise<SubscriptionView[]> {
@@ -74,6 +171,18 @@ export class SubscriptionViewService {
 
     const live = await this.liveOfPooledPlans(records);
     const vendorAdmins = await this.vendorAdminsOf(records);
+    const today = await this.organizationReads.businessToday();
+    const seatCounts = await this.seatsOf(records, today);
+    const readings = this.readingsOf(records, today, seatCounts, await this.continuedAmong(records));
+    const answerer = await this.answerersOf(records);
+    const adjustment = (record: SubscriptionRecord) => ({
+      logoUrl: record.applicationLogoUrl,
+      responsibleItAdmin: answerer(record),
+      expiry: readings.get(record.id)?.state ?? null,
+      daysLeft: readings.get(record.id)?.daysLeft ?? null,
+      deadlineKind: readings.get(record.id)?.deadlineKind ?? null,
+      seats: seatsOfPool(record, seatCounts),
+    });
     const views: SubscriptionView[] = [];
     for (const record of records) {
       // The rule against a second live subscription of a K2 or K4 plan: answered at every phase of the baseline, so the IT Admin sees what to fold (`QĐ-104k`(3)).
@@ -85,13 +194,12 @@ export class SubscriptionViewService {
         quantity: record.purchasedQuantity,
         startDate: record.startDate,
         billingCycle: record.billingCycle,
-        hasPrice: record.unitPrice !== null,
-        hasSnapshot: record.priceSnapshot !== null,
+        hasPrice: isPricedInDong(record),
       });
       let group: TaxEstimateResult['group'] | null = groups.get(record.vendor.id)?.group ?? null;
       let taxEstimate: TaxEstimateSummary | null = null;
       let unitPrice: SubscriptionView['unitPrice'] = null;
-      let priceSnapshot: SubscriptionView['priceSnapshot'] = null;
+      let originalPrice: SubscriptionView['originalPrice'] = null;
       if (record.unitPrice) {
         const units = await minorUnitOf(record.unitPrice.currency);
         unitPrice = { amount: formatAmount(record.unitPrice.amountMinor, units), currency: record.unitPrice.currency };
@@ -107,16 +215,11 @@ export class SubscriptionViewService {
           estimatedCost: formatAmount(estimate.estimatedCostMinor, units),
         };
       }
-      if (record.unitPrice && record.priceSnapshot) {
-        const reportingUnits = await minorUnitOf(record.priceSnapshot.reportingCurrency);
-        priceSnapshot = {
-          recordedOn: record.unitPrice.recordedOn,
-          rate: formatRate(record.priceSnapshot.rate),
-          rateDate: record.priceSnapshot.rateDate,
-          rateSource: record.priceSnapshot.rateSource,
-          reportingAmount: formatAmount(record.priceSnapshot.reportingMinor, reportingUnits),
-          reportingCurrency: record.priceSnapshot.reportingCurrency,
-          exchangeRateId: record.priceSnapshot.exchangeRateId,
+      if (record.originalPrice) {
+        const originalUnits = await minorUnitOf(record.originalPrice.currency);
+        originalPrice = {
+          amount: formatAmount(record.originalPrice.amountMinor, originalUnits),
+          currency: record.originalPrice.currency,
         };
       }
 
@@ -134,7 +237,7 @@ export class SubscriptionViewService {
         missing,
         purchasedQuantity: record.purchasedQuantity,
         unitPrice,
-        priceSnapshot,
+        originalPrice,
         billingCycle: record.billingCycle,
         commitmentTermMonths: record.commitmentTermMonths,
         startDate: record.startDate,
@@ -146,6 +249,7 @@ export class SubscriptionViewService {
         responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
         vendorMinimumSeats: record.vendorMinimumSeats,
         isPrimaryForPlan: record.isPrimaryForPlan,
+        ...adjustment(record),
         noticeDeadline: { value: notice.deadline, source: notice.source },
         alerts: { baseDate: notice.baseDate, dates: alertDates(notice.baseDate, daysBefore) },
         warnings: [...noticeWarnings(notice.source), ...poolWarnings(record), ...mergeWarnings(mergeCandidateIds)],

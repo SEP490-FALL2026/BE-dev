@@ -173,20 +173,17 @@ describe('BR-MF1-02: one-step result notifications', () => {
     expect(told(notices)).toContain(`${PEOPLE.requester}:REQUEST_BUDGET_BLOCKED`);
     expect(told(notices).some((value) => value.startsWith(PEOPLE.finance))).toBe(false);
   });
-  it.each(['PRICE_MISSING', 'RATE_MISSING'])(
-    'Q-31: tells IT and requester for %s, without a budget amount',
-    (reason) => {
-      const notices = plan(
-        event('ACCESS_REQUEST.ONE_STEP_PRICE_MISSING', { reason }, { actorEmployeeId: PEOPLE.requester }),
-        facts(holders),
-      );
-      expect(told(notices)).toEqual([
-        `${PEOPLE.requester}:REQUEST_BUDGET_BLOCKED`,
-        `${PEOPLE.itAdmin}:REQUEST_BUDGET_BLOCKED`,
-      ]);
-      expect(notices[0].params).toEqual({ requestId: REQUEST_ID, reasons: reason });
-    },
-  );
+  it.each(['PRICE_MISSING'])('Q-31: tells IT and requester for %s, without a budget amount', (reason) => {
+    const notices = plan(
+      event('ACCESS_REQUEST.ONE_STEP_PRICE_MISSING', { reason }, { actorEmployeeId: PEOPLE.requester }),
+      facts(holders),
+    );
+    expect(told(notices)).toEqual([
+      `${PEOPLE.requester}:REQUEST_BUDGET_BLOCKED`,
+      `${PEOPLE.itAdmin}:REQUEST_BUDGET_BLOCKED`,
+    ]);
+    expect(notices[0].params).toEqual({ requestId: REQUEST_ID, reasons: reason });
+  });
   it('keeps the no-need-approver flag audit-only', () =>
     expect(plan(event('ACCESS_REQUEST.NO_NEED_APPROVER'), facts(holders))).toEqual([]));
 });

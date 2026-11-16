@@ -1,4 +1,5 @@
 import { FlowWorld } from '../support/flows/flow-world';
+import { bm10Body } from '../support/flows/flow-budget';
 
 const RANDOM_ID = '5b1b4f7e-0a52-4b0e-9f5b-9f3c1a2d7e10';
 
@@ -48,8 +49,11 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
           expectedSpendOn: call().today(),
         }),
       );
-      await refusedWithNothingWritten('access_requests', () =>
-        call().post('NV-DEV3', '/access-requests', { planId: figma, businessReason: 'x', termMonths: 12 }),
+      // Figma is a plan of seats (K2): it takes up to 12 months, so 13 is the first that is refused (not a schema error: the rule of the plan).
+      await refusedWithNothingWritten(
+        'access_requests',
+        () => call().post('NV-DEV3', '/access-requests', { planId: figma, businessReason: 'x', termMonths: 13 }),
+        { status: 422, code: 'ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE' },
       );
       const preview = await call().post('NV-DEV3', '/access-requests/preview', {
         planId: figma,
@@ -65,7 +69,7 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
           await call().post('NV-DEV3', '/access-requests', {
             planId: jira,
             businessReason: 'x',
-            expectedEndDate: call().inDays(60),
+            termMonths: 2,
           })
         ).status,
       ).toBe(201);
@@ -97,27 +101,21 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
       expect((await call().post('NV-ENGH', '/delegated-requests', {})).status).toBe(404);
     });
 
-    it('ngân sách: dòng BM-10 còn khoảng mua, phiên bản còn ngưỡng giá trị cao ⟹ 422 #13 12b @B2', async () => {
-      // The year after: Design already has its proposal for this year (it is how the dataset gave the department its budget), and the
-      // cycle of the next year is published with no proposal of Design in it.
+    it('ngân sách: BM-10 còn dòng hay khoảng mua, phiên bản còn ngưỡng giá trị cao ⟹ 422 #13 12b @B2', async () => {
+      // The year after: its cycle is open and the dataset left no BM-10 of Design in it (DEMO-15).
       const year = Number(call().today().slice(0, 4)) + 1;
-      // A line with no plan: a line that names Figma would be asked for the zero-based explanation (KPI-3 of the usage of the dataset),
-      // which is not what this scenario proves. The only difference between the refusal and the proposal is the retired field.
-      const proposalLine = {
-        description: 'Công cụ thiết kế khác',
-        seats: 2,
-        amount: { amount: '1000000' },
-        lineType: 'RENEW',
-        priorityRank: 1,
-      };
-      await refusedWithNothingWritten('budget_proposals', () =>
-        call().post('NV-DESH', '/budget-proposals', {
-          year,
-          lines: [{ ...proposalLine, windowFrom: call().today() }],
-        }),
-      );
+      // BM-10 is one amount and its files (`QĐ-111ab`): the only difference between a refusal and the proposal is the retired key.
+      const bm10 = await bm10Body(world, 'NV-DESH', year, '1000000');
+      for (const retired of [
+        { lines: [{ description: 'Công cụ thiết kế khác', amount: { amount: '1000000' }, lineType: 'RENEW' }] },
+        { windowFrom: call().today() },
+      ]) {
+        await refusedWithNothingWritten('budget_proposals', () =>
+          call().post('NV-DESH', '/budget-proposals', { ...bm10, ...retired }),
+        );
+      }
       const proposals = await count('budget_proposals');
-      expect((await call().post('NV-DESH', '/budget-proposals', { year, lines: [proposalLine] })).status).toBe(201);
+      expect((await call().post('NV-DESH', '/budget-proposals', bm10)).status).toBe(201);
       expect(await count('budget_proposals')).toBe(proposals + 1);
       await refusedWithNothingWritten('budget_versions', () =>
         call().post('NV-FIN1', '/budget-versions', {

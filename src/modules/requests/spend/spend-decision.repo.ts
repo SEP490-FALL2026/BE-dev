@@ -27,6 +27,18 @@ export interface NewSpendDecision {
   requestState: AccessRequestState;
 }
 
+/** A spend step the spending approver sent back (`QĐ-111ap`): the step closes, the request goes back, and the record of approval says why. */
+export interface NewSpendReturn {
+  organizationId: string;
+  requestId: string;
+  stepId: string;
+  departmentId: string;
+  reason: string;
+  decidedByEmployeeId: string;
+  decidedAt: Date;
+  requestState: AccessRequestState;
+}
+
 /**
  * The one writer of what the spending approver decided: the step, the request, the electronic approval record and the
  * snapshot, written together. The record and the snapshot are never changed (`INV-05`).
@@ -66,6 +78,28 @@ export class SpendDecisionRepo {
     });
   }
 
+  /** The return of the step: no snapshot and no decision of spend, only the step, the request and the record of approval (never changed). */
+  async recordReturn(tx: DbTx, input: NewSpendReturn): Promise<void> {
+    await tx.accessRequestStep.update({
+      where: { id: input.stepId },
+      data: { state: 'CLOSED', decidedAt: input.decidedAt },
+    });
+    await tx.accessRequest.update({ where: { id: input.requestId }, data: { state: input.requestState } });
+    await tx.approvalRecord.create({
+      data: {
+        organizationId: input.organizationId,
+        requestId: input.requestId,
+        stepId: input.stepId,
+        decision: 'RETURNED',
+        decidedByEmployeeId: input.decidedByEmployeeId,
+        deciderRole: 'SPENDING_APPROVER',
+        departmentId: input.departmentId,
+        reason: input.reason,
+        decidedAt: input.decidedAt,
+      },
+    });
+  }
+
   /** What the approver decided, the newest if the request was decided more than once. */
   async latest(requestId: string, tx?: DbTx): Promise<(SpendDecisionRecord & { reason: string | null }) | null> {
     const db = tx ?? this.prisma;
@@ -77,8 +111,11 @@ export class SpendDecisionRepo {
     if (!row) return null;
     const { step, ...decision } = row;
 
+    if (decision.decision === 'RETURNED') throw new Error('The spend decision of a step is never returned.');
+
     return {
       ...decision,
+      decision: decision.decision,
       reason: step.approvalRecord?.reason ?? null,
     };
   }

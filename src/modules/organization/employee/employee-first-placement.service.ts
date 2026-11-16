@@ -79,6 +79,7 @@ export class EmployeeFirstPlacementService {
         workEmail: employee.workEmail,
         employmentType: employee.employmentType,
         hireDate: employee.hireDate,
+        contractEndDate: employee.contractEndDate,
         status: employee.status,
         workState: employee.workState,
         memberSince: input.effectiveFrom,

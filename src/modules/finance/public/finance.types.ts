@@ -9,39 +9,18 @@ export interface CurrencyRecord {
   minorUnit: number;
 }
 
-/** One manually entered rate: units of the reporting currency for one unit of `currency` on `rateDate`. */
-export interface ExchangeRateRecord {
-  id: string;
-  currency: string;
-  rateDate: BusinessDate;
-  rate: ScaledRate;
-  createdAt: Date;
-}
-
-export interface ExchangeRateListFilter {
-  currency?: string;
-  from?: BusinessDate;
-  to?: BusinessDate;
-  skip: number;
-  take: number;
-}
-
-/** Where the rate of a snapshot came from. `SAME_CURRENCY` is rate 1 for the reporting currency itself. */
-export type ConversionRateSource = 'MANUAL' | 'SAME_CURRENCY';
-
-/** What a money value was worth in the reporting currency when it was recorded; frozen, never recomputed (INV-04). */
+/**
+ * What a money value was worth in the reporting currency when it was recorded; frozen, never recomputed (INV-04). Every amount is in the
+ * reporting currency (`QĐ-111an`), so the snapshot is always the one of the same currency: rate 1, `SAME_CURRENCY`, no rate row.
+ */
 export interface ConversionSnapshot {
   rate: ScaledRate;
   rateDate: BusinessDate;
-  rateSource: ConversionRateSource;
+  rateSource: 'SAME_CURRENCY';
   reportingAmountMinor: bigint;
   reportingCurrency: string;
-  /** The rate row used; null for `SAME_CURRENCY`. */
-  exchangeRateId: string | null;
+  exchangeRateId: null;
 }
-
-/** `MISSING_RATE`: no rate for that currency on that very day — never the nearest or latest one (QĐ-42b). */
-export type SnapshotResult = { status: 'CONVERTED'; snapshot: ConversionSnapshot } | { status: 'MISSING_RATE' };
 
 // The tax profile shapes other modules read (the catalog vendor routes), as the public surface of the module.
 export type TaxGroup = 'T1' | 'T2' | 'T3';

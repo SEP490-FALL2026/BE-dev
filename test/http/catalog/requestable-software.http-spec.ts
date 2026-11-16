@@ -15,22 +15,39 @@ const WITH_COST_CENTER = 'e-with-cost-center';
 const WITHOUT_COST_CENTER = 'e-without-cost-center';
 const NO_DEPARTMENT = 'e-no-department';
 
+const GROUP = { id: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d99', name: 'Khác' };
 const applications = [
-  { id: SAAS_APP, name: 'Figma', kind: 'SAAS', vendorName: 'Figma Inc', functionalGroup: null, planCount: 1 },
-  { id: INTERNAL_APP, name: 'Report portal', kind: 'INTERNAL', vendorName: null, functionalGroup: null, planCount: 1 },
+  {
+    id: SAAS_APP,
+    name: 'Figma',
+    kind: 'SAAS',
+    logoUrl: null,
+    vendorName: 'Figma Inc',
+    functionalGroup: GROUP,
+    planCount: 1,
+  },
+  {
+    id: INTERNAL_APP,
+    name: 'Report portal',
+    kind: 'INTERNAL',
+    logoUrl: null,
+    vendorName: null,
+    functionalGroup: GROUP,
+    planCount: 1,
+  },
 ] as const;
 const plans = [
   {
     id: SAAS_PLAN,
     name: 'Professional',
     provisioningType: 'K2',
-    application: { id: SAAS_APP, name: 'Figma', kind: 'SAAS' },
+    application: { id: SAAS_APP, name: 'Figma', kind: 'SAAS', logoUrl: null },
   },
   {
     id: INTERNAL_PLAN,
     name: 'Standard',
     provisioningType: 'K5',
-    application: { id: INTERNAL_APP, name: 'Report portal', kind: 'INTERNAL' },
+    application: { id: INTERNAL_APP, name: 'Report portal', kind: 'INTERNAL', logoUrl: null },
   },
 ] as const;
 

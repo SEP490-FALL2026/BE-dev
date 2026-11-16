@@ -1,8 +1,16 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { REASON_MAX_LENGTH, employeeRef, moneySchema, pricingSchema } from '../access-request/access-request.dto';
+import {
+  REASON_MAX_LENGTH,
+  employeeRef,
+  moneySchema,
+  pricingSchema,
+  requestSchema,
+  termMonthsSchema,
+} from '../access-request/access-request.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
+import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 
 /** A web address with a host: the homepage of the software, which a screen links to. */
 function isWebAddress(value: string): boolean {
@@ -22,25 +30,63 @@ const text = (max: number) => z.string().trim().min(1).max(max);
  * purpose, the data of the company that will go through it (required) and how many people will use it, with the term
  * asked for. The purpose is the reason of the request. Nothing here chooses the branch, the amount or who decides.
  */
-export const proposalBodySchema = z.strictObject({
-  softwareName: text(200),
-  homepageUrl: z.string().trim().max(500).refine(isWebAddress, { message: 'Must be an http or https address.' }).meta({
-    description: 'An absolute web address, http or https, with a host; surrounding whitespace is trimmed first.',
-  }),
-  purpose: text(REASON_MAX_LENGTH),
-  dataDescription: text(REASON_MAX_LENGTH),
-  expectedUsers: z.number().int().min(1).max(1_000_000),
-  /** The day the right ends; optional, at most a year from today, and required for a contractor, a freelancer or an intern. */
-  expectedEndDate: businessDate.optional(),
-  /** GH-3 (`BR-MF1-01g`): required when the person already uses as many paid applications as the threshold; ignored otherwise. */
-  manyPaidSoftwareReason: text(REASON_MAX_LENGTH).optional(),
-});
+export const proposalBodySchema = z
+  .strictObject({
+    softwareName: text(200),
+    homepageUrl: z
+      .string()
+      .trim()
+      .max(500)
+      .refine(isWebAddress, { message: 'Must be an http or https address.' })
+      .meta({
+        description: 'An absolute web address, http or https, with a host; surrounding whitespace is trimmed first.',
+      }),
+    purpose: text(REASON_MAX_LENGTH),
+    dataDescription: text(REASON_MAX_LENGTH),
+    expectedUsers: z.number().int().min(1).max(1_000_000),
+    /** The time of use in months, 1 to 12, or null for a right with no end; a contractor, a freelancer or an intern gives the months. */
+    termMonths: termMonthsSchema.optional(),
+    existingApplicationId: z.uuid().optional().meta({
+      description:
+        'Case B, short: the application of the catalog the software is already in, when only the plan asked for is missing; give it with plannedPlanName. Left out, the software is new to the company and is refused when the catalog already has it (ACCESS_REQUEST.SOFTWARE_IN_CATALOG).',
+    }),
+    plannedPlanName: text(200).optional().meta({
+      description:
+        'Case B, short: the name of the plan asked for, which the application does not have yet; give it with existingApplicationId.',
+    }),
+  })
+  .superRefine((body, context) => {
+    // The application and the plan are one ask: either alone says nothing the IT Admin could assess.
+    if (body.existingApplicationId !== undefined && body.plannedPlanName === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['plannedPlanName'],
+        message: 'Give the plan asked for with the application.',
+      });
+    }
+    if (body.plannedPlanName !== undefined && body.existingApplicationId === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['existingApplicationId'],
+        message: 'Give the application the plan is for.',
+      });
+    }
+  });
 
 const moneyInput = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
 
 /** The quote the IT Admin records: what one person costs for one billing cycle and the days it is in force (`BR-MF1-06`). */
 const quoteInput = z.strictObject({
-  unitPrice: moneyInput,
+  unitPrice: moneyInput.meta({
+    description:
+      'What one person costs for one billing cycle, in dong: a decimal string in major units, currency VND. Another currency is refused (ASSESSMENT.QUOTE_PRICE_NOT_VND).',
+  }),
+  originalPrice: moneyInput
+    .meta({
+      description:
+        'The price the vendor quoted in another currency, kept beside the quote in dong for matching an invoice later: a decimal string in major units of its currency. It is only kept, never converted.',
+    })
+    .optional(),
   billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL']),
   validFrom: businessDate,
   validUntil: businessDate.nullable().optional(),
@@ -80,19 +126,36 @@ export const assessmentPatchSchema = z
       'Give at least one field; a field that is present is written, and the ones that can be cleared take null.',
   });
 
-export const catalogLinkBodySchema = z.strictObject({ planId: z.uuid() });
+export const catalogLinkBodySchema = z.strictObject({
+  planId: z.uuid(),
+  addToDepartmentList: z.boolean().optional().meta({
+    description:
+      'True puts the application and the plan in the list of software of the department of the request, a guide for the next people who ask: the IT Admin must be in charge of that department. False or left out lists nothing.',
+  }),
+});
+
+/**
+ * Completing the assessment (`QĐ-111ap`): the answers to the questions of the policy in force at the step. An answer No locks the completion.
+ */
+export const assessmentCompletionBodySchema = z.strictObject({ checklist: checklistBodySchema }).meta({
+  description:
+    'The checklist of the policy in force at the step of the assessment. The assessment is completed only when every question is answered Yes.',
+});
 
 /**
  * The refusal at the gate of the assessment (`US-05-18`): the kind, which is either a tool that cannot be controlled or
  * software that is not eligible for the catalog (there is no outcome for free software, `QĐ-82n`), the reason that must
- * go with it, and the alternative when the IT Admin has one: a plan of the catalog, a note, or neither.
+ * go with it (typed, or filled in from the questions answered No), and the alternative when the IT Admin has one: a plan of
+ * the catalog, a note, or neither.
  */
-export const assessmentRejectionBodySchema = z
+const assessmentRefusalBodySchema = z
   .strictObject({
+    decision: z.literal('REJECT'),
     kind: z.enum(['UNCONTROLLABLE', 'NOT_ELIGIBLE']),
-    reason: text(REASON_MAX_LENGTH),
+    reason: text(REASON_MAX_LENGTH).optional(),
     alternativePlanId: z.uuid().optional(),
     alternativeNote: text(REASON_MAX_LENGTH).optional(),
+    checklist: checklistBodySchema,
   })
   .superRefine((body, context) => {
     if (body.kind === 'UNCONTROLLABLE' && body.alternativePlanId === undefined && body.alternativeNote === undefined) {
@@ -106,6 +169,26 @@ export const assessmentRejectionBodySchema = z
   .meta({ description: 'UNCONTROLLABLE requires alternativePlanId or alternativeNote.' });
 
 /**
+ * Sending the proposal back to the person who asked, to add what is missing and send it again (`QĐ-111ap`, R-24): no kind and no alternative,
+ * the request is not refused. The reason is typed, or filled in from the questions answered No.
+ */
+const assessmentReturnBodySchema = z.strictObject({
+  decision: z.literal('RETURN'),
+  reason: text(REASON_MAX_LENGTH).optional(),
+  checklist: checklistBodySchema,
+});
+
+/** What the IT Admin does at the gate of the assessment besides completing it: refuse the proposal (`REJECT`) or send it back to its sender (`RETURN`). */
+export const assessmentRejectionBodySchema = z
+  .discriminatedUnion('decision', [assessmentRefusalBodySchema, assessmentReturnBodySchema])
+  .meta({
+    description:
+      'REJECT ends the request as refused by IT and needs the kind of the refusal; RETURN sends the proposal back to the person who asked and takes no kind. Both carry the checklist of the policy in force at the step, and a reason typed or left to be filled in from the questions answered No.',
+  });
+export type AssessmentRefusalBody = z.output<typeof assessmentRefusalBodySchema>;
+export type AssessmentReturnBody = z.output<typeof assessmentReturnBodySchema>;
+
+/**
  * Registering software the company built itself (`US-05-20`): the name when it is not the one proposed; the IT Admin who registers it answers for
  * it (`QĐ-111g`). A payment that the grant needs (`US-05-20` AC-10) comes with the quote that prices it.
  */
@@ -117,6 +200,7 @@ export const internalRegistrationBodySchema = z.strictObject({
 
 const quoteView = z.strictObject({
   unitPrice: moneySchema,
+  originalPrice: moneySchema.nullable(),
   billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL']),
   validFrom: z.string(),
   validUntil: z.string().nullable(),
@@ -131,7 +215,13 @@ const assessmentSchema = z.strictObject({
     purpose: z.string(),
     dataDescription: z.string(),
     expectedUsers: z.number().int().positive(),
+    /** The application of the catalog the software is already in, when only the plan asked for is missing (case B, short); null for software that is new. */
+    existingApplicationId: z.uuid().nullable(),
+    /** That application by name, so the IT Admin sets it against the software the person typed and rejects the proposal when they differ; null when `existingApplicationId` is. */
+    existingApplication: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   }),
+  /** What the IT Admin assesses: FULL is the software and its plan, PLAN_ONLY the plan alone (the proposal names an application of the catalog). */
+  scope: z.enum(['FULL', 'PLAN_ONLY']),
   /** The step of the IT Admin: who holds it, how long it may wait, and when it was done. */
   step: z
     .strictObject({
@@ -197,7 +287,21 @@ const assessmentSchema = z.strictObject({
 export class ProposalBodyDto extends createZodDto(proposalBodySchema) {}
 export class AssessmentPatchDto extends createZodDto(assessmentPatchSchema) {}
 export class CatalogLinkBodyDto extends createZodDto(catalogLinkBodySchema) {}
-export class AssessmentRejectionBodyDto extends createZodDto(assessmentRejectionBodySchema) {}
+/** The request with its plan, and the place of the list of software of the department when the IT Admin asked for one (`added` is false when the place was listed already). */
+export class CatalogLinkResponseDto extends createZodDto(
+  successEnvelopeSchema(
+    z.strictObject({
+      request: requestSchema,
+      departmentList: z.strictObject({ entryId: z.uuid(), added: z.boolean() }).nullable(),
+    }),
+  ),
+) {}
+export class AssessmentCompletionBodyDto extends createZodDto(assessmentCompletionBodySchema) {}
+/** A union is not a class to extend: the value makes the DTO of the route and the same name is the type of what it validates. */
+export const AssessmentRejectionBodyDto = Object.defineProperty(createZodDto(assessmentRejectionBodySchema), 'name', {
+  value: 'AssessmentRejectionBodyDto',
+});
+export type AssessmentRejectionBodyDto = z.infer<typeof assessmentRejectionBodySchema>;
 export class InternalRegistrationBodyDto extends createZodDto(internalRegistrationBodySchema) {}
 export class AssessmentResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ assessment: assessmentSchema })),

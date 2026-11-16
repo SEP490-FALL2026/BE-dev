@@ -23,7 +23,7 @@ export class RequestLimitsRepo {
   }
 
   /**
-   * The requests for new access each of these people has open, oldest first (`QĐ-104b`): sent (not a draft) and not at an end (a
+   * The requests for new access each of these people has open, oldest first, for the duplicate of a plan (GH-1, `QĐ-104b`): sent (not a draft) and not at an end (a
    * request withdrawn that waits for the IT Admin to close its task counts as ended); a request of one person (`GRANT`, a proposal
    * of new software included) or the line of the person in a request for a group that has not ended. A request for a renewal, for a
    * service account, or one that is exempt is not counted, unless `includeExempt` (what the duplicate of a request in the grace of a transfer is
@@ -57,5 +57,35 @@ export class RequestLimitsRepo {
     }
 
     return found;
+  }
+
+  /**
+   * How many requests for new access each of these people was named in between `from` (included) and `to` (excluded) by the moment it was sent
+   * (`QĐ-111h`): a request of one person (`GRANT`, a proposal of new software included) or the line of the person in a request for a group,
+   * whatever became of it: a request withdrawn or refused still counts, a draft is not sent yet and does not. A request for a renewal, for a
+   * service account, or one that is exempt (`QĐ-108c`, `QĐ-110q`) is not counted. One statement; the people with none are absent.
+   */
+  async sentNewRequestsOf(
+    tx: DbTx,
+    employeeIds: readonly string[],
+    window: { from: Date; to: Date },
+  ): Promise<Map<string, number>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await tx.$queryRaw<{ employee_id: string; sent: number }[]>`
+      SELECT b.employee_id, count(*)::int AS sent
+        FROM access_request_beneficiaries b
+        JOIN access_requests r ON r.id = b.request_id
+        LEFT JOIN access_request_lines l ON l.request_id = b.request_id AND l.employee_id = b.employee_id
+       WHERE b.employee_id = ANY(${[...employeeIds]}::uuid[])
+         AND r.state <> 'DRAFT'
+         AND r.submitted_at >= ${window.from}::timestamptz
+         AND r.submitted_at < ${window.to}::timestamptz
+         AND (
+           (r.type = 'GRANT' AND r.limit_exemption IS NULL)
+           OR (r.type = 'GROUP_GRANT' AND l.employee_id IS NOT NULL AND l.limit_exemption IS NULL)
+         )
+       GROUP BY b.employee_id`;
+
+    return new Map(rows.map((row) => [row.employee_id, row.sent]));
   }
 }

@@ -24,7 +24,9 @@ const SECTION_KEYS = {
     'ghostSeats',
     'grantTasks',
     'licenseKeys',
+    'missingInvoicePeriods',
     'offboardingHandovers',
+    'outOfProcessRevocationsDue',
     'plansBelowVendorAdminMinimum',
     'revocationTasks',
     'saasIssues',
@@ -297,6 +299,13 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       expect(sections.licenseKeys).toEqual(countedAs(2, 'licenseKeyList'));
       expect(sections.unconfirmedDevices).toEqual(
         countedAs(await h.totalOf('/api/v1/devices', it1, { state: 'AWAITING_ACKNOWLEDGEMENT' }), 'deviceList'),
+      );
+      // PI-2: the periods whose invoice is five working days late, counted as the list of them totals for this IT Admin.
+      expect(sections.missingInvoicePeriods).toEqual(
+        countedAs(
+          await h.totalOf('/api/v1/purchase-invoices/missing-periods', it1),
+          'purchaseInvoiceMissingPeriodList',
+        ),
       );
       expect(sections.discrepancies).toEqual(countedAs(0, 'usageNoAssignmentFindingList'));
       expect(sections.cancellationDeadlines).toMatchObject({

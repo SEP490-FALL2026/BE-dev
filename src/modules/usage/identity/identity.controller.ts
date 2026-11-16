@@ -110,7 +110,7 @@ export class IdentityController {
   @ApiSuccessResponse(UnmatchedPageResponseDto, {
     message: 'USAGE_IDENTITY.UNMATCHED_LISTED',
     description:
-      'The queue: the open identifiers and the dismissed ones (dismissing keeps them here); each with the people it may be, by code and work email only.',
+      'The queue: the open identifiers and the dismissed ones (dismissing keeps them here); each with the people it may be, by code and work email only. With importId, only the identifiers of the result of that import, to tie or dismiss them there (the same routes handle them by their own id).',
   })
   @ApiErrorResponses(...COMMON_ERRORS, INVALID)
   async queue(@Query() query: UnmatchedListQueryDto) {

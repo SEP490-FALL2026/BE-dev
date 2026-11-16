@@ -9,6 +9,7 @@ import { SpendRoutingService, type RoutingOutcome } from '../../src/modules/requ
 import type { ApiAccount } from './api-accounts';
 import { BudgetHarness, type VersionWire } from './budget-harness';
 import { approvedBudget } from './builders/budget.builder';
+import { submitBatchBody, type SubmitBatchRest } from './spend-batch-body';
 import { waitForLockWaiters } from './lock-wait';
 import type { Department, Person } from './request-harness';
 
@@ -31,8 +32,6 @@ export interface PaidSpec {
 export interface BudgetSpec {
   total: number;
   year?: number;
-  /** The lines of the plan; one line of the last month of the year when not given. */
-  lines?: object[];
   /** The reserve of the version, on top of the base `total`; none when not given (BR-MF1-06e). */
   reserve?: number;
   /** What the attached commitments hold, and what has become an expense. */
@@ -116,7 +115,16 @@ export class SpendHarness extends BudgetHarness {
    * payments the spec gives it. Everything but the payments is what the real routes made.
    */
   async paidRequest(unit: Unit, planId: string, spec: PaidSpec = {}): Promise<string> {
-    const sent = await this.sent(unit.member, planId, { termMonths: 1 });
+    // A plan bought once (K4) asks for no time of use; every other kind takes one month here (`QĐ-111i`).
+    const kind = await this.ctx.sql.query<{ provisioning_type: string }>(
+      `SELECT provisioning_type::text FROM plans WHERE id = $1`,
+      [planId],
+    );
+    const sent = await this.sent(
+      unit.member,
+      planId,
+      kind.rows[0]?.provisioning_type === 'K4' ? {} : { termMonths: 1 },
+    );
     await this.decide(sent.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
     await this.setPayments(sent.id, spec);
 
@@ -159,7 +167,7 @@ export class SpendHarness extends BudgetHarness {
       headToken: unit.head.account.accessToken,
       financeToken: this.finance.accessToken,
       deciderToken: this.deciderOf().accessToken,
-      proposal: this.proposalBody(unit.department.unitId, spec.lines ?? [this.line()], year),
+      proposal: this.proposalBody(unit.department.unitId, spec.total, year),
       version: {
         base: this.money(spec.total),
         reserve: this.money(spec.reserve ?? 0),
@@ -266,18 +274,18 @@ export class SpendHarness extends BudgetHarness {
 
   spendQueue = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/spend-queue').query(query).set(this.as(account));
-  sendOn = (
-    requestIds: string[],
-    account: ApiAccount,
-    reserveConfirmations?: { requestId: string; reason: string }[],
-  ) =>
+  /** The head sends requests on (`spendBatchSubmit`); `submitBatchBody` says what a batch with confirmations of the reserve carries. */
+  sendOn = (requestIds: string[], account: ApiAccount, ...rest: SubmitBatchRest) =>
     request(this.server())
       .post('/api/v1/spend-batches')
       .set(this.as(account))
-      .send(reserveConfirmations ? { requestIds, reserveConfirmations } : { requestIds });
+      .send(submitBatchBody(this.checklists, requestIds, ...rest));
   /** The head confirms, with a line of reason, that a request uses the reserve (`spendReserveConfirm`). */
   confirmReserve = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/reserve-confirmation`).set(this.as(account)).send(body);
+    request(this.server())
+      .post(`/api/v1/access-requests/${id}/reserve-confirmation`)
+      .set(this.as(account))
+      .send(this.checklists.withYes('1.6', body));
   batchList = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/spend-batches').query(query).set(this.as(account));
   batchOf = (id: string, account: ApiAccount) =>
@@ -294,7 +302,7 @@ export class SpendHarness extends BudgetHarness {
   approvalOf = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/access-requests/${id}/spend-approval`).set(this.as(account));
   decideSpend = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/spend-approval`).set(this.as(account)).send(body);
+    this.decisionPost(`/api/v1/access-requests/${id}/spend-approval`, account, '1.7', body);
   withdrawRequest = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/access-requests/${id}/withdraw`).set(this.as(account)).send(body);
   /**
@@ -343,7 +351,7 @@ export class SpendHarness extends BudgetHarness {
   commitmentReleases = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/budget-commitments/${id}/releases`).set(this.as(account));
   decideBatch = (batchId: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/spend-batches/${batchId}/decisions`).set(this.as(account)).send(body);
+    this.decisionPost(`/api/v1/spend-batches/${batchId}/decisions`, account, '1.7', body);
 
   /** A request sent on, so that its spend step waits for the approver: made, attached as the head approved it, and sent. */
   async waitingForApprover(unit: Unit, planId: string, spec: PaidSpec = {}): Promise<string> {

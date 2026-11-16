@@ -8,8 +8,10 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../../support/http-test-app';
+import { declareApplication } from '../../support/builders/catalog.builder';
 
 interface PlanWire {
+  applicationLogoUrl: string | null;
   id: string;
   applicationId: string;
   applicationName: string;
@@ -38,7 +40,6 @@ interface ProfileWire {
   } | null;
 }
 
-const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
 const omit = (source: Record<string, unknown>, key: string) =>
   Object.fromEntries(Object.entries(source).filter(([name]) => name !== key));
 
@@ -91,19 +92,12 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
   const putProfile = (id: string, body: object, account: ApiAccount = it1) =>
     request(server()).put(`/api/v1/plans/${id}/workspace-profile`).set(as(account)).send(body);
   const application = async (kind: 'SAAS' | 'LICENSED' | 'INTERNAL' = 'SAAS', name = unique('App')): Promise<string> =>
-    dataOf<{ id: string }>(
-      await request(server())
-        .post('/api/v1/applications')
-        .set(as(it1))
-        .send({
-          name,
-          kind,
-          ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
-          dataSensitivity: 'LOW',
-          communication: NO,
-        })
-        .expect(201),
-    ).id;
+    declareApplication(ctx, it1.accessToken, {
+      name,
+      kind,
+      ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
+      dataSensitivity: 'LOW',
+    });
   const k2 = (applicationId: string, extra: object = {}) => ({
     applicationId,
     name: unique('Organization'),
@@ -170,32 +164,100 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       ]);
     });
 
-    it('AC-2: refuses a K1, K2 or K4 plan without a pricing model, storing nothing', async () => {
+    it('AC-2, B-5: a plan sent with no pricing model gets the one its kind implies: K1 and K2 per seat, K4 (bought once) none', async () => {
       const app = await application();
-      const before = await n('plans');
 
-      for (const provisioningType of ['K1', 'K2', 'K4']) {
-        const response = await createPlan({
-          applicationId: app,
-          name: unique('No model'),
-          provisioningType,
-          controlLevel: 'FULL',
-        }).expect(422);
-        expect(codeOf(response)).toBe('PLAN.PRICING_MODEL_REQUIRED');
+      for (const [provisioningType, expected] of [
+        ['K1', 'PER_SEAT'],
+        ['K2', 'PER_SEAT'],
+        ['K4', null],
+      ] as const) {
+        const created = dataOf<PlanWire>(
+          await createPlan({
+            applicationId: app,
+            name: unique('No model'),
+            provisioningType,
+            controlLevel: 'FULL',
+          }).expect(201),
+        );
+        expect(created.pricingModel).toBe(expected);
       }
+    });
 
-      expect(await n('plans')).toBe(before);
+    it('B-5: a plan whose kind of provisioning changes is priced again by its new kind (K2 to K4: none, K4 to K2: per seat), and keeps its model when the kind stays', async () => {
+      const app = await application();
+      const created = await plan(app, { name: unique('Repriced') });
+      expect(created.pricingModel).toBe('PER_SEAT');
+
+      const bought = dataOf<PlanWire>(await patchPlan(created.id, { provisioningType: 'K4' }).expect(200));
+      expect([bought.provisioningType, bought.pricingModel, bought.seatTracking]).toEqual([
+        'K4',
+        null,
+        'NOT_APPLICABLE',
+      ]);
+      const back = dataOf<PlanWire>(await patchPlan(created.id, { provisioningType: 'K2' }).expect(200));
+      expect([back.provisioningType, back.pricingModel, back.seatTracking]).toEqual(['K2', 'PER_SEAT', 'APPLICABLE']);
+
+      // A plan made before the derivation may keep another model: a change that leaves the kind alone does not touch it.
+      await ctx.sql.query(`UPDATE plans SET pricing_model = 'FLAT_RATE' WHERE id = $1`, [created.id]);
+      const renamed = dataOf<PlanWire>(await patchPlan(created.id, { name: unique('Renamed') }).expect(200));
+      expect(renamed.pricingModel).toBe('FLAT_RATE');
+      const sameKind = dataOf<PlanWire>(await patchPlan(created.id, { provisioningType: 'K2' }).expect(200));
+      expect(sameKind.pricingModel).toBe('FLAT_RATE');
     });
 
     it('AC-3: a plan that is not per seat shows seats as not applicable, never as zero', async () => {
       const app = await application();
 
+      // A plan made before the pricing model followed the kind may have any of these: the row says it, the answer shows the seats as not applicable.
       for (const pricingModel of ['FLAT_RATE', 'CONCURRENT', 'CONSUMPTION', 'PER_HOST']) {
-        const created = await plan(app, { pricingModel });
+        const created = await plan(app);
+        await ctx.sql.query(`UPDATE plans SET pricing_model = $2::"PricingModel" WHERE id = $1`, [
+          created.id,
+          pricingModel,
+        ]);
+        const read = dataOf<PlanWire & { workspaceProfile: unknown }>(
+          await request(server()).get(`/api/v1/plans/${created.id}`).set(as(it1)).expect(200),
+        );
 
-        expect(created.seatTracking).toBe('NOT_APPLICABLE');
-        expect(Object.keys(created).filter((key) => /seat/i.test(key))).toEqual(['seatTracking']);
+        expect(read.pricingModel).toBe(pricingModel);
+        expect(read.seatTracking).toBe('NOT_APPLICABLE');
+        expect(Object.keys(read).filter((key) => /seat/i.test(key))).toEqual(['seatTracking']);
       }
+    });
+
+    it('B-5: refuses a pricing model the kind of provisioning does not imply, telling the one it does, and writes nothing', async () => {
+      const app = await application();
+      const before = await n('plans');
+      const refused = async (body: object, expected: string | null) => {
+        const response = await createPlan({
+          applicationId: app,
+          name: unique('Not derived'),
+          controlLevel: 'FULL',
+          ...body,
+        }).expect(422);
+        expect(codeOf(response)).toBe('PLAN.PRICING_MODEL_NOT_DERIVED');
+        expect((response.body as { error: { details: { expected: string | null } } }).error.details.expected).toBe(
+          expected,
+        );
+      };
+
+      await refused({ provisioningType: 'K1', pricingModel: 'FLAT_RATE' }, 'PER_SEAT');
+      await refused({ provisioningType: 'K2', pricingModel: 'PER_HOST' }, 'PER_SEAT');
+      await refused({ provisioningType: 'K4', pricingModel: 'PER_SEAT' }, null);
+      expect(await n('plans')).toBe(before);
+      // The one the kind implies is accepted, and so is leaving it out.
+      await createPlan({
+        applicationId: app,
+        name: unique('Implied'),
+        provisioningType: 'K1',
+        pricingModel: 'PER_SEAT',
+        controlLevel: 'FULL',
+      }).expect(201);
+      const k2plan = await plan(app);
+      const patched = await patchPlan(k2plan.id, { pricingModel: 'FLAT_RATE' }).expect(422);
+      expect(codeOf(patched)).toBe('PLAN.PRICING_MODEL_NOT_DERIVED');
+      await patchPlan(k2plan.id, { provisioningType: 'K4', pricingModel: null }).expect(200);
     });
 
     it('AC-4: refuses a plan without a kind; one application has plans of different kinds; K3 cannot be declared yet', async () => {
@@ -347,15 +409,14 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       const changed = dataOf<PlanWire>(
         await patchPlan(created.id, {
           provisioningType: 'K1',
-          pricingModel: 'FLAT_RATE',
           controlLevel: 'PARTIAL',
         }).expect(200),
       );
       expect(changed).toMatchObject({
         provisioningType: 'K1',
-        pricingModel: 'FLAT_RATE',
+        pricingModel: 'PER_SEAT',
         controlLevel: 'PARTIAL',
-        seatTracking: 'NOT_APPLICABLE',
+        seatTracking: 'APPLICABLE',
       });
       expect(codeOf(await patchPlan(created.id, { provisioningType: 'K5' }).expect(422))).toBe(
         'PLAN.PROVISIONING_TYPE_MISMATCH',
@@ -617,9 +678,9 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       const k2Plan = await plan(await application());
       await putProfile(k2Plan.id, profileBody()).expect(200);
 
-      expect(
-        codeOf(await patchPlan(k2Plan.id, { provisioningType: 'K1', pricingModel: 'FLAT_RATE' }).expect(409)),
-      ).toBe('PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE');
+      expect(codeOf(await patchPlan(k2Plan.id, { provisioningType: 'K1' }).expect(409))).toBe(
+        'PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE',
+      );
       await patchPlan(k2Plan.id, { name: unique('Still K2') }).expect(200);
       expect(dataOf<PlanWire>(await getPlan(k2Plan.id).expect(200)).provisioningType).toBe('K2');
     });
@@ -668,6 +729,17 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       );
       expect(all.items.map((item) => item.name)).toEqual(['A plan', 'B plan', 'C plan']);
       expect(all.pagination.totalItems).toBe(3);
+      // CT-1.L2: each row names the logo link of its application, null while there is none.
+      expect(all.items.map((item) => item.applicationLogoUrl)).toEqual([null, null, null]);
+      await ctx.sql.query(`UPDATE applications SET logo_url = 'https://cdn.example.com/logo.png' WHERE id = $1`, [app]);
+      const logo = dataOf<{ items: PlanWire[] }>(
+        await request(server()).get('/api/v1/plans').query({ applicationId: app }).set(as(it1)).expect(200),
+      );
+      expect(logo.items.map((item) => item.applicationLogoUrl)).toEqual([
+        'https://cdn.example.com/logo.png',
+        'https://cdn.example.com/logo.png',
+        'https://cdn.example.com/logo.png',
+      ]);
       const k1 = dataOf<{ items: PlanWire[] }>(
         await request(server())
           .get('/api/v1/plans')

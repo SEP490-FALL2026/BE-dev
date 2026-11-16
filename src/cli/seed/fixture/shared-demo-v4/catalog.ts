@@ -4,7 +4,6 @@ const k2 = (key: string, name: string, extra: Partial<DemoPlan> = {}): DemoPlan 
   key,
   name,
   provisioningType: 'K2',
-  pricingModel: 'PER_SEAT',
   controlLevel: 'FULL',
   dataLossOnRemoval: false,
   sharingPolicy: 'NOT_ALLOWED',
@@ -15,7 +14,6 @@ const k4 = (key: string, name: string, extra: Partial<DemoPlan> = {}): DemoPlan 
   key,
   name,
   provisioningType: 'K4',
-  pricingModel: 'PER_SEAT',
   controlLevel: 'FULL',
   dataLossOnRemoval: false,
   sharingPolicy: 'NOT_ALLOWED',
@@ -29,7 +27,34 @@ const app = (
   plans: DemoPlan[],
   kind: DemoApplication['kind'] = 'SAAS',
   dataSensitivity: DemoApplication['dataSensitivity'] = 'MEDIUM',
-): DemoApplication => ({ key, name, kind, vendorName, dataSensitivity, plans });
+): DemoApplication => ({ key, name, kind, vendorName, dataSensitivity, functionalGroup: groupOf(key), plans });
+
+/**
+ * The seven functional groups the installation writes (`functional-group-standard.policy.ts`), each holding at least one application of the
+ * dataset (C-O5): the catalog screen and the dashboards show every group.
+ */
+export const FUNCTIONAL_GROUPS: readonly (readonly [application: string, group: string])[] = [
+  ['chatgpt', 'Trợ lý AI'],
+  ['cursor', 'Trợ lý AI'],
+  ['figma', 'Thiết kế & sáng tạo'],
+  ['canva', 'Thiết kế & sáng tạo'],
+  ['jira', 'Lập trình & kỹ thuật'],
+  ['github', 'Lập trình & kỹ thuật'],
+  ['postman', 'Lập trình & kỹ thuật'],
+  ['jetbrains', 'Lập trình & kỹ thuật'],
+  ['onepassword', 'Văn phòng & cộng tác'],
+  ['grammarly', 'Văn phòng & cộng tác'],
+  ['mailchimp', 'Chuyên ngành'],
+  ['hr-portal', 'Khác'],
+  ['slack', 'Liên lạc (email, chat, họp)'],
+];
+
+function groupOf(key: string): string {
+  const group = FUNCTIONAL_GROUPS.find(([application]) => application === key)?.[1];
+  if (!group) throw new Error(`The application ${key} names no functional group`);
+
+  return group;
+}
 
 /*
  * Thirteen applications. Each (application, plan) has exactly one subscription, the stock of the shared pool (`QĐ-103d`): K2 plans have
@@ -71,7 +96,6 @@ const APPLICATIONS: DemoApplication[] = [
         key: 'chatgpt-plus',
         name: 'ChatGPT Plus',
         provisioningType: 'K1',
-        pricingModel: 'PER_SEAT',
         controlLevel: 'PARTIAL',
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
@@ -89,7 +113,6 @@ const APPLICATIONS: DemoApplication[] = [
         key: 'cursor-pro',
         name: 'Cursor Pro',
         provisioningType: 'K1',
-        pricingModel: 'PER_SEAT',
         controlLevel: 'PARTIAL',
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
@@ -107,7 +130,6 @@ const APPLICATIONS: DemoApplication[] = [
         key: 'grammarly-pro',
         name: 'Grammarly Pro',
         provisioningType: 'K1',
-        pricingModel: 'PER_SEAT',
         controlLevel: 'PARTIAL',
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
@@ -116,21 +138,16 @@ const APPLICATIONS: DemoApplication[] = [
     'SAAS',
     'MEDIUM',
   ),
-  app(
-    'jetbrains',
-    'JetBrains',
-    'JetBrains',
-    [
-      k4('jetbrains-all', 'JetBrains All Products', { hasAdminConsole: true, vendorAdmin: 'NV-ITA3' }),
-      k4('jetbrains-datagrip', 'JetBrains DataGrip'),
-    ],
-    'LICENSED',
-  ),
+  app('jetbrains', 'JetBrains', 'JetBrains', [
+    k4('jetbrains-all', 'JetBrains All Products', { hasAdminConsole: true, vendorAdmin: 'NV-ITA3' }),
+    k4('jetbrains-datagrip', 'JetBrains DataGrip'),
+  ]),
   {
     key: 'hr-portal',
     name: 'Cổng Nhân sự Nội bộ',
     kind: 'INTERNAL',
     dataSensitivity: 'HIGH',
+    functionalGroup: groupOf('hr-portal'),
     plans: [
       { key: 'hr-portal-access', name: 'Truy cập Cổng Nhân sự', provisioningType: 'K5', dataLossOnRemoval: false },
     ],
@@ -143,12 +160,11 @@ const monthly = (
   amount: string,
   responsible: string,
   freeAfterBaseline: number,
-  currency = 'VND',
 ): DemoSubscription => ({
   key,
   plan,
   kind: 'TERM',
-  unitPrice: { amount, currency },
+  unitPrice: { amount, currency: 'VND' },
   billingCycle: 'MONTHLY',
   termMonths: 1,
   noticePeriodDays: 30,
@@ -180,8 +196,14 @@ const SUBSCRIPTIONS: DemoSubscription[] = [
   monthly('canva', 'canva-teams', '250000', 'NV-ITA2', 4),
   // K1: bought one by one when a seat is granted, so ChatGPT and Cursor start with none (the MF-5 reduction flows count their seats).
   { ...monthly('chatgpt', 'chatgpt-plus', '500000', 'NV-ITA1', 0), quantity: 0, ownerDepartment: 'ENG' },
-  // The one plan priced in a foreign currency: Finance records the rate of the day.
-  { ...monthly('cursor', 'cursor-pro', '20', 'NV-ITA1', 0, 'USD'), quantity: 0, ownerDepartment: 'ENG' },
+  // The vendor quotes 20 USD; a price is written in dong (`QĐ-111an`), so it is 508.000 (at the 25.400 the dataset used to record) and the
+  // dollar quote stays beside it as the original price (FX-1, D-45).
+  {
+    ...monthly('cursor', 'cursor-pro', '508000', 'NV-ITA1', 0),
+    quantity: 0,
+    ownerDepartment: 'ENG',
+    originalPrice: { amount: '20', currency: 'USD' },
+  },
   // The K1 plan of the person who leaves today: its one seat is his, so his revocation shows the K1 checklist (D-62).
   { ...monthly('grammarly', 'grammarly-pro', '300000', 'NV-ITA1', 0), quantity: 1, ownerDepartment: 'ENG' },
   // K4: a key is bought once; the keys sit in the key store. JetBrains has three, DataGrip none.
@@ -234,6 +256,10 @@ const SEATS: DemoSeat[] = [
   ...seat('figma', ['NV-DES10'], { endInDays: 20 }),
   ...seat('figma', ['NV-DES12'], { endInDays: 35 }),
   ...seat('slack', ['NV-ENGH', 'NV-FINH']),
+  // The seat of the bot that posts the alerts of IT in Slack, held by an IT Admin: marked a machine account, never a ghost seat (DEMO-8).
+  ...seat('slack', ['NV-ITA3']),
+  // A right that ends in 7 days: its holder asked to carry it on, the request waits for the head (DEMO-5, R33).
+  ...seat('postman', ['NV-SAL2'], { endInDays: 7 }),
   // Legal has no head, so its budget is built from the baseline: the seats its people hold are what that baseline is made of.
   ...seat('github', ['NV-ENGH', 'NV-DEV1', 'NV-OFF1', 'NV-LGL1']),
   ...seat('onepassword', ['NV-ENGH', 'NV-DEV1', 'NV-DEV4']),
@@ -244,9 +270,8 @@ const SEATS: DemoSeat[] = [
   ...seat('grammarly', ['NV-OFF1']),
 ];
 
-export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats' | 'exchangeRates'> = {
+export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats'> = {
   applications: APPLICATIONS,
   subscriptions: SUBSCRIPTIONS,
   seats: SEATS,
-  exchangeRates: [{ currency: 'USD', rate: '25400' }],
 };

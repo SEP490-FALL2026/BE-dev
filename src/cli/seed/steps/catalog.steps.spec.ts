@@ -11,7 +11,12 @@ import {
 /** QĐ-103d, QĐ-103e: one subscription per plan, in no department's name, bought for the seats of the baseline and the free ones. */
 describe('the body of a subscription the dataset declares', () => {
   const employees = new Map(SHARED_DEMO_V4.people.map((person) => [person.code, `id-${person.code}`]));
-  const ctx = { fixture: SHARED_DEMO_V4, today: '2026-11-10', ids: { employees } } as unknown as DemoRunContext;
+  const departments = new Map([['ENG', 'id-ENG']]);
+  const ctx = {
+    fixture: SHARED_DEMO_V4,
+    today: '2026-11-10',
+    ids: { employees, departments },
+  } as unknown as DemoRunContext;
   const subscription = (key: string) => SHARED_DEMO_V4.subscriptions.find((candidate) => candidate.key === key)!;
 
   it('names the IT Admin who answers for it, no owner department, and a month for a subscription paid by the month', () => {
@@ -35,6 +40,16 @@ describe('the body of a subscription the dataset declares', () => {
       endDate: '2026-12-29',
       startDate: '2025-12-30',
     });
+  });
+
+  it('writes the price in dong and, for the plan once priced in dollars, the original price beside it (FX-1)', () => {
+    expect(subscriptionBody(ctx, subscription('cursor'), 'plan-1')).toMatchObject({
+      unitPrice: { amount: '508000', currency: 'VND' },
+      originalPrice: { amount: '20', currency: 'USD' },
+    });
+    const jira = subscriptionBody(ctx, subscription('jira'), 'plan-1');
+    expect(jira).toMatchObject({ unitPrice: { amount: '200000', currency: 'VND' } });
+    expect(jira).not.toHaveProperty('originalPrice');
   });
 
   it('declares a perpetual subscription with the day it was bought and no end', () => {

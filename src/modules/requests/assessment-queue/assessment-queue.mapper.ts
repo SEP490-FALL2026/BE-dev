@@ -1,4 +1,4 @@
-import { judgeCompletion } from '../assessment/assessment.policy';
+import { judgeCompletion, type AssessmentScope } from '../assessment/assessment.policy';
 import type { AssessmentQueueItemWire } from './assessment-queue.dto';
 import type { AssessmentQueueRow } from './assessment-queue.repo';
 
@@ -12,9 +12,11 @@ export interface QueuePerson {
 export interface QueueLookups {
   people: ReadonlyMap<string, QueuePerson>;
   departments: ReadonlyMap<string, { id: string; name: string }>;
+  /** The applications of the page that are internal software: a short proposal for a plan of one is rejected, not completed (`QĐ-111d`). */
+  internalApplicationIds?: ReadonlySet<string>;
 }
 
-const personOf = (lookups: QueueLookups, id: string) => {
+export const personOf = (lookups: QueueLookups, id: string) => {
   const found = lookups.people.get(id);
   if (!found) throw new Error(`The employee ${id} of a waiting assessment does not exist.`);
 
@@ -22,11 +24,15 @@ const personOf = (lookups: QueueLookups, id: string) => {
 };
 
 /** What completing the assessment would do now, and how many fields it still lacks, as the completion judges it. */
-export function readinessOf(fields: AssessmentQueueRow['fields']): {
+export function readinessOf(
+  fields: AssessmentQueueRow['fields'],
+  scope: AssessmentScope = 'FULL',
+  internalApplication = false,
+): {
   readiness: AssessmentQueueItemWire['readiness'];
   missingCount: number;
 } {
-  const verdict = judgeCompletion(fields);
+  const verdict = judgeCompletion(fields, scope, internalApplication);
   switch (verdict.kind) {
     case 'OK':
       return { readiness: 'COMPLETABLE', missingCount: 0 };
@@ -36,6 +42,8 @@ export function readinessOf(fields: AssessmentQueueRow['fields']): {
       return { readiness: 'INTERNAL_BY_REGISTRATION', missingCount: 0 };
     case 'UNCONTROLLABLE':
       return { readiness: 'UNCONTROLLABLE', missingCount: 0 };
+    case 'FREE_PLAN':
+      return { readiness: 'FREE_PLAN', missingCount: 0 };
   }
 }
 
@@ -68,7 +76,12 @@ export function queueItemOf(
     canAct: !row.readerIsParty,
     started: row.started,
     classification: row.fields.classification,
-    ...readinessOf(row.fields),
+    scope: row.planOnly ? 'PLAN_ONLY' : 'FULL',
+    ...readinessOf(
+      row.fields,
+      row.planOnly ? 'PLAN_ONLY' : 'FULL',
+      row.existingApplicationId !== null && (lookups.internalApplicationIds?.has(row.existingApplicationId) ?? false),
+    ),
     quote: row.fields.quote === null ? 'MISSING' : 'RECORDED',
     slaWorkingDays: row.slaWorkingDays,
     waitingSince: row.reachedItAt.toISOString(),

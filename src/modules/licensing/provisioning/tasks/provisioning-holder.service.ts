@@ -9,6 +9,7 @@ import { OrganizationReadApi } from '../../../organization/public/organization-r
 import {
   ProvisioningBeneficiaryDepartedError,
   ProvisioningBeneficiaryNotStartedError,
+  ProvisioningContractEndedError,
   ProvisioningResponsibleInvalidError,
   ProvisioningResponsibleNotInDepartmentError,
 } from '../../public/licensing.errors';
@@ -68,7 +69,7 @@ export class ProvisioningHolderService {
 
   /**
    * Throws EmployeeNotFoundError, ProvisioningBeneficiaryDepartedError, ProvisioningBeneficiaryNotStartedError,
-   * ProvisioningPersonalAccountError and ProvisioningAnotherItAdminNeededError (an IT Admin does not queue the grant of their own
+   * ProvisioningContractEndedError, ProvisioningPersonalAccountError and ProvisioningAnotherItAdminNeededError (an IT Admin does not queue the grant of their own
    * request while another usable IT Admin can, `QĐ-77m`).
    */
   async personal(
@@ -82,6 +83,11 @@ export class ProvisioningHolderService {
     await this.requireCanBegin(tx, input.requestId, employee);
     if (employee.hireDate > input.today) {
       throw new ProvisioningBeneficiaryNotStartedError(input.requestId, employee.hireDate);
+    }
+    // A person with a term whose contract ended before today has no day left for a seat to run (`INV-07`, R-38): the day the contract ends is still one.
+    const contractEnd = employee.contractEndDate ?? null;
+    if (employee.employmentType !== 'STAFF' && contractEnd !== null && contractEnd < input.today) {
+      throw new ProvisioningContractEndedError(input.requestId, contractEnd);
     }
 
     const mode = await this.frame.selfExecutionMode(actor, input.employeeId, tx);

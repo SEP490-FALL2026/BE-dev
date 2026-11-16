@@ -10,6 +10,7 @@ describe('UploadInspection', () => {
 
   beforeEach(() => {
     storage = {
+      putObject: jest.fn(),
       createUploadUrl: jest.fn(),
       createDownloadUrl: jest.fn(),
       head: jest.fn(),

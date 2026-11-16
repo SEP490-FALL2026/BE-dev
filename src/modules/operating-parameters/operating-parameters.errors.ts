@@ -46,16 +46,6 @@ export class NonWorkingDateReasonInvalidError extends Error {
   }
 }
 
-export type ReportingCurrencyLock = 'EXCHANGE_RATE' | 'CONVERTED_PRICE';
-
-/** A rate is recorded or a subscription has a converted price: the reporting currency is locked (US-01-04 AC-9). */
-export class ReportingCurrencyLockedError extends Error {
-  constructor(readonly reason: ReportingCurrencyLock) {
-    super('The reporting currency is locked: values were already recorded in it.');
-    this.name = 'ReportingCurrencyLockedError';
-  }
-}
-
 /** The parameter is set by another role: the Super Admin sets its own and Finance sets Finance's (`QĐ-103z`(1)). */
 export class ParameterNotYoursError extends Error {
   constructor(readonly key: string) {

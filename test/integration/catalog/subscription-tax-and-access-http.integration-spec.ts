@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { SubscriptionHttpHarness, type SubscriptionWire, USD_1200 } from '../../support/subscription-http-harness';
+import { SubscriptionHttpHarness, type SubscriptionWire, VND_1_2M } from '../../support/subscription-http-harness';
 
 describe('subscriptions and perpetual purchases over HTTP (integration, real PostgreSQL): the tax of the vendor, who may use it, declaring and changing', () => {
   const h = new SubscriptionHttpHarness();
@@ -11,7 +11,6 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
     codeOf,
     detailsOf,
     today,
-    rate,
     plan,
     create,
     patch,
@@ -43,11 +42,10 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
         ],
       }).expect(200);
       today('2026-09-01');
-      await rate('USD', '2026-09-01', '25000');
 
       const created = await subscription(planId, {
         purchasedQuantity: 1,
-        unitPrice: USD_1200,
+        unitPrice: VND_1_2M,
         billingCycle: 'ANNUAL',
         startDate: '2026-09-01',
       });
@@ -57,10 +55,10 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
         basis: 'PROFILE',
         label: 'ESTIMATE',
         group: 'T2',
-        taxAmount: '180.00',
-        deductibleTaxAmount: '120.00',
-        nonDeductibleTaxAmount: '60.00',
-        estimatedCost: '1260.00',
+        taxAmount: '180000',
+        deductibleTaxAmount: '120000',
+        nonDeductibleTaxAmount: '60000',
+        estimatedCost: '1260000',
       });
       await request(server())
         .put(`/api/v1/vendors/${vendorId}/tax-profile`)
@@ -72,11 +70,10 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
     it('AC-11: a vendor with no profile: the price is stored, the tax estimate falls back on the default with its own label, and Finance sees the vendor to declare', async () => {
       const { planId, vendorId } = await plan({ vendorName: 'Miro Inc' });
       today('2026-09-01');
-      await rate('USD', '2026-09-01', '25000');
 
       const created = await subscription(planId, {
         purchasedQuantity: 1,
-        unitPrice: { amount: '800.00', currency: 'USD' },
+        unitPrice: { amount: '800000', currency: 'VND' },
         billingCycle: 'ANNUAL',
         startDate: '2026-09-01',
       });
@@ -87,8 +84,8 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
         basis: 'DEFAULT_NO_PROFILE',
         label: 'ESTIMATE_NO_PROFILE',
         group: 'T2',
-        taxAmount: '120.00',
-        estimatedCost: '840.00',
+        taxAmount: '120000',
+        estimatedCost: '840000',
       });
       const missing = dataOf<{ items: Array<{ id: string }> }>(
         await request(server())
@@ -257,20 +254,12 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
 
     it('queues nothing wrongly: two simultaneous completions of one draft both answer 200 and complete it once', async () => {
       const { planId } = await plan();
-      today('2026-08-20');
-      const created = await subscription(planId, {
-        purchasedQuantity: 1,
-        unitPrice: USD_1200,
-        billingCycle: 'ANNUAL',
-        startDate: '2026-08-01',
-      });
-      await rate('USD', '2026-08-20', '25000');
-      jest.restoreAllMocks();
+      const draftId = await h.wholeDraft(planId, { day: '2026-08-20' });
 
-      const results = await Promise.all([complete(created.id), complete(created.id)]);
+      const results = await Promise.all([complete(draftId), complete(draftId)]);
 
       expect(results.map((response) => response.status)).toEqual([200, 200]);
-      expect((await auditOf(created.id)).filter((event) => event.action === 'SUBSCRIPTION.COMPLETED')).toHaveLength(1);
+      expect((await auditOf(draftId)).filter((event) => event.action === 'SUBSCRIPTION.COMPLETED')).toHaveLength(1);
     });
   });
 });

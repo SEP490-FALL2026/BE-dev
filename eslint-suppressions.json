@@ -4,17 +4,7 @@
       "count": 1
     }
   },
-  "src/modules/budgets/budget/version-view.service.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/budgets/proposal/proposal-view.service.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
-  "src/modules/budgets/version/line-import.service.ts": {
     "complexity": {
       "count": 1
     }
@@ -277,9 +267,6 @@
   "src/modules/requests/group-line-decisions/group-spend-decision.service.ts": {
     "complexity": {
       "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
     }
   },
   "src/modules/requests/group-request-submission/group-request-trail.mapper.ts": {

@@ -1,6 +1,25 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { ProvisioningKind } from '../../licensing/public/licensing.types';
 
+/**
+ * Where the Request to grant a software that a person sent for themselves stands on its way, as the review of the accounts outside the process reads it
+ * (`US-13-05` AC-23): before the step of the spending approver, at that step (to be sent as spend, waiting for the decision, or sent back to the
+ * requester), or approved (to be carried out, being carried out, or done).
+ */
+export interface GrantRequestOnItsWay {
+  requestId: string;
+  stage: 'BEFORE_SPEND' | 'AT_SPEND' | 'APPROVED';
+  /** The day it came to the queue of the step of the spending approver, in the calendar of the organization; null before it, or when it was not recorded. */
+  reachedSpendOn: BusinessDate | null;
+}
+
+/** The Request of one person for one application that a case asks about; a Request done counts only when the right was granted on or after `since`. */
+export interface GrantRequestQuestion {
+  employeeId: string;
+  applicationId: string;
+  since: BusinessDate;
+}
+
 /** A request a person is the beneficiary of that is not over, as the IT Admin sees it beside the record of their departure (`US-03-04` AC-24). */
 export interface OpenRequestOfBeneficiary {
   requestId: string;

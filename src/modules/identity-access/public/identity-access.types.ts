@@ -213,3 +213,11 @@ export interface AccessBlockRecord {
 
 /** What cancelling a departure did to the block: dropped, kept because it already took effect, or there was none. */
 export type PendingBlockOutcome = 'CLEARED' | 'IN_FORCE' | 'NONE';
+
+/** One account that can act and holds a role asked about, with who its person is: a row of a report of who has done something for the role. */
+export interface RoleHolderRecord {
+  appUserId: string;
+  employeeId: string;
+  employeeCode: string;
+  fullName: string;
+}

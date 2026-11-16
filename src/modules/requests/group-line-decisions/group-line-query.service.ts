@@ -100,7 +100,7 @@ export class GroupLineQueryService {
     const wires: GroupLineWire[] = [];
     for (const line of items) {
       const mine = decisions.filter((decision) => decision.employeeId === line.employeeId);
-      const held = shares.filter((share) => share.employeeId === line.employeeId);
+      const held = shares.filter((share) => share.employeeId === line.employeeId && share.held);
       const step = stepOf.get(line.needStepId);
       if (!step) throw new Error(`The line of ${line.employeeId} points at a missing step.`);
       wires.push({

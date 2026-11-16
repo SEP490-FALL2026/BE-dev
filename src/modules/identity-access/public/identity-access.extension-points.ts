@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Contributions } from '../../../core/extension/contributions';
 import { Listeners } from '../../../core/extension/listeners';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { ApprovalRoleChange } from './identity-access.types';
+import type { AppRole, ApprovalRoleChange } from './identity-access.types';
 
 // The points identity-access opens for the modules above it (`core/extension`): they add to them from a `*.listener.ts` when
 // their module starts, so identity-access never imports them. One instance of each per application.
@@ -62,5 +62,36 @@ export interface SpendingApproverGrantCheck {
 export class SpendingApproverGrantChecks extends Contributions<SpendingApproverGrantCheck> {
   constructor() {
     super('identity-access.spending-approver-grant-checks');
+  }
+}
+
+/** A policy in force that a person owes an acknowledgement of: what `GET /me` lists so the interface can ask before the dashboard (`QĐ-111ar`). */
+export interface PendingPolicyAcknowledgement {
+  code: string;
+  title: string;
+  versionNumber: number;
+}
+
+/** The person to ask about: the account and the roles it holds, as `GET /me` knows them. */
+export interface PolicyReader {
+  appUserId: string;
+  employeeId: string;
+  roles: readonly AppRole[];
+}
+
+/** A module that knows policies the person has not acknowledged yet. */
+export interface PendingPolicyAcknowledgementSource {
+  pendingFor(reader: PolicyReader): Promise<PendingPolicyAcknowledgement[]>;
+}
+
+/**
+ * Who tells `GET /me` which policies the caller owes an acknowledgement of (`QĐ-111ar`): the library of policies sits in a module above
+ * identity-access, which adds one source from a `*.listener.ts`. Held by the facade module, one per application; with nobody added the
+ * list is empty. The route only tells: no other route refuses a person who has not acknowledged.
+ */
+@Injectable()
+export class PendingPolicyAcknowledgements extends Contributions<PendingPolicyAcknowledgementSource> {
+  constructor() {
+    super('identity-access.pending-policy-acknowledgements');
   }
 }

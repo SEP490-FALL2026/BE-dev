@@ -41,4 +41,30 @@ export class BudgetViewsHarness extends SpendHarness {
       amount,
     ]);
   }
+
+  /** An expense of a Cost Center with no commitment (an invoice of a purchase booked to the department that bears it, a case outside the process): the month it pays for names the year. */
+  async expenseWithoutCommitment(unit: Unit, serviceMonth: string, amount: number): Promise<void> {
+    await this.ctx.sql.query(
+      `
+      INSERT INTO vendors (id, organization_id, name, normalized_name)
+      VALUES (gen_random_uuid(), $1, 'Budget views vendor', 'budget views vendor') ON CONFLICT DO NOTHING`,
+      [this.seed.organizationId],
+    );
+    await this.ctx.sql.query(
+      `
+      INSERT INTO invoices (id, organization_id, commitment_id, cost_center_id, service_month, vendor_id, number, issued_on, currency,
+        net_minor, deductible_tax_minor, non_deductible_tax_minor, actual_cost_minor, applied_minor, match_result, recorded_by_employee_id, recorded_at)
+      SELECT gen_random_uuid(), $1, NULL, $2, $3::date, id, $4, $3::date, $5, $6, 0, 0, $6, 0, 'MATCHED', $7, $3::date
+        FROM vendors WHERE organization_id = $1 ORDER BY id LIMIT 1`,
+      [
+        this.seed.organizationId,
+        unit.department.unitId,
+        serviceMonth,
+        `BV-X-${unit.department.unitId.slice(0, 8)}-${serviceMonth}`,
+        this.reporting,
+        amount,
+        this.finance.employeeId,
+      ],
+    );
+  }
 }

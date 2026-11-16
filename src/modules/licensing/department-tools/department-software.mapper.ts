@@ -3,7 +3,7 @@ import type { SoftwareEntry, SoftwareProposal } from './department-software.type
 
 /** What the catalog and the organization call the things a place and a proposal name: only the words, never a price or a subscription. */
 export interface SoftwareNames {
-  applications: ReadonlyMap<string, string>;
+  applications: ReadonlyMap<string, { name: string; logoUrl: string | null }>;
   plans: ReadonlyMap<string, string>;
   people: ReadonlyMap<string, { employeeCode: string; fullName: string }>;
   departments: ReadonlyMap<string, { code: string; name: string }>;
@@ -21,7 +21,8 @@ export function toEntryWire(entry: SoftwareEntry, names: SoftwareNames): Softwar
   return {
     entryId: entry.id,
     applicationId: entry.applicationId,
-    applicationName: named(names.applications, entry.applicationId, 'application'),
+    applicationName: named(names.applications, entry.applicationId, 'application').name,
+    applicationLogoUrl: named(names.applications, entry.applicationId, 'application').logoUrl,
     planId: entry.planId,
     planName: entry.planId === null ? null : named(names.plans, entry.planId, 'plan'),
     note: entry.note,
@@ -37,7 +38,8 @@ export function toProposalWire(proposal: SoftwareProposal, names: SoftwareNames)
     proposalId: proposal.id,
     department: { id: proposal.departmentId, code: department.code, name: department.name },
     applicationId: proposal.applicationId,
-    applicationName: named(names.applications, proposal.applicationId, 'application'),
+    applicationName: named(names.applications, proposal.applicationId, 'application').name,
+    applicationLogoUrl: named(names.applications, proposal.applicationId, 'application').logoUrl,
     planId: proposal.planId,
     planName: proposal.planId === null ? null : named(names.plans, proposal.planId, 'plan'),
     reason: proposal.reason,

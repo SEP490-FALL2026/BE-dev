@@ -410,3 +410,101 @@ model UsageNoAssignmentFinding {
   @@index([applicationId, status])
   @@map("usage_no_assignment_findings")
 }
+
+// Where a difference between what the company has on record and what the vendor shows came from (`SBF-08`, RC-2).
+enum VendorAccountDiscrepancySource {
+  NO_ASSIGNMENT
+  UNMATCHED_IDENTITY
+  INVOICE_DIFFERENCE
+  COLLECTOR_UNLISTED
+}
+
+enum VendorAccountDiscrepancyState {
+  OPEN
+  DECIDED
+}
+
+enum VendorAccountDecision {
+  LEGALIZE_VIA_REQUEST
+  REVOKE
+  FALSE_ALARM
+  OUT_OF_PROCESS
+}
+
+enum OutOfProcessCaseState {
+  OPEN
+  CLOSED
+}
+
+enum OutOfProcessOutcome {
+  FALSE_ALARM
+  RECORD_SPENT
+  REPORT_ONLY
+  // The account was on a company asset and was revoked, with the renewal or payment cancelled and a proof of it (QĐ-104j, US-13-05 AC-25).
+  REVOKED
+}
+
+// One difference between what the company has on record (`internalValue`) and what the vendor shows (`vendorValue`), kept with the day of the
+// evidence and the one decision of the IT Admin (`SBF-08`, QĐ-111y). One row for each thing seen (`source`, `sourceRef`); the evidence is deleted
+// after 24 months (US-14-04 AC-2). The application, the vendor and the person are values of other contexts, with no foreign key. The
+// CHECKs `vendor_account_discrepancies_text_check` and `…_state_check` and the trigger that lets a decided row never change are SQL in the
+// migration (ADR-0005).
+model VendorAccountDiscrepancy {
+  id                  String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId      String                         @map("organization_id") @db.Uuid
+  source              VendorAccountDiscrepancySource
+  sourceRef           String                         @map("source_ref")
+  applicationId       String?                        @map("application_id") @db.Uuid
+  vendorId            String?                        @map("vendor_id") @db.Uuid
+  employeeId          String?                        @map("employee_id") @db.Uuid
+  identity            String?
+  internalValue       String                         @map("internal_value")
+  vendorValue         String                         @map("vendor_value")
+  evidenceOn          DateTime                       @map("evidence_on") @db.Date
+  firstSeenAt         DateTime                       @map("first_seen_at") @db.Timestamptz(3)
+  lastSeenAt          DateTime                       @map("last_seen_at") @db.Timestamptz(3)
+  state               VendorAccountDiscrepancyState  @default(OPEN)
+  decision            VendorAccountDecision?
+  decisionNote        String?                        @map("decision_note")
+  decidedByEmployeeId String?                        @map("decided_by_employee_id") @db.Uuid
+  decidedAt           DateTime?                      @map("decided_at") @db.Timestamptz(3)
+  outOfProcessCaseId  String?                        @map("out_of_process_case_id") @db.Uuid
+  // The decided row of the same thing this one follows when it was seen again with newer evidence (QĐ-106j); the one still open is unique (SQL: partial).
+  reopenedFromId      String?                        @map("reopened_from_id") @db.Uuid
+
+  @@unique([organizationId, source, sourceRef], map: "vendor_account_discrepancies_open_key")
+  @@index([organizationId, source, sourceRef], map: "vendor_account_discrepancies_source_idx")
+  @@index([organizationId, state, firstSeenAt(sort: Desc), id], map: "vendor_account_discrepancies_state_seen_idx")
+  @@index([evidenceOn], map: "vendor_account_discrepancies_evidence_on_idx")
+  @@map("vendor_account_discrepancies")
+}
+
+// What happened outside the process (`SBF-07a`, QĐ-111y, R-45): opened by an `OUT_OF_PROCESS` decision, closed once as a false alarm, as money
+// spent with a proof of payment (the invoice of the case is in the budgets context), or as a report only. It keeps no evidence of the review;
+// `discrepancyId` is a value. The CHECK `out_of_process_cases_state_check` and the trigger that closes it once are SQL in the migration.
+model OutOfProcessCase {
+  id                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String                @map("organization_id") @db.Uuid
+  discrepancyId      String                @unique @map("discrepancy_id") @db.Uuid
+  applicationId      String?               @map("application_id") @db.Uuid
+  vendorId           String?               @map("vendor_id") @db.Uuid
+  openedAt           DateTime              @map("opened_at") @db.Timestamptz(3)
+  state              OutOfProcessCaseState @default(OPEN)
+  outcome            OutOfProcessOutcome?
+  note               String?
+  closedByEmployeeId String?               @map("closed_by_employee_id") @db.Uuid
+  closedAt           DateTime?             @map("closed_at") @db.Timestamptz(3)
+  amountMinor        BigInt?               @map("amount_minor")
+  costCenterId       String?               @map("cost_center_id") @db.Uuid
+  documentIds        String[]              @default([]) @map("document_ids") @db.Uuid
+  // The account the case is about: one case is open for each (`QĐ-98h`); null once closed or for a case older than the rule (SQL: partial unique).
+  identityKey        String?               @map("identity_key")
+  // Concluded as outside the process on a company asset (registered with the company email or in the company workspace, QĐ-103y(3)); the day it was concluded.
+  companyAsset       Boolean?              @map("company_asset")
+  concludedOn        DateTime?             @map("concluded_on") @db.Date
+  renewalCancelled   Boolean               @default(false) @map("renewal_cancelled")
+
+  @@unique([organizationId, identityKey], map: "out_of_process_cases_open_identity_key")
+  @@index([organizationId, state, openedAt(sort: Desc), id], map: "out_of_process_cases_state_opened_idx")
+  @@map("out_of_process_cases")
+}

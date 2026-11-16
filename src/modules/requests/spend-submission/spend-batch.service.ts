@@ -8,6 +8,8 @@ import { AccessRequestNotFoundError } from '../access-request/access-request.err
 import { hasSpendStep } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
+import { PolicyChecklistIncompleteError } from '../../policies/public/policy-checklist.errors';
+import type { ChecklistBody } from '../../policies/public/policy-checklist.types';
 import { ReserveConfirmationService } from '../reserve-confirmation/reserve-confirmation.service';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
 import { SpendHeadService } from './spend-head.service';
@@ -40,6 +42,10 @@ export interface ReserveConfirmationInput {
  * unused and the answer says so; one for a request that is not in the batch refuses the batch. Only the head of the department of a
  * request sends it; a request that is not theirs is answered as if it did not exist. The check of each request, the step it is given and
  * the batch are written together.
+ *
+ * A batch that carries confirmations of the reserve carries the checklist of the step 1.6 too, one for the whole batch (`QĐ-111ap`, `QĐ-111aq`,
+ * `QĐ-111be`): it is judged before any request is checked, an answer No refuses the whole batch and nothing of it is written, and the answers are
+ * kept once for each request whose confirmation was applied, never for one that was ignored.
  */
 @Injectable()
 export class SpendBatchService {
@@ -55,14 +61,18 @@ export class SpendBatchService {
   ) {}
 
   /**
-   * Throws SpendNotHeadError, AccessRequestNotFoundError, SpendNotInQueueError, SpendConfirmationNotInBatchError and
-   * FinanceSetupIncompleteError (the department has no Cost Center in use now, `QĐ-87g`); returns the id of the batch and how each fared.
+   * Throws SpendNotHeadError, AccessRequestNotFoundError, SpendNotInQueueError, SpendConfirmationNotInBatchError,
+   * FinanceSetupIncompleteError (the department has no Cost Center in use now, `QĐ-87g`) and what the checklist of the reserve refuses
+   * (`QĐ-111ap`); returns the id of the batch and how each fared.
    */
   async submit(
     actor: AuthenticatedPrincipal,
     requestIds: readonly string[],
     confirmations: readonly ReserveConfirmationInput[] = [],
+    checklist?: ChecklistBody,
   ): Promise<{ batchId: string; results: SubmitResult[] }> {
+    // The body asks for the checklist with a confirmation; a caller that did not is refused, never let through.
+    if (confirmations.length > 0 && checklist === undefined) throw new PolicyChecklistIncompleteError('1.6', [], []);
     const outside = confirmations.find((confirmation) => !requestIds.includes(confirmation.requestId));
     if (outside) throw new SpendConfirmationNotInBatchError(outside.requestId);
     const departmentId = await this.head.departmentOf(actor);
@@ -77,12 +87,25 @@ export class SpendBatchService {
       if (unit) this.organizationReads.requireUnitCostCenter(unit);
 
       const organizationId = (locked.get(requestIds[0]) as AccessRequestRecord).organizationId;
+      const verdict =
+        confirmations.length > 0 && checklist
+          ? await this.reserve.judgeBatchChecklist(tx, organizationId, checklist)
+          : null;
       const now = new Date();
       const results: SubmitResult[] = [];
       for (const id of requestIds) {
         results.push(
           await this.sendOn(tx, actor, locked.get(id) as AccessRequestRecord, { reason: reasons.get(id), now }),
         );
+      }
+
+      const confirmed = results.filter((result) => result.reserveConfirmation === 'APPLIED').map((r) => r.requestId);
+      if (verdict && confirmed.length > 0) {
+        await this.reserve.recordBatchChecklist(tx, actor, organizationId, {
+          verdict,
+          decidedAt: now,
+          requestIds: confirmed,
+        });
       }
 
       const batchId = await this.batches.create(tx, {

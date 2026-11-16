@@ -91,6 +91,17 @@ describe('what a decision of the need step leads to (US-05-04 AC-12, AC-16, US-0
     });
   });
 
+  it('sends a returned request back to the person who sent it, whatever its branch, and refuses nothing for it', () => {
+    for (const branch of ['INTERNAL_FREE', 'PAID_IN_CATALOG', 'NEW_SOFTWARE'] as const) {
+      expect(needDecisionOutcome(asked(branch, 1), { decision: 'RETURN' })).toEqual({
+        approved: false,
+        returned: true,
+        requestState: 'AWAITING_REQUESTER_REVISION',
+        deciderRole: 'MANAGER',
+      });
+    }
+  });
+
   it('records no decision for a legacy row 3 or 4: nobody decides in it', () => {
     for (const row of [3, 4]) expect(() => needDecisionOutcome(asked('PAID_IN_CATALOG', row), approve)).toThrow();
   });

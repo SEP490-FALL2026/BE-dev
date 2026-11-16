@@ -1,5 +1,6 @@
 export type UsageSourceProblem =
   | 'NOT_FOUND'
+  | 'CONTRACT_NOT_FOUND'
   | 'APPLICATION_NOT_FOUND'
   | 'APPLICATION_INTERNAL'
   | 'APPLICATION_RETIRED'

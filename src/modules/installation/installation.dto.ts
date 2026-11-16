@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { businessDateAt, isBusinessDate, isValidTimeZone } from '../../core/business-date';
 import { InvalidEmailError, normalizeEmail } from '../../core/email';
+import { DONG } from '../../core/money/money';
 import { isDepartmentCodeValid, isEmployeeCodeValid } from '../organization/public/organization-code.policy';
 
 /** Words that mark a value as a stand-in rather than a real one (QĐ-67b: real values only). */
@@ -64,7 +65,10 @@ const employee = z.strictObject({
 export const installationInputSchema = z
   .strictObject({
     timeZone: z.string().refine(isValidTimeZone, 'must be an IANA zone such as Asia/Ho_Chi_Minh'),
-    reportingCurrency: z.string().regex(/^[A-Z]{3}$/, 'must be an ISO 4217 code such as VND'),
+    // Every amount is in dong and nothing is converted (`QĐ-111an`, R-4): the reporting currency is fixed, so no other is installed.
+    reportingCurrency: z
+      .string()
+      .refine((currency) => currency === DONG, `must be ${DONG}: every amount is in dong and nothing is converted`),
     organizationName: name,
     departmentCode,
     departmentName: name,

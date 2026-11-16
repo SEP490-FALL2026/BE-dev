@@ -1,5 +1,11 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { AssignmentDateBasis, AssignmentRecord, AssignmentView } from '../public/licensing.types';
+import type {
+  AssignmentDateBasis,
+  AssignmentRecord,
+  AssignmentRevocation,
+  AssignmentView,
+  ProvisioningTaskStatus,
+} from '../public/licensing.types';
 
 /** What the audit event of a new assignment says of it; the account identifier and the purpose are never written to the trail. */
 export const assignmentCreatedSnapshot = (record: AssignmentRecord, importId: string | null) => ({
@@ -34,6 +40,17 @@ export function toAssignmentView(record: AssignmentRecord): AssignmentView {
     grantedOn: record.effectiveFromBasis === 'ACTUAL' ? record.effectiveFrom : null,
     effectiveFromLabel: effectiveFromLabel(record.effectiveFromBasis, record.effectiveFrom),
   };
+}
+
+/**
+ * The revocation a seat has from the task that is open for it (`QĐ-111p`): the task and its state, and whether it may be taken today, which is the
+ * reading the task itself gives (`claimableNow`): only a reason that asks for a day not before, still ahead, holds it back.
+ */
+export function revocationOf(
+  task: { id: string; status: ProvisioningTaskStatus; notBefore: BusinessDate | null },
+  today: BusinessDate,
+): AssignmentRevocation {
+  return { taskId: task.id, status: task.status, claimableNow: task.notBefore === null || task.notBefore <= today };
 }
 
 /** The day a first assignment could be used from its `valid_from` and its grant tasks that were not dropped; null while one is still open. */
@@ -89,4 +106,38 @@ export function replacedByGrant(
     !grant.revocationUnderWay &&
     (old.subscriptionId ?? old.planId) === (grant.target.subscriptionId ?? grant.target.planId)
   );
+}
+
+/** What the rule of carrying a seat into a next period reads of it: the days it begins, ends and is expected to end. */
+export interface CarriableSeat {
+  validFrom: BusinessDate;
+  validUntil: BusinessDate | null;
+  expectedEndDate: BusinessDate | null;
+}
+
+/**
+ * The seats that go on into the new period (`QĐ-35c`): those held on its first day — begun before it, not ended by it, and not
+ * expected to end before it. A seat that ends before the new period stays where it is and is never carried. The one rule for the
+ * seats held when a renewal is recorded and for a seat granted after it was.
+ */
+export function seatsToCarry<T extends CarriableSeat>(seats: readonly T[], startDate: BusinessDate): T[] {
+  return seats.filter(
+    (seat) =>
+      seat.validFrom < startDate &&
+      (seat.validUntil === null || seat.validUntil > startDate) &&
+      (seat.expectedEndDate === null || seat.expectedEndDate >= startDate),
+  );
+}
+
+/**
+ * The first day of the next period a seat granted today goes on into: the period recorded ahead of its start that continues the
+ * one the seat is on, when it is active (a draft takes no seat). Null when there is none, it has begun, or it is not yet a pool.
+ */
+export function nextPeriodStart(
+  next: { status: 'DRAFT' | 'ACTIVE'; startDate: BusinessDate | null } | undefined,
+  today: BusinessDate,
+): BusinessDate | null {
+  if (!next || next.status !== 'ACTIVE' || next.startDate === null) return null;
+
+  return next.startDate > today ? next.startDate : null;
 }

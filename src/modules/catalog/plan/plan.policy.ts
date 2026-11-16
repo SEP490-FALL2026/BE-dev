@@ -5,6 +5,7 @@ import {
   PlanNameInvalidError,
   PlanNoteInvalidError,
   PlanPricingModelNotApplicableError,
+  PlanPricingModelNotDerivedError,
   PlanPricingModelRequiredError,
   PlanPrimaryOwnerNotListedError,
   PlanProvisioningTypeMismatchError,
@@ -55,8 +56,8 @@ export interface PlanShape {
 
 /**
  * The rules a plan must meet whatever its fields are, in a fixed order: K3 is not declarable yet; an internal application
- * has K5 plans only and K5 belongs to no other; K1, K2 and K4 name a pricing model and K5 has none; K1, K2 and K4 name a
- * control level; the data-loss flag needs the note that says what is lost. Throws the first one that fails.
+ * has K5 plans only and K5 belongs to no other; K1 and K2 name a pricing model, K4 may have none (it is bought once, `B-5`) and
+ * K5 has none; K1, K2 and K4 name a control level; the data-loss flag needs the note that says what is lost. Throws the first one that fails.
  */
 export function assertPlanShape(plan: PlanShape): void {
   if (plan.provisioningType === 'K3') throw new PlanProvisioningTypeNotSupportedError();
@@ -66,10 +67,29 @@ export function assertPlanShape(plan: PlanShape): void {
   if (plan.provisioningType === 'K5') {
     if (plan.pricingModel !== null) throw new PlanPricingModelNotApplicableError();
   } else {
-    if (plan.pricingModel === null) throw new PlanPricingModelRequiredError();
+    if (plan.pricingModel === null && plan.provisioningType !== 'K4') throw new PlanPricingModelRequiredError();
     if (plan.controlLevel === null) throw new PlanControlLevelRequiredError();
   }
   if (plan.dataLossOnRemoval && plan.revocationNote === null) throw new PlanDataLossNoteRequiredError();
+}
+
+/**
+ * How a plan is priced, from the kind of provisioning (`B-5`, `QĐ-111f`): the IT Admin is not asked. K1 and K2 are bought per seat; K4 is
+ * bought once (the model has no value for that, and its subscriptions are perpetual purchases); K5 has no price. K3 cannot be declared yet.
+ */
+export function derivedPricingModel(type: ProvisioningType): PricingModel | null {
+  return type === 'K1' || type === 'K2' ? 'PER_SEAT' : null;
+}
+
+/**
+ * A pricing model that is sent is the one the kind of provisioning implies (`B-5`, `QĐ-111f`): the system works the model out, so the IT Admin's
+ * value can only repeat it. Nothing sent is nothing to judge: a plan made before the rule keeps the model it has until its kind changes.
+ * Throws PlanPricingModelNotDerivedError.
+ */
+export function assertPricingModelDerived(type: ProvisioningType, sent: PricingModel | null | undefined): void {
+  if (sent === undefined) return;
+  const expected = derivedPricingModel(type) as 'PER_SEAT' | null;
+  if (sent !== expected) throw new PlanPricingModelNotDerivedError(expected);
 }
 
 /** Seats are counted only for a per-seat plan; any other plan shows them as not applicable, never as zero (`BR-06.4`). */

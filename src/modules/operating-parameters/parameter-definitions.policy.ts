@@ -111,27 +111,15 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
   },
   {
     key: 'REQUEST_OPEN_NEW_LIMIT',
-    label: 'Số Request cấp mới đang mở tối đa của một người',
+    label: 'Số Request cấp mới tối đa mỗi tuần của một người',
     group: 'WORKFLOW',
     shape: { kind: 'int', min: 1, max: 20 },
-    default: 3,
+    default: 10,
     unit: 'requests',
     unitLabel: 'Request',
     description:
-      'GH-2: a person who already is the beneficiary of this many requests for new access still open cannot be named in another one.',
-    source: 'BR-MF1-01f, QĐ-103c, QĐ-104b',
-  },
-  {
-    key: 'PAID_SOFTWARE_FLAG_THRESHOLD',
-    label: 'Ngưỡng số phần mềm trả phí cần lý do khi xin thêm',
-    group: 'WORKFLOW',
-    shape: { kind: 'int', min: 1, max: 100 },
-    default: 10,
-    unit: 'applications',
-    unitLabel: 'phần mềm',
-    description:
-      'GH-3: a person who already uses this many paid applications may still ask for another one, with a reason, and the request is flagged.',
-    source: 'BR-MF1-01g, QĐ-103c',
+      'GH-2: a person already named in this many requests for new access sent in the calendar week (Monday to Sunday, organization time zone; withdrawn and refused ones count) cannot be named in another one until the next Monday.',
+    source: 'BR-MF1-01f, QĐ-111h',
   },
   {
     key: 'RENEWAL_WINDOW_DAYS',

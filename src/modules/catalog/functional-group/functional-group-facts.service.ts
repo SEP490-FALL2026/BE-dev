@@ -11,4 +11,9 @@ export class FunctionalGroupFactsService {
   findActive(tx: DbTx, id: string): Promise<{ id: string; name: string } | null> {
     return this.groups.findActiveShared(tx, id);
   }
+
+  /** The group an application declared with none is put in (`Khác`, `QĐ-111d`), locked `FOR SHARE`; the organization is given one when it has none. */
+  ensureDefault(tx: DbTx, organizationId: string): Promise<{ id: string; name: string }> {
+    return this.groups.ensureOtherShared(tx, organizationId);
+  }
 }

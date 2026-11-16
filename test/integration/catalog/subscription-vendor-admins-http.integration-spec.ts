@@ -36,7 +36,7 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
           applicationId: application,
           name: h.unique('Plan'),
           provisioningType: type,
-          pricingModel: 'PER_SEAT',
+          ...(type === 'K4' ? {} : { pricingModel: 'PER_SEAT' }),
           controlLevel: 'FULL',
           ...extra,
         })

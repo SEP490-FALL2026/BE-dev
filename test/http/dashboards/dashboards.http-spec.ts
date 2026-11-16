@@ -99,6 +99,8 @@ const ROUTES: Route[] = [
         unconfirmedDevices: MISSING,
         saasIssues: COUNTED,
         ghostSeats: COUNTED,
+        missingInvoicePeriods: COUNTED,
+        outOfProcessRevocationsDue: COUNTED,
       },
     },
   },

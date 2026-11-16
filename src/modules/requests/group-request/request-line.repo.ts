@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { manyPaidSoftwareColumns } from '../access-request/access-request-record.mapper';
 import { fromDateColumn, toDateColumn } from '../../../core/business-date';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
@@ -12,8 +11,6 @@ export interface NewLine {
   state: Extract<LineState, 'AWAITING_NEED' | 'NEED_CONFIRMED'>;
   needStepId: string;
   expectedEndDate: string | null;
-  /** GH-3 of the person (`BR-MF1-01g`), with the reason the sender gave for them; absent or null when not flagged. */
-  manyPaidSoftware?: { count: number; reason: string } | null;
 }
 
 /** What a move of a line writes with the new state: when and by whom it ended, why, and when a withdrawal was asked. */
@@ -75,7 +72,6 @@ export class RequestLineRepo {
         state: line.state,
         needStepId: line.needStepId,
         expectedEndDate: line.expectedEndDate ? toDateColumn(line.expectedEndDate) : null,
-        ...manyPaidSoftwareColumns(line.manyPaidSoftware),
       })),
     });
   }
@@ -135,6 +131,17 @@ export class RequestLineRepo {
   }
 
   /** Moves a line; the caller holds the lock and has judged that the move is allowed (the database judges it too). */
+  /**
+   * The people who still wait for their need now wait on a new need step, because the request was sent back and sent on again (R-24); the
+   * database lets a line change its step only for that.
+   */
+  async repointNeed(tx: DbTx, requestId: string, employeeIds: readonly string[], needStepId: string): Promise<void> {
+    await tx.accessRequestLine.updateMany({
+      where: { requestId, employeeId: { in: [...employeeIds] }, state: 'AWAITING_NEED' },
+      data: { needStepId },
+    });
+  }
+
   async move(tx: DbTx, requestId: string, employeeId: string, move: LineMove): Promise<void> {
     await tx.accessRequestLine.update({
       where: { requestId_employeeId: { requestId, employeeId } },

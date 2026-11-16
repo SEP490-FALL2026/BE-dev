@@ -27,11 +27,6 @@ export class OrganizationRepo {
     return tx.organization.findFirst({ select: ORGANIZATION_SELECT });
   }
 
-  /** Writes the reporting currency; the database refuses (55000) once rates or converted prices exist. */
-  async setReportingCurrency(tx: DbTx, organizationId: string, currency: string): Promise<void> {
-    await tx.organization.update({ where: { id: organizationId }, data: { reportingCurrency: currency } });
-  }
-
   async createOrganization(tx: DbTx, input: CreateOrganizationInput): Promise<OrganizationRecord> {
     try {
       return await tx.organization.create({

@@ -11,6 +11,7 @@ import {
 } from '../intake-gate/intake-gate.errors';
 import { judgeIntakeState, type GateReason } from '../intake-gate/intake-gate.policy';
 import { IntakeRejectionRepo, type NewRejection } from '../intake-gate/intake-rejection.repo';
+import { VendorAccountIntakeService } from '../vendor-account-review/vendor-account-intake.service';
 import { evaluateDays, type UsageDayInput } from './ai-usage-day.policy';
 import { AiUsageRepo } from './ai-usage.repo';
 
@@ -47,6 +48,7 @@ export class AiUsageBatchService {
     private readonly allowlist: AllowlistFactsService,
     private readonly usage: AiUsageRepo,
     private readonly rejections: IntakeRejectionRepo,
+    private readonly review: VendorAccountIntakeService,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -84,6 +86,17 @@ export class AiUsageBatchService {
           .filter((verdict) => verdict.reason)
           .map((verdict) => this.rejection(context, verdict.reason as GateReasonOrDay, verdict.date)),
       );
+      // A tool the collector reports that is not on the allowlist is software outside what the company manages: the review of the accounts sees it (RC-2.3).
+      const unlisted = input.days.flatMap((day, index) =>
+        verdicts[index].reason === 'NOT_IN_ALLOWLIST'
+          ? day.tools
+              .filter((tool) => !(allowedByDay.get(day.date) ?? new Map()).has(tool.tool))
+              .map((tool) => ({ tool: tool.tool, date: day.date }))
+          : [],
+      );
+      if (unlisted.length > 0) {
+        await this.review.fromUnlistedTools(tx, { organizationId: context.organizationId, sightings: unlisted }, now);
+      }
       const changed = await this.usage.upsertDays(
         tx,
         { ...context, generatedAt: input.generatedAt },

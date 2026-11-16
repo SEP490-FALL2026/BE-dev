@@ -2,6 +2,10 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { DepartmentSoftwareNotInCatalogError } from '../public/licensing.errors';
 import { DepartmentSoftwareProposalService } from './department-software-proposal.service';
+import {
+  DepartmentSoftwareOwnProposalError,
+  DepartmentSoftwareProposalNotFoundError,
+} from './department-software.errors';
 import type { SoftwareEntry, SoftwareProposal } from './department-software.types';
 
 const TX = { marker: 'tx' } as unknown as DbTx;
@@ -95,7 +99,7 @@ function build() {
     audit as never,
   );
 
-  return { service, repo, view, inTransaction, organizationReads };
+  return { service, repo, view, inTransaction, organizationReads, access, notice, audit, runner };
 }
 
 describe('DepartmentSoftwareProposalService: the catalog is read in the transaction that writes (DS-R3)', () => {
@@ -143,5 +147,46 @@ describe('DepartmentSoftwareProposalService: the catalog is read in the transact
     await expect(service.accept(IT_ADMIN, proposal.id)).rejects.toBeInstanceOf(DepartmentSoftwareNotInCatalogError);
 
     expect(repo.decide).not.toHaveBeenCalled();
+  });
+});
+
+describe('DepartmentSoftwareProposalService: nobody decides the proposal they made (SoD-4, D-122)', () => {
+  /** The head who proposed holds the IT Admin role now (a person holds one role, so this is a change of role after the proposal). */
+  const proposer = { ...IT_ADMIN, appUserId: 'user-1', employeeId: 'e1' };
+
+  it.each(['accept', 'reject'] as const)(
+    'refuses %s to the person who made the proposal and writes, tells and audits nothing',
+    async (action) => {
+      const { service, repo, runner, notice, audit } = build();
+
+      await expect(
+        action === 'accept' ? service.accept(proposer, proposal.id) : service.reject(proposer, proposal.id, 'No'),
+      ).rejects.toBeInstanceOf(DepartmentSoftwareOwnProposalError);
+
+      expect(runner.run).not.toHaveBeenCalled();
+      expect(repo.decide).not.toHaveBeenCalled();
+      expect(notice.decided).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['accept', 'reject'] as const)(
+    'still answers that the proposal is not found to an IT Admin who is not in charge of its department, the proposer or not (%s)',
+    async (action) => {
+      const { service, access } = build();
+      access.itAdminScope.mockResolvedValue(new Set());
+
+      await expect(
+        action === 'accept' ? service.accept(proposer, proposal.id) : service.reject(proposer, proposal.id, 'No'),
+      ).rejects.toBeInstanceOf(DepartmentSoftwareProposalNotFoundError);
+    },
+  );
+
+  it('lets another IT Admin of the department decide it', async () => {
+    const { service, repo } = build();
+
+    await service.accept(IT_ADMIN, proposal.id);
+
+    expect(repo.decide).toHaveBeenCalledTimes(1);
   });
 });

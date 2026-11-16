@@ -3,10 +3,12 @@ import { formatAmount } from '../../../core/money/money';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
+import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { codesOf, wireRouteOf } from '../spend/budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord } from '../spend/budget-check.repo';
 import { SpendReviewNotFoundError } from '../spend/spend.errors';
 import { SpendStepRepo } from '../spend/spend-step.repo';
+import { NextYearBudgetService } from '../spend-approval-view/next-year-budget.service';
 import type { CheckWire } from './budget-check.dto';
 
 export type Money = { amount: string; currency: string };
@@ -24,31 +26,49 @@ export class BudgetCheckViewService {
     private readonly checks: BudgetCheckRepo,
     private readonly steps: SpendStepRepo,
     private readonly finance: FinanceApi,
+    private readonly nextYear: NextYearBudgetService,
   ) {}
 
   /** The newest check of the request. Throws SpendReviewNotFoundError. */
   async latestCheck(actor: AuthenticatedPrincipal, requestId: string): Promise<CheckWire> {
-    await this.requireReader(actor, requestId);
+    const request = await this.requireReader(actor, requestId);
     const check = await this.checks.latest(requestId);
     if (!check) throw new SpendReviewNotFoundError();
 
-    return this.checkWire(check);
+    return this.checkWire(check, await this.nextYearBudgetOf(request));
   }
 
   /**
    * Finance reads every check; the person the spend step is given to reads the check of their own step, and nobody else
-   * reads one (`US-06-01` AC-1). The head and the requester are not among them.
+   * reads one (`US-06-01` AC-1). The head and the requester are not among them. Returns the request that was read.
    */
-  async requireReader(actor: AuthenticatedPrincipal, requestId: string): Promise<void> {
-    if (!(await this.requests.findById(requestId))) throw new SpendReviewNotFoundError();
-    if (actor.roles.includes('FINANCE')) return;
+  async requireReader(actor: AuthenticatedPrincipal, requestId: string): Promise<AccessRequestRecord> {
+    const request = await this.requests.findById(requestId);
+    if (!request) throw new SpendReviewNotFoundError();
+    if (actor.roles.includes('FINANCE')) return request;
     const spend = await this.steps.findLatest(requestId, 'SPEND_APPROVAL');
-    if (spend?.assigneeEmployeeId === actor.employeeId) return;
+    if (spend?.assigneeEmployeeId === actor.employeeId) return request;
 
     throw new SpendReviewNotFoundError();
   }
 
-  private async checkWire(check: CheckRecord): Promise<CheckWire> {
+  /** What is left of the budget of the year after with the part of it the request keeps (`QĐ-111al`, S-3): only the readers of this route see it. */
+  private async nextYearBudgetOf(request: AccessRequestRecord): Promise<CheckWire['nextYearBudget']> {
+    const { pricing } = request;
+    const found = await this.nextYear.of([
+      {
+        requestId: request.id,
+        costCenterId: request.costCenterId,
+        budgetYear: pricing.budgetYear,
+        nextYearAmountMinor: pricing.nextYearAmount?.amountMinor ?? null,
+        currency: pricing.nextYearAmount?.currency ?? null,
+      },
+    ]);
+
+    return found.get(request.id) ?? null;
+  }
+
+  private async checkWire(check: CheckRecord, nextYearBudget: CheckWire['nextYearBudget']): Promise<CheckWire> {
     const money = await this.formatter(check.currency);
     const optional = (minor: bigint | null) => (minor === null ? null : money(minor));
     // A check made before the three outcomes says only its code: within the budget, or not.
@@ -68,6 +88,7 @@ export class BudgetCheckViewService {
       primaryCode: codesOf(check)[0] ?? null,
       bindingTotal: money(check.bindingTotalMinor),
       yearCount: check.years.length,
+      nextYearBudget,
       ranAt: check.ranAt.toISOString(),
     };
   }

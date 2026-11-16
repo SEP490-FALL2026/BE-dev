@@ -1,6 +1,6 @@
 import { deadlineDuties } from './cycle-deadline.policy';
 
-const cycle = { submissionDeadline: '2026-12-01', decisionDeadline: '2026-12-15', publishedOnce: true };
+const cycle = { submissionDeadline: '2026-12-01', decisionDeadline: '2026-12-15', opened: true };
 
 describe('deadlineDuties', () => {
   it('asks for the setup of the Cost Centers until the submission deadline is over, the day of it included', () => {
@@ -25,8 +25,8 @@ describe('deadlineDuties', () => {
     expect(deadlineDuties({ ...cycle, today: '2026-12-16' }).decisionPassed).toBe(true);
   });
 
-  it('owes nothing while the cycle was never published', () => {
-    expect(deadlineDuties({ ...cycle, publishedOnce: false, today: '2026-12-20' })).toEqual({
+  it('owes nothing while the cycle is still a draft', () => {
+    expect(deadlineDuties({ ...cycle, opened: false, today: '2026-12-20' })).toEqual({
       submissionPassed: false,
       decisionPassed: false,
       costCenterSetup: false,

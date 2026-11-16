@@ -6,6 +6,7 @@ import { AssignmentRepo } from '../../../src/modules/licensing/assignment/assign
 import { waitForLockWaiters } from '../../support/lock-wait';
 import { ensureVendorAdmins } from '../../support/builders/catalog.builder';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
+import { intakeBodyOf } from '../../support/application-body';
 
 const h = new ProvisioningHarness();
 
@@ -239,13 +240,15 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
       await request(h.server())
         .post('/api/v1/applications')
         .set(h.as(h.it1))
-        .send({
-          name: h.unique('Office'),
-          kind: 'LICENSED',
-          vendorName: h.unique('Vendor'),
-          dataSensitivity: 'LOW',
-          communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
-        })
+        .send(
+          intakeBodyOf({
+            name: h.unique('Office'),
+            kind: 'LICENSED',
+            vendorName: h.unique('Vendor'),
+            dataSensitivity: 'LOW',
+            communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
+          }),
+        )
         .expect(201),
     ).id;
     const planId = h.dataOf<{ id: string }>(
@@ -256,7 +259,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
           applicationId,
           name: h.unique('Office 2021'),
           provisioningType: 'K4',
-          pricingModel: 'PER_SEAT',
           controlLevel: 'FULL',
         })
         .expect(201),

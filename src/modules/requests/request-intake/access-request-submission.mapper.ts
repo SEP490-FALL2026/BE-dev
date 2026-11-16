@@ -1,7 +1,7 @@
 import type { AuditValue } from '../../audit/public/audit.types';
 import type { SubmitBodyDto } from '../access-request/access-request.dto';
 import { hasSpendStep } from '../access-request/access-request.policy';
-import type { ManyPaidSoftwareFlag, NewAccessRequest } from '../access-request/access-request.types';
+import type { NewAccessRequest } from '../access-request/access-request.types';
 import type { Assessment } from '../access-request/request-facts.service';
 import type { TransferGraceHolding } from '../public/requests.extension-points';
 
@@ -9,13 +9,11 @@ import type { TransferGraceHolding } from '../public/requests.extension-points';
 export interface SubmittedRequest {
   actor: { employeeId: string; appUserId: string };
   organizationId: string;
-  body: Pick<SubmitBodyDto, 'planId' | 'expectedEndDate' | 'businessReason'>;
-  assessed: Pick<Assessment, 'unit' | 'policy' | 'pricing' | 'routing'>;
+  body: Pick<SubmitBodyDto, 'planId' | 'businessReason'>;
+  assessed: Pick<Assessment, 'unit' | 'policy' | 'pricing' | 'routing' | 'term'>;
   now: Date;
   /** The draft the request is sent from: its row becomes the request. */
   draftId?: string;
-  /** GH-3 of the person, when the request is flagged (`BR-MF1-01g`). */
-  manyPaidSoftware?: ManyPaidSoftwareFlag | null;
   /** The grace of a transfer in which the person asks again for a right they hold from before it: left out of GH-1/GH-2, and the old right it replaces (`QĐ-110q`, R-49). */
   graceHold?: TransferGraceHolding | null;
 }
@@ -41,8 +39,9 @@ export function newRequestOf(facts: SubmittedRequest): NewAccessRequest {
     departmentId: unit.departmentId,
     costCenterId: unit.costCenter?.id ?? null,
     businessReason: body.businessReason,
-    termMonths: null,
-    expectedEndDate: body.expectedEndDate ?? null,
+    // The time of use asked for; the end of the seat is worked out from the day it is granted (`QĐ-111i`), so the request carries no end date.
+    termMonths: assessed.term.months,
+    expectedEndDate: null,
     pricing,
     policy,
     createdByAppUserId: actor.appUserId,
@@ -55,7 +54,6 @@ export function newRequestOf(facts: SubmittedRequest): NewAccessRequest {
       slaWorkingDays: policy.slaWorkingDays,
     },
     draftId: facts.draftId ?? null,
-    manyPaidSoftware: facts.manyPaidSoftware ?? null,
     ...(facts.graceHold
       ? { limitExemption: 'TRANSFER_GRACE' as const, replacesAssignmentId: facts.graceHold.assignmentId }
       : {}),
@@ -71,7 +69,8 @@ export function submittedAuditDetail(facts: SubmittedRequest): { [key: string]: 
     branch: policy.branch,
     state: startState(assessed.routing),
     planId: body.planId,
-    expectedEndDate: body.expectedEndDate ?? null,
+    termMonths: assessed.term.months,
+    termCutAt: assessed.term.cutAt,
     requesterEmployeeId: actor.employeeId,
     beneficiaryEmployeeIds: [actor.employeeId],
     departmentId: unit.departmentId,
@@ -83,7 +82,6 @@ export function submittedAuditDetail(facts: SubmittedRequest): { [key: string]: 
     amountMinor: pricing.amount?.amountMinor.toString() ?? null,
     amountCurrency: pricing.amount?.currency ?? null,
     budgetYear: pricing.budgetYear,
-    manyPaidSoftwareCount: facts.manyPaidSoftware?.count ?? null,
     // The grace of a transfer (`QĐ-110q`, R-49): the request is left out of GH-1/GH-2 and replaces the right the person holds from before it.
     ...(facts.graceHold
       ? {

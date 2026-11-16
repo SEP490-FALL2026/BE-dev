@@ -95,8 +95,6 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
       expect(expired.version.state).toBe('EXPIRED');
       expect(proposals.items.map((item) => item.id)).toContain(proposal.id);
       expect(versions.items.map((item) => item.id)).toContain(version.id);
-      await h.versionLines(version.id).expect(200);
-      await h.proposalLines(proposal.id, unit.head.account).expect(200);
     });
 
     it('refuses the trigger the Finance outcome gave a check: the Finance review is gone, so no new check carries it (F65, QĐ-97c)', async () => {

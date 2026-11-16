@@ -1,5 +1,6 @@
 import {
   PlanControlLevelRequiredError,
+  PlanPricingModelNotDerivedError,
   PlanDataLossNoteRequiredError,
   PlanNameInvalidError,
   PlanNoteInvalidError,
@@ -14,8 +15,10 @@ import {
 } from './plan.errors';
 import {
   assertPlanShape,
+  assertPricingModelDerived,
   assertWorkspaceShape,
   cleanPlanName,
+  derivedPricingModel,
   cleanRevocationNote,
   cleanWorkspaceText,
   kpi3Percent,
@@ -90,12 +93,15 @@ describe('assertPlanShape', () => {
     },
   );
 
-  it('needs a pricing model for K1, K2 and K4 and forbids one for K5', () => {
-    for (const type of ['K1', 'K2', 'K4'] as const) {
+  it('needs a pricing model for K1 and K2, lets K4 have none (it is bought once, B-5) and forbids one for K5', () => {
+    for (const type of ['K1', 'K2'] as const) {
       expect(() =>
         assertPlanShape({ ...saas, provisioningType: type, pricingModel: null, controlLevel: 'FULL' }),
       ).toThrow(PlanPricingModelRequiredError);
     }
+    expect(() =>
+      assertPlanShape({ ...saas, provisioningType: 'K4', pricingModel: null, controlLevel: 'FULL' }),
+    ).not.toThrow();
     expect(() =>
       assertPlanShape({
         ...saas,
@@ -260,5 +266,35 @@ describe('kpi3Percent (AF-08, QĐ-109d): the seats used over the seats bought', 
 
   it('gives none when nothing was bought', () => {
     expect(kpi3Percent(3, 0)).toBeNull();
+  });
+});
+
+describe('derivedPricingModel (B-5: the kind of provisioning says how a plan is priced)', () => {
+  it('prices K1 and K2 per seat, and K4 (bought once) and K5 (no price) by no model at all', () => {
+    expect(derivedPricingModel('K1')).toBe('PER_SEAT');
+    expect(derivedPricingModel('K2')).toBe('PER_SEAT');
+    expect(derivedPricingModel('K4')).toBeNull();
+    expect(derivedPricingModel('K5')).toBeNull();
+  });
+
+  it('leaves K3, which cannot be declared yet, with none', () => {
+    expect(derivedPricingModel('K3')).toBeNull();
+  });
+});
+
+describe('assertPricingModelDerived (B-5: a pricing model that is sent is the one the kind implies)', () => {
+  it('lets through what is not sent and the model the kind implies', () => {
+    expect(() => assertPricingModelDerived('K1', undefined)).not.toThrow();
+    expect(() => assertPricingModelDerived('K2', 'PER_SEAT')).not.toThrow();
+    expect(() => assertPricingModelDerived('K4', null)).not.toThrow();
+    expect(() => assertPricingModelDerived('K5', null)).not.toThrow();
+  });
+
+  it('refuses any other, telling the model the kind implies', () => {
+    expect(() => assertPricingModelDerived('K1', 'FLAT_RATE')).toThrow(PlanPricingModelNotDerivedError);
+    expect(() => assertPricingModelDerived('K2', null)).toThrow(PlanPricingModelNotDerivedError);
+    expect(() => assertPricingModelDerived('K4', 'PER_SEAT')).toThrow(PlanPricingModelNotDerivedError);
+    expect(() => assertPricingModelDerived('K4', 'PER_HOST')).toThrow(PlanPricingModelNotDerivedError);
+    expect(new PlanPricingModelNotDerivedError('PER_SEAT').expected).toBe('PER_SEAT');
   });
 });

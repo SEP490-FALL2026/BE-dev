@@ -51,6 +51,10 @@ export class BudgetCheckYearsViewService {
         budget: nullable(year.budgetMinor),
         base: nullable(year.baseMinor),
         reserve: nullable(year.reserveMinor),
+        effectiveBudget:
+          year.baseMinor === null || year.reserveMinor === null || year.budgetMinor === null
+            ? null
+            : { base: money(year.baseMinor), reserve: money(year.reserveMinor), total: money(year.budgetMinor) },
         held: nullable(year.heldMinor),
         spent: nullable(year.spentMinor),
         remaining: nullable(year.remainingMinor),

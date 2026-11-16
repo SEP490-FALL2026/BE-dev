@@ -43,7 +43,7 @@ dùng bởi: không module nào; chỉ `app/app.module.ts` mount `DashboardsModu
 - `manager/` — `GET /dashboards/manager` (`MANAGER`, phòng đang làm trưởng): ghế phòng, review sau điều chuyển; hàng đợi trình
   chi, đề xuất ngân sách, dòng phiên bản đã duyệt `AT_SOURCE`; chờ quyết nhu cầu `COUNTED`; ghost seat, thực chi + cam kết `NOT_AVAILABLE`.
 - `it-admin/` — `GET /dashboards/it-admin` (`IT_ADMIN`, phạm vi phụ trách): task cấp/thu hồi, báo lỗi SaaS, ca nghỉ việc đang bàn
-  giao (khóa `offboardingHandovers` giữ một bản cạnh `departures`), key trong kho; thuê bao sắp tới hạn báo hủy, điều khoản cần rà soát `AT_SOURCE`; sai lệch, máy chưa xác nhận
+  giao (khóa `offboardingHandovers` giữ một bản cạnh `departures`), key trong kho, số kỳ chưa có hóa đơn quá 5 ngày làm việc (`missingInvoicePeriods`, PI-2), số ca ngoài quy trình trên tài sản công ty tới hạn thu hồi (`outOfProcessRevocationsDue`, `US-13-05` AC-23; không `sourceOperationId`, cả tổ chức); các số lấy từ facade module khác gom ở `it-admin-dashboard-facts.service.ts`; thuê bao sắp tới hạn báo hủy, điều khoản cần rà soát `AT_SOURCE`; sai lệch, máy chưa xác nhận
   `NOT_AVAILABLE`.
 - `super-admin/` — `GET /dashboards/super-admin` (`SUPER_ADMIN`): phòng thiếu trưởng phòng/IT Admin, thông báo biến động chờ xử
   lý; nghẽn, cấu hình người duyệt, vai Super Admin, hồ sơ có thể cấp tài khoản `AT_SOURCE`; tác vụ nền `NOT_AVAILABLE`.

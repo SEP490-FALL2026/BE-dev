@@ -29,6 +29,12 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
 
     return { subscriptionId, task: await h.granted(employeeId, planId, { subscriptionId }) };
   };
+  /** A task nobody has taken: the grant takes the work for whoever presses it, so it is one put back in the queue after a failure. */
+  const freshInQueue = async (employeeId = e5, quantity = 5) => {
+    const made = await fresh(employeeId, quantity);
+
+    return { ...made, task: await h.unclaimed(made.task.id) };
+  };
   const taken = async (employeeId = e5) => {
     const made = await fresh(employeeId);
     await h.claim(made.task.id).expect(200);
@@ -155,7 +161,7 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
   it('US-07-02 AC-3: manual and connector tasks are in one queue and measured the same way; no one works the connector by hand', async () => {
     const manual = (await fresh()).task;
     const connector = (await fresh(e7)).task;
-    await h.ctx.sql.query(`UPDATE provisioning_tasks SET channel = 'CONNECTOR' WHERE id = $1`, [connector.id]);
+    await h.makeConnector(connector.id);
 
     const items = h.dataOf<{ items: TaskWire[] }>(await h.list({ pageSize: 100 }).expect(200)).items;
     const both = items.filter((item) => [manual.id, connector.id].includes(item.id));
@@ -199,7 +205,7 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
   });
 
   it('keeps the order of work: completing or failing a task nobody has taken is refused, and taking it again is a no-op', async () => {
-    const { task: made } = await fresh();
+    const { task: made } = await freshInQueue();
 
     expect(h.codeOf(await h.complete(made.id, { evidence: 'x' }).expect(409))).toBe(
       'PROVISIONING_TASK.NOT_IN_PROGRESS',
@@ -209,9 +215,10 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
     const again = taskOf(await h.claim(made.id).expect(200));
 
     expect(again.claimedAt).toBe(first.claimedAt);
+    // The claim of the grant, then the one after the task was put back in the queue: taking it again adds none.
     expect(
       (await h.auditEvents('ProvisioningTask', made.id)).filter((event) => event.action.endsWith('CLAIMED')),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
   });
 
   it('lets another IT Admin take over a task in progress, and the audit says from whom', async () => {
@@ -229,7 +236,7 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
 
   it('US-07-01 AC-17: a person who left after the task was made cannot have it started, and the task is unchanged', async () => {
     const left = await h.member('P-DES', 'E-LEFT', designer);
-    const { task: made } = await fresh(left);
+    const { task: made } = await freshInQueue(left);
     await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [left]);
 
     const refused = await h.claim(made.id).expect(409);
@@ -382,7 +389,7 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
   });
 
   it('QĐ-77m (US-01-05 AC-12): an IT Admin cannot work their own task while another IT Admin can, and can when none can, marked as such', async () => {
-    const { task: own } = await fresh(a1Employee);
+    const { task: own } = await freshInQueue(a1Employee);
 
     expect(h.codeOf(await h.claim(own.id, a1).expect(403))).toBe('PROVISIONING.ANOTHER_IT_ADMIN_NEEDED');
     expect((await task(own.id)).status).toBe('QUEUED');

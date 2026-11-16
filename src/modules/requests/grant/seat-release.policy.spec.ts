@@ -1,9 +1,11 @@
 import type { SeatCommitment } from '../../budgets/public/budgets.types';
 import {
+  coverageEndOf,
   firstMonthOf,
   lastMonthOf,
   lateGrantShare,
   givenAtTransfer,
+  lastMonthBeginsOf,
   releasesBeforeGrant,
   revocationEndsOn,
   revocationShare,
@@ -25,6 +27,7 @@ const commitment = (over: Partial<SeatCommitment> = {}): SeatCommitment => ({
 /** A request whose amount was worked out in 2026 for October to December, with no end. */
 const coverage = (over: Partial<SeatCoverage> = {}): SeatCoverage => ({
   endDate: null,
+  lastMonthBeginsOn: null,
   budgetYear: 2026,
   amountMonths: 3,
   ...over,
@@ -104,6 +107,52 @@ describe('seat-release policy (RV-07, M-06, M-10)', () => {
       expect(
         revocationShare({ commitment: commitment(), coverage: limited, endsOn: '2026-10-01', currentYear: 2026 }),
       ).toBe(0n);
+    });
+
+    it('a right that ended after the last day paid was used to the end: nothing goes back, whether its months are counted by the day they begin or by the calendar', () => {
+      // K1, 15/03 to 14/06, three months held: the revocation is completed on 15/06, after the term.
+      const byTheDayTheyBegin = coverage({ endDate: '2026-06-14', lastMonthBeginsOn: '2026-05-15', amountMonths: 3 });
+      const byTheCalendar = coverage({ endDate: '2026-06-14', amountMonths: 3 });
+      for (const limited of [byTheDayTheyBegin, byTheCalendar]) {
+        for (const endsOn of ['2026-06-15', '2026-06-20']) {
+          expect(revocationShare({ commitment: commitment(), coverage: limited, endsOn, currentYear: 2026 })).toBe(0n);
+        }
+      }
+    });
+
+    it('R-39: the months of a term are the months that began, 15/03 to 14/06 is March, April and May, and the share runs down to nothing with no step at the end', () => {
+      // 1500 a month, 4500 held. The months are those of 15/03, 15/04 and 15/05: first month 3, last month 5.
+      const limited = coverage({ endDate: '2026-06-14', lastMonthBeginsOn: '2026-05-15', amountMonths: 3 });
+      const share = (endsOn: string) =>
+        revocationShare({ commitment: commitment(), coverage: limited, endsOn, currentYear: 2026 });
+
+      expect(firstMonthOf(commitment(), limited)).toBe(3);
+      expect(lastMonthOf(2026, limited.lastMonthBeginsOn)).toBe(5);
+      // Taken back on 20/04: May and the rest of April, 19 days of 30 of April used (950 of 1500).
+      expect(share('2026-04-20')).toBe(2n * 1500n - 950n);
+      // Taken back in the month the last month began, 15/05: 14 of 31 days of May used (677 of 1500).
+      expect(share('2026-05-15')).toBe(1500n - 677n);
+      // No day of June is a day of a month that began: from 01/06 to the last day paid nothing goes back, and there is no step at 15/06.
+      expect(share('2026-06-01')).toBe(0n);
+      expect(share('2026-06-14')).toBe(0n);
+      expect(share('2026-06-15')).toBe(0n);
+    });
+
+    it('R-39: a commitment of 01/01 for the months that begin in the year after (7 of 9 from 15/11) goes back from the month of the day the right ends', () => {
+      // 600.000 a month scaled to 1500: 9 months from 15/11/2026 end 14/08/2027, the last month began on 15/07; 01/01 holds the 7 of 2027.
+      const yearStart = commitment({ year: 2027, origin: 'YEAR_START', heldMinor: 7n * 1500n });
+      const limited = coverage({
+        endDate: '2027-08-14',
+        lastMonthBeginsOn: '2027-07-15',
+        budgetYear: 2026,
+        amountMonths: 2,
+      });
+      const share = (endsOn: string) =>
+        revocationShare({ commitment: yearStart, coverage: limited, endsOn, currentYear: 2027 });
+
+      // Leaving on 01/02 gives back February to July, six months; January was used. Expiring on 15/08 gives back nothing.
+      expect(share('2027-02-01')).toBe(6n * 1500n);
+      expect(share('2027-08-15')).toBe(0n);
     });
 
     it('a request to go on using whose months begin after the end gives back all of them, the one before only its own months', () => {
@@ -197,6 +246,43 @@ describe('seat-release policy (RV-07, M-06, M-10)', () => {
       expect(releasesBeforeGrant('K2')).toBe(true);
       expect(releasesBeforeGrant('K1')).toBe(false);
       expect(releasesBeforeGrant('K4')).toBe(false);
+    });
+  });
+
+  describe('coverageEndOf (B-C1: a request with months of use records no end, the seat its grant made has it)', () => {
+    it('a request with months of use ends where the seat its grant made ends', () => {
+      expect(coverageEndOf({ recordedEnd: null, termMonths: 3, grantedEnd: '2026-06-14' })).toBe('2026-06-14');
+    });
+
+    it('a right with no months of use has no end, whatever seat it made (a long-term right, a one-time price)', () => {
+      expect(coverageEndOf({ recordedEnd: null, termMonths: null, grantedEnd: '2026-06-14' })).toBeNull();
+      expect(coverageEndOf({ recordedEnd: null, termMonths: 3, grantedEnd: null })).toBeNull();
+    });
+
+    it('the end a request records (an older request, one to go on using) is never replaced', () => {
+      expect(coverageEndOf({ recordedEnd: '2026-09-30', termMonths: 3, grantedEnd: '2026-06-14' })).toBe('2026-09-30');
+    });
+  });
+
+  describe('lastMonthBeginsOf (the day the last month of a term of months begins on)', () => {
+    const facts = {
+      startDate: '2026-03-15',
+      endDate: '2026-06-14',
+      termMonths: 3,
+      byHand: false,
+    };
+
+    it('is the last day a month began on, from the start of the seat the grant made to its end', () => {
+      expect(lastMonthBeginsOf(facts)).toBe('2026-05-15');
+      // A seat cut by the contract on 16/05 had a month begin on 15/05.
+      expect(lastMonthBeginsOf({ ...facts, endDate: '2026-05-16' })).toBe('2026-05-15');
+    });
+
+    it('is none for a request with no months of use, no end, no start, or an end a person chose by hand (its months are counted by the calendar)', () => {
+      expect(lastMonthBeginsOf({ ...facts, termMonths: null })).toBeNull();
+      expect(lastMonthBeginsOf({ ...facts, endDate: null })).toBeNull();
+      expect(lastMonthBeginsOf({ ...facts, startDate: null })).toBeNull();
+      expect(lastMonthBeginsOf({ ...facts, byHand: true })).toBeNull();
     });
   });
 

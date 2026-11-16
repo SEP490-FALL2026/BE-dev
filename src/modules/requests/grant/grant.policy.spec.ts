@@ -60,12 +60,16 @@ describe('grantAnswerFor a request of a person (US-07-01 AC-3, AC-16)', () => {
     ).not.toHaveProperty('replacesAssignmentId');
   });
 
-  it('ends no seat by term for free internal software, which costs nothing and has no term to bind (R-H1, Q-03 a1)', () => {
+  it('QĐ-111i: free internal software (K5) takes months of use too, and its seat ends with them; with none it has no end', () => {
     expect(grantAnswerFor({ ...request('AWAITING_EXECUTION'), branch: 'INTERNAL_FREE' })).toMatchObject({
       status: 'GRANTABLE',
       seat: 'PERSONAL',
-      termBound: false,
+      termMonths: 6,
+      termBound: true,
     });
+    expect(
+      grantAnswerFor({ ...request('AWAITING_EXECUTION'), branch: 'INTERNAL_FREE', termMonths: null }),
+    ).toMatchObject({ status: 'GRANTABLE', termBound: false });
   });
 
   it('R-D01: a request with no term in months and no end date has a seat with no end, and one with an end date ends with it', () => {

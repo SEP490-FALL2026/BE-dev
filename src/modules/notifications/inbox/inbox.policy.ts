@@ -30,6 +30,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   REQUEST_SUBMITTED: ['requestId', 'stage'],
   REQUEST_NEED_APPROVED: ['requestId', 'next'],
   REQUEST_REJECTED: ['requestId', 'by', 'reason', 'suggestedPlanId'],
+  REQUEST_RETURNED: ['requestId', 'by', 'reason'],
   REQUEST_IT_REJECTED: ['requestId', 'kind', 'reason', 'alternativePlanId', 'alternativeNote', 'noAlternative'],
   REQUEST_SPEND_APPROVED: ['requestId'],
   REQUEST_GRANTED: ['requestId', 'accessGuide', 'homepageUrl'],
@@ -98,8 +99,10 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_PROPOSAL_CLOSED_YEAR_END: ['proposalId', 'costCenterId', 'year'],
   BUDGET_PROPOSAL_TASK_ASSIGNED: ['costCenterId', 'departmentId', 'year'],
   BUDGET_PROPOSAL_TASK_WAITING: ['proposalId', 'costCenterId', 'year'],
-  // The cycle of a year opened and a department ceiling published: the year and the department, never the figure (FIGURE_WORDS).
-  BUDGET_CYCLE_OPENED: ['cycleId', 'year', 'submissionDeadline'],
+  // The cycle of a year opened (with the kind of the form to download, `templateKind`) and its submission deadline moved: the year and the days, never a figure (FIGURE_WORDS).
+  // A department ceiling published is no longer sent (QĐ-111aa); the notices written before stay readable.
+  BUDGET_CYCLE_OPENED: ['cycleId', 'year', 'submissionDeadline', 'templateKind'],
+  BUDGET_CYCLE_DEADLINE_MOVED: ['cycleId', 'year', 'submissionDeadline', 'previousSubmissionDeadline'],
   BUDGET_DEPARTMENT_CEILING_PUBLISHED: ['cycleId', 'year', 'departmentId'],
   // The deadlines of the cycle: the year, the day, and how many departments or versions (a count, never a figure of money).
   BUDGET_PROPOSAL_DEADLINE_REMINDER: ['cycleId', 'year', 'costCenterId', 'submissionDeadline'],
@@ -108,6 +111,21 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_DECISION_DEADLINE_REMINDER: ['cycleId', 'year', 'versionCount', 'decisionDeadline'],
   BUDGET_COST_CENTER_SETUP_DUE: ['cycleId', 'year', 'departmentId'],
   BUDGET_BASELINE_VERSION_HEAD_ASSIGNED: ['versionId', 'costCenterId', 'year'],
+  // The budget of the year after is not approved yet for a Cost Center: the Cost Center and the year, never a figure.
+  BUDGET_NEXT_YEAR_MISSING: ['costCenterId', 'year'],
+  // The close of a month (`QĐ-111ae`, `QĐ-104i`): the year and month, and for the summary the period and how many Cost Centers have each light; never a figure.
+  BUDGET_REVIEW_DUE: ['year', 'month'],
+  BUDGET_REVIEW_SUMMARY: ['periodId', 'year', 'month', 'kind', 'greenCount', 'yellowCount', 'redCount', 'underCount'],
+  BUDGET_SHARED_POOL_OVER_RESERVE: ['year', 'month'],
+  // The use of the budget of a Cost Center reached 80 or 100 percent of its base (`QĐ-111af`, RV-2): the Cost Center, the year and the threshold, never a figure.
+  BUDGET_THRESHOLD_REACHED: ['costCenterId', 'year', 'threshold'],
+  // The head of a department is reminded to explain a Cost Center of a quarterly review (`QĐ-111ah`, B-7): on the due day and every Monday until they explain or Finance signs.
+  BUDGET_REVIEW_EXPLANATION_DUE: ['periodId', 'costCenterId', 'year', 'month', 'dueOn'],
+  // The head of a department is asked to explain a Cost Center of a quarterly review the day the quarter opens (`QĐ-111ah`, US-12-21 AC-4): the due day and the light, never a figure.
+  BUDGET_REVIEW_EXPLANATION_REQUESTED: ['periodId', 'costCenterId', 'year', 'month', 'dueOn', 'light'],
+  // An adjustment of the budget in the year (`QĐ-111ag`): asked of the spending approver, and decided for Finance and the head of a Cost Center it concerns; the id, the year, the kind and the decision, never a figure.
+  BUDGET_ADJUSTMENT_REQUESTED: ['adjustmentId', 'year', 'kind'],
+  BUDGET_ADJUSTMENT_DECIDED: ['adjustmentId', 'year', 'kind', 'decision', 'costCenterId'],
   // The alerts of the rights (`a03-license-inbox-alerts`): the right, the person, the day and the role asked; never a key, an
   // account identifier, a price or the text of a note.
   LICENSE_EXPIRY_REMINDER: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'audience'],
@@ -173,6 +191,10 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   REQUEST_CANCELLED_BENEFICIARY_GONE: ['requestId', 'beneficiaryEmployeeId', 'reasonKind'],
   // The same, for the request the system left to the IT Admin because its grant is being carried out (`QĐ-110d`).
   REQUEST_BENEFICIARY_GONE_IT_CHECK: ['requestId', 'beneficiaryEmployeeId', 'reasonKind'],
+  // The purchase invoices of PI-1: the invoice is the subject; the request or subscription it is for tells where to read it.
+  PURCHASE_INVOICE_SUBMITTED: ['purchaseInvoiceId', 'linkKind', 'servicePeriodMonth'],
+  PURCHASE_INVOICE_CONFIRMED: ['purchaseInvoiceId', 'linkKind', 'servicePeriodMonth'],
+  PURCHASE_INVOICE_RETURNED: ['purchaseInvoiceId', 'linkKind', 'servicePeriodMonth'],
   // The list of software of a department (`QĐ-110s`, `QĐ-110t`).
   DEPARTMENT_SOFTWARE_PROPOSED: ['proposalId', 'departmentId', 'applicationId', 'planId'],
   DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED: ['proposalId', 'departmentId', 'applicationId', 'planId', 'decision', 'reason'],
@@ -186,6 +208,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   IT_ADMIN_HANDOVER_RECEIVED: ['sourceKind', 'sourceId', 'fromEmployeeId', 'subscriptions', 'applications'],
   // A departure cancelled after the last working day: how many revocation tasks in progress the IT Admin closes by hand (`QĐ-110c`).
   DEPARTURE_REVOCATION_IT_CLOSE: ['caseId', 'employeeId', 'taskCount'],
+  // A new version of a policy: which policy, which version, and whether the reader is asked to acknowledge it (`QĐ-111bi`).
+  POLICY_PUBLISHED: ['policyCode', 'versionNumber', 'requiresReacknowledgement'],
 };
 
 /** Whether the code is one of the closed table. */

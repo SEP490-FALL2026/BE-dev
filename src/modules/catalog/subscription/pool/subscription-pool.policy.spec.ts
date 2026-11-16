@@ -1,9 +1,11 @@
+import { toDateColumn } from '../../../../core/business-date';
 import {
   SubscriptionBillingCycleUnsupportedError,
   SubscriptionBillingLongerThanCommitmentError,
   SubscriptionCommitmentTermNotAllowedError,
   SubscriptionCommitmentTermRequiredError,
   SubscriptionK1MonthlyOnlyError,
+  SubscriptionK4PerpetualOnlyError,
   SubscriptionResponsibleRequiredError,
   SubscriptionVendorAdminsRequiredError,
 } from '../subscription.errors';
@@ -21,6 +23,7 @@ import {
   pickPriceSource,
   poolWarnings,
   vendorAdminFlags,
+  withoutPeriodsAhead,
   withoutVendorAdminDetail,
   type LivenessFacts,
   type PriceSource,
@@ -73,6 +76,21 @@ describe('the rules of the shared pool on a write (QĐ-103e, QĐ-104d(3), R-E01,
     );
     expect(() =>
       assertPoolTerms({ ...k1, billingCycle: 'MONTHLY', commitmentTermMonths: 1, activating: true }),
+    ).not.toThrow();
+  });
+
+  it('B-5: a K4 plan is bought once, so what is written for it is a perpetual purchase and never a term', () => {
+    const k4 = { ...term, planProvisioningType: 'K4' as const, billingCycle: 'MONTHLY' as const };
+
+    expect(() => assertPoolTerms({ ...k4, commitmentTermMonths: 1 })).toThrow(SubscriptionK4PerpetualOnlyError);
+    expect(() => assertPoolTerms({ ...k4, commitmentTermMonths: null, activating: false })).toThrow(
+      SubscriptionK4PerpetualOnlyError,
+    );
+    expect(() =>
+      assertPoolTerms({ ...k4, kind: 'PERPETUAL', billingCycle: null, commitmentTermMonths: null, activating: true }),
+    ).not.toThrow();
+    expect(() =>
+      assertPoolTerms({ ...term, planProvisioningType: 'K2' as const, commitmentTermMonths: 12 }),
     ).not.toThrow();
   });
 
@@ -232,6 +250,44 @@ describe('the order a grant that names no subscription takes them (P0-05)', () =
     ]);
 
     expect(ordered.map((source) => source.id)).toEqual(['primary', 'dear', 'cheap', 'free-of-price']);
+  });
+});
+
+describe('withoutPeriodsAhead: the seats of the period that runs and of the next one recorded ahead are one pool, counted once (QĐ-111n)', () => {
+  const TODAY = '2026-11-15';
+  const period = (id: string, renewedFromId: string | null = null, startsOn: string | null = '2026-01-05') => ({
+    id,
+    renewedFromId,
+    startDate: startsOn === null ? null : toDateColumn(startsOn),
+  });
+  const idsOf = (rows: readonly { id: string }[]) => rows.map((row) => row.id);
+
+  it('keeps every period when none of them continues another, and answers nothing for nothing', () => {
+    expect(idsOf(withoutPeriodsAhead([period('a'), period('b')], TODAY))).toEqual(['a', 'b']);
+    expect(withoutPeriodsAhead([], TODAY)).toEqual([]);
+  });
+
+  it('leaves out a next period that begins after today when the period it continues is among them', () => {
+    expect(idsOf(withoutPeriodsAhead([period('a'), period('b', 'a', '2026-12-15')], TODAY))).toEqual(['a']);
+  });
+
+  it('keeps a next period that begins today or before: it has taken the pool over, the period it continues is no longer one of them', () => {
+    expect(idsOf(withoutPeriodsAhead([period('a'), period('b', 'a', TODAY)], TODAY))).toEqual(['a', 'b']);
+    expect(idsOf(withoutPeriodsAhead([period('a'), period('b', 'a', '2026-11-01')], TODAY))).toEqual(['a', 'b']);
+  });
+
+  it('keeps a next period whose previous one is not among them (it is over, or another IT Admin answers for it): the pool lives on it', () => {
+    expect(idsOf(withoutPeriodsAhead([period('b', 'a', '2026-12-15')], TODAY))).toEqual(['b']);
+  });
+
+  it('keeps only the period that runs of a chain of periods recorded ahead, in the order given', () => {
+    const chain = [period('c', 'b', '2027-12-15'), period('a'), period('b', 'a', '2026-12-15')];
+
+    expect(idsOf(withoutPeriodsAhead(chain, TODAY))).toEqual(['a']);
+  });
+
+  it('keeps a period with no start date: nothing says it is ahead', () => {
+    expect(idsOf(withoutPeriodsAhead([period('a'), period('b', 'a', null)], TODAY))).toEqual(['a', 'b']);
   });
 });
 

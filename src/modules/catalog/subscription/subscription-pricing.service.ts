@@ -4,13 +4,14 @@ import { MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { toSnapshot } from './subscription.mapper';
-import type { PriceSnapshotRecord, UnitPriceRecord } from './subscription.types';
+import { assertPriceInDong, uniformSnapshotOf } from './price/subscription-price.policy';
+import type { OriginalPriceRecord, PriceSnapshotRecord, UnitPriceRecord } from './subscription.types';
 
 /**
- * The unit price of a subscription as it is read, recorded and frozen: parsed in the minor units of its currency, recorded
- * on the day it is entered and converted by the finance facade at the rate of that day (`ADR-0007`, `QĐ-42b`). Pure
- * coordination: it stores nothing, and the subscription service keeps the transaction.
+ * The unit price of a subscription as it is read, recorded and frozen: parsed in dong (the only currency a price is entered in), recorded
+ * on the day it is entered and given the snapshot of the same currency (`QĐ-111an`, `ADR-0007`). The price a vendor quoted in another
+ * currency is read apart, in its own currency, and only kept. Pure coordination: it stores nothing, converts nothing and reads no exchange
+ * rate, and the subscription service keeps the transaction.
  */
 @Injectable()
 export class SubscriptionPricingService {
@@ -19,40 +20,34 @@ export class SubscriptionPricingService {
     private readonly organizationReads: OrganizationReadApi,
   ) {}
 
-  /** Reads the unit price in the minor units of its currency; a negative price is out of range. */
+  /** Reads the unit price in dong; another currency is refused before the amount is read, and a negative price is out of range. */
   async read(unitPrice: { amount: string; currency: string }): Promise<Money> {
+    assertPriceInDong(unitPrice.currency);
     const money = await this.finance.parseMoney(unitPrice);
     if (money.amountMinor < 0n) throw new MoneyOutOfRangeError();
 
     return money;
   }
 
-  /**
-   * The unit price recorded today and converted at the rate of today, frozen. No rate for today leaves the price with no
-   * snapshot (a draft), never a converted value from another day (`QĐ-42b`).
-   */
+  /** Reads the price the vendor quoted, in the minor units of its own currency; a negative price is out of range. */
+  async readOriginal(originalPrice: { amount: string; currency: string }): Promise<OriginalPriceRecord> {
+    const money = await this.finance.parseMoney(originalPrice);
+    if (money.amountMinor < 0n) throw new MoneyOutOfRangeError();
+
+    return { amountMinor: money.amountMinor, currency: money.currency };
+  }
+
+  /** The unit price recorded today with the snapshot of the same currency, frozen: no exchange rate is read, so no price is ever left unpriced for want of one. */
   async priceToday(
     tx: DbTx,
     money: Money | null,
   ): Promise<{ unitPrice: UnitPriceRecord | null; priceSnapshot: PriceSnapshotRecord | null }> {
     if (money === null) return { unitPrice: null, priceSnapshot: null };
     const recordedOn = await this.organizationReads.businessToday(undefined, tx);
-    const result = await this.finance.snapshotMoney(tx, money, recordedOn);
 
     return {
       unitPrice: { amountMinor: money.amountMinor, currency: money.currency, recordedOn },
-      priceSnapshot: result.status === 'CONVERTED' ? toSnapshot(result.snapshot) : null,
+      priceSnapshot: uniformSnapshotOf(money, recordedOn),
     };
-  }
-
-  /** The conversion of a price recorded earlier, at the rate now entered for the day it was recorded on. */
-  async snapshotOfRecorded(tx: DbTx, unitPrice: UnitPriceRecord): Promise<PriceSnapshotRecord | null> {
-    const result = await this.finance.snapshotMoney(
-      tx,
-      { amountMinor: unitPrice.amountMinor, currency: unitPrice.currency },
-      unitPrice.recordedOn,
-    );
-
-    return result.status === 'CONVERTED' ? toSnapshot(result.snapshot) : null;
   }
 }

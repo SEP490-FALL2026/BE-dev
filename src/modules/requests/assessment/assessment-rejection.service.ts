@@ -7,15 +7,16 @@ import { accessRequestAuditEvent } from '../access-request/access-request-audit-
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { RequestOutcomeService } from '../outcome/request-outcome.service';
-import type { AssessmentRejectionBodyDto } from './assessment.dto';
+import type { AssessmentRefusalBody } from './assessment.dto';
 import { AssessmentReferenceNotFoundError } from './assessment.errors';
 import { AssessmentRepo } from './assessment.repo';
 import { AssessmentGate } from './assessment-gate.service';
 
 /**
  * The IT Admin refuses at the gate of the assessment (`US-05-18`): a tool that cannot be controlled, or software that is not
- * eligible for the catalog. The reason is required, the alternative is optional (it may be a plan of the catalog, a note, or
- * nothing). The request ends there: no spend step, no snapshot, no commitment, and the spending approver is never asked.
+ * eligible for the catalog. The reason is required (typed, or filled in from the questions of the checklist answered No), the alternative
+ * is optional (it may be a plan of the catalog, a note, or nothing). The request ends there: no spend step, no snapshot, no commitment,
+ * and the spending approver is never asked.
  */
 @Injectable()
 export class AssessmentRejectionService {
@@ -29,11 +30,14 @@ export class AssessmentRejectionService {
     private readonly outcomes: RequestOutcomeService,
   ) {}
 
-  /** Throws AssessmentRefusedError, AssessmentReferenceNotFoundError and AccessRequestNotFoundError. */
+  /**
+   * Throws AssessmentRefusedError, AssessmentReferenceNotFoundError and AccessRequestNotFoundError, and what the checklist of the step refuses
+   * (`QĐ-111ap`): a version left behind, answers missing, a reason that is neither typed nor given by an answer No.
+   */
   async reject(
     actor: AuthenticatedPrincipal,
     requestId: string,
-    body: AssessmentRejectionBodyDto,
+    body: AssessmentRefusalBody,
   ): Promise<AccessRequestRecord> {
     return this.runner.run(async (tx) => {
       const request = await this.gate.lockProposal(tx, requestId);
@@ -44,11 +48,16 @@ export class AssessmentRejectionService {
       ) {
         throw new AssessmentReferenceNotFoundError('alternativePlanId');
       }
+      const { verdict, reason } = await this.gate.judgeRefusal(tx, request, {
+        decision: 'REJECT',
+        checklist: body.checklist,
+        reason: body.reason,
+      });
 
       const now = new Date();
       await this.assessments.reject(tx, requestId, {
         kind: body.kind,
-        reason: body.reason,
+        reason,
         alternativePlanId: body.alternativePlanId ?? null,
         alternativeNote: body.alternativeNote ?? null,
         employeeId: actor.employeeId,
@@ -73,6 +82,7 @@ export class AssessmentRejectionService {
           },
         ),
       );
+      await this.gate.keepChecklist(tx, actor, request, { verdict, decision: 'REJECT', decidedAt: now });
       await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, now);
 
       const record = await this.requests.findById(requestId, tx);

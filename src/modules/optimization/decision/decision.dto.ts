@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { businessDate, responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 import { GHOST_SEAT_GROUPS, GHOST_SEAT_STATES, GHOST_SEAT_TIERS } from '../ghost-seat/ghost-seat.types';
 
 const pagination = z.strictObject({
@@ -28,6 +29,7 @@ export const decisionBodySchema = z
       .meta({ description: 'The recommendations the one choice and reason apply to (1 to 50), all or none.' }),
     choice,
     reason,
+    checklist: checklistBodySchema,
     exemptUntil: businessDate.optional().meta({
       description:
         'Only for EXEMPT: the last day as YYYY-MM-DD, after today and at most 12 months from today; it must exist (2026-02-30 is refused).',

@@ -24,7 +24,7 @@ const managerDashboardSchema = z.strictObject({
     ),
     spendQueue: section('The requests ready to be submitted for spending approval, with those returned and why.'),
     budgetProposals: section('The budget proposals of the department.'),
-    approvedBudgetLines: section('The lines of the approved budget version of the department.'),
+    approvedBudgetLines: section('The approved budget of the department: one figure for the year, read at its source.'),
   }),
 });
 

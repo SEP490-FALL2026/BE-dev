@@ -9,15 +9,13 @@ import { FinanceSetupIncompleteError } from '../../organization/public/organizat
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   AccessRequestAlreadyHoldsAccessError,
-  AccessRequestManyPaidSoftwareReasonRequiredError,
   AccessRequestOpenLimitReachedError,
   AccessRequestOpenRequestExistsError,
   AccessRequestEmployeeRequiredError,
   AccessRequestNotDraftError,
   AccessRequestRoleRequiredError,
   AccessRequestSuperAdminCannotRequestError,
-  AccessRequestEndDateOutOfRangeError,
-  AccessRequestTermRequiredError,
+  AccessRequestTermRefusedError,
   AccessRequestGroupUsesLinesError,
   AccessRequestApplicationRetiredError,
   AccessRequestDecisionRefusedError,
@@ -82,15 +80,12 @@ export function toAccessRequestApiException(error: unknown): unknown {
     );
   }
 
-  if (error instanceof AccessRequestEndDateOutOfRangeError) {
+  if (error instanceof AccessRequestTermRefusedError) {
     return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
-      code: 'ACCESS_REQUEST.END_DATE_OUT_OF_RANGE',
+      code: `ACCESS_REQUEST.${error.reason}`,
       message: error.message,
-      details: { maxEndDate: error.maxEndDate },
+      ...(error.reason === 'TERM_CONTRACT_ENDED' ? { details: { contractEndDate: error.contractEndDate } } : {}),
     });
-  }
-  if (error instanceof AccessRequestTermRequiredError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCESS_REQUEST.TERM_REQUIRED', error.message);
   }
   if (error instanceof AccessRequestAlreadyHoldsAccessError) {
     return new ApiException(HttpStatus.CONFLICT, {
@@ -107,17 +102,10 @@ export function toAccessRequestApiException(error: unknown): unknown {
     });
   }
   if (error instanceof AccessRequestOpenLimitReachedError) {
-    return new ApiException(HttpStatus.CONFLICT, {
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
       code: 'ACCESS_REQUEST.OPEN_LIMIT_REACHED',
       message: error.message,
-      details: { limit: error.limit, openRequestIds: [...error.openRequestIds] },
-    });
-  }
-  if (error instanceof AccessRequestManyPaidSoftwareReasonRequiredError) {
-    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
-      code: 'ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED',
-      message: error.message,
-      details: { count: error.count, threshold: error.threshold },
+      details: { limit: error.limit, resetsOn: error.resetsOn },
     });
   }
   if (error instanceof AccessRequestNotAssigneeError) {
@@ -181,8 +169,11 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
-  END_DATE_OUT_OF_RANGE: example(new AccessRequestEndDateOutOfRangeError('2027-11-09')),
-  TERM_REQUIRED: example(new AccessRequestTermRequiredError()),
+  TERM_REQUIRED: example(new AccessRequestTermRefusedError('TERM_REQUIRED')),
+  TERM_MONTHS_OUT_OF_RANGE: example(new AccessRequestTermRefusedError('TERM_MONTHS_OUT_OF_RANGE')),
+  TERM_NOT_ASKED: example(new AccessRequestTermRefusedError('TERM_NOT_ASKED')),
+  TERM_LONG_TERM_NOT_ALLOWED: example(new AccessRequestTermRefusedError('TERM_LONG_TERM_NOT_ALLOWED')),
+  TERM_CONTRACT_ENDED: example(new AccessRequestTermRefusedError('TERM_CONTRACT_ENDED', '2026-10-31')),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({
@@ -206,8 +197,7 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
     }),
   ),
   OPEN_REQUEST_EXISTS: example(new AccessRequestOpenRequestExistsError('<request-id>')),
-  OPEN_LIMIT_REACHED: example(new AccessRequestOpenLimitReachedError(3, ['<request-id>'])),
-  MANY_PAID_SOFTWARE_REASON_REQUIRED: example(new AccessRequestManyPaidSoftwareReasonRequiredError(10, 10)),
+  OPEN_LIMIT_REACHED: example(new AccessRequestOpenLimitReachedError(10, '2026-11-16')),
   NOT_ASSIGNEE: example(new AccessRequestNotAssigneeError()),
   EMPLOYEE_REQUIRED: example(new AccessRequestEmployeeRequiredError()),
   GROUP_USES_LINES: example(new AccessRequestGroupUsesLinesError()),
@@ -229,3 +219,12 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   BENEFICIARY_NOT_TRANSFERRED: cancellation('BENEFICIARY_NOT_TRANSFERRED'),
   EVIDENCE_REQUIRED: cancellation('EVIDENCE_REQUIRED'),
 } as const;
+
+/** The five answers of a time of use that is refused, for the routes that take one (`QĐ-111i`, `INV-07`). */
+export const TERM_ERROR_EXAMPLES = [
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_REQUIRED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_MONTHS_OUT_OF_RANGE,
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_NOT_ASKED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_LONG_TERM_NOT_ALLOWED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_CONTRACT_ENDED,
+] as const;

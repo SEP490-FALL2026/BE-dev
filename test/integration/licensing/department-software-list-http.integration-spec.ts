@@ -8,6 +8,7 @@ interface EntryWire {
   entryId: string;
   applicationId: string;
   applicationName: string;
+  applicationLogoUrl: string | null;
   planId: string | null;
   planName: string | null;
   note: string | null;
@@ -92,6 +93,9 @@ describe('the list of software of a department over HTTP (integration, real Post
       await change(design.id, h.as(designIt.account), {
         add: [{ applicationId, planId, note: 'for the designers' }, { applicationId }],
       }).expect(200);
+      await h.ctx.sql.query(`UPDATE applications SET logo_url = 'https://cdn.example.com/logo.png' WHERE id = $1`, [
+        applicationId,
+      ]);
 
       for (const who of [
         h.as(designMember.account),
@@ -112,6 +116,10 @@ describe('the list of software of a department over HTTP (integration, real Post
         [planId],
       );
       expect(withPlan?.applicationName).toBe(names.rows[0].application);
+      // CT-1.L2: the link the IT Admin pasted comes with the name, for every place of the application.
+      expect(
+        list.items.filter((item) => item.applicationId === applicationId).map((item) => item.applicationLogoUrl),
+      ).toEqual(['https://cdn.example.com/logo.png', 'https://cdn.example.com/logo.png']);
       expect(withPlan?.planName).toBe(names.rows[0].plan);
       expect(withPlan?.note).toBe('for the designers');
       expect(withPlan?.addedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);

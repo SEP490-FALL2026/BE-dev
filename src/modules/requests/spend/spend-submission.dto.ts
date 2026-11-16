@@ -1,7 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
+import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 import { requestStateSchema } from '../access-request/access-request.dto';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -19,27 +19,40 @@ export const reserveReasonSchema = z
   .max(500)
   .refine((value) => !/[\r\n]/.test(value), { message: 'The reason is one line.' });
 
-export const submitBatchBodySchema = z.strictObject({
-  requestIds: z
-    .array(z.uuid())
-    .min(1)
-    .max(BATCH_MAX)
-    .refine((ids) => new Set(ids).size === ids.length, { message: 'A request is sent once in a batch.' })
-    .meta({ uniqueItems: true }),
-  /**
-   * The confirmations of the reserve the head gives in the same act (`RV-11`): each applies only to a request of the batch whose check
-   * says it uses the reserve now; one whose check says otherwise is left as it is and the answer says it was ignored.
-   */
-  reserveConfirmations: z
-    .array(z.strictObject({ requestId: z.uuid(), reason: reserveReasonSchema }))
-    .max(BATCH_MAX)
-    .refine((items) => new Set(items.map((item) => item.requestId)).size === items.length, {
-      message: 'A request is confirmed once.',
-    })
-    .optional(),
-});
+export const submitBatchBodySchema = z
+  .strictObject({
+    requestIds: z
+      .array(z.uuid())
+      .min(1)
+      .max(BATCH_MAX)
+      .refine((ids) => new Set(ids).size === ids.length, { message: 'A request is sent once in a batch.' })
+      .meta({ uniqueItems: true }),
+    /**
+     * The confirmations of the reserve the head gives in the same act (`RV-11`): each applies only to a request of the batch whose check
+     * says it uses the reserve now; one whose check says otherwise is left as it is and the answer says it was ignored.
+     */
+    reserveConfirmations: z
+      .array(z.strictObject({ requestId: z.uuid(), reason: reserveReasonSchema }))
+      .max(BATCH_MAX)
+      .refine((items) => new Set(items.map((item) => item.requestId)).size === items.length, {
+        message: 'A request is confirmed once.',
+      })
+      .optional(),
+    /**
+     * The checklist of the step 1.6 for the confirmations of the reserve of the batch, one for the whole batch (`QĐ-111ap`, `QĐ-111aq`): needed
+     * when the batch carries a confirmation, and left out otherwise.
+     */
+    checklist: checklistBodySchema.optional(),
+  })
+  .refine((body) => (body.reserveConfirmations ?? []).length === 0 || body.checklist !== undefined, {
+    path: ['checklist'],
+    message: 'A batch that confirms the reserve answers the checklist of the step.',
+  });
 
-export const reserveConfirmationBodySchema = z.strictObject({ reason: reserveReasonSchema });
+export const reserveConfirmationBodySchema = z.strictObject({
+  reason: reserveReasonSchema,
+  checklist: checklistBodySchema,
+});
 
 export const supplementBodySchema = z
   .strictObject({
@@ -51,14 +64,16 @@ export const supplementBodySchema = z
       .refine((ids) => new Set(ids).size === ids.length, { message: 'A person is named once.' })
       .meta({ uniqueItems: true })
       .optional(),
-    /** An earlier day the right ends than the request has (a request with no end may be given one); the price is made again for it. */
-    expectedEndDate: businessDate.optional(),
+    /** A shorter time of use than the request has, in months (a request with no end may be given one); the price is made again for it. */
+    termMonths: z.number().int().optional(),
     reason: text(1000),
   })
-  .refine((body) => body.dropEmployeeIds !== undefined || body.expectedEndDate !== undefined, {
-    message: 'Name the people to leave out, an earlier end date, or both.',
+  .refine((body) => body.dropEmployeeIds !== undefined || body.termMonths !== undefined, {
+    message: 'Name the people to leave out, a shorter time of use, or both.',
   })
-  .meta({ description: 'The people of the group the head leaves out and/or an earlier end date, and why.' });
+  .meta({
+    description: 'The people of the group the head leaves out and/or a shorter time of use in months, and why.',
+  });
 
 const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -127,9 +142,7 @@ const batchSchema = z.strictObject({
 const submitResultSchema = z.strictObject({
   requestId: z.uuid(),
   outcome: z.enum(['SENT_TO_APPROVER', 'AWAITING_RESERVE_CONFIRMATION', 'STOPPED']),
-  stopReason: z
-    .enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING', 'RATE_MISSING'])
-    .nullable(),
+  stopReason: z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING']).nullable(),
   /** `APPLIED`: the confirmation was kept and the spend step opened; `IGNORED`: it was given for a request that does not use the reserve; `NOT_GIVEN`. */
   reserveConfirmation: z.enum(['APPLIED', 'IGNORED', 'NOT_GIVEN']),
 });
@@ -157,7 +170,6 @@ const batchItemSchema = z.strictObject({
       'NO_APPROVED_BUDGET',
       'OVER_RESERVE',
       'PRICE_MISSING',
-      'RATE_MISSING',
       'STALE_COST_EVIDENCE',
       'CLOSED_OR_EXPIRED_BUDGET_PERIOD',
     ])

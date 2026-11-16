@@ -11,13 +11,17 @@ import {
   DocumentUploadMismatchError,
 } from './contract.errors';
 
-export type DocumentPurpose =
-  | 'CONTRACT_ATTACHMENT'
-  | 'PURCHASE_DOCUMENT'
-  | 'TAX_PAYMENT_PROOF'
-  | 'SIGNATURE_RECORD'
-  | 'IMPORT_SOURCE'
-  | 'COST_STATEMENT';
+/** The purposes a new file may be declared with (`US-04-04` AC-11): a bank statement is not one, nobody uploads it any more. */
+export const NEW_DOCUMENT_PURPOSES = [
+  'CONTRACT_ATTACHMENT',
+  'PURCHASE_DOCUMENT',
+  'TAX_PAYMENT_PROOF',
+  'SIGNATURE_RECORD',
+  'IMPORT_SOURCE',
+] as const;
+export type NewDocumentPurpose = (typeof NEW_DOCUMENT_PURPOSES)[number];
+/** The purposes a stored file has: `COST_STATEMENT` stays only so that a file kept before is still read; the database keeps the value. */
+export type DocumentPurpose = NewDocumentPurpose | 'COST_STATEMENT';
 export type DocumentStatus = 'AWAITING_UPLOAD' | 'PENDING_ATTACH' | 'READY' | 'QUARANTINED' | 'EXPIRED';
 
 /** How long a link that opens a file lives (`US-04-04` AC-1, AC-2); it is never stored and a new request makes a new one. */
@@ -32,6 +36,7 @@ const PURPOSE_ROLES: Record<DocumentPurpose, readonly string[]> = {
   TAX_PAYMENT_PROOF: ['FINANCE'],
   SIGNATURE_RECORD: ['IT_ADMIN'],
   IMPORT_SOURCE: ['IT_ADMIN'],
+  // Only a file kept before has it (no new one is declared with it): the same role that chose it then still judges it.
   COST_STATEMENT: ['FINANCE'],
 };
 
@@ -40,6 +45,9 @@ const ATTACHES_TO_CONTRACT: ReadonlySet<DocumentPurpose> = new Set(['CONTRACT_AT
 
 /** A signed record belongs to the person who signed it, not to a contract (`BM-06`). */
 const ATTACHES_TO_SIGNER: ReadonlySet<DocumentPurpose> = new Set(['SIGNATURE_RECORD']);
+
+/** A purchase document may also belong to the purchase invoice it came with (`PI-1`). */
+const ATTACHES_TO_PURCHASE_INVOICE: ReadonlySet<DocumentPurpose> = new Set(['PURCHASE_DOCUMENT']);
 
 /** What is kept: each type with the extensions that go with it. A name that says otherwise is refused. */
 const ALLOWED_TYPES: Record<string, readonly string[]> = {
@@ -61,8 +69,18 @@ export function assertPurposeAvailable(purpose: DocumentPurpose): void {
 }
 
 /** A file is attached to what its purpose names and to nothing else. Throws DocumentPurposeMismatchError. */
-export function assertPurposeAttachesTo(purpose: DocumentPurpose, target: 'CONTRACT' | 'SIGNER'): void {
-  const fits = target === 'CONTRACT' ? ATTACHES_TO_CONTRACT.has(purpose) : ATTACHES_TO_SIGNER.has(purpose);
+export function assertPurposeAttachesTo(
+  purpose: DocumentPurpose,
+  target: 'CONTRACT' | 'SIGNER' | 'PURCHASE_INVOICE' | 'OUT_OF_PROCESS_CASE',
+): void {
+  const targets = {
+    CONTRACT: ATTACHES_TO_CONTRACT,
+    SIGNER: ATTACHES_TO_SIGNER,
+    PURCHASE_INVOICE: ATTACHES_TO_PURCHASE_INVOICE,
+    // A proof of payment is a purchase document, whoever it is attached to.
+    OUT_OF_PROCESS_CASE: ATTACHES_TO_PURCHASE_INVOICE,
+  } as const;
+  const fits = targets[target].has(purpose);
   if (!fits) throw new DocumentPurposeMismatchError();
 }
 

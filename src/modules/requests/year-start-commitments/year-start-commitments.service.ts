@@ -27,7 +27,7 @@ type Step =
  * The pass of 01/01 (`FR-5.8`(6), `FR-5.8a`, `BR-MF1-09e`, `QĐ-109a`): in the first pass of a year — the sweeper runs every hour, so the first after
  * midnight of the organization — every paid request whose right goes on into the year, or that was approved as spend and not yet granted, gets one
  * commitment for the year, with no approval and no check of the budget. The year is the calendar year of the organization's own day; the price is
- * the one of 01/01 and the seats those that run on 01/01 whenever the pass runs, so a pass that runs late changes nothing but the rate it may convert at.
+ * the one of 01/01 and the seats those that run on 01/01 whenever the pass runs, so a pass that runs late changes nothing.
  *
  * The mark `year_start_commitment_runs` makes it idempotent: a year whose mark is complete is not read again, and a pass that failed half way
  * leaves it open with the last request it went through, and the next goes on after it — no request is judged twice and a commitment is never

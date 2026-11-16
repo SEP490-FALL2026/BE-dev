@@ -6,6 +6,9 @@ export interface Money {
   currency: string;
 }
 
+/** The one currency a price or a quote is entered in (`QĐ-111an`, R-4): the reporting currency of the organization is fixed to it. */
+export const DONG = 'VND';
+
 /** The most minor units a money value may hold: 10^15. */
 export const MAX_AMOUNT_MINOR = 10n ** 15n;
 

@@ -186,7 +186,8 @@ describe('removing a person who left from a request for a group (integration, re
       const { people, id } = await approved(3);
       const [e1, e2] = people;
       await granted(id, e1.employeeId);
-      await granted(id, e2.employeeId);
+      // Nobody has worked the task of the person who left: the grant takes the work for whoever presses it, so it is one put back in the queue.
+      await h.unclaimed((await granted(id, e2.employeeId)).id);
       await h.depart(e2);
 
       await h.closeLineForDeparture(id, e2.employeeId, note, h.it1).expect(200);
@@ -197,16 +198,16 @@ describe('removing a person who left from a request for a group (integration, re
       const theirs = rows.find((row) => row.employee_id === e1.employeeId);
       expect(mine).toMatchObject({ status: 'CANCELLED', close_reason: 'BENEFICIARY_LEFT' });
       expect(mine?.cancelled_at).not.toBeNull();
-      expect(theirs).toMatchObject({ status: 'QUEUED', cancelled_at: null });
+      expect(theirs).toMatchObject({ status: 'IN_PROGRESS', cancelled_at: null });
       expect(await h.state(id)).toBe('EXECUTING');
     });
 
     it('cancels a task that is being worked only with the evidence that the work was undone', async () => {
       const { people, id } = await approved(2);
       const [e1, e2] = people;
-      const running = await granted(id, e1.employeeId);
+      // Both tasks are in the hands of the IT Admin who granted them: the grant takes the work for whoever presses it.
+      await granted(id, e1.employeeId);
       await granted(id, e2.employeeId);
-      await h.claim(running.id).expect(200);
       await h.depart(e1);
 
       const refused = await h.closeLineForDeparture(id, e1.employeeId, note, h.it1).expect(422);
@@ -214,14 +215,14 @@ describe('removing a person who left from a request for a group (integration, re
       expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.EVIDENCE_REQUIRED');
       expect(await h.lineStates(id)).toEqual(['EXECUTING', 'EXECUTING']);
       expect(await releases(id)).toEqual([]);
-      expect((await tasks(id)).map((row) => row.status).sort()).toEqual(['IN_PROGRESS', 'QUEUED']);
+      expect((await tasks(id)).map((row) => row.status).sort()).toEqual(['IN_PROGRESS', 'IN_PROGRESS']);
 
       await h
         .closeLineForDeparture(id, e1.employeeId, { ...note, evidence: 'Took the invitation back' }, h.it1)
         .expect(200);
 
       expect(await h.lineStates(id)).toEqual(['CANCELLED', 'EXECUTING']);
-      expect((await tasks(id)).map((row) => row.status).sort()).toEqual(['CANCELLED', 'QUEUED']);
+      expect((await tasks(id)).map((row) => row.status).sort()).toEqual(['CANCELLED', 'IN_PROGRESS']);
       expect((await releases(id)).length).toBeGreaterThan(0);
     });
 

@@ -51,6 +51,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'REQUEST_SUBMITTED',
   'REQUEST_NEED_APPROVED',
   'REQUEST_REJECTED',
+  // A step sent the request back to its sender to add what is missing and send it again (`QĐ-111ap`, R-24).
+  'REQUEST_RETURNED',
   'REQUEST_IT_REJECTED',
   'REQUEST_SPEND_APPROVED',
   'REQUEST_GRANTED',
@@ -108,6 +110,9 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_PROPOSAL_TASK_ASSIGNED',
   'BUDGET_PROPOSAL_TASK_WAITING',
   'BUDGET_CYCLE_OPENED',
+  // The submission deadline of an open cycle moved, with a reason kept in the Audit Trail (`QĐ-111z`, `US-06-15` AC-21).
+  'BUDGET_CYCLE_DEADLINE_MOVED',
+  // No longer sent (`QĐ-111aa`: there is no ceiling of a department to publish); notices written before it stay readable.
   'BUDGET_DEPARTMENT_CEILING_PUBLISHED',
   // The deadlines of the cycle (`QĐ-103i`, `R-I05`): a head who has not proposed, the departments nobody heads, how many departments have
   // not proposed, the versions still waiting after the decision deadline, a department with no Cost Center yet, and a head named after a
@@ -118,6 +123,24 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_DECISION_DEADLINE_REMINDER',
   'BUDGET_COST_CENTER_SETUP_DUE',
   'BUDGET_BASELINE_VERSION_HEAD_ASSIGNED',
+  // The budget of the year after is not approved yet for a Cost Center (`QĐ-111am`, B-4): told to Finance and the spending approver on 01/12 and then every Monday
+  // until a version is approved. The Cost Center and the year only.
+  'BUDGET_NEXT_YEAR_MISSING',
+  // The close of the month of the review (`QĐ-111ae`, R-47): Finance is asked on the fifth working day to close the month before; the spending approver is told, when Finance signs
+  // the month, the summary with the table of lights (the number of Cost Centers of each light, never a figure); Finance is warned when the line of the shared pool is above its
+  // reserve (`QĐ-104i`). The year and month, the period and the counts only.
+  'BUDGET_REVIEW_DUE',
+  'BUDGET_REVIEW_SUMMARY',
+  'BUDGET_SHARED_POOL_OVER_RESERVE',
+  // The use of the budget of a Cost Center reached 80 or 100 percent of its base (`QĐ-111af`, RV-2): told once each time to the head of the department and Finance; the Cost Center, the year and the threshold, never a figure.
+  'BUDGET_THRESHOLD_REACHED',
+  // The head of a department is reminded to explain a Cost Center of a quarterly review (`QĐ-111ah`, B-7): on the due day and every Monday until they explain or Finance signs; the period, the Cost Center and the due day, never a figure.
+  'BUDGET_REVIEW_EXPLANATION_DUE',
+  // The head of a department is asked to explain a Cost Center of a quarterly review the day Finance closes the quarter (`QĐ-111ah`, US-12-21 AC-4): the period, the Cost Center, the due day and the light, never a figure.
+  'BUDGET_REVIEW_EXPLANATION_REQUESTED',
+  // An adjustment of the budget in the year (`QĐ-111ag`): the spending approver is asked to decide it; Finance who made it and the head of each Cost Center it concerns are told how it was decided. The id, the year and the kind, never a figure.
+  'BUDGET_ADJUSTMENT_REQUESTED',
+  'BUDGET_ADJUSTMENT_DECIDED',
   // The alerts of the rights (`a03-license-inbox-alerts`, `FR-5.14`): a right about to end, a handover not confirmed, a service
   // account whose person leaves, a person who left and keeps a K1 access to the end of the paid period. Ids, codes and days only.
   // The codes of the handover and of the service account are read only (`QĐ-110g`, `QĐ-110m`): nothing writes one any more, a row of
@@ -168,6 +191,10 @@ export const IN_APP_NOTIFICATION_CODES = [
   'REQUEST_CANCELLED_BENEFICIARY_GONE',
   // The grant of a request of that person is being carried out, so the system did not close it: the IT Admin checks the vendor and closes it.
   'REQUEST_BENEFICIARY_GONE_IT_CHECK',
+  // A purchase invoice waits for Finance to sign the money out (`QĐ-111u`); and, for the IT Admin who submitted it, Finance signed it or returned it with a reason.
+  'PURCHASE_INVOICE_SUBMITTED',
+  'PURCHASE_INVOICE_CONFIRMED',
+  'PURCHASE_INVOICE_RETURNED',
   'DEPARTMENT_SOFTWARE_PROPOSED',
   'DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED',
   'VENDOR_ADMINS_BELOW_MINIMUM',
@@ -179,6 +206,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   // A handover cancelled after its last working day left revocation tasks in progress with no reason of the departure: the IT Admin closes
   // them by what happened at the provider (`QĐ-110c`, MF2-C).
   'DEPARTURE_REVOCATION_IT_CLOSE',
+  // A new version of a policy is in force (`QĐ-111bi`): told once to each account of a role it applies to, with the code, the number and whether it asks to be acknowledged again.
+  'POLICY_PUBLISHED',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

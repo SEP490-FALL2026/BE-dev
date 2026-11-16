@@ -12,8 +12,10 @@ export interface RenewalSubmission {
   /** The person who holds the seat and the plan of it. */
   holder: { employeeId: string; planId: string };
   body: Pick<RenewalBodyDto, 'businessReason'>;
-  termMonths: number;
-  newEnd: BusinessDate;
+  /** The months of use asked; null for a right that goes on with no end. */
+  termMonths: number | null;
+  /** The last day of the new period, cut at the end of the contract of a person who has one; null for a right with no end. */
+  newEnd: BusinessDate | null;
   now: Date;
   assessed: Pick<Assessment, 'unit' | 'policy' | 'pricing' | 'routing'>;
 }

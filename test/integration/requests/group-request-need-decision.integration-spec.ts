@@ -181,7 +181,7 @@ describe('the need of the people of a request for a group, decided one by one ov
         .expect(422);
 
       // An end date past a year from today is the domain's refusal (`US-05-23` AC-9); the confirmation in words is a field that is gone.
-      expect(h.codeOf(long)).toBe('GROUP_REQUEST.TERM_BEYOND_LIMIT');
+      expect(h.codeOf(long)).toBe('ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE');
       expect(h.codeOf(confirmed)).toBe('VALIDATION_ERROR');
       expect(await h.lineStates(request.id)).toEqual(['AWAITING_NEED', 'AWAITING_NEED']);
     });

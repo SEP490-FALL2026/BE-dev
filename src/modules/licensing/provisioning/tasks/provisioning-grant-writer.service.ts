@@ -19,7 +19,7 @@ import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
 import type { GrantInput, ProvisioningGrantPlanner } from './provisioning-grant-planner.service';
 import { claimMatchesAnswer, grantPurchaseOf, grantTaskAudit } from './provisioning-grant.policy';
-import { effectiveEndOf } from '../../../../core/term-limit';
+import { termRunOf } from '../../../../core/term-limit';
 import type { GrantRequestAnswer } from '../../public/licensing.types';
 import { ProvisioningHolderService } from './provisioning-holder.service';
 import { SharedPoolService } from '../../shared-pool/shared-pool.service';
@@ -52,6 +52,7 @@ export class ProvisioningGrantWriter {
     planned: Planned,
   ): Promise<ProvisioningTaskRecord> {
     const { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts } = planned;
+    const { holderContractEnd, holderHasTerm } = planned;
     // The request is locked and moved to "being carried out" here, in the transaction of the grant: a second grant of
     // the same request finds it no longer grantable, and a request that changed since the read above is refused.
     const claimed = await this.gate.get().claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);
@@ -78,7 +79,7 @@ export class ProvisioningGrantWriter {
       target,
       holder,
       effectiveFrom: today,
-      expectedEndDate: this.endOfSeat(claimed, today),
+      expectedEndDate: this.endOfSeat(claimed, today, { contractEnd: holderContractEnd, hasTerm: holderHasTerm }),
       replacesAssignmentId: replaced,
     });
 
@@ -93,22 +94,85 @@ export class ProvisioningGrantWriter {
       maxAttempts,
       ...(bought && { purchase: bought }),
     });
+
+    return this.recordTask(tx, actor, {
+      task,
+      organizationId: organization.id,
+      assignmentId: assignment.id,
+      input,
+      holder,
+    });
+  }
+
+  /**
+   * The audit event of the task, then the claim of the IT Admin who made it (`QĐ-111m`), then the notice to the Super Admin when the IT
+   * Admin answers for the account themselves because no other can (`SoD-5`). Returns the task as it stands, taken.
+   */
+  private async recordTask(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: {
+      task: ProvisioningTaskRecord;
+      organizationId: string;
+      assignmentId: string;
+      input: GrantInput;
+      holder: { selfExecuted: boolean | null };
+    },
+  ): Promise<ProvisioningTaskRecord> {
+    const { task, organizationId, holder } = facts;
     await this.audit.record(
       tx,
       licensingAuditEvent(
         actor,
-        organization.id,
+        organizationId,
         'PROVISIONING_TASK.CREATED',
         'ProvisioningTask',
         task.id,
         null,
-        grantTaskAudit(input.requestId, assignment.id, task, holder.selfExecuted),
+        grantTaskAudit(facts.input.requestId, facts.assignmentId, task, holder.selfExecuted),
       ),
     );
-    // An IT Admin who answers for the account themselves because no other can is told to the Super Admin (`SoD-5`).
-    if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
+    const taken = await this.takeTask(tx, actor, { task, organizationId, selfExecuted: holder.selfExecuted });
+    if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organizationId, task.id, actor.employeeId);
 
-    return task;
+    return taken;
+  }
+
+  /**
+   * The IT Admin who presses "Grant" takes the work (`QĐ-111m`): the task is theirs from the moment it exists, with the event of the claim as any
+   * other claim of a task has it (what the task was before, who took it).
+   */
+  private async takeTask(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: { task: ProvisioningTaskRecord; organizationId: string; selfExecuted: boolean | null },
+  ): Promise<ProvisioningTaskRecord> {
+    const { task } = facts;
+    await this.repo.markClaimed(tx, task.id, actor.appUserId, new Date());
+    await this.audit.record(
+      tx,
+      licensingAuditEvent(
+        actor,
+        facts.organizationId,
+        'PROVISIONING_TASK.CLAIMED',
+        'ProvisioningTask',
+        task.id,
+        {
+          status: task.status,
+          claimedBy: task.claimedByAppUserId,
+          attempts: task.attempts,
+          defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
+        },
+        {
+          status: 'IN_PROGRESS',
+          claimedBy: actor.appUserId,
+          defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
+          selfExecuted: facts.selfExecuted === true,
+        },
+      ),
+    );
+
+    return (await this.repo.find(task.id, tx)) ?? task;
   }
 
   /**
@@ -286,14 +350,21 @@ export class ProvisioningGrantWriter {
   }
 
   /**
-   * The day the seat ends: the day the request carries (the IT Admin names none, `Q-03` c1), else the end of its term for a request that
-   * costs money, never cut at the end of the calendar year (`QĐ-98`, `QĐ-104a`); free internal software and a service account have none.
+   * The day the seat ends: the day an older request carries (the IT Admin names none, `Q-03` c1), else the end of the months of use the
+   * request asked for, counted from today, the day it is granted, and never cut at the end of the calendar year (`QĐ-98`, `QĐ-111i`). A person
+   * with a term is cut at the end of their contract, whenever that comes first (R-38, `INV-07`). A right with no months and a service account
+   * have no end.
    */
-  private endOfSeat(claimed: Extract<GrantRequestAnswer, { status: 'GRANTABLE' }>, today: string): string | null {
+  private endOfSeat(
+    claimed: Extract<GrantRequestAnswer, { status: 'GRANTABLE' }>,
+    today: string,
+    holder: { contractEnd: string | null; hasTerm: boolean },
+  ): string | null {
     if (claimed.expectedEndDate !== null) return claimed.expectedEndDate;
-    if (!claimed.termBound) return null;
+    // A right with no months still ends for a person with a term: at the end of their contract (`INV-07`, R-38).
+    if (!claimed.termBound) return holder.hasTerm ? holder.contractEnd : null;
 
-    return effectiveEndOf({ start: today, months: claimed.termMonths });
+    return termRunOf({ start: today, months: claimed.termMonths, contractEndDate: holder.contractEnd }).end;
   }
 
   /** K5: the plan itself (no seat); K1 and K2: the subscription, which must be of the plan and have a quantity. */

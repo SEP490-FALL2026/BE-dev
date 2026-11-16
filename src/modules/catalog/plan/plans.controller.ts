@@ -23,9 +23,9 @@ import {
   WorkspaceProfileResponseDto,
 } from './plan.dto';
 import { PLAN_ERROR_EXAMPLES as EXAMPLES, toPlanApiException } from './plan.http-errors';
-import { seatTrackingOf } from './plan.policy';
+import { toPlanSummaryWire, toPlanWire } from './plan.mapper';
 import { PlanService } from './plan.service';
-import type { PlanRecord, PlanSummaryRecord, WorkspaceProfileView } from './plan.types';
+import type { WorkspaceProfileView } from './plan.types';
 import { PlanWorkspaceService } from './plan-workspace.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -40,7 +40,7 @@ const READERS = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const INVALID_DESCRIPTION =
-  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone) or UPDATE_EMPTY.';
+  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone) or UPDATE_EMPTY.';
 /** The rule refusals of the shape of a plan, met by a declaration and by a change alike. */
 const SHAPE_EXAMPLES = [
   EXAMPLES.NAME_INVALID,
@@ -49,6 +49,7 @@ const SHAPE_EXAMPLES = [
   EXAMPLES.PROVISIONING_TYPE_MISMATCH,
   EXAMPLES.PRICING_MODEL_REQUIRED,
   EXAMPLES.PRICING_MODEL_NOT_APPLICABLE,
+  EXAMPLES.PRICING_MODEL_NOT_DERIVED,
   EXAMPLES.CONTROL_LEVEL_REQUIRED,
   EXAMPLES.DATA_LOSS_NOTE_REQUIRED,
   EXAMPLES.ADMIN_CONSOLE_NOT_APPLICABLE,
@@ -64,7 +65,7 @@ const UPDATE_INVALID = {
   examples: [VALIDATION_EXAMPLE, ...SHAPE_EXAMPLES, EXAMPLES.UPDATE_EMPTY],
 } as const;
 const CONFLICT_DESCRIPTION =
-  'The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS or SUBSCRIPTIONS).';
+  'The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has) or SUBSCRIPTIONS).';
 const DECLARE_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description: CONFLICT_DESCRIPTION,
@@ -85,28 +86,6 @@ const NOT_FOUND = {
   description: 'The plan does not exist (PLAN.NOT_FOUND).',
   examples: [EXAMPLES.NOT_FOUND],
 } as const;
-
-function toPlanSummaryWire(plan: PlanSummaryRecord) {
-  return {
-    id: plan.id,
-    applicationId: plan.applicationId,
-    applicationName: plan.applicationName,
-    name: plan.name,
-    provisioningType: plan.provisioningType,
-    pricingModel: plan.pricingModel,
-    controlLevel: plan.controlLevel,
-    dataLossOnRemoval: plan.dataLossOnRemoval,
-    sharingPolicy: plan.sharingPolicy,
-    hasAdminConsole: plan.hasAdminConsole,
-    seatTracking: seatTrackingOf(plan.pricingModel),
-    createdAt: plan.createdAt.toISOString(),
-    updatedAt: plan.updatedAt.toISOString(),
-  };
-}
-
-function toPlanWire(plan: PlanRecord) {
-  return { ...toPlanSummaryWire(plan), revocationNote: plan.revocationNote };
-}
 
 function toProfileWire(profile: WorkspaceProfileView) {
   return { ...profile, updatedAt: profile.updatedAt.toISOString() };
@@ -130,7 +109,8 @@ export class PlansController {
   @ApiOperation({ operationId: 'planList', summary: 'List plans' })
   @ApiSuccessResponse(PlanPageResponseDto, {
     message: 'PLAN.LISTED',
-    description: 'A page of plans by application then plan name, optionally for one application or one kind.',
+    description:
+      'A page of plans by application then plan name, optionally for one application, one kind of provisioning, the functional group or the catalog status of the application, or a search over the plan and application names.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

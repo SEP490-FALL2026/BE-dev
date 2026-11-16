@@ -2,7 +2,7 @@ import {
   checkRenewable,
   checkRenewalSender,
   monthsBetween,
-  newEndFits,
+  renewalTermMonthsOf,
   renewalWindowOf,
   routeRenewal,
 } from './renewal-request.policy';
@@ -105,16 +105,19 @@ describe('BR-MF1-08a QĐ-108b: the window of the renewal', () => {
   });
 });
 
-describe('QĐ-108a RV-25: the new end date of the renewal', () => {
-  const facts = { previousEnd: '2026-06-30', maxEnd: '2027-06-30' };
+describe('T-RQ3: the window of a right that ends on 04/11/2026 opens 30 days before, on 05/10 (QĐ-111l)', () => {
+  const facts = { previousEnd: '2026-11-04', windowDays: 30 };
 
-  it.each([
-    ['the current end', '2026-06-30', false],
-    ['a day before it', '2026-06-29', false],
-    ['the day after it', '2026-07-01', true],
-    ['twelve months on', '2027-06-30', true],
-    ['a day past twelve months', '2027-07-01', false],
-  ])('%s', (_name, newEnd, fits) => {
-    expect(newEndFits({ ...facts, newEnd })).toBe(fits);
+  it('refuses a renewal sent on 04/10 and takes one sent on 05/10', () => {
+    expect(renewalWindowOf({ ...facts, today: '2026-10-04' })).toEqual({ open: false, opensOn: '2026-10-05' });
+    expect(renewalWindowOf({ ...facts, today: '2026-10-05' })).toEqual({ open: true, opensOn: '2026-10-05' });
+  });
+});
+
+describe('the time of use a renewal asks for (QĐ-111l, QĐ-111i)', () => {
+  it('is the months asked, or none for a right to go on with no end', () => {
+    expect(renewalTermMonthsOf({ extensionMonths: 3 })).toBe(3);
+    expect(renewalTermMonthsOf({ extensionMonths: 12 })).toBe(12);
+    expect(renewalTermMonthsOf({ longTerm: true })).toBeNull();
   });
 });

@@ -55,32 +55,23 @@ describe('BR-MF4-05 budgetMine over PostgreSQL', () => {
     expect(await h.route(exact, u.head.account)).toMatchObject({ status: 'ROUTED', outcome: 'USES_RESERVE' });
   });
 
-  it('BR-MF4-01 exposes only the published department ceiling and cycle deadlines', async () => {
+  it('QĐ-111z gives the head both deadlines and the state of the cycle, and no ceiling of a department nor the company amounts', async () => {
     const u = await unit();
-    await h.ctx.sql.query(
-      `INSERT INTO budget_department_ceilings
-      (cycle_id, department_id, signed_commitments_minor, planned_seats_minor, priority_minor, total_minor, published_total_minor)
-      SELECT id, $1, 10, 20, 30, 60, 60 FROM budget_cycles WHERE year = $2`,
-      [u.department.id, h.year],
-    );
-    expect(await mine(u)).toMatchObject({
-      departmentCeiling: {
-        total: { amount: '60' },
-        signedCommitments: { amount: '10' },
-        plannedSeats: { amount: '20' },
-        priority: { amount: '30' },
-      },
-      cycle: { submissionDeadline: `${h.year}-12-01`, decisionDeadline: `${h.year}-12-15`, published: true },
+
+    const open = await mine(u);
+
+    expect(open.cycle).toMatchObject({
+      submissionDeadline: `${h.year}-12-31`,
+      decisionDeadline: `${h.year}-12-31`,
     });
-    await h.ctx.sql.query(
-      'UPDATE budget_cycles SET published_at = NULL, published_by_employee_id = NULL WHERE year = $1',
-      [h.year],
-    );
-    const unpublished = await mine(u);
-    expect(unpublished.departmentCeiling).toBeNull();
-    expect(unpublished.cycle?.published).toBe(false);
-    expect(unpublished).not.toHaveProperty('annualCeiling');
-    expect(unpublished).not.toHaveProperty('sharedPoolReserve');
+    expect(open.cycle?.status).toBe('OPEN');
+    expect(open).not.toHaveProperty('departmentCeiling');
+    expect(open).not.toHaveProperty('annualCeiling');
+    expect(open).not.toHaveProperty('sharedPoolReserve');
+    await h.ctx.sql.query('UPDATE budget_cycles SET opened_at = NULL, opened_by_employee_id = NULL WHERE year = $1', [
+      h.year,
+    ]);
+    expect((await mine(u)).cycle?.status).toBe('DRAFT');
     expect((await mine(u, h.year + 5)).cycle).toBeNull();
   });
 
@@ -99,26 +90,14 @@ describe('BR-MF4-05 budgetMine over PostgreSQL', () => {
   });
 
   it('BR-MF4-05 preserves negative remaining amounts when actual spend exceeds budget', async () => {
-    // Restore the fixture cycle after the publication-visibility test.
-    await h.ctx.sql.query(
-      'UPDATE budget_cycles SET published_at = now(), published_by_employee_id = $2 WHERE year = $1',
-      [h.year, h.finance.employeeId],
-    );
+    // Restore the fixture cycle after the test of the state of the cycle.
+    await h.ctx.sql.query('UPDATE budget_cycles SET opened_at = now(), opened_by_employee_id = $2 WHERE year = $1', [
+      h.year,
+      h.finance.employeeId,
+    ]);
     const u = await unit();
     await h.budgetFor(u, { total: 10 * M, spent: 11 * M });
     expect(await mine(u)).toMatchObject({ remainingWithReserve: { amount: String(-M) }, overBudget: true });
-  });
-
-  it('AF-16 S4-01: tells the head the ceiling that was published, not the one Finance is editing', async () => {
-    const u = await unit();
-    await h.ctx.sql.query(
-      `INSERT INTO budget_department_ceilings
-      (cycle_id, department_id, signed_commitments_minor, planned_seats_minor, priority_minor, total_minor, published_total_minor)
-      SELECT id, $1, 70, 0, 0, 70, 50 FROM budget_cycles WHERE year = $2`,
-      [u.department.id, h.year],
-    );
-
-    expect((await mine(u)).departmentCeiling?.total).toMatchObject({ amount: '50' });
   });
 
   it('AF-12 BR-MF4-07 QĐ-100p: lists the sent versions of the department with their base, reserve and total', async () => {

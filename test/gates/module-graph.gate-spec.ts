@@ -63,12 +63,25 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // The worker prices and checks conversions through read-only contracts, without mounting the HTTP contexts.
   'BudgetsReadFacadeModule: BudgetsReadApi',
   'CatalogPricingFacadeModule: CatalogPricingApi',
+  // CT-1.1 (QĐ-111bf): the installation command makes the standard functional groups of a new organization through this facade.
+  'CatalogBootstrapFacadeModule: CatalogBootstrapApi',
+  // QĐ-112b: the installation writes the eight policies and their first versions through this one facade.
+  'PoliciesBootstrapFacadeModule: PoliciesBootstrapApi',
+  'PoliciesChecklistFacadeModule: PolicyChecklistApi',
+  // QĐ-111as: the point the modules that read import files add their columns to, so the library builds the template files from what the parsers read.
+  'PoliciesTemplateFacadeModule: ImportTemplateContributions',
   // The extension points the requests context binds (public/budgets.extension-points.ts): what waits to be decided as spend, the release guard and the facts of a commitment request.
   'BudgetsModule: PendingSpendContributions',
+  // QĐ-111ac: what a Cost Center carries into the year, added by the requests context from a dry run of the pass of 01/01.
+  'BudgetsModule: CarriedOverContributions',
   'BudgetsModule: CommitmentReleaseGuardHook',
   'BudgetsModule: CommitmentRequestFactsHook',
+  // PI-1.7: the purchase invoice behind an invoice of a commitment (its label and how it was paid), bound by the requests context.
+  'BudgetsModule: PurchaseInvoiceFactsHook',
   // G4 (ADR-0013): the catalog facade licensing reads the seat targets (subscription or internal plan) through.
   'CatalogModule: CatalogApi',
+  // B2D-01 (`US-04-13` AC-15): the usage module reads which applications rest on a contract through this facade, to show their sources at the contract.
+  'CatalogModule: CatalogContractApi',
   // X-IT.2: what an IT Admin answers for in the catalog (subscriptions and applications), counted and handed over by the hand-over of personnel.
   'CatalogModule: CatalogResponsibilityApi',
   // The extension point licensing binds its reader of occupied seats to (public/catalog.extension-points.ts).
@@ -83,10 +96,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // The extension point the usage module binds the collector allowlist to (devices/public/devices.extension-points.ts).
   'DevicesModule: CollectorAllowlistHook',
   'DevicesModule: Symbol(DEVICE_CREDENTIAL_VERIFIER)', // port of src/infrastructure/security
-  // G3 (ADR-0013): the finance facade, money in and conversion snapshot out; the repos stay private.
+  // G3 (ADR-0013): the finance facade, money in and the snapshot of the same currency out; the repos stay private.
   'FinanceModule: FinanceApi',
-  // The audited exchange-rate use case the finance HTTP module serves; the raw ledger is not exported.
-  'FinanceModule: ExchangeRateService',
   'IdentityAccessFacadeModule: IdentityAccessApi',
   // D-S21 (qd93-remove-fallback-substitute-approvers): who can never ask for or be given access through a Request, one facade for every route that makes one.
   'IdentityAccessFacadeModule: RequestPartyEligibilityApi',
@@ -98,15 +109,19 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // qd103-vendor-usage-import: the seats and holders the usage import matches identities against, and the one door to the usage evidence the rules of wasted seats read.
   'LicensingModule: LicensingUsageApi',
   'UsageModule: UsageEvidenceApi',
+  'UsageModule: UsageOutOfProcessApi',
   // qd103-ghost-seat-g3-g4: the extension point the rules of wasted seats bind to deny a recommendation when a report is confirmed.
   'UsageModule: UsageImportListeners',
   'LicensingModule: LicensingOpenGrantsApi',
+  // IN-1.2 (QĐ-111c): the list of software of a department, which the link of a request to the catalog writes when the IT Admin ticks it (DS.4).
+  'LicensingModule: LicensingDepartmentToolsApi',
   'OptimizationModule: OptimizationApi',
   'LicensingModule: LicensingSeatBaselineApi',
   // G8 (US-12-15): the counts of licensing the role overviews read.
   'LicensingModule: LicensingDashboardApi',
   // P2-03: what the shared pool of a plan holds, which the queue of grants of requests shows beside each request.
   'LicensingModule: LicensingPoolStockApi',
+  'LicensingModule: LicensingSeatMonthApi',
   // The extension points requests and personnel bind or add to (public/licensing.extension-points.ts).
   'LicensingModule: GrantRequestGateHook',
   'LicensingModule: RevocationListeners',
@@ -125,6 +140,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // QĐ-93d(3): where the grant of SPENDING_APPROVER asks the modules above it for the open work of a person; requests, budgets and
   // licensing add a check each from a `*.listener.ts`, so the one point the facade holds is injected by them.
   'IdentityAccessFacadeModule: SpendingApproverGrantChecks',
+  // QĐ-111ar: where `GET /me` asks the modules above it which policies the caller has not acknowledged; the library of policies adds the one
+  // source from a `*.listener.ts`, so the point the facade holds is injected by it.
+  'IdentityAccessFacadeModule: PendingPolicyAcknowledgements',
   'IdentityAccessFacadeModule: RoleGrantService',
   // H6.1: the read-only account contract of `ops:inspect`, declared only in the inspection graph.
   'IdentityAccessInspectionFacadeModule: IdentityAccessInspectionApi',
@@ -203,6 +221,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'RequestsModule: RequestOutcomeListeners',
   // MF3-C.3 (QĐ-110q, R-49): the extension point the personnel context adds its answer to — a person in the grace of a transfer who holds the software asked for (public/requests.extension-points.ts).
   'RequestsModule: TransferGraceHoldContributions',
+  // RC-1 (QĐ-111y, R-29): the extension point the review of the accounts at the vendor adds its listener to — a case of an invoice that differs closed as a suspicion (public/requests.extension-points.ts).
+  'RequestsModule: InvoiceDiscrepancyReferralListeners',
   // The two entry services of `pnpm ops:recover` (Q6; E7): the holder's own account, and the role transfer.
   'IdentityAccessRecoveryCliModule: HolderRecoveryApi',
   'IdentityAccessRecoveryCliModule: RoleTransferRecoveryApi',

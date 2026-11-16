@@ -1,13 +1,31 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
-import { termEndOf } from '../../../src/core/term-limit';
 import { bodyOf } from '../api-body';
 import type { FlowActors } from './flow-actors';
 import type { FlowClock } from './flow-clock';
 import type { FlowFacts } from './flow-facts';
 
 type Method = 'get' | 'post' | 'put' | 'patch' | 'delete';
+
+/** The decision step whose checklist a POST to `path` answers, or null (`DECISION_STEP_CODES`; a batch only when it confirms the reserve). */
+export function decisionStepOf(path: string, body: object): string | null {
+  const route = path.split('?')[0];
+  if (/\/(need-decision|line-need-decisions)$/.test(route)) return '1.2';
+  if (/\/assessment\/(completion|rejection)$/.test(route)) return '1.3';
+  if (/\/reserve-confirmation$/.test(route)) return '1.6';
+  if (route === '/spend-batches') {
+    const confirmations = (body as { reserveConfirmations?: unknown[] }).reserveConfirmations;
+    return confirmations && confirmations.length > 0 ? '1.6' : null;
+  }
+  if (/\/(spend-approval|line-spend-decisions)$/.test(route) || /^\/spend-batches\/[^/]+\/decisions$/.test(route))
+    return '1.7';
+  if (/^\/budget-versions\/[^/]+\/decision$/.test(route)) return '4.7';
+  if (route === '/ghost-seat-recommendations/escalations') return '5.3';
+  if (route === '/ghost-seat-decisions') return '5.4';
+
+  return null;
+}
 
 /**
  * The calls of the scenarios, in one place: a request as a signed-in person of the dataset, and the bodies of the contract after the
@@ -33,8 +51,41 @@ export class FlowCalls {
     return this.as(code, 'get', path);
   }
 
-  post(code: string, path: string, body: object = {}): Promise<request.Response> {
-    return this.as(code, 'post', path, body);
+  /**
+   * A POST as `code`. A decision route of a step with a checklist (`QĐ-111ap`, PL-2) gets the checklist of the policy in force at that step
+   * with every question of the person answered Yes, as the screen sends it, unless the body brings its own (`checklist`, or `checklist:
+   * undefined` to leave it out on purpose).
+   */
+  async post(code: string, path: string, body: object = {}): Promise<request.Response> {
+    const step = decisionStepOf(path, body);
+    const withChecklist = step && !('checklist' in body) ? { ...body, checklist: await this.yesChecklist(step) } : body;
+
+    return this.as(code, 'post', path, withChecklist);
+  }
+
+  /** The checklist of a step all Yes, read from the version of its policy in force now. */
+  async yesChecklist(
+    step: string,
+  ): Promise<{ policyVersionId: string; answers: { itemCode: string; answer: 'YES' }[] }> {
+    const rows = await this.facts.rows<{
+      id: string;
+      content: { steps: { code: string; checklist: { code: string; check: string }[] }[] };
+    }>(
+      `SELECT DISTINCT ON (v.policy_id) v.id, v.content
+         FROM policy_versions v WHERE v.version_number IS NOT NULL ORDER BY v.policy_id, v.version_number DESC`,
+    );
+    for (const row of rows) {
+      const found = row.content.steps.find((candidate) => candidate.code === step);
+      if (found) {
+        return {
+          policyVersionId: row.id,
+          answers: found.checklist
+            .filter((item) => item.check === 'PERSON')
+            .map((item) => ({ itemCode: item.code, answer: 'YES' as const })),
+        };
+      }
+    }
+    throw new Error(`No policy in force has the step ${step}.`);
   }
 
   put(code: string, path: string, body: object = {}): Promise<request.Response> {
@@ -89,13 +140,11 @@ export class FlowCalls {
 
   /** An employee sends a Request for a plan and the id of it is returned, failing on anything but 201. */
   async submitRequest(code: string, planId: string, extra: Record<string, unknown> = {}): Promise<string> {
-    // A flow that still says how long in months says it as the API takes it: the day the right ends (`QĐ-104a`).
-    const { termMonths, ...rest } = extra;
+    // A flow says how long in months, as the API takes it (`QĐ-111i`): `termMonths` goes in the body as it is.
     const response = await this.post(code, '/access-requests', {
       planId,
       businessReason: 'Cần cho công việc của nhóm',
-      ...rest,
-      ...(typeof termMonths === 'number' ? { expectedEndDate: termEndOf(this.today(), termMonths) } : {}),
+      ...extra,
     });
     if (response.status !== 201)
       throw new Error(`submit answered ${response.status}: ${JSON.stringify(response.body)}`);

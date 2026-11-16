@@ -63,7 +63,7 @@ Mỗi luật có một câu ở [module structure](../rules/module-structure.md)
 | R4  | `*.api.ts` và `*.extension-points.ts` chỉ nằm trong `public/`; mỗi facade export đúng một lớp `<X>Api`                                              | `module-layout`                                                          |
 | R5  | Gốc module có thư mục capability chỉ giữ `README.md`, `*.module.ts` và file dùng chung mang tên module                                              | `module-layout`                                                          |
 | R6  | Capability trong một module không import nhau theo vòng, ở mọi module; capability không import facade của chính module                              | `capability-graph`, `module-layout`; `pnpm arch:capabilities`            |
-| R7  | `src/core` chỉ giữ primitive ít nhất hai vùng dùng; ngoại lệ có lý do, danh sách chỉ thu hẹp (hiện `core/money/convert.ts`)                         | `capability-graph` (TG-9); `pnpm arch:capabilities --core`               |
+| R7  | `src/core` chỉ giữ primitive ít nhất hai vùng dùng; ngoại lệ có lý do, danh sách chỉ thu hẹp (hiện rỗng)                                            | `capability-graph` (TG-9); `pnpm arch:capabilities --core`               |
 | R8  | ESLint `complexity` 12, `max-lines-per-function` 60, `max-params` 8 là `error`; nợ cũ nằm ở `eslint-suppressions.json`, chỉ giảm, `max-params` về 0 | `lint-debt` (TG-2), `pnpm lint`                                          |
 | R9  | Cỡ spec: unit trong module ≤ 400 dòng; `test/integration`, `test/http`, `test/e2e` ≤ 800 dòng; `test/support` ≤ 400 dòng                            | `module-layout`, `test-size`, `test-support-structure`                   |
 | R10 | Export của Nest module nghiệp vụ ngoài danh sách hợp đồng công khai chỉ hợp lệ khi mọi consumer (theo DI metadata của mọi graph) ở cùng thư mục     | `module-graph` (`test/support/module-export-consumers.ts`)               |
@@ -98,6 +98,14 @@ thái hiện tại. Quyết định của Owner (29/10/2026): **O1** chấp nh�
 | S11 | `test-support-structure` giữ là gate trong `test/gates/` (spec định chuyển sang ESLint)                      | Gate đọc bằng parser TypeScript đã đúng và có self-test; ESLint không có rule tương đương sẵn                                                | Giữ                                                            |
 | S12 | `Dockerfile` thêm `COPY scripts/build` cho bước build (spec: không chạm Dockerfile)                          | `pnpm build` sinh alias CLI cần script đó trong image builder; đường chạy không đổi                                                          | Owner chấp nhận 29/10/2026 (O2)                                |
 | S13 | Ba văn bản OpenAPI đổi (summary 73 ký tự, hai message > 160 ký tự)                                           | Test `api-inventory` đỏ sẵn ở mốc; mã lỗi giữ nguyên, message của lệnh vận hành vẫn nêu lệnh đó                                              | Owner chấp nhận 29/10/2026 (O3)                                |
+
+## Bổ sung: module `policies` ở T3 (15/11/2026)
+
+Owner chấp nhận (`B-3`, `S-2` của review feedback FE): thư viện chính sách, xác nhận đã đọc, checklist khi quyết định và file mẫu
+import dùng chung một mô hình nên không thuộc module sẵn có nào; đặt `policies` ở **T3**, cạnh `finance` và
+`operating-parameters`, không có cạnh cùng tầng. `requests`, `budgets` (T5) và `optimization` (T7) gọi `public/` của nó;
+`identity-access` (T2) lấy cờ "chưa xác nhận" cho `GET /me` qua `Contributions` do chính nó mở và `policies` đăng ký trong một
+`*.listener.ts`; module sở hữu một parser góp định nghĩa cột file mẫu qua `Contributions` do `policies` mở.
 
 ## Hệ quả
 

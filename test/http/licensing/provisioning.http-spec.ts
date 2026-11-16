@@ -90,6 +90,31 @@ describe('provisioning queue routes (e2e, no database)', () => {
     ['a grant that carries a password', 'post', BASE, { requestId: ID, password: 'hunter2' }],
     ['evidence of over two thousand characters', 'post', `${BASE}/${ID}/complete`, { evidence: 'x'.repeat(2001) }],
     ['a completion with an unknown field', 'post', `${BASE}/${ID}/complete`, { evidence: 'x', done: true }],
+    // QĐ-111az: the checklist of a K1 grant has the shape of the one of a revocation; only the shape is checked here.
+    [
+      'a grant completion with a step that does not exist',
+      'post',
+      `${BASE}/${ID}/complete`,
+      { k1Checklist: { items: [{ code: 'COFFEE_BREAK', done: true }] } },
+    ],
+    [
+      'a grant completion with a step ticked at a time that is not one',
+      'post',
+      `${BASE}/${ID}/complete`,
+      { k1Checklist: { items: [{ code: 'COMPANY_EMAIL_REGISTERED', done: true, doneAt: 'yesterday' }] } },
+    ],
+    [
+      'a grant completion with a variant chosen by the client',
+      'post',
+      `${BASE}/${ID}/complete`,
+      { k1Checklist: { variant: 'GRANT', items: [] } },
+    ],
+    [
+      'a grant completion with more than ten steps',
+      'post',
+      `${BASE}/${ID}/complete`,
+      { k1Checklist: { items: Array.from({ length: 11 }, () => ({ code: 'NO_PERSONAL_DEVICE_MFA', done: false })) } },
+    ],
     ['a reason of over a thousand characters', 'post', `${BASE}/${ID}/report-failure`, { reason: 'x'.repeat(1001) }],
     ['a status that does not exist', 'get', `${BASE}?status=DONE`, undefined],
     // BR-MF5-04: the filter of the tasks that may be taken today is a flag.
@@ -336,6 +361,33 @@ describe('provisioning queue routes (e2e, no database)', () => {
       }
       const card = JSON.stringify((document.paths[`${BASE}/{id}`] as { get: unknown }).get);
       expect(card).toContain('k1Checklist');
+    },
+    OPENAPI_DOCUMENT_BUDGET_MS,
+  );
+
+  it(
+    'QĐ-111az: documents the checklist of the grant of a K1 seat: the body, its three codes of refusal, and the steps they expect',
+    () => {
+      const document = createOpenApiDocument(app);
+      const complete = (
+        document.paths[`${BASE}/{id}/complete`] as {
+          post: { requestBody: unknown; responses: Record<string, unknown> };
+        }
+      ).post;
+      type Examples = Record<string, { value: { error: { details?: unknown } } }>;
+      const examples = (complete.responses['422'] as { content: { 'application/json': { examples: Examples } } })
+        .content['application/json'].examples;
+
+      expect(JSON.stringify(complete.requestBody)).toContain('CompleteBodyDto');
+      expect(JSON.stringify(document.components?.schemas ?? {})).toContain('COMPANY_EMAIL_REGISTERED');
+      for (const code of ['PROVISIONING.K1_CHECKLIST_INCOMPLETE', 'PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER']) {
+        expect(examples[code].value.error.details).toEqual({
+          variant: 'GRANT',
+          codes: ['COMPANY_EMAIL_REGISTERED', 'NO_PERSONAL_DEVICE_MFA'],
+        });
+      }
+      // A grant of another kind has no steps to tell.
+      expect(examples['PROVISIONING.K1_CHECKLIST_NOT_ALLOWED'].value.error.details).toBeUndefined();
     },
     OPENAPI_DOCUMENT_BUDGET_MS,
   );

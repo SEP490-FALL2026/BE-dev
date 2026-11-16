@@ -1,4 +1,5 @@
 import { RevocationCompletionError } from '../../public/licensing.errors';
+import { ProvisioningK1ChecklistError } from '../provisioning.errors';
 import type {
   K1ChecklistCode,
   K1ChecklistExpectation,
@@ -37,13 +38,13 @@ export interface StoredK1ChecklistItem {
   doneAt: string;
 }
 
-/** The checklist as the task keeps it once the revocation is completed: the variant it was ticked as and the steps by their order. */
+/** The checklist as the task keeps it once the grant or the revocation is completed: the variant it was ticked as and the steps by their order. */
 export interface StoredK1Checklist {
   variant: K1ChecklistVariant;
   items: StoredK1ChecklistItem[];
 }
 
-/** What a K1 completion stores from the checklist: the checklist itself, the evidence it stands on and what the listeners are told. */
+/** What the completion of a K1 task stores from the checklist: the checklist itself, the evidence it stands on and what the listeners are told. */
 export interface K1ChecklistPlan extends StoredK1Checklist {
   evidence: string;
   facts: K1ChecklistFacts;
@@ -63,6 +64,8 @@ const LABELS: Record<K1ChecklistCode, string> = {
   RENEWAL_DISABLED: 'Turn off the renewal of the subscription for this seat',
   EVIDENCE_RECORDED: 'Record the evidence',
   MAILBOX_LOCKED: 'Lock the mailbox',
+  COMPANY_EMAIL_REGISTERED: 'Register on the company email of the person themself',
+  NO_PERSONAL_DEVICE_MFA: 'Do not turn on multi-factor sign-in with a personal device',
 };
 
 /**
@@ -70,7 +73,8 @@ const LABELS: Record<K1ChecklistCode, string> = {
  * the sessions signed out, the renewal turned off, the evidence kept and, last, the mailbox locked. A person who still works (a transfer,
  * an expiry, a return, a ghost seat...) has only the renewal turned off and the evidence kept: the mailbox is theirs (`R-35`). The system
  * controls neither Google nor Microsoft 365: the IT Admin does the steps there and ticks them here. The lock of the mailbox is a step of
- * the last K1 revocation of the person only (see `k1ChecklistCodes`).
+ * the last K1 revocation of the person only (see `k1ChecklistCodes`). The grant of a K1 seat has its own two steps (`US-07-01` AC-7): the
+ * subscription is registered on the company email of the person who will use it, and no multi-factor sign-in is turned on with a personal device.
  */
 const CODES_OF: Record<K1ChecklistVariant, readonly K1ChecklistCode[]> = {
   DEPARTURE: [
@@ -82,6 +86,7 @@ const CODES_OF: Record<K1ChecklistVariant, readonly K1ChecklistCode[]> = {
     'MAILBOX_LOCKED',
   ],
   STILL_EMPLOYED: ['RENEWAL_DISABLED', 'EVIDENCE_RECORDED'],
+  GRANT: ['COMPANY_EMAIL_REGISTERED', 'NO_PERSONAL_DEVICE_MFA'],
 };
 
 /**
@@ -89,7 +94,7 @@ const CODES_OF: Record<K1ChecklistVariant, readonly K1ChecklistCode[]> = {
  * came first, because one task answers for all the reasons of a seat (`QĐ-64a`) and the mailbox of a person who leaves is reset and locked
  * whatever else asked for the seat. No source: the person is not known to leave.
  */
-export function k1VariantOf(sources: readonly RevocationSource[]): K1ChecklistVariant {
+export function k1VariantOf(sources: readonly RevocationSource[]): Exclude<K1ChecklistVariant, 'GRANT'> {
   return sources.some((source) => DEPARTURE_SOURCES.has(source)) ? 'DEPARTURE' : 'STILL_EMPLOYED';
 }
 
@@ -111,13 +116,27 @@ export function k1ChecklistItems(variant: K1ChecklistVariant, lastOfPerson: bool
   }));
 }
 
-/** Refuses the checklist, telling the variant and the steps this task expects (nothing is told when the kind of grant has no checklist). */
-function fail(
-  problem: 'COMPLETION_NOT_ALLOWED' | 'K1_CHECKLIST_INCOMPLETE' | 'K1_CHECKLIST_OUT_OF_ORDER',
-  expected?: K1ChecklistExpectation,
-): never {
-  throw new RevocationCompletionError(problem, expected);
-}
+/** What is wrong with a checklist: a step it does not have or sent twice, a step or the evidence missing, a step timed before one that comes first. */
+type Fault = 'NOT_ALLOWED' | 'INCOMPLETE' | 'OUT_OF_ORDER';
+
+/**
+ * Refuses the checklist, telling the variant and the steps this task expects (nothing is told when the kind of grant has no checklist). The
+ * revocation and the grant of a K1 seat judge a checklist the same way, and each answers with the error of its own route.
+ */
+type Refuse = (fault: Fault, expected?: K1ChecklistExpectation) => never;
+
+/** The refusal of the completion of a revocation (`REVOCATION.*` on the wire). */
+const refuseRevocation: Refuse = (fault, expected) => {
+  throw new RevocationCompletionError(
+    fault === 'NOT_ALLOWED' ? 'COMPLETION_NOT_ALLOWED' : `K1_CHECKLIST_${fault}`,
+    expected,
+  );
+};
+
+/** The refusal of the completion of a grant (`PROVISIONING.*` on the wire). */
+const refuseGrant: Refuse = (fault, expected) => {
+  throw new ProvisioningK1ChecklistError(`K1_CHECKLIST_${fault}`, expected);
+};
 
 /** The instant of a ticked step, or null when it is not ticked or has no instant. */
 function tickedAt(item: K1ChecklistClaimItem | undefined): number | null {
@@ -129,25 +148,55 @@ function tickedAt(item: K1ChecklistClaimItem | undefined): number | null {
 
 /**
  * The steps the IT Admin sent, found for each step of the variant. A step the variant does not have, or sent twice, does not belong to
- * this checklist (`COMPLETION_NOT_ALLOWED`); a step of the variant that is not sent, not ticked, or ticked with no instant is missing
- * (`K1_CHECKLIST_INCOMPLETE`). Returns the instants in the order of the list.
+ * this checklist (`NOT_ALLOWED`); a step of the variant that is not sent, not ticked, or ticked with no instant is missing
+ * (`INCOMPLETE`). Returns the instants in the order of the list.
  */
 function instantsOf(
   expected: K1ChecklistExpectation,
   lastOfPerson: boolean,
   claim: K1ChecklistClaim,
+  refuse: Refuse,
 ): { item: K1ChecklistItem; time: number }[] {
   const sent = claim.items.map((item) => item.code);
   if (sent.some((code, index) => !expected.codes.includes(code) || sent.indexOf(code) !== index)) {
-    fail('COMPLETION_NOT_ALLOWED', expected);
+    refuse('NOT_ALLOWED', expected);
   }
 
   return k1ChecklistItems(expected.variant, lastOfPerson).map((item) => {
     const time = tickedAt(claim.items.find((sentItem) => sentItem.code === item.code));
-    if (time === null) fail('K1_CHECKLIST_INCOMPLETE', expected);
+    if (time === null) refuse('INCOMPLETE', expected);
 
     return { item, time };
   });
+}
+
+/**
+ * The judgment of the checklist of a variant that is known, shared by the revocation and the grant of a K1 seat: every step of the variant
+ * ticked with the instant it was done, the instants not falling as the list goes, and the evidence (the one written in the checklist or, when it
+ * has none, the one written beside it). A step that is missing is told before a step that is out of order.
+ */
+function judgeChecklist(
+  input: { variant: K1ChecklistVariant; lastOfPerson: boolean; claim: K1ChecklistClaim | undefined; evidence: string },
+  refuse: Refuse,
+): K1ChecklistPlan {
+  const { variant, lastOfPerson, claim } = input;
+  const expected: K1ChecklistExpectation = { variant, codes: [...k1ChecklistCodes(variant, lastOfPerson)] };
+  if (claim === undefined) refuse('INCOMPLETE', expected);
+
+  const instants = instantsOf(expected, lastOfPerson, claim, refuse);
+  const evidence = claim.evidence?.trim() || input.evidence.trim();
+  if (evidence.length === 0) refuse('INCOMPLETE', expected);
+  if (instants.some(({ time }, index) => index > 0 && time < instants[index - 1].time)) {
+    refuse('OUT_OF_ORDER', expected);
+  }
+
+  const items = instants.map(({ item, time }) => ({
+    code: item.code,
+    order: item.order,
+    doneAt: new Date(time).toISOString(),
+  }));
+
+  return { variant, items, evidence, facts: { variant, doneCodes: items.map((item) => item.code) } };
 }
 
 /**
@@ -170,28 +219,34 @@ export function planK1Checklist(input: {
   evidence: string;
 }): K1ChecklistPlan | null {
   if (input.type !== 'K1') {
-    if (input.claim !== undefined) fail('COMPLETION_NOT_ALLOWED');
+    if (input.claim !== undefined) refuseRevocation('NOT_ALLOWED');
 
     return null;
   }
-  const variant = k1VariantOf(input.sources);
-  const expected: K1ChecklistExpectation = { variant, codes: [...k1ChecklistCodes(variant, input.lastOfPerson)] };
-  if (input.claim === undefined) fail('K1_CHECKLIST_INCOMPLETE', expected);
 
-  const instants = instantsOf(expected, input.lastOfPerson, input.claim);
-  const evidence = input.claim.evidence?.trim() || input.evidence.trim();
-  if (evidence.length === 0) fail('K1_CHECKLIST_INCOMPLETE', expected);
-  if (instants.some(({ time }, index) => index > 0 && time < instants[index - 1].time)) {
-    fail('K1_CHECKLIST_OUT_OF_ORDER', expected);
+  return judgeChecklist({ ...input, variant: k1VariantOf(input.sources) }, refuseRevocation);
+}
+
+/**
+ * The checklist of the grant of a K1 seat that is completed (`QĐ-111az`, R-19, `US-07-01` AC-7): the two steps of the variant `GRANT` ticked in
+ * their order, each with the instant it was done, and the evidence (in the checklist, or beside it). It is judged as the checklist of a
+ * revocation: a step that is missing is told before one out of order, the same instant is in order, and a step is not refused for being before
+ * the task or ahead of the clock. A grant of another kind of provisioning has no checklist and refuses one. Throws ProvisioningK1ChecklistError
+ * (`K1_CHECKLIST_NOT_ALLOWED`, `K1_CHECKLIST_INCOMPLETE`, `K1_CHECKLIST_OUT_OF_ORDER`).
+ */
+export function planK1GrantChecklist(input: {
+  type: ProvisioningKind;
+  claim: K1ChecklistClaim | undefined;
+  /** The evidence written beside the checklist, in the body of the completion. */
+  evidence: string;
+}): K1ChecklistPlan | null {
+  if (input.type !== 'K1') {
+    if (input.claim !== undefined) refuseGrant('NOT_ALLOWED');
+
+    return null;
   }
 
-  const items = instants.map(({ item, time }) => ({
-    code: item.code,
-    order: item.order,
-    doneAt: new Date(time).toISOString(),
-  }));
-
-  return { variant, items, evidence, facts: { variant, doneCodes: items.map((item) => item.code) } };
+  return judgeChecklist({ ...input, variant: 'GRANT', lastOfPerson: true }, refuseGrant);
 }
 
 /**

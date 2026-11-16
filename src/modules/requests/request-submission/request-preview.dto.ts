@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import {
   costEstimateSchema,
+  costViewSchema,
   employeeRef,
   limitExemptionSchema,
   moneySchema,
@@ -11,13 +12,13 @@ import {
 } from '../access-request/access-request.dto';
 
 /**
- * What is asked before a request is sent: the plan and, when the sender has one, the day the right ends. The reason is for
+ * What is asked before a request is sent: the plan and the time of use in months when the kind of plan asks for it. The reason is for
  * sending, not for looking.
  * There is no field for an amount, a price or a budget year: nobody gives the system a number (`US-05-01` AC-14).
  */
 export const previewBodySchema = submitBodySchema.pick({
   planId: true,
-  expectedEndDate: true,
+  termMonths: true,
 });
 
 const chainStepSchema = z.strictObject({
@@ -40,18 +41,28 @@ const previewSchema = z.strictObject({
     applicationName: z.string(),
   }),
   branch: z.enum(['INTERNAL_FREE', 'PAID_IN_CATALOG']),
-  /** The day the right ends as the sender gave it; null for a right with no end. */
-  expectedEndDate: z.string().nullable(),
+  /** The time of use in months as the sender gave it; null for a right with no end or a plan that asks none. */
+  termMonths: z.number().int().nullable(),
+  /**
+   * Why the time of use cannot be sent as it is, or null: missing, outside what the kind of plan takes, given to a plan bought once, no end
+   * for a contractor, a freelancer or an intern, or a contract that ended before the day the term begins. A term that runs past the end of a
+   * contract is not refused: it is cut (`cost.termCutAt`).
+   */
+  termRefusal: z
+    .enum([
+      'TERM_REQUIRED',
+      'TERM_MONTHS_OUT_OF_RANGE',
+      'TERM_NOT_ASKED',
+      'TERM_LONG_TERM_NOT_ALLOWED',
+      'TERM_CONTRACT_ENDED',
+    ])
+    .nullable(),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
   /**
    * Read only: the Unit of the department of the day; nothing the sender or a project changes (`US-05-01` AC-7). Null when the
    * department has none in use and the request is free internal software, which is judged without it (`QĐ-87g(2)`).
    */
   costCenter: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
-  /** The last day a right asked for today may end: the day before the same day a year later (`US-05-23` AC-9). */
-  maxEndDate: z.string(),
-  /** True when the person it is for is not staff and no end date was given: the request cannot be sent without one (`FR-2.8`). */
-  termRequired: z.boolean(),
   /** What one person costs a year at the vendor, whatever month the right begins in; null when the request is free or has no price (`P2-02`). */
   annualVendorAmount: moneySchema.nullable(),
   /** The seat the person already holds of the plan; when present, the request cannot be sent. */
@@ -70,16 +81,15 @@ const previewSchema = z.strictObject({
     })
     .nullable(),
   /**
-   * GH-1/GH-2/GH-3 of the person on the day (`BR-MF1-01`): the requests for new access they have open and the most they may, the paid
-   * applications they use and the threshold, whether a reason is required, and why sending would be refused (`openRequestId` is the
-   * request of the same plan already open). Read without a lock: sending judges again.
+   * GH-1/GH-2 of the person on the day (`BR-MF1-01`): the requests for new access they were named in this calendar week (Monday to Sunday of
+   * the organization; withdrawn and refused ones count) and the most they may, the Monday the count starts again, and why sending would be
+   * refused (`openRequestId` is the request of the same plan already open). Read without a lock: sending judges again.
    */
   limits: z.strictObject({
     openNewCount: z.number().int().nonnegative(),
     openNewMax: z.number().int().positive(),
-    paidSoftwareCount: z.number().int().nonnegative(),
-    paidSoftwareThreshold: z.number().int().positive(),
-    reasonRequired: z.boolean(),
+    /** The Monday, as YYYY-MM-DD, the count of GH-2 starts again. */
+    resetsOn: z.string(),
     refusal: z.enum(['HAS_OPEN_REQUEST', 'OPEN_LIMIT_REACHED']).nullable(),
     openRequestId: z.uuid().nullable(),
   }),
@@ -92,6 +102,12 @@ const previewSchema = z.strictObject({
   canSubmit: z.boolean(),
   budgetYear: z.number().int().nullable(),
   pricing: pricingSchema,
+  /**
+   * The cost by the year before tax: the months that begin this year, the part of the year after (an estimate; for a right with no end, twelve
+   * months), the months that have begun by the end of the term and the day a contract cut it short. Only the spending approver and Finance
+   * see what is left of a budget, never here (`S-3`). Null when nothing is priced by the month.
+   */
+  cost: costViewSchema.nullable(),
   /** The estimated tax of a priced request; null with no price or no vendor. Never a budget figure. */
   costEstimate: costEstimateSchema.nullable(),
   /** Whether the request can go on to be decided as spend once the need is approved. */

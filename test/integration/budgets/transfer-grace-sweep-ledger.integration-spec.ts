@@ -86,7 +86,7 @@ describe('the revocation the sweep opens and the commitment of the old right (in
   const seatOfNewRequest = async (u: Unit): Promise<{ requestId: string; assignmentId: string }> => {
     const requestId = await h.waitingForApprover(u, plan, { amount: 12 * M });
     await h.ctx.sql.query(
-      `UPDATE access_requests SET amount_months = 12, price_kind = 'RECURRING', expected_end_date = NULL, budget_year = $2 WHERE id = $1`,
+      `UPDATE access_requests SET amount_months = 12, price_kind = 'RECURRING', term_months = NULL, expected_end_date = NULL, budget_year = $2 WHERE id = $1`,
       [requestId, h.year],
     );
     await h.decideSpend(requestId, { decision: 'APPROVE' }, h.boss.account).expect(200);

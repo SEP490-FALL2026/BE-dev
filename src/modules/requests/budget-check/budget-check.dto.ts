@@ -1,6 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { nextYearBudgetSchema } from '../spend-approval-view/spend-approval.dto';
 
 const money = z.strictObject({ amount: z.string(), currency: z.string() });
 /** The codes a check gave: a year's own, and the two of the data that checks made before the three outcomes still carry. */
@@ -58,6 +59,11 @@ const checkSchema = z.strictObject({
   /** What binds the company in all, in the reporting currency; it is never compared with the budget of one year. */
   bindingTotal: money,
   yearCount: z.number().int().positive(),
+  /**
+   * What is left of the budget of the year after for the request, with the part of it the request keeps (\`QĐ-111al\`): what Finance and the person
+   * who holds the spend step read, as the spend step does. Null when the request keeps nothing of that year.
+   */
+  nextYearBudget: nextYearBudgetSchema,
   ranAt: z.iso.datetime(),
 });
 
@@ -67,10 +73,13 @@ const yearSchema = z.strictObject({
   cost: money,
   /** Null for a year of a check made before that had ended: it was not judged. */
   code: z.enum(['BUDGET_OK', 'HIGH_VALUE', 'INSUFFICIENT_BUDGET', 'NO_ACTIVE_BUDGET']).nullable(),
-  /** Base and reserve together. Null when the year has no approved version: that is not a budget of 0. */
+  /** The effective base and the reserve together. Null when the year has no approved version: that is not a budget of 0. */
   budget: money.nullable(),
+  /** The effective base: the base of the approved version plus the adjustments approved for the year, the same figure as effectiveBudget.base (the table of budgets names the base of the version `base`). */
   base: money.nullable(),
   reserve: money.nullable(),
+  /** The budget the check was made against: the approved version with the adjustments approved for it, the reserve as it is. Null when the year has no approved version. */
+  effectiveBudget: z.strictObject({ base: money, reserve: money, total: money }).nullable(),
   held: money.nullable(),
   spent: money.nullable(),
   /** What is left with the reserve; negative when more is held than base and reserve allow. */

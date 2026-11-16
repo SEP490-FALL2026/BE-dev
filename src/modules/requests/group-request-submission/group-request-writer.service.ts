@@ -24,10 +24,6 @@ export interface GroupWritten {
   draftId: string | null;
 }
 
-/** Each line carries the GH-3 flag of its person with the reason the sender gave (`BR-MF1-01g`). */
-const withFlags = <Line extends { employeeId: string }>(lines: Line[], judged: GroupJudgement) =>
-  lines.map((line) => ({ ...line, manyPaidSoftware: judged.manyPaidSoftware.get(line.employeeId) ?? null }));
-
 /**
  * Writes the request for a group once everything about it was judged (`US-05-17`, `US-05-03` AC-8, AC-14): the request with the first need
  * step, the others, a line for each person, the approval of the people the head confirmed by sending, and the audit events. All of it in
@@ -62,7 +58,7 @@ export class GroupRequestWriter {
       departmentId: unit.departmentId,
       costCenterId: unit.costCenter?.id ?? null,
       businessReason: body.businessReason,
-      termMonths: null,
+      termMonths: judged.termMonths,
       pricing: judged.pricing,
       policy,
       createdByAppUserId: actor.appUserId,
@@ -74,7 +70,7 @@ export class GroupRequestWriter {
     for (const entry of rest) {
       stepIds.push(await this.requests.addNeedStep(tx, { requestId: created.id, step: entry.step, now }));
     }
-    await this.lines.insertMany(tx, withFlags(groupLineRowsOf(created.id, planned, stepIds), judged));
+    await this.lines.insertMany(tx, groupLineRowsOf(created.id, planned, stepIds));
 
     const confirmed = planned.findIndex((entry) => entry.confirmedBySending);
     if (confirmed >= 0) {
@@ -93,7 +89,7 @@ export class GroupRequestWriter {
       organizationId,
       requestId: created.id,
       planId: body.planId,
-      expectedEndDate: judged.pricing.expectedEndDate,
+      termMonths: judged.termMonths,
       state,
       judged,
       planned,

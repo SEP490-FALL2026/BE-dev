@@ -11,8 +11,10 @@ import {
   AccountRecord,
   AccountSnapshot,
   ActivationState,
+  AppRole,
   AppUserStatus,
   CreateAppUserInput,
+  RoleHolderRecord,
 } from '../public/identity-access.types';
 
 type LockMode = 'SHARE' | 'UPDATE';
@@ -230,6 +232,56 @@ export class AppUserRepo {
     });
 
     return rows.map((row) => row.employeeId);
+  }
+
+  /** Every employee who holds an effective grant of any of these roles on an account that can act, by employee code. */
+  async findUsableEmployeeIdsHoldingRoles(roles: readonly AppRole[], tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).appUser.findMany({
+      where: {
+        status: 'ACTIVE',
+        activationState: 'ACTIVATED',
+        employee: { status: 'ACTIVE' },
+        roleGrants: { some: { role: { in: [...roles] }, revokedAt: null } },
+      },
+      orderBy: { employee: { employeeCode: 'asc' } },
+      select: { employeeId: true },
+    });
+
+    return rows.map((row) => row.employeeId);
+  }
+
+  /** A page of the accounts that can act and hold an effective grant of any of these roles, by employee code; the total counts all of them. */
+  async pageUsableRoleHolders(
+    roles: readonly AppRole[],
+    skip: number,
+    take: number,
+  ): Promise<{ rows: RoleHolderRecord[]; total: number }> {
+    const where = {
+      status: 'ACTIVE' as const,
+      activationState: 'ACTIVATED' as const,
+      employee: { status: 'ACTIVE' as const },
+      roleGrants: { some: { role: { in: [...roles] }, revokedAt: null } },
+    };
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.appUser.count({ where }),
+      this.prisma.appUser.findMany({
+        where,
+        orderBy: [{ employee: { employeeCode: 'asc' } }, { id: 'asc' }],
+        skip,
+        take,
+        select: { id: true, employeeId: true, employee: { select: { employeeCode: true, fullName: true } } },
+      }),
+    ]);
+
+    return {
+      total,
+      rows: rows.map((row) => ({
+        appUserId: row.id,
+        employeeId: row.employeeId,
+        employeeCode: row.employee.employeeCode,
+        fullName: row.employee.fullName,
+      })),
+    };
   }
 
   /** The employee with the smallest employee code who holds an effective IT_ADMIN grant on an account that can act, or null. */

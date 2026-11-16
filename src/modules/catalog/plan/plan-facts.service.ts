@@ -4,7 +4,13 @@ import { IdentityAccessApi } from '../../identity-access/public/identity-access.
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ApplicationPlans } from '../catalog-entry/application-plans.types';
 import type { BusinessDate } from '../../../core/business-date';
-import type { PlanRevocationInfo, PlanSummary, PlanUsageRate, WorkspaceDuty } from '../public/catalog.types';
+import type {
+  PlanRevocationInfo,
+  PlanSummary,
+  PlanSummaryWithLogo,
+  PlanUsageRate,
+  WorkspaceDuty,
+} from '../public/catalog.types';
 import { kpi3Percent } from './plan.policy';
 import { PlanRepo } from './plan.repo';
 import { PlanUsageRepo } from './plan-usage.repo';
@@ -104,6 +110,11 @@ export class PlanFactsService implements ApplicationPlans {
   /** The plans with these ids by name, with their application: for the views that list seats. */
   summaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
     return this.plans.findSummaries(ids, tx);
+  }
+
+  /** The same with the logo of the application, for a view that shows it beside the name. */
+  summariesWithLogo(ids: readonly string[], tx?: DbTx): Promise<PlanSummaryWithLogo[]> {
+    return this.plans.findSummariesWithLogo(ids, tx);
   }
 
   /** The plans of the other applications of the same functional group (`US-05-04` AC-3): bounded, empty with no group. */

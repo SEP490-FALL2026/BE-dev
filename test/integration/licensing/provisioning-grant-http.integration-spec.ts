@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount } from '../../support/api-accounts';
+import { addDays } from '../../../src/core/business-date';
 import { effectiveEndOf } from '../../../src/core/term-limit';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
@@ -58,14 +59,15 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(task).toMatchObject({
       kind: 'GRANT',
       channel: 'MANUAL',
-      status: 'QUEUED',
+      // The IT Admin who presses "Grant" takes the work: the task is theirs from the start, whoever is in charge by default.
+      status: 'IN_PROGRESS',
       subscriptionId,
       accountIdentifier: 'e-5@acme.vn',
       defaultResponsibleEmployeeId: a1Employee,
       inGeneralQueue: false,
       beneficiary: { employeeId: e5, employeeCode: 'E-5' },
       plan: { provisioningType: 'K2' },
-      claimedBy: null,
+      claimedBy: h.it1.appUserId,
       completedBy: null,
     });
     expect(await h.freeSeats(subscriptionId)).toBe(0);
@@ -112,7 +114,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(forAssignment.map((event) => event.action)).toEqual(['LICENSE_ASSIGNMENT.CREATED']);
     expect(forAssignment[0].after).toMatchObject({ source: 'REQUEST', requestId: task.requestId });
     expect(JSON.stringify(forAssignment[0].after)).not.toContain('e-7@acme.vn');
-    expect(forTask.map((event) => event.action)).toEqual(['PROVISIONING_TASK.CREATED']);
+    expect(forTask.map((event) => event.action)).toEqual(['PROVISIONING_TASK.CREATED', 'PROVISIONING_TASK.CLAIMED']);
     expect(forTask[0]).toMatchObject({
       actor_app_user_id: h.it1.appUserId,
       before: null,
@@ -209,7 +211,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
 
     const task = await h.granted(e6, k5);
 
-    expect(task).toMatchObject({ subscriptionId: null, plan: { provisioningType: 'K5' }, status: 'QUEUED' });
+    expect(task).toMatchObject({ subscriptionId: null, plan: { provisioningType: 'K5' }, status: 'IN_PROGRESS' });
     expect(
       (
         await h.ctx.sql.query<{ subscription_id: string | null }>(
@@ -363,6 +365,57 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
       expect(await seatEndOf(person)).toEqual([termEnd()]);
     });
 
+    it('INV-07: a right with no months (a key bought once) gives the seat of a person with a term the end of their contract, and one of staff none', async () => {
+      const { subscriptionId, planId } = await k2();
+      const intern = await h.member('P-DES', 'E-END-KEY-I', designer);
+      const staff = await h.member('P-DES', 'E-END-KEY-S', designer);
+      await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_end_date = $2 WHERE id = $1`, [
+        intern,
+        addDays(h.today(), 90),
+      ]);
+      const notBound = (employeeId: string) =>
+        h.gate.answer({
+          status: 'GRANTABLE',
+          seat: 'PERSONAL',
+          employeeId,
+          planId,
+          departmentId: h.gate.defaultDepartmentId,
+          expectedEndDate: null,
+          termMonths: 0,
+          termBound: false,
+        });
+
+      await h.grant({ requestId: notBound(intern), subscriptionId }).expect(201);
+      await h.grant({ requestId: notBound(staff), subscriptionId }).expect(201);
+
+      expect(await seatEndOf(intern)).toEqual([addDays(h.today(), 90)]);
+      expect(await seatEndOf(staff)).toEqual([null]);
+    });
+
+    it('B-R1 (INV-07): a person with a term whose contract ended before the day of the grant gets no seat: 409 PROVISIONING.CONTRACT_ENDED, nothing written', async () => {
+      const { subscriptionId, planId } = await k2();
+      const person = await h.member('P-DES', 'E-END-GONE', designer);
+      const contractEnd = addDays(h.today(), -1);
+      await h.ctx.sql.query(`UPDATE employees SET hire_date = '2020-01-01' WHERE id = $1`, [person]);
+      await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_end_date = $2 WHERE id = $1`, [
+        person,
+        contractEnd,
+      ]);
+      const requestId = h.gate.grantable(person, planId);
+      const before = await count(`SELECT count(*) AS n FROM license_assignments`);
+
+      const refused = await h.grant({ requestId, subscriptionId }).expect(409);
+
+      expect(h.codeOf(refused)).toBe('PROVISIONING.CONTRACT_ENDED');
+      expect(h.detailsOf(refused)).toEqual({ requestId, contractEndDate: contractEnd });
+      expect(await seatEndOf(person)).toEqual([]);
+      expect(await count(`SELECT count(*) AS n FROM license_assignments`)).toBe(before);
+      // The day the contract ends is still a day of the right: the seat is granted and ends there.
+      await h.ctx.sql.query(`UPDATE employees SET contract_end_date = $2 WHERE id = $1`, [person, h.today()]);
+      await h.grant({ requestId, subscriptionId }).expect(201);
+      expect(await seatEndOf(person)).toEqual([h.today()]);
+    });
+
     it('gives the seat of free internal software no end by term: it costs nothing and has no term to bind (R-H1)', async () => {
       const planId = await h.plan('K5');
       const person = await h.member('P-DES', 'E-END-FREE', designer);
@@ -476,7 +529,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(await assignmentsOf(e5)).toBe(held);
 
     const task = await h.granted(e5, planId, { subscriptionId });
-    expect(task.status).toBe('QUEUED');
+    expect(task.status).toBe('IN_PROGRESS');
     expect(
       (
         await h.ctx.sql.query<{ source: string }>(`SELECT source FROM license_assignments WHERE id = $1`, [

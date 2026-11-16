@@ -45,9 +45,7 @@ const BUDGET_CHECKED = (event: StatusEvent, facts: StatusFacts): NotificationInt
       recipients: [
         request.requesterEmployeeId,
         facts.departmentHeadEmployeeId,
-        reasons.some((reason) => ['PRICE_EXPIRED', 'PRICE_MISSING', 'RATE_MISSING'].includes(reason))
-          ? facts.itAdminEmployeeId
-          : null,
+        reasons.some((reason) => ['PRICE_EXPIRED', 'PRICE_MISSING'].includes(reason)) ? facts.itAdminEmployeeId : null,
       ],
       includeActor: text(event.after, 'routingMode') === 'ONE_STEP',
       code: 'REQUEST_BUDGET_BLOCKED',
@@ -89,7 +87,7 @@ export const BUDGET_CHECK_RULES: Readonly<Record<string, StatusRule>> = {
           recipients: [
             request.requesterEmployeeId,
             facts.departmentHeadEmployeeId,
-            reasons.some((reason) => ['PRICE_EXPIRED', 'PRICE_MISSING', 'RATE_MISSING'].includes(reason))
+            reasons.some((reason) => ['PRICE_EXPIRED', 'PRICE_MISSING'].includes(reason))
               ? facts.itAdminEmployeeId
               : null,
           ],

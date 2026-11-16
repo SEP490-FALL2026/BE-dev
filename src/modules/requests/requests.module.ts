@@ -7,6 +7,8 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { BudgetsModule } from '../budgets/budgets.module';
+import { PoliciesChecklistFacadeModule } from '../policies/policies-checklist-facade.module';
+import { BudgetsReadFacadeModule } from '../budgets/budgets-read-facade.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { LicensingModule } from '../licensing/licensing.module';
 import { FinanceModule } from '../finance/finance.module';
@@ -21,15 +23,22 @@ import { SeatRevocationHook } from './grant/seat-revocation.listener';
 import { GrantQueueController } from './grant-queue/grant-queue.controller';
 import { GrantQueueRepo } from './grant-queue/grant-queue.repo';
 import { GrantQueueService } from './grant-queue/grant-queue.service';
+import { AssessmentDecisionsRepo } from './assessment-queue/assessment-decisions.repo';
+import { AssessmentDecisionsService } from './assessment-queue/assessment-decisions.service';
 import { AssessmentQueueController } from './assessment-queue/assessment-queue.controller';
 import { AssessmentQueueRepo } from './assessment-queue/assessment-queue.repo';
+import { AssessmentQueueReachService } from './assessment-queue/assessment-queue-reach.service';
 import { AssessmentQueueService } from './assessment-queue/assessment-queue.service';
 import { RequestCommitmentReleaseGuard } from './spend/commitment-release.listener';
 import { RequestCommitmentFacts } from './spend/commitment-request-facts.listener';
 import { RequestDraftService } from './draft/request-draft.service';
 import { RequestDraftSubmitService } from './draft/request-draft-submit.service';
 import { RequestDraftsController } from './draft/request-drafts.controller';
-import { RequestOutcomeListeners, TransferGraceHoldContributions } from './public/requests.extension-points';
+import {
+  InvoiceDiscrepancyReferralListeners,
+  RequestOutcomeListeners,
+  TransferGraceHoldContributions,
+} from './public/requests.extension-points';
 import { RequestOutcomeService } from './outcome/request-outcome.service';
 import { AssessmentRepo } from './assessment/assessment.repo';
 import { AssessmentCompletionService } from './assessment/assessment-completion.service';
@@ -38,12 +47,17 @@ import { AssessmentPatchService } from './assessment/assessment-patch.service';
 import { AssessmentPricingService } from './assessment/assessment-pricing.service';
 import { AssessmentQueryService } from './assessment/assessment-query.service';
 import { AssessmentRejectionService } from './assessment/assessment-rejection.service';
+import { AssessmentDecisionService } from './assessment-decision/assessment-decision.service';
+import { AssessmentReturnService } from './assessment-decision/assessment-return.service';
 import { AssessmentService } from './assessment/assessment.service';
 import { AssessmentViewService } from './assessment/assessment-view.service';
 import { AssessmentStepRepo } from './assessment/assessment-step.repo';
-import { CatalogLinkService } from './assessment/catalog-link.service';
+import { AssessmentTermFitService } from './assessment/assessment-term-fit.service';
+import { CatalogLinkDepartmentListService } from './catalog-link/catalog-link-department-list.service';
+import { CatalogLinkService } from './catalog-link/catalog-link.service';
 import { QuoteService } from './assessment/quote.service';
 import { InternalRegistrationService } from './assessment/internal-registration.service';
+import { ProposalDeclarationService } from './assessment/proposal-declaration.service';
 import { ProposalService } from './assessment/proposal.service';
 import { ProposalsController } from './proposal-review/proposals.controller';
 import { AccessRequestQueryService } from './request-view/access-request-query.service';
@@ -77,6 +91,7 @@ import { RequestEndService } from './request-end/request-end.service';
 import { RequestsApi } from './public/requests.api';
 import { RequestsAiSourceApi } from './public/requests-ai-source.api';
 import { PricingViewService } from './request-view/pricing-view.service';
+import { RequestCostViewService } from './request-view/request-cost-view.service';
 import { RequestPreviewService } from './request-submission/request-preview.service';
 import { SimilarSeatsService } from './need-decision/similar-seats.service';
 import { GroupCandidateService } from './group-request-submission/group-candidate.service';
@@ -94,7 +109,9 @@ import { GroupRequestService } from './group-request-submission/group-request.se
 import { GroupRequestsController } from './group-request-submission/group-requests.controller';
 import { GroupResolutionEnding } from './group-request/group-resolution-ending.service';
 import { GroupResolutionService } from './group-request/group-resolution.service';
+import { GroupSpendChecklist } from './group-line-decisions/group-spend-checklist.service';
 import { GroupSpendDecisionService } from './group-line-decisions/group-spend-decision.service';
+import { GroupSpendPreconditions } from './group-line-decisions/group-spend-preconditions.service';
 import { GroupSpendHold } from './group-line-decisions/group-spend-hold.service';
 import { GroupSpendReport } from './group-line-decisions/group-spend-report.service';
 import { GroupSpendRecordService } from './group-line-decisions/group-spend-record.service';
@@ -111,6 +128,8 @@ import { ControlledWaitController } from './reassignment/controlled-wait.control
 import { CongestionController } from './sla/congestion.controller';
 import { CongestionService } from './sla/congestion.service';
 import { RequestsWorkFacadeModule } from './requests-work-facade.module';
+import { CarriedOverListener } from './year-start-commitments/carried-over.listener';
+import { YearStartCarriedOverService } from './year-start-commitments/year-start-carried-over.service';
 import { YearStartCommitmentsBatchService } from './year-start-commitments/year-start-commitments-batch.service';
 import { YearStartCommitmentsSweeper } from './year-start-commitments/year-start-commitments.job';
 import { YearStartCommitmentsRepo } from './year-start-commitments/year-start-commitments.repo';
@@ -119,6 +138,7 @@ import { BudgetCheckController } from './budget-check/budget-check.controller';
 import { BudgetCheckViewService } from './budget-check/budget-check-view.service';
 import { BudgetCheckYearsViewService } from './budget-check/budget-check-years-view.service';
 import { ReserveConfirmationRepo } from './reserve-confirmation/reserve-confirmation.repo';
+import { ReserveConfirmationChecklist } from './reserve-confirmation/reserve-confirmation-checklist.service';
 import { ReserveConfirmationService } from './reserve-confirmation/reserve-confirmation.service';
 import { SpendApprovalQueueService } from './spend-approval-view/spend-approval-queue.service';
 import { SpendApprovalSourcesService } from './spend-approval-view/spend-approval-sources.service';
@@ -129,6 +149,7 @@ import { SpendBatchDecisionService } from './spend-approval/spend-batch-decision
 import { SpendBatchRepo } from './spend/spend-batch.repo';
 import { SpendDecisionRepo } from './spend/spend-decision.repo';
 import { SpendDecisionRecorder } from './spend-approval/spend-decision-recorder.service';
+import { SpendBatchGroupReturnService } from './spend-approval/spend-batch-group-return.service';
 import { SpendDecisionService } from './spend-approval/spend-decision.service';
 import { SpendBatchService } from './spend-submission/spend-batch.service';
 import { SpendBatchListService } from './spend-submission/spend-batch-list.service';
@@ -138,6 +159,8 @@ import { SpendHeadService } from './spend-submission/spend-head.service';
 import { SpendQueueService } from './spend-submission/spend-queue.service';
 import { SpendQueueOutcomeService } from './spend-submission/spend-queue-outcome.service';
 import { SpendApprovalSnapshotService } from './spend-approval-view/spend-approval-snapshot.service';
+import { NextYearBudgetRepo } from './spend-approval-view/next-year-budget.repo';
+import { NextYearBudgetService } from './spend-approval-view/next-year-budget.service';
 import { SpendWireViewService } from './spend/spend-wire-view.service';
 import { SpendSubmissionController } from './spend-submission/spend-submission.controller';
 import { SupplementRepo } from './spend-submission/supplement.repo';
@@ -177,6 +200,20 @@ import { RequestReadRepo } from './request-view/request-read.repo';
 import { MyRequestsFactsRepo } from './my-requests/my-requests-facts.repo';
 import { MyRequestsRepo } from './my-requests/my-requests.repo';
 import { MyRequestsService } from './my-requests/my-requests.service';
+import { InvoiceDiscrepanciesController } from './invoice-discrepancy-queue/invoice-discrepancies.controller';
+import { InvoiceDiscrepancyQueryService } from './invoice-discrepancy-queue/invoice-discrepancy-query.service';
+import { InvoiceDiscrepancyClosureService } from './invoice-discrepancy/invoice-discrepancy-closure.service';
+import { InvoiceDiscrepancyOpeningService } from './invoice-discrepancy/invoice-discrepancy-opening.service';
+import { InvoiceDiscrepancyRepo } from './invoice-discrepancy/invoice-discrepancy.repo';
+import { PurchaseInvoicePlanService } from './purchase-invoice/purchase-invoice-plan.service';
+import { PurchaseInvoiceFacts } from './purchase-invoice/purchase-invoice-facts.listener';
+import { PurchaseInvoiceMissingPeriodsQueryService } from './purchase-invoice/purchase-invoice-missing-periods-query.service';
+import { PurchaseInvoiceQueryService } from './purchase-invoice/purchase-invoice-query.service';
+import { PurchaseInvoiceConfirmationService } from './purchase-invoice/confirmation/purchase-invoice-confirmation.service';
+import { PurchaseInvoiceDecisionsController } from './purchase-invoice/purchase-invoice-decisions.controller';
+import { PurchaseInvoiceRepo } from './purchase-invoice/purchase-invoice.repo';
+import { PurchaseInvoiceSubmissionService } from './purchase-invoice/purchase-invoice-submission.service';
+import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices.controller';
 
 /**
  * The requests context (C4, ADR-0015): the request for access to software, the people it is for and the steps that decide
@@ -200,6 +237,9 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     CatalogModule,
     FinanceModule,
     BudgetsModule,
+    PoliciesChecklistFacadeModule,
+    // What the spending approver reads of the approved budget of the year after (`NextYearBudgetService`).
+    BudgetsReadFacadeModule,
     LicensingModule,
     OperatingParametersModule,
     RequestsWorkFacadeModule,
@@ -221,6 +261,9 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     AssessmentQueueController,
     ReturnRequestsController,
     RenewalRequestsController,
+    PurchaseInvoicesController,
+    PurchaseInvoiceDecisionsController,
+    InvoiceDiscrepanciesController,
     ControlledWaitController,
     RequestTimingsController,
     CongestionController,
@@ -238,6 +281,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     AssessmentRepo,
     AssessmentStepRepo,
     PricingViewService,
+    RequestCostViewService,
     RequestPreviewService,
     AccessRequestService,
     RequestLimitsRepo,
@@ -251,6 +295,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     // The listeners of the outcome of a request, the extension point this module opens, and the service that tells them.
     RequestOutcomeListeners,
     RequestOutcomeService,
+    ProposalDeclarationService,
     ProposalService,
     QuoteService,
     AssessmentViewService,
@@ -258,9 +303,13 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     AssessmentQueryService,
     AssessmentPatchService,
     AssessmentPricingService,
+    AssessmentTermFitService,
     AssessmentCompletionService,
     AssessmentRejectionService,
+    AssessmentDecisionService,
+    AssessmentReturnService,
     AssessmentService,
+    CatalogLinkDepartmentListService,
     CatalogLinkService,
     InternalRegistrationService,
     AccessRequestQueryService,
@@ -296,6 +345,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     BudgetCheckYearsViewService,
     ReserveConfirmationRepo,
     ReserveConfirmationService,
+    ReserveConfirmationChecklist,
     SpendWireViewService,
     SpendHeadService,
     SpendBatchRepo,
@@ -305,6 +355,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     SpendQueueService,
     SpendQueueOutcomeService,
     SpendApprovalSnapshotService,
+    NextYearBudgetRepo,
+    NextYearBudgetService,
     SupplementRepo,
     SupplementPricing,
     SupplementRecorder,
@@ -313,6 +365,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     SpendDecisionRepo,
     SpendDecisionRecorder,
     SpendDecisionService,
+    SpendBatchGroupReturnService,
     SpendBatchDecisionService,
     SpendApprovalQueueService,
     SpendApprovalSourcesService,
@@ -324,6 +377,9 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     GrantQueueService,
     AssessmentQueueRepo,
     AssessmentQueueService,
+    AssessmentQueueReachService,
+    AssessmentDecisionsRepo,
+    AssessmentDecisionsService,
     ReturnRequestRepo,
     ReturnSeatGate,
     ReturnRequestService,
@@ -333,6 +389,19 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     RenewalRequestWriter,
     RenewalSeatFactsService,
     RenewalRequestService,
+    PurchaseInvoiceRepo,
+    PurchaseInvoicePlanService,
+    PurchaseInvoiceSubmissionService,
+    PurchaseInvoiceQueryService,
+    PurchaseInvoiceMissingPeriodsQueryService,
+    PurchaseInvoiceFacts,
+    PurchaseInvoiceConfirmationService,
+    // The case of an invoice that differs (`SBF-11a`): opened when Finance signs, read and closed here, and the extension point a suspicion is sent on through.
+    InvoiceDiscrepancyRepo,
+    InvoiceDiscrepancyOpeningService,
+    InvoiceDiscrepancyClosureService,
+    InvoiceDiscrepancyQueryService,
+    InvoiceDiscrepancyReferralListeners,
     RenewalApplyService,
     RenewalRequestTrail,
     RenewalHoldReader,
@@ -358,6 +427,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     GroupSpendReport,
     GroupSpendRecordService,
     GroupSpendDecisionService,
+    GroupSpendChecklist,
+    GroupSpendPreconditions,
     GroupGrantService,
     GroupLineWithdrawer,
     GroupWithdrawalAftermath,
@@ -379,6 +450,9 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     // The pass of 01/01 and the sweeper that runs it every hour in the API process (ADR-0018).
     YearStartCommitmentsRepo,
     YearStartCommitmentsBatchService,
+    // QĐ-111ac: what a Cost Center carries into the year, told to the budgets by a dry run of the same rule.
+    YearStartCarriedOverService,
+    CarriedOverListener,
     YearStartCommitmentsService,
     YearStartCommitmentsSweeper,
   ],
@@ -386,6 +460,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     RequestsApi,
     RequestOutcomeListeners,
     TransferGraceHoldContributions,
+    InvoiceDiscrepancyReferralListeners,
     RequestsDashboardApi,
     RequestsAiSourceApi,
   ],

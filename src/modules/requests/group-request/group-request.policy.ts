@@ -72,10 +72,11 @@ export type LineReason =
   | 'OUTSIDE_DEPARTMENT'
   | BeneficiaryRefusal
   | 'TERM_REQUIRED'
+  | 'TERM_LONG_TERM_NOT_ALLOWED'
+  | 'TERM_CONTRACT_ENDED'
   | 'HAS_ACCESS'
   | 'HAS_OPEN_REQUEST'
-  | 'OPEN_LIMIT_REACHED'
-  | 'MANY_PAID_SOFTWARE_REASON_REQUIRED';
+  | 'OPEN_LIMIT_REACHED';
 
 /** What is known of one person who was named, read on the day. */
 export interface LineFacts {
@@ -90,14 +91,16 @@ export interface LineFacts {
   holdsAccess: boolean;
   /** A request for the plan is open for the person: another of their own, or a line of another group. */
   hasOpenRequest: boolean;
-  /** GH-2 (`BR-MF1-01f`): the person already has as many requests for new access open as they may. */
+  /** GH-2 (`BR-MF1-01f`, `QĐ-111h`): the person was already named in as many requests for new access this calendar week as they may. */
   openLimitReached?: boolean;
-  /** GH-3 (`BR-MF1-01g`): the person uses many paid applications and the sender gave no reason for their line. */
-  manyPaidSoftwareReasonMissing?: boolean;
   /** The sender heads the department and this is their own line: it asks for no email and no end day. */
   isDepartmentHead?: boolean;
-  /** The person is not staff and the group names no end date: a contractor, a freelancer or an intern gets access for a term (`FR-2.8`). */
-  termRequired: boolean;
+  /**
+   * A person with a term (a contractor, a freelancer, an intern) gets access for a term (`FR-2.8`, `INV-07`): the group gives no months
+   * (`TERM_REQUIRED`), none for a right with no end (`TERM_LONG_TERM_NOT_ALLOWED`), or their contract ended before the term begins
+   * (`TERM_CONTRACT_ENDED`, `INV-07`). Null for anybody else.
+   */
+  termRefusal: 'TERM_REQUIRED' | 'TERM_LONG_TERM_NOT_ALLOWED' | 'TERM_CONTRACT_ENDED' | null;
   /** The person holds the spending approver role: they are no party of a Request, and the reason comes before any other. */
   spendingApprover: boolean;
 }
@@ -134,10 +137,9 @@ function reasonFor(departmentId: string, person: LineFacts): LineReason | null {
     { skipContact: false },
   );
   if (refusal !== null) return refusal;
-  if (person.termRequired) return 'TERM_REQUIRED';
+  if (person.termRefusal !== null) return person.termRefusal;
   if (person.holdsAccess) return 'HAS_ACCESS';
   if (person.hasOpenRequest) return 'HAS_OPEN_REQUEST';
-  if (person.openLimitReached) return 'OPEN_LIMIT_REACHED';
 
-  return person.manyPaidSoftwareReasonMissing ? 'MANY_PAID_SOFTWARE_REASON_REQUIRED' : null;
+  return person.openLimitReached ? 'OPEN_LIMIT_REACHED' : null;
 }

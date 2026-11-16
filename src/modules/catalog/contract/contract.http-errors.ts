@@ -3,8 +3,22 @@ import { ApiException } from '../../../infrastructure/http/errors/api.exception'
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
+  ContractEffectiveFromRequiredError,
+  ContractEffectiveRangeError,
+  ContractIncompleteError,
   ContractNameRequiredError,
   ContractNotFoundError,
+  ContractNumberTakenError,
+  ContractReasonRequiredError,
+  ContractSubscriptionAlreadyLinkedError,
+  ContractSubscriptionKindNotAllowedError,
+  ContractSubscriptionNotFoundError,
+  ContractSubscriptionNotLinkedError,
+  ContractSubscriptionVendorMismatchError,
+  ContractUpdateEmptyError,
+  ContractVendorLockedError,
+  ContractVendorNotFoundError,
+  ContractVendorRequiredError,
   DocumentAccessForbiddenError,
   DocumentAlreadyAttachedError,
   DocumentFileInvalidError,
@@ -34,6 +48,39 @@ export function toContractApiException(error: unknown): unknown {
 
   if (error instanceof ContractNotFoundError) return refuse(HttpStatus.NOT_FOUND, 'CONTRACT.NOT_FOUND', error.message);
   if (error instanceof ContractNameRequiredError) return refuse(UNPROCESSABLE, 'CONTRACT.NAME_REQUIRED', error.message);
+  if (error instanceof ContractVendorRequiredError)
+    return refuse(UNPROCESSABLE, 'CONTRACT.VENDOR_REQUIRED', error.message);
+  if (error instanceof ContractEffectiveFromRequiredError) {
+    return refuse(UNPROCESSABLE, 'CONTRACT.EFFECTIVE_FROM_REQUIRED', error.message);
+  }
+  if (error instanceof ContractEffectiveRangeError) {
+    return refuse(UNPROCESSABLE, 'CONTRACT.EFFECTIVE_RANGE_INVALID', error.message, { problem: error.problem });
+  }
+  if (error instanceof ContractReasonRequiredError)
+    return refuse(UNPROCESSABLE, 'CONTRACT.REASON_REQUIRED', error.message);
+  if (error instanceof ContractUpdateEmptyError) return refuse(UNPROCESSABLE, 'CONTRACT.UPDATE_EMPTY', error.message);
+  if (error instanceof ContractVendorNotFoundError)
+    return refuse(UNPROCESSABLE, 'CONTRACT.VENDOR_NOT_FOUND', error.message);
+  if (error instanceof ContractNumberTakenError) return refuse(CONFLICT, 'CONTRACT.NUMBER_TAKEN', error.message);
+  if (error instanceof ContractVendorLockedError) return refuse(CONFLICT, 'CONTRACT.VENDOR_LOCKED', error.message);
+  if (error instanceof ContractSubscriptionNotFoundError) {
+    return refuse(HttpStatus.NOT_FOUND, 'CONTRACT.SUBSCRIPTION_NOT_FOUND', error.message);
+  }
+  if (error instanceof ContractSubscriptionNotLinkedError) {
+    return refuse(HttpStatus.NOT_FOUND, 'CONTRACT.SUBSCRIPTION_NOT_LINKED', error.message);
+  }
+  if (error instanceof ContractSubscriptionKindNotAllowedError) {
+    return refuse(UNPROCESSABLE, 'CONTRACT.SUBSCRIPTION_KIND_NOT_ALLOWED', error.message, {
+      provisioningType: error.provisioningType,
+    });
+  }
+  if (error instanceof ContractIncompleteError) return refuse(UNPROCESSABLE, 'CONTRACT.INCOMPLETE', error.message);
+  if (error instanceof ContractSubscriptionVendorMismatchError) {
+    return refuse(UNPROCESSABLE, 'CONTRACT.SUBSCRIPTION_VENDOR_MISMATCH', error.message);
+  }
+  if (error instanceof ContractSubscriptionAlreadyLinkedError) {
+    return refuse(CONFLICT, 'CONTRACT.SUBSCRIPTION_ALREADY_LINKED', error.message, { contractId: error.contractId });
+  }
   if (error instanceof DocumentNotFoundError) return refuse(HttpStatus.NOT_FOUND, 'DOCUMENT.NOT_FOUND', error.message);
   if (error instanceof DocumentAccessForbiddenError) return refuse(FORBIDDEN, 'AUTHORIZATION.FORBIDDEN', error.message);
   if (error instanceof DocumentPurposeForbiddenError) {
@@ -76,6 +123,20 @@ const EXAMPLE_MAX_BYTES = 10 * 1024 * 1024;
 export const CONTRACT_ERROR_EXAMPLES = {
   CONTRACT_NOT_FOUND: example(new ContractNotFoundError()),
   NAME_REQUIRED: example(new ContractNameRequiredError()),
+  VENDOR_REQUIRED: example(new ContractVendorRequiredError()),
+  EFFECTIVE_FROM_REQUIRED: example(new ContractEffectiveFromRequiredError()),
+  EFFECTIVE_RANGE_INVALID: example(new ContractEffectiveRangeError('TO_BEFORE_FROM')),
+  REASON_REQUIRED: example(new ContractReasonRequiredError()),
+  UPDATE_EMPTY: example(new ContractUpdateEmptyError()),
+  VENDOR_NOT_FOUND: example(new ContractVendorNotFoundError()),
+  NUMBER_TAKEN: example(new ContractNumberTakenError()),
+  VENDOR_LOCKED: example(new ContractVendorLockedError()),
+  SUBSCRIPTION_NOT_FOUND: example(new ContractSubscriptionNotFoundError()),
+  SUBSCRIPTION_NOT_LINKED: example(new ContractSubscriptionNotLinkedError()),
+  SUBSCRIPTION_KIND_NOT_ALLOWED: example(new ContractSubscriptionKindNotAllowedError('K1')),
+  INCOMPLETE: example(new ContractIncompleteError()),
+  SUBSCRIPTION_VENDOR_MISMATCH: example(new ContractSubscriptionVendorMismatchError()),
+  SUBSCRIPTION_ALREADY_LINKED: example(new ContractSubscriptionAlreadyLinkedError('<contract-id>')),
   DOCUMENT_NOT_FOUND: example(new DocumentNotFoundError()),
   PURPOSE_FORBIDDEN: example(new DocumentPurposeForbiddenError()),
   PURPOSE_MISMATCH: example(new DocumentPurposeMismatchError()),

@@ -7,17 +7,18 @@ import {
   CurrencyNotSupportedError,
   MoneyOutOfRangeError,
   MoneyScaleExceededError,
-  ReportingCurrencyNotSupportedError,
 } from '../../../core/money/money.errors';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import {
   SubscriptionApplicationRetiredError,
+  SubscriptionPriceNotVndError,
   SubscriptionBillingCycleUnsupportedError,
   SubscriptionBillingLongerThanCommitmentError,
   SubscriptionCommitmentTermNotAllowedError,
   SubscriptionCommitmentTermRequiredError,
   SubscriptionK1MonthlyOnlyError,
+  SubscriptionK4PerpetualOnlyError,
   SubscriptionPrimaryConflictError,
   SubscriptionPrimaryNotEligibleError,
   SubscriptionResponsibleNotItAdminError,
@@ -85,6 +86,9 @@ export function toSubscriptionApiException(error: unknown): unknown {
   if (error instanceof SubscriptionStillDraftError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.STILL_DRAFT', error.message, { missing: error.missing });
   }
+  if (error instanceof SubscriptionPriceNotVndError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PRICE_NOT_VND', error.message, { currency: error.currency });
+  }
 
   // The pool of a K2 or K4 plan is one: a second live subscription is refused once the seat baseline is closed (`QĐ-104k`(3)).
   if (error instanceof SubscriptionDuplicatePlanError) {
@@ -100,6 +104,9 @@ export function toSubscriptionApiException(error: unknown): unknown {
   }
   if (error instanceof SubscriptionK1MonthlyOnlyError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.K1_MONTHLY_ONLY', error.message);
+  }
+  if (error instanceof SubscriptionK4PerpetualOnlyError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.K4_PERPETUAL_ONLY', error.message);
   }
   if (error instanceof SubscriptionBillingLongerThanCommitmentError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.BILLING_LONGER_THAN_COMMITMENT', error.message);
@@ -153,10 +160,12 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   DATES_INVALID: example(new SubscriptionDatesInvalidError('START_AFTER_END')),
   UPDATE_EMPTY: example(new SubscriptionUpdateEmptyError()),
   QUANTITY_BELOW_OCCUPIED: example(new SubscriptionQuantityBelowOccupiedError(3, 2)),
-  STILL_DRAFT: example(new SubscriptionStillDraftError(['EXCHANGE_RATE'])),
+  STILL_DRAFT: example(new SubscriptionStillDraftError(['UNIT_PRICE'])),
+  PRICE_NOT_VND: example(new SubscriptionPriceNotVndError('USD')),
   COMMITMENT_TERM_REQUIRED: example(new SubscriptionCommitmentTermRequiredError()),
   COMMITMENT_TERM_NOT_ALLOWED: example(new SubscriptionCommitmentTermNotAllowedError()),
   K1_MONTHLY_ONLY: example(new SubscriptionK1MonthlyOnlyError()),
+  K4_PERPETUAL_ONLY: example(new SubscriptionK4PerpetualOnlyError()),
   BILLING_LONGER_THAN_COMMITMENT: example(new SubscriptionBillingLongerThanCommitmentError()),
   BILLING_CYCLE_UNSUPPORTED: example(new SubscriptionBillingCycleUnsupportedError('QUARTERLY')),
   RESPONSIBLE_REQUIRED: example(new SubscriptionResponsibleRequiredError()),
@@ -168,5 +177,4 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
   CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
-  REPORTING_CURRENCY_NOT_SUPPORTED: example(new ReportingCurrencyNotSupportedError('XYZ')),
 } as const;

@@ -33,7 +33,7 @@ describe('the vendor admins of a plan: the workspace profile (integration, real 
           applicationId,
           name: h.unique('Plan'),
           provisioningType: type,
-          pricingModel: 'PER_SEAT',
+          ...(type === 'K4' ? {} : { pricingModel: 'PER_SEAT' }),
           controlLevel: 'FULL',
           ...extra,
         })

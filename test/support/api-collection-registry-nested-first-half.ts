@@ -1,8 +1,16 @@
 import { ROLE_GRANTS, type NestedArrayEntry } from './api-collection-registry';
 import { NESTED_ARRAYS_G9 } from './api-collection-registry-nested-g9';
+import { NESTED_ARRAYS_CO1 } from './api-collection-registry-nested-co1';
+import { NESTED_ARRAYS_PL1 } from './api-collection-registry-nested-pl1';
+import { NESTED_ARRAYS_IA1 } from './api-collection-registry-nested-ia1';
 import { NESTED_ARRAYS_K1CL } from './api-collection-registry-nested-k1cl';
 import { NESTED_ARRAYS_MF3B } from './api-collection-registry-nested-mf3b';
 import { NESTED_ARRAYS_RD } from './api-collection-registry-nested-rd';
+import { NESTED_ARRAYS_PI1 } from './api-collection-registry-nested-pi1';
+import { NESTED_ARRAYS_RC1 } from './api-collection-registry-nested-rc1';
+import { NESTED_ARRAYS_RC2 } from './api-collection-registry-nested-rc2';
+import { NESTED_ARRAYS_SM1 } from './api-collection-registry-nested-sm1';
+import { NESTED_ARRAYS_US1 } from './api-collection-registry-nested-us1';
 import { NESTED_ARRAYS_W2 } from './api-collection-registry-nested-w2';
 import { NESTED_ARRAYS_W3 } from './api-collection-registry-nested-w3';
 import { NESTED_ARRAYS_W6 } from './api-collection-registry-nested-w6';
@@ -352,4 +360,12 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
   ...NESTED_ARRAYS_MF3B,
   ...NESTED_ARRAYS_XIT,
   ...NESTED_ARRAYS_RD,
+  ...NESTED_ARRAYS_IA1,
+  ...NESTED_ARRAYS_CO1,
+  ...NESTED_ARRAYS_PL1,
+  ...NESTED_ARRAYS_PI1,
+  ...NESTED_ARRAYS_RC1,
+  ...NESTED_ARRAYS_RC2,
+  ...NESTED_ARRAYS_SM1,
+  ...NESTED_ARRAYS_US1,
 ];

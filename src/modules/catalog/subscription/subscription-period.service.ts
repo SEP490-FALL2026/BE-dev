@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { BusinessDate } from '../../../core/business-date';
+import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -7,10 +7,16 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { SubscriptionPeriodRefusedError } from '../public/subscription-period.errors';
-import type { NextPeriodInput, RenewalPeriodFacts } from '../public/subscription-period.types';
+import type {
+  NextPeriodInput,
+  PaymentScheduleFacts,
+  RenewalPeriodFacts,
+  SubscriptionPurchaseFacts,
+} from '../public/subscription-period.types';
 import { assertPoolTerms } from './pool/subscription-pool.policy';
 import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { snapshotOf } from './subscription.mapper';
+import { monthlyCostOf } from './price/subscription-price.policy';
 import {
   assertSubscriptionShape,
   declaredStateOf,
@@ -18,7 +24,8 @@ import {
   noticeInputOf,
   subscriptionStatusOf,
 } from './subscription.policy';
-import { SubscriptionRepo } from './subscription.repo';
+import { SubscriptionPriceNotVndError } from './subscription.errors';
+import { SubscriptionRepo, type PaidTermRow } from './subscription.repo';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import type { ApplicationKind, BillingCycle, ProvisioningType, SubscriptionRecord } from './subscription.types';
 
@@ -61,6 +68,24 @@ function factsOf(record: OwnedRecord, renewedById: string | null): RenewalPeriod
   };
 }
 
+/** The payment schedule of a row that has what one needs (a cycle and a start day); a row that lacks one has no payment day. */
+function scheduleOf(row: PaidTermRow): PaymentScheduleFacts | null {
+  if (row.startDate === null) return null;
+  if (row.billingCycle !== 'MONTHLY' && row.billingCycle !== 'QUARTERLY' && row.billingCycle !== 'ANNUAL') return null;
+
+  return {
+    subscriptionId: row.id,
+    planId: row.planId,
+    ownerDepartmentId: row.ownerDepartmentId,
+    billingCycle: row.billingCycle,
+    startDate: fromDateColumn(row.startDate),
+    endDate: row.endDate ? fromDateColumn(row.endDate) : null,
+    renewalDate: row.renewalDate ? fromDateColumn(row.renewalDate) : null,
+    autoRenew: row.autoRenew,
+    recordedAt: row.createdAt,
+  };
+}
+
 /**
  * The periods of the subscriptions as the renewal of a subscription reads and continues them (`QĐ-16`, `US-11-03`): the milestone
  * derived by the same rule the subscription is read with, the period that already continues one, and the new period recorded
@@ -82,6 +107,19 @@ export class SubscriptionPeriodService {
     const records = await this.subscriptions.findMany(ids, tx);
 
     return this.withSuccessors(records, tx);
+  }
+
+  /** What a purchase invoice reads of the subscriptions with these ids, the shared pool's included; an id that does not exist is absent. */
+  async purchaseFacts(ids: readonly string[], tx?: DbTx): Promise<SubscriptionPurchaseFacts[]> {
+    return (await this.subscriptions.findMany(ids, tx)).map((record) => ({
+      subscriptionId: record.id,
+      planId: record.planId,
+      ownerDepartmentId: record.ownerDepartmentId,
+      responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
+      purchasedQuantity: record.purchasedQuantity,
+      ...monthlyCostOf(record),
+      renewalDate: record.renewalDate,
+    }));
   }
 
   /** The period, locked `FOR UPDATE` until the caller's transaction ends (the lock a seat of it takes too); null if absent. */
@@ -109,6 +147,14 @@ export class SubscriptionPeriodService {
     const facts = await this.withSuccessors([...dated.slice(0, SWEEP_LIMIT), ...undated]);
 
     return facts.filter((period) => period.renewedById === null);
+  }
+
+  /**
+   * The subscriptions that run a period, with the days their payments follow (`PI-2`): `departmentIds` narrows to those departments and the
+   * shared pool, which no department owns and every IT Admin works; null reads every one. One statement; the invoices of the periods are not read here.
+   */
+  async paymentSchedules(departmentIds: readonly string[] | null, tx?: DbTx): Promise<PaymentScheduleFacts[]> {
+    return (await this.subscriptions.listPaidTerms(departmentIds, tx)).flatMap((row) => scheduleOf(row) ?? []);
   }
 
   /**
@@ -140,7 +186,11 @@ export class SubscriptionPeriodService {
       vendorMinimumSeats: previous.vendorMinimumSeats,
     };
     this.assertNextPeriod(plan, state, input.billingCycle, previous);
-    const money = await this.pricing.read(input.unitPrice);
+    // A price is entered in dong only (`QĐ-111an`): the continuation of a period is refused for one in another currency, nothing written.
+    const money = await this.pricing.read(input.unitPrice).catch((error: unknown) => {
+      if (error instanceof SubscriptionPriceNotVndError) throw new SubscriptionPeriodRefusedError('PRICE_NOT_VND');
+      throw error;
+    });
     const priced = await this.pricing.priceToday(tx, money);
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A renewal was recorded before installation');
@@ -158,6 +208,7 @@ export class SubscriptionPeriodService {
       renewedFromId: previous.id,
       ...state,
       ...priced,
+      originalPrice: null,
       isPrimaryForPlan: takesPrimary,
       status,
     });

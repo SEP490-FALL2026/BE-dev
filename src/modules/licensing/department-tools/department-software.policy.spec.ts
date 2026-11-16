@@ -1,5 +1,6 @@
 import {
   catalogRefusal,
+  decidedByRefusal,
   decisionRefusal,
   entryKey,
   mayChangeList,
@@ -133,6 +134,16 @@ describe('decisionRefusal (an open proposal is decided once)', () => {
 
   it.each(['ACCEPTED', 'REJECTED'] as const)('refuses one already %s', (state) => {
     expect(decisionRefusal(state)).toBe('NOT_PENDING');
+  });
+});
+
+describe('decidedByRefusal (nobody decides their own proposal, SoD-4)', () => {
+  it('lets a person decide the proposal of somebody else', () => {
+    expect(decidedByRefusal({ employeeId: 'it-admin' }, { proposedByEmployeeId: 'head' })).toBeNull();
+  });
+
+  it('refuses the person who made the proposal, whatever role they hold now', () => {
+    expect(decidedByRefusal({ employeeId: 'head' }, { proposedByEmployeeId: 'head' })).toBe('OWN_PROPOSAL');
   });
 });
 

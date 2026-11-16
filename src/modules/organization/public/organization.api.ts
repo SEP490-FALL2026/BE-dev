@@ -39,11 +39,6 @@ export class OrganizationApi {
     return this.changes.emit(tx, change);
   }
 
-  /** Changes the reporting currency; the database locks it once a rate or a converted price exists (AC-9, `55000`). */
-  setReportingCurrency(tx: DbTx, organizationId: string, currency: string): Promise<void> {
-    return this.repo.setReportingCurrency(tx, organizationId, currency);
-  }
-
   createOrganization(tx: DbTx, input: CreateOrganizationInput): Promise<OrganizationRecord> {
     return this.repo.createOrganization(tx, input);
   }

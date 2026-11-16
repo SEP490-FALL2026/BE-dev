@@ -1,6 +1,5 @@
 import request from 'supertest';
-import { addDays } from '../../../src/core/business-date';
-import { maxEndDateOf, monthsBetween } from '../../../src/modules/requests/access-request/pricing.policy';
+import { monthsBeginningIn, termRunOf } from '../../../src/core/term-limit';
 import { AccessRequestWire, Department, Person, RequestHarness } from '../../support/request-harness';
 
 const h = new RequestHarness();
@@ -43,15 +42,15 @@ describe('requests over HTTP: the preview before sending (integration, real Post
   describe('paid software that has a price (AC-1, AC-3)', () => {
     it('shows the amount, the chain with who holds each step, and the time of every step', async () => {
       const today = h.today();
-      const end = h.endDated({ termMonths: 6 }).expectedEndDate as string;
-      const yearEnd = `${today.slice(0, 4)}-12-31`;
-      // BR-MF1-06: the months left of the year, the month it starts counted whole, to the end date at the latest.
-      const months = monthsBetween(today, end < yearEnd ? end : yearEnd);
+      const { end } = termRunOf({ start: today, months: 6, contractEndDate: null });
+      // BR-MF1-06, R-39: the months that begin this year, to the end of the 6 months at the latest.
+      const months = monthsBeginningIn({ start: today, end, year: Number(today.slice(0, 4)) });
       const preview = await h.previewed(designer, paidPlan, { termMonths: 6 });
 
       expect(preview).toMatchObject({
         branch: 'PAID_IN_CATALOG',
-        expectedEndDate: end,
+        termMonths: 6,
+        termRefusal: null,
         pricing: {
           status: 'PRICED',
           kind: 'RECURRING',
@@ -95,17 +94,17 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         [
           'plan',
           'branch',
-          'expectedEndDate',
+          'termMonths',
+          'termRefusal',
           'department',
           'costCenter',
-          'maxEndDate',
-          'termRequired',
           'annualVendorAmount',
           'existingAccess',
           'blockedBy',
           'canSubmit',
           'budgetYear',
           'pricing',
+          'cost',
           'costEstimate',
           'spendSubmission',
           'chain',
@@ -165,19 +164,17 @@ describe('requests over HTTP: the preview before sending (integration, real Post
     });
   });
 
-  describe('an end date more than a year away (US-05-23 AC-9)', () => {
-    it('shows the last day a right may end, and sending a later one is refused (422)', async () => {
-      const edge = await h.previewed(designer, paidPlan, { expectedEndDate: maxEndDateOf(h.today()) });
+  describe('a time of use the plan does not take (QĐ-111i)', () => {
+    it('says so in the preview (canSubmit false, the reason) and refuses the sending with the same code (422)', async () => {
+      const over = await h.previewed(designer, paidPlan, { termMonths: 13 });
       const short = await h.previewed(designer, paidPlan, { termMonths: 6 });
 
-      const over = await h.submit(
-        h.form(paidPlan, { expectedEndDate: addDays(maxEndDateOf(h.today()), 1) }),
-        designer.account,
-      );
-      expect([over.status, h.codeOf(over)]).toEqual([422, 'ACCESS_REQUEST.END_DATE_OUT_OF_RANGE']);
-      expect(edge.maxEndDate).toBe(maxEndDateOf(h.today()));
-      expect(edge.canSubmit).toBe(true);
-      expect(kinds(edge)).toEqual(kinds(short));
+      const sent = await h.submit(h.form(paidPlan, { termMonths: 13 }), designer.account);
+
+      expect([sent.status, h.codeOf(sent)]).toEqual([422, 'ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE']);
+      expect(over).toMatchObject({ canSubmit: false, termRefusal: 'TERM_MONTHS_OUT_OF_RANGE' });
+      expect(short).toMatchObject({ canSubmit: true, termRefusal: null });
+      expect(kinds(over)).toEqual(kinds(short));
     });
   });
 
@@ -233,7 +230,6 @@ describe('requests over HTTP: the preview before sending (integration, real Post
       const sent = await h.sent(designer, paidPlan);
 
       expect(Object.keys(preview)).not.toContain('outsideStandard');
-      expect(preview.maxEndDate).toBe(maxEndDateOf(h.today()));
       expect([old.status, h.codeOf(old)]).toEqual([422, 'VALIDATION_ERROR']);
       expect([bare.status, h.codeOf(bare)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(await h.requestRows()).toBe(rows + 1);

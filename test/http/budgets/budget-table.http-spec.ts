@@ -15,6 +15,7 @@ const ROW = {
   base: null,
   reserve: null,
   total: null,
+  effectiveBudget: null,
   committed: money('20'),
   spent: money('10'),
   pendingSpend: money('0'),

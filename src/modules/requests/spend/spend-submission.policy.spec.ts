@@ -1,15 +1,14 @@
-import { checkSupplement, supplementAuditDetail, supplementChangeOf } from './spend-submission.policy';
+import { checkSupplement, stopReasonOf, supplementAuditDetail, supplementChangeOf } from './spend-submission.policy';
 
 describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16; L2-38)', () => {
   const facts = {
     state: 'AWAITING_SPEND_SUBMISSION',
     priced: true,
   };
-  const term = (requested: string, current: string | null) => ({
+  const term = (requested: number, current: number | null, kind: 'K1' | 'K2' | 'K4' | 'K5' = 'K2') => ({
     requested,
     current,
-    today: '2026-11-10',
-    maxEndDate: '2027-11-09',
+    kind,
   });
 
   it('leaves people of a group out of a request back in the queue', () => {
@@ -28,19 +27,40 @@ describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16; L2-38)'
     expect(checkSupplement({ ...facts })).toBe('NO_CHANGE');
   });
 
-  it('L2-38: shortens a term to an earlier end date, and gives an end to a right that had none', () => {
-    expect(checkSupplement({ ...facts, term: term('2026-12-31', '2027-03-31') })).toBeNull();
-    expect(checkSupplement({ ...facts, term: term('2027-09-30', null) })).toBeNull();
+  it('L2-38, QĐ-111i: shortens the time of use to fewer months, and gives an end to a right that had none', () => {
+    expect(checkSupplement({ ...facts, term: term(3, 6) })).toBeNull();
+    expect(checkSupplement({ ...facts, term: term(12, null) })).toBeNull();
   });
 
-  it('L2-38: refuses an end date that is not earlier than the one the request has', () => {
-    expect(checkSupplement({ ...facts, term: term('2027-03-31', '2027-03-31') })).toBe('TERM_NOT_REDUCED');
-    expect(checkSupplement({ ...facts, term: term('2027-06-30', '2027-03-31') })).toBe('TERM_NOT_REDUCED');
+  it('L2-38: refuses a time of use that is not shorter than the one the request has', () => {
+    expect(checkSupplement({ ...facts, term: term(6, 6) })).toBe('TERM_NOT_REDUCED');
+    expect(checkSupplement({ ...facts, term: term(9, 6) })).toBe('TERM_NOT_REDUCED');
   });
 
-  it('L2-38: refuses an end date before today or more than a year from today', () => {
-    expect(checkSupplement({ ...facts, term: term('2026-11-09', null) })).toBe('END_DATE_OUT_OF_RANGE');
-    expect(checkSupplement({ ...facts, term: term('2027-11-10', null) })).toBe('END_DATE_OUT_OF_RANGE');
+  it('QĐ-111i: follows the kind of the plan: a plan bought once asks no months, and K1 takes 1 to 9', () => {
+    expect(checkSupplement({ ...facts, term: term(3, null, 'K4') })).toBe('TERM_NOT_ASKED');
+    expect(checkSupplement({ ...facts, term: term(9, 12, 'K1') })).toBeNull();
+    expect(checkSupplement({ ...facts, term: term(10, 12, 'K1') })).toBe('TERM_MONTHS_OUT_OF_RANGE');
+    expect(checkSupplement({ ...facts, term: term(12, null, 'K5') })).toBeNull();
+  });
+
+  it('L2-38: a request of an older release that carries an end date takes only months that end sooner than that day', () => {
+    const older = (requested: number) => ({
+      requested,
+      current: null,
+      kind: 'K2' as const,
+      endDate: { today: '2026-11-10', end: '2027-03-31' },
+    });
+
+    expect(checkSupplement({ ...facts, term: older(3) })).toBeNull();
+    expect(checkSupplement({ ...facts, term: older(5) })).toBe('TERM_NOT_REDUCED');
+    expect(checkSupplement({ ...facts, term: older(6) })).toBe('TERM_NOT_REDUCED');
+    expect(checkSupplement({ ...facts, term: older(13) })).toBe('TERM_MONTHS_OUT_OF_RANGE');
+  });
+
+  it('QĐ-111i: refuses a time of use that is not 1 to 12 whole months', () => {
+    expect(checkSupplement({ ...facts, term: term(0, null) })).toBe('TERM_MONTHS_OUT_OF_RANGE');
+    expect(checkSupplement({ ...facts, term: term(13, null) })).toBe('TERM_MONTHS_OUT_OF_RANGE');
   });
 });
 
@@ -106,5 +126,16 @@ describe('what a supplementary file changes, and what it says (QĐ-82n, US-06-14
       afterAmountMinor: '800',
       droppedEmployeeIds: ['emp-3'],
     });
+  });
+});
+
+describe('QĐ-111an, R-4: the stop reason of a batch item an older release made is read with the reasons that exist now', () => {
+  it('reads a request that stopped for want of a rate as the missing price it comes to, and leaves the other reasons as they were', () => {
+    expect(['RATE_MISSING', 'PRICE_MISSING', 'OVER_RESERVE', null].map(stopReasonOf)).toEqual([
+      'PRICE_MISSING',
+      'PRICE_MISSING',
+      'OVER_RESERVE',
+      null,
+    ]);
   });
 });

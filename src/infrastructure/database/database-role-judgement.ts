@@ -25,6 +25,8 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   budget_version_history: ['INSERT', 'SELECT'],
   // An invoice Finance recorded is evidence of what was spent: added to and never changed or deleted.
   invoices: ['INSERT', 'SELECT'],
+  // The files that came with a purchase invoice are evidence added with it and never changed (its trigger refuses it first).
+  purchase_invoice_documents: ['INSERT', 'SELECT'],
   // The notice, the signed record and the acknowledgement of a machine are evidence: added to and never changed.
   monitoring_notice_versions: ['INSERT', 'SELECT'],
   device_acknowledgements: ['INSERT', 'SELECT'],
@@ -34,6 +36,10 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   // Which tools a collector may report, version by version: what was allowed on a day stays knowable.
   collector_allowlist_versions: ['INSERT', 'SELECT'],
   collector_allowlist_entries: ['INSERT', 'SELECT'],
+  // Who acknowledged which version of a policy is evidence: added to and never changed (its triggers refuse it first).
+  policy_acknowledgements: ['INSERT', 'SELECT'],
+  // The answers of a checklist a decision was made with are evidence too: added to and never changed (its triggers refuse it first).
+  decision_checklists: ['INSERT', 'SELECT'],
 };
 
 /** Sequence privileges the runtime role holds on every sequence of `public`: drawing numbers (`nextval`) and `currval`. */

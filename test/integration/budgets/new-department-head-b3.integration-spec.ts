@@ -60,11 +60,10 @@ describe('the head of a department that starts next year does the budget work (i
     const head = await futureHead(department);
 
     const sent = h.dataOf<{ proposal: ProposalWire }>(
-      await h.submitProposal({ year: h.next, lines: h.twoLines() }, head.account).expect(201),
+      await h.submitProposal({ year: h.next, ...h.bm10() }, head.account).expect(201),
     ).proposal;
     expect(sent.costCenter.id).toBe(department.unitId);
     await h.proposalOf(sent.id, head.account).expect(200);
-    await h.proposalLines(sent.id, head.account).expect(200);
     expect(
       h.dataOf<{ budget: { costCenter: { id: string }; proposal: { id: string } | null } }>(
         await h.mine(head.account, h.next).expect(200),
@@ -76,22 +75,21 @@ describe('the head of a department that starts next year does the budget work (i
     await h.withdraw(sent.id, head.account).expect(200);
     const again = await h.budgetProposed(head, department.unitId);
     await h.giveBack(again.id, { reason: 'Add the seats' }, h.finance).expect(200);
-    await h.resubmit(again.id, { lines: h.twoLines() }, head.account).expect(201);
+    await h.resubmit(again.id, h.bm10(), head.account).expect(201);
   });
 
-  it('completes, links and reads the documents of the proposal, and reads its own lines and versions, before the department starts (DA2-09)', async () => {
+  it('completes, links and reads the documents of the proposal, and reads its own versions, before the department starts (DA2-09)', async () => {
     const department = await upcoming();
     const head = await futureHead(department);
     const file = await h.uploaded(SAMPLE_PDF, head.account);
 
     const sent = h.dataOf<{ proposal: ProposalWire }>(
-      await h.submitProposal({ year: h.next, lines: h.twoLines(), attachmentIds: [file] }, head.account).expect(201),
+      await h.submitProposal({ year: h.next, ...h.bm10(), attachmentIds: [file] }, head.account).expect(201),
     ).proposal;
     const listed = await h.listProposalAttachments(sent.id, '', head.account).expect(200);
     await h.linkAttachment(file, head.account).expect(200);
 
     expect(h.dataOf<{ items: { id: string }[] }>(listed).items.map((item) => item.id)).toEqual([file]);
-    await h.mineLines(head.account, h.next).expect(200);
     await h.listMineVersions(`?year=${h.next}`, head.account).expect(200);
   });
 
@@ -99,7 +97,7 @@ describe('the head of a department that starts next year does the budget work (i
     const department = await upcoming();
     const head = await futureHead(department);
 
-    const sent = await h.submitProposal({ year: h.year, lines: h.twoLines() }, head.account).expect(403);
+    const sent = await h.submitProposal({ year: h.year, ...h.bm10() }, head.account).expect(403);
     const mine = await h.mine(head.account, h.year).expect(403);
 
     expect(h.codeOf(sent)).toBe('BUDGET.NOT_YOUR_COST_CENTER');
@@ -110,7 +108,7 @@ describe('the head of a department that starts next year does the budget work (i
     const department = await upcoming(false);
     const head = await futureHead(department);
 
-    const refused = await h.submitProposal({ year: h.next, lines: h.twoLines() }, head.account).expect(409);
+    const refused = await h.submitProposal({ year: h.next, ...h.bm10() }, head.account).expect(409);
 
     expect(h.codeOf(refused)).toBe('FINANCE.SETUP_INCOMPLETE');
   });
@@ -138,15 +136,15 @@ describe('the head of a department that starts next year does the budget work (i
       [head.employeeId, department.id, start],
     );
 
-    const unnamed = await h.submitProposal({ year: h.next, lines: h.twoLines() }, head.account).expect(422);
+    const unnamed = await h.submitProposal({ year: h.next, ...h.bm10() }, head.account).expect(422);
     const stranger = await h
-      .submitProposal({ year: h.next, lines: h.twoLines(), costCenterId: h.finance.employeeId }, head.account)
+      .submitProposal({ year: h.next, ...h.bm10(), costCenterId: h.finance.employeeId }, head.account)
       .expect(403);
     const named = await h
-      .submitProposal({ year: h.next, lines: h.twoLines(), costCenterId: department.unitId }, head.account)
+      .submitProposal({ year: h.next, ...h.bm10(), costCenterId: department.unitId }, head.account)
       .expect(201);
     const oldOne = await h
-      .submitProposal({ year: h.next, lines: h.twoLines(), costCenterId: old.unitId }, head.account)
+      .submitProposal({ year: h.next, ...h.bm10(), costCenterId: old.unitId }, head.account)
       .expect(201);
     const mineUnnamed = await h.mine(head.account, h.next).expect(422);
     const mineNamed = await request(h.server())

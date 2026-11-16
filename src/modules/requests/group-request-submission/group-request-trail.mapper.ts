@@ -16,7 +16,7 @@ export function submissionEvents(
     organizationId: string;
     requestId: string;
     planId: string;
-    expectedEndDate: string | null;
+    termMonths: number | null;
     state: string;
     judged: GroupJudgement;
     planned: readonly PlannedNeedStep<{ employeeId: string }>[];
@@ -34,7 +34,7 @@ export function submissionEvents(
       branch: policy.branch,
       state: input.state,
       planId: input.planId,
-      expectedEndDate: input.expectedEndDate,
+      termMonths: input.termMonths,
       requesterEmployeeId: actor.employeeId,
       createdByEmployeeId: actor.employeeId,
       beneficiaryEmployeeIds: people,

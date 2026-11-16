@@ -77,6 +77,10 @@ export const softwareEntrySchema = z.strictObject({
   entryId: z.uuid(),
   applicationId: z.uuid(),
   applicationName: z.string(),
+  applicationLogoUrl: z.string().nullable().meta({
+    description:
+      'The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.',
+  }),
   planId: z.uuid().nullable(),
   planName: z.string().nullable(),
   note: z.string().nullable(),
@@ -90,6 +94,10 @@ export const softwareProposalSchema = z.strictObject({
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
   applicationId: z.uuid(),
   applicationName: z.string(),
+  applicationLogoUrl: z.string().nullable().meta({
+    description:
+      'The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.',
+  }),
   planId: z.uuid().nullable(),
   planName: z.string().nullable(),
   reason: z.string(),

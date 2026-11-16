@@ -1,30 +1,27 @@
 /**
- * The literal expectations of the OpenAPI examples (OPENAPI-EXAMPLE.1), written out so the test never asks the code that
- * builds the examples what they should be. Traced on BE `ea73c2f` (25/10/2026), and for the G5/G6 routes on their
- * merge `0da8f56` (Prompt 02, 26/10/2026), from each handler through its service, policies and repository to the HTTP
- * mapper — never from a response description; see docs/workspace/items/openapi-response-examples/spec.md.
+ * The literal expectations of the OpenAPI examples (OPENAPI-EXAMPLE.1), written out so the test never asks the code that builds the
+ * examples what they should be. Traced on BE `ea73c2f` and, for the G5/G6 routes, on `0da8f56`, from each handler through its service,
+ * policies and repository to the HTTP mapper — never from a response description; see docs/workspace/items/openapi-response-examples/spec.md.
  *
  * - SUCCESS_MESSAGES: the success `message` each operation answers with (its `@ApiSuccessResponse` metadata).
  * - BODYLESS_RESPONSES: success responses that have no JSON body, with the reason.
  * - ROUTE_ERROR_CODES: the codes an operation can answer with at a status beyond the ones every operation of its kind
  *   answers with (guards, validation pipe, throttler, request parsers — written out in api-inventory.e2e-spec.ts).
- *   Adding a code here needs the traced code path; a code that cannot be reached is never listed. A reachable code of
- *   another capability that the route only passes through is not shown until its owner can give the example within the
- *   module boundaries (Prompt 02 decision: personnelNoticeRecord, the revocation hooks; see the item spec).
- * - NO_EXAMPLE_RESPONSES: declared error responses the running system cannot answer yet, so they show no example
- *   (their declaration says why in `noExampleBecause`). The list only shrinks: the slice that makes one reachable adds
- *   its examples and removes the entry.
+ *   Adding a code here needs the traced code path; a code that cannot be reached is never listed. A reachable code of another
+ *   capability that the route only passes through is not shown until its owner can give the example within the module boundaries.
+ * - NO_EXAMPLE_RESPONSES: declared error responses the running system cannot answer yet, so they show no example (their declaration
+ *   says why in `noExampleBecause`). The list only shrinks: the slice that makes one reachable adds its examples and removes the entry.
  */
-
+import { SUCCESS_MESSAGES_POLICIES } from './openapi-example-messages-policies';
 import { ROUTE_ERROR_CODES_AI_ASSIST } from './openapi-example-route-codes-ai-assist';
 import { ROUTE_ERROR_CODES_BUDGETS } from './openapi-example-route-codes-budgets';
 import { ROUTE_ERROR_CODES_CATALOG } from './openapi-example-route-codes-catalog';
 import { ROUTE_ERROR_CODES_DATA_IMPORT } from './openapi-example-route-codes-data-import';
 import { SUCCESS_MESSAGES_DEVICES } from './openapi-example-messages-devices';
 import { SUCCESS_MESSAGES_OPTIMIZATION } from './openapi-example-messages-optimization';
+import { SUCCESS_MESSAGES_PURCHASE_INVOICE } from './openapi-example-messages-purchase-invoice';
 import { SUCCESS_MESSAGES_USAGE } from './openapi-example-messages-usage';
 import { ROUTE_ERROR_CODES_DEVICES } from './openapi-example-route-codes-devices';
-import { ROUTE_ERROR_CODES_FINANCE } from './openapi-example-route-codes-finance';
 import { ROUTE_ERROR_CODES_HEALTH } from './openapi-example-route-codes-health';
 import { ROUTE_ERROR_CODES_IDENTITY_ACCESS } from './openapi-example-route-codes-identity-access';
 import { ROUTE_ERROR_CODES_LICENSING } from './openapi-example-route-codes-licensing';
@@ -36,11 +33,13 @@ import { ROUTE_ERROR_CODES_REQUESTS } from './openapi-example-route-codes-reques
 import { ROUTE_ERROR_CODES_REQUESTS_SPEND } from './openapi-example-route-codes-requests-spend';
 import { ROUTE_ERROR_CODES_USAGE } from './openapi-example-route-codes-usage';
 
-export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '422' | '429' | '500' | '503';
+export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '415' | '422' | '429' | '500' | '503';
 
 export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   ...SUCCESS_MESSAGES_DEVICES,
   ...SUCCESS_MESSAGES_OPTIMIZATION,
+  ...SUCCESS_MESSAGES_POLICIES,
+  ...SUCCESS_MESSAGES_PURCHASE_INVOICE,
   ...SUCCESS_MESSAGES_USAGE,
   accessRequestAssessmentComplete: 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
   accessRequestAssessmentGet: 'ACCESS_REQUEST.ASSESSMENT_FETCHED',
@@ -81,6 +80,8 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   appUserLock: 'APP_USER.LOCKED',
   appUserResendInvitation: 'APP_USER.INVITATION_SENT',
   appUserUnlock: 'APP_USER.UNLOCKED',
+  assessmentDecisionList: 'ASSESSMENT_DECISIONS.LISTED',
+  assessmentQueueDepartmentList: 'ASSESSMENT_QUEUE.DEPARTMENTS_LISTED',
   assessmentQueueList: 'ASSESSMENT_QUEUE.LISTED',
   applicationCreate: 'APPLICATION.CREATED',
   applicationGet: 'APPLICATION.FETCHED',
@@ -110,20 +111,25 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   budgetCycleGet: 'BUDGET_CYCLE.FETCHED',
   budgetCycleList: 'BUDGET_CYCLE.LISTED',
   budgetCyclePackage: 'BUDGET_CYCLE.PACKAGE_FETCHED',
+  budgetCycleCreate: 'BUDGET_CYCLE.CREATED',
+  budgetReviewPeriodClose: 'BUDGET_REVIEW.CLOSED',
+  budgetReviewPeriodGet: 'BUDGET_REVIEW.RETRIEVED',
+  budgetReviewPeriodList: 'BUDGET_REVIEW.LISTED',
+  budgetReviewPeriodSign: 'BUDGET_REVIEW.SIGNED',
+  budgetReviewLineExplain: 'BUDGET_REVIEW.LINE_EXPLAINED',
+  budgetAdjustmentCreate: 'BUDGET_ADJUSTMENT.CREATED',
+  budgetAdjustmentDecide: 'BUDGET_ADJUSTMENT.DECIDED',
+  budgetAdjustmentList: 'BUDGET_ADJUSTMENT.LISTED',
+  budgetCycleDelete: 'BUDGET_CYCLE.DELETED',
   budgetCycleOpen: 'BUDGET_CYCLE.OPENED',
-  budgetCyclePublish: 'BUDGET_CYCLE.PUBLISHED',
   budgetCycleUpdate: 'BUDGET_CYCLE.UPDATED',
-  budgetDepartmentCeilingsSet: 'BUDGET_CYCLE.CEILINGS_SET',
-  budgetCommitmentInvoiceRecord: 'BUDGET_COMMITMENT.INVOICE_RECORDED',
   budgetCommitmentRelease: 'BUDGET_COMMITMENT.RELEASED',
   budgetCommitmentReleases: 'BUDGET_COMMITMENT.RELEASES_LISTED',
   budgetMine: 'BUDGET.FETCHED',
-  budgetMineLineList: 'BUDGET.LINES_LISTED',
   budgetMineVersionList: 'BUDGET.VERSIONS_LISTED',
   budgetProposalAttachmentDeclare: 'BUDGET_ATTACHMENT.DECLARED',
   budgetProposalAttachmentList: 'BUDGET_ATTACHMENT.LISTED',
   budgetProposalGet: 'BUDGET_PROPOSAL.FETCHED',
-  budgetProposalLineList: 'BUDGET_PROPOSAL.LINES_LISTED',
   budgetProposalList: 'BUDGET_PROPOSAL.LISTED',
   budgetProposalResubmit: 'BUDGET_PROPOSAL.RESUBMITTED',
   budgetProposalReturn: 'BUDGET_PROPOSAL.RETURNED',
@@ -138,15 +144,15 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   budgetVersionDecide: 'BUDGET_VERSION.DECIDED',
   budgetVersionGet: 'BUDGET_VERSION.FETCHED',
   budgetVersionHistoryList: 'BUDGET_VERSION.HISTORY_LISTED',
-  budgetVersionImport: 'BUDGET_VERSION.LINES_IMPORTED',
-  budgetVersionLineAdd: 'BUDGET_VERSION.LINES_ADDED',
-  budgetVersionLineList: 'BUDGET_VERSION.LINES_LISTED',
-  budgetVersionLineUpdate: 'BUDGET_VERSION.LINE_CHANGED',
   budgetVersionList: 'BUDGET_VERSION.LISTED',
   budgetVersionSend: 'BUDGET_VERSION.SENT',
   budgetVersionUpdate: 'BUDGET_VERSION.UPDATED',
   contractCreate: 'CONTRACT.CREATED',
   contractGet: 'CONTRACT.FETCHED',
+  contractList: 'CONTRACT.LISTED',
+  contractSubscriptionLink: 'CONTRACT.SUBSCRIPTION_LINKED',
+  contractSubscriptionUnlink: 'CONTRACT.SUBSCRIPTION_UNLINKED',
+  contractUpdate: 'CONTRACT.UPDATED',
   controlledWaitList: 'CONTROLLED_WAIT.LISTED',
   costCenterCreate: 'COST_CENTER.CREATED',
   costCenterDeactivate: 'COST_CENTER.DEACTIVATED',
@@ -201,8 +207,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   employeeImportUpload: 'EMPLOYEE_IMPORT.UPLOADED',
   employeeList: 'EMPLOYEE.LISTED',
   employeeUpdateOfficialFields: 'EMPLOYEE.UPDATED',
-  exchangeRateList: 'EXCHANGE_RATE.LISTED',
-  exchangeRateRecord: 'EXCHANGE_RATE.RECORDED',
   functionalGroupCreate: 'FUNCTIONAL_GROUP.CREATED',
   functionalGroupList: 'FUNCTIONAL_GROUP.LISTED',
   functionalGroupUpdate: 'FUNCTIONAL_GROUP.UPDATED',
@@ -294,7 +298,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   provisioningTaskReportFailure: 'PROVISIONING_TASK.FAILED',
   provisioningTaskRetry: 'PROVISIONING_TASK.RETRY_REQUESTED',
   reportingCurrencyGet: 'REPORTING_CURRENCY.FETCHED',
-  reportingCurrencySet: 'REPORTING_CURRENCY.SET',
   requestableApplicationGet: 'REQUESTABLE_APPLICATION.FETCHED',
   requestableApplicationList: 'REQUESTABLE_APPLICATION.LISTED',
   requestablePlanGet: 'REQUESTABLE_PLAN.FETCHED',
@@ -319,6 +322,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   seatBaselineImportGet: 'SEAT_BASELINE_IMPORT.FETCHED',
   seatBaselineImportRows: 'SEAT_BASELINE_IMPORT.ROWS_LISTED',
   seatBaselineImportUpload: 'SEAT_BASELINE_IMPORT.UPLOADED',
+  seatMonthChargeList: 'SEAT_MONTH_CHARGE.LISTED',
   spendApprovalDecide: 'SPEND_APPROVAL.DECIDED',
   spendApprovalGet: 'SPEND_APPROVAL.FETCHED',
   spendApprovalLineDecide: 'SPEND_APPROVAL.LINES_DECIDED',
@@ -334,6 +338,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   stepCongestionIncidentRecord: 'STEP_CONGESTION.INCIDENT_RECORDED',
   stepCongestionList: 'STEP_CONGESTION.LISTED',
   stepCongestionStepList: 'STEP_CONGESTION.STEPS_LISTED',
+  stockSummaryList: 'STOCK_SUMMARY.LISTED',
   subscriptionComplete: 'SUBSCRIPTION.COMPLETED',
   subscriptionDeadlineEventList: 'SUBSCRIPTION_DEADLINE_EVENT.LISTED',
   subscriptionCreate: 'SUBSCRIPTION.CREATED',
@@ -364,13 +369,11 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   vendorTaxProfileHistory: 'VENDOR_TAX_PROFILE.HISTORY_LISTED',
   vendorTaxProfileSet: 'VENDOR_TAX_PROFILE.DECLARED',
 };
-
 export const BODYLESS_RESPONSES: Readonly<Record<string, string>> = {
   'authLogout 204': 'Signed out: 204 No Content has no body (@RawResponse).',
+  'importTemplateGet 200': 'A file (xlsx or csv) sent as raw bytes with its own content type (@RawResponse).',
 };
-
 export const NO_EXAMPLE_RESPONSES: Readonly<Record<string, string>> = {};
-
 /**
  * The route-specific codes, in one file per owning module to keep each support file small (TEST-HARDEN.1); a module whose
  * routes do not fit one file has a second named by its area. An operationId listed twice is a mistake the inventory test reports.
@@ -381,7 +384,6 @@ const PARTS = [
   ROUTE_ERROR_CODES_CATALOG,
   ROUTE_ERROR_CODES_DATA_IMPORT,
   ROUTE_ERROR_CODES_DEVICES,
-  ROUTE_ERROR_CODES_FINANCE,
   ROUTE_ERROR_CODES_HEALTH,
   ROUTE_ERROR_CODES_IDENTITY_ACCESS,
   ROUTE_ERROR_CODES_LICENSING,

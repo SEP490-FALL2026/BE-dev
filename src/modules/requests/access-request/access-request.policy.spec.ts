@@ -5,6 +5,7 @@ import {
   canReadRequest,
   canViewRequest,
   chargedCostCenterId,
+  currentMissingReasonOf,
   mayRequest,
   policyFor,
   proposalPolicy,
@@ -212,4 +213,16 @@ describe('BR-MF1-02: one-step policy chains', () => {
     expect(policyFor('SAAS', 2, routing).chain).toEqual(['SPEND_APPROVAL', 'IT_EXECUTION']));
   it('keeps assessment then spend for proposed software', () =>
     expect(proposalPolicy(2, routing).chain).toEqual(['IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECUTION']));
+});
+
+describe('QĐ-111an, R-4: RATE_MISSING is a reason an older release wrote and is only read now', () => {
+  it('reads a request or a batch item an older release sent back for want of a rate as the missing price it comes to: the price is not in dong', () => {
+    expect(currentMissingReasonOf('RATE_MISSING')).toBe('PRICE_MISSING');
+  });
+
+  it('leaves every other reason as it was', () => {
+    for (const reason of ['PRICE_MISSING', 'PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE'] as const) {
+      expect(currentMissingReasonOf(reason)).toBe(reason);
+    }
+  });
 });

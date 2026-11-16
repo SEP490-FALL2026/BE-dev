@@ -36,6 +36,8 @@ const SUMMARY_KEYS = [
   'revocation',
   'status',
   'subscriptionId',
+  // R-38: the day the seat of a grant ends because the contract of its holder ends there; null otherwise.
+  'termCutAt',
 ];
 
 /** LD-08 of the post-merge review: the task list is a summary read in a fixed number of statements; the detail has the rest. */

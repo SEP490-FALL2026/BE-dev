@@ -15,12 +15,15 @@ import {
   SpendReviewNotFoundError,
   SpendSupplementRefusedError,
 } from './spend.errors';
+import { toChecklistApiException } from '../../policies/public/policy-checklist.http-errors';
 
 const refuse = (status: HttpStatus, code: string, message: string): ApiException =>
   new ApiException(status, { code, message });
 
 /** Maps the errors of the check of the budget and of the spend steps to their HTTP answers; the rest are the request's own. */
 export function toSpendApiException(error: unknown): unknown {
+  const checklist = toChecklistApiException(error);
+  if (checklist) return checklist;
   if (error instanceof SpendReviewNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'SPEND.REVIEW_NOT_FOUND', error.message);
   }

@@ -25,6 +25,7 @@ export const importSummarySchema = z.strictObject({
   unmappedEventTypes: z.array(z.string()).max(MAX_UNMAPPED_EVENT_TYPES),
   trackingNoticeRequired: z.boolean(),
   recordedOn: day,
+  duplicateOfImportId: z.uuid().optional(),
 }) satisfies z.ZodType<ImportSummary>;
 
 /** `usage_imports.summary`. */

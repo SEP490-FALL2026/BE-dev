@@ -4,10 +4,13 @@ import type { SystemActor } from '../../licensing/public/licensing.types';
 import { OpenRequestService } from '../access-request/open-request/open-request.service';
 import { BeneficiaryGoneCancellation } from '../cancellation/beneficiary-gone-cancellation.service';
 import { SeatReleaseService } from '../grant/seat-release.service';
+import type { BusinessDate } from '../../../core/business-date';
 import type {
   BeneficiaryGoneInput,
   BeneficiaryGonePreview,
   BeneficiaryGoneResult,
+  GrantRequestOnItsWay,
+  GrantRequestQuestion,
   OpenRequestOfBeneficiary,
   TransferReleaseInput,
   TransferReleaseResult,
@@ -74,5 +77,24 @@ export class RequestsApi {
     filter: { departmentId?: string } = {},
   ): Promise<{ items: OpenRequestOfBeneficiary[]; total: number }> {
     return this.open.pageOf(employeeId, page, tx, filter);
+  }
+
+  /**
+   * The Request the person sent for the application that has come furthest on its way to a grant, or null when they have none that is open,
+   * approved or, once done, granted on or after `since` (`US-13-05` AC-23: what a case outside the process waits for). A Request that was refused,
+   * withdrawn, cancelled or failed is none, and a draft, a group's Request or a Request for another application never is the answer.
+   */
+  async openGrantRequestOf(
+    employeeId: string,
+    applicationId: string,
+    since: BusinessDate,
+    tx?: DbTx,
+  ): Promise<GrantRequestOnItsWay | null> {
+    return (await this.open.grantsOnItsWay([{ employeeId, applicationId, since }], tx))[0];
+  }
+
+  /** `openGrantRequestOf` for many questions at once, the answers in the order of the questions; two statements however many there are. */
+  openGrantRequestsOf(questions: readonly GrantRequestQuestion[], tx?: DbTx): Promise<(GrantRequestOnItsWay | null)[]> {
+    return this.open.grantsOnItsWay(questions, tx);
   }
 }

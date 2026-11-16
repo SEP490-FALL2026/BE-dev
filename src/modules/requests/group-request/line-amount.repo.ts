@@ -9,6 +9,8 @@ export interface NewLineAmount {
   budgetYear: number;
   amountMinor: bigint;
   currency: string;
+  /** False for the part of the year after, which no commitment holds yet (`QĐ-111k`); true when left out. */
+  held?: boolean;
 }
 
 /**
@@ -41,6 +43,7 @@ export class LineAmountRepo {
       budgetYear: row.budgetYear,
       amountMinor: row.amountMinor,
       currency: row.currency,
+      held: row.held,
       releasedAt: row.releasedAt,
     }));
   }

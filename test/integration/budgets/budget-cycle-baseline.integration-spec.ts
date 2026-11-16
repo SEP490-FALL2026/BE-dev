@@ -1,7 +1,6 @@
 import request from 'supertest';
 import { PgRelay } from '../../support/pg-relay';
 import { QueryCounter, dataStatements } from '../../support/query-count';
-import { BaselineService } from '../../../src/modules/budgets/cycle/baseline.service';
 import { SpendHarness } from '../../support/spend-harness';
 
 const h = new SpendHarness();
@@ -247,19 +246,6 @@ describe('the baseline and the package of a budget cycle (integration, real Post
 
       expect(entryOf(wire, holders.department.id, owner.subscription)?.estimatedAnnualCost?.amount).toBe('36000000');
       expect(poolEntryOf(wire, owner.subscription)?.seatsIdle).toBe(7);
-    });
-
-    it('builds the lines of a version of source BASELINE the same way: Renew lines of what its people hold', async () => {
-      const owner = await department();
-      const holders = await department();
-      await holdFor(owner, holders.department, 3);
-      const service = h.ctx.app.get(BaselineService, { strict: false });
-
-      const lines = await service.renewalLinesOf(holders.department.id, year(), h.today());
-      const ownerLines = await service.renewalLinesOf(owner.department.id, year(), h.today());
-
-      expect(lines).toEqual([expect.objectContaining({ lineType: 'RENEW', seats: 3, amountMinor: 36_000_000n })]);
-      expect(ownerLines).toEqual([]);
     });
 
     it('gives a head their own department only, without the line of the pool', async () => {
@@ -515,6 +501,35 @@ describe('the baseline and the package of a budget cycle (integration, real Post
         BigInt(version.base.amount) + BigInt(version.reserve.amount),
       );
       expect(after.versionsTotal.amount).toBe(before.versionsTotal.amount);
+    });
+
+    it('tells who heads each department and whether Finance may build it from the baseline, with no lines in the proposal (B4, QĐ-111bb)', async () => {
+      const headed = await department();
+      const proposal = await h.budgetProposed(headed.head, headed.department.unitId, undefined, year());
+      const headless = await h.departmentWithUnit(`P-PKN${Date.now() % 100000}`);
+      const { rows } = await h.ctx.sql.query<{ deadline: string }>(
+        `SELECT submission_deadline::text AS deadline FROM budget_cycles WHERE year = $1`,
+        [year()],
+      );
+      const moveDeadline = (deadline: string) =>
+        h.ctx.sql.query(`UPDATE budget_cycles SET submission_deadline = $2 WHERE year = $1`, [year(), deadline]);
+      await moveDeadline(`${h.year}-01-01`);
+
+      const response = await packageOf();
+      await moveDeadline(rows[0].deadline);
+      expect(response.status).toBe(200);
+      const wire = h.dataOf<PackageWire>(response);
+      const raw = wire.departments as unknown as Record<string, unknown>[];
+      const of = (id: string) => raw.find((row) => row.departmentId === id);
+
+      expect(of(headed.department.id)).toMatchObject({
+        headStatus: 'HAS_HEAD',
+        baselineAllowed: false,
+        baselineRefusal: 'HAS_PROPOSAL',
+        proposal: { id: proposal.id },
+      });
+      expect(of(headed.department.id)?.proposal).not.toHaveProperty('lines');
+      expect(of(headless.id)).toMatchObject({ headStatus: 'NO_HEAD', baselineAllowed: true, baselineRefusal: null });
     });
 
     it('is for Finance and the spending approver only', async () => {

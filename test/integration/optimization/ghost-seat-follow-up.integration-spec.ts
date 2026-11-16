@@ -17,7 +17,7 @@ const decide = (account: ApiAccount, recommendationId: string, choice: string, e
   request(w.server())
     .post('/api/v1/ghost-seat-decisions')
     .set(w.as(account))
-    .send({ items: [{ recommendationId }], choice, reason: 'Lý do', ...extra });
+    .send(w.checklists.withYes('5.4', { items: [{ recommendationId }], choice, reason: 'Lý do', ...extra }));
 
 /** An instant `offset` days from today (at noon of the calendar) that is, or is not, on a weekend. */
 const dayWhere = async (weekend: boolean, from = 1): Promise<Date> => {

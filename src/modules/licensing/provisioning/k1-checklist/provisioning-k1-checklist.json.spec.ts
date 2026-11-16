@@ -1,6 +1,7 @@
 import { Prisma } from '../../../../generated/prisma/client';
 import { JsonColumnShapeError } from '../../../../infrastructure/database/json-column.errors';
 import { k1ChecklistJson } from './provisioning-k1-checklist.json';
+import type { StoredK1Checklist } from './provisioning-k1-checklist.policy';
 
 const STORED = {
   variant: 'STILL_EMPLOYED',
@@ -14,6 +15,19 @@ describe('k1ChecklistJson (provisioning_tasks.k1_checklist)', () => {
   it('reads the checklist a completed K1 revocation keeps, and NULL as none (a task that is not K1, or was completed before the checklist)', () => {
     expect(k1ChecklistJson.decode(STORED)).toEqual(STORED);
     expect(k1ChecklistJson.decode(null)).toBeNull();
+  });
+
+  it('reads and writes the checklist a K1 grant keeps (K1-GR): the variant GRANT and its two steps', () => {
+    const grant: StoredK1Checklist = {
+      variant: 'GRANT',
+      items: [
+        { code: 'COMPANY_EMAIL_REGISTERED', order: 1, doneAt: '2026-11-15T08:00:00.000Z' },
+        { code: 'NO_PERSONAL_DEVICE_MFA', order: 2, doneAt: '2026-11-15T08:01:00.000Z' },
+      ],
+    };
+
+    expect(k1ChecklistJson.decode(grant)).toEqual(grant);
+    expect(k1ChecklistJson.encode(grant)).toEqual(grant);
   });
 
   it.each([

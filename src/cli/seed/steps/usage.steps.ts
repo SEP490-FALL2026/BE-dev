@@ -1,4 +1,5 @@
 import { DemoApiError } from '../demo-api-client';
+import { yesChecklist } from './checklist-kit';
 import { dayOffset } from '../demo-dates';
 import { as, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
@@ -165,6 +166,8 @@ interface QueueItem {
   holder?: { employeeCode: string } | null;
   application?: { applicationName: string } | null;
   state: string;
+  /** The last decision of the head on it, when it came back to the queue after one (a seat kept is put back for review later). */
+  previousDecision?: { choice: string } | null;
 }
 
 /** The follow-up job of the heads' queues first runs 6 minutes after the API starts, then hourly: the wait for it is bounded a little above. */
@@ -238,12 +241,26 @@ async function decideOne(
     // Still unrouted in a plan, or decided and gone from the queue of the head.
     return standing.others.some((item) => item.state === 'OPEN') && ctx.mode === 'plan' ? 'planned' : 'present';
   }
+  // Decided by the dataset already, and the seat came back to the queue by the rules' own follow-up (a seat kept is raised again, a
+  // recommendation kept is put back): the decision of the fixture is in the history of the head, nothing to do again (D-Z2-7).
+  if (standing.waiting.previousDecision?.choice === spec.choice) return 'present';
+  const ofHolder = new Set(standing.others.map((item) => item.id));
+  // The history of decisions is read by the Super Admin (the head reads only the queue).
+  const history = await listAll<{ recommendationId: string; choice: string }>(
+    ctx,
+    ctx.superAdminEmail,
+    '/ghost-seat-decisions',
+  );
+  if (history.some((decision) => decision.choice === spec.choice && ofHolder.has(decision.recommendationId))) {
+    return 'present';
+  }
   if (ctx.mode === 'plan') return 'planned';
   await ctx.api.call(email, 'POST', '/ghost-seat-decisions', {
     items: [{ recommendationId: standing.waiting.id }],
     choice: spec.choice,
     reason: spec.reason,
     ...(spec.choice === 'EXEMPT' ? { exemptUntil: dayOffset(ctx.today, spec.exemptDays ?? 90) } : {}),
+    checklist: await yesChecklist(ctx, email, '5.4'),
   });
 
   return 'done';

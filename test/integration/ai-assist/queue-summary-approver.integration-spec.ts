@@ -148,7 +148,7 @@ describe('the AI summary of the queue of the spending approver (integration, rea
         softwareName: applicationName,
         beneficiaryDisplayName: names[0],
         reason: r9.businessReason,
-        // A request carries an end date now, not months (`QĐ-104a`): the AI source has no duration in months to give.
+        // R9 is sent with no *Thời gian dùng* (a right with no end): there is no number of months to label (`QĐ-111i`).
         requestedDurationLabel: null,
         estimatedCostRef: 'C001',
       },
@@ -158,7 +158,9 @@ describe('the AI summary of the queue of the spending approver (integration, rea
         softwareName: applicationName,
         beneficiaryDisplayName: names[1],
         reason: expect.any(String) as string,
-        requestedDurationLabel: null,
+        // R10 is made by `paidRequest`, which asks for one month of use (`termMonths: 1`, `QĐ-111i`): the label is that month,
+        // whatever day the suite runs.
+        requestedDurationLabel: '1 tháng',
         estimatedCostRef: 'C002',
       },
       {

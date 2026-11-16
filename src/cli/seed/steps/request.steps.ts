@@ -1,7 +1,7 @@
-import { dayOffset, endOfMonth } from '../demo-dates';
 import { as, listAll, tag } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
-import type { DemoRequestEnd, DemoRequestScenario } from '../fixture/demo-fixture.types';
+import type { DemoRequestScenario } from '../fixture/demo-fixture.types';
+import { yesChecklist } from './checklist-kit';
 import { nextScenarioAction, reachedTarget, ScenarioAction } from './scenario-path';
 
 export interface RequestWire {
@@ -25,19 +25,13 @@ function departmentOf(ctx: DemoRunContext, code: string) {
   return department;
 }
 
-/** The end date a scenario names, relative to today (`undefined`: the request names none). */
-export function endDateOf(ctx: DemoRunContext, end: DemoRequestEnd): string | undefined {
-  if (end === 'NONE') return undefined;
-  if (end === 'EOM') return endOfMonth(ctx.today);
-
-  return dayOffset(ctx.today, end.inDays);
-}
-
-const withEnd = (ctx: DemoRunContext, end: DemoRequestEnd) => {
-  const expectedEndDate = endDateOf(ctx, end);
-
-  return expectedEndDate === undefined ? {} : { expectedEndDate };
-};
+/**
+ * The time of use of a request as the body carries it (`QĐ-111i`, RQ-2): the months it asks for, never a date (`expectedEndDate` is a 422).
+ * No months: the field is left out, which is a right with no end for a plan of seats or internal software of a staff member, and nothing for a
+ * plan bought once.
+ */
+export const termBody = (termMonths: number | null): { termMonths?: number } =>
+  termMonths === null ? {} : { termMonths };
 
 /**
  * The request of a scenario, found from what the API itself recorded: every request its requester sent is an Audit Trail
@@ -74,23 +68,25 @@ async function submit(ctx: DemoRunContext, scenario: DemoRequestScenario): Promi
   const planId = ctx.ids.plans.get(scenario.plan ?? '');
   let created: { request: RequestWire };
   if (scenario.proposal) {
+    const { existingApplication, ...proposal } = scenario.proposal;
     created = await ctx.api.call(requester, 'POST', '/access-requests/proposals', {
-      ...scenario.proposal,
+      ...proposal,
+      ...(existingApplication ? { existingApplicationId: ctx.ids.applications.get(existingApplication) } : {}),
       purpose: text,
-      ...withEnd(ctx, scenario.end),
+      ...termBody(scenario.termMonths),
     });
   } else if (scenario.beneficiaries) {
     created = await ctx.api.call(requester, 'POST', '/group-requests', {
       planId,
       lines: scenario.beneficiaries.map((code) => ({ employeeId: ctx.ids.employees.get(code) })),
       businessReason: text,
-      ...withEnd(ctx, scenario.end),
+      ...termBody(scenario.termMonths),
     });
   } else {
     created = await ctx.api.call(requester, 'POST', '/access-requests', {
       planId,
       businessReason: text,
-      ...withEnd(ctx, scenario.end),
+      ...termBody(scenario.termMonths),
     });
   }
   ctx.ids.requests.set(scenario.key, created.request.id);
@@ -142,6 +138,13 @@ async function reload(ctx: DemoRunContext, scenario: DemoRequestScenario, id: st
   return (await ctx.api.call<{ request: RequestWire }>(requester, 'GET', `/access-requests/${id}`)).request;
 }
 
+/** The checklist of a decision step all Yes, as the person of `code` reads it. */
+async function checklistOf(ctx: DemoRunContext, code: string | null, step: string) {
+  if (!code) throw new Error(`No demo person decides step ${step}: the fixture leaves that role empty`);
+
+  return yesChecklist(ctx, await as(ctx, code), step);
+}
+
 async function post(ctx: DemoRunContext, code: string | null, path: string, body?: unknown): Promise<unknown> {
   if (!code) throw new Error(`No demo person acts at ${path}: the fixture leaves that role empty`);
 
@@ -165,6 +168,7 @@ async function perform(
       });
       return;
     case 'SUBMIT_BATCH':
+      // A batch that confirms the reserve answers the checklist of step 1.6 once for the batch (FIX-PL2-O4).
       await post(ctx, department.head, '/spend-batches', {
         requestIds: [request.id],
         ...(scenario.confirmReserve
@@ -172,6 +176,7 @@ async function perform(
               reserveConfirmations: [
                 { requestId: request.id, reason: `${tag(ctx, scenario.key)} Cần cho chiến dịch tháng này.` },
               ],
+              checklist: await checklistOf(ctx, department.head, '1.6'),
             }
           : {}),
       });
@@ -179,33 +184,30 @@ async function perform(
     case 'CONFIRM_RESERVE':
       await post(ctx, department.head, `/access-requests/${request.id}/reserve-confirmation`, {
         reason: `${tag(ctx, scenario.key)} Cần cho chiến dịch tháng này.`,
+        checklist: await checklistOf(ctx, department.head, '1.6'),
       });
       return;
     case 'APPROVE_SPEND':
-      if (scenario.beneficiaries) {
-        // A request for a group is decided line by line (the whole group here: every person it names).
-        await post(
-          ctx,
-          ctx.fixture.approvalRoles.SPENDING_APPROVER,
-          `/access-requests/${request.id}/line-spend-decisions`,
-          {
-            lines: scenario.beneficiaries.map((code) => ({
-              employeeId: ctx.ids.employees.get(code),
-              decision: 'APPROVE',
-            })),
-          },
-        );
-        return;
-      }
-      await post(ctx, ctx.fixture.approvalRoles.SPENDING_APPROVER, `/access-requests/${request.id}/spend-approval`, {
-        decision: 'APPROVE',
-      });
-      return;
+      return approveSpend(ctx, scenario, request);
     case 'GRANT':
       return grant(ctx, scenario, request, department.itAdmin);
     case 'COMPLETE_TASK':
       return completeGrant(ctx, department.itAdmin, request.id, scenario);
   }
+}
+
+/** The spending approver approves with the checklist of step 1.7: a group line by line (every person it names), a request as a whole. */
+async function approveSpend(ctx: DemoRunContext, scenario: DemoRequestScenario, request: RequestWire) {
+  const approver = ctx.fixture.approvalRoles.SPENDING_APPROVER;
+  const checklist = await checklistOf(ctx, approver, '1.7');
+  if (scenario.beneficiaries) {
+    await post(ctx, approver, `/access-requests/${request.id}/line-spend-decisions`, {
+      lines: scenario.beneficiaries.map((code) => ({ employeeId: ctx.ids.employees.get(code), decision: 'APPROVE' })),
+      checklist,
+    });
+    return;
+  }
+  await post(ctx, approver, `/access-requests/${request.id}/spend-approval`, { decision: 'APPROVE', checklist });
 }
 
 async function decideNeed(ctx: DemoRunContext, scenario: DemoRequestScenario, request: RequestWire, approve: boolean) {
@@ -215,9 +217,10 @@ async function decideNeed(ctx: DemoRunContext, scenario: DemoRequestScenario, re
       `The need step of ${scenario.key} is held by somebody outside the dataset (${assignee ?? 'nobody'})`,
     );
   }
+  const checklist = await checklistOf(ctx, assignee, '1.2');
   const body = approve
-    ? { decision: 'APPROVE' }
-    : { decision: 'REJECT', reason: `${tag(ctx, scenario.key)} Chưa cần trong quý này.` };
+    ? { decision: 'APPROVE', checklist }
+    : { decision: 'REJECT', reason: `${tag(ctx, scenario.key)} Chưa cần trong quý này.`, checklist };
   await post(ctx, assignee, `/access-requests/${request.id}/need-decision`, body);
 }
 
@@ -269,6 +272,28 @@ async function freeKeyId(
   return keys[0]?.id;
 }
 
+/**
+ * What the grant of a K1 seat is completed with besides the evidence (`QĐ-111az`, K1-GR): the two steps of its checklist, the company email first,
+ * ticked a moment ago and in that order. The grant of any other kind takes none. No evidence goes in the checklist: it is sent beside it.
+ */
+export function grantChecklistBody(
+  type: string | null,
+  now: number,
+): { k1Checklist?: { items: { code: string; done: boolean; doneAt: string }[] } } {
+  if (type !== 'K1') return {};
+  const steps = ['COMPANY_EMAIL_REGISTERED', 'NO_PERSONAL_DEVICE_MFA'];
+
+  return {
+    k1Checklist: {
+      items: steps.map((code, index) => ({
+        code,
+        done: true,
+        doneAt: new Date(now - 1000 * (steps.length - index)).toISOString(),
+      })),
+    },
+  };
+}
+
 async function completeGrant(
   ctx: DemoRunContext,
   admin: string | null,
@@ -277,6 +302,7 @@ async function completeGrant(
 ) {
   if (!admin) throw new Error(`No IT Admin of the dataset carries out ${scenario.key}`);
   const email = await as(ctx, admin);
+  const type = planTypeOf(ctx, scenario);
   const tasks = await listAll<TaskRow>(ctx, email, '/provisioning-tasks?scope=ALL');
   const open = tasks.filter(
     (row) => row.requestId === requestId && row.kind === 'GRANT' && ['QUEUED', 'IN_PROGRESS'].includes(row.status),
@@ -288,6 +314,7 @@ async function completeGrant(
     await ctx.api.call(email, 'POST', `/provisioning-tasks/${task.id}/complete`, {
       evidence: `${tag(ctx, scenario.key)} Đã cấp quyền cho người dùng.`,
       ...(licenseKeyId ? { licenseKeyId } : {}),
+      ...grantChecklistBody(type, Date.now()),
     });
   }
 }

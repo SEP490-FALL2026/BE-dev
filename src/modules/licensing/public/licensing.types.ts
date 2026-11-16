@@ -42,11 +42,22 @@ export interface AssignmentView extends AssignmentRecord {
   effectiveFromLabel: string | null;
 }
 
-/** An assignment of a list, with who holds it, which plan it is of and which Cost Center it is charged to. */
+/**
+ * The revocation a seat has: the task that takes it back, which is open (not completed, closed as failed or cancelled), and whether it may be taken
+ * now (`false` while a reason asks for a day not before that has not come). The IT Admin presses "Revoke" only where there is one (`QĐ-111p`).
+ */
+export interface AssignmentRevocation {
+  taskId: string;
+  status: ProvisioningTaskStatus;
+  claimableNow: boolean;
+}
+
+/** An assignment of a list, with who holds it, which plan it is of, which Cost Center it is charged to and the revocation open for it. */
 export interface AssignmentSummaryView extends AssignmentView {
   employee: { employeeId: string; employeeCode: string; fullName: string };
-  plan: { planId: string; planName: string; applicationName: string };
+  plan: { planId: string; planName: string; applicationName: string; logoUrl: string | null };
   costCenter: { id: string; code: string; name: string } | null;
+  revocation: AssignmentRevocation | null;
 }
 
 /** Who holds the seat a request is granted and under which account, with what a service account says besides (`US-05-21`). */
@@ -126,6 +137,8 @@ export interface AssignmentListFilter {
   employeeId?: string;
   source?: AssignmentSource;
   kind?: AssignmentKind;
+  /** Only the rights in force as of this day: not ended, not failed, not cancelled (one that begins later is in force already). */
+  holdingOn?: BusinessDate;
   skip: number;
   take: number;
 }
@@ -291,14 +304,15 @@ export type KeyDisposition = 'RETURN_TO_STORE' | 'WITHDRAW';
 export type AccessState = 'CUT' | 'UNTIL_PAID_END';
 
 /**
- * Which list of steps the IT Admin ticks to complete the revocation of a K1 seat (`QĐ-111az`, `US-07-05` AC-19): the server decides it from why the
- * seat is revoked. `DEPARTURE` is for a person who leaves (the mailbox is reset and locked); `STILL_EMPLOYED` is for any other source, where the
- * person still works and only the renewal is turned off.
+ * Which list of steps the IT Admin ticks to complete a K1 task (`QĐ-111az`, `US-07-01` AC-7, `US-07-05` AC-19): the server decides it. `GRANT` is
+ * the grant of the seat (register on the company email of the person, no multi-factor sign-in on a personal device). The others are for the
+ * revocation, from why the seat is revoked: `DEPARTURE` is for a person who leaves (the mailbox is reset and locked); `STILL_EMPLOYED` is for
+ * any other source, where the person still works and only the renewal is turned off.
  */
-export const K1_CHECKLIST_VARIANTS = ['DEPARTURE', 'STILL_EMPLOYED'] as const;
+export const K1_CHECKLIST_VARIANTS = ['DEPARTURE', 'STILL_EMPLOYED', 'GRANT'] as const;
 export type K1ChecklistVariant = (typeof K1_CHECKLIST_VARIANTS)[number];
 
-/** Every step a K1 revocation checklist can hold; which of them a task has depends on its variant. */
+/** Every step a K1 checklist can hold; which of them a task has depends on its variant. */
 export const K1_CHECKLIST_CODES = [
   'MAILBOX_PASSWORD_RESET',
   'SOFTWARE_FORGOT_PASSWORD',
@@ -306,6 +320,8 @@ export const K1_CHECKLIST_CODES = [
   'RENEWAL_DISABLED',
   'EVIDENCE_RECORDED',
   'MAILBOX_LOCKED',
+  'COMPANY_EMAIL_REGISTERED',
+  'NO_PERSONAL_DEVICE_MFA',
 ] as const;
 export type K1ChecklistCode = (typeof K1_CHECKLIST_CODES)[number];
 
@@ -427,6 +443,13 @@ export interface RevocationCompletedFacts {
    * the money held for the right by such a request is found too (G4-01, G9-02).
    */
   chainAssignmentIds: string[];
+  /**
+   * The day the seat that grant made began (its `valid_from`) and the day it ends (its `expected_end_date`): a request with months of use records
+   * no end date, so the end is the last day it pays for the right and the two give the days its months begin on (R-39); null when no request
+   * granted it, and the end null when the seat has none.
+   */
+  grantedStartDate: BusinessDate | null;
+  grantedEndDate: BusinessDate | null;
   provisioningType: ProvisioningKind;
   /** The day the right ends: it holds the seat on every day before it (`valid_until`). */
   endedOn: BusinessDate | null;
@@ -448,6 +471,9 @@ export interface GrantOutcomeFacts {
   provisioningType: ProvisioningKind;
   grantedOn: BusinessDate;
   assignmentId: string;
+  /** The day the seat began and the day it ends, as they stand once granted; the end is null when the seat has none (see `RevocationCompletedFacts.grantedStartDate`). */
+  effectiveFrom: BusinessDate;
+  expectedEndDate: BusinessDate | null;
 }
 
 /**
@@ -458,6 +484,9 @@ export interface RightChain {
   assignmentId: string;
   grantRequestId: string | null;
   chainAssignmentIds: string[];
+  /** The start and the end of the seat the request's grant made, as in {@link RevocationCompletedFacts.grantedStartDate}. */
+  grantedStartDate: BusinessDate | null;
+  grantedEndDate: BusinessDate | null;
 }
 
 /** The facts of a revocation task its listeners are told. */

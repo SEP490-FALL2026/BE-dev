@@ -300,7 +300,8 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
     it('cancels the task nobody has worked with its assignment: the seat is free, nothing failed (AC-5)', async () => {
       const u = await example();
       const id = await approved(u, 15 * M);
-      const task = await granted(id);
+      // Nobody has worked it: the grant takes the work for whoever presses it, so this is a task put back in the queue after a failure.
+      const task = await h.unclaimed((await granted(id)).id);
       const free = await h.freeSeats(subscriptionId);
       expect(await h.state(id)).toBe('EXECUTING');
 
@@ -468,7 +469,9 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
 
       expect(await cancel(worked.id)).toBe(FINAL);
       expect(await cancel(done.id)).toBe(FINAL);
-      const queued = await granted(await approvedBy(u, await h.staff(u.department, `W-Q${(counter += 1)}`), 5 * M));
+      const queued = await h.unclaimed(
+        (await granted(await approvedBy(u, await h.staff(u.department, `W-Q${(counter += 1)}`), 5 * M))).id,
+      );
       expect(await sqlState(`UPDATE provisioning_tasks SET status = 'CANCELLED' WHERE id = $1`, [queued.id])).toBe(
         CHECK,
       );

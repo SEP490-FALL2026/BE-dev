@@ -1,16 +1,21 @@
 import {
   checkLineNeedDecider,
   compareLines,
+  needChecklistDecisionOf,
+  peopleWithoutReason,
   needLineState,
   needRecordOf,
   needStepOf,
   lineSpendDecidedDetail,
   groupSpendDecidedDetail,
   refusalsWithoutReason,
+  returnReasonOf,
   spendLineState,
   stepOutcomeOf,
   stepRefusalReason,
+  typedReasonOf,
   verdictsOf,
+  withReasons,
   type LineDeciderFacts,
 } from './group-line-decision.policy';
 
@@ -207,5 +212,46 @@ describe('what the audit says of a spend decision taken on the people of a group
         deciderRole: 'SPENDING_APPROVER',
       }),
     ).toMatchObject({ requestState: 'REJECTED', usesReserve: false, reserveReason: null, checkId: null });
+  });
+});
+
+describe('the checklist of the need of a group is one for all its people (US-05-04 AC-22, R-6)', () => {
+  const line = (employeeId: string, decision: 'APPROVE' | 'REJECT' | 'RETURN', reason?: string) => ({
+    employeeId,
+    decision,
+    reason,
+  });
+
+  it('judges the group as approved when anybody goes on, as sent back when everybody is, and as refused otherwise', () => {
+    expect(needChecklistDecisionOf([line('e1', 'APPROVE'), line('e2', 'REJECT', 'x')])).toBe('APPROVE');
+    expect(needChecklistDecisionOf([line('e1', 'RETURN'), line('e2', 'RETURN')])).toBe('RETURN');
+    expect(needChecklistDecisionOf([line('e1', 'REJECT', 'x'), line('e2', 'REJECT')])).toBe('REJECT');
+  });
+
+  it('offers the checklist the reason typed for the group only when every person who is refused or sent back has one', () => {
+    expect(typedReasonOf([line('e1', 'APPROVE'), line('e2', 'REJECT', ' no tool ')])).toBe('no tool');
+    expect(typedReasonOf([line('e1', 'REJECT', 'a'), line('e2', 'RETURN')])).toBeUndefined();
+    expect(typedReasonOf([line('e1', 'APPROVE')])).toBeUndefined();
+  });
+
+  it('gives each person who is refused or sent back the reason they typed, else the one the answers No give', () => {
+    const settled = withReasons([line('e1', 'APPROVE'), line('e2', 'REJECT', 'mine'), line('e3', 'REJECT')], 'auto');
+
+    expect(settled).toEqual([
+      { employeeId: 'e1', decision: 'APPROVE' },
+      { employeeId: 'e2', decision: 'REJECT', reason: 'mine' },
+      { employeeId: 'e3', decision: 'REJECT', reason: 'auto' },
+    ]);
+  });
+
+  it('names the people who are refused or sent back and have no reason once the answers No have filled theirs in', () => {
+    expect(
+      peopleWithoutReason(withReasons([line('e1', 'APPROVE'), line('e2', 'REJECT'), line('e3', 'RETURN', 'x')], null)),
+    ).toEqual(['e2']);
+    expect(peopleWithoutReason(withReasons([line('e1', 'REJECT'), line('e2', 'RETURN')], 'auto'))).toEqual([]);
+  });
+
+  it('keeps on the record of the step the reasons of a group sent back, each once', () => {
+    expect(returnReasonOf([{ reason: 'auto' }, { reason: 'auto' }, { reason: 'mine' }])).toBe('auto; mine');
   });
 });

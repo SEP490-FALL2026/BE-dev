@@ -1,5 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { randomUUID } from 'node:crypto';
+import request from 'supertest';
 import { addDays } from '../../../src/core/business-date';
 import { IdentityAccessApi } from '../../../src/modules/identity-access/public/identity-access.api';
 import { ghostSeatEvidenceJson } from '../../../src/modules/optimization/ghost-seat/ghost-seat-evidence.json';
@@ -171,7 +172,7 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
     expect(JSON.stringify(g3.evidence)).not.toMatch(/tokens|sessions|responses|volume/);
   });
 
-  it('US-10-03 AC-1, AC-5, M5-18: last activity 66 days ago over a window of 91 days is a G4 review of 65 days; 41 days ago is a watch on the board, no recommendation', async () => {
+  it('US-10-03 AC-1, AC-5, M5-18: last activity 66 days ago over a window of 91 days is a G4 review of 65 days; 41 days ago is a watch, a row of the IT Admin alone (G4, MONITOR); the holder active 3 days ago has none', async () => {
     const today = nextToday();
     const w = await world(
       today,
@@ -191,10 +192,52 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
       state: 'OPEN',
       activity_status: 'INACTIVE',
     });
-    // M5-18, FR-4.12: the watch tier is the board's only, never a recommendation.
-    expect(await rowsOf(w.people[1])).toEqual([]);
+    // B3A-01, FR-4.12: the watch tier is a row the IT Admin alone sees; no head is asked about it.
+    expect(await rowsOf(w.people[1])).toEqual([
+      expect.objectContaining({ group: 'G4', tier: 'MONITOR', state: 'OPEN', inactive_days: 40 }),
+    ]);
     expect(await seatState(w.people[1])).toMatchObject({ status: 'INACTIVE', inactive_days: 40 });
     expect(await rowsOf(w.people[2])).toEqual([]);
+  });
+
+  it('B3A-01, FR-4.12, QĐ-111ay: the weekly pass makes a watch a row of the IT Admin alone (G4, MONITOR, open, asked of no head, nobody told) and keeps it when it runs again, so that the IT Admin can push it early from a real pass', async () => {
+    const today = nextToday();
+    const w = await world(today, [{ last: addDays(today, -41) }, { last: addDays(today, -2) }], {
+      from: addDays(today, -91),
+      to: addDays(today, -1),
+    });
+
+    await service().run(new Date());
+
+    const [watch, ...rest] = await rowsOf(w.people[0]);
+    expect(rest).toEqual([]);
+    expect(watch).toMatchObject({ group: 'G4', tier: 'MONITOR', state: 'OPEN', inactive_days: 40 });
+    expect(
+      (
+        await h.ctx.sql.query(`SELECT routed_at, decider_department_id FROM ghost_seat_recommendations WHERE id = $1`, [
+          watch.id,
+        ])
+      ).rows[0],
+    ).toEqual({ routed_at: null, decider_department_id: null });
+    expect(await noticesOf(w.people[0], 'GHOST_SEAT_NEW')).toEqual([]);
+    expect(await rowsOf(w.people[1])).toEqual([]);
+
+    week += 1;
+    pretendBusinessToday(h.ctx.app, addDays(today, 7));
+    await service().run(new Date());
+
+    expect(await rowsOf(w.people[0])).toEqual([
+      expect.objectContaining({ id: watch.id, tier: 'MONITOR', state: 'OPEN' }),
+    ]);
+    const pushed = await request(h.server())
+      .post('/api/v1/ghost-seat-recommendations/escalations')
+      .set(h.as(h.it1))
+      .set('Idempotency-Key', `b3a01-${randomUUID()}`)
+      .send(h.checklists.withYes('5.3', { recommendationIds: [watch.id] }))
+      .expect(201);
+    const [result] = h.dataOf<{ results: { outcome: string; reason: string | null }[] }>(pushed).results;
+    expect(result).toMatchObject({ outcome: 'ESCALATED' });
+    expect((await rowsOf(w.people[0]))[0]).toMatchObject({ id: watch.id, tier: 'REVIEW' });
   });
 
   it('DA6-05: reports of two separate months count only the covered days (20 + 31 = 51, a watch), not the gap', async () => {
@@ -245,8 +288,8 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
 
     await service().run(new Date());
 
-    // M5-18: a watch is the state of the seat only.
-    expect(await rowsOf(person)).toEqual([]);
+    // B3A-01: a watch is a row of the IT Admin alone, as well as the state of the seat.
+    expect(await rowsOf(person)).toEqual([expect.objectContaining({ group: 'G4', tier: 'MONITOR', state: 'OPEN' })]);
     expect(await seatState(person)).toMatchObject({ status: 'INACTIVE', inactive_days: 20 + 31 });
   });
 
@@ -423,8 +466,10 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
 
     await service().run(new Date());
 
-    // M5-18: 80 days under a review threshold of 120 is a watch: on the board, no recommendation.
-    expect(await rowsOf(w.people[0])).toEqual([]);
+    // B3A-01: 80 days under a review threshold of 120 is a watch: a row of the IT Admin alone.
+    expect(await rowsOf(w.people[0])).toEqual([
+      expect.objectContaining({ group: 'G4', tier: 'MONITOR', state: 'OPEN' }),
+    ]);
     expect(await seatState(w.people[0])).toMatchObject({ status: 'INACTIVE', inactive_days: 80 });
   });
 
@@ -462,15 +507,16 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
     expect(await noticesOf(w.people[0], 'GHOST_SEAT_NEW')).toEqual([]);
   });
 
-  it('M5-18, FR-4.12: a seat that was a watch on the board becomes a review recommendation once it rises a tier', async () => {
+  it('M5-18, FR-4.12, B3A-01: a seat that was a watch (a MONITOR row of the IT Admin) rises to a review in the same row, and only then is a head asked', async () => {
     const today = nextToday();
     const w = await world(today, [{ last: addDays(today, -41) }, { last: addDays(today, -2) }], {
       from: addDays(today, -91),
       to: addDays(today, -1),
     });
     await service().run(new Date());
-    // M5-18: the watch is the board's only; the review it rises to is the first recommendation of the seat.
-    expect(await rowsOf(w.people[0])).toEqual([]);
+    // B3A-01: the watch is a row of the IT Admin alone; the review it rises to is the same row, and the first a head is asked about.
+    const [watched] = await rowsOf(w.people[0]);
+    expect(watched).toMatchObject({ tier: 'MONITOR', state: 'OPEN' });
 
     // Four weeks on, with a newer report that adds no activity, the same seat has 68 days: the watch rises to review in the same row.
     const later = addDays(today, 28);
@@ -492,7 +538,7 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
 
     const rows = await rowsOf(w.people[0]);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ tier: 'REVIEW', group: 'G4' });
+    expect(rows[0]).toMatchObject({ id: watched.id, tier: 'REVIEW', group: 'G4' });
     expect(rows[0].inactive_days).toBeGreaterThanOrEqual(60);
   });
 
@@ -590,28 +636,6 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
     await service().run(new Date());
 
     expect(await rowsOf(w.people[0])).toEqual([expect.objectContaining({ id: denied, close_reason: 'NEGATED' })]);
-  });
-
-  it('M5-18, FR-4.12: a watch made before is closed OUT_OF_SCOPE by the next pass and holds no place at gate 8', async () => {
-    const today = nextToday();
-    const w = await world(today, [{ last: addDays(today, -41) }, { last: addDays(today, -2) }], {
-      from: addDays(today, -91),
-      to: addDays(today, -1),
-    });
-    const watch = await seedOn(w.people[0], 'G4');
-    // The watch was made from the last day the report shows (41 days ago): no later day of activity denies it (NEGATED), whatever today is.
-    // The denial reads the column `last_active_date`, the evidence only shows it: both are written.
-    await h.ctx.sql.query(
-      `UPDATE ghost_seat_recommendations
-          SET evidence = jsonb_set(evidence, '{lastActiveDate}', to_jsonb($2::text)), last_active_date = $2::date
-        WHERE id = $1`,
-      [watch, addDays(today, -41)],
-    );
-
-    await service().run(new Date());
-
-    expect((await rowsOf(w.people[0]))[0]).toMatchObject({ id: watch, state: 'CLOSED', close_reason: 'OUT_OF_SCOPE' });
-    expect(await rowsOf(w.people[0])).toHaveLength(1);
   });
 
   it('US-10-04 AC-5, Q-92: the confirmation of a report with activity after the last day closes an undecided G4 NEGATED at once, with no notice; a decided reclaim stays and is flagged', async () => {

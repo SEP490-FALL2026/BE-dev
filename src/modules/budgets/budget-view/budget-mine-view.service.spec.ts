@@ -7,22 +7,12 @@ function setup() {
   const versions = { reference: jest.fn().mockResolvedValue(current), latestOf: jest.fn().mockResolvedValue(null) };
   const cycle = {
     currency: 'VND',
-    publishedAt: new Date(),
+    openedAt: new Date('2026-11-01T00:00:00Z') as Date | null,
     submissionDeadline: '2026-12-01',
     decisionDeadline: '2026-12-15',
-    ceilings: [
-      {
-        departmentId: 'department',
-        // AF-16: Finance edits the ceiling to 120 after publishing 100; the head reads the published 100.
-        totalMinor: 120n,
-        publishedTotalMinor: 100n,
-        signedCommitmentsMinor: 20n,
-        plannedSeatsMinor: 70n,
-        priorityMinor: 10n,
-      },
-    ],
   };
   const numbers = {
+    adjustmentOf: jest.fn().mockResolvedValue(0n),
     totals: jest
       .fn()
       .mockResolvedValue(
@@ -42,10 +32,8 @@ function setup() {
   };
   const service = new BudgetViewService(
     versions as never,
-    {} as never,
     { chainOf: jest.fn().mockResolvedValue([]) } as never,
     numbers as never,
-    {} as never,
     {} as never,
     facts as never,
     {} as never,
@@ -68,31 +56,29 @@ describe('BR-MF4-05 budgetMine selection and visibility', () => {
       pendingSpend: format(30n),
       remainingBase: format(40n),
       remainingWithReserve: format(60n),
-      departmentCeiling: {
-        total: format(100n),
-        signedCommitments: format(20n),
-        plannedSeats: format(70n),
-        priority: format(10n),
-      },
     });
+    expect(wire).not.toHaveProperty('departmentCeiling');
     expect(wire).not.toHaveProperty('annualCeiling');
     expect(wire).not.toHaveProperty('sharedPoolReserve');
   });
 
-  it('BR-MF4-01 hides an unpublished division while retaining both deadlines', async () => {
-    const { service, numbers, cycle } = setup();
-    numbers.cycle.mockResolvedValue({ ...cycle, publishedAt: null });
+  it.each([
+    ['a draft', null, '2026-11-09', 'DRAFT'],
+    ['open through the day of the submission deadline', new Date('2026-11-01T00:00:00Z'), '2026-12-01', 'OPEN'],
+    ['locked the day after it', new Date('2026-11-01T00:00:00Z'), '2026-12-02', 'LOCKED'],
+  ] as const)('QĐ-111z gives both deadlines and the state of the cycle: %s', async (_name, openedAt, today, status) => {
+    const { service, numbers, cycle, facts } = setup();
+    numbers.cycle.mockResolvedValue({ ...cycle, openedAt });
+    facts.today.mockResolvedValue(today);
     const wire = await service.mine(actor, 2027);
-    expect(wire.departmentCeiling).toBeNull();
-    expect(wire.cycle).toEqual({ submissionDeadline: '2026-12-01', decisionDeadline: '2026-12-15', published: false });
+    expect(wire.cycle).toEqual({ submissionDeadline: '2026-12-01', decisionDeadline: '2026-12-15', status });
   });
 
-  it('BR-MF4-01 gives no cycle and no department ceiling when there is no cycle', async () => {
+  it('gives no cycle when there is none', async () => {
     const { service, numbers } = setup();
     numbers.cycle.mockResolvedValue(null);
     const wire = await service.mine(actor, 2027);
     expect(wire.cycle).toBeNull();
-    expect(wire.departmentCeiling).toBeNull();
   });
 
   it('preserves held and spent figures without an active budget', async () => {

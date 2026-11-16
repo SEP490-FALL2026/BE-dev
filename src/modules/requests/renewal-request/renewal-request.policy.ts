@@ -92,7 +92,10 @@ export function renewalWindowOf(facts: { today: BusinessDate; previousEnd: Busin
   return { open: facts.today >= opensOn, opensOn };
 }
 
-/** The new end asked for fits (`QĐ-108a`): after the end the right has, and not after `maxEnd` (twelve months after it). */
-export function newEndFits(facts: { previousEnd: BusinessDate; newEnd: BusinessDate; maxEnd: BusinessDate }): boolean {
-  return facts.newEnd > facts.previousEnd && facts.newEnd <= facts.maxEnd;
+/**
+ * The time of use a renewal asks for, in months (`QĐ-111l`, `QĐ-111i`): the months the holder gave, or none for a right to go on with no end
+ * (_Dùng lâu dài_). The kind of the plan and the person say whether that is allowed (`checkTermMonths`).
+ */
+export function renewalTermMonthsOf(body: { extensionMonths?: number; longTerm?: true }): number | null {
+  return body.longTerm === true ? null : (body.extensionMonths ?? null);
 }

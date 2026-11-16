@@ -1,0 +1,318 @@
+import request from 'supertest';
+import { addDays, type BusinessDate } from '../../../src/core/business-date';
+import { nthWorkingDayFrom } from '../../../src/core/working-days';
+import { BudgetReviewExplanationReminderService } from '../../../src/modules/budgets/review/budget-review-explanation-reminder.service';
+import { OperatingParametersApi } from '../../../src/modules/operating-parameters/public/operating-parameters.api';
+import { InvoiceHarness } from '../../support/invoice-harness';
+import { pretendBusinessToday } from '../../support/pretend-today';
+import type { Unit } from '../../support/spend-harness';
+
+const h = new InvoiceHarness();
+const M = 1_000_000;
+
+interface LineWire {
+  costCenter: { id: string } | null;
+  light: string;
+  explanationStatus: string;
+  explanation: {
+    cause: string;
+    persistence: string;
+    action: string;
+    knownNeedsToYearEnd: { amount: { amount: string } | null; note: string };
+  } | null;
+}
+interface PeriodWire {
+  id: string;
+  kind: string;
+  state: string;
+  explanationsDueOn: string | null;
+}
+interface DetailWire {
+  period: PeriodWire;
+  items: LineWire[];
+}
+
+/**
+ * The explanations of a quarterly review (`RV-3`, `QĐ-111ah`, R-10, R-17, B-7): the quarter opens waiting for the explanations of its yellow, red and under Cost Centers, with the
+ * fifth working day as the due day; only the head of the department of the Cost Center explains, and only a line that was asked; the head is reminded on the due day and every
+ * Monday after it, once each day; Finance signs whenever it wants and what nobody answered is UNEXPLAINED; a department that had no head when the quarter opened is NO_HEAD from the
+ * start (RV3-04, AC-12): nobody is asked, nobody is reminded, the quarter does not wait for it, and a head named later does not change it; a signed quarter takes no explanation, and the
+ * database refuses to move an explanation of a period that does not wait for it.
+ */
+describe('the heads of departments explain a quarterly review and Finance signs it (integration; RV-3)', () => {
+  let answering: Unit;
+  let green: Unit;
+  let headless: Unit;
+  let leaving: Unit;
+  let silent: Unit;
+  let other: Unit;
+  let vendorId: string;
+  let today: BusinessDate;
+  let quarter: PeriodWire;
+  const costCenterOf = (unit: Unit): string => unit.department.unitId;
+  const explaining = (
+    unit: Unit,
+    asHeadOf: Unit = unit,
+    body: Record<string, unknown> = {},
+    periodId: string = quarter.id,
+  ) =>
+    request(h.server())
+      .put(`/api/v1/budget-review-periods/${periodId}/lines/${costCenterOf(unit)}/explanation`)
+      .set(h.as(asHeadOf.head.account))
+      .send({
+        cause: 'Licences bought early for the new team',
+        persistence: 'ONE_OFF',
+        action: 'No further purchase this quarter',
+        knownNeedsToYearEnd: { amount: h.money(5 * M), note: 'Two more seats in the autumn' },
+        ...body,
+      });
+  const detail = async (periodId: string = quarter.id): Promise<DetailWire> =>
+    h.dataOf<DetailWire>(
+      await request(h.server())
+        .get(`/api/v1/budget-review-periods/${periodId}`)
+        .query({ pageSize: 100 })
+        .set(h.as(h.finance))
+        .expect(200),
+    );
+  const lineOf = async (unit: Unit, periodId?: string): Promise<LineWire> =>
+    (await detail(periodId)).items.find((line) => line.costCenter?.id === costCenterOf(unit)) as LineWire;
+  const reminder = () => h.ctx.app.get(BudgetReviewExplanationReminderService, { strict: false });
+  const noticesTo = async (unit: Unit): Promise<string[]> =>
+    (
+      await h.ctx.sql.query<{ event_key: string }>(
+        `SELECT event_key FROM in_app_notifications
+          WHERE code = 'BUDGET_REVIEW_EXPLANATION_DUE' AND recipient_employee_id = $1 ORDER BY event_key`,
+        [unit.head.employeeId],
+      )
+    ).rows.map((row) => row.event_key);
+  const requestsTo = async (unit: Unit): Promise<Array<{ key: string; params: Record<string, unknown> }>> =>
+    (
+      await h.ctx.sql.query<{ event_key: string; params: Record<string, unknown> }>(
+        `SELECT event_key, params FROM in_app_notifications
+          WHERE code = 'BUDGET_REVIEW_EXPLANATION_REQUESTED' AND recipient_employee_id = $1 ORDER BY event_key`,
+        [unit.head.employeeId],
+      )
+    ).rows.map((row) => ({ key: row.event_key, params: row.params }));
+  /** A department with a budget of 100 tr, and an invoice of `spentTr` for February: yellow at the close of March (the pace is far over 110 percent). */
+  const department = async (code: string, spentTr: number): Promise<Unit> => {
+    const unit = await h.departmentWithHead(code);
+    await h.ctx.sql.query(`UPDATE budget_cycles SET annual_ceiling_minor = 1000000000000 WHERE year = $1`, [h.year]);
+    await h.budgetFor(unit, { total: 100 * M });
+    if (spentTr > 0) {
+      await h.recordPurchase(vendorId, {
+        chargedCostCenterId: costCenterOf(unit),
+        netMinor: BigInt(spentTr * M),
+        issuedOn: `${h.year}-02-10`,
+        serviceMonth: `${h.year}-02-01`,
+      });
+    }
+
+    return unit;
+  };
+
+  beforeAll(async () => {
+    await h.start();
+    await h.withApprover();
+    vendorId = (await h.vendorOf(await h.planOf(await h.subscription(10)))).id;
+    answering = await department('P-RV3A', 90);
+    green = await department('P-RV3G', 0);
+    headless = await department('P-RV3N', 90);
+    silent = await department('P-RV3S', 90);
+    other = await department('P-RV3O', 0);
+    leaving = await department('P-RV3L', 90);
+    // The department of P-RV3N has no head when the quarter opens (US-12-21 AC-12): its head is gone before the close.
+    await h.ctx.sql.query(
+      `UPDATE department_head_periods SET valid_to = $2::date WHERE department_id = $1 AND valid_to IS NULL`,
+      [headless.department.id, `${h.year}-12-31`],
+    );
+    // After the year: every month of it has ended, and the heads named today are heads on that day.
+    today = `${h.year + 1}-01-10`;
+    pretendBusinessToday(h.ctx.app, today);
+    quarter = h.dataOf<PeriodWire>(
+      await request(h.server())
+        .post('/api/v1/budget-review-periods')
+        .set(h.as(h.finance))
+        .send({ year: h.year, month: 3 })
+        .expect(201),
+    );
+  }, 300000);
+
+  afterAll(async () => {
+    jest.restoreAllMocks();
+    await h.stop();
+  });
+
+  it('the quarter opens waiting for explanations, due on the fifth working day from the close, and asks only the yellow, red and under Cost Centers', async () => {
+    const nonWorking = await h.ctx.app
+      .get(OperatingParametersApi, { strict: false })
+      .getNonWorkingDates(today, addDays(today, 30));
+    const read = await detail();
+
+    expect(quarter).toMatchObject({ kind: 'QUARTER', state: 'AWAITING_EXPLANATIONS' });
+    expect(read.period.explanationsDueOn).toBe(nthWorkingDayFrom(today, 5, nonWorking));
+    expect(await lineOf(answering)).toMatchObject({ light: 'YELLOW', explanationStatus: 'PENDING', explanation: null });
+    expect(await lineOf(green)).toMatchObject({ light: 'GREEN', explanationStatus: 'NOT_REQUIRED' });
+    // RV3-04: the department with no head at the close is not waited for: its line is NO_HEAD at once, not PENDING.
+    expect(await lineOf(headless)).toMatchObject({ light: 'YELLOW', explanationStatus: 'NO_HEAD', explanation: null });
+    expect(await lineOf(leaving)).toMatchObject({ explanationStatus: 'PENDING' });
+    expect(await requestsTo(headless)).toEqual([]);
+  }, 120000);
+
+  it('RV3-01 (US-12-21 AC-4): the quarter that opens asks the head of each yellow, red and under Cost Center at once, with the due day, and nobody else', async () => {
+    const dueOn = (await detail()).period.explanationsDueOn as BusinessDate;
+
+    for (const unit of [answering, silent]) {
+      expect(await requestsTo(unit)).toEqual([
+        {
+          key: `review:${quarter.id}:${costCenterOf(unit)}:open`,
+          params: {
+            periodId: quarter.id,
+            costCenterId: costCenterOf(unit),
+            year: h.year,
+            month: 3,
+            dueOn,
+            light: 'YELLOW',
+          },
+        },
+      ]);
+    }
+    // A green Cost Center is not asked, and the head of a department who has no Cost Center in the picture is told nothing.
+    expect(await requestsTo(green)).toEqual([]);
+    expect(await requestsTo(other)).toEqual([]);
+  }, 120000);
+
+  it('only the head of the department of the Cost Center explains: the head of another department and Finance get 403', async () => {
+    const other403 = await explaining(answering, other).expect(403);
+    expect((other403.body as { error: { code: string } }).error.code).toBe('BUDGET.NOT_YOUR_COST_CENTER');
+    await request(h.server())
+      .put(`/api/v1/budget-review-periods/${quarter.id}/lines/${costCenterOf(answering)}/explanation`)
+      .set(h.as(h.finance))
+      .send({ cause: 'x', persistence: 'ONE_OFF', action: 'y', knownNeedsToYearEnd: { note: 'z' } })
+      .expect(403);
+    expect((await lineOf(answering)).explanationStatus).toBe('PENDING');
+  }, 120000);
+
+  it('the head explains a line that was asked, and may write it again until Finance signs; a green line takes none', async () => {
+    const done = h.dataOf<{ explanationStatus: string; explanation: LineWire['explanation'] }>(
+      await explaining(answering).expect(200),
+    );
+    expect(done.explanationStatus).toBe('EXPLAINED');
+    expect(done.explanation).toMatchObject({
+      cause: 'Licences bought early for the new team',
+      persistence: 'ONE_OFF',
+      knownNeedsToYearEnd: { amount: { amount: String(5 * M) }, note: 'Two more seats in the autumn' },
+    });
+    // RV3-03 (US-12-21 AC-5): the need to the end of the year is one of the four things the head says, and nothing (0) is an answer.
+    await explaining(answering, answering, {
+      persistence: 'ONGOING',
+      knownNeedsToYearEnd: { amount: h.money(0), note: 'Nothing known yet' },
+    }).expect(200);
+    expect(await lineOf(answering)).toMatchObject({
+      explanationStatus: 'EXPLAINED',
+      explanation: {
+        persistence: 'ONGOING',
+        knownNeedsToYearEnd: { amount: { amount: '0' }, note: 'Nothing known yet' },
+      },
+    });
+    const noAmount = await explaining(answering, answering, {
+      knownNeedsToYearEnd: { note: 'No figure given' },
+    }).expect(422);
+    expect((noAmount.body as { error: { code: string } }).error.code).toBe('VALIDATION_ERROR');
+    await explaining(answering, answering, {
+      knownNeedsToYearEnd: { amount: { amount: '-5' }, note: 'Below nothing' },
+    }).expect(422);
+    // A refused explanation changes nothing: the one before it stands.
+    expect(await lineOf(answering)).toMatchObject({
+      explanation: { knownNeedsToYearEnd: { amount: { amount: '0' }, note: 'Nothing known yet' } },
+    });
+    await expect(
+      h.ctx.sql.query(
+        `UPDATE budget_review_lines SET explanation_needs_amount_minor = NULL WHERE period_id = $1 AND cost_center_id = $2`,
+        [quarter.id, costCenterOf(answering)],
+      ),
+    ).rejects.toThrow(/budget_review_lines_explanation_amount_check/);
+    const notAsked = await explaining(green).expect(422);
+    expect((notAsked.body as { error: { code: string } }).error.code).toBe('BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED');
+    await explaining(answering, answering, { cause: '' }).expect(422);
+  }, 120000);
+
+  it('B-7: the head who has not explained is reminded on the due day and then every Monday, once each day, and nobody before the due day', async () => {
+    // A head is named for the department that had none when the quarter opened, and the head of another leaves: neither changes who was asked (RV3-04).
+    await h.ctx.sql.query(`UPDATE department_head_periods SET valid_to = NULL WHERE department_id = $1`, [
+      headless.department.id,
+    ]);
+    await h.ctx.sql.query(
+      `UPDATE department_head_periods SET valid_to = $2::date WHERE department_id = $1 AND valid_to IS NULL`,
+      [leaving.department.id, `${h.year}-12-31`],
+    );
+    // The line of a department that had no head is not one that was asked: the head named since cannot explain it.
+    expect(((await explaining(headless).expect(422)).body as { error: { code: string } }).error.code).toBe(
+      'BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED',
+    );
+    const dueOn = (await detail()).period.explanationsDueOn as BusinessDate;
+    let monday = addDays(dueOn, 1);
+    while (new Date(`${monday}T00:00:00Z`).getUTCDay() !== 1) monday = addDays(monday, 1);
+    const key = (day: string) => `review:${quarter.id}:${costCenterOf(silent)}:${day}`;
+
+    expect(await reminder().remind(addDays(dueOn, -1))).toBe(0);
+    expect(await reminder().remind(dueOn)).toBe(1);
+    expect(await reminder().remind(dueOn)).toBe(0);
+    expect(await reminder().remind(addDays(dueOn, 1) === monday ? addDays(dueOn, 2) : addDays(dueOn, 1))).toBe(0);
+    expect(await reminder().remind(monday)).toBe(1);
+    expect(await noticesTo(silent)).toEqual([key(dueOn), key(monday)].sort());
+    // The head who explained is never reminded; the head named after the close of a department that had none was never asked, and the head who left has nobody behind them to remind.
+    expect(await noticesTo(answering)).toEqual([]);
+    expect(await noticesTo(headless)).toEqual([]);
+    expect(await noticesTo(leaving)).toEqual([]);
+  }, 120000);
+
+  it('R-10, R-17, RV3-04: Finance signs with a department that did not answer, and the line says UNEXPLAINED (its head was asked, even one who left since); a department that had no head at the close stays NO_HEAD, even with a head named since; a signed quarter takes nothing', async () => {
+    await request(h.server())
+      .post(`/api/v1/budget-review-periods/${quarter.id}/signature`)
+      .set(h.as(h.finance))
+      .send({})
+      .expect(200);
+    const signed = await detail();
+
+    expect(signed.period.state).toBe('SIGNED');
+    expect(await lineOf(answering)).toMatchObject({ explanationStatus: 'EXPLAINED' });
+    expect(await lineOf(green)).toMatchObject({ explanationStatus: 'NOT_REQUIRED' });
+    expect(await lineOf(silent)).toMatchObject({ explanationStatus: 'UNEXPLAINED' });
+    expect(await lineOf(headless)).toMatchObject({ explanationStatus: 'NO_HEAD' });
+    expect(await lineOf(leaving)).toMatchObject({ explanationStatus: 'UNEXPLAINED' });
+    const late = await explaining(silent).expect(409);
+    expect((late.body as { error: { code: string } }).error.code).toBe('BUDGET_REVIEW.NOT_AWAITING_EXPLANATIONS');
+    expect(await reminder().remind(addDays(signed.period.explanationsDueOn as BusinessDate, 7))).toBe(0);
+  }, 120000);
+
+  it('a month has no explanations, and the database refuses to move an explanation of a period that does not wait for one', async () => {
+    const month = h.dataOf<PeriodWire>(
+      await request(h.server())
+        .post('/api/v1/budget-review-periods')
+        .set(h.as(h.finance))
+        .send({ year: h.year, month: 4 })
+        .expect(201),
+    );
+    expect(month).toMatchObject({ kind: 'MONTH', state: 'SNAPSHOT', explanationsDueOn: null });
+    expect((await lineOf(silent, month.id)).explanationStatus).toBe('NOT_REQUIRED');
+    expect(
+      ((await explaining(silent, silent, {}, month.id).expect(409)).body as { error: { code: string } }).error.code,
+    ).toBe('BUDGET_REVIEW.NOT_AWAITING_EXPLANATIONS');
+    await expect(
+      h.ctx.sql.query(
+        `UPDATE budget_review_lines SET explanation_status = 'PENDING' WHERE period_id = $1 AND cost_center_id = $2`,
+        [month.id, costCenterOf(silent)],
+      ),
+    ).rejects.toThrow(/waits for explanations/);
+    await expect(
+      h.ctx.sql.query(
+        `UPDATE budget_review_lines SET explanation_cause = 'late' WHERE period_id = $1 AND cost_center_id = $2`,
+        [quarter.id, costCenterOf(answering)],
+      ),
+    ).rejects.toThrow(/waits for explanations/);
+    // The figures of the picture still never move.
+    await expect(
+      h.ctx.sql.query(`UPDATE budget_review_lines SET spent_minor = 0 WHERE period_id = $1`, [quarter.id]),
+    ).rejects.toThrow(/never change/);
+  }, 120000);
+});

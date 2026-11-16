@@ -20,7 +20,8 @@ export class PlanNotFoundError extends Error {
 }
 
 export class PlanNameTakenError extends Error {
-  constructor() {
+  /** `existing` is the plan of the application that has the name, when it could be read (`QĐ-111b`). */
+  constructor(readonly existing: { id: string; name: string; provisioningType: string } | null = null) {
     super('The application already has a plan with this name.');
     this.name = 'PlanNameTakenError';
   }
@@ -58,6 +59,14 @@ export class PlanPricingModelRequiredError extends Error {
   constructor() {
     super('A plan of kind K1, K2 or K4 names its pricing model.');
     this.name = 'PlanPricingModelRequiredError';
+  }
+}
+
+/** A pricing model that is sent is the one the kind of provisioning implies (`B-5`): the system works it out, the IT Admin is not asked. */
+export class PlanPricingModelNotDerivedError extends Error {
+  constructor(readonly expected: 'PER_SEAT' | null) {
+    super('The pricing model follows the kind of provisioning: leave it out, or send the one the kind implies.');
+    this.name = 'PlanPricingModelNotDerivedError';
   }
 }
 
@@ -165,7 +174,13 @@ export class PlanTermsBlockTypeChangeError extends Error {
 }
 
 /** What the database found on the plan that the change would leave invalid (`plans_keep_children_valid`). */
-export type PlanChangeBlock = 'ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY' | 'LICENSE_KEYS' | 'SUBSCRIPTIONS';
+export type PlanChangeBlock =
+  | 'ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY'
+  | 'LICENSE_KEYS'
+  | 'PERPETUAL_SUBSCRIPTIONS'
+  | 'TERM_SUBSCRIPTIONS'
+  | 'CONTRACT_LINKS'
+  | 'SUBSCRIPTIONS';
 
 export class PlanInUseBlocksChangeError extends Error {
   constructor(readonly reason: PlanChangeBlock) {
