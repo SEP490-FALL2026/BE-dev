@@ -353,6 +353,17 @@ export class BudgetReviewRepo {
     return rows.map((row) => row.costCenterId);
   }
 
+  /** The Cost Centers of the period that were asked and have not answered, with their light, in order of id: who is asked the day the quarter opens. */
+  async pendingLines(tx: DbTx, periodId: string): Promise<Array<{ costCenterId: string; light: ReviewLight }>> {
+    const rows = await tx.budgetReviewLine.findMany({
+      where: { periodId, explanationStatus: 'PENDING' },
+      select: { costCenterId: true, light: true },
+      orderBy: { costCenterId: 'asc' },
+    });
+
+    return rows.map((row) => ({ costCenterId: row.costCenterId, light: row.light as ReviewLight }));
+  }
+
   /** What the lines still waiting become when Finance signs: `UNEXPLAINED` for the Cost Centers whose department has a head, `NO_HEAD` for the others (R-10, R-17). */
   async closePending(tx: DbTx, periodId: string, noHead: readonly string[]): Promise<void> {
     await tx.budgetReviewLine.updateMany({

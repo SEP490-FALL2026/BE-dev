@@ -83,6 +83,14 @@ describe('the heads of departments explain a quarterly review and Finance signs 
         [unit.head.employeeId],
       )
     ).rows.map((row) => row.event_key);
+  const requestsTo = async (unit: Unit): Promise<Array<{ key: string; params: Record<string, unknown> }>> =>
+    (
+      await h.ctx.sql.query<{ event_key: string; params: Record<string, unknown> }>(
+        `SELECT event_key, params FROM in_app_notifications
+          WHERE code = 'BUDGET_REVIEW_EXPLANATION_REQUESTED' AND recipient_employee_id = $1 ORDER BY event_key`,
+        [unit.head.employeeId],
+      )
+    ).rows.map((row) => ({ key: row.event_key, params: row.params }));
   /** A department with a budget of 100 tr, and an invoice of `spentTr` for February: yellow at the close of March (the pace is far over 110 percent). */
   const department = async (code: string, spentTr: number): Promise<Unit> => {
     const unit = await h.departmentWithHead(code);
@@ -136,6 +144,29 @@ describe('the heads of departments explain a quarterly review and Finance signs 
     expect(read.period.explanationsDueOn).toBe(nthWorkingDayFrom(today, 5, nonWorking));
     expect(await lineOf(answering)).toMatchObject({ light: 'YELLOW', explanationStatus: 'PENDING', explanation: null });
     expect(await lineOf(green)).toMatchObject({ light: 'GREEN', explanationStatus: 'NOT_REQUIRED' });
+  }, 120000);
+
+  it('RV3-01 (US-12-21 AC-4): the quarter that opens asks the head of each yellow, red and under Cost Center at once, with the due day, and nobody else', async () => {
+    const dueOn = (await detail()).period.explanationsDueOn as BusinessDate;
+
+    for (const unit of [answering, silent]) {
+      expect(await requestsTo(unit)).toEqual([
+        {
+          key: `review:${quarter.id}:${costCenterOf(unit)}:open`,
+          params: {
+            periodId: quarter.id,
+            costCenterId: costCenterOf(unit),
+            year: h.year,
+            month: 3,
+            dueOn,
+            light: 'YELLOW',
+          },
+        },
+      ]);
+    }
+    // A green Cost Center is not asked, and the head of a department who has no Cost Center in the picture is told nothing.
+    expect(await requestsTo(green)).toEqual([]);
+    expect(await requestsTo(other)).toEqual([]);
   }, 120000);
 
   it('only the head of the department of the Cost Center explains: the head of another department and Finance get 403', async () => {

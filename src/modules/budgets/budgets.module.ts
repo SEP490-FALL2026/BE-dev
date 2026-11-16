@@ -98,6 +98,7 @@ import { BudgetReviewFiguresService } from './review/budget-review-figures.servi
 import { BudgetReviewExplanationController } from './review/budget-review-explanation.controller';
 import { BudgetReviewExplanationReminderService } from './review/budget-review-explanation-reminder.service';
 import { BudgetReviewExplanationService } from './review/budget-review-explanation.service';
+import { BudgetReviewPeriodWriterService } from './review/budget-review-period-writer.service';
 import { BudgetReviewPoolWatchService } from './review/budget-review-pool-watch.service';
 import { BudgetReviewPriceService } from './review/budget-review-price.service';
 import { BudgetReviewQueryService } from './review/budget-review-query.service';
@@ -223,6 +224,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BudgetReviewExplanationService,
     BudgetReviewExplanationReminderService,
     BudgetReviewQueryService,
+    BudgetReviewPeriodWriterService,
     BudgetReviewSnapshotService,
     BudgetReviewSignatureService,
     BudgetReviewReminderService,

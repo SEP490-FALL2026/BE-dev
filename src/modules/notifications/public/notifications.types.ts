@@ -134,6 +134,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_THRESHOLD_REACHED',
   // The head of a department is reminded to explain a Cost Center of a quarterly review (`QĐ-111ah`, B-7): on the due day and every Monday until they explain or Finance signs; the period, the Cost Center and the due day, never a figure.
   'BUDGET_REVIEW_EXPLANATION_DUE',
+  // The head of a department is asked to explain a Cost Center of a quarterly review the day Finance closes the quarter (`QĐ-111ah`, US-12-21 AC-4): the period, the Cost Center, the due day and the light, never a figure.
+  'BUDGET_REVIEW_EXPLANATION_REQUESTED',
   // An adjustment of the budget in the year (`QĐ-111ag`): the spending approver is asked to decide it; Finance who made it and the head of each Cost Center it concerns are told how it was decided. The id, the year and the kind, never a figure.
   'BUDGET_ADJUSTMENT_REQUESTED',
   'BUDGET_ADJUSTMENT_DECIDED',
