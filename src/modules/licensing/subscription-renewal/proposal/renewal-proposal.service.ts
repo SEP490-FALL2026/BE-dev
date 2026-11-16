@@ -13,7 +13,12 @@ import type { RankedSeat } from '../subscription-renewal-ranking.policy';
 import { RenewalRankingService } from '../subscription-renewal-ranking.service';
 import { RenewalError } from '../subscription-renewal.errors';
 import { SubscriptionRenewalRepo } from '../subscription-renewal.repo';
-import type { ReleasedSeat, RenewalChoice, RenewalRecord } from '../subscription-renewal.types';
+import {
+  isOwnedPeriod,
+  type ReleasedSeat,
+  type RenewalChoice,
+  type RenewalRecord,
+} from '../subscription-renewal.types';
 import { checkProposable, checkProposedQuantity, milestoneOf } from './renewal-proposal.policy';
 
 export interface ProposeRenewalInput {
@@ -50,7 +55,7 @@ export class RenewalProposalService {
   /** Throws RenewalError (`NOT_FOUND`, `NOT_RENEWABLE`, `CONTRACT_DATA_INCOMPLETE`, `QUANTITY_INVALID`, `EXCESS_SELECTION_INVALID`, `ALREADY_PROPOSED`, `PROPOSER_IS_OWNER_HEAD`). */
   async propose(actor: AuthenticatedPrincipal, input: ProposeRenewalInput): Promise<RenewalRecord> {
     const [period] = await this.periods.getPeriods([input.subscriptionId]);
-    if (!period) throw new RenewalError('NOT_FOUND');
+    if (!isOwnedPeriod(period)) throw new RenewalError('NOT_FOUND');
     const problem =
       checkProposable(period) ??
       checkProposedQuantity(input.choice, input.proposedQuantity ?? null, period.purchasedQuantity);

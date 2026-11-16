@@ -46,10 +46,15 @@ export class SubscriptionRenewalSweepService {
     const today = await this.organizationReads.businessToday(now);
     const value = await this.parameters.getValue('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE');
     const daysBefore = Array.isArray(value) ? value.filter((day): day is number => typeof day === 'number') : [];
-    const subjects = await this.periods.listRenewalSubjects({
-      from: addDays(today, -LOOKBACK_DAYS),
-      to: addDays(today, Math.max(0, ...daysBefore)),
-    });
+    // Until the sweep reads the point of adjustment itself (S20-T6): the K2 periods a department owns, whose milestone falls in the
+    // window or has no date at all, as the milestone-window read gave before the shared pool's subscriptions came into the facts.
+    const from = addDays(today, -LOOKBACK_DAYS);
+    const to = addDays(today, Math.max(0, ...daysBefore));
+    const subjects = (await this.periods.listAdjustmentSubjects()).filter(
+      (period) =>
+        period.ownerDepartmentId !== null &&
+        (period.notice.baseDate === null || (period.notice.baseDate >= from && period.notice.baseDate <= to)),
+    );
     if (subjects.length === 0) return result;
     const ids = subjects.map((period) => period.subscriptionId);
     const renewals = await this.repo.ofSubscriptions(ids);

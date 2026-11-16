@@ -1,5 +1,15 @@
 import type { BusinessDate } from '../../../core/business-date';
+import type { RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import type { RenewalFinancialSnapshot } from '../public/licensing-subscription-renewal.types';
+
+/**
+ * A period a department owns. The renewal of the shared pool's subscriptions (no owner department) is rewritten by S20-T3/T4; until then the
+ * routes that need an owner department read only these, as they always have.
+ */
+export type OwnedPeriod = RenewalPeriodFacts & { ownerDepartmentId: string };
+
+export const isOwnedPeriod = (period: RenewalPeriodFacts | undefined): period is OwnedPeriod =>
+  period !== undefined && period.ownerDepartmentId !== null;
 
 export type RenewalChoice = 'RENEW' | 'REDUCE' | 'CANCEL' | 'INCREASE';
 /** `STALE`: a proposal closed because it was out of date when the head confirmed it; the IT Admin proposes again. */

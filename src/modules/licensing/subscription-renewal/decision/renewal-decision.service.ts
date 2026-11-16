@@ -3,7 +3,6 @@ import { addDays, type BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
-import type { RenewalPeriodFacts } from '../../../catalog/public/subscription-period.types';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { RevocationService } from '../../provisioning/revocation.service';
 import { RenewalFinancialContributions } from '../../public/licensing.extension-points';
@@ -12,13 +11,15 @@ import { RenewalDecisionTrail } from './renewal-decision-trail.service';
 import { RenewalRankingService } from '../subscription-renewal-ranking.service';
 import { RenewalError } from '../subscription-renewal.errors';
 import { SubscriptionRenewalRepo } from '../subscription-renewal.repo';
-import type {
-  DecisionSnapshot,
-  DeciderRole,
-  HeldSeat,
-  ReleasedSeat,
-  RenewalChoice,
-  RenewalRecord,
+import {
+  isOwnedPeriod,
+  type DecisionSnapshot,
+  type DeciderRole,
+  type HeldSeat,
+  type OwnedPeriod,
+  type ReleasedSeat,
+  type RenewalChoice,
+  type RenewalRecord,
 } from '../subscription-renewal.types';
 import { checkDecider, executionPointOf, proposalIsStale, seatsToRelease } from './renewal-decision.policy';
 
@@ -62,7 +63,7 @@ export class RenewalDecisionService {
     const current = await this.repo.find(id);
     if (!current) throw new RenewalError('NOT_FOUND');
     const [period] = await this.periods.getPeriods([current.subscriptionId]);
-    if (!period) throw new RenewalError('NOT_FOUND');
+    if (!isOwnedPeriod(period)) throw new RenewalError('NOT_FOUND');
     // Who may decide is settled before the money is read and before any row is locked: a head of another department finds no such case,
     // and a caller who is not the head of this one is refused (`NOT_DECIDER`) without the snapshot being taken.
     const scope = await this.parties.readScopeOf(actor, today);
@@ -195,7 +196,7 @@ export class RenewalDecisionService {
   }
 
   /** What the head saw of money, frozen now: the reader of the module that owns budgets, or that none is connected. */
-  private async snapshotOf(period: RenewalPeriodFacts, now: Date): Promise<DecisionSnapshot> {
+  private async snapshotOf(period: OwnedPeriod, now: Date): Promise<DecisionSnapshot> {
     const [reader] = this.financial.all();
     if (!reader) return { source: 'NOT_CONNECTED', takenAt: now.toISOString() };
     const renewalOn: BusinessDate | null = period.renewalDate ?? (period.endDate ? addDays(period.endDate, 1) : null);

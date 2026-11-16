@@ -5,7 +5,6 @@ import { formatAmount } from '../../../core/money/money';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
-import type { RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type {
@@ -20,7 +19,13 @@ import { toDeadlineEvent, toRenewalDetail, toRenewalSummary } from './subscripti
 import { RenewalPartiesService, type RenewalReadScope } from './subscription-renewal-parties.service';
 import { RenewalRankingService } from './subscription-renewal-ranking.service';
 import { SubscriptionRenewalRepo } from './subscription-renewal.repo';
-import type { DeadlineOutcome, RenewalRecord, RenewalState } from './subscription-renewal.types';
+import {
+  isOwnedPeriod,
+  type DeadlineOutcome,
+  type OwnedPeriod,
+  type RenewalRecord,
+  type RenewalState,
+} from './subscription-renewal.types';
 
 type PageQuery = { page: number; pageSize: number };
 
@@ -206,14 +211,14 @@ export class RenewalViewService {
   }
 
   /** A case of another department is as good as absent to the head who asks for it. */
-  private inScope(scope: RenewalReadScope, period: RenewalPeriodFacts): boolean {
+  private inScope(scope: RenewalReadScope, period: OwnedPeriod): boolean {
     return scope.kind === 'ALL' || scope.departmentId === period.ownerDepartmentId;
   }
 
-  private async periodsOf(ids: readonly string[]): Promise<Map<string, RenewalPeriodFacts>> {
+  private async periodsOf(ids: readonly string[]): Promise<Map<string, OwnedPeriod>> {
     const periods = await this.periods.getPeriods([...new Set(ids)]);
 
-    return new Map(periods.map((period) => [period.subscriptionId, period]));
+    return new Map(periods.filter(isOwnedPeriod).map((period) => [period.subscriptionId, period]));
   }
 
   private async savingsOf(record: RenewalRecord): Promise<{ amount: string; currency: string } | null> {

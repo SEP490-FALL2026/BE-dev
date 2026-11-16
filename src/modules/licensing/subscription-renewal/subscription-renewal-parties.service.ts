@@ -39,10 +39,13 @@ export class RenewalPartiesService {
    * department is read first and both named are tested in ONE read; the first usable IT Admin is read only when neither is usable.
    */
   async itAdminOf(
-    period: { ownerDepartmentId: string; responsibleItAdminEmployeeId: string | null },
+    period: { ownerDepartmentId: string | null; responsibleItAdminEmployeeId: string | null },
     tx?: DbTx,
   ): Promise<string | null> {
-    const inCharge = await this.organizationReads.getItAdminInChargeOfDepartment(period.ownerDepartmentId, tx);
+    const inCharge =
+      period.ownerDepartmentId === null
+        ? null
+        : await this.organizationReads.getItAdminInChargeOfDepartment(period.ownerDepartmentId, tx);
     const named = [...new Set([period.responsibleItAdminEmployeeId, inCharge].filter((id) => id !== null))];
     const usable = await this.identity.findUsableItAdminEmployeeIds(named, tx);
 
@@ -113,7 +116,7 @@ export class RenewalPartiesService {
 
   /** Everyone a milestone of the period may be sent to: the shared people and those of the period itself. */
   async peopleOf(
-    period: { ownerDepartmentId: string; responsibleItAdminEmployeeId: string | null },
+    period: { ownerDepartmentId: string | null; responsibleItAdminEmployeeId: string | null },
     shared: Pick<RenewalPeople, 'finance' | 'approver' | 'superAdmin'>,
   ): Promise<RenewalPeople> {
     return {

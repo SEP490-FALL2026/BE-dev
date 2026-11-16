@@ -1,8 +1,7 @@
-import type { RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import type { DeadlineEventWire, RenewalDetailWire, RenewalSummaryWire } from './subscription-renewal.dto';
-import type { DeadlineEventRecord, ReleasedSeat, RenewalRecord } from './subscription-renewal.types';
+import type { DeadlineEventRecord, OwnedPeriod, ReleasedSeat, RenewalRecord } from './subscription-renewal.types';
 
-const briefOf = (period: RenewalPeriodFacts) => ({
+const briefOf = (period: OwnedPeriod) => ({
   id: period.subscriptionId,
   planId: period.planId,
   planName: period.planName,
@@ -14,7 +13,7 @@ const briefOf = (period: RenewalPeriodFacts) => ({
 /** A case as a list shows it: the period it is about, the milestone, the choice proposed and where the case stands. */
 export function toRenewalSummary(
   record: RenewalRecord,
-  period: RenewalPeriodFacts,
+  period: OwnedPeriod,
   waitingReason: RenewalSummaryWire['waitingReason'],
 ): RenewalSummaryWire {
   return {
@@ -59,7 +58,7 @@ function decisionWire(
 export function toRenewalDetail(
   record: RenewalRecord,
   context: {
-    period: RenewalPeriodFacts;
+    period: OwnedPeriod;
     seatsInUse: number;
     usageAvailable: boolean;
     released: readonly ReleasedSeat[];
@@ -107,7 +106,7 @@ export function toRenewalDetail(
   };
 }
 
-export function toDeadlineEvent(event: DeadlineEventRecord, period: RenewalPeriodFacts): DeadlineEventWire {
+export function toDeadlineEvent(event: DeadlineEventRecord, period: OwnedPeriod): DeadlineEventWire {
   return {
     id: event.id,
     subscription: briefOf(period),

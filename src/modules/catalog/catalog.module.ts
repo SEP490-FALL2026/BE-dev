@@ -63,7 +63,8 @@ import { SeatTargetService } from './subscription/seat-target.service';
 import { SubscriptionDepartmentUseReader } from './subscription/subscription-department-use.listener';
 import { SubscriptionFactsService } from './subscription/subscription-facts.service';
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
-import { SubscriptionPeriodService } from './subscription/subscription-period.service';
+import { SubscriptionPeriodRepo } from './subscription/period/subscription-period.repo';
+import { SubscriptionPeriodService } from './subscription/period/subscription-period.service';
 import { SubscriptionPeriodApi } from './public/subscription-period.api';
 import { SubscriptionSeatIncreaseService } from './subscription/seat-increase/subscription-seat-increase.service';
 import { SubscriptionObligationService } from './subscription/obligation/subscription-obligation.service';
@@ -174,6 +175,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionGrantingRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,
+    SubscriptionPeriodRepo,
     SubscriptionPeriodService,
     SeatTargetService,
     OnboardingFactsService,
