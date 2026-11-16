@@ -50,7 +50,7 @@ flowchart BT
   budgets -->|2| finance
   budgets -->|5| identity_access
   budgets -->|5| licensing
-  budgets -->|10| notifications
+  budgets -->|11| notifications
   budgets -->|4| operating_parameters
   budgets -->|23| organization
   budgets -->|4| policies
