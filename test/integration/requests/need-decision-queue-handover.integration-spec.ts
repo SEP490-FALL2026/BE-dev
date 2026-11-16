@@ -44,7 +44,7 @@ describe('the queue of the need steps when the person who holds a step changes (
     request(h.server())
       .post(`/api/v1/access-requests/${id}/need-decision`)
       .set({ ...h.as(account), ...MOBILE })
-      .send(body);
+      .send(h.checklists.withYes('1.2', body));
   const spendIdsOf = async (account: ApiAccount) =>
     h
       .dataOf<{ items: Array<{ requestId: string }> }>(
@@ -56,7 +56,10 @@ describe('the queue of the need steps when the person who holds a step changes (
       )
       .items.map((item) => item.requestId);
   const spendDecide = (id: string, body: object, account: ApiAccount) =>
-    request(h.server()).post(`/api/v1/access-requests/${id}/spend-approval`).set(h.as(account)).send(body);
+    request(h.server())
+      .post(`/api/v1/access-requests/${id}/spend-approval`)
+      .set(h.as(account))
+      .send(h.checklists.withYes('1.7', body));
   const records = async (id: string) =>
     (
       await h.ctx.sql.query<{ decided_by_employee_id: string; decider_role: string }>(

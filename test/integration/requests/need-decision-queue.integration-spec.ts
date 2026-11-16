@@ -218,7 +218,7 @@ describe('the queue of the need steps of the person who holds them (integration,
       const refused = await request(h.server())
         .post(`/api/v1/access-requests/${own.id}/need-decision`)
         .set(h.as(h.boss.account))
-        .send({ decision: 'APPROVE' });
+        .send(h.checklists.withYes('1.2', { decision: 'APPROVE' }));
       // There is no need step to decide: the route has none for the approver to reach.
       expect([refused.status, h.codeOf(refused)]).toEqual([404, 'ACCESS_REQUEST.NOT_FOUND']);
     });
