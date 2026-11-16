@@ -196,6 +196,15 @@ export class DemoApiClient {
     }
   }
 
+  /**
+   * Puts the bytes of a file at the upload link the API gave (object storage, outside the API): the headers are the ones the API
+   * named. A refusal is a DemoApiError of the storage (method PUT, the link without its signature).
+   */
+  async putFile(url: string, headers: Record<string, string>, content: Uint8Array): Promise<void> {
+    const response = await this.fetchImpl(url, { method: 'PUT', headers, body: content as BodyInit });
+    if (!response.ok) throw new DemoApiError('PUT', url.split('?')[0], response.status, 'OBJECT_STORAGE_REFUSED');
+  }
+
   /** Ends every session this run opened (best effort: a logout that fails leaves a session that expires by itself). */
   async signOutAll(): Promise<void> {
     for (const session of this.sessions.values()) {

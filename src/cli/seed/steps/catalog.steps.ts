@@ -50,10 +50,15 @@ async function oneApplication(
   }
   if (ctx.mode === 'plan') return { status: 'planned', label };
   // QĐ-111f: one command makes the application with its first plan (the kind of the application follows the plan, the pricing model follows the
-  // kind of provisioning); the other plans of the fixture are made by the next step. No group is named: the application stands in Khác.
+  // kind of provisioning); the other plans of the fixture are made by the next step. The group is one of the seven of the installation (C-O5).
   const [first] = application.plans;
+  const groups = await listAll<{ id: string; name: string }>(ctx, admin, '/functional-groups');
+  const functionalGroupId = groups.find((group) => group.name === application.functionalGroup)?.id;
+  if (!functionalGroupId)
+    return { status: 'conflict', label: `${label}: không có nhóm ${application.functionalGroup}` };
   const created = await ctx.api.call<ApplicationRow>(admin, 'POST', '/applications', {
     name: application.name,
+    functionalGroupId,
     ...(application.vendorName ? { vendorName: application.vendorName } : {}),
     dataSensitivity: application.dataSensitivity,
     plan: firstPlanBody(first),

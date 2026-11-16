@@ -106,6 +106,8 @@ const PEOPLE: DemoPerson[] = [
   // The contract ends in 20 days: his request names months and his right is cut there, inside the 30-day window of the request to go on.
   { ...person('NV-CTR1', 'Vũ Quốc Phong', 'phong.vu', 'ENG', 'EMPLOYEE', 'CONTRACTOR'), contractEndInDays: 20 },
   person('NV-INT1', 'Đặng Quốc Huy', 'huy.dang', 'ENG', null, 'INTERN'),
+  // An intern whose contract ends in about two and a half months: a K1 request of 9 months is cut there (DEMO-3).
+  { ...person('NV-INT2', 'Lê Thị Hạnh', 'hanh.le', 'ENG', 'EMPLOYEE', 'INTERN'), contractEndInDays: 76 },
   // Design: the department of the usage scenarios (MF-5); most of its people only hold seats.
   person('NV-DESH', 'Bùi Ngọc Khánh', 'khanh.bui', 'DES', 'MANAGER'),
   person('NV-DES1', 'Đỗ Thị Lan', 'lan.do', 'DES', 'EMPLOYEE'),

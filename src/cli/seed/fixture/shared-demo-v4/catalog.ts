@@ -27,7 +27,34 @@ const app = (
   plans: DemoPlan[],
   kind: DemoApplication['kind'] = 'SAAS',
   dataSensitivity: DemoApplication['dataSensitivity'] = 'MEDIUM',
-): DemoApplication => ({ key, name, kind, vendorName, dataSensitivity, plans });
+): DemoApplication => ({ key, name, kind, vendorName, dataSensitivity, functionalGroup: groupOf(key), plans });
+
+/**
+ * The seven functional groups the installation writes (`functional-group-standard.policy.ts`), each holding at least one application of the
+ * dataset (C-O5): the catalog screen and the dashboards show every group.
+ */
+export const FUNCTIONAL_GROUPS: readonly (readonly [application: string, group: string])[] = [
+  ['chatgpt', 'Trợ lý AI'],
+  ['cursor', 'Trợ lý AI'],
+  ['figma', 'Thiết kế & sáng tạo'],
+  ['canva', 'Thiết kế & sáng tạo'],
+  ['jira', 'Lập trình & kỹ thuật'],
+  ['github', 'Lập trình & kỹ thuật'],
+  ['postman', 'Lập trình & kỹ thuật'],
+  ['jetbrains', 'Lập trình & kỹ thuật'],
+  ['onepassword', 'Văn phòng & cộng tác'],
+  ['grammarly', 'Văn phòng & cộng tác'],
+  ['mailchimp', 'Chuyên ngành'],
+  ['hr-portal', 'Khác'],
+  ['slack', 'Liên lạc (email, chat, họp)'],
+];
+
+function groupOf(key: string): string {
+  const group = FUNCTIONAL_GROUPS.find(([application]) => application === key)?.[1];
+  if (!group) throw new Error(`The application ${key} names no functional group`);
+
+  return group;
+}
 
 /*
  * Thirteen applications. Each (application, plan) has exactly one subscription, the stock of the shared pool (`QĐ-103d`): K2 plans have
@@ -120,6 +147,7 @@ const APPLICATIONS: DemoApplication[] = [
     name: 'Cổng Nhân sự Nội bộ',
     kind: 'INTERNAL',
     dataSensitivity: 'HIGH',
+    functionalGroup: groupOf('hr-portal'),
     plans: [
       { key: 'hr-portal-access', name: 'Truy cập Cổng Nhân sự', provisioningType: 'K5', dataLossOnRemoval: false },
     ],
@@ -228,6 +256,10 @@ const SEATS: DemoSeat[] = [
   ...seat('figma', ['NV-DES10'], { endInDays: 20 }),
   ...seat('figma', ['NV-DES12'], { endInDays: 35 }),
   ...seat('slack', ['NV-ENGH', 'NV-FINH']),
+  // The seat of the bot that posts the alerts of IT in Slack, held by an IT Admin: marked a machine account, never a ghost seat (DEMO-8).
+  ...seat('slack', ['NV-ITA3']),
+  // A right that ends in 7 days: its holder asked to carry it on, the request waits for the head (DEMO-5, R33).
+  ...seat('postman', ['NV-SAL2'], { endInDays: 7 }),
   // Legal has no head, so its budget is built from the baseline: the seats its people hold are what that baseline is made of.
   ...seat('github', ['NV-ENGH', 'NV-DEV1', 'NV-OFF1', 'NV-LGL1']),
   ...seat('onepassword', ['NV-ENGH', 'NV-DEV1', 'NV-DEV4']),

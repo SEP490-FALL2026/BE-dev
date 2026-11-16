@@ -1,7 +1,9 @@
 import { as, listAll, summarize, yearOf } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
-import type { DemoBudget, DemoNextYear } from '../fixture/demo-fixture.types';
-import { financePerson, money, proposalLines } from './finance-kit';
+import type { DemoNextYear } from '../fixture/demo-fixture.types';
+import { yesChecklist } from './checklist-kit';
+import { uploadBudgetFile } from './file-kit';
+import { financePerson, money } from './finance-kit';
 
 type Result = { status: StepOutcome['status']; label: string };
 
@@ -42,40 +44,66 @@ async function proposalOf(ctx: DemoRunContext, department: string, costCenterId:
   return { proposal: proposals[0], headEmail };
 }
 
-function propose(ctx: DemoRunContext, plan: Pick<DemoBudget, 'lines'>, to: { headEmail: string; year: number }) {
+/** `BM-10` (`QĐ-111ab`): the head uploads the filled-in form first, then sends one amount for the year with it. */
+async function propose(
+  ctx: DemoRunContext,
+  plan: { department: string; amount: string; note?: string },
+  to: { headEmail: string; year: number },
+) {
+  const file = await uploadBudgetFile(
+    ctx,
+    to.headEmail,
+    '/budget-proposals/attachments',
+    `BM-10-${plan.department}-${to.year}.pdf`,
+  );
+
   return ctx.api.call(to.headEmail, 'POST', '/budget-proposals', {
     year: to.year,
-    lines: proposalLines(ctx, plan.lines),
+    requestedAmount: money(plan.amount),
+    ...(plan.note ? { note: plan.note } : {}),
+    attachmentIds: [file],
   });
 }
 
-/** One turn of the chain of the budget of the year of a department: the one next action, read from where the chain stands. */
-async function currentYearTurn(ctx: DemoRunContext, plan: DemoBudget, year: number): Promise<Move> {
+/** Finance sends a draft version to the spending approver; a version is sent with at least one file of its own. */
+async function sendVersion(ctx: DemoRunContext, finance: string, versionId: string, label: string): Promise<unknown> {
+  const files = await listAll<{ id: string }>(ctx, finance, `/budget-versions/${versionId}/attachments`);
+  if (files.length === 0) {
+    await uploadBudgetFile(ctx, finance, `/budget-versions/${versionId}/attachments`, `phien-ban-${label}.pdf`);
+  }
+
+  return ctx.api.call(finance, 'POST', `/budget-versions/${versionId}/submission`);
+}
+
+/** The spending approver decides a sent version with the checklist of step 4.7 all Yes. */
+async function decide(ctx: DemoRunContext, versionId: string, decision: 'APPROVE' | 'RETURN', reason?: string) {
+  const approver = await as(ctx, ctx.fixture.approvalRoles.SPENDING_APPROVER);
+
+  return ctx.api.call(approver, 'POST', `/budget-versions/${versionId}/decision`, {
+    decision,
+    ...(reason ? { reason } : {}),
+    checklist: await yesChecklist(ctx, approver, '4.7'),
+  });
+}
+
+/**
+ * One turn of the chain of the budget of a department and year towards `stage`: the one next action, read from where the chain stands.
+ * A version in a state past the stage is the dataset's (the demo may have moved it on) and is left as it is.
+ */
+async function turn(
+  ctx: DemoRunContext,
+  plan: { department: string; amount: string; base: string; note?: string; reason?: string },
+  stage: DemoNextYear['stage'],
+  year: number,
+): Promise<Move> {
   const costCenterId = ctx.ids.costCenters.get(plan.department) ?? '';
   const finance = await as(ctx, financePerson(ctx));
   const version = await latestVersion(ctx, finance, costCenterId, year);
-  if (version) {
-    if (version.state === 'APPROVED') return { done: true, action: null };
-    if (version.state === 'DRAFT') {
-      return act(ctx, 'Finance gửi phiên bản', () =>
-        ctx.api.call(finance, 'POST', `/budget-versions/${version.id}/submission`),
-      );
-    }
-    if (version.state !== 'SENT') return { done: false, action: null };
-    const approver = await as(ctx, ctx.fixture.approvalRoles.SPENDING_APPROVER);
-
-    return act(ctx, 'Người duyệt chi duyệt phiên bản', () =>
-      ctx.api.call(approver, 'POST', `/budget-versions/${version.id}/decision`, { decision: 'APPROVE' }),
-    );
-  }
-  if (plan.origin === 'BASELINE') {
-    // A department with no head cannot propose: Finance builds the version from the baseline of its seats (`QĐ-103`).
-    return act(ctx, 'Finance lập phiên bản số liệu nền', () =>
-      ctx.api.call(finance, 'POST', '/budget-versions', { source: 'BASELINE', costCenterId, year }),
-    );
-  }
+  const label = `${plan.department}-${year}`;
+  if (version) return versionTurn(ctx, { finance, label, reason: plan.reason }, version, stage);
   const { proposal, headEmail } = await proposalOf(ctx, plan.department, costCenterId, year);
-  if (!proposal) return act(ctx, 'trưởng phòng gửi đề xuất', () => propose(ctx, plan, { headEmail, year }));
+  if (!proposal) return act(ctx, 'trưởng phòng gửi BM-10', () => propose(ctx, plan, { headEmail, year }));
+  if (stage === 'PROPOSAL_SUBMITTED') return { done: true, action: null };
   if (proposal.state !== 'SUBMITTED') return { done: false, action: null };
 
   return act(ctx, 'Finance lập phiên bản', () =>
@@ -84,14 +112,40 @@ async function currentYearTurn(ctx: DemoRunContext, plan: DemoBudget, year: numb
   );
 }
 
+/** The next move of a version that exists, towards `stage`. */
+async function versionTurn(
+  ctx: DemoRunContext,
+  by: { finance: string; label: string; reason?: string },
+  version: Row,
+  stage: DemoNextYear['stage'],
+): Promise<Move> {
+  if (version.state === 'DRAFT') {
+    return act(ctx, 'Finance gửi phiên bản', () => sendVersion(ctx, by.finance, version.id, by.label));
+  }
+  if (version.state === 'SENT' && stage === 'APPROVED') {
+    return act(ctx, 'Người duyệt chi duyệt phiên bản', () => decide(ctx, version.id, 'APPROVE'));
+  }
+  if (version.state === 'SENT' && stage === 'VERSION_RETURNED') {
+    return act(ctx, 'Người duyệt chi trả phiên bản về Finance', () => decide(ctx, version.id, 'RETURN', by.reason));
+  }
+  const reached: Record<DemoNextYear['stage'], boolean> = {
+    APPROVED: version.state === 'APPROVED',
+    VERSION_SENT: version.state === 'SENT',
+    VERSION_RETURNED: version.state === 'CHANGES_REQUESTED',
+    PROPOSAL_SUBMITTED: true,
+  };
+
+  return reached[stage] ? { done: true, action: null } : { done: false, action: null };
+}
+
 async function walk(
   ctx: DemoRunContext,
-  turn: () => Promise<Move>,
+  next: () => Promise<Move>,
   done: string,
 ): Promise<{ status: StepOutcome['status']; detail: string }> {
   let moved = false;
-  for (let turns = 0; turns < 6; turns++) {
-    const move = await turn();
+  for (let turns = 0; turns < 8; turns++) {
+    const move = await next();
     if (move.done) return { status: moved ? 'done' : 'present', detail: done };
     if (move.action === null) return { status: 'conflict', detail: 'chuỗi ngân sách đã đi hướng khác' };
     if (ctx.mode === 'plan') return { status: 'planned', detail: `bước kế tiếp: ${move.action}` };
@@ -101,63 +155,32 @@ async function walk(
   return { status: 'conflict', detail: 'chuỗi ngân sách không tới được trạng thái cần' };
 }
 
-/** The approved budget of the year of every department that has a Cost Center, each through its whole chain. */
+/** The approved budget of the year of every department with a Cost Center and a head, each through its whole chain. */
 async function currentYear(ctx: DemoRunContext): Promise<StepOutcome> {
   const year = yearOf(ctx).year;
   const results: Result[] = [];
   for (const plan of ctx.fixture.budgets) {
-    const outcome = await walk(ctx, () => currentYearTurn(ctx, plan, year), 'ngân sách năm hiện hành đã được duyệt');
+    const outcome = await walk(
+      ctx,
+      () => turn(ctx, { ...plan, amount: plan.base }, 'APPROVED', year),
+      'ngân sách năm hiện hành đã được duyệt',
+    );
     results.push({ status: outcome.status, label: `${plan.department} ${year}: ${outcome.detail}` });
   }
 
   return summarize(results);
 }
 
-/** One turn towards the stage the next-year budget of a department is left at. */
-async function nextYearTurn(ctx: DemoRunContext, plan: DemoNextYear, year: number): Promise<Move> {
-  const costCenterId = ctx.ids.costCenters.get(plan.department) ?? '';
-  const finance = await as(ctx, financePerson(ctx));
-  const version = await latestVersion(ctx, finance, costCenterId, year);
-  const approver = ctx.fixture.approvalRoles.SPENDING_APPROVER;
-  if (version) {
-    // A version that exists in any state is the dataset's: the demo may have moved it on, and the seed never undoes that.
-    if (plan.stage !== 'CHANGES_REQUESTED') return { done: true, action: null };
-    if (version.state === 'DRAFT') {
-      return act(ctx, 'Finance gửi phiên bản', () =>
-        ctx.api.call(finance, 'POST', `/budget-versions/${version.id}/submission`),
-      );
-    }
-    if (version.state !== 'SENT') return { done: true, action: null };
-
-    return act(ctx, 'Người duyệt chi yêu cầu sửa', async () =>
-      ctx.api.call(await as(ctx, approver), 'POST', `/budget-versions/${version.id}/decision`, {
-        decision: 'REQUEST_CHANGES',
-        reason: plan.reason,
-      }),
-    );
-  }
-  const { proposal, headEmail } = await proposalOf(ctx, plan.department, costCenterId, year);
-  if (!proposal) return act(ctx, 'trưởng phòng gửi đề xuất', () => propose(ctx, plan, { headEmail, year }));
-  if (plan.stage === 'PROPOSAL_SUBMITTED') return { done: true, action: null };
-  if (proposal.state !== 'SUBMITTED') return { done: false, action: null };
-
-  return act(ctx, 'Finance lập phiên bản', () =>
-    ctx.api.call(finance, 'POST', '/budget-versions', { proposalId: proposal.id, base: money(plan.base) }),
-  ).then(async (move) => {
-    if (ctx.mode !== 'apply' || plan.stage !== 'VERSION_SENT') return move;
-    const created = await latestVersion(ctx, finance, costCenterId, year);
-    if (created?.state === 'DRAFT') await ctx.api.call(finance, 'POST', `/budget-versions/${created.id}/submission`);
-
-    return { done: false, action: 'Finance gửi phiên bản' };
-  });
-}
-
-/** The budgets of the next year, each left where the demo carries on from (a proposal, a sent version, a version sent back). */
+/** The budgets of the next year, each left where the demo carries on from (DEMO-15). */
 async function nextYear(ctx: DemoRunContext): Promise<StepOutcome> {
   const year = yearOf(ctx).year + 1;
   const results: Result[] = [];
   for (const plan of ctx.fixture.nextYear) {
-    const outcome = await walk(ctx, () => nextYearTurn(ctx, plan, year), plan.stage);
+    const outcome = await walk(
+      ctx,
+      () => turn(ctx, { ...plan, amount: plan.requestedAmount }, plan.stage, year),
+      plan.stage,
+    );
     results.push({ status: outcome.status, label: `${plan.department} ${year}: ${outcome.detail}` });
   }
 
@@ -168,7 +191,7 @@ export function budgetSteps(): DemoStep[] {
   return [
     {
       key: 'budget.year',
-      title: 'Ngân sách năm hiện hành của mọi phòng có Cost Center (trưởng phòng → Finance → Người duyệt chi)',
+      title: 'Ngân sách năm hiện hành của mọi phòng có Cost Center và trưởng phòng (BM-10 → Finance → Người duyệt chi)',
       needs: [
         'budget.cycles',
         'finance.cost-centers',
@@ -181,7 +204,8 @@ export function budgetSteps(): DemoStep[] {
     },
     {
       key: 'budget.next-year',
-      title: 'Ngân sách năm sau: đề xuất chờ Finance, phiên bản chờ Người duyệt chi, phiên bản bị yêu cầu sửa',
+      title:
+        'Ngân sách năm sau: một phòng đã duyệt, BM-10 chờ Finance, phiên bản chờ Người duyệt chi, phiên bản bị trả về',
       needs: ['budget.cycles', 'finance.cost-centers', 'catalog.plans', 'org.heads', 'org.approval-roles'],
       run: nextYear,
     },

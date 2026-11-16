@@ -29,6 +29,7 @@ import {
 } from '../disposable-database';
 import type { DisposableDatabase } from '../disposable-database';
 import { createHttpTestApp, SEED_PASSWORD } from '../http-test-app';
+import { SeedStorage } from './seed-storage';
 
 /*
  * The seeded template of the flows runner (spec e2e-main-flows-suite, section 2). Prepared once by test/config/flows-global-setup.ts:
@@ -80,7 +81,10 @@ function seededTemplate(): TemplateHandle {
 
 /** Installs the demo organization and applies the default fixture through the HTTP API of an application on `database`. */
 async function seedInto(database: DisposableDatabase): Promise<void> {
-  const ctx = await createHttpTestApp({ database, providerOverrides: SWEEPER_OVERRIDES });
+  // The files the seed uploads (BM-10, files of a version, invoices) land in a fake storage the seeding application reads.
+  const seedStorage = new SeedStorage();
+  await seedStorage.start();
+  const ctx = await createHttpTestApp({ database, providerOverrides: [...SWEEPER_OVERRIDES, seedStorage.override] });
   const install = await NestFactory.createApplicationContext(
     (await import('../../../src/modules/installation/installation.module')).InstallationModule,
     { logger: false },
@@ -118,6 +122,7 @@ async function seedInto(database: DisposableDatabase): Promise<void> {
     await demo?.close();
     await install.close();
     await ctx.close();
+    await seedStorage.stop();
   }
 }
 
