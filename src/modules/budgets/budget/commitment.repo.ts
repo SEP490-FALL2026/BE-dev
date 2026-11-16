@@ -11,7 +11,7 @@ import type {
   RequestCommitment,
   SeatCommitment,
 } from '../public/budgets.types';
-import { BudgetCommitmentNotHoldableError } from './budget.errors';
+import { BudgetCommitmentNotHoldableError } from '../public/budgets.errors';
 import { BudgetYearLockRepo } from './budget-year-lock.repo';
 import { InvoiceRepo } from './invoice.repo';
 import type { CommitmentRow } from './commitment-release.policy';

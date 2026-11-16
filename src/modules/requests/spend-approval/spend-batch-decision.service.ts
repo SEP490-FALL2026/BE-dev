@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { BudgetCommitmentExistsError, BudgetCommitmentNotHoldableError } from '../../budgets/public/budgets.errors';
 import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
 import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
@@ -95,6 +96,10 @@ export class SpendBatchDecisionService {
         return skipped('GROUP_NEEDS_LINES');
       }
       if (error instanceof SpendDecisionRefusedError) return skipped(error.reason);
+      // The commitment could not be held (a safety net after the check): this request is skipped, the others of the batch go on.
+      if (error instanceof BudgetCommitmentNotHoldableError || error instanceof BudgetCommitmentExistsError) {
+        return skipped('COMMITMENT_NOT_HOLDABLE');
+      }
       throw error;
     }
   }
