@@ -12,7 +12,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { CHECKLIST_ERROR_EXAMPLES } from '../checklist/checklist.http-errors';
+import { CHECKLIST_ERROR_EXAMPLES } from '../../policies/public/policy-checklist.http-errors';
 import { ReserveConfirmationService } from '../reserve-confirmation/reserve-confirmation.service';
 import { SpendBatchService } from './spend-batch.service';
 import { SpendBatchListService } from './spend-batch-list.service';

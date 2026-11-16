@@ -323,7 +323,7 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
       const response = await request(h.server())
         .post(`/api/v1/budget-versions/${version.id}/decision`)
         .set({ Authorization: `Bearer ${h.admin}` })
-        .send({ decision: 'APPROVE' });
+        .send(h.checklists.withYes('4.7', { decision: 'APPROVE' }));
 
       expect(response.status).toBe(403);
       expect(await stateOf(version.id)).toBe('SENT');

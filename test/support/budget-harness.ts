@@ -257,7 +257,7 @@ export class BudgetHarness extends RequestHarness {
   }
 
   decideVersion = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/budget-versions/${id}/decision`).set(this.as(account)).send(body);
+    this.decisionPost(`/api/v1/budget-versions/${id}/decision`, account, '4.7', body);
 
   /** A department with its Unit, a head and a member. */
   async departmentWithHead(code: string): Promise<{ department: Department; head: Person; member: Person }> {

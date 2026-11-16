@@ -1,3 +1,4 @@
+import { CHECKLIST_ERROR_EXAMPLES, toChecklistApiException } from '../../policies/public/policy-checklist.http-errors';
 import { Body, Controller, Get, HttpStatus, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
@@ -299,14 +300,20 @@ export class BudgetVersionsController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: 'The version was not sent, or was already decided (BUDGET.VERSION_NOT_SENT).',
-      examples: [EXAMPLES.VERSION_NOT_SENT],
+      description:
+        'The version was not sent, or was already decided (BUDGET.VERSION_NOT_SENT); or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED).',
+      examples: [EXAMPLES.VERSION_NOT_SENT, CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The decision is invalid (VALIDATION_ERROR): REJECT or REQUEST_CHANGES, which are no longer decisions, a RETURN without its reason, an approval with one; or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED],
+        'The decision is invalid (VALIDATION_ERROR): REJECT or REQUEST_CHANGES, which are no longer decisions, a RETURN with no reason and no answer No to take it from, an approval with a reason; the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO); or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.YEAR_ENDED,
+        CHECKLIST_ERROR_EXAMPLES.INCOMPLETE,
+        CHECKLIST_ERROR_EXAMPLES.HAS_NO,
+      ],
     },
   )
   async decide(
@@ -317,7 +324,7 @@ export class BudgetVersionsController {
     try {
       return { version: await this.decisions.decide(actor, params.id, body) };
     } catch (error) {
-      throw toBudgetApiException(error);
+      throw toChecklistApiException(error) ?? toBudgetApiException(error);
     }
   }
 }

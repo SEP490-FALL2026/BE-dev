@@ -15,7 +15,7 @@ import {
   SpendReviewNotFoundError,
   SpendSupplementRefusedError,
 } from './spend.errors';
-import { toChecklistApiException } from '../checklist/checklist.http-errors';
+import { toChecklistApiException } from '../../policies/public/policy-checklist.http-errors';
 
 const refuse = (status: HttpStatus, code: string, message: string): ApiException =>
   new ApiException(status, { code, message });

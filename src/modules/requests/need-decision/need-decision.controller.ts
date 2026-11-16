@@ -15,7 +15,7 @@ import {
   ACCESS_REQUEST_ERROR_EXAMPLES as EXAMPLES,
   toAccessRequestApiException,
 } from '../access-request/access-request.http-errors';
-import { CHECKLIST_ERROR_EXAMPLES, toChecklistApiException } from '../checklist/checklist.http-errors';
+import { CHECKLIST_ERROR_EXAMPLES, toChecklistApiException } from '../../policies/public/policy-checklist.http-errors';
 import { AccessRequestQueryService } from '../request-view/access-request-query.service';
 import { toWire } from '../request-view/access-request.mapper';
 import { NeedDecisionService } from './need-decision.service';

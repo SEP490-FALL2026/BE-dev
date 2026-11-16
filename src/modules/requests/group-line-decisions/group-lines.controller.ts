@@ -1,5 +1,5 @@
 import { SPEND_ERROR_EXAMPLES } from '../spend/spend.http-errors';
-import { CHECKLIST_ERROR_EXAMPLES } from '../checklist/checklist.http-errors';
+import { CHECKLIST_ERROR_EXAMPLES } from '../../policies/public/policy-checklist.http-errors';
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {

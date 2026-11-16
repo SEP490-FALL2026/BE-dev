@@ -10,6 +10,9 @@ const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
  * `BM-10` is a file and an amount, and a version is one figure for the year (B-6): the routes of the lines of a proposal, of the lines
  * of a version, of their file and of the lines of the budget of a department are gone, whoever calls them.
  */
+/** The checklist of the step (`QĐ-111ap`): the shape is judged here, the answers by the policy. */
+const CHECKLIST = { policyVersionId: '8a4d7c1e-2b3f-4c5d-9e6f-0a1b2c3d4e5f', answers: [] };
+
 describe('the routes of the budget lines (HTTP contract, no database)', () => {
   let app: INestApplication<App>;
 
@@ -80,7 +83,7 @@ describe('the routes of the budget lines (HTTP contract, no database)', () => {
     it.each([
       ['REJECT, with its reason', { decision: 'REJECT', reason: 'Too high' }],
       ['REQUEST_CHANGES, with its reason', { decision: 'REQUEST_CHANGES', reason: 'Look again' }],
-      ['RETURN without its reason', { decision: 'RETURN' }],
+      ['APPROVE without a checklist', { decision: 'APPROVE' }],
       ['APPROVE with a reason', { decision: 'APPROVE', reason: 'Fine' }],
     ] as const)('turns away %s with 422', async (_name, body) => {
       const response = await decide(body).expect(422);
@@ -89,8 +92,12 @@ describe('the routes of the budget lines (HTTP contract, no database)', () => {
     });
 
     it.each([
-      ['APPROVE', { decision: 'APPROVE' }],
-      ['RETURN with its reason', { decision: 'RETURN', reason: 'The reserve is too high' }],
+      ['APPROVE', { decision: 'APPROVE', checklist: CHECKLIST }],
+      ['RETURN with its reason', { decision: 'RETURN', reason: 'The reserve is too high', checklist: CHECKLIST }],
+      [
+        'RETURN with no reason (the checklist or the service says it is missing)',
+        { decision: 'RETURN', checklist: CHECKLIST },
+      ],
     ] as const)('takes %s: the next error is not a validation one', async (_name, body) => {
       expect(bodyOf(await decide(body)).error?.code).not.toBe('VALIDATION_ERROR');
     });

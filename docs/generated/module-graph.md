@@ -53,7 +53,7 @@ flowchart BT
   budgets -->|12| notifications
   budgets -->|4| operating_parameters
   budgets -->|23| organization
-  budgets -->|4| policies
+  budgets -->|8| policies
   catalog -->|23| audit
   catalog -->|10| finance
   catalog -->|8| identity_access
@@ -139,7 +139,7 @@ flowchart BT
   requests -->|12| notifications
   requests -->|12| operating_parameters
   requests -->|97| organization
-  requests -->|21| policies
+  requests -->|26| policies
   usage -->|10| audit
   usage -->|3| budgets
   usage -->|15| catalog

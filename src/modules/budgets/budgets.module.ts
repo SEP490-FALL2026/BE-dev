@@ -58,6 +58,7 @@ import { VersionHistoryService } from './version/version-history.service';
 import { VersionHistoryViewService } from './version/version-history-view.service';
 import { VersionDecisionJudge } from './version/version-decision-judge.service';
 import { VersionDecisionWriter } from './version/version-decision-writer.service';
+import { PoliciesChecklistFacadeModule } from '../policies/policies-checklist-facade.module';
 import { VersionDecisionService } from './version/version-decision.service';
 import { VersionRepo } from './budget/version.repo';
 import { VersionBaselineCreationService } from './version/version-baseline-creation.service';
@@ -129,6 +130,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
  */
 @Module({
   imports: [
+    PoliciesChecklistFacadeModule,
     PoliciesTemplateFacadeModule,
     BudgetsReadFacadeModule,
     DatabaseModule,

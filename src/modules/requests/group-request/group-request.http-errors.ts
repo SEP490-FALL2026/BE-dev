@@ -28,7 +28,7 @@ import {
   GroupRequestTooManyLinesError,
   GroupSupplementDropRefusedError,
 } from './group-request.errors';
-import { toChecklistApiException } from '../checklist/checklist.http-errors';
+import { toChecklistApiException } from '../../policies/public/policy-checklist.http-errors';
 
 /**
  * Maps the errors of the request for a group to their HTTP answers. The rest are those of the request and of the spend decision,

@@ -1,0 +1,100 @@
+import { bodyOf } from '../../support/api-body';
+import { BudgetHarness } from '../../support/budget-harness';
+import type { Person } from '../../support/request-harness';
+
+const h = new BudgetHarness();
+
+/**
+ * The checklist of the decision of the spending approver on a version of a budget (`PL-2.5`, `QĐ-111ap`, `QĐ-111ad`): the answers kept with the
+ * version, a No that locks the approval and leaves only the return to Finance, and the reason of the return filled in from the answers.
+ */
+describe('the checklist of the decision on a version of a budget (integration, real PostgreSQL)', () => {
+  let boss: Person;
+  let counter = 0;
+
+  beforeAll(async () => {
+    await h.start();
+    const executive = await h.departmentWithUnit('P-EXE');
+    boss = await h.staff(executive, 'EXE-C1');
+    await h.makeHead(executive, await h.staff(executive, 'EXE-H1'));
+    await h.setRole('SPENDING_APPROVER', boss);
+  }, 240000);
+
+  afterAll(async () => {
+    await h.stop();
+  });
+
+  const sent = async () => {
+    counter += 1;
+    const unit = await h.departmentWithHead(`P-V${counter}`);
+    const proposal = await h.budgetProposed(unit.head, unit.department.unitId, undefined, h.next);
+    const version = await h.built(proposal.id, {});
+    await h.sendVersion(version.id).expect(200);
+
+    return version;
+  };
+  const stateOf = async (id: string) =>
+    (await h.ctx.sql.query<{ state: string }>(`SELECT state FROM budget_versions WHERE id = $1`, [id])).rows[0].state;
+  const rowsOf = (id: string) =>
+    h.ctx.sql
+      .query<{ decision: string; has_no: boolean; policy_version_id: string }>(
+        `SELECT decision, has_no, policy_version_id FROM decision_checklists WHERE subject_id = $1 AND step_code = '4.7'`,
+        [id],
+      )
+      .then((result) => result.rows);
+  const no = () => h.checklists.questionsOf('4.7')[1];
+
+  it('keeps the answers with the approval of a version', async () => {
+    const version = await sent();
+
+    await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account).expect(200);
+
+    expect(await stateOf(version.id)).toBe('APPROVED');
+    expect(await rowsOf(version.id)).toEqual([
+      expect.objectContaining({
+        decision: 'APPROVE',
+        has_no: false,
+        policy_version_id: h.checklists.yes('4.7').policyVersionId,
+      }),
+    ]);
+  });
+
+  it('locks the approval when an answer is No, and decides nothing', async () => {
+    const version = await sent();
+
+    const refused = await h
+      .decideVersion(version.id, { decision: 'APPROVE', checklist: h.checklists.answer('4.7', [no()]) }, boss.account)
+      .expect(422);
+
+    expect(bodyOf(refused).error.code).toBe('POLICY.CHECKLIST_HAS_NO');
+    expect(await stateOf(version.id)).toBe('SENT');
+    expect(await rowsOf(version.id)).toEqual([]);
+  });
+
+  it('returns the version to Finance with the reason filled in from the answer No', async () => {
+    const version = await sent();
+
+    await h
+      .decideVersion(version.id, { decision: 'RETURN', checklist: h.checklists.answer('4.7', [no()]) }, boss.account)
+      .expect(200);
+
+    expect(await stateOf(version.id)).toBe('CHANGES_REQUESTED');
+    const reason = (
+      await h.ctx.sql.query<{ reason: string | null }>(
+        `SELECT reason FROM budget_version_decisions WHERE version_id = $1`,
+        [version.id],
+      )
+    ).rows[0].reason;
+    expect(reason).toContain(no());
+    expect(await rowsOf(version.id)).toEqual([expect.objectContaining({ decision: 'RETURN', has_no: true })]);
+  });
+
+  it('asks for a reason when a return has none and every answer is Yes', async () => {
+    const version = await sent();
+
+    const refused = await h.decideVersion(version.id, { decision: 'RETURN' }, boss.account).expect(422);
+
+    expect(bodyOf(refused).error.code).toBe('VALIDATION_ERROR');
+    expect(await stateOf(version.id)).toBe('SENT');
+  });
+});

@@ -23,7 +23,7 @@ import { SpendApprovalViewService } from '../spend-approval-view/spend-approval-
 import { SpendBatchDecisionService } from './spend-batch-decision.service';
 import { SpendDecisionService } from './spend-decision.service';
 import { IdParamDto } from '../spend/spend-submission.dto';
-import { CHECKLIST_ERROR_EXAMPLES } from '../checklist/checklist.http-errors';
+import { CHECKLIST_ERROR_EXAMPLES } from '../../policies/public/policy-checklist.http-errors';
 import { SPEND_ERROR_EXAMPLES, toRecheckedApiException, toSpendApiException } from '../spend/spend.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;

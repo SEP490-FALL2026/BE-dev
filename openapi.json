@@ -62521,7 +62521,7 @@
             }
           },
           "409": {
-            "description": "The version was not sent, or was already decided (BUDGET.VERSION_NOT_SENT).",
+            "description": "The version was not sent, or was already decided (BUDGET.VERSION_NOT_SENT); or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -62533,6 +62533,18 @@
                       "error": {
                         "code": "BUDGET.VERSION_NOT_SENT",
                         "message": "The version cannot be decided: NOT_SENT.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.VERSION_CHANGED": {
+                    "summary": "The policy of the step has a new version in force since the checklist was shown.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.VERSION_CHANGED",
+                        "message": "The policy of the step has a new version in force since the checklist was shown.",
+                        "details": { "stepCode": "1.2", "policyVersionId": "v3", "versionNumber": 3 },
                         "requestId": "req_example"
                       }
                     }
@@ -62584,7 +62596,7 @@
             }
           },
           "422": {
-            "description": "The decision is invalid (VALIDATION_ERROR): REJECT or REQUEST_CHANGES, which are no longer decisions, a RETURN without its reason, an approval with one; or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).",
+            "description": "The decision is invalid (VALIDATION_ERROR): REJECT or REQUEST_CHANGES, which are no longer decisions, a RETURN with no reason and no answer No to take it from, an approval with a reason; the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO); or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -62609,6 +62621,33 @@
                         "code": "BUDGET.YEAR_ENDED",
                         "message": "The year 2025 has ended.",
                         "details": { "year": 2025 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_INCOMPLETE": {
+                    "summary": "The checklist of the step is not answered in full.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_INCOMPLETE",
+                        "message": "The checklist of the step is not answered in full.",
+                        "details": { "stepCode": "1.2", "missing": ["1.2-05"], "unexpected": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_HAS_NO": {
+                    "summary": "An answer of the checklist is No, so the decision cannot go on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_HAS_NO",
+                        "message": "An answer of the checklist is No, so the decision cannot go on.",
+                        "details": {
+                          "stepCode": "1.2",
+                          "items": [{ "code": "1.2-05", "text": "The tools they have do not meet the need" }]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -121651,10 +121690,36 @@
         "type": "object",
         "properties": {
           "decision": { "type": "string", "enum": ["APPROVE", "RETURN"] },
-          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "checklist": {
+            "type": "object",
+            "properties": {
+              "policyVersionId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The version of the policy whose questions were shown (from the step of the policy)."
+              },
+              "answers": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemCode": { "type": "string", "minLength": 1, "maxLength": 30 },
+                    "answer": { "type": "string", "enum": ["YES", "NO"] }
+                  },
+                  "required": ["itemCode", "answer"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["policyVersionId", "answers"],
+            "additionalProperties": false,
+            "description": "The answers to the questions of the policy in force at this step. Every question the person answers needs an answer; a question the system answers is Yes by itself."
+          }
         },
-        "required": ["decision"],
-        "description": "APPROVE (no reason) or RETURN to Finance (the reason is required); REJECT and REQUEST_CHANGES are no longer decisions.",
+        "required": ["decision", "checklist"],
+        "description": "The checklist of the policy in force at this step, and the decision: APPROVE (no reason; locked while an answer is No) or RETURN to Finance (the reason, or the one the answers No give); REJECT and REQUEST_CHANGES are no longer decisions.",
         "additionalProperties": false
       },
       "MineResponseDto": {

@@ -1,3 +1,4 @@
+import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
@@ -49,18 +50,16 @@ export const decisionBodySchema = z
   .strictObject({
     decision: z.enum(['APPROVE', 'RETURN']),
     reason: text(REASON_MAX).optional(),
+    checklist: checklistBodySchema,
   })
   .superRefine((body, ctx) => {
-    if (body.decision === 'RETURN' && body.reason === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['reason'], message: 'A version returned to Finance gives its reason.' });
-    }
     if (body.decision === 'APPROVE' && body.reason !== undefined) {
       ctx.addIssue({ code: 'custom', path: ['reason'], message: 'An approval gives no reason.' });
     }
   })
   .meta({
     description:
-      'APPROVE (no reason) or RETURN to Finance (the reason is required); REJECT and REQUEST_CHANGES are no longer decisions.',
+      'The checklist of the policy in force at this step, and the decision: APPROVE (no reason; locked while an answer is No) or RETURN to Finance (the reason, or the one the answers No give); REJECT and REQUEST_CHANGES are no longer decisions.',
   });
 
 const versionFigures = {

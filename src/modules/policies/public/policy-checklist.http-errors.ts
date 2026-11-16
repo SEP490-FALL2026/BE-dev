@@ -7,7 +7,7 @@ import {
   PolicyChecklistIncompleteError,
   PolicyDecisionReasonRequiredError,
   PolicyVersionChangedError,
-} from '../../policies/public/policy-checklist.errors';
+} from './policy-checklist.errors';
 
 /**
  * The answers of the checklist of a decision, turned into what the route says (`QĐ-111ap`): a version of the policy that is no longer in force is
