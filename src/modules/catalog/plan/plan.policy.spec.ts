@@ -14,6 +14,7 @@ import {
   PlanWorkspaceTextInvalidError,
 } from './plan.errors';
 import {
+  applicationPlanName,
   assertPlanShape,
   assertPricingModelDerived,
   assertWorkspaceShape,
@@ -296,5 +297,11 @@ describe('assertPricingModelDerived (B-5: a pricing model that is sent is the on
     expect(() => assertPricingModelDerived('K4', 'PER_SEAT')).toThrow(PlanPricingModelNotDerivedError);
     expect(() => assertPricingModelDerived('K4', 'PER_HOST')).toThrow(PlanPricingModelNotDerivedError);
     expect(new PlanPricingModelNotDerivedError('PER_SEAT').expected).toBe('PER_SEAT');
+  });
+});
+
+describe('applicationPlanName', () => {
+  it('names a plan by its application and itself, with an en dash', () => {
+    expect(applicationPlanName('Figma', 'Professional')).toBe('Figma – Professional');
   });
 });

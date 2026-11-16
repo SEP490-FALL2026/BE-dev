@@ -499,15 +499,22 @@ export class SubscriptionRepo {
     return rows.map((row) => row.id);
   }
 
-  /** A short label for each of these subscriptions, by id: the application and the plan, never a price or a person. */
-  async labelsOf(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+  /**
+   * A short label for each of these subscriptions, by id: the application and the plan, never a price or a person; "application / plan" unless
+   * `label` words them (the notification text uses `applicationPlanName`). An id that does not exist is absent.
+   */
+  async labelsOf(
+    ids: readonly string[],
+    tx?: DbTx,
+    label: (applicationName: string, planName: string) => string = (application, plan) => `${application} / ${plan}`,
+  ): Promise<Map<string, string>> {
     if (ids.length === 0) return new Map();
     const rows = await (tx ?? this.prisma).subscription.findMany({
       where: { id: { in: [...ids] } },
       select: { id: true, plan: { select: { name: true, application: { select: { name: true } } } } },
     });
 
-    return new Map(rows.map((row) => [row.id, `${row.plan.application.name} / ${row.plan.name}`]));
+    return new Map(rows.map((row) => [row.id, label(row.plan.application.name, row.plan.name)]));
   }
 
   /**

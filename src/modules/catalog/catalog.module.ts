@@ -55,6 +55,7 @@ import { PlansController } from './plan/plans.controller';
 import { PlanTermsController } from './plan-terms/plan-terms.controller';
 import { PlanTermsRepo } from './plan-terms/plan-terms.repo';
 import { PlanTermsService } from './plan-terms/plan-terms.service';
+import { CatalogNotificationNamesListener } from './requestable-software/catalog-notification-names.listener';
 import { RequestableSoftwareController } from './requestable-software/requestable-software.controller';
 import { RequestableSoftwareRepo } from './requestable-software/requestable-software.repo';
 import { RequestableSoftwareService } from './requestable-software/requestable-software.service';
@@ -196,6 +197,8 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionPeriodApi,
     RequestableSoftwareRepo,
     RequestableSoftwareService,
+    // Names an application, a plan and a subscription in a notification sentence: added to the name sources of `notifications` when the module starts.
+    CatalogNotificationNamesListener,
   ],
   // The facade licensing reads the seat targets through (ADR-0013), and the hook licensing binds its reader of occupied seats to
   // (`public/catalog.extension-points.ts`), and the facade the hand-over of an IT Admin who leaves moves their subscriptions and applications through

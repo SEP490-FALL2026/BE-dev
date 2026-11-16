@@ -66,6 +66,10 @@ unitPrice, reportingUnitPrice, billingCycle }`, thuê bao `PERPETUAL` có giá �
   biết baseline đã đóng chưa để chặn trùng thuê bao K2/K4. Chưa bind ⟹ coi như đã đóng (chặn).
 - Đăng ký vào: `organization.department-use-readers` (`DepartmentUseContributions`, tên `catalog.subscriptions`) —
   `subscription/subscription-department-use.listener.ts`.
+- Đăng ký vào `notifications.name-sources` (`NotificationNameContributions`, tên `catalog.names`) — `requestable-software/catalog-notification-names.listener.ts`, khai ở `catalog.module.ts`:
+  APPLICATION (tên ứng dụng), PLAN và SUBSCRIPTION (`<Ứng dụng> – <Gói>`, hàm `applicationPlanName` ở `plan/plan.policy.ts`), mỗi kind một truy vấn theo lô ở repo chủ bảng (`ApplicationRepo.namesOf`,
+  `PlanRepo.namesOf`, `SubscriptionRepo.labelsOf(ids, tx, applicationPlanName)`; mặc định `labelsOf` vẫn là `<Ứng dụng> / <Gói>` cho phần "đang dùng" của phòng ban). Đặt ở `requestable-software` vì capability này đã đọc
+  cả ba bảng (không thêm cạnh capability; `subscription/` đã đủ 25 file, `catalog-entry` không import `plan`).
 
 ## Hướng phụ thuộc giữa capability (R6)
 
