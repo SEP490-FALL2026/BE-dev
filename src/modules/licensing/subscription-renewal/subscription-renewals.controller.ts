@@ -14,7 +14,7 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { RenewalDecisionService } from './decision/renewal-decision.service';
 import { RenewalOutcomeService } from './outcome/renewal-outcome.service';
-import { RenewalProposalService } from './proposal/renewal-proposal.service';
+import { RenewalRecordService } from './record/renewal-record.service';
 import {
   SubscriptionDeadlineEventPageResponseDto,
   SubscriptionRenewalDecideBodyDto,
@@ -61,7 +61,7 @@ const NOT_FOUND: ErrorResponseDeclaration = {
 export class SubscriptionRenewalsController {
   constructor(
     private readonly views: RenewalViewService,
-    private readonly proposals: RenewalProposalService,
+    private readonly records: RenewalRecordService,
     private readonly decisions: RenewalDecisionService,
     private readonly outcomes: RenewalOutcomeService,
   ) {}
@@ -161,7 +161,7 @@ export class SubscriptionRenewalsController {
   )
   async propose(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: SubscriptionRenewalProposeBodyDto) {
     try {
-      const created = await this.proposals.propose(actor, body);
+      const created = await this.records.record(actor, body);
 
       return { renewal: await this.views.detailOf(created, actor) };
     } catch (error) {

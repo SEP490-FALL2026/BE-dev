@@ -22,7 +22,27 @@ const ANSWERS: Readonly<Record<RenewalProblem, { status: HttpStatus; message: st
     message:
       'The subscription has no cancellation deadline or end date to count from: complete its contract data first.',
   },
-  ALREADY_PROPOSED: { status: HttpStatus.CONFLICT, message: 'This period already has a renewal proposal.' },
+  ALREADY_PROPOSED: {
+    status: HttpStatus.CONFLICT,
+    message: 'The result of this period is already recorded, or a renewal of before still waits for its outcome.',
+  },
+  BEFORE_ADJUSTMENT_POINT: {
+    status: HttpStatus.CONFLICT,
+    message: 'The point of adjustment of this period has not come: the result is recorded from that day.',
+  },
+  QUANTITY_NOT_SEATS_NEEDED: {
+    status: HttpStatus.CONFLICT,
+    message: 'The quantity is not the seats the next period needs: read the count again and record that number.',
+  },
+  CANCEL_NOT_ALLOWED: {
+    status: HttpStatus.CONFLICT,
+    message:
+      'The subscription cannot be cancelled while seats are needed, seats are still in effect or a request for the plan is open.',
+  },
+  VENDOR_MINIMUM_EVIDENCE_REQUIRED: {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: 'The seats are the vendor minimum above the need: the note must give the evidence for it.',
+  },
   QUANTITY_INVALID: {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     message: 'A reduction names fewer seats than are bought; renewing as it is and cancelling name none.',
@@ -102,9 +122,31 @@ const renewal = (problem: RenewalProblem, details?: Record<string, string | numb
 export const RENEWAL_ERROR_EXAMPLES = {
   NOT_FOUND: renewal('NOT_FOUND'),
   READ_FORBIDDEN: renewal('READ_FORBIDDEN'),
-  NOT_RENEWABLE: renewal('NOT_RENEWABLE'),
+  NOT_RENEWABLE: renewal('NOT_RENEWABLE', { reason: 'ALREADY_CONTINUED' }),
   CONTRACT_DATA_INCOMPLETE: renewal('CONTRACT_DATA_INCOMPLETE'),
   ALREADY_PROPOSED: renewal('ALREADY_PROPOSED'),
+  BEFORE_ADJUSTMENT_POINT: renewal('BEFORE_ADJUSTMENT_POINT', {
+    adjustmentPointOn: '2026-11-24',
+    deadline: '2026-12-01',
+  }),
+  QUANTITY_NOT_SEATS_NEEDED: renewal('QUANTITY_NOT_SEATS_NEEDED', {
+    seatsNeeded: 8,
+    vendorMinimumSeats: 5,
+    target: 8,
+    quantity: 7,
+  }),
+  CANCEL_NOT_ALLOWED: renewal('CANCEL_NOT_ALLOWED', {
+    seatsNeeded: 8,
+    heldPastRenewal: 6,
+    pendingContinuations: 1,
+    approvedAwaitingGrant: 1,
+    activeSeatsToday: 7,
+    openRequests: 1,
+  }),
+  VENDOR_MINIMUM_EVIDENCE_REQUIRED: renewal('VENDOR_MINIMUM_EVIDENCE_REQUIRED', {
+    seatsNeeded: 3,
+    vendorMinimumSeats: 5,
+  }),
   QUANTITY_INVALID: renewal('QUANTITY_INVALID'),
   NOT_DECIDER: renewal('NOT_DECIDER'),
   PROPOSER_IS_OWNER_HEAD: renewal('PROPOSER_IS_OWNER_HEAD'),

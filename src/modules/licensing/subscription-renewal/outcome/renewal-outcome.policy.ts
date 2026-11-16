@@ -4,8 +4,9 @@ import type { RenewalChoice, RenewalOutcomeKind } from '../subscription-renewal.
 
 /**
  * Whether the outcome fits the decision (`US-11-03` AC-15, AC-18, `US-11-05` AC-11, AC-12): an outcome as decided records the new
- * period a renewal or a reduction makes, with the number of seats decided (the same number for a renewal as it is), and no period
- * for a cancellation. Any other outcome records what the vendor really did, with or without a new period.
+ * period a renewal, a reduction or a raise makes, with the number of seats decided, and no period for a cancellation. A renewal as
+ * it is of before the one-write renewal decided no number and keeps the seats bought. Any other outcome records what the vendor
+ * really did, with or without a new period.
  */
 export function checkOutcome(input: {
   outcome: RenewalOutcomeKind;
@@ -17,7 +18,8 @@ export function checkOutcome(input: {
   if (input.outcome !== 'AS_DECIDED') return null;
   if (input.decidedChoice === 'CANCEL') return input.nextQuantity === null ? null : 'OUTCOME_MISMATCH';
   if (input.nextQuantity === null) return 'OUTCOME_MISMATCH';
-  const expected = input.decidedChoice === 'REDUCE' ? input.decidedQuantity : input.purchasedQuantity;
+  const numbered = input.decidedChoice === 'REDUCE' || input.decidedChoice === 'INCREASE';
+  const expected = numbered ? input.decidedQuantity : (input.decidedQuantity ?? input.purchasedQuantity);
 
   return expected === null || expected === input.nextQuantity ? null : 'OUTCOME_MISMATCH';
 }
@@ -61,4 +63,31 @@ export function realisedSavingsOf(input: {
   const saved = (totalOf(input.old) ?? 0n) - (totalOf(input.next) ?? 0n);
 
   return saved > 0n && input.old.unitPrice ? { amountMinor: saved, currency: input.old.unitPrice.currency } : null;
+}
+
+/** The days a seat holds, as the rule of its last day reads them. */
+export interface SeatDays {
+  validUntil: BusinessDate | null;
+  expectedEndDate: BusinessDate | null;
+}
+
+/** The last day of a seat: the earlier of the day before its right ends and its expected end; null when it does not end. */
+export function lastDayOf(seat: SeatDays): BusinessDate | null {
+  const days = [seat.validUntil === null ? null : addDays(seat.validUntil, -1), seat.expectedEndDate].filter(
+    (day) => day !== null,
+  );
+
+  return days.length === 0 ? null : days.reduce((first, day) => (day < first ? day : first));
+}
+
+/**
+ * The seats that go on into the new period of a renewal recorded at the point of adjustment (`QĐ-106i`(2), R2-2): the seat whose last day
+ * is the renewal day or before stays on the old period to its last day, since the count of the seats needed (`SBF-20` §4.3) leaves it out.
+ */
+export function carriedPast<T extends SeatDays>(seats: readonly T[], endingBy: BusinessDate): T[] {
+  return seats.filter((seat) => {
+    const last = lastDayOf(seat);
+
+    return last === null || last > endingBy;
+  });
 }

@@ -172,6 +172,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'SUBSCRIPTION_RENEWAL_PROPOSED',
   'SUBSCRIPTION_RENEWAL_DECIDED',
   'SUBSCRIPTION_RENEWAL_LATE',
+  // The result of the adjustment of a subscription recorded by the IT Admin (`QĐ-106i`(3), `SBF-20`): told to Finance, and to the IT Admin in charge when another recorded it.
+  'SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED',
   'SUBSCRIPTION_AUTO_RENEWAL_INCIDENT',
   'SUBSCRIPTION_EXPIRY_MARKED',
   // The usage of an application is tracked from a vendor report (`qd103-vendor-usage-import`, `US-08-05` AC-2): told to each person who holds it.

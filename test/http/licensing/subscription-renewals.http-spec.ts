@@ -3,7 +3,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { RenewalDecisionService } from '../../../src/modules/licensing/subscription-renewal/decision/renewal-decision.service';
 import { RenewalOutcomeService } from '../../../src/modules/licensing/subscription-renewal/outcome/renewal-outcome.service';
-import { RenewalProposalService } from '../../../src/modules/licensing/subscription-renewal/proposal/renewal-proposal.service';
+import { RenewalRecordService } from '../../../src/modules/licensing/subscription-renewal/record/renewal-record.service';
 import { RenewalError } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal.errors';
 import { RenewalViewService } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal-view.service';
 import { bodyOf } from '../../support/api-body';
@@ -70,7 +70,7 @@ describe('subscription renewal routes (e2e, no database)', () => {
             detailOf: throwing,
           },
         },
-        { token: RenewalProposalService, useValue: { propose: throwing } },
+        { token: RenewalRecordService, useValue: { record: throwing } },
         { token: RenewalDecisionService, useValue: { confirm: throwing } },
         { token: RenewalOutcomeService, useValue: { record: throwing } },
       ],

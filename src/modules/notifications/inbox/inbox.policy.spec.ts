@@ -226,17 +226,26 @@ describe('the notices of the renewal of a subscription (a06, EP-11)', () => {
     SUBSCRIPTION_RENEWAL_PROPOSED: ['renewalId', 'subscriptionId', 'choice'],
     SUBSCRIPTION_RENEWAL_DECIDED: ['renewalId', 'subscriptionId', 'choice', 'executionPoint'],
     SUBSCRIPTION_RENEWAL_LATE: ['renewalId', 'subscriptionId', 'baseDate'],
-    SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate'],
+    SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED: [
+      'renewalId',
+      'subscriptionId',
+      'choice',
+      'quantity',
+      'outcome',
+      'nextSubscriptionId',
+      'substitute',
+    ],
+    SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate', 'renewalId'],
     SUBSCRIPTION_EXPIRY_MARKED: ['subscriptionId', 'baseDate', 'endDate'],
   } as const;
 
-  it('pins the keys of each of the seven codes (the Business Owner notice is gone, `QĐ-111g`), so a new key is a decision and not an accident', () => {
+  it('pins the keys of each of the eight codes (the Business Owner notice is gone, `QĐ-111g`), so a new key is a decision and not an accident', () => {
     for (const [code, keys] of Object.entries(KEYS_BY_CODE))
       expect({ code, keys: [...(PARAM_KEYS_BY_CODE[code as keyof typeof PARAM_KEYS_BY_CODE] ?? [])].sort() }).toEqual({
         code,
         keys: [...keys].sort(),
       });
-    expect(Object.keys(KEYS_BY_CODE)).toHaveLength(7);
+    expect(Object.keys(KEYS_BY_CODE)).toHaveLength(8);
     // The code is out of the table: nothing writes it any more, and a notice already kept under it is still read (its code is text).
     expect(PARAM_KEYS_BY_CODE).not.toHaveProperty('SUBSCRIPTION_BUSINESS_OWNER_LEFT');
   });

@@ -3,11 +3,11 @@ export type RenewalProblem =
   | 'NOT_FOUND'
   /** The caller is not among the people who work the renewals (a head of department, an employee: `SoD-2`). */
   | 'READ_FORBIDDEN'
-  /** A perpetual purchase, a draft or a period already continued has no renewal (`QĐ-49c`). */
+  /** No renewal is recorded for it (`QĐ-49c`, `FR-1.12`(9)): `details.reason` is PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE or ALREADY_CONTINUED. */
   | 'NOT_RENEWABLE'
   /** The period has no milestone: the contract data must be completed first (`US-11-05` AC-1). */
   | 'CONTRACT_DATA_INCOMPLETE'
-  /** The period already has a proposal: one case per period. */
+  /** The period already has its result recorded, or a case of before still waits for its outcome: one case per period (`details.renewalId`). */
   | 'ALREADY_PROPOSED'
   /** The quantity does not fit the choice: a reduction names fewer seats than bought, the others name none. */
   | 'QUANTITY_INVALID'
@@ -25,6 +25,14 @@ export type RenewalProblem =
   | 'PROPOSAL_STALE'
   /** Reducing within the paid period is only for a subscription that allows a reduction mid-term. */
   | 'MID_TERM_NOT_ALLOWED'
+  /** The result is recorded from the point of adjustment of the period, not before it (`QĐ-103e`). */
+  | 'BEFORE_ADJUSTMENT_POINT'
+  /** The quantity is not the seats the system counts for the next period (`QĐ-104d`(1)). */
+  | 'QUANTITY_NOT_SEATS_NEEDED'
+  /** A cancellation while seats are in effect or a request for the plan is open, or while seats are needed (`QĐ-104d`(2)). */
+  | 'CANCEL_NOT_ALLOWED'
+  /** The seats are the vendor minimum above the need and the note gives no evidence for it (`QĐ-104d`(1)). */
+  | 'VENDOR_MINIMUM_EVIDENCE_REQUIRED'
   /** The case is not waiting for its outcome (not decided yet, or recorded already). */
   | 'NOT_AWAITING_OUTCOME'
   /** An outcome as decided does not match the decision: record it as different. */

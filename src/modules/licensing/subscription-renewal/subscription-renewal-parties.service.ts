@@ -58,6 +58,25 @@ export class RenewalPartiesService {
     );
   }
 
+  /**
+   * Whether the IT Admin who records stands in for the one responsible for the subscription (`QĐ-104l`, `QĐ-58b`): the one responsible
+   * still works as an IT Admin and is someone else. Any IT Admin records; this only tells the audit trail and the notice who answers for it.
+   * `responsibleItAdminEmployeeId` is that person while they are usable, else null (nobody to tell, nobody replaced).
+   */
+  async substituteOf(
+    actor: Pick<AuthenticatedPrincipal, 'employeeId'>,
+    period: { responsibleItAdminEmployeeId: string | null },
+    tx?: DbTx,
+  ): Promise<{ substitute: boolean; responsibleItAdminEmployeeId: string | null }> {
+    const responsible = period.responsibleItAdminEmployeeId;
+    if (responsible === null) return { substitute: false, responsibleItAdminEmployeeId: null };
+    const usable = (await this.identity.findUsableItAdminEmployeeIds([responsible], tx)).has(responsible);
+
+    return usable
+      ? { substitute: responsible !== actor.employeeId, responsibleItAdminEmployeeId: responsible }
+      : { substitute: false, responsibleItAdminEmployeeId: null };
+  }
+
   /** The person assigned head of the department on `today`, or null: the department names none, or its head period has not begun. */
   async ownerHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
     return (
@@ -80,6 +99,11 @@ export class RenewalPartiesService {
   /** Finance, when they still work: who is told the result of a decision (`QĐ-94d`(2)). */
   financeOf(tx?: DbTx): Promise<string | null> {
     return this.identity.findUsableFinanceEmployeeId(tx);
+  }
+
+  /** The person who decides spending, or null: who hears of an incident but of nothing else of a renewal (`QĐ-99h`). */
+  approverOf(tx?: DbTx): Promise<string | null> {
+    return this.identity.getSpendingApproverEmployeeId(tx);
   }
 
   /** Who confirms a case proposed by this person now: the head of the owner department, and nobody in their place. */

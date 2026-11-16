@@ -169,7 +169,18 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   SUBSCRIPTION_RENEWAL_PROPOSED: ['renewalId', 'subscriptionId', 'choice'],
   SUBSCRIPTION_RENEWAL_DECIDED: ['renewalId', 'subscriptionId', 'choice', 'executionPoint'],
   SUBSCRIPTION_RENEWAL_LATE: ['renewalId', 'subscriptionId', 'baseDate'],
-  SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate'],
+  // The result of the adjustment of a subscription (`SBF-20` §13): what the IT Admin chose and the vendor did, the seats and the new period; no figure of money.
+  SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED: [
+    'renewalId',
+    'subscriptionId',
+    'choice',
+    'quantity',
+    'outcome',
+    'nextSubscriptionId',
+    'substitute',
+  ],
+  // `renewalId` is the case that chose a smaller period when the vendor renewed more (`QĐ-106i`(4)); null when the sweep found it.
+  SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate', 'renewalId'],
   SUBSCRIPTION_EXPIRY_MARKED: ['subscriptionId', 'baseDate', 'endDate'],
   // What the person is told before the usage of an application they hold is written (`US-08-05` AC-2): the application by id (the interface turns it into a name), what counts as activity,
   // the kinds of data, why, how long the usage is kept, and where to read it. Words and one number; never a name or a figure of money.

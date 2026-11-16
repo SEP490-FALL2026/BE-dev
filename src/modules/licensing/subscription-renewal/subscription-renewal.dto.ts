@@ -28,15 +28,6 @@ const pagination = z.strictObject({
 });
 const money = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
 
-export const proposeRenewalBodySchema = z.strictObject({
-  subscriptionId: z.uuid(),
-  choice,
-  proposedQuantity: quantity.optional(),
-  note: text.optional(),
-  /** The seats to take back when reducing below the seats in use: exactly the excess (`QĐ-66x`); none for another choice. */
-  releasedAssignmentIds: z.array(z.uuid()).max(10_000).optional(),
-});
-
 /** The head of the owner department confirms the proposal as it is; nothing of it is changed here (`QĐ-94d`(2)). */
 export const decideRenewalBodySchema = z.strictObject({
   decision: z.literal('CONFIRM'),
@@ -69,6 +60,48 @@ export const recordOutcomeBodySchema = z
   .refine((body) => !NEEDS_NOTE.includes(body.outcome) || body.note !== undefined, {
     path: ['note'],
     message: 'The note (the reason and the evidence) is required when the vendor refused or did something else.',
+  });
+
+/**
+ * The one write of the result at the point of adjustment (`SBF-20` §4.4): the choice and the seats, what the vendor did and the new period, and
+ * for a cancellation the two confirmations of closing the subscription (`QĐ-99i`). Only the shape is judged here; which number the seats must be
+ * is the count of the system (`QĐ-104d`), answered with its own code.
+ */
+export const proposeRenewalBodySchema = z
+  .strictObject({
+    subscriptionId: z.uuid(),
+    choice,
+    proposedQuantity: quantity.optional(),
+    /** The evidence of the vendor minimum when the seats are that minimum above the need. */
+    note: text.optional(),
+    outcome,
+    outcomeNote: text.optional(),
+    nextPeriod: nextPeriodSchema.optional(),
+    closure: z.strictObject({ dataExported: z.boolean(), adminsTransferred: z.boolean() }).optional(),
+  })
+  .superRefine((body, context) => {
+    if (NEEDS_NOTE.includes(body.outcome) && body.outcomeNote === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['outcomeNote'],
+        message: 'The note (the reason and the evidence) is required when the vendor refused or did something else.',
+      });
+    }
+    if (body.closure !== undefined && body.choice !== 'CANCEL') {
+      context.addIssue({
+        code: 'custom',
+        path: ['closure'],
+        message: 'The closure is confirmed only with a cancellation.',
+      });
+    }
+    const closing = body.choice === 'CANCEL' && body.outcome === 'AS_DECIDED';
+    if (closing && !(body.closure?.dataExported === true && body.closure.adminsTransferred === true)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['closure'],
+        message: 'Closing a subscription needs the data exported and the admins transferred, both confirmed.',
+      });
+    }
   });
 
 const listQuerySchema = z.strictObject({
