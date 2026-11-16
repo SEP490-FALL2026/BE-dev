@@ -1,5 +1,226 @@
 # OVERNIGHT-DECISIONS — chạy đêm Prompt 3 (14/11/2026)
 
+## ĐỌC TRƯỚC — tóm tắt cho Owner (16/11/2026, prompt 3 xong)
+
+> Owner chỉ cần đọc phần này. Phần dưới của file giữ nguyên làm chi tiết (`D-n`, `file:dòng`).
+> Cách trả lời: ghi "đồng ý khuyến nghị" cho cả bảng, hoặc ghi riêng `mã = A/B`. Dòng có chữ **ĐỔI** là khuyến nghị khác code đang chạy.
+> Owner không trả lời dòng nào ⟹ giữ phương án đang chạy.
+
+**Owner đã chốt 16/11 (không hỏi lại):** `loginEmail` = `workEmail` (phương án A, code ở prompt 5) · thông báo BE trả `title`/`message` theo
+`Accept-Language`, lỗi giữ `message` tiếng Anh + `code`/`details` cụ thể (prompt 5) · "Super Admin quản lý file mẫu" ngoài phạm vi ·
+prompt 4 dùng Fable (4a audit), 4b dùng Sonnet · MG-03 = A (15/11, D-82).
+
+**Khuyến nghị ĐỔI code (11 mã, cần Owner gật):** B2C-O1, B2B-05, AUDIT-MF23.a, B2A-Q2, FX1-O4, FIX-PL2-Q1, FX-1-RG(2), B1A-09,
+FIX-RV23-Q2, LBG-08, LBG-13. Cần Owner chọn vì nguồn không có khuyến nghị duy nhất: FIX-PL2-Q3, B3A-03, B3A-09, NL-1.
+
+### 1. Chờ Owner quyết
+
+#### MF-1 — Request, đánh giá, duyệt chi, cấp
+
+| Mã | Khuyến nghị | Câu hỏi | Đang chạy | Phương án khác |
+| -- | ----------- | ------- | --------- | -------------- |
+| B2C-R1 · K1-GR-Q1 · B2C-O3 (D-61) | Giữ | Hoàn tất cấp `K1` bắt buộc `k1Checklist` 2 mục, đúng thứ tự? | Bắt buộc 2 mục (`COMPANY_EMAIL_REGISTERED` rồi `NO_PERSONAL_DEVICE_MFA`) + bằng chứng; sai thứ tự 422. **FE phải gửi trước deploy**, không thì MF-1 bước 16 kẹt ở 3 gói `K1` demo | Tạm nhận `{ evidence }` khi FE chưa kịp · thêm mục 3 · bỏ kiểm thứ tự |
+| B2C-O1 (D-61) | **ĐỔI → B** | Gói `K1` có được gán bằng email công ty của nhân viên khác? | Nhận (IT tick là đủ) | 422 khi trùng `workEmail` của nhân viên khác, alias lạ vẫn nhận (đúng `FR-2.9`, `QĐ-111q`) |
+| IN-1-O3 · B2A-O1 (D-39) | Giữ A | `catalog-link` không tick có kiểm phạm vi phòng? | Không kiểm (thao tác ghi kỹ thuật, IT khác xử lý thay `QĐ-58b`); tick mới kiểm | Kiểm mọi lần |
+| B2B-05 | **ĐỔI → A** | Hàng cấp có cho IT Admin xem phòng ngoài phạm vi để xử lý thay? | Không (đúng SPEC "chỉ phòng trong phạm vi") | Thêm `scope=all` chỉ đọc như `GET /saas-issues` (khớp `QĐ-58b`, `QĐ-111ax`) |
+| IA-1-Q2 (D-55) | Giữ A | `GET /grant-queue` không truyền `state` thì trả gì? | Mọi trạng thái | Mặc định `WAITING` |
+| IA-1-Q3 (D-56) | Giữ A | IT thứ hai bấm "Cấp" cho Request đã có người nhận? | Trả lại đúng tác vụ đó (201, `claimedBy` người đầu) | 409 `PROVISIONING.TASK_TAKEN` |
+| IA-1-Q5 (D-56) | Giữ A | Người xin rút Request sau khi IT bấm "Cấp"? | 409 `ACCESS_REQUEST.GRANT_RUNNING` (`QĐ-111m`; A4 lưu ý có thể trái `US-05-08`) | Cho rút, tự hủy tác vụ chưa hoàn tất |
+| AUDIT-MF23.a · FX2-O2 (D-53) | **ĐỔI → B** (gói sau) | Request `K5` **gửi mới** khi trưởng phòng đã đi, kế nhiệm chưa bắt đầu? | Đi thẳng IT (Request đang chờ thì chờ kế nhiệm) | Gửi mới cũng chờ kế nhiệm (`QĐ-110h`/`110i`) |
+| AUDIT-MF23.b (D-54) | Giữ A | Người đề xuất tự quyết đề xuất danh sách phần mềm của mình? | 403 `DEPARTMENT_SOFTWARE.OWN_PROPOSAL`, không ngoại lệ | Cho tự quyết khi phòng không còn IT Admin khác |
+| B2A-Q1 · B2A-O7 (D-64) | Giữ A (demo) | Đề xuất rút gọn cho gói `K5` của ứng dụng nội bộ? | IT hoàn tất ⟹ 409 `SHORT_PROPOSAL_FREE_PLAN`, IT từ chối kèm `alternativePlanId`, người xin gửi lại case A | Chuyển nhánh `INTERNAL_FREE`, cấp thẳng |
+| B2A-Q2 · AUDIT-MF23-O1 (D-53) | **ĐỔI → A** | Request **trả phí** của người vừa thành trưởng phòng kẹt `WAITING NO_DEPARTMENT_HEAD`? | Kẹt, không ai được báo | A: bỏ bước nhu cầu, mở bước Người duyệt chi (`QĐ-103b`) · B: giữ chờ + báo Super Admin |
+| FX2-Q2 (D-71) | Giữ A | Nhóm "Khác" có tính là "cùng chức năng" ở màn Người duyệt chi? | Không | Có |
+| FX1-R1-OQ (D-49) | Giữ A | Trả lại cam kết theo tháng lịch hay theo ngày thật? | Tháng lịch (giữ lại nhiều hơn, tối đa gần nửa tháng mỗi seat) | Theo ngày thật |
+| FX1-O4 (D-47) | **ĐỔI → B** | Khoản 01/01 trả lại theo ngày tính theo giá nào? | Giá 01/01 (chặn trên bởi `heldMinor`) | Giá lúc duyệt (trả đúng số đã giữ) |
+| B-O1 (D-26) | Giữ A + 1 test | Request tiếp tục đã duyệt mà IT không bao giờ kéo dài ⟹ quyền sống mãi? | Giữ D-26 | Đặt hạn kéo dài, quá hạn thì kết thúc |
+| FIX-PL2-Q1 (PL2-04) | **ĐỔI → B** | Lô duyệt chi có _Không_ còn cho `REJECT` một phần? | Cho (`BR-MF1-07` nói cả lô trả về) | 422 `POLICY.CHECKLIST_HAS_NO` nếu không `RETURN` |
+| FIX-PL2-Q2 (PL2-06) | B (ghi ngoại lệ vào QT) | `internal-registration` có cần checklist `1.3`? | Không checklist | A: thêm checklist (mục `1.3` nói về nhà cung cấp, không hợp) |
+| FIX-PL2-Q3 (PL2-08) | **Owner chọn**: A nếu giữ `FR-11.2`, B nếu giữ phạm vi go-live | Gửi lại sau _Trả về_ có nhận hồ sơ bổ sung? | Không nhận | A: `resubmission` nhận `{ supplement }` (bảng mới, cỡ M) · B: ghi vào QĐ "không cần hồ sơ" |
+
+#### MF-2/MF-3 — nhân sự
+
+| Mã | Khuyến nghị | Câu hỏi | Đang chạy | Phương án khác |
+| -- | ----------- | ------- | --------- | -------------- |
+| D-16 · D-21 (R-38) | A cho demo, B trước dữ liệu thật | Ngày hết hợp đồng nhập ở đâu? | Chỉ `POST/PATCH /employees`; thiếu ngày ⟹ `TERM_REQUIRED` | Thêm cột vào import `BM-09` |
+
+#### MF-4 + SBF-11 — ngân sách năm và trong năm
+
+| Mã | Khuyến nghị | Câu hỏi | Đang chạy | Phương án khác |
+| -- | ----------- | ------- | --------- | -------------- |
+| LBG-12 (D-B12) | Giữ A | `costCenterId` của `BM-10` bắt buộc? | Tùy chọn (server suy ra; bắt buộc khi người gửi có > 1 Cost Center) | Bắt buộc như SPEC |
+| LBG-08 | **ĐỔI → A** | Kiểm Dự phòng kho ≤ Trần năm khi tạo/sửa kỳ? | Không kiểm; lỗi lộ ở lúc gửi phiên bản (409 `OVER_CEILING`) | 422 `BUDGET_CYCLE.RESERVE_OVER_CEILING` ngay ở kỳ |
+| LBG-13 | **ĐỔI → A** (đổi hợp đồng FE) | Chặn gửi phiên bản khi kỳ chưa khóa (QT §4.6)? | Không chặn | 409 mới khi kỳ chưa `LOCKED` |
+| B1A-09 (D-31) | **ĐỔI → B** | Nhắc "chưa có ngân sách năm sau" gửi bao nhiêu? | Mỗi Cost Center × người × Thứ Hai (10 CC thiếu ⟹ 20 thông báo/tuần) | Gộp một thông báo mỗi người mỗi ngày |
+| FIX-SM1-Q1 (D-95) | Giữ B | Seat-tháng tiêu cam kết ngay hay đợi ký tháng? | Tiêu ngay, tính lại thì bù trừ append-only | A': chỉ tiêu khi RV-1 ký tháng |
+| RV-1-Q1 (D-96) | Xác nhận A (đã tạm chốt) | Ký kỳ quý có báo Người duyệt chi? | Báo cả kỳ tháng và quý | Chỉ kỳ tháng |
+| RV-1-Q2 (D-96) | Xác nhận A (đã tạm chốt) | Phải chốt tháng theo thứ tự? | Không bắt | 422 nếu tháng trước chưa chốt |
+| AD-1-Q1 · AD-1-O6 (D-99) | Xác nhận A (đã tạm chốt) | Điều chỉnh đang chờ có giữ chỗ phần chưa phân bổ? | Không; lúc duyệt chỉ một cái qua | Trừ ngay lúc lập |
+| FIX-AD1-Q1 (D-101) | Giữ A | _Chuyển_ do đổi Cost Center tối đa bao nhiêu? | Phần còn lại (theo `QĐ-111bh`, US AC-10; trái SPEC T-AD1) | Số cơ sở (theo SPEC) |
+| FIX-AD1-Q2 (D-101) | Giữ A | Khi nào lập điều chỉnh được? | Chỉ khi kỳ đã khóa (`FR-5.18(3)` nói "lúc nào cũng được", A3) | Kỳ mở vẫn lập cho phòng không có đề xuất/phiên bản đang làm |
+| FIX-RV23-Q1 · RV-3-O3 (D-104) | Giữ A | "Cam kết dài hạn" ở màn rà soát quý là gì? | Mọi cam kết `HELD` của năm | Chỉ _Dùng lâu dài_ hoặc hết sau cuối quý |
+| FIX-RV23-Q2 (D-104) | **ĐỔI → B** (gói riêng) | Giảm cơ sở làm đã dùng vượt 80/100 % có báo? | Không báo | Báo như một lần vượt (`QĐ-111af`) |
+| NL-1 (Z2) | **Owner chọn** (nguồn chưa có khuyến nghị) | Ghế nền trước ngày tạo nhân viên có seat-tháng? | Tạo/import nhân viên ⟹ vị trí bắt đầu hôm nay (`memberSince` = hôm nay, chủ đích theo code) ⟹ seat-tháng các tháng trước = 0, không cảnh báo 80/100 % (DEMO-12 thiếu) | Vị trí tính từ `hireDate` |
+
+#### MF-5 — usage, ghế lãng phí, phạm vi đọc của IT Admin
+
+| Mã | Khuyến nghị | Câu hỏi | Đang chạy | Phương án khác |
+| -- | ----------- | ------- | --------- | -------------- |
+| US-1-Q1 (D-67) | Giữ A | `activeDays` của nhóm nhiều người đếm thế nào? | Hợp ngày (`QĐ-111aw`) | Người-ngày |
+| US-1-Q2 (D-69) | Giữ A | Dòng import đã khớp người ngoài phạm vi có hiện? | Ẩn (`US-08-04` AC-9) | Hiện cho người tải tệp |
+| US-1-Q3 · US-1-O3 (D-67) | Giữ A (demo) | Usage gắn phòng nào? | Phòng hiện tại | Phòng tại ngày phát sinh |
+| US-2-Q2 (D-72) | Giữ A | Sổ máy có lọc theo phạm vi phòng? | Không lọc | Lọc, ngoài phạm vi 404 |
+| IA-1-Q4 (D-58) | Giữ A | Bộ lọc `departmentId` của `GET /saas-issues` ngoài phạm vi? | Trang rỗng | Không kiểm khi `scope=all` |
+| B3A-03 (D-87) | **Owner chọn**: B nếu đẩy sớm là rà usage, A nếu IT khác được làm thay | Ai được đẩy sớm tầng _Theo dõi_? | Mọi IT Admin (`FR-4.12` nói IT phụ trách) | Chỉ IT có phòng người giữ trong phạm vi |
+| B3A-09 (D-87) | **Owner chọn**: B nếu đọc usage chặn cứng (`QĐ-111ax`), A nếu ghép tay là việc chung | Ứng viên của định danh chưa khớp hiện người phòng khác? | Hiện | Lọc ứng viên ngoài phạm vi |
+
+#### Kho, thuê bao, hợp đồng (SBF-20, cấp từ kho)
+
+| Mã | Khuyến nghị | Câu hỏi | Đang chạy | Phương án khác |
+| -- | ----------- | ------- | --------- | -------------- |
+| FY1-06 · C-O6 (D-48) | A cho demo, B khi có ca thật | Gói từng có thuê bao `TERM` không bao giờ đổi sang `K4`? | Chặn mọi `TERM` (kể cả đã hết) | Chỉ chặn `TERM` còn hiệu lực (migration mới) |
+| IA-1-Q1 (D-57) | Giữ A | Gói năm qua hạn chót báo hủy vẫn `SOON`? | `SOON` tới hết kỳ, `EXPIRED` sau ngày gia hạn (`QĐ-98e`) | Rời `SOON` sau hạn chót |
+| IA-2-Q1 (D-60) | Giữ A | `stock-summary?mine=true` đếm gì? | Chỉ thuê bao mình phụ trách | Cả gói |
+| IA-2-Q2 · B2B-07 (D-60) | Giữ A | `revocation` trên quyền là tác vụ nào; `claimableNow` đúng tên? | Mọi tác vụ chưa kết thúc; `claimableNow` chỉ xét `notBefore` (A4: true cả khi `FAILED`) | Chỉ tác vụ còn lý do; đổi `claimableNow` hoặc đổi tên |
+| B2B-Q1 (D-65) | Giữ A | Kỳ kế tiếp ghi trước có nhiều ghế hơn: ghế thêm Trống ngay? | Chỉ kỳ đang chạy | Cộng phần vượt vào Trống, cho cấp vào kỳ kế tiếp |
+| FX2-Q1 (D-70) | Giữ A | Cấp khi kỳ kế tiếp không đủ ghế? | 422 `SUBSCRIPTION_NEXT_PERIOD_SEATS`, IT sửa số ghế | Hệ thống tự mua thêm |
+| CO-1-Q1 (D-62) | Giữ A | Hợp đồng mới bắt buộc `vendorId` và `effectiveFrom`? | Bắt buộc cả hai | Chỉ nhà cung cấp |
+| CO-1-Q2 (D-62) | Giữ A | `PATCH /contracts` sửa được `name`? | Được, kèm lý do | Không |
+| B2D-Q1 · FX2-O3 (D-66) | Giữ B | Finance xem nguồn usage thế nào? | Route hẹp `GET /contracts/{id}/usage-sources` | Mở `GET /usage-sources` cho Finance |
+| FX-1-RG(2) · B1A-07 | **ĐỔI → B** (nguồn ghi "trước RC-1", RC-1 đã xong) | Đổi `unitPrice` VND mà không gửi giá gốc? | Giữ giá gốc cũ (lệch khi so hóa đơn R-44) | Xóa giá gốc |
+
+#### SBF-19 hóa đơn mua · SBF-11a lệch hóa đơn · SBF-07a ngoài quy trình
+
+| Mã | Khuyến nghị | Câu hỏi | Đang chạy | Phương án khác |
+| -- | ----------- | ------- | --------- | -------------- |
+| B3B-05 (D-85) | Giữ A | Hạn 5 ngày làm việc nộp hóa đơn có tính ngày thanh toán là ngày 1? | Có (`QĐ-104k(2)`: TT 10/11 ⟹ cờ 17/11) | Như SPEC T-PI (cờ 18/11) |
+| PI-1-Q2 (D-75) | Giữ A | Cost Center chịu của kỳ quá khứ? | Cost Center hiện tại của phòng | Lịch sử Cost Center theo ngày |
+| PI-1-Q3 (D-76) | Giữ A (demo) | Finance xem thực chi không cam kết ở đâu? | `GET /purchase-invoices?state=CONFIRMED` | Route mới theo Cost Center + năm |
+| PI-2-Q2 (D-77) | Giữ A | Thuê bao nhập khi đang chạy có cờ kỳ trước ngày nhập? | Không | Cờ từ ngày bắt đầu |
+| PI-1c-Q1 · PI-1c-O1 (D-78) | Giữ A | Ai nộp và thấy cờ hóa đơn của kho dùng chung? | Mọi IT Admin (A5: IT không xem được hóa đơn kho do IT khác nộp ⟹ cần Owner xác nhận) | Chỉ IT phụ trách |
+| RC-1-Q1 (D-79) | Giữ A | Đóng `OUT_OF_PROCESS_SUSPECTED` bắt buộc số chênh > 0? | Bắt buộc | Cho 0 |
+| RC-1-Q2 (D-79) | Giữ A | Người đóng hồ sơ lệch phải khác người ký? | Không bắt | Bắt, 409 |
+| B3C-06 (D-86) | Giữ A | Ai ghi tiền (`RECORD_SPENT`) ca ngoài quy trình? | Chỉ Finance (SBF-07a v4.1) | Finance hoặc IT (`QĐ-96e`) |
+| FIX-B3b-Q1 (D-93) | Giữ A (demo) | Ghi tiền mà không đóng ca: thêm route riêng? | Dùng `closure` + `RECORD_SPENT`, ca ở lại `OPEN` | `POST …/spend` riêng |
+| FIX-B3b-Q2 · B3C-01 (D-88, D-94) | Giữ A (demo) | Cần tác vụ thu hồi `SBF-18` thật cho tài khoản ngoài quy trình? | Không; `revocation.due` tính lúc đọc, IT thu hồi tay | Tác vụ thật (chạm bất biến `licensing`, cần review riêng) |
+
+#### Optional đang chờ Owner (không trả lời ⟹ giữ hiện trạng)
+
+| Mã | Nội dung một câu | Đề xuất trong nguồn |
+| -- | ---------------- | ------------------- |
+| FX-1-RG(1) · B1A-11 | Response thuê bao mất ngày ghi giá | Thêm `unitPriceRecordedOn` |
+| CT-1-RN(1) · C-O1 | `PATCH /applications` đổi tên/tên miền, đăng ký nội bộ case B lách luật trùng `QĐ-111b` | A (làm) |
+| IN-1-O2 | Đánh giá rút gọn không 422 khi gửi `adminConsole` cho gói không `K4` | Owner chốt |
+| B1A-05 · B-N2 | Hai mã/status cho một luật (giá ngoại tệ 409 vs 422; `SUPPLEMENT_TERM_NOT_ASKED` 409 vs 422) | Đồng bộ 422 |
+| B-O8 | Xác nhận các D-13…D-28 của RQ-1/2/3 | Audit kết luận giữ |
+| C-O2 | `PATCH /plans` gửi lại đúng `pricingModel` cũ vẫn 422 | Đã báo FE; cách A (bỏ qua khi bằng cũ) |
+| FX1-O3 · FX1-O3b · FX1-O6 | Request ngoại tệ cũ: `nextYearBudget` bỏ qua, giữ 9 thay 7 tháng, khoản 01/01 `NO_PRICE` | Owner/audit |
+| FX1-R3-O1 | Gắn gói khác kiểu sau duyệt chi không định giá lại | Owner |
+| AUDIT-MF23-O2 | Người xin `K5` không được báo khi bước nhu cầu bị bỏ | Gói thông báo |
+| IA-1-O7 | Phòng của phiếu SaaS là phòng hôm nay, không phải lúc báo | Gói sau nếu cần |
+| IA-1-O14 | Finance thấy tên IT phụ trách thuê bao | Ẩn nếu muốn |
+| IA-2-O4 · FX2-O1 · FX2-O5 · B2B-04 | Kho bỏ sót: thuê bao hết kỳ còn người giữ, gói tháng tự gia hạn có `endDate` qua, kỳ kế tiếp nháp | Gói thuê bao/kho sau |
+| B2D-02 · B2D-03 · B2D-09 · CO-1-O8 · B2D-04 | Hợp đồng: kỳ gia hạn không mang liên kết; liên kết không xét ngày hiệu lực; mã `INCOMPLETE` lệch nghĩa; gỡ thuê bao không lý do | B2D-03: A (giữ, FE cảnh báo); khác: gói hợp đồng sau |
+| US-1-O1 · US-2-O2 | Route đọc usage/identity và `GET /devices/{id}/usage` không lọc phạm vi phòng | Cùng quyết định với B3A-09 (mục 2 dòng 4) |
+| RC-2-O6 | `RECORD_SPENT` ghi vào tháng ghi nhận, không tháng chi thật | Thêm ngày chi nếu cần |
+| B3B-O2 · B3B-O5 | Cờ `OVER_APPROVED` bỏ qua hóa đơn chưa ký; chưa nhắc quá hạn 5 ngày | Owner xếp gói |
+| SM-1-O6 | Dòng kho có thể âm (hóa đơn năm chỉ ở tháng dịch vụ) | Owner (D-90) |
+| FIX-RV1-O3 | Độ chính xác hệ số k theo tháng | Làm khi cần |
+| FIX-AD1-O6 | Điều chỉnh `PENDING` qua 01/01 không tự hết hạn; Finance không hủy được bản mình lập | Gói sau |
+| FIX-PL2-O2 | Mục `5.3-02` không kiểm lại khi đẩy sớm | Kiểm lại, hoặc bỏ mục ở bản 2 `POL-USAGE` |
+| LBG-09 | Kỳ `LOCKED` khóa cả hạn quyết và ưu tiên | B (giữ, đã ghi D-B8) / A cho đổi kèm lý do |
+| LBF-06 | Khóa chữ mục `SYSTEM` của checklist | Owner chốt nếu khóa |
+| D-Z2-1 | Không có endpoint/CLI dựng thời gian cho seed | Ngoài phạm vi Z2, cần Owner |
+
+**Đã đóng, không cần trả lời:** IA-2-Q3, US-2-Q1, PI-1-Q1, PI-2-Q1, RC-2-Q1 (phần còn lại ở FIX-B3b-Q2), PL-2-Q1 (làm B), FX2-O2 (gộp
+AUDIT-MF23.a), MG-03 (A, 15/11).
+
+### 2. Lệch BRD/QĐ và nghi lỗi BE mới (16/11)
+
+Prompt 4a = audit xác nhận (Fable), 4b = sửa (Sonnet), 5 = `loginEmail`, i18n thông báo, chi tiết lỗi.
+
+| # | Mức | Mô tả | Nguồn | Đề xuất |
+| - | --- | ----- | ----- | ------- |
+| 1 | Cao | SBF-20 điều chỉnh thuê bao vẫn qua trưởng phòng `CONFIRM` (`QĐ-103e`/`104d` đã bỏ); vẫn cho `CANCEL` khi còn ghế gán; vẫn cảnh báo `RENEWAL_ALERT_DAYS_BEFORE_DEADLINE`; **kho `K2`/`K4` không phòng sở hữu ⟹ 404, không có route điều chỉnh nào**; sự cố tự gia hạn không báo Finance (`QĐ-106i`), Finance 403 ở `subscriptionDeadlineEventList` | REPORT-A4, REVIEW-R2 §3.7 | 4a thiết kế lại theo QĐ ⟹ 4b |
+| 2 | Cao | Duyệt chi (`spendApprovalDecide`, `spendBatchDecide`, `spendApprovalLineDecide`) trả **500 thay 409** khi `BUDGET.COMMITMENT_NOT_HOLDABLE`/`COMMITMENT_EXISTS` (mapper spend/group-request không gọi `budget.http-errors`) | REPORT-A6 (đã kiểm code) | 4b, sửa nhỏ |
+| 3 | Cao | Thông báo thiếu ở MF-1: gửi lại sau _Trả về_ không báo ai, người giữ bước mở lại không nhận `STEP_ASSIGNED`; bước chi mở qua lô không có `STEP_ASSIGNED` cho Người duyệt chi; trưởng phòng tự đề xuất phần mềm mới ⟹ IT không được báo; trình lô dừng `PRICE_MISSING` ⟹ IT không được báo | REPORT-A1, A6 (đã kiểm), REVIEW-R1 F3 | 4a gom một gói thông báo ⟹ 4b; chữ theo prompt 5 |
+| 4 | Cao | Báo lỗi SaaS không phát thông báo nào (`FR-2.15`, SBF-09 b7, `QĐ-108f`); thiếu tệp đính kèm (`QĐ-108g`); không tự đóng khi quyền kết thúc/người báo nghỉ (`QĐ-108h`); `DUPLICATE` nhận cả `WAITING_*` | REPORT-A4, REVIEW-R2 §3.7 | 4a ⟹ 4b |
+| 5 | Trung | Thông báo thiếu khác: SBF-07a không báo người dùng và trưởng phòng (`QĐ-103m`); SBF-08 không báo IT; SBF-19 không nhắc hạn nộp (IT, Finance); ghi "đã nghỉ việc" (`DEPARTURE_MARKED_LEFT`) không báo ai; phiên bản thông báo giám sát mới không báo người giữ máy (`FR-10.4`); không cảnh báo IT khi người giữ chưa xác nhận (SBF-05) | REVIEW-R1 C5, REPORT-A5, A2, A4 | Cùng gói thông báo ở dòng 3 |
+| 6 | Trung | `QĐ-111ax`: IT Admin đọc ngoài phòng phụ trách ở `ghostSeatRecommendationGet` (bằng chứng đầy đủ), `ghostSeatExemptionList`, `usageIdentityMappingList`, `usageUnmatchedIdentityList`, `usageNoAssignmentFindingList`, usage máy; `ghostSeatQueueList` trả `evidence` đầy đủ cho trưởng phòng (trái `SoD-2`) | REPORT-A4, REVIEW-R2 §3.7 | Chờ Owner (B3A-09, US-1-O1) ⟹ 4b lọc |
+| 7 | Trung | SBF-08 thiếu route import "danh sách tài khoản xuất từ trang quản trị nhà cung cấp" (`QĐ-111y`); quyết định chỉ `FALSE_ALARM`/`OUT_OF_PROCESS` (không cấp/thu hồi lại SBF-17/18); `INVOICE_DIFFERENCE` chỉ `FALSE_ALARM` | REPORT-A5 | Chờ Owner: làm hay ghi ngoài phạm vi go-live |
+| 8 | Trung | NL-1: vị trí của nhân viên tạo/import bắt đầu hôm nay (`memberSince`, chủ đích theo code) ⟹ seat-tháng các tháng trước = 0, DEMO-12 không có cảnh báo 80/100 % | Z2-NOTES | Chờ Owner (bảng 1, MF-4) |
+| 9 | Trung | Request nhóm do trưởng phòng gửi nhận tới 100 người; `BR-MF1-01` ≤ 10 | REPORT-A1, REVIEW-R1 E | Chờ Owner: sửa BRD hay sửa code (4b) |
+| 10 | Trung | SBF-19: hạn 5 ngày làm việc BRD tính từ ngày mua, code từ ngày trả của kỳ; tháng thêm của `K1` do Request tiếp tục không bao giờ có cờ "chưa có hóa đơn" (`QĐ-111x`) | REPORT-A5, REVIEW-R1 F5 | 4a ⟹ 4b (phần hạn: cùng B3B-05) |
+| 11 | Trung | Chưa có dashboard Finance và Người duyệt chi (`FR-5.14`, BRD §5.5.4); dashboard trưởng phòng thiếu danh sách phần mềm của phòng và người chuyển đến trong ân hạn | REPORT-A5 | Chờ Owner (phạm vi) |
+| 12 | Trung | Thiết bị: người giữ không mở được bản đã ký (`US-09-03` AC-7); chưa có route dừng thu thập (`FR-4.18`) | REPORT-A4 | 4a ⟹ 4b |
+| 13 | Trung | Chặn còn sót sau khi hủy hồ sơ nghỉ muộn không hiện ở `appUserGet`/hồ sơ `CANCELLED` ⟹ Super Admin không biết gọi `appUserUnlock` | REPORT-A2 | 4b |
+| 14 | Thấp | MF-2: đóng hồ sơ đòi nhiều hơn `BR-MF2-06` (BRD chỉ mục 1b); `workEmail`/`loginEmail` không kiểm tên miền khi nhập (`QĐ-54c`); `onboardingChecklistGet` bước 5 luôn `NOT_AVAILABLE`; ghi nghỉ `BLOCK_NOW` qua thông báo vẫn bắt `lastWorkingDay` (`QĐ-110b`) | REPORT-A2, REVIEW-R2 §3.1 | Tên miền: prompt 5 cùng `loginEmail`; còn lại 4b |
+| 15 | Thấp | SBF-11a: BRD cho IT đóng ca "nhà cung cấp tính sai", code chỉ Finance; SBF-07a có 4 kết cục (thêm `REPORT_ONLY`) so BRD 3 | REPORT-A5 | Chờ Owner hoặc sửa BRD |
+| 16 | Thấp | Cấp: chưa có SLA 2 ngày làm việc (`US-07-01` AC-19, `dueOn = null`); `grantQueueList.expectedEndDate` luôn `null` với Request mới; ghi chú đẩy sớm (`5.3-06`) lưu nhưng không route nào trả | REPORT-A1, A4 | 4b |
+| 17 | Thấp | Contract/OpenAPI lệch code: mô tả cũ (Trần phòng, service account, "Finance gave it back"…); mã thật không khai (`PURCHASE_INVOICE.NO_PLACE`, `POLICY.VERSION_NOT_FOUND`, `BUDGET.COST_CENTER_NOT_FOUND`…); 403 vs 409 `ANOTHER_IT_ADMIN_NEEDED`; `PROPOSAL_STALE` có ghi; `deviceHolderChange` 422 thay 404; DTO tax-profile hứa 100 dòng (handler 20); `departmentDeactivate` còn `serviceAccounts`; `policyList.totalItems` đếm cả bản chưa xuất bản | REPORT-A1, A3, A4, A5, REVIEW-R1 F, R2 §3 | 4b dọn một lượt |
+| 18 | Thấp | `seatMonthChargeList` có thể 500 thay 503 khi DB tạm lỗi (chưa kiểm global filter); `budgetMine` phòng chưa có Cost Center 403 trong khi nộp đề xuất 409 | REPORT-A3 | 4a kiểm |
+| 19 | Thấp (chưa kiểm lại) | `ABRUPT_DEPARTURE_RECORDED` không loại người nghỉ khỏi IT nhận; `VENDOR_ADMINS_BELOW_MINIMUM.adminCount` luôn 0; nhánh IT của `CONTROLLED_WAIT_ALERT` không chạy; `WITHDRAWAL_AWAITING_IT_CLOSE` không báo ai khi phòng chưa có IT; `REQUEST_RESERVE_CONFIRMATION_NEEDED` là mã chết | REPORT-A6, REVIEW-R1 F2 | 4a kiểm |
+| 20 | Thấp | Lỗi chung chung: ~60 mã 409/422 thiếu id/lý do; `VALIDATION_ERROR` thiếu min/max; 3 mã 503 cùng nghĩa; tiền trong `details` là minor chuỗi | REPORT-A1…A6, `apidocs/GENERIC-ERRORS.md` (184 dòng) | Prompt 5 |
+
+### 3. Thay đổi phá hợp đồng FE
+
+- `termMonths` thay `expectedEndDate` (gửi, xem trước, nháp, nhóm, đề xuất, hồ sơ bổ sung); Request tiếp tục gửi `extensionMonths` hoặc `longTerm`, bỏ `newEndDate`; bỏ `manyPaidSoftwareReason`.
+- Xem trước Request: bỏ `flags`, `maxEndDate`, `termRequired`, `limits.paidSoftware*`, `reasonRequired`; thêm `termRefusal`, `limits.resetsOn`, `cost`; Request có thêm `cost`, `termCost`, `nextYearBudget`.
+- Mã lỗi đổi status: `OPEN_LIMIT_REACHED` 409→422 (`details { limit, resetsOn }`, tuần lịch, mặc định 10); `RENEWAL_REQUEST.WINDOW_NOT_OPEN` 409→422; bỏ `END_DATE_OUT_OF_RANGE`, `TERM_BEYOND_LIMIT`, `MANY_PAID_SOFTWARE_REASON_REQUIRED`; thêm `ACCESS_REQUEST.TERM_*`, `SUPPLEMENT_TERM_*`.
+- Checklist bắt buộc (lỗi `POLICY.*`) ở mọi route quyết định MF-1 (nhu cầu, duyệt chi, lô, xác nhận dự phòng, đánh giá), quyết định ghế lãng phí `5.4` và quyết định phiên bản ngân sách; thêm `RETURN`.
+- Hoàn tất cấp `K1` bắt buộc `k1Checklist` biến thể `GRANT` (422 `PROVISIONING.K1_CHECKLIST_*`).
+- Hàng cấp: không truyền `state` ⟹ mọi trạng thái, thêm `execution`, `logoUrl`; rút Request sau khi IT bấm "Cấp" ⟹ 409 `GRANT_RUNNING`; `catalog-link` trả `{ request, departmentList }`; cấp có 409 `CONTRACT_ENDED`, 422 `SUBSCRIPTION_NEXT_PERIOD_SEATS`.
+- Kỳ ngân sách: `POST /budget-cycles` tạo nháp (`sharedPoolReserve` bắt buộc), `POST …/opening` để mở; `status` `DRAFT/OPEN/LOCKED`; bỏ `ceilings`, `allocated`, `unallocated`.
+- Route đã xóa (404): 9 route ngân sách (Trần phòng, publish, các route dòng, import phiên bản, ghi hóa đơn cam kết tay) và `exchangeRateList`/`Record`, `reportingCurrencySet`.
+- `BM-10`: bỏ `lines[]`, thay `requestedAmount` + `note?` + `attachmentIds` 1–10 (bắt buộc); rút/trả về khóa sau hạn nộp.
+- Phiên bản ngân sách: bỏ `quarters`; gửi cần ≥ 1 tệp; `BUDGET.OVER_ANNUAL_CEILING` → `BUDGET_VERSION.OVER_CEILING` (`overBy`, `availableMinor`); quyết định chỉ `APPROVE`/`RETURN`; `budgetMine` bỏ `departmentCeiling`, `cycle.published` → `cycle.status`.
+- Tiền: `unitPrice` chỉ VND (422 `SUBSCRIPTION.PRICE_NOT_VND`), ngoại tệ ở `originalPrice`; body tiền chỉ nhận `amount` (gửi `currency` ⟹ 422 `VALIDATION_ERROR`); bỏ tham số `FISCAL_YEAR_START_MONTH`, 409 `PARAMETER.LOCKED`.
+- `applicationCreate` tạo ứng dụng + gói đầu trong một lệnh, bỏ `kind` và ô liên lạc, 409 `APPLICATION.DUPLICATE`, `pricingModel` do hệ thống suy; `K4` chỉ `PERPETUAL`.
+- Hợp đồng: `contractCreate` bắt buộc `vendorId` + `effectiveFrom`; `contractGet` bọc trong `contract`.
+- Field mới bắt buộc ở response: `plan.logoUrl`, `revocation` (quyền), `termCutAt` (tác vụ), `title`/`department` (phiếu SaaS), `collection` (máy), `applicationLogoUrl`; 403 `DEPARTMENT_SOFTWARE.OWN_PROPOSAL`.
+- Usage: `usageImportRowList` ẩn dòng ngoài phạm vi IT; `DUPLICATE_FILE` + `duplicateOfImportId`; tầng `MONITOR` là `OPEN` chỉ IT thấy. (MF-2/MF-3 chỉ thêm, không phá.)
+
+Chi tiết: `Docs/Figma UI-UX/API-Integration/changes/2026-11-16-prompt3-fe-feedback.md`.
+
+### 4. Demo và deploy
+
+**DEMO (Z2, DB trống, 16/11; Z2-NOTES đang được cập nhật, dòng mới nhất thắng bảng tổng cũ):** Đạt: DEMO-1, 2, 3, 5 (Request tiếp
+tục R33, bước `demo.renewal`), 8 (ghế tài khoản máy Slack, `demo.machine-account`), 9, 11 (SBF-11a 1 ca, SBF-08 3 dòng, SBF-07a 1 ca
+`RECORD_SPENT`), 13, 15. Đạt một phần: DEMO-4 ("năm nay 2 tháng" chỉ đúng khi seed tháng 11), 6, 7 (vị trí nhân viên seed bắt đầu ngày
+seed ⟹ điều chuyển sớm nhất ngày sau; "xin lại và cấp lại" phải làm tay ngày demo: NV-DEV4 gửi Request Jira, NV-ITOH duyệt, NV-ITA1
+cấp), 10 (kỳ "chưa có hóa đơn" = 0 ở ngày seed), 12 (NL-1), chung (logo: chưa có tính năng). Không ở ngày seed: DEMO-14.
+
+**Lịch seed:** seed ≤ 1 ngày trước demo; **ngày demo chạy lại seed, không reset** (`seed.sh --continue`) để ghi điều chỉnh DEMO-14
+(kỳ năm Y khóa từ ngày sau ngày seed). Tự tới sau ngày seed: DEMO-6 "quá hạn thu hồi" (ngày làm việc sau), DEMO-13 "quá hạn"
+(sau 5 ngày làm việc), DEMO-15 phiên bản từ số liệu nền (sau 30 ngày).
+
+**VPS cần MinIO thật** (bucket `OBJECT_STORAGE_BUCKET`): `BM-10` và phiên bản ngân sách bắt buộc tệp. Máy local dùng SeaweedFS vì không
+kéo được image MinIO; `seed.sh`/Compose prod chưa diễn tập.
+
+**Chuỗi lệnh từ DB trống** (điều kiện: release chứa `feat/z2-seed` đã deploy qua CI/CD; `postgres`, `minio`, `api`, `worker` chạy):
+
+1. Máy Owner: `scp scripts/ops/seed.sh .env.seed.example <demo-host>:/opt/slm/backend/`.
+2. VPS: `cp .env.seed.example .env.seed && chmod 600 .env.seed`, điền `SEED_OPERATOR_REFERENCE`, `SEED_SUPER_ADMIN_PASSWORD`,
+   `SEED_DEMO_ACCOUNT_PASSWORD` (12–128 ký tự, khác nhau), `SEED_ALLOW_RESET=true`.
+3. DB còn dữ liệu cũ: `seed.sh --app-dir /opt/slm/backend --config /opt/slm/backend/.env.seed --confirm-reset <POSTGRES_DB>` (dump →
+   DROP/CREATE → provision → migrate → reconcile → up → apply). Đã tự DROP: `compose stop api worker` → `CREATE DATABASE` → `compose run
+   --rm -T db-admin` → `seed.sh … --continue`.
+4. Ngày demo: `seed.sh … --continue` (không reset). Mã thoát: 0 xong, 2 không còn gì ghi, 3 từ chối, 4 xung đột, 1 lỗi.
+
+**Kiểm lúc deploy (Ops):** `REQUEST_OPEN_NEW_LIMIT` đã lưu ở DB thật (RQ-1-R1(a)); gói `K4` có thuê bao `TERM` (FY1-05, SQL ở OVERNIGHT);
+đọc `RAISE NOTICE` của migration `…002900` (FX-1-RG(3), B1A-15); ghi danh sách ứng dụng đổi nhóm của `…003400` (C-O4); chạy
+`ops:preflight`/`migrate status` trước bản hợp nhất (MG-06); DB local của nhánh phải reset (B-O5); FE gửi `k1Checklist` trước deploy (B2C-R1).
+
+**Trạng thái nhánh và CI (16/11 tối):** `feat/fe-feedback` = FIX-TEST (7 commit test, chat 83) + merge Z2 `0940aa5b` + merge tài liệu
+`feat/mf2-mf3`. **CI GitHub đầy đủ xanh** (run `43856062372` trên `0940aa5b`: quality gồm `pnpm check`/drift Prisma/compose/openapi/audit,
+http-contract, integration 1–3, integration-inband, e2e-smoke); `test:flows` local 11/11 suite xanh (9 test `it.skip` có sẵn của MF-2/MF-3);
+`seed:local` từ DB trống exit 0. Nhánh đã push lên GitHub để chạy CI (chỉ nhánh tính năng; chưa merge `dev`, chưa deploy). Commit sau
+`0940aa5b` chỉ là tài liệu. Tài liệu API FE: Docs `main` `94f8b68` + `a643633` (chưa push).
+
+---
+
+# Chi tiết (giữ nguyên từ đêm 14–16/11)
+
 > Nhánh `feat/fe-feedback`. Chế độ đêm ([HANDOFF-CHAT §6](HANDOFF-CHAT.md)): Owner không trả lời; mọi điểm tự chốt dưới đây là **tạm chốt**,
 > audit sẽ hỏi lại Owner từng điểm `D-n`. Mỗi mục: câu hỏi · phương án · đã chọn + căn cứ · file/commit · cách đổi lại.
 > Thứ tự căn cứ: QĐ → BRD → OWNER-REVIEW → SPEC/PLAN → code → thông lệ. Không tự chốt điều trái QĐ.
@@ -1460,3 +1681,236 @@ _Bổ sung D-26 (review RQ-3):_ quyền mà cổng thu hồi từ chối (`Revoc
 - **File/commit:** RV-3.1 `3166bd0b` (`budgets/review/budget-review-explanation.{policy,policy.spec,dto,mapper,service,controller}.ts`, `budget-review-explanation-reminder.service.ts`, `budget-review.{repo,dto,errors,http-errors}.ts`, `budget-review-{snapshot,signature,query,reminder}.service.ts`, `budget/budget-facts.service.ts` `nonWorkingDates`, mã thông báo, migration, `prisma/models/budgets.prisma`, `docs/rules/security-jobs.md`, `test/integration/budgets/budget-review-explanation.integration-spec.ts`, manifest test), `e68e8f7c` (file sinh); RV-3.2 `11ad63fd` (`budgets/commitment/*`, `budget/commitment.repo.ts`, `test/integration/budgets/budget-commitments-long-term.integration-spec.ts`), `73d38397` (file sinh), `3f344392` (`test/http/budgets/budget-commitments.http-spec.ts`).
 - **Đổi lại:** (1) cho kỳ quý đóng ở `SNAPSHOT` bằng cách bỏ nhánh `QUARTER` ở `BudgetReviewRepo.insert` (ký thẳng vẫn được); (2) đổi `explanationDueOn` ở policy thuần; (3) bỏ ràng buộc trưởng phòng ở `BudgetReviewExplanationService`; (4) đổi `closeUnanswered` (ví dụ chỉ `UNEXPLAINED`); (5) bỏ trigger `budget_review_lines_explanation_guard` bằng migration kế; (6) đổi `explanationReminderDay`; (8) đổi `CommitmentService.list` (và `termMonths` ở `CommitmentRequestView` nếu lọc theo thời hạn thật).
 - **Sửa bởi D-104 (FIX-RV23):** (3) số tiền nhu cầu tới cuối năm BẮT BUỘC và nhận 0 (RV3-03, migration `20261113102600`); (4) `NO_HEAD` quyết LÚC MỞ KỲ, lúc ký chỉ còn `UNEXPLAINED` (RV3-04); (6) thêm yêu cầu giải trình gửi ngay lúc mở kỳ, `BUDGET_REVIEW_EXPLANATION_REQUESTED` (RV3-01); (8) "cam kết dài hạn" = mọi cam kết còn giữ của năm của kỳ, `year` bắt buộc (RV3-02, tạm chốt A, B ở FIX-RV23-Q1).
+
+---
+
+## Lane B (gộp từ OVERNIGHT-DECISIONS-LANE-B.md, 16/11)
+
+> Nhánh `feat/fe-feedback-lane-b`. Owner không trả lời lúc chạy; mọi điểm dưới đây là **tạm chốt**, audit hỏi lại từng `D-Bn`. Mỗi mục: câu
+> hỏi · phương án · đã chọn + căn cứ · file/commit · cách đổi lại. Thứ tự căn cứ: QĐ → BRD → OWNER-REVIEW → SPEC/PLAN → code → thông lệ.
+
+### Chờ Owner quyết
+
+| Mã                   | Câu hỏi                                                                                                                                                                                                                                                                                                                                                                                                                      | A                                                                                                                                                                                                                                                               | B                                                                       | Khuyến nghị                                                                                                                                                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LBG-12 (D-B12(2))    | `costCenterId` của `BM-10` tùy chọn hay bắt buộc? Hiện server suy ra Cost Center của phòng người gửi và chỉ bắt buộc (422 `BUDGET.COST_CENTER_REQUIRED`) khi người đó phụ trách hơn một Cost Center trong năm; SPEC ghi bắt buộc.                                                                                                                                                                                            | Giữ tùy chọn (đúng QĐ-111ab, FR-5.15(1); không đổi hợp đồng đang chạy của FE).                                                                                                                                                                                  | Bắt buộc như SPEC: bỏ `.optional()` ở `budget.dto.ts`, FE luôn gửi.     | **A.** Không trái QĐ; bắt buộc chỉ thêm một trường FE phải gửi mà server đã suy ra được.                                                                                                                                    |
+| LBG-08               | Dự phòng kho (`sharedPoolReserve`) ≤ Trần năm (`annualCeiling`) chưa được kiểm khi tạo/sửa kỳ. Dự phòng > Trần ⟹ phần còn lại bị kẹp về 0 ở view và mọi lần gửi phiên bản bị 409 `BUDGET_VERSION.OVER_CEILING` mà không có thông báo sớm về nguyên nhân.                                                                                                                                                                     | Chặn ngay ở `POST`/`PATCH /budget-cycles`: 422 mã mới `BUDGET_CYCLE.RESERVE_OVER_CEILING` (luật thuần ở `cycle.policy.ts` + unit test; thêm mã vào manifest/ví dụ OpenAPI).                                                                                     | Giữ như nay: lỗi chỉ lộ ở lúc gửi phiên bản.                            | **A.** Chi phí nhỏ, báo lỗi đúng chỗ Finance đang nhập.                                                                                                                                                                     |
+| LBG-13               | Gửi phiên bản trước khi khóa kỳ chưa bị chặn: Finance lập và gửi phiên bản từ đề nghị trước hạn nộp được, trong khi QT §4.6 nói "sau khi khóa, Finance … chốt"; gửi sớm còn đóng cửa sổ tạo phòng R-16 sớm hơn mong đợi.                                                                                                                                                                                                     | Chặn gửi phiên bản khi kỳ chưa `LOCKED` (409 mới). Chi phí: harness/test hiện gửi phiên bản khi kỳ đang `OPEN` phải đặt hạn quá khứ trước khi gửi; FE/Z2 phải biết.                                                                                             | Giữ: Finance làm dần khi đề nghị về; ghi rõ vào D-B8.                   | **A nếu Owner muốn đúng chữ QT §4.6**; B nếu muốn Finance xử lý sớm. Tôi nghiêng về A nhưng đổi hợp đồng nên cần Owner chốt.                                                                                                |
+| MG-03 (AUDIT-MERGE1) | Hóa đơn mua gắn **thuê bao** (`invoices.subscription_id`, `cost_center_id` NULL) không vào `spent` của Cost Center nào (`invoice.repo.ts` `spentOf` gom theo `COALESCE(i.cost_center_id, c.cost_center_id)`), nên kiểm FR-3.20 khi trình lô, snapshot Người duyệt chi và `spentThisYear` của số liệu nền không thấy khoản đó; Dự phòng kho dùng chung (mức kỳ) cũng không có số "đã dùng". Chỉ `lastInvoiceRecordedAt` thấy. | Thuê bao có phòng sở hữu ⟹ ghi thêm `cost_center_id` = Cost Center của phòng sở hữu ở tháng kỳ (lane A, `bookPurchaseInvoice` trả `SUBSCRIPTION` kèm `costCenterId`); thuê bao kho (`K2`/`K4`) ⟹ "đã chi kho" đọc theo `subscription_id` ở báo cáo kỳ (lane B). | Giữ nguyên và ghi vào SPEC rằng chi thuê bao nằm ngoài ngân sách phòng. | **A cho thuê bao có phòng sở hữu** (không thì kiểm FR-3.20 bỏ sót chi thật); phần kho cần Owner xác nhận có muốn số "đã dùng" của Dự phòng kho hay không. Chưa làm: đổi nghĩa `spent` là việc của lane A và cần Owner chốt. |
+
+### Quyết định tự chốt (D-Bn)
+
+#### D-B1 — thêm `GET /policies/{code}/draft` cho Super Admin
+
+- **Câu hỏi:** SPEC PL-1 có `PUT`/`DELETE` nháp nhưng không có route đọc nháp; Super Admin cần đọc nháp đang soạn.
+- **Phương án:** (A) thêm `GET /policies/{code}/draft` (SUPER_ADMIN); (B) chỉ trả nháp trong `PUT`; (C) thêm trường `draft` vào `GET /policies/{code}`.
+- **Chọn A:** thêm một route chỉ đọc, không đổi route nào của SPEC; `GET /policies/{code}` không lộ nháp cho người đọc thường.
+- **File/commit:** `policies/library/` (task PL-1.3). **Đổi lại:** xóa route, FE dùng kết quả `PUT`.
+
+#### D-B2 — "người có vai áp dụng" tính theo vai được cấp (`directRoles`), không theo vai đang hiệu lực
+
+- **Câu hỏi:** MANAGER chưa là trưởng phòng của phòng nào có vai (cấp) nhưng không hiệu lực; có phải xác nhận chính sách không?
+- **Phương án:** (A) vai được cấp và còn hiệu lực (`directRoles`, giống `roles` của `GET /me`); (B) vai hiệu lực (`roles` của principal).
+- **Chọn A:** khớp `GET /me` (FE chặn theo danh sách này) và khớp người nhận thông báo xuất bản (tài khoản giữ grant). **Đổi lại:** đổi nguồn vai ở `acknowledgement.service.ts`.
+
+#### D-B3 — chủ sở hữu mục sổ collection của PL-1 là work item `us-01-bootstrap-login-session`
+
+- **Câu hỏi:** gate `api-collection-contract` đòi mỗi mảng lồng mới có `owner`/`item` là một thư mục có sẵn dưới `docs/workspace/items`; không có thư mục cho thư viện chính sách.
+- **Phương án:** (A) dùng work item EP-01 gần nhất có sẵn; (B) tạo thư mục work item mới (kèm README, dòng trong chỉ mục, rules:check).
+- **Chọn A** (US-01-13/14 thuộc EP-01; không tạo tài liệu chỉ để qua gate). **File:** `test/support/api-collection-registry-nested-pl1.ts`, `…-events-pl1.ts`. **Đổi lại:** đổi `OWNER`/`item` khi có work item riêng.
+
+#### D-B4 — báo cáo xác nhận đã đọc không lọc theo trạng thái
+
+- **Câu hỏi:** `GET /policies/{code}/acknowledgements` ("báo cáo đã/chưa, phân trang") có cần lọc `state=PENDING|DONE`?
+- **Phương án:** (A) không lọc, trả trang theo mã nhân viên với `state` từng dòng; (B) lọc bằng SQL join `app_users`/`role_grants` (bảng của module khác) hoặc đọc cả tập rồi cắt trang trong bộ nhớ (cả hai vi phạm luật).
+- **Chọn A** (đúng chữ SPEC, không lách luật module/phân trang); FE lọc trang đang xem. **Đổi lại:** thêm điều kiện `state` vào `IdentityAccessApi.pageUsableRoleHolders` cùng một câu join `policy_acknowledgements` qua facade.
+
+#### D-B5 — căn cứ ban hành bản 1 và nơi nạp 8 chính sách (SỬA theo FIX-LB1 LB1-01, LB1-02)
+
+- **Câu hỏi:** nạp 8 chính sách ở đâu và căn cứ bản 1 ghi gì khi tổ chức mới cài và khi tổ chức đã cài từ trước.
+- **Phương án:** (A) lệnh cài đặt nạp cho tổ chức mới; (B) thêm migration bù cho mọi tổ chức đã có (tiền lệ CT-1.1); (C) chỉ seed demo nạp.
+- **Chọn A + B** (bản đầu chọn A và loại B vì "không có tổ chức lúc migrate" — sai với môi trường đã cài; reviewer chỉ ra, đã sửa). Cài đặt mới: `PoliciesBootstrapApi.seedInitialPolicies` qua `InstallationInitialDataService`. Môi trường có sẵn: migration `20261113100300_fixlb1_policies_backfill` (SQL sinh từ `INITIAL_POLICIES`, mỗi câu bỏ qua cái đã có nên chạy lại không nhân đôi và không đụng bản Super Admin đã xuất bản; test DB thật đọc lại và so với code). Căn cứ bản 1 = đúng văn bản chính thức: _"Bộ mẫu SaaS-Sentry 1.0 — công ty xuất bản phiên bản 2 kèm quyết định của mình"_ (không còn "v1.9").
+- **File:** `policies/initial/*`, `installation/installation-initial-data.service.ts`, `prisma/migrations/20261113100300_*`. **Đổi lại:** sửa `INITIAL_CHANGE_NOTE` trước khi cài; migration đã chạy thì bản 1 bất biến — sửa bằng bản 2.
+
+#### D-B6 — bỏ mục đích tệp `COST_STATEMENT` ("sao kê") khỏi enum nhận mới (ĐÃ LÀM ở FIX-LB4 MG-04 `4508b978`, xem D-B22)
+
+- **Câu hỏi:** PLAN PL-3.1 bảo bỏ mục đích tệp sao kê khỏi enum nhận mới (US-01-12 AC-10, US-04-04 AC-11). Mục đích đó là `COST_STATEMENT` trong `catalog/contract/contract.dto.ts` + `contract.policy.ts`.
+- **Phương án:** (A) bỏ ngay ở lane B; (B) để lại tới lượt hợp nhất vì cùng file lane A (CO-1 sửa hợp đồng/tệp, PI-1 thêm mục đích tệp cho hóa đơn); (C) giữ vĩnh viễn.
+- **Chọn B** (tránh xung đột file chung, không mất gì: không có route nào của PL-3 nhận file sao kê, và **không có mẫu sao kê**). **Việc cho chat điều phối:** sau khi lane A xong PI-1, bỏ `COST_STATEMENT` khỏi danh sách nhận mới (`contract.dto.ts:95`, `contract.policy.ts:20,35`, `contract.policy.spec.ts`), giữ giá trị trong DB để đọc tệp cũ.
+
+#### D-B7 — các điểm Optional/Nit của review để lại (LB1-07…LB1-20, LB3-07…LB3-16)
+
+Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lane A); chờ lượt hợp nhất: LB1-07 khóa ngoại `organization_id` của ba bảng; LB1-09 thông báo xuất bản theo lô (hiện tuần tự trong transaction, quy mô cỡ 100–500 tài khoản); LB1-10 `POLICY_ROLES` suy từ `AppRole`; LB1-12 báo cáo xác nhận chưa có tổng đã/chưa (FE ghi chú); LB1-13 `GET /policy-steps/{stepCode}` để FE khỏi cứng hóa bước ⟹ chính sách; LB1-14 `applicableRoles` của xuất bản tùy chọn; LB1-16 `totalItems` đếm cả chính sách chưa có bản; LB1-17 `versionNumber` trả về khi DONE là bản hiện hành chứ không phải bản đã xác nhận; LB1-18 tên file `initial/pol-*.types.ts`; LB1-19 owner sổ collection (D-B3); LB1-20 migration không `IF NOT EXISTS`; LB3-07 `COST_STATEMENT` (D-B6); LB3-08 quyền tải mẫu do module sở hữu import khai; LB3-09 hai nguồn cùng một `kind`; LB3-10 dòng ví dụ có thể bị nhập thật; LB3-11 cách mở CSV trên máy Việt Nam; LB3-12 spec nhân sự ghim cột bằng literal; LB3-13 BOM viết bằng ký tự vô hình; LB3-14 nhánh `??` chết ở mẫu usage; LB3-15 tên `*-template.policy.ts` chứa hằng dữ liệu; LB3-16 tên file `mau-usage-csv.xlsx`. Chi tiết ở AUDIT-LB-PL1.md và AUDIT-LB-PL3.md.
+
+#### D-B8 — kỳ ngân sách: "hết hạn nộp" = ngày sau hạn nộp; luật sửa theo trạng thái; cửa sổ tạo phòng (BG-1)
+
+- **Câu hỏi:** (1) `QĐ-111z` nói "hết hạn nộp là khóa": ngày đúng bằng hạn còn trong hạn không; (2) lý do bắt buộc ở kỳ đang mở áp cho thay đổi nào; (3) cửa sổ tạo phòng khi kỳ năm sau còn nháp.
+- **Chọn:** (1) khóa từ **ngày sau** hạn nộp (cùng quy ước đã có của nhắc hạn: "ngày bằng hạn còn trong hạn"); (2) kỳ đang mở: dời hạn nộp (về hôm nay hoặc sau, không về quá khứ), đổi Trần năm, đổi Dự phòng kho đều **bắt buộc lý do** và lưu trước/sau; hạn quyết và ưu tiên đổi tự do; nháp sửa tự do, không lý do, hạn nộp có thể ở quá khứ nhưng **không mở được** (422 `BUDGET_CYCLE.DEADLINE_PASSED`, sửa trước); (3) nháp ⟹ cửa sổ **đóng** (đúng chữ SPEC "kỳ năm sau đã mở"); mở và chưa có phiên bản nào có `sent_at` ⟹ mở; không có kỳ nào ⟹ như cài đặt.
+- **Mã mới:** `BUDGET_CYCLE.LOCKED`, `.NOT_DRAFT`, `.ALREADY_OPEN` (409), `.DEADLINE_PASSED` (422), `.NOT_OPEN` (409, thay `BUDGET.CYCLE_NOT_PUBLISHED`); các mã cũ `BUDGET.CYCLE_*` còn lại giữ nguyên. Danh sách kỳ trả bản tóm tắt không có `priorities` (cổng collection-contract không cho phần tử danh sách trùng hình dạng chi tiết).
+- **Đổi lại:** nếu Owner muốn "đúng ngày hạn là khóa" hoặc nháp cũng cho tạo phòng thì đổi `cycleStateOf` / `windowOf` (một dòng mỗi nơi, có test).
+
+#### D-B9 — phiên bản ngân sách: một số cho cả năm, tên trường giữ nguyên, mã 409 đổi theo SPEC (BG-2)
+
+- **Chọn:** giữ tên trường đang có trên dây (`base`, `reserve`, `reserveReason`) cho `baseAmount`/`reserveAmount` của SPEC, để FE hiện tại không phải đổi tên; chỉ bỏ `quarters`. Mã vượt Trần: `BUDGET_VERSION.OVER_CEILING`, `details.overBy` và `details.availableMinor` là số nhỏ nhất dạng chữ (cùng kiểu mọi `details` tiền khác). Cột `q1..q4_minor` và dòng `BM-10` cũ **không ghi nữa nhưng không xóa** (expand–contract).
+- **Việc BG-2 còn lại, chưa làm ở lượt này:** BG-2.1 `CarriedOverContributions` (budgets mở điểm mở rộng, `requests` gắn bằng hàm 01/01 của XY-1 — lane A đang sửa chính hàm đó nên chờ; **đã nối ở FIX-LB4 MG-02**, D-B19), BG-2.2 `BM-10` = tệp + `requestedAmount` + `note` + khóa sau hạn, BG-2.3 xóa route dòng/import, BG-2.5 phần còn lại (`reservePercent`, ≥ 1 tệp khi gửi, mặc định cơ sở = số chạy sang), BG-2.6 số liệu nền (`carriedOverNextYear`, `noProposalSubmitted`, `BASELINE_NO_PROPOSAL`, bỏ chặn `HAS_HEAD`), BG-2.7 quyết định chỉ `APPROVE`|`RETURN`.
+
+#### D-B10 — phiên bản từ số liệu nền `BASELINE_NO_PROPOSAL` cần nới CHECK nguồn (nguyên nhân 500 của BG-2.1/2.6)
+
+- **Câu hỏi:** `POST /budget-versions` nguồn `BASELINE` trả 500 sau khi đổi `origin` sang `BASELINE_NO_PROPOSAL`.
+- **Nguyên nhân:** CHECK `budget_versions_source_check` (migration `20261108550000`) đòi `proposal_id IS NULL` ⟺ `origin = 'BASELINE_NO_HEAD'`; dòng mới có `proposal_id NULL` và origin mới ⟹ 23514 ⟹ 500.
+- **Chọn:** migration `20261113100600_bg2_baseline_no_proposal_source` thay CHECK bằng bản chỉ **nới** (`origin IN ('BASELINE_NO_HEAD','BASELINE_NO_PROPOSAL')`), mọi dòng cũ vẫn thỏa; không drop cột/bảng. `ADJUSTMENT` **chưa** thêm vào nhánh "không có proposal" — AD-1 (lane A) tự nới khi dùng. **Đổi lại:** migration mới thay CHECK.
+
+#### D-B11 — xóa route dòng (BG-2.3): dashboard trưởng phòng, lịch sử, phiên bản từ đề nghị
+
+- **Chọn:** (1) mục `approvedBudgetLines` của `GET /dashboards/manager` trỏ sang `budgetMine` (giữ tên khóa để FE không vỡ; mô tả đổi) — đổi tên khóa để Z2/FE quyết; (2) lịch sử phiên bản vẫn **đọc** được mục `LINE_UPDATED`/`LINES_ADDED`/`LINES_IMPORTED` cũ, chỉ bỏ phần ghi (`lineEdited`, `linesAdded`, `lineChange`, `chunkSnapshots` + spec); (3) phiên bản tạo từ đề nghị **không chép dòng** nữa (route đọc dòng đã xóa nên dòng chép sang là dữ liệu chết); bảng `budget_version_lines`, `budget_proposal_lines` giữ, thôi ghi.
+- **Đổi lại:** khôi phục từ commit BG-2.3 nếu Owner muốn giữ route đọc dòng cũ.
+
+#### D-B12 — `BM-10` (BG-2.2): `requestedAmount` ở `total_minor`, `costCenterId` vẫn tùy chọn, rút đề nghị cũng khóa sau hạn
+
+- **Chọn:** (1) `requestedAmount` lưu vào cột có sẵn `total_minor` (không thêm cột); response có cả `total` (giữ cho FE hiện tại) và `requestedAmount` + `note`; (2) `costCenterId` giữ **tùy chọn** như trước (chỉ bắt buộc khi người gửi phụ trách hơn một Cost Center trong năm — 422 `BUDGET.COST_CENTER_REQUIRED`), vì bắt buộc luôn là đổi hợp đồng không cần thiết; (3) `note` 1–1000 ký tự không toàn khoảng trắng (CHECK `budget_proposals_note_check`, migration `20261113100700`); (4) gửi, gửi lại **và rút** (đúng dòng SPEC) sau hạn nộp ⟹ 409 `BUDGET_CYCLE.LOCKED`; Finance trả về chỉ trước hạn (sau hạn 409 `BUDGET_CYCLE.LOCKED`, kỳ chưa mở 409 `BUDGET_CYCLE.NOT_OPEN`); luật thuần `proposalWorkRefusal` ở `cycle.policy.ts`; (5) số tiền 0 được nhận (không có luật nào cấm), âm ⟹ 422 như mọi số tiền.
+- **Xóa code chết:** `ProposalLineJudge`, `proposal-line-rules.policy` (ZBB, xếp hạng, cờ vượt Trần phòng) + spec, `BudgetProposalLinesInvalidError`, `BudgetPlanNotFoundError`, `requirePlans`/`planNames`, `patchChangesLine`, `versionLineOverCeiling`, đọc dòng của repo đề nghị.
+- **Đổi lại:** nếu Owner muốn `costCenterId` bắt buộc ⟹ bỏ `.optional()` ở `budget.dto.ts`.
+
+#### D-B13 — test: tệp của ngân sách ghi bằng SQL khi suite không nói về tệp
+
+- **Chọn:** `test/support/budget-files.ts` ghi dòng `budget_attachments` hợp lệ (đề nghị: `UPLOADED`; phiên bản: `ATTACHED`) đúng như route để lại; `submitProposal`/`resubmit`/`sendVersion` của harness và `approvedBudget` tự thêm một tệp khi body không nêu; test luật "≥ 1 tệp" gọi route thô. Không đụng object storage.
+
+#### D-B14 — số liệu phiên bản (BG-2.5/2.6): dự phòng theo tỷ lệ hay số tiền, cờ đỏ so cơ sở, gửi cần tệp
+
+- **Chọn:** (1) `reservePercent` (0–100, số nguyên) **hoặc** `reserve` (loại trừ nhau ⟹ 422); tỷ lệ Finance chọn được lưu vào `reserve_percent` (trả lại đúng như đã gửi) và dùng để tính `reserve`; dự phòng khác mặc định của tổ chức, dù chọn bằng tỷ lệ hay số tiền, cần `reserveReason` khi gửi (SỬA theo FIX-LB3 LBG-02 ⟹ D-B17; bản đầu cho tỷ lệ đã chọn khỏi lý do vì so với chính tỷ lệ đã lưu, trái QĐ-100h/100k, FR-5.15(2)); (2) `base` bỏ trống ⟹ điền `carriedOverNextYear` (cả nguồn `PROPOSAL` lẫn `BASELINE`; nguồn chạy sang: `requests` bind từ FIX-LB4 MG-02, D-B19; không ai bind ⟹ 0); `PUT` không tự đổi cơ sở theo số chạy sang; (3) `belowCarriedOver` = (**cơ sở + dự phòng**) < số chạy sang, kèm `carriedOverShortfall` (SỬA theo FIX-LB3 LBG-01 ⟹ D-B16; bản đầu so riêng cơ sở, trái QĐ-111ac, `C-09` và QT §4.6); ở số liệu nền cờ lấy theo phiên bản mới nhất (không tách rời) của Cost Center trong năm, không có phiên bản ⟹ `false`; (4) đếm tệp đính kèm khi gửi đọc `budget_attachments` qua `VersionRepo.countAttachedFiles` (capability `attachment` đã phụ thuộc `version`, import ngược tạo vòng — gate capability graph); (5) BG-2.5 và BG-2.6 vào một commit vì cùng DTO và cùng `VersionFigures`.
+- **Đổi lại:** (3) đã sửa sang so tổng (cơ sở + dự phòng) ở D-B16; so riêng cơ sở lại ⟹ đổi `belowCarriedOver` ở `budget.policy.ts`.
+
+#### D-B15 — quyết định phiên bản chỉ `APPROVE` | `RETURN` (BG-2.7)
+
+- **Chọn:** `RETURN` (lý do bắt buộc) ghi quyết định `CHANGES_REQUESTED` và trạng thái `CHANGES_REQUESTED` có sẵn (Finance sửa và gửi lại); `REJECT`, `REQUEST_CHANGES` ⟹ 422 `VALIDATION_ERROR`. Giá trị enum `REJECTED` (trạng thái và quyết định) **giữ** để đọc bản cũ; luồng "bản bị từ chối ⟹ đề nghị kế tiếp / làm lại từ đề nghị" giữ nguyên cho dữ liệu cũ (không còn đường tạo mới). Mã thông báo `BUDGET_VERSION_DECIDED` mang `decision: CHANGES_REQUESTED` khi trả về.
+- **Đổi lại:** thêm lại giá trị vào `decisionBodySchema` và `decisionOutcomeOf`.
+
+#### D-B16 — cờ đỏ `belowCarriedOver` so ngân sách phòng (cơ sở + dự phòng) và nói phần thiếu (FIX-LB3 LBG-01, sửa D-B14(3))
+
+- **Câu hỏi:** cờ đỏ so với số nào, và có nói phần thiếu không.
+- **Phương án:** (A) giữ so riêng cơ sở (D-B14(3) cũ); (B) so ngân sách phòng = cơ sở + dự phòng, thêm `carriedOverShortfall`; (C) so ngân sách phòng nhưng FE tự tính phần thiếu.
+- **Chọn B** theo chữ tài liệu: QĐ-111ac ("ngân sách phòng thấp hơn số chạy sang ⟹ cờ đỏ"), `C-09` ("ngân sách phòng = số cơ sở + dự phòng"), QT §4.6 dòng 780 ("kèm phần thiếu", ví dụ 800 + 80 = 880 so với 900 ⟹ thiếu 20 tr). `carriedOverShortfall` = `max(0, số chạy sang − (cơ sở + dự phòng))` là số tiền (`{ amount, currency }`) trên `GET /budget-versions/{id}` và trên từng phòng của `GET /budget-cycles/{year}/baseline` (0 khi đủ hoặc khi phòng chưa có phiên bản). Cờ vẫn không chặn gì.
+- **File/commit:** `budget/budget.policy.ts` (`belowCarriedOver`, `carriedOverShortfall` nhận `{ baseMinor, reserveMinor }` để hai nơi gọi không lệch), `budget/version-view.service.ts`, `cycle/baseline-flags.service.ts`, `cycle/baseline.service.ts`, DTO `budget.dto.ts` + `cycle.dto.ts`. **Đổi lại:** đổi hai hàm ở `budget.policy.ts` về so `baseMinor`.
+
+#### D-B17 — dự phòng khác mặc định của tổ chức luôn cần lý do khi gửi (FIX-LB3 LBG-02, sửa D-B14(1))
+
+- **Câu hỏi:** "khác mặc định" so với đâu: tỷ lệ đã lưu trên phiên bản, một ảnh chụp mặc định lúc lập, hay tham số mặc định của tổ chức.
+- **Phương án:** (A) so với tỷ lệ đã lưu (cũ, sai: tỷ lệ Finance chọn trở thành "mặc định" của chính phiên bản); (B) so với ảnh chụp mặc định lúc lập (tách cột); (C) so với tham số `BUDGET_RESERVE_DEFAULT_PERCENT` đọc lúc gửi.
+- **Chọn C:** đúng chữ QĐ-100h/100k và FR-5.15(2) (lý do khi khác mặc định của tổ chức), không cần cột mới, không bị lệch khi hai nơi đọc cùng một nguồn. `reserveReasonMissing(version, defaultPercent)` nhận mặc định từ `VersionFigures.defaultPercent()` đọc trước transaction của `POST …/submission`; `reservePercent` trên dây vẫn là tỷ lệ phiên bản được lập (mặc định lúc lập hoặc tỷ lệ Finance chọn) và `defaultReserve` là dự phòng theo mặc định hiện hành của tổ chức, để FE thấy đúng số mà luật lý do dùng. Phiên bản cũ có `reservePercent` NULL vẫn không bị hỏi lý do. Hệ quả chấp nhận: đổi tham số mặc định giữa lúc lập nháp và lúc gửi thì nháp cũ khác mặc định mới ⟹ cần lý do.
+- **File/commit:** `budget/budget.policy.ts`, `version/version.service.ts`, `version/version-figures.service.ts`, `budget/version-view.service.ts`; test `requests/budget-versions.integration-spec.ts` (sửa ca khẳng định `reserveReason: null` cho tỷ lệ 20 %; thêm ca gửi 20 % không lý do ⟹ 422), `budgets/budget-baseline-version.integration-spec.ts` (ca tỷ lệ 5 % giờ kèm `reserveReason`). **Đổi lại:** chọn (B): thêm cột "tỷ lệ mặc định lúc lập" (migration mới) và so với cột đó.
+
+#### D-B18 — bản nháp/bản trả về cũ còn số quý: sửa tổng thì bỏ số quý, và dọn dữ liệu bằng migration (FIX-LB3 LBG-03)
+
+- **Câu hỏi:** `VersionRepo.patch` đổi `total_minor` nhưng giữ `q1..q4_minor` ⟹ vi phạm CHECK `budget_versions_quarters_check` (23514) ⟹ 500 cho bản `DRAFT`/`CHANGES_REQUESTED` lập trước BG-2 còn số quý; bản đó kẹt, không sửa được nữa.
+- **Phương án:** (A) `patch` ghi `q1..q4 = NULL` khi tổng đổi; (B) chỉ migration xóa số quý; (C) cả hai; (D) nới CHECK (trái expand–contract ngược chiều: CHECK đang bảo vệ dữ liệu cũ).
+- **Chọn C:** QĐ-111ac bỏ quý (một số cho cả năm) nên không ai còn giữ dự báo quý; (A) làm đường ghi mới luôn thỏa CHECK cũ, (B) dọn dữ liệu đang có để bản trả về không còn quý. Migration `20261113100800_fixlb3_version_quarters_cleared` chỉ `UPDATE … SET q1..q4 = NULL WHERE state IN ('DRAFT','CHANGES_REQUESTED')`; KHÔNG đụng bản đã gửi/duyệt/từ chối/hết hạn (không có trigger bất biến nào chặn UPDATE cột quý; trigger `budget_versions_retired_columns` chỉ bảo vệ `reason`, `high_value_*`), không drop cột. `patch` chỉ ghi NULL khi tổng thật sự đổi (tổng không đổi thì CHECK vẫn thỏa).
+- **File/commit:** `budget/version.repo.ts` (`patch`), migration trên; test `budgets/budget-version-legacy-quarters` (API: nháp và bản trả về có số quý, sửa cơ sở/dự phòng ⟹ 200 và quý NULL, gửi lại được) và `budgets/budget-version-quarters-migration` (DB thật dựng lịch sử tới migration trước, nạp 6 bản ở 6 trạng thái, chạy migration: nháp + trả về hết quý, đã gửi/duyệt/từ chối/hết hạn giữ nguyên 25/25/25/25). **Đổi lại:** xóa migration (chưa chạy ở đâu) và bỏ nhánh `q*: null` ở `patch` thì quay về lỗi 500.
+
+#### D-B19 — số chạy sang của `CarriedOverContributions` là một lần chạy thử đúng luật 01/01, chỉ đọc (FIX-LB4 MG-02)
+
+- **Câu hỏi:** `requests` bind nguồn số chạy sang bằng cách nào để `carriedOverNextYear`, cơ sở điền sẵn và `belowCarriedOver` không còn luôn 0, mà không viết luật 01/01 thứ hai.
+- **Phương án:** (A) chạy thử đúng luật của lượt 01/01 (cùng hàm, không khóa, không ghi); (B) viết công thức riêng cho số chạy sang; (C) lưu sẵn một cột "số năm sau" lúc duyệt chi rồi cộng.
+- **Chọn A:** B tạo hai luật dễ lệch (QĐ-111ac: "một luật, cùng lượt 01/01"); C không phản ánh seat bị thu hồi, người nghỉ, quyền gia hạn hay giá 01/01 của quyền _Dùng lâu dài_. Cụ thể: (1) `YearStartCommitmentsBatchService.judgeBatch` tách khỏi `commitBatch` (không đổi hành vi: lượt 01/01 vẫn khóa hàng rồi gọi nó, test cũ xanh); (2) `YearStartCommitmentsRepo.readBatch` đọc cùng tập Request như `lockBatch` nhưng **không `FOR UPDATE`**, nên đọc ngân sách không chờ và không chặn Request đang được quyết; (3) `YearStartCarriedOverService.carriedOverOf(costCenterIds, year, tx?)` quét Request trả phí của tổ chức theo lô 100, cộng `amountMinor` của khoản mà lượt 01/01 sẽ tạo theo Cost Center (`carriedOverByCostCenter`, policy thuần); không `tx` thì tự mở một transaction đọc; (4) Request **đã giữ khoản của năm đó** thì không tính (đúng như lượt 01/01 bỏ qua — khoản ấy đã nằm trong số cam kết, không chạy sang nữa), nên sau lượt 01/01 số chạy sang của năm đó về 0; (5) mọi số bằng đồng như khoản 01/01 (QĐ-111an); không ghi audit "bỏ qua/bỏ số đã lưu" (việc của lượt thật).
+- **Hệ quả chấp nhận:** mỗi lần budgets hỏi (số liệu nền, tạo phiên bản, đọc phiên bản) quét hết Request trả phí của tổ chức (cỡ vài trăm đến vài nghìn ⟹ vài chục câu lệnh); chưa thu hẹp theo phòng vì phòng chịu chi phí chỉ biết sau khi đọc seat. Nếu chậm: lọc theo `department_id` của Cost Center cộng các seat bàn giao, hoặc cache theo (năm, phiên bản đọc).
+- **File/commit:** `requests/year-start-commitments/{carried-over.listener.ts, year-start-carried-over.service.ts, year-start-commitments-batch.service.ts, year-start-commitments.repo.ts, year-start-commitments.policy.ts}`, `requests.module.ts`, `test/gates/module-graph.gate-spec.ts` (`BudgetsModule: CarriedOverContributions`); test `requests/year-start-carried-over` (T-BG2 = 123.000.000 từ nguồn thật, chạy thử = cam kết lượt 01/01 tạo ra, không ghi, không chờ khóa). Commit `949f665f`. **Đổi lại:** bỏ `CarriedOverListener` khỏi `providers` của `requests.module.ts` ⟹ số chạy sang về 0.
+
+#### D-B20 — `budget-baseline-version` không thêm nguồn giả cạnh nguồn thật (FIX-LB4 MG-05)
+
+- **Câu hỏi:** suite thêm nguồn `'test'` vào `CarriedOverContributions`, mà `totals` cộng mọi nguồn; sau MG-02 nguồn thật của `requests` được cộng thêm.
+- **Phương án:** (A) spy `totals` trả đúng số suite nói; (B) giữ nguồn giả và dùng phòng không có Request nào; (C) bỏ nguồn thật khỏi graph.
+- **Chọn A:** suite này kiểm phía `budgets` (cờ đỏ, cơ sở điền sẵn, phần thiếu) trên số do test đặt; nguồn thật và các con số của nó đã có suite riêng (D-B19). Không còn hai nguồn cộng dồn. Commit `949f665f`. **Đổi lại:** thay spy bằng `add('test', …)` kèm phòng không có Request.
+
+#### D-B21 — kỳ ngân sách của harness mở đến hết năm, không đến 01/12 (FIX-LB4 MG-01)
+
+- **Câu hỏi:** `BudgetHarness.openedCycle` đặt hạn nộp 01/12 và hạn duyệt 15/12; từ 02/12 kỳ khóa (`cycleStateOf`) và mọi `budgetFor`/`approvedBudget` của năm hiện tại trả 409 `BUDGET_CYCLE.LOCKED`.
+- **Phương án:** (A) cả hai hạn = 31/12 của năm (CHECK chỉ đòi hạn duyệt ≥ hạn nộp); (B) giả lập đồng hồ trong mọi suite; (C) đặt hạn theo "hôm nay + N ngày".
+- **Chọn A:** đơn giản, không phụ thuộc đồng hồ, kỳ vẫn Mở đến hết ngày 31/12 (ngày bằng hạn còn trong hạn, D-B8); suite nào kiểm khóa tự đặt hạn (`setDeadline`). `budget-mine` đọc đúng hạn của harness nên đổi kỳ vọng sang 31/12 và trạng thái `OPEN`. Thêm ca giả lập 20/12 (`budget-harness-december`). Commit `aa4162af`. **Đổi lại:** một dòng SQL ở `openedCycle`.
+
+#### D-B22 — `POST /documents` không nhận `COST_STATEMENT`, bản ghi cũ vẫn đọc được (FIX-LB4 MG-04, làm xong D-B6)
+
+- **Câu hỏi:** bỏ mục đích tệp "sao kê" khỏi enum nhận mới thế nào mà không làm gãy tệp đã lưu.
+- **Phương án:** (A) tách enum nhận (`NEW_DOCUMENT_PURPOSES`, 5 giá trị) khỏi enum đọc (6 giá trị) ở DTO; chính sách vẫn giữ vai cho bản ghi cũ; (B) bỏ hẳn giá trị khỏi mọi chỗ (làm gãy response schema của tệp cũ); (C) bỏ cả giá trị enum DB (phá, không expand–contract).
+- **Chọn A:** body `POST /documents` với `purpose: COST_STATEMENT` ⟹ 422 `VALIDATION_ERROR` với mọi vai (trước đây 403 hoặc 409 theo vai); `GET /documents/{id}` và danh sách tệp của hợp đồng vẫn trả `COST_STATEMENT` cho tệp đã lưu; DB giữ giá trị. OpenAPI: enum của body mất giá trị, response giữ. Commit `4508b978`. **Đổi lại:** thêm `'COST_STATEMENT'` vào `NEW_DOCUMENT_PURPOSES`.
+
+### Optional và việc để lại
+
+#### FIX-LB4 — Optional và Nit của AUDIT-MERGE1
+
+Đã làm: MG-01 `aa4162af`, MG-02 `949f665f`, MG-05 `949f665f`, MG-04 `4508b978`, MG-07 và MG-08 `c225606c`, `budget-attachment-access` `d10a6e44`. Còn lại:
+
+- **MG-03** (cần Owner quyết) hóa đơn thuê bao không vào "đã chi" của ai: câu hỏi ở bảng "Chờ Owner quyết"; chưa làm vì đổi nghĩa `spent` là việc của lane A.
+- **MG-06** (FYI vận hành) thứ tự migration lane A (`20261113004400`, `004500`) trước lane B (`2026111310xxxx`) an toàn vì không bảng/enum/CHECK nào bị hai bên cùng sửa; môi trường đã deploy riêng nhánh lane B nên chạy `ops:preflight`/`migrate status` trước khi deploy bản hợp nhất. Không có việc code.
+- **Chi phí của D-B19**: mỗi lần budgets hỏi số chạy sang, `requests` quét hết Request trả phí của tổ chức (theo lô 100); thu hẹp theo phòng hoặc cache khi tổ chức lớn hoặc khi đo thấy chậm. `budget-cycle-baseline` (có đếm câu lệnh) vẫn xanh vì suite không có Request.
+- `src/cli/seed/**` và flows vẫn thuộc Z2: nay `base` điền sẵn của phiên bản `BASELINE` là số thật của `requests`, không còn 0 (đã ghi ở mục "Seed cần cho Z2").
+- Mô tả OpenAPI chạm ở lượt này (enum `purpose` của body `POST /documents`) không chứa mã "QĐ-…".
+
+#### FIX-LB3 — Optional và Nit của AUDIT-LB-BG (BG-1 + BG-2)
+
+Đã làm (rẻ, an toàn, mỗi mục một commit, test đỏ trước): **LBG-06** `99ff0e49` (`noProposalSubmitted` cũng đúng cho phiên bản `BASELINE_NO_HEAD`), **LBG-17** `b41a12ed` (số liệu nền hỏi `cycleStateOf(cycle, today) === 'LOCKED'`, kỳ nháp có hạn quá khứ không còn bị coi là khóa). Ba mục chờ Owner ở bảng trên: LBG-08, LBG-12, LBG-13. Còn lại để lại:
+
+- **LBG-05** (A khuyến nghị) gói B4/B5 `GET /budget-cycles/{year}/package` không có `carriedOverNextYear`, `belowCarriedOver`, `noProposalSubmitted` theo phòng cạnh đề nghị (QT §4.7, FR-5.16(4)); FE phải gọi `GET /budget-versions/{id}` từng phòng (N+1). Đề xuất: thêm ba trường vào `departments[].version` của package bằng `BaselineFlags` (3 câu lệnh).
+- **LBG-07** eventKey thông báo dời hạn (`budget-notifier.service.ts:304`) = `…:${submissionDeadline}:${head}`: dời A→B→A→B thì lần B thứ hai bị chống trùng. Đề xuất: thêm `previousSubmissionDeadline` hoặc id bản ghi audit vào eventKey; test ba lần dời ⟹ ba thông báo.
+- **LBG-09** (A/B) kỳ `LOCKED` từ chối mọi sửa, kể cả hạn quyết và ưu tiên (tài liệu chỉ khóa hạn nộp, Trần, Dự phòng kho). A: cho hạn quyết + ưu tiên đổi sau khóa, kèm lý do; B (hiện tại): khóa hết, đã ghi ở D-B8.
+- **LBG-10** phòng tạo sau khi mở kỳ (cửa sổ R-16) không được báo kỳ đang mở + mẫu `BM-10` (QĐ-111ba); khi gán trưởng phòng cho phòng thuộc năm của kỳ `OPEN` ⟹ gửi `BUDGET_CYCLE_OPENED` (listener của sự kiện gán trưởng phòng).
+- **LBG-11** `headsOf` = 2 truy vấn mỗi phòng trong transaction mở kỳ/dời hạn (đang giữ khóa `FOR UPDATE` của kỳ), 500 phòng ⟹ ~1.000 câu lệnh dưới khóa. Đề xuất: một lần `getDepartmentHeads(ids)` + `getUpcomingHeads(ids)` theo lô.
+- **LBG-14** mất ca đồng thời của suite cũ `budget-cycle-edges`; thêm vào `budget-cycle-lifecycle.integration-spec.ts`: hai `POST /opening` song song ⟹ 1×200 + 1×409 `ALREADY_OPEN`, mỗi trưởng phòng đúng 1 thông báo.
+- **LBG-15** tài liệu FE (`Docs/Figma UI-UX/API-Integration/reference/budgets.md`, `api-index.md`, `coverage-manifest.json`) còn 8 route đã xóa (`department-ceilings`, `publish`, 6 route dòng/import) ⟹ sinh lại API docs sau merge (generator trên clone dev; repo Docs không sửa ở lane B).
+- **LBG-16** FYI vận hành: kỳ năm sau tạo trước migration `20261113100400` mà chưa "phát hành" giờ thành `OPEN` (có `opened_at`), trưởng phòng nộp được ngay mà chưa nhận thông báo mở kỳ. Nếu cần, gửi bù `BUDGET_CYCLE_OPENED` cho kỳ `first_published_at IS NULL` hoặc ghi chú vận hành.
+- **LBG-18** (Nit) migration `20261113100600` `DROP CONSTRAINT` không `IF EXISTS`, `100400` `ADD CONSTRAINT` không xóa trước ⟹ không chạy lại thủ công được. Không sửa: migration đã có checksum, Prisma chỉ chạy một lần; migration mới của lane B dùng dạng chạy lại an toàn.
+- **LBG-19** (Nit) `budget/version.repo.ts:485-487` (`countAttachedFiles`) đếm `budget_attachments` của capability `attachment` từ capability `budget` (đã ghi ở D-B14(4)); chuyển thành một hàm đọc ở `attachment/` khi gỡ được vòng phụ thuộc capability.
+- **LBG-20** (Nit) khóa `approvedBudgetLines` của `dashboards/manager` trỏ sang `budgetMine` (D-B11); đổi tên khi FE đổi.
+- **LBG-21** (Nit) `src/cli/seed/fixture/shared-demo-v4/README.md:253,255` còn route đã xóa: thuộc `src/cli/seed/**` (Z2), đã vào mục "Seed cần cho Z2" (mục 4).
+
+- BG-2: `approvedBudgetLines` của dashboard trưởng phòng nên đổi tên khóa (vd. `approvedBudget`) khi FE đổi; `costCenterId` của `BM-10` vẫn tùy chọn (D-B12); `GET /budget-cycles/{year}/package` chưa trả `note` của đề nghị (FE đọc ở `GET /budget-proposals/{id}`); CHECK nguồn phiên bản chưa có nhánh `ADJUSTMENT` (AD-1 tự thêm); e2e `test/e2e/budget-version`, `mobile-approver-journey` đã sửa theo `BM-10` nhưng chưa chạy.
+
+- Báo cáo xác nhận chưa có tổng `done`/`pending` toàn tập (cần join chéo module); thêm khi FE đòi.
+- `GET /policies/{code}` cho phiên bản cũ trả `myAcknowledgement = null` (chỉ bản hiện hành có trạng thái).
+- FIX-LB2 Optional: LBF-04 (CHECK của migration `…100200` làm deploy hỏng nếu một DB đã có bản xuất bản vi phạm — chưa DB nào ngoài máy dev chạy PL-1, FYI, không cần Owner); LBF-05 (ca gọi `insertOnce` hai lần trong một transaction; CHECK bản 1 luôn đòi xác nhận lại; quyền runtime của `policy_acknowledgements`); LBF-06 phần còn lại (so mã `SYSTEM` theo cặp bước + mục, khóa chữ mục `SYSTEM` — cần Owner chốt nếu khóa chữ); LBF-07 (`publishedBy` có tên); LBF-08/09/10 (ghi chú thứ tự, lệch OVERNIGHT/HANDOFF, backfill so snapshot 1.0); PF1-04 (request bay lúc ghi `LEFT` đặt lại ảnh/SĐT), PF1-05 (sweeper gọi storage trong một transaction), PF1-06 (README module + `security-jobs.md` + chú thích client vẽ lại ảnh), PF1-07 (giới hạn điểm ảnh), PF1-08…12. Chi tiết ở `AUDIT-LB-FIX1-PF1.md`.
+- Mã thông báo cũ `BUDGET_DEPARTMENT_CEILING_PUBLISHED` giữ (đọc được hàng cũ) — BG-1.3 chỉ ngừng phát.
+
+### Nợ test cho FIX-TEST
+
+- `test/integration/requests/year-start-commitments-migration.integration-spec.ts` — ca "keeps what was committed…": `schemaDrift` trả mã 2 thay vì 0; nghi gốc: schema Prisma lệch 4 tên index `purchase_invoices` (`…_request_service_month_idx`, `…_resubmission_key`, `…_state_submitted_idx`, `…_subscription_service_month_idx`) của migration PI-1 (`20261113004500`, lane A), không phải do FIX-LB4; hết đỏ khi lane A đổi tên index trong schema hoặc thêm migration đổi tên.
+- `test/integration/budgets/budget-baseline-version.integration-spec.ts` — một lần đỏ cả 19 ca ở `beforeAll` với `TransientDatabaseError` tại `BudgetHarness.start` (`test/support/seat-baseline-harness.ts:77`) khi chạy cùng lúc một lượt 49 suite, `test:http` toàn bộ và một lần `migrate deploy` trên cùng container; chạy lại một mình xanh 19/19; nghi gốc: tranh chấp DB/giao dịch tạm thời của `start()` khi nhiều tiến trình cùng dùng một container, không phải logic.
+
+### Seed cần cho Z2
+
+> Lane B KHÔNG sửa `src/cli/seed/**` hay flows (việc của Z2). Hợp đồng ngân sách đã đổi (BG-1, BG-2) rộng hơn những gì ghi lúc đầu: **cho tới khi Z2 làm xong,
+> 4 suite seed (`test/integration/installation/seed.integration-spec.ts`, `seed-calendar`, `seed-rerun`, `test/integration/_serial/seed-check-runtime.integration-spec.ts`) sẽ ĐỎ ở
+> bước `budget.cycles`/`budget.*` (chúng chạy `ops:seed apply` qua API thật), và nightly `flows` (mf4 và mọi flow cần dataset) sẽ đỏ.** Đỏ vì hợp đồng
+> đã đổi chứ không phải test sai. Chi tiết theo từng file (số dòng ở `529beb0f`, có thể lệch vài dòng):
+
+1. **`src/cli/seed/steps/finance.steps.ts`** (bước `budget.cycles`):
+   - `:72`, `:109` `CycleRow.firstPublishedAt` — wire kỳ không còn trường này (có `status` `DRAFT|OPEN|LOCKED`, `openedAt`) ⟹ `found?.firstPublishedAt` luôn rỗng, kỳ không bao giờ "present". Đổi: nhận diện "đã có" bằng `openedAt !== null`.
+   - `:112-117` `POST /budget-cycles` thiếu `sharedPoolReserve` (nay bắt buộc ⟹ 422): thêm `sharedPoolReserve: money(plan.sharedPoolReserve)`.
+   - `:119-123` `PUT /budget-cycles/{year}/department-ceilings` và `POST …/publish` ⟹ 404 (đã xóa). Bỏ cả hai, gọi `POST /budget-cycles/{year}/opening`; bỏ `ceilingsOf` (`:91-102`); `evenShareOf` chỉ còn dùng ở `shared-demo-v4.spec.ts`.
+   - **Hạn nộp (cần Z2 quyết):** kỳ chỉ mở được khi hạn nộp chưa qua (422 `BUDGET_CYCLE.DEADLINE_PASSED`), và sau hạn đề nghị của trưởng phòng bị 409 `BUDGET_CYCLE.LOCKED`. `dayBeforeNewYear(year, 60)` của năm hiện hành (2/11/2026) đã qua so với ngày chạy seed ⟹ kỳ năm hiện hành không mở được và không nộp được đề nghị. Z2 chọn: tính hạn từ "hôm nay + N ngày" (kỳ năm hiện hành mở với hạn còn), hoặc dựng ngân sách năm hiện hành bằng `source: 'BASELINE'` (được phép sau hạn khi phòng không có đề nghị; xem mục 2).
+2. **`src/cli/seed/steps/budget.steps.ts`** (+ `finance-kit.ts`):
+   - `:45-49` `POST /budget-proposals` gửi `{ year, lines }` ⟹ 422 (khóa lạ `lines`; thiếu `requestedAmount`, `attachmentIds`). Đổi sang `{ year, requestedAmount: money(…), note?, attachmentIds }`. Tệp BM-10 phải tải trước: `POST /budget-proposals/attachments` (khai tên, loại, dung lượng) ⟹ PUT lên URL trả về ⟹ `POST /budget-attachments/{id}/complete`; 1–10 tệp, không trùng. `finance-kit.ts:12-23` `proposalLines` bỏ.
+   - `:61`, `:127`, `:149` `POST /budget-versions/{id}/submission` cần ≥ 1 tệp của phiên bản (422 `BUDGET_VERSION.ATTACHMENT_REQUIRED`): tải trước bằng `POST /budget-versions/{id}/attachments` ⟹ PUT ⟹ `POST /budget-attachments/{id}/complete`.
+   - `:133-135` quyết định `'REQUEST_CHANGES'` ⟹ 422. Đổi `'RETURN'` (lý do bắt buộc, đã có `plan.reason`); `REJECT` cũng 422.
+   - `:74` `POST /budget-versions { source: 'BASELINE', costCenterId, year }` vẫn dùng được nhưng phiên bản sinh ra có `origin = BASELINE_NO_PROPOSAL` (không còn dòng; phiên bản cũ `BASELINE_NO_HEAD` chỉ còn để đọc), chỉ lập được sau hạn nộp và khi phòng không có đề nghị đang chờ (409 `BUDGET.BASELINE_VERSION_NOT_ALLOWED`); `base` bỏ trống ⟹ = số chạy sang (từ FIX-LB4 MG-02 là số khoản 01/01 của năm đó sẽ giữ theo các Request đang chạy của phòng, D-B19; phòng không có Request ⟹ 0).
+   - `:83`, `:145` `POST /budget-versions { proposalId, base }` vẫn đúng (dự phòng mặc định 10 % không cần lý do). Nếu fixture muốn dự phòng khác 10 % (`reservePercent` hoặc `reserve`) thì phải kèm `reserveReason` khi gửi (D-B17, 422 `BUDGET.RESERVE_REASON_REQUIRED`).
+3. **`src/cli/seed/fixture/shared-demo-v4/finance.ts`** + **`src/cli/seed/fixture/demo-fixture.types.ts`** + **`src/cli/seed/fixture/shared-demo-v4.spec.ts`:**
+   - `budgets[].lines` (`:56-105`) và `nextYear[].lines` (`:112-150`) ⟹ thay bằng `requestedAmount` (+ `note`); dòng `RENEW/CHANGE/NEW/CANCEL`, `zbb`, `note` "vượt trần phòng", xếp hạng và cờ vượt Trần phòng không còn (đã bỏ ở BG-2); `DemoBudgetLine` bỏ khi không còn nơi dùng.
+   - `nextCycle.ceilings` (`finance.ts:39-48`) và `DemoCycle.ceilings` (`demo-fixture.types.ts:114-123`) ⟹ bỏ (Trần phòng không còn, chỉ còn Trần năm + Dự phòng kho); sửa các chú thích ở `finance.ts:25-26`, `:32-33`, `:50-55`, `:107-111` và `note` "Vượt trần phòng" (`:122`, `:126`) nhắc "Trần của từng phòng", "dòng", "vượt trần".
+   - `shared-demo-v4.spec.ts:173-197` (và `import { evenShareOf }` ở `:4`) kiểm Trần phòng và `evenShareOf` ⟹ viết lại theo luật mới: tổng (cơ sở + dự phòng) các phiên bản năm ≤ Trần năm − Dự phòng kho.
+4. **`src/cli/seed/fixture/shared-demo-v4/README.md`** `:253-257` (kịch bản demo MF-4) còn các route đã xóa: `PUT …/department-ceilings`, `POST …/publish`, `GET /budget-proposals/{id}/lines` ⟹ thay bằng `POST …/opening`, tải tệp BM-10, `GET /budget-proposals/{id}`.
+5. **`test/integration/installation/seed-calendar.integration-spec.ts`** `:127-133` đọc `first_published_at` (cột không còn được ghi; biến `published`) ⟹ `opened_at IS NOT NULL AS opened`; kỳ vọng đếm phiên bản (`2026: 8`, `2027: 2`) phụ thuộc cách Z2 dựng ngân sách năm hiện hành (mục 1, hạn nộp).
+6. **`test/flows/mf4-budget.flow-spec.ts`:**
+   - `:44-71` thân `BM-10` gửi `lines` ⟹ `{ year, requestedAmount: { amount }, note?, attachmentIds: [≥ 1 tệp] }` (có sẵn `uploadedFile` ở `:27`; `proposal()` mặc định `attachmentIds = []` nay là 422).
+   - `:166-207` ca 422: `valid` dùng `lines` + `attachmentIds: []` ⟹ thân `BM-10` mới kèm một tệp (ca 201 cuối `:207` cần tệp); `withCurrency` đổi sang `requestedAmount: { amount, currency }` và `issuesOf` kỳ vọng `['requestedAmount']` (hiện `['lines.0.amount']`).
+   - `:115`, `:260`, `:274`, `:282` mọi `POST …/submission` cần ≥ 1 tệp phiên bản đã đính trước (`:250` vẫn 422 `RESERVE_REASON_REQUIRED` vì luật lý do kiểm trước luật tệp). Ca dự phòng 6.000.000 trên cơ sở 30.000.000 (`:241-260`) vẫn đúng với D-B17.
+7. **`test/flows/mf1-request-contract.flow-spec.ts`** `:103-130` (review LBG-04 chưa nêu): ca "ngân sách: dòng BM-10 còn khoảng mua" gửi `POST /budget-proposals { year, lines: [proposalLine] }` mong 201 ⟹ nay 422. Đổi sang thân `BM-10` (có `requestedAmount` + một tệp) cho nhánh 201, và dùng khóa bị bỏ (`lines`, `highValuePercent`) làm nhánh 422.
+
+### Bị chặn
+
+- Không còn mục nào. **BG-2.1 phía `requests` đã đóng ở FIX-LB4 MG-02** (`949f665f`, D-B19): `requests/year-start-commitments/carried-over.listener.ts` bind `CarriedOverContributions` bằng một lần chạy thử đúng luật 01/01, chỉ đọc. T-BG2 (10 quyền _Dùng lâu dài_ × 1.000.000 × 12 + 3.000.000 đã lưu = **123.000.000 đ**) được chứng minh bằng nguồn thật ở `test/integration/requests/year-start-carried-over.integration-spec.ts`; `PUBLIC_CONTRACT_EXPORTS` đã khai `BudgetsModule: CarriedOverContributions`.
+
+### Dừng ở đâu
+
+- Xong PL-1, PL-3, PF-1, FIX-LB1, BG-1, FIX-LB2 và cả BG-2: BG-2.0 `4d58016a`, BG-2.4 `09fb1d0e`, BG-2.1 + một phần BG-2.6 `5a1dfc03`, BG-2.3 `a4ba8bec`, BG-2.2 `7f740cf4`, BG-2.5 + BG-2.6 `d2bad69f`, BG-2.7 `6c62609d`, BG-2-G `50d9ca2f`. Còn lại ngoài lane B: phía `requests` của BG-2.1 (mục "Bị chặn"), seed/flows (mục "Seed cần cho Z2" ở HANDOFF). Dừng "LANE B CHỜ MERGE".
+
+- **FIX-LB3 xong** (4 mục Required của AUDIT-LB-BG + Optional/Nit rẻ): LBG-01 `df8289da` (D-B16), LBG-02 `4e92423c` (D-B17), LBG-03 `96644b01` (D-B18, migration `20261113100800`), LBG-04 `511e9e41` (danh sách "Seed cần cho Z2" theo từng file), Optional/Nit LBG-17 `b41a12ed`, LBG-06 `99ff0e49`, danh sách còn lại + ba câu "Chờ Owner quyết" (LBG-12, LBG-08, LBG-13) `1a639286`, chore regenerate `e94863de`. Gate cuối gói xanh (xem HANDOFF dòng "FIX-LB3 (gate cuối gói)"). Còn lại ngoài lane B: phía `requests` của BG-2.1 ("Bị chặn"), seed/flows (Z2), lệch tên 4 index `purchase_invoices` của PI-1 (lane A). Dừng "LANE B CHỜ MERGE".
+
+- **FIX-LB4 xong (gói cuối của lane B)**: MG-01 `aa4162af` (D-B21), MG-02 + MG-05 `949f665f` (D-B19, D-B20; đóng mục "Bị chặn" của BG-2.1), `budget-attachment-access` `d10a6e44`, MG-04 `4508b978` (D-B22, làm xong D-B6), MG-07 + MG-08 `c225606c`, chore regenerate `23e5571a`. Gate cuối gói xanh (xem HANDOFF dòng "FIX-LB4 (gate cuối gói)"). Còn lại ngoài lane B: MG-03 chờ Owner, ba câu LBG-08/12/13 chờ Owner, seed/flows (Z2), 4 tên index `purchase_invoices` của PI-1 (lane A), hai dòng "Nợ test cho FIX-TEST". Lane B dừng hẳn; PL-2 thuộc lane A.
