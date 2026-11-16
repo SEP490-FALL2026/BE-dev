@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AuditApi } from '../../audit/public/audit.api';
+import { budgetAuditEvent } from '../budget/budget-facts.service';
 import { VersionRepo } from '../budget/version.repo';
 import { CycleRepo, type CycleRecord } from '../cycle/cycle.repo';
 import { ThresholdAlertService } from '../threshold/threshold-alert.service';
@@ -23,6 +25,7 @@ export class BudgetAdjustmentApplyService {
     private readonly versions: VersionRepo,
     private readonly versionMaker: VersionAdjustmentCreationService,
     private readonly thresholds: ThresholdAlertService,
+    private readonly audit: AuditApi,
   ) {}
 
   /**
@@ -39,7 +42,7 @@ export class BudgetAdjustmentApplyService {
   ): Promise<string | null> {
     await this.judge.require(tx, cycle, adjustment, today);
     if (adjustment.kind === 'CEILING_REDUCTION') {
-      await this.cycles.update(tx, cycle.id, { annualCeilingMinor: cycle.annualCeilingMinor - adjustment.amountMinor });
+      await this.lowerCeiling(tx, actor, cycle, adjustment);
 
       return null;
     }
@@ -61,5 +64,33 @@ export class BudgetAdjustmentApplyService {
     await this.thresholds.settle(tx, watch, now);
 
     return versionId;
+  }
+
+  /** Lowers the annual ceiling of the cycle and keeps the ceiling before and after in the trail of the cycle, with the adjustment that moved it (US-06-20: Audit Trail). */
+  private async lowerCeiling(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    cycle: CycleRecord,
+    adjustment: AdjustmentRecord,
+  ): Promise<void> {
+    const lowered = cycle.annualCeilingMinor - adjustment.amountMinor;
+    await this.cycles.update(tx, cycle.id, { annualCeilingMinor: lowered });
+    await this.audit.record(
+      tx,
+      budgetAuditEvent(
+        actor,
+        cycle.organizationId,
+        'BUDGET_CYCLE.UPDATED',
+        'BudgetCycle',
+        cycle.id,
+        {
+          year: cycle.year,
+          annualCeilingMinor: lowered.toString(),
+          adjustmentId: adjustment.id,
+          reason: adjustment.reason,
+        },
+        { year: cycle.year, annualCeilingMinor: cycle.annualCeilingMinor.toString() },
+      ),
+    );
   }
 }

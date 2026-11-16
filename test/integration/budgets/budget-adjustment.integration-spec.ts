@@ -309,6 +309,15 @@ describe('Finance asks for an adjustment of the budget and the spending approver
     await decide(asked.id, { decision: 'APPROVE' }).expect(200);
 
     expect(await ceilingOf()).toBe(ceiling - BigInt(9 * M));
+    // AD1-06 (US-06-20, Audit Trail): the annual ceiling before and after is in the trail of the cycle, with the adjustment that moved it.
+    const trail = await h.ctx.sql.query<{ before: Record<string, string>; after: Record<string, string> }>(
+      `SELECT e.before, e.after FROM audit_events e JOIN budget_cycles c ON c.id::text = e.resource_id
+        WHERE c.year = $1 AND e.action = 'BUDGET_CYCLE.UPDATED' AND e.after->>'adjustmentId' = $2`,
+      [h.year, asked.id],
+    );
+    expect(trail.rows).toHaveLength(1);
+    expect(trail.rows[0].before).toMatchObject({ annualCeilingMinor: ceiling.toString() });
+    expect(trail.rows[0].after).toMatchObject({ annualCeilingMinor: (ceiling - BigInt(9 * M)).toString() });
   });
 
   it('what an adjustment moved is counted when a version is sent: with nothing left after an approved supplement, a version of another Cost Center is over the annual ceiling', async () => {
