@@ -26,7 +26,7 @@ Tầng: T5 (`scripts/arch/tiers.cjs`). Phụ thuộc: audit, organization, ident
   DELETE, TRUNCATE và quyền runtime chỉ `INSERT, SELECT`. Cột `document_attachments.signer_employee_id` thuộc `catalog` nhưng
   chỉ module này ghi qua `CatalogApi.attachSignatureRecord`.
 
-## Capability (không vòng: `notice` → `registry` → `acknowledgement` → `my-devices`)
+## Capability (không vòng: `notice` → `registry` → `acknowledgement`/`stop-request` → `my-devices`)
 
 - `notice/` — phiên bản thông báo (Super Admin phát hành, mọi tài khoản đọc bản hiện hành); đánh số dưới advisory lock; phiên bản đòi
   xác nhận lại thì khóa mọi đăng ký mở rồi xóa đầu chuỗi xác nhận.
@@ -34,7 +34,13 @@ Tầng: T5 (`scripts/arch/tiers.cjs`). Phụ thuộc: audit, organization, ident
   `signature-record.service.ts` gắn bản ký `BM-06` cho người ký; `registry-query.*` đọc danh sách (mỗi máy có `collection { state, lastAcceptedAt }`, một truy vấn: `lastAcceptedAt` = lần gần nhất một credential của đăng ký đang mở được nhận), chi tiết và lịch sử người giữ `GET /devices/{id}/registrations` (mới nhất trước, phân trang).
 - `acknowledgement/` — người giữ máy xác nhận bản hiện hành sau khi IT lưu bản ký (`acknowledgement.policy.ts` là quyết định duy
   nhất cho cả `POST` và `canAcknowledge`/`blockedReason` của danh sách).
-- `my-devices/` — `GET /me/devices`.
+- `stop-request/` — yêu cầu dừng thu thập (`FR-4.18`, `US-09-04`): người giữ gửi `POST /me/device-registrations/{id}/stop-requests`
+  (dòng `INVALID` `DUPLICATE`/`ALREADY_STOPPED` vẫn được ghi, có `handled_at`; `dueAt` = 2 ngày làm việc), IT Admin xem
+  `GET /device-stop-requests` và hoàn tất `POST /device-stop-requests/{id}/completion` — một `UPDATE` đặt `collection_stopped_at` và xóa
+  `acknowledged_from` (CHECK `device_registrations_one_projection`), không thu hồi credential. Đăng ký kết thúc thì
+  `registry.repo.ts` đóng mọi yêu cầu `OPEN` thành `INVALID REGISTRATION_ENDED` (nên `registry` không import `stop-request`). Xác nhận lại
+  dùng route xác nhận có sẵn. Thông báo cho IT và sweep quá hạn: chưa làm (FX-T9c).
+- `my-devices/` — `GET /me/devices` (kèm `stopRequestPending`).
 - `devices-collection-state.policy.ts` — hàm trạng thái thu thập (`RETIRED`, `UNREGISTERED`, `COLLECTION_STOPPED`, `ACTIVE`,
   `AWAITING_ACKNOWLEDGEMENT`) mà danh sách đọc bằng cùng `CASE` SQL và lát credential/intake đọc lại.
 
@@ -51,4 +57,4 @@ phiên bản → khóa mọi đăng ký mở theo id.
 
 ## Chưa làm (mức B, sau demo)
 
-Yêu cầu dừng và SLA, lịch sử `/me`, `PATCH /devices`, kết thúc đăng ký theo ngày làm việc cuối, cổng đọc sổ thiết bị cho licensing K4 (contract `licensing/device-binding` đã gỡ ở MF2-A, `QĐ-110`: thiết kế lại từ sổ thiết bị thật khi làm K4 theo thiết bị).
+Thông báo yêu cầu dừng và sweep quá hạn (FX-T9c), lịch sử `/me`, `PATCH /devices`, kết thúc đăng ký theo ngày làm việc cuối, cổng đọc sổ thiết bị cho licensing K4 (contract `licensing/device-binding` đã gỡ ở MF2-A, `QĐ-110`: thiết kế lại từ sổ thiết bị thật khi làm K4 theo thiết bị).
