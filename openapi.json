@@ -63188,7 +63188,7 @@
             "name": "longTerm",
             "required": false,
             "in": "query",
-            "description": "true lists the long-term commitments of the quarterly review: the ones still held that were made before the running quarter began. The term of the request is never shortened by it.",
+            "description": "true lists the long-term commitments of the quarterly review: every commitment of the year that is still held, whenever it was made; year is required with it. The term of the request is never shortened by it.",
             "schema": { "type": "string", "enum": ["true", "false"] }
           },
           { "name": "requestId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
@@ -124158,7 +124158,7 @@
                               "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                               "required": ["amount", "currency"],
                               "additionalProperties": false,
-                              "description": "What the department already knows it will need to the end of the year, when it can say.",
+                              "description": "What the department already knows it will need to the end of the year (nothing is 0); null only on an explanation written before the amount was asked for.",
                               "nullable": true
                             },
                             "note": { "type": "string" }
@@ -124276,11 +124276,11 @@
             "type": "object",
             "properties": {
               "amount": {
-                "description": "What the department already knows it will need to the end of the year, above nothing, when it can say.",
                 "type": "object",
                 "properties": { "amount": { "type": "string", "maxLength": 40 } },
                 "required": ["amount"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "What the department already knows it will need to the end of the year, in the reporting currency: required, and 0 when it knows of no need."
               },
               "note": {
                 "type": "string",
@@ -124289,7 +124289,7 @@
                 "description": "What is known of the need to the end of the year, in words."
               }
             },
-            "required": ["note"],
+            "required": ["amount", "note"],
             "additionalProperties": false,
             "description": "What the department already knows it will need to the end of the year."
           }
@@ -124330,7 +124330,7 @@
                         "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                         "required": ["amount", "currency"],
                         "additionalProperties": false,
-                        "description": "What the department already knows it will need to the end of the year, when it can say.",
+                        "description": "What the department already knows it will need to the end of the year (nothing is 0); null only on an explanation written before the amount was asked for.",
                         "nullable": true
                       },
                       "note": { "type": "string" }
