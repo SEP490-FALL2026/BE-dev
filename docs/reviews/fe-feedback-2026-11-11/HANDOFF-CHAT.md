@@ -1,3 +1,25 @@
+# Bàn giao chat điều phối (Opus) — bản 4, 16/11/2026 tối: PROMPT 3 XONG
+
+> Chat "SEP-Start 122" kết thúc prompt 3. Bản 3 (14/11) giữ nguyên bên dưới làm lịch sử.
+
+## Trạng thái
+- **Một thư mục BE duy nhất:** `D:\FPT\FALL2026\Code\BE-dev-software-license-management`, nhánh `feat/fe-feedback` (đã push lên GitHub
+  để chạy CI; chưa merge `dev`, chưa deploy). Các worktree `be-fe-feedback`, `be-fe-lane-b`, `be-verify`, `be-z2`, `be-flows` đã gỡ;
+  nhánh `feat/fe-feedback-lane-b`, `feat/z2-seed` đã merge, còn giữ ở local.
+- **Kiểm chứng:** CI GitHub đầy đủ xanh run `43856062372` trên `0940aa5b` (commit sau đó chỉ tài liệu, `rules:check`/`format:check` xanh);
+  `test:flows` 11/11 suite; `seed:local` DB trống exit 0. Chi tiết: [AUDIT.md](AUDIT.md).
+- **Owner đọc:** phần đầu [OVERNIGHT-DECISIONS.md](OVERNIGHT-DECISIONS.md) (59 điểm Chờ Owner, 20 lệch BRD/nghi lỗi BE, breaking FE, demo/deploy).
+- **Tài liệu API FE:** Docs `main` `94f8b68`, `a643633`, `ae7f00a` (chưa push) — mô tả BE `69ce5f09`; `--check` 0 vấn đề.
+- **Việc kế tiếp:** Owner duyệt [PROMPT-4-5-DRAFT.md](PROMPT-4-5-DRAFT.md) (4a audit Fable trên bản code cuối, 4b Sonnet FIX, 5 thông
+  báo/lỗi/email) và trả lời bảng Chờ Owner; Owner push/merge/deploy (VPS drop DB ⟹ chuỗi `seed.sh` ở OVERNIGHT §4 Demo và deploy).
+- **Môi trường test local:** Docker `slm-test-db` 35432, `slm-test-db-b` 35433 (có DB `slm_z2_local` đã seed), `slm-test-db-c` 35434 (tmpfs,
+  dựng lại bằng `make-test-db.sh` trong scratchpad chat 122 hoặc `.github/actions/test-database`), `redis-server`, `slm-z2-s3` (SeaweedFS
+  38333, thay MinIO cho seed local). CI nhanh: `gh workflow run ci.yml --ref feat/fe-feedback` (chạy mọi suite, không deploy).
+- Lưu ý: `docs/reviews/mf2-mf3-2026-11-10/C2-CLEANUP-LOG.md` có một thay đổi chưa commit (ký tự `m` thừa ở dòng 1, không phải của chat
+  điều phối) — Owner tự quyết giữ hay bỏ.
+
+---
+
 # Bàn giao chat điều phối (Opus) — bản 3, 14/11/2026 đêm
 
 > Cho chat điều phối mới **"SEP-Start 121: reseach,review,plan - fix main flows 2-3"** (Opus high), nối tiếp "SEP-Start 120" (sắp cạn
