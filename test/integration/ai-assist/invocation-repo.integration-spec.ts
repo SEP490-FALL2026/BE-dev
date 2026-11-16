@@ -207,7 +207,7 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
     await expect(prisma.aiInvocation.findUnique({ where: { id } })).resolves.toMatchObject({ id });
   });
 
-  it('takes a call stuck for too long for FAILED, and a run that ends after that writes nothing', async () => {
+  it('takes a call stuck for too long for FAILED, and a finish after that is refused', async () => {
     const input = call({ at: new Date(Date.now() - 300_000) });
     const { id } = await insertWithContent(input);
     await repo.markRunning(id, new Date(Date.now() - 200_000));
@@ -220,7 +220,7 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
 
     const row = await prisma.aiInvocation.findUniqueOrThrow({ where: { id }, include: { content: true } });
     expect(row).toMatchObject({ status: 'FAILED', errorCode: 'AI.PROVIDER_TIMEOUT', promptTokens: null });
-    expect(row.content?.promptText).toBeNull();
+    // That a late run then writes no content is pinned over HTTP on PostgreSQL: queue-summary-failures, 'its late COMPLETED end changes nothing'.
     // A failed call no longer holds the revision: the next one may be recorded.
     await expect(repo.findLive(input)).resolves.toBeNull();
     await expect(insertWithContent(call({ actorAppUserId: input.actorAppUserId }))).resolves.toEqual({
