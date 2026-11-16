@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { dayOffset, endOfMonth } from '../demo-dates';
-import { evenShareOf } from '../steps/finance.steps';
 import { INSTALLATION } from './shared-demo-v4/installation';
 import { SHARED_DEMO_V4 as F } from './shared-demo-v4';
 
@@ -130,14 +129,14 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
 });
 
 describe('shared dataset v4: the budgets', () => {
-  it('has an approved budget of the year for every department with a Cost Center, and only for them', () => {
+  it('has an approved budget of the year for every department with a Cost Center and a head, and only for them', () => {
+    // A department with no head sends no BM-10; its version from the baseline waits for the deadline (D-Z2-2).
     expect(F.budgets.map((b) => b.department).sort()).toEqual(
       F.departments
-        .filter((d) => d.costCenter !== null)
+        .filter((d) => d.costCenter !== null && d.head !== null)
         .map((d) => d.code)
         .sort(),
     );
-    expect(F.budgets.find((b) => b.department === 'LGL')?.origin).toBe('BASELINE');
     expect(department('LGL').head).toBeNull();
   });
 
@@ -169,32 +168,29 @@ describe('shared dataset v4: the budgets', () => {
     }
   });
 
-  it('opens the next year with a ceiling for each department, within the annual ceiling', () => {
-    const { annualCeiling, sharedPoolReserve, ceilings } = F.nextCycle;
-    const total = Object.values(ceilings ?? {}).reduce((sum, value) => sum + BigInt(value), BigInt(sharedPoolReserve));
-    expect(total).toBeLessThanOrEqual(BigInt(annualCeiling));
-    for (const next of F.nextYear) expect(Object.keys(ceilings ?? {})).toContain(next.department);
+  it('keeps the versions of every year within the annual ceiling less the reserve of the shared pool (10 % reserve each)', () => {
+    const withReserve = (base: string) => (BigInt(base) * 11n) / 10n;
+    const sum = (bases: string[]) => bases.reduce((total, base) => total + withReserve(base), 0n);
+    const room = (cycle: typeof F.cycle) => BigInt(cycle.annualCeiling) - BigInt(cycle.sharedPoolReserve);
+    expect(sum(F.budgets.map((b) => b.base))).toBeLessThanOrEqual(room(F.cycle));
+    const versions = F.nextYear.filter((n) => n.stage !== 'PROPOSAL_SUBMITTED');
+    expect(sum(versions.map((n) => n.base))).toBeLessThanOrEqual(room(F.nextCycle));
   });
 
-  it('leaves the next year at every stage, with a proposal over its ceiling that has all four kinds of line', () => {
+  it('leaves the next year at every stage (DEMO-15), opens the year and the next, and keeps the year after a draft', () => {
     expect(new Set(F.nextYear.map((n) => n.stage))).toEqual(
-      new Set(['PROPOSAL_SUBMITTED', 'VERSION_SENT', 'CHANGES_REQUESTED']),
+      new Set(['PROPOSAL_SUBMITTED', 'VERSION_SENT', 'VERSION_RETURNED', 'APPROVED']),
     );
-    const eng = F.nextYear.find((n) => n.department === 'ENG')!;
-    expect(new Set(eng.lines.map((l) => l.lineType))).toEqual(new Set(['RENEW', 'CHANGE', 'NEW', 'CANCEL']));
-    const counted = eng.lines.filter((l) => l.lineType !== 'CANCEL').reduce((sum, l) => sum + BigInt(l.amount), 0n);
-    expect(counted).toBeGreaterThan(BigInt(F.nextCycle.ceilings!.ENG));
-    for (const line of eng.lines.filter((l) => l.lineType === 'NEW')) expect(line.zbb).toBeDefined();
-    expect(F.nextYear.find((n) => n.stage === 'CHANGES_REQUESTED')?.reason).toBeTruthy();
-  });
-
-  it('divides the annual ceiling so that the departments and the reserve never add up to more, whatever their number', () => {
-    const { annualCeiling, sharedPoolReserve } = F.cycle;
-    for (const departments of [1, 7, 19, 200, 5000]) {
-      const share = BigInt(evenShareOf(annualCeiling, sharedPoolReserve, departments));
-      expect(share * BigInt(departments) + BigInt(sharedPoolReserve)).toBeLessThanOrEqual(BigInt(annualCeiling));
+    expect(F.nextYear.find((n) => n.stage === 'VERSION_RETURNED')?.reason).toBeTruthy();
+    // Some departments with a head send nothing for the next year: the flag of no proposal.
+    const heads = F.departments.filter((d) => d.costCenter !== null && d.head !== null).map((d) => d.code);
+    expect(heads.filter((code) => !F.nextYear.some((n) => n.department === code)).length).toBeGreaterThan(0);
+    expect([F.cycle.open, F.nextCycle.open, F.draftCycle.open]).toEqual([true, true, false]);
+    // The cycle of the year is open on the day of the seed and locked from the next (adjustments, FIX-AD1-Q2).
+    expect(F.cycle.submissionOffsetDays).toBe(0);
+    for (const cycle of [F.cycle, F.nextCycle, F.draftCycle]) {
+      expect(cycle.decisionOffsetDays).toBeGreaterThanOrEqual(cycle.submissionOffsetDays);
     }
-    expect(evenShareOf(annualCeiling, sharedPoolReserve, 0)).toBe('0');
   });
 });
 

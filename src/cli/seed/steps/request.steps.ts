@@ -1,6 +1,7 @@
 import { as, listAll, tag } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoRequestScenario } from '../fixture/demo-fixture.types';
+import { yesChecklist } from './checklist-kit';
 import { nextScenarioAction, reachedTarget, ScenarioAction } from './scenario-path';
 
 export interface RequestWire {
@@ -67,8 +68,10 @@ async function submit(ctx: DemoRunContext, scenario: DemoRequestScenario): Promi
   const planId = ctx.ids.plans.get(scenario.plan ?? '');
   let created: { request: RequestWire };
   if (scenario.proposal) {
+    const { existingApplication, ...proposal } = scenario.proposal;
     created = await ctx.api.call(requester, 'POST', '/access-requests/proposals', {
-      ...scenario.proposal,
+      ...proposal,
+      ...(existingApplication ? { existingApplicationId: ctx.ids.applications.get(existingApplication) } : {}),
       purpose: text,
       ...termBody(scenario.termMonths),
     });
@@ -135,6 +138,13 @@ async function reload(ctx: DemoRunContext, scenario: DemoRequestScenario, id: st
   return (await ctx.api.call<{ request: RequestWire }>(requester, 'GET', `/access-requests/${id}`)).request;
 }
 
+/** The checklist of a decision step all Yes, as the person of `code` reads it. */
+async function checklistOf(ctx: DemoRunContext, code: string | null, step: string) {
+  if (!code) throw new Error(`No demo person decides step ${step}: the fixture leaves that role empty`);
+
+  return yesChecklist(ctx, await as(ctx, code), step);
+}
+
 async function post(ctx: DemoRunContext, code: string | null, path: string, body?: unknown): Promise<unknown> {
   if (!code) throw new Error(`No demo person acts at ${path}: the fixture leaves that role empty`);
 
@@ -158,6 +168,7 @@ async function perform(
       });
       return;
     case 'SUBMIT_BATCH':
+      // A batch that confirms the reserve answers the checklist of step 1.6 once for the batch (FIX-PL2-O4).
       await post(ctx, department.head, '/spend-batches', {
         requestIds: [request.id],
         ...(scenario.confirmReserve
@@ -165,6 +176,7 @@ async function perform(
               reserveConfirmations: [
                 { requestId: request.id, reason: `${tag(ctx, scenario.key)} Cần cho chiến dịch tháng này.` },
               ],
+              checklist: await checklistOf(ctx, department.head, '1.6'),
             }
           : {}),
       });
@@ -172,33 +184,30 @@ async function perform(
     case 'CONFIRM_RESERVE':
       await post(ctx, department.head, `/access-requests/${request.id}/reserve-confirmation`, {
         reason: `${tag(ctx, scenario.key)} Cần cho chiến dịch tháng này.`,
+        checklist: await checklistOf(ctx, department.head, '1.6'),
       });
       return;
     case 'APPROVE_SPEND':
-      if (scenario.beneficiaries) {
-        // A request for a group is decided line by line (the whole group here: every person it names).
-        await post(
-          ctx,
-          ctx.fixture.approvalRoles.SPENDING_APPROVER,
-          `/access-requests/${request.id}/line-spend-decisions`,
-          {
-            lines: scenario.beneficiaries.map((code) => ({
-              employeeId: ctx.ids.employees.get(code),
-              decision: 'APPROVE',
-            })),
-          },
-        );
-        return;
-      }
-      await post(ctx, ctx.fixture.approvalRoles.SPENDING_APPROVER, `/access-requests/${request.id}/spend-approval`, {
-        decision: 'APPROVE',
-      });
-      return;
+      return approveSpend(ctx, scenario, request);
     case 'GRANT':
       return grant(ctx, scenario, request, department.itAdmin);
     case 'COMPLETE_TASK':
       return completeGrant(ctx, department.itAdmin, request.id, scenario);
   }
+}
+
+/** The spending approver approves with the checklist of step 1.7: a group line by line (every person it names), a request as a whole. */
+async function approveSpend(ctx: DemoRunContext, scenario: DemoRequestScenario, request: RequestWire) {
+  const approver = ctx.fixture.approvalRoles.SPENDING_APPROVER;
+  const checklist = await checklistOf(ctx, approver, '1.7');
+  if (scenario.beneficiaries) {
+    await post(ctx, approver, `/access-requests/${request.id}/line-spend-decisions`, {
+      lines: scenario.beneficiaries.map((code) => ({ employeeId: ctx.ids.employees.get(code), decision: 'APPROVE' })),
+      checklist,
+    });
+    return;
+  }
+  await post(ctx, approver, `/access-requests/${request.id}/spend-approval`, { decision: 'APPROVE', checklist });
 }
 
 async function decideNeed(ctx: DemoRunContext, scenario: DemoRequestScenario, request: RequestWire, approve: boolean) {
@@ -208,9 +217,10 @@ async function decideNeed(ctx: DemoRunContext, scenario: DemoRequestScenario, re
       `The need step of ${scenario.key} is held by somebody outside the dataset (${assignee ?? 'nobody'})`,
     );
   }
+  const checklist = await checklistOf(ctx, assignee, '1.2');
   const body = approve
-    ? { decision: 'APPROVE' }
-    : { decision: 'REJECT', reason: `${tag(ctx, scenario.key)} Chưa cần trong quý này.` };
+    ? { decision: 'APPROVE', checklist }
+    : { decision: 'REJECT', reason: `${tag(ctx, scenario.key)} Chưa cần trong quý này.`, checklist };
   await post(ctx, assignee, `/access-requests/${request.id}/need-decision`, body);
 }
 

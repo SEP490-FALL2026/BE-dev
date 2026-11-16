@@ -27,7 +27,35 @@ const app = (
   plans: DemoPlan[],
   kind: DemoApplication['kind'] = 'SAAS',
   dataSensitivity: DemoApplication['dataSensitivity'] = 'MEDIUM',
-): DemoApplication => ({ key, name, kind, vendorName, dataSensitivity, plans });
+): DemoApplication => ({ key, name, kind, vendorName, dataSensitivity, functionalGroup: groupOf(key), plans });
+
+/**
+ * The seven functional groups the installation writes (`functional-group-standard.policy.ts`), each holding at least one application of the
+ * dataset (C-O5): the catalog screen and the dashboards show every group.
+ */
+export const FUNCTIONAL_GROUPS: Record<string, string> = {
+  chatgpt: 'Trợ lý AI',
+  cursor: 'Trợ lý AI',
+  figma: 'Thiết kế & sáng tạo',
+  canva: 'Thiết kế & sáng tạo',
+  jira: 'Lập trình & kỹ thuật',
+  github: 'Lập trình & kỹ thuật',
+  postman: 'Lập trình & kỹ thuật',
+  jetbrains: 'Lập trình & kỹ thuật',
+  datagrip: 'Lập trình & kỹ thuật',
+  onepassword: 'Văn phòng & cộng tác',
+  grammarly: 'Văn phòng & cộng tác',
+  mailchimp: 'Chuyên ngành',
+  'hr-portal': 'Khác',
+  slack: 'Liên lạc (email, chat, họp)',
+};
+
+function groupOf(key: string): string {
+  const group = FUNCTIONAL_GROUPS[key];
+  if (!group) throw new Error(`The application ${key} names no functional group`);
+
+  return group;
+}
 
 /*
  * Thirteen applications. Each (application, plan) has exactly one subscription, the stock of the shared pool (`QĐ-103d`): K2 plans have
@@ -120,6 +148,7 @@ const APPLICATIONS: DemoApplication[] = [
     name: 'Cổng Nhân sự Nội bộ',
     kind: 'INTERNAL',
     dataSensitivity: 'HIGH',
+    functionalGroup: groupOf('hr-portal'),
     plans: [
       { key: 'hr-portal-access', name: 'Truy cập Cổng Nhân sự', provisioningType: 'K5', dataLossOnRemoval: false },
     ],
