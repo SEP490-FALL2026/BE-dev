@@ -38,6 +38,8 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   collector_allowlist_entries: ['INSERT', 'SELECT'],
   // Who acknowledged which version of a policy is evidence: added to and never changed (its triggers refuse it first).
   policy_acknowledgements: ['INSERT', 'SELECT'],
+  // The answers of a checklist a decision was made with are evidence too: added to and never changed (its triggers refuse it first).
+  decision_checklists: ['INSERT', 'SELECT'],
 };
 
 /** Sequence privileges the runtime role holds on every sequence of `public`: drawing numbers (`nextval`) and `currval`. */

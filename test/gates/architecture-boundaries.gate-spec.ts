@@ -72,6 +72,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   Policy: 'policies',
   PolicyVersion: 'policies',
   PolicyAcknowledgement: 'policies',
+  DecisionChecklist: 'policies',
   AuditEvent: 'audit',
   Application: 'catalog',
   ApplicationBusinessOwner: 'catalog',

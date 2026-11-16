@@ -67,6 +67,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'CatalogBootstrapFacadeModule: CatalogBootstrapApi',
   // QĐ-112b: the installation writes the eight policies and their first versions through this one facade.
   'PoliciesBootstrapFacadeModule: PoliciesBootstrapApi',
+  'PoliciesChecklistFacadeModule: PolicyChecklistApi',
   // QĐ-111as: the point the modules that read import files add their columns to, so the library builds the template files from what the parsers read.
   'PoliciesTemplateFacadeModule: ImportTemplateContributions',
   // The extension points the requests context binds (public/budgets.extension-points.ts): what waits to be decided as spend, the release guard and the facts of a commitment request.

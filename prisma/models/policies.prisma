@@ -33,8 +33,9 @@ model PolicyVersion {
   createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                 DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  policy           Policy                  @relation(fields: [policyId], references: [id], onDelete: Restrict)
-  acknowledgements PolicyAcknowledgement[]
+  policy             Policy                  @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  acknowledgements   PolicyAcknowledgement[]
+  decisionChecklists DecisionChecklist[]
 
   @@unique([policyId, versionNumber])
   @@map("policy_versions")
@@ -54,4 +55,31 @@ model PolicyAcknowledgement {
   @@index([organizationId, employeeId])
   @@index([appUserId, policyVersionId])
   @@map("policy_acknowledgements")
+}
+
+// The checklist answered when a decision was made (`QĐ-111ap`): the answers to the questions of a step of the policy in force, with the
+// version that asked them. A batch or a group answers once and is kept once for each request or line; added to and never changed. The CHECKs
+// (the seven steps, the three subjects, a No only with a refusal, a return or a reclaim) and the triggers that keep it so are SQL in the
+// migration. `subject_id`, `line_employee_id` and `decided_by_employee_id` are values of other contexts, not foreign keys.
+model DecisionChecklist {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  policyVersionId     String   @map("policy_version_id") @db.Uuid
+  stepCode            String   @map("step_code")
+  subjectKind         String   @map("subject_kind")
+  subjectId           String   @map("subject_id") @db.Uuid
+  lineEmployeeId      String?  @map("line_employee_id") @db.Uuid
+  decidedByEmployeeId String   @map("decided_by_employee_id") @db.Uuid
+  decision            String
+  answers             Json
+  hasNo               Boolean  @map("has_no")
+  decidedAt           DateTime @map("decided_at") @db.Timestamptz(3)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  policyVersion PolicyVersion @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+
+  @@index([subjectKind, subjectId])
+  @@index([organizationId, stepCode, decidedAt])
+  @@index([policyVersionId])
+  @@map("decision_checklists")
 }

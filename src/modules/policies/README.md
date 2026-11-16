@@ -9,7 +9,7 @@ thấp hơn). Được dùng bởi: `src/app/app.module.ts`; module trên gọi 
 
 ## Trạng thái
 
-Gói PL-1 (thư viện, xác nhận đã đọc, 8 chính sách khởi tạo) và PL-3 (file mẫu import) đã nối; PL-2 (checklist khi quyết định) chưa có.
+Gói PL-1 (thư viện, xác nhận đã đọc, 8 chính sách khởi tạo) và PL-3 (file mẫu import) đã nối. PL-2 (checklist khi quyết định) đang làm dần: nền (`PolicyChecklistApi`, bảng `decision_checklists`) đã có (PL-2.1); từng bước quyết định gọi nó ở các task PL-2.2…PL-2.6 của module chủ bước.
 
 ## Public API (`public/`)
 
@@ -17,15 +17,15 @@ Gói PL-1 (thư viện, xác nhận đã đọc, 8 chính sách khởi tạo) v�
 - `PoliciesBootstrapApi` ([public/policies-bootstrap.api.ts](public/policies-bootstrap.api.ts)): `seedInitialPolicies` — ghi 8 chính sách và bản 1 của
   mỗi chính sách trong transaction của người gọi (lệnh cài đặt; seed demo sau này), chạy lại không đổi gì, không đụng bản đã có.
   Nằm ở `policies-bootstrap-facade.module.ts` (không controller) để lệnh cài đặt không nạp cả thư viện.
-- Chưa có `PolicyChecklistApi`; thêm ở PL-2.
+- `PolicyChecklistApi` ([public/policy-checklist.api.ts](public/policy-checklist.api.ts)): `judge` (bản chính sách hiện hành của bước, đủ câu trả lời, quyết định cho phép hay khóa, lý do tự điền từ mục _Không_) rồi `record` (một dòng `decision_checklists` cho mỗi Request/dòng/phiên bản/khuyến nghị của lần quyết) trong cùng transaction với quyết định. Lỗi ở `public/policy-checklist.errors.ts`; kiểu và `checklistBodySchema` (body chung `checklist`) ở `public/policy-checklist.types.ts`. Nằm ở `policies-checklist-facade.module.ts` (không controller).
 - `public/policies.extension-points.ts` — `ImportTemplateContributions` (xem mục Extension point), `ImportTemplateSource`.
 - `public/policies.types.ts` còn `IMPORT_TEMPLATE_KINDS`, `IMPORT_TEMPLATE_ROLES` (ai tải mẫu nào) và `ImportTemplateDefinition`/`ImportTemplateColumn`.
 
 ## Bảng sở hữu
 
 - `policies` (mã cố định mỗi tổ chức), `policy_versions` (mỗi bản một dòng; bản nháp là dòng có `version_number` NULL, tối đa một mỗi chính
-  sách; bản xuất bản không bao giờ sửa hay xóa — trigger `policy_versions_guard`), `policy_acknowledgements` (chỉ ghi thêm — trigger
-  `policies_append_only`, quyền runtime `INSERT, SELECT`) ([prisma/models/policies.prisma](../../../prisma/models/policies.prisma)).
+  sách; bản xuất bản không bao giờ sửa hay xóa — trigger `policy_versions_guard`), `policy_acknowledgements` và `decision_checklists` (chỉ ghi thêm — trigger
+  `policies_append_only`, quyền runtime `INSERT, SELECT`; `decision_checklists` giữ câu trả lời kèm bản chính sách cho từng thứ được quyết) ([prisma/models/policies.prisma](../../../prisma/models/policies.prisma)).
   `employee_id`, `app_user_id` là giá trị, không khóa ngoại: người thuộc module khác.
 
 ## Capability (không vòng: `reading` → `acknowledgement` → `library`)
@@ -39,6 +39,7 @@ Gói PL-1 (thư viện, xác nhận đã đọc, 8 chính sách khởi tạo) v�
 - `initial/` — dữ liệu bản 1 của 8 chính sách (`pol-*.types.ts`, sinh từ [POLICY-SEED-DRAFT](../../../docs/reviews/fe-feedback-2026-11-11/POLICY-SEED-DRAFT.md)
   đã duyệt `QĐ-112b`), `initial-policies.policy.ts` (danh sách + căn cứ ban hành bản 1 mặc định), `initial-policies.service.ts` (ghi một lần, chạy lại an toàn). Bảy bước có
   checklist của `QĐ-111ap` nằm đúng chính sách của luồng mình; spec khóa danh sách đó.
+- `checklist/` — `checklist.policy.ts` là luật thuần duy nhất (`evaluateChecklist`: bản cũ ⟹ `VERSION_CHANGED`, thiếu/thừa/trùng ⟹ `INCOMPLETE`, mục `SYSTEM` tự _Có_; `judgeDecision`: quyết định đi tiếp bị khóa khi có _Không_, từ chối/trả về lấy lý do gõ tay hoặc điền từ mục _Không_), `checklist.repo.ts` (bản hiện hành của mọi chính sách, ghi `decision_checklists`), `checklist-judge.service.ts`, `checklist-record.service.ts`. Bước nằm đúng một chính sách (thư viện giữ bộ bước cố định) nên bước tìm chính sách theo mã bước.
 - `import-template/` — `GET /import-templates/{kind}?format=xlsx|csv` (`QĐ-111as`): file dựng từ định nghĩa cột do module đọc file góp vào
   (sheet _Dữ liệu_ có dòng ví dụ + sheet _Hướng dẫn_: cột, bắt buộc, định dạng, ví dụ, ràng buộc; CSV UTF-8 có BOM). Trả file thô
   (`@RawResponse`), không có mẫu sao kê. `import-template.policy.ts` giữ luật thuần (CSV, bảng hướng dẫn, ai được tải).
@@ -54,5 +55,6 @@ Gói PL-1 (thư viện, xác nhận đã đọc, 8 chính sách khởi tạo) v�
 
 ## Chưa làm
 
-- PL-2 checklist khi quyết định. Seed demo gọi `PoliciesBootstrapApi` với căn cứ riêng (việc của Z2). Mục `SYSTEM` của
-  checklist chưa đối chiếu với guard thật (CS-8): PL-2 làm.
+- PL-2.2…PL-2.6: từng bước quyết định (nhu cầu, dự phòng, duyệt chi, đánh giá case B, phiên bản `MF-4`, ghost seat, đẩy sớm) gọi
+  `PolicyChecklistApi`; module chủ bước đã nối bước nào thì ghi ở README của module đó. Seed demo gọi `PoliciesBootstrapApi` với căn
+  cứ riêng (việc của Z2). Mục `SYSTEM` của checklist chưa đối chiếu với guard thật (CS-8): PL-2 làm.

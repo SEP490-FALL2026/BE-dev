@@ -16,6 +16,7 @@ import { LibraryDraftController } from './library/library-draft.controller';
 import { LibraryDraftService } from './library/library-draft.service';
 import { LibraryPublishService } from './library/library-publish.service';
 import { PoliciesBootstrapFacadeModule } from './policies-bootstrap-facade.module';
+import { PoliciesChecklistFacadeModule } from './policies-checklist-facade.module';
 import { PoliciesTemplateFacadeModule } from './policies-template-facade.module';
 import { PolicyReadingController } from './reading/policy-reading.controller';
 import { PolicyReadingQueryService } from './reading/policy-reading-query.service';
@@ -33,6 +34,7 @@ import { PolicyReadingQueryService } from './reading/policy-reading-query.servic
     IdentityAccessFacadeModule,
     NotificationsModule,
     PoliciesBootstrapFacadeModule,
+    PoliciesChecklistFacadeModule,
     PoliciesTemplateFacadeModule,
   ],
   controllers: [PolicyReadingController, LibraryDraftController, AcknowledgementController, ImportTemplateController],
