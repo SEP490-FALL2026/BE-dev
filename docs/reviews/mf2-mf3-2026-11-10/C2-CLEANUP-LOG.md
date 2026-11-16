@@ -1,4 +1,4 @@
-# C2 — Nhật ký xóa ba thư mục nhật ký review QĐ-93 / QĐ-95 / QĐ-96→100 (11/11/2026)
+m# C2 — Nhật ký xóa ba thư mục nhật ký review QĐ-93 / QĐ-95 / QĐ-96→100 (11/11/2026)
 
 **Skill đã đọc/dùng:** `andrej-karpathy-skills:karpathy-guidelines` (process: thay đổi tối thiểu, chỉ chạm dòng có tham
 chiếu) · `documentation-and-adrs` (domain: tài liệu lịch sử bị gỡ thì ghi rõ, giữ nguồn chính) ·
