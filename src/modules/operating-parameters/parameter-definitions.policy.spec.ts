@@ -31,6 +31,7 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(defaults.GHOST_SEAT_REVOCATION_GRACE_DAYS).toBe(7);
     expect(defaults.RULE_SCHEDULE_G1_G2).toBe('DAILY');
     expect(defaults.RULE_SCHEDULE_G3_G4).toBe('WEEKLY');
+    expect(defaults.AI_PROVIDER_MODE).toBe('SIMULATED');
   });
 
   it('has no budget period kind and no high-value threshold: the budget period is the fiscal year (AC-8, AC-14)', () => {
@@ -124,6 +125,16 @@ describe('operating parameter definitions (US-01-04)', () => {
   });
 });
 
+const SWITCH_LABELS = { ON: 'Bật', OFF: 'Tắt' };
+const SCHEDULE_LABELS = { DAILY: 'Hằng ngày', WEEKLY: 'Hằng tuần' };
+const OPTION_LABELS: Record<string, Record<string, string>> = {
+  RULE_SCHEDULE_G1_G2: SCHEDULE_LABELS,
+  RULE_SCHEDULE_G3_G4: SCHEDULE_LABELS,
+  AI_ENABLED: SWITCH_LABELS,
+  AI_ACCESS_REQUEST_SUMMARY_ENABLED: SWITCH_LABELS,
+  AI_PROVIDER_MODE: { SIMULATED: 'Giả lập (không gọi model)', MODEL: 'Model AI' },
+};
+
 const EXPECTED_KEYS = [
   'APPROVAL_SLA_WORKING_DAYS',
   'BACKLOG_ALERT_THRESHOLD',
@@ -154,10 +165,11 @@ const EXPECTED_KEYS = [
   'RULE_SCHEDULE_G3_G4',
   'AI_ENABLED',
   'AI_ACCESS_REQUEST_SUMMARY_ENABLED',
+  'AI_PROVIDER_MODE',
 ];
 
 describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
-  it('pins the twenty-nine keys, ordered by group and, inside a group, as the spec table lists them', () => {
+  it('pins the thirty keys, ordered by group and, inside a group, as the spec table lists them', () => {
     expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
   });
 
@@ -285,6 +297,7 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['RULE_SCHEDULE_G3_G4', 'Lịch chạy luật lãng phí (dữ liệu usage)', 'USAGE', 'schedule', 'lịch'],
       ['AI_ENABLED', 'Công tắc tổng của các tính năng AI', 'AI', 'switch', 'công tắc'],
       ['AI_ACCESS_REQUEST_SUMMARY_ENABLED', 'Tóm tắt hàng chờ duyệt bằng AI', 'AI', 'switch', 'công tắc'],
+      ['AI_PROVIDER_MODE', 'Nguồn trả lời của AI', 'AI', 'mode', 'chế độ'],
     ]);
   });
 
@@ -296,15 +309,14 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       'RULE_SCHEDULE_G3_G4',
       'AI_ENABLED',
       'AI_ACCESS_REQUEST_SUMMARY_ENABLED',
+      'AI_PROVIDER_MODE',
     ]);
     expect(ENUM_OPTIONS_MAX).toBe(10);
     for (const definition of enums) {
       if (definition.shape.kind !== 'enum') continue;
       expect(Object.keys(definition.shape.optionLabels).sort()).toEqual([...definition.shape.options].sort());
       expect(definition.shape.options.length).toBeLessThanOrEqual(ENUM_OPTIONS_MAX);
-      expect(definition.shape.optionLabels).toEqual(
-        definition.group === 'AI' ? { ON: 'Bật', OFF: 'Tắt' } : { DAILY: 'Hằng ngày', WEEKLY: 'Hằng tuần' },
-      );
+      expect(definition.shape.optionLabels).toEqual(OPTION_LABELS[definition.key]);
     }
   });
 
@@ -326,6 +338,30 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       }
     }
     expect(definitionOf('AI_FINANCE_NARRATIVE_ENABLED')).toBeUndefined();
+  });
+
+  it('answers with the simulation until the Super Admin chooses the model, and takes nothing but SIMULATED or MODEL', () => {
+    const definition = definitionOf('AI_PROVIDER_MODE');
+
+    expect(definition).toMatchObject({
+      label: 'Nguồn trả lời của AI',
+      group: 'AI',
+      shape: { kind: 'enum', options: ['SIMULATED', 'MODEL'] },
+      default: 'SIMULATED',
+      unit: 'mode',
+      unitLabel: 'chế độ',
+    });
+    expect(definition?.description).toContain('Chỉ có hiệu lực khi công tắc AI đang bật.');
+    expect(defaultValues().AI_PROVIDER_MODE).toBe('SIMULATED');
+    for (const value of ['SIMULATED', 'MODEL']) {
+      expect(validateParameterValue('AI_PROVIDER_MODE', value, defaultValues())).toEqual({ ok: true });
+    }
+    for (const value of ['simulated', 'model', 'ON', 'OFF', 'OPENAI', '', true, 1, null]) {
+      expect(validateParameterValue('AI_PROVIDER_MODE', value, defaultValues())).toEqual({
+        ok: false,
+        reason: 'OUT_OF_RANGE',
+      });
+    }
   });
 
   it('describes the notice review as the Super Admin task (API-DOC-F07)', () => {

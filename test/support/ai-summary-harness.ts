@@ -19,6 +19,7 @@ export interface SummaryWire {
   status: string;
   createdAt: string;
   sourceStale: boolean;
+  simulated: boolean;
   omittedCount: number;
   lines: SummaryLineWire[];
   errorCode: string | null;
@@ -64,9 +65,16 @@ export class AiSummaryHarness extends GroupHarness {
     super();
   }
 
+  /**
+   * Starts the application pointed at the stand-in (`env` may override, `AI_SERVICE_BASE_URL: ''` for no AI service) with
+   * `AI_PROVIDER_MODE` = MODEL, so a summary goes to the stand-in; a spec of the simulation sets SIMULATED with `setMode`.
+   */
   override async start(options: Parameters<GroupHarness['start']>[0] = {}): Promise<void> {
     await this.ai.start();
     await super.start({ ...options, env: { ...this.ai.environment(this.timeoutMs), ...(options.env ?? {}) } });
+    const response = await this.setMode('MODEL');
+    if (response.status !== 200)
+      throw new Error(`AI_PROVIDER_MODE: ${response.status} ${JSON.stringify(response.body)}`);
   }
 
   override async stop(): Promise<void> {
@@ -129,6 +137,13 @@ export class AiSummaryHarness extends GroupHarness {
       .put(`/api/v1/operating-parameters/${key}`)
       .set({ Authorization: `Bearer ${this.admin}` })
       .send({ value });
+
+  /** The Super Admin sets where the answers of the next calls come from. */
+  setMode = (mode: 'MODEL' | 'SIMULATED') =>
+    request(this.server())
+      .put('/api/v1/operating-parameters/AI_PROVIDER_MODE')
+      .set({ Authorization: `Bearer ${this.admin}` })
+      .send({ value: mode });
 
   async switchAll(value: 'ON' | 'OFF'): Promise<void> {
     for (const key of AI_SWITCHES) await this.setSwitch(key, value).expect(200);

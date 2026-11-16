@@ -2,7 +2,7 @@ import type { QueueContext, QueueRequestItem, QueueSummaryParsed, SummaryItem } 
 
 /**
  * The checks of the backend on the lines the model wrote for a queue (design section 6), the TypeScript port of the reference
- * validator `AI-dev/eval/validators.py` that scores the models. A line passes only when it names a step of the context once, with
+ * validator `AI-SERVICE/eval/validators.py` that scores the models. A line passes only when it names a step of the context once, with
  * its kind, gives no advice, rank, risk or deadline, claims no action as done, carries no link, and writes no number that the source
  * of its own line does not have: every run of numerals must be a whole number of that source, a unit of money or a percentage
  * must be in it too, and the only placeholder is the cost of a spend line. Known gaps, as in the reference: a comparison or a

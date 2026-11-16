@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../src/infrastructure/database/prisma.service';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../src/infrastructure/database/unique-violation';
+import { AiInvocationContentRepo } from '../../../src/modules/ai-assist/invocation/invocation-content.repo';
 import { AiInvocationRepo } from '../../../src/modules/ai-assist/invocation/invocation.repo';
 import type { InvocationOutcome, NewInvocation } from '../../../src/modules/ai-assist/invocation/invocation.types';
 import {
@@ -81,6 +82,7 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
     actorAppUserId: randomUUID(),
     actorEmployeeId: randomUUID(),
     feature: 'ACCESS_REQUEST_QUEUE_SUMMARY',
+    providerMode: 'MODEL',
     sourceRevision: 'a'.repeat(64),
     context: CONTEXT,
     status: 'PENDING',
@@ -147,7 +149,7 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
     await repo.markRunning(id, new Date(Date.now() - 200_000));
     const cutoff = new Date(Date.now() - 150_000);
 
-    await expect(runner.run((tx) => repo.stuckOf(tx, input, cutoff))).resolves.toEqual([id]);
+    await expect(runner.run((tx) => repo.stuckOf(tx, input, cutoff))).resolves.toEqual([{ id, providerMode: 'MODEL' }]);
     await expect(runner.run((tx) => repo.expire(tx, id, cutoff, new Date()))).resolves.toBe(true);
     await expect(runner.run((tx) => repo.expire(tx, id, cutoff, new Date()))).resolves.toBe(false);
     await expect(runner.run((tx) => repo.finish(tx, id, OUTCOME, new Date()))).resolves.toBe(false);
@@ -179,5 +181,39 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
       errorCode: 'AI.SOURCE_UNREADABLE',
       finishedAt: expect.any(Date) as unknown,
     });
+  });
+
+  it('keeps one call per queue revision and mode: the other mode is a call of its own, read back with its mode', async () => {
+    const model = call();
+    const simulated: NewInvocation = { ...model, providerMode: 'SIMULATED' };
+    const first = await runner.run((tx) => repo.insert(tx, model));
+    const second = await runner.run((tx) => repo.insert(tx, simulated));
+
+    await expect(repo.findLive(model)).resolves.toEqual({ id: first.id, status: 'PENDING' });
+    await expect(repo.findLive(simulated)).resolves.toEqual({ id: second.id, status: 'PENDING' });
+    const again = await runner.run((tx) => repo.insert(tx, simulated)).catch((error: unknown) => error);
+    expect(isUniqueViolation(again, 'ai_invocations_active_per_revision', 'source_revision')).toBe(true);
+    await expect(repo.findOwned(second.id, model.actorAppUserId)).resolves.toMatchObject({ providerMode: 'SIMULATED' });
+    await expect(runner.run((tx) => new AiInvocationContentRepo(prisma).find(tx, second.id))).resolves.toMatchObject({
+      invocationId: second.id,
+      organizationId,
+      providerMode: 'SIMULATED',
+    });
+  });
+
+  it('gives the stuck calls of the person in every mode, each with its mode', async () => {
+    const model = call({ at: new Date(Date.now() - 300_000) });
+    const simulated: NewInvocation = { ...model, providerMode: 'SIMULATED', sourceRevision: 'b'.repeat(64) };
+    const ids = [
+      (await runner.run((tx) => repo.insert(tx, model))).id,
+      (await runner.run((tx) => repo.insert(tx, simulated))).id,
+    ];
+
+    const stuck = await runner.run((tx) => repo.stuckOf(tx, model, new Date(Date.now() - 150_000)));
+
+    expect([...stuck].sort((a, b) => a.providerMode.localeCompare(b.providerMode))).toEqual([
+      { id: ids[0], providerMode: 'MODEL' },
+      { id: ids[1], providerMode: 'SIMULATED' },
+    ]);
   });
 });

@@ -163,6 +163,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'RULE_SCHEDULE_G3_G4',
         'AI_ENABLED',
         'AI_ACCESS_REQUEST_SUMMARY_ENABLED',
+        'AI_PROVIDER_MODE',
       ]);
       expect([...new Set(items.map((item) => item.group))]).toEqual([
         'WORKFLOW',
@@ -411,6 +412,48 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect(rows[0].valid_to).not.toBeNull();
     });
 
+    it('starts the source of the AI answers at the simulation, lets the Super Admin choose the model with an audit, and takes nothing else', async () => {
+      const key = 'AI_PROVIDER_MODE';
+
+      expect((await list()).get(key)).toMatchObject({
+        value: 'SIMULATED',
+        default: 'SIMULATED',
+        isDefault: true,
+        label: 'Nguồn trả lời của AI',
+        group: 'AI',
+        groupLabel: 'Trợ lý AI',
+        unit: 'mode',
+        unitLabel: 'chế độ',
+        constraints: {
+          kind: 'enum',
+          options: ['SIMULATED', 'MODEL'],
+          optionLabels: { SIMULATED: 'Giả lập (không gọi model)', MODEL: 'Model AI' },
+        },
+      });
+
+      await setParameter(key, 'MODEL').expect(200);
+      expect((await list()).get(key)).toMatchObject({ value: 'MODEL', isDefault: false });
+      expect(await auditFor(key)).toEqual([
+        { action: 'PARAMETER.CHANGED', before: { value: 'SIMULATED' }, after: { value: 'MODEL' } },
+      ]);
+      await expect(ctx.app.get(OperatingParametersApi).getValue(key)).resolves.toBe('MODEL');
+      for (const refused of ['OPENAI', 'model', 'ON']) {
+        expect(errorOf(await setParameter(key, refused).expect(422)).details).toMatchObject({
+          key,
+          problem: 'OUT_OF_RANGE',
+        });
+      }
+      await setParameter(key, 'MODEL', as(it1)).expect(403);
+      expect((await list()).get(key)).toMatchObject({ value: 'MODEL' });
+
+      await setParameter(key, 'SIMULATED').expect(200);
+      expect((await list()).get(key)).toMatchObject({ value: 'SIMULATED' });
+      expect((await auditFor(key)).map((event) => [event.before, event.after])).toEqual([
+        [{ value: 'SIMULATED' }, { value: 'MODEL' }],
+        [{ value: 'MODEL' }, { value: 'SIMULATED' }],
+      ]);
+    });
+
     it('does not return, and does not fail on, a budget period kind stored before it was removed (AC-8)', async () => {
       await ctx.sql.query(
         `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
@@ -424,8 +467,8 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       // 27 before GH-1/2/3 and the renewal window (REQUEST_OPEN_NEW_LIMIT, PAID_SOFTWARE_FLAG_THRESHOLD, RENEWAL_WINDOW_DAYS), less the
       // threshold of GH-3 that went with it (PAID_SOFTWARE_FLAG_THRESHOLD, QĐ-111h), then the three of MF-2 and MF-3 (DEPARTURE_REVOCATION_WORKING_DAYS, TRANSFER_GRACE_WORKING_DAYS, TRANSFER_GRACE_REMINDER_WORKING_DAYS), less the
       // two of the handover that went (ABRUPT_DEPARTURE_HOLD_WORKING_DAYS, HANDOVER_SHORT_DEADLINE_WORKING_DAYS, QĐ-110g) and the deadline of the
-      // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p).
-      expect(parameters.size).toBe(29);
+      // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p), then AI_PROVIDER_MODE (QĐ-102f).
+      expect(parameters.size).toBe(30);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {

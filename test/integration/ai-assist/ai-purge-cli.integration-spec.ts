@@ -49,8 +49,8 @@ describe('ops:ai-purge (integration, real CLI and PostgreSQL)', () => {
     const id = randomUUID();
     ids.set(name, id);
     await ctx.sql.query(
-      `INSERT INTO ai_invocations (id, organization_id, feature, actor_app_user_id, actor_employee_id, status, source_revision, created_at, finished_at)
-       VALUES ($1, $2, 'ACCESS_REQUEST_QUEUE_SUMMARY', $3, $4, $7::"AiInvocationStatus", $5, $6, $8)`,
+      `INSERT INTO ai_invocations (id, organization_id, feature, actor_app_user_id, actor_employee_id, status, source_revision, created_at, finished_at, provider_mode)
+       VALUES ($1, $2, 'ACCESS_REQUEST_QUEUE_SUMMARY', $3, $4, $7::"AiInvocationStatus", $5, $6, $8, 'MODEL')`,
       [
         id,
         seed.organizationId,

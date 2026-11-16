@@ -15,7 +15,7 @@ const PURGEABLE = { invocation: { status: { notIn: ['PENDING', 'RUNNING'] as Arr
 export class AiInvocationContentRepo {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** The content of one call with the organization of the call, or null when there is none (never made, or purged). */
+  /** The content of one call with the organization and the mode of the call, or null when there is none (never made, or purged). */
   async find(tx: DbTx, invocationId: string): Promise<InvocationContentRecord | null> {
     const row = await tx.aiInvocationContent.findUnique({
       where: { invocationId },
@@ -25,7 +25,7 @@ export class AiInvocationContentRepo {
         rawResponse: true,
         parsed: true,
         result: true,
-        invocation: { select: { organizationId: true } },
+        invocation: { select: { organizationId: true, providerMode: true } },
       },
     });
     if (!row) return null;
@@ -33,6 +33,7 @@ export class AiInvocationContentRepo {
     return {
       invocationId,
       organizationId: row.invocation.organizationId,
+      providerMode: row.invocation.providerMode,
       context: aiInvocationContextJson.decode(row.context),
       promptText: row.promptText,
       rawResponse: row.rawResponse,

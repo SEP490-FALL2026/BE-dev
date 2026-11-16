@@ -7,7 +7,8 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RequestsAiSourceApi } from '../../requests/public/requests-ai-source.api';
-import { AiServiceClient, QUEUE_MAX_REQUESTS } from '../ai-service/ai-service.types';
+import { AiServiceClients } from '../ai-service/ai-service-clients.service';
+import { type AiProviderMode, QUEUE_MAX_REQUESTS } from '../ai-service/ai-service.types';
 import { AiInvocationRepo } from '../invocation/invocation.repo';
 import type { InvocationKey, InvocationRecord, LiveInvocation } from '../invocation/invocation.types';
 import { summaryFailedEvent, summaryRequestedEvent } from './queue-summary-audit-event.mapper';
@@ -32,6 +33,8 @@ import {
 
 /** The two switches that must both be ON: the switch of the AI and the switch of this feature. */
 const SWITCHES = ['AI_ENABLED', 'AI_ACCESS_REQUEST_SUMMARY_ENABLED'] as const;
+/** The operating parameter that says where the answers of a new call come from. */
+const PROVIDER_MODE = 'AI_PROVIDER_MODE';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UNIQUE_INDEX = 'ai_invocations_active_per_revision';
 
@@ -58,24 +61,31 @@ export class QueueSummaryService {
     private readonly parameters: OperatingParametersApi,
     private readonly organizations: OrganizationReadApi,
     private readonly audit: AuditApi,
-    private readonly client: AiServiceClient,
+    private readonly clients: AiServiceClients,
     private readonly runs: QueueSummaryRunService,
   ) {}
 
   /**
-   * Asks for a summary of the queue the person sees (`queueRevision`). Refuses with AiDisabledError, AiProviderUnavailableError,
-   * NoAssignedStepsError (the model is never called, AC-9) or SummarySourceStaleError; gives back the call already kept for the same
-   * revision, after taking the stuck runs of the person for FAILED. A source that cannot be read is recorded as a FAILED
-   * call, never an error of the request.
+   * Asks for a summary of the queue the person sees (`queueRevision`), in the mode `AI_PROVIDER_MODE` says now: the call keeps it
+   * until it ends. Refuses with AiDisabledError (in either mode), AiProviderUnavailableError (MODEL with no AI service configured;
+   * the simulation needs none), NoAssignedStepsError (the model is never called, AC-9) or SummarySourceStaleError; gives back the
+   * call already kept for the same revision in the same mode, after taking the stuck runs of the person for FAILED. A source that
+   * cannot be read is recorded as a FAILED call, never an error of the request.
    */
   async create(
     actor: AuthenticatedPrincipal,
     input: { queueRevision: string },
   ): Promise<{ invocationId: string; status: QueueSummaryStatus }> {
     await this.requireSwitchedOn();
-    if (!this.client.configured()) throw new AiProviderUnavailableError();
+    const providerMode = await this.providerMode();
+    if (!this.clients.forMode(providerMode).configured()) throw new AiProviderUnavailableError();
     const organizationId = await this.organizationId();
-    const key: InvocationKey = { organizationId, actorAppUserId: actor.appUserId, feature: QUEUE_SUMMARY_FEATURE };
+    const key: InvocationKey = {
+      organizationId,
+      actorAppUserId: actor.appUserId,
+      feature: QUEUE_SUMMARY_FEATURE,
+      providerMode,
+    };
     let admission: Admission;
     try {
       admission = await this.runner.run((tx) => this.admit(tx, actor, key, input.queueRevision));
@@ -138,6 +148,20 @@ export class QueueSummaryService {
     }
   }
 
+  /**
+   * MODEL only when the parameter says so; any other value means SIMULATED, the source that sends nothing out, and a value that is
+   * not one of the two is told to the operator (by its kind, never what it holds).
+   */
+  private async providerMode(): Promise<AiProviderMode> {
+    const value = await this.parameters.getValue(PROVIDER_MODE);
+    if (value === 'MODEL' || value === 'SIMULATED') return value;
+    this.logger.warn(
+      `feature=${QUEUE_SUMMARY_FEATURE} ${PROVIDER_MODE} is not MODEL or SIMULATED (${typeof value}): SIMULATED is used`,
+    );
+
+    return 'SIMULATED';
+  }
+
   private async organizationId(): Promise<string> {
     const organization = await this.organizations.getOrganization();
     if (organization === null) throw new Error('The AI summary was asked for before installation.');
@@ -182,6 +206,7 @@ export class QueueSummaryService {
       tx,
       summaryRequestedEvent(actor, key.organizationId, id, {
         queueRevision,
+        providerMode: key.providerMode,
         stepCount: composed.lines.length,
         omittedCount: composed.omittedCount,
       }),
@@ -193,18 +218,25 @@ export class QueueSummaryService {
       context: composed.context,
       lines: composed.lines,
       total: source.total,
+      providerMode: key.providerMode,
     };
 
     return { kind: 'admitted', job };
   }
 
-  /** Takes every live call of the person older than 150 seconds for FAILED (`AI.PROVIDER_TIMEOUT`), each with its audit event. */
+  /**
+   * Takes every live call of the person older than 150 seconds for FAILED (`AI.PROVIDER_TIMEOUT`), in every mode, each with its audit
+   * event in the mode of that call (not the mode of the request that found it).
+   */
   private async expireStuck(tx: DbTx, actor: AuthenticatedPrincipal, key: InvocationKey, now: Date): Promise<void> {
-    for (const id of await this.repo.stuckOf(tx, key, stuckBefore(now))) {
+    for (const { id, providerMode } of await this.repo.stuckOf(tx, key, stuckBefore(now))) {
       if (await this.repo.expire(tx, id, stuckBefore(now), now)) {
         await this.audit.record(
           tx,
-          summaryFailedEvent(actor, key.organizationId, id, SUMMARY_ERROR_CODES.PROVIDER_TIMEOUT),
+          summaryFailedEvent(actor, key.organizationId, id, {
+            errorCode: SUMMARY_ERROR_CODES.PROVIDER_TIMEOUT,
+            providerMode,
+          }),
         );
       }
     }
@@ -219,7 +251,10 @@ export class QueueSummaryService {
       if (await this.repo.expire(tx, record.id, stuckBefore(now), now)) {
         await this.audit.record(
           tx,
-          summaryFailedEvent(actor, record.organizationId, record.id, SUMMARY_ERROR_CODES.PROVIDER_TIMEOUT),
+          summaryFailedEvent(actor, record.organizationId, record.id, {
+            errorCode: SUMMARY_ERROR_CODES.PROVIDER_TIMEOUT,
+            providerMode: record.providerMode,
+          }),
         );
       }
     });
@@ -270,13 +305,17 @@ export class QueueSummaryService {
         tx,
         summaryRequestedEvent(actor, key.organizationId, invocationId, {
           queueRevision,
+          providerMode: key.providerMode,
           stepCount: 0,
           omittedCount: 0,
         }),
       );
       await this.audit.record(
         tx,
-        summaryFailedEvent(actor, key.organizationId, invocationId, SUMMARY_ERROR_CODES.SOURCE_UNREADABLE),
+        summaryFailedEvent(actor, key.organizationId, invocationId, {
+          errorCode: SUMMARY_ERROR_CODES.SOURCE_UNREADABLE,
+          providerMode: key.providerMode,
+        }),
       );
 
       return invocationId;

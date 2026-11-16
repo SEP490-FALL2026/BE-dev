@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 /**
- * Version 1 of the contract between the backend and the AI service (`AI-dev/src/ai_service/contract.py`, design section 4): what the
- * backend sends to summarise the queue of a person and what the service answers. The schemas below are the one place its shape is
- * written on this side; the service checks the same limits on its side.
+ * Version 1 of the contract between the backend and the AI service (`AI-SERVICE/src/ai_service/contract.py`, design section 4): what
+ * the backend sends to summarise the queue of a person and what the service answers. The schemas below are the one place its shape
+ * is written on this side; the service checks the same limits on its side.
  */
 export const AI_CONTRACT_VERSION = '1';
 
@@ -113,6 +113,13 @@ export interface AiServiceSettings {
 }
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
+
+/**
+ * Where the answers of a call come from (operating parameter `AI_PROVIDER_MODE`, QĐ-102f): the AI service, or the simulation that
+ * calls no model. A call keeps the mode it was made in until it ends.
+ */
+export const AI_PROVIDER_MODES = ['MODEL', 'SIMULATED'] as const;
+export type AiProviderMode = (typeof AI_PROVIDER_MODES)[number];
 
 /**
  * The AI service as the summary calls it. It answers a call or throws one of `ai-service.errors.ts`; it never falls back to another

@@ -22,6 +22,7 @@ const ADMIN = {
 const RECORD: InvocationContentRecord = {
   invocationId: INVOCATION_ID,
   organizationId: ORGANIZATION_ID,
+  providerMode: 'MODEL',
   context: { generatedAt: '2026-11-04T09:00:00.000Z', requests: [] },
   promptText: 'the prompt',
   rawResponse: '{"items":[]}',
@@ -61,12 +62,19 @@ describe('InvocationContentQueryService.read', () => {
 
     await expect(service.read(ADMIN, INVOCATION_ID)).resolves.toEqual({
       invocationId: INVOCATION_ID,
+      providerMode: 'MODEL',
       context: RECORD.context,
       promptText: 'the prompt',
       rawResponse: '{"items":[]}',
       parsed: { items: [] },
       result: RECORD.result,
     });
+  });
+
+  it('gives the mode the call was made in, so a simulated answer is never read as one of the model', async () => {
+    const { service } = world({ ...RECORD, providerMode: 'SIMULATED' });
+
+    await expect(service.read(ADMIN, INVOCATION_ID)).resolves.toMatchObject({ providerMode: 'SIMULATED' });
   });
 
   it('keeps the fields the table lets be empty as null', async () => {
