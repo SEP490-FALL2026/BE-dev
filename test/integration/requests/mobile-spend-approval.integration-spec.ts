@@ -41,7 +41,7 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
   const post = (path: string, account: ApiAccount, body: object, label?: Label) =>
     request(h.server()).post(`/api/v1${path}`).set(headers(account, label)).send(body);
   const spend = (id: string, body: object, account: ApiAccount = h.boss.account, label?: Label) =>
-    post(`/access-requests/${id}/spend-approval`, account, body, label);
+    post(`/access-requests/${id}/spend-approval`, account, h.checklists.withYes('1.7', body), label);
   const queue = async (account: ApiAccount = h.boss.account) =>
     h.dataOf<{ items: QueueItem[] }>(await get('/spend-approvals', account, { pageSize: 100 }).expect(200)).items;
   const years = async (id: string, account: ApiAccount = h.boss.account) =>
@@ -227,7 +227,11 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
       expect(r9.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' });
 
       // Nobody holds a need step: the approver has no need decision to make on it.
-      const need = await post(`/access-requests/${r9.id}/need-decision`, h.boss.account, { decision: 'APPROVE' });
+      const need = await post(
+        `/access-requests/${r9.id}/need-decision`,
+        h.boss.account,
+        h.checklists.withYes('1.2', { decision: 'APPROVE' }),
+      );
       expect([need.status, h.codeOf(need)]).toEqual([404, 'ACCESS_REQUEST.NOT_FOUND']);
       const sent = h.dataOf<{ request: AccessRequestWire }>(
         await get(`/access-requests/${r9.id}`, u.head.account).expect(200),

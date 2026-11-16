@@ -139,7 +139,7 @@ flowchart BT
   requests -->|12| notifications
   requests -->|12| operating_parameters
   requests -->|97| organization
-  requests -->|13| policies
+  requests -->|21| policies
   usage -->|10| audit
   usage -->|3| budgets
   usage -->|15| catalog

@@ -267,9 +267,6 @@
   "src/modules/requests/group-line-decisions/group-spend-decision.service.ts": {
     "complexity": {
       "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
     }
   },
   "src/modules/requests/group-request-submission/group-request-trail.mapper.ts": {

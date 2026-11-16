@@ -49704,7 +49704,7 @@
         },
         "responses": {
           "200": {
-            "description": "The person the step is given to approves it or refuses it with a reason. The request is checked again for the day of the decision and the decision is made on that check, which is kept with it. There is no override: a request that is blocked now (over the reserve, no approved budget in the current Cost Center, a quote that is no longer valid), or that uses the reserve with no confirmation of the head on this step, goes back to its head and is not decided; the requester and the head are told.",
+            "description": "The person the step is given to answers the checklist of the policy in force and approves it, refuses it with a reason, or sends it back to the head of the department (RETURN; a request of one step goes back to its sender): an answer No locks the approval and gives the reason of a refusal or a return. The request is checked again for the day of the decision and the decision is made on that check, which is kept with it. There is no override: a request that is blocked now (over the reserve, no approved budget in the current Cost Center, a quote that is no longer valid), or that uses the reserve with no confirmation of the head on this step, goes back to its head and is not decided; the requester and the head are told.",
             "content": {
               "application/json": {
                 "schema": {
@@ -49884,6 +49884,18 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "POLICY.VERSION_CHANGED": {
+                    "summary": "The policy of the step has a new version in force since the checklist was shown.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.VERSION_CHANGED",
+                        "message": "The policy of the step has a new version in force since the checklist was shown.",
+                        "details": { "stepCode": "1.2", "policyVersionId": "v3", "versionNumber": 3 },
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
@@ -49932,7 +49944,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR: a refusal without a reason, or a field that is not of the body, such as the override that no longer exists).",
+            "description": "The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, or a field that is not of the body, such as the override that no longer exists), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -49945,6 +49957,33 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_INCOMPLETE": {
+                    "summary": "The checklist of the step is not answered in full.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_INCOMPLETE",
+                        "message": "The checklist of the step is not answered in full.",
+                        "details": { "stepCode": "1.2", "missing": ["1.2-05"], "unexpected": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_HAS_NO": {
+                    "summary": "An answer of the checklist is No, so the decision cannot go on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_HAS_NO",
+                        "message": "An answer of the checklist is No, so the decision cannot go on.",
+                        "details": {
+                          "stepCode": "1.2",
+                          "items": [{ "code": "1.2-05", "text": "The tools they have do not meet the need" }]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -50024,7 +50063,7 @@
         },
         "responses": {
           "200": {
-            "description": "Approves or refuses the requests chosen of a batch the caller holds, one by one in the order given. Each is checked and decided on its own, with its own record. One that is not in the batch or is not the caller one, has no spend step, or went back to its head when checked again (the requester and the head are told) is skipped with its reason and the others go on. A refusal gives one reason for all.",
+            "description": "Answers one checklist for the whole batch and approves or refuses the requests chosen of a batch the caller holds, one by one in the order given, or sends the whole batch back to the head (RETURN: every request the caller holds of it, with the reason of the answers No; the head drops the request at fault and sends a new batch). Each is checked and decided on its own, with its own record and the same answers. One that is not in the batch or is not the caller one, has no spend step, or went back to its head when checked again (the requester and the head are told) is skipped with its reason and the others go on. A refusal gives one reason for all.",
             "content": {
               "application/json": {
                 "schema": {
@@ -50110,6 +50149,28 @@
               }
             }
           },
+          "409": {
+            "description": "The policy has a newer version in force than the checklist the caller answered (POLICY.VERSION_CHANGED): nothing is decided.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "POLICY.VERSION_CHANGED": {
+                    "summary": "The policy of the step has a new version in force since the checklist was shown.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.VERSION_CHANGED",
+                        "message": "The policy of the step has a new version in force since the checklist was shown.",
+                        "details": { "stepCode": "1.2", "policyVersionId": "v3", "versionNumber": 3 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "413": {
             "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
             "content": {
@@ -50153,7 +50214,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
+            "description": "The request is invalid (VALIDATION_ERROR), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO): nothing is decided.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -50166,6 +50227,33 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_INCOMPLETE": {
+                    "summary": "The checklist of the step is not answered in full.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_INCOMPLETE",
+                        "message": "The checklist of the step is not answered in full.",
+                        "details": { "stepCode": "1.2", "missing": ["1.2-05"], "unexpected": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_HAS_NO": {
+                    "summary": "An answer of the checklist is No, so the decision cannot go on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_HAS_NO",
+                        "message": "An answer of the checklist is No, so the decision cannot go on.",
+                        "details": {
+                          "stepCode": "1.2",
+                          "items": [{ "code": "1.2-05", "text": "The tools they have do not meet the need" }]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -57374,7 +57462,7 @@
         },
         "responses": {
           "200": {
-            "description": "The person the spend step is given to decides all the people whose need is confirmed at once, approving some and refusing others, each refusal with its reason. The request is checked again on the people approved and the decision is made on that check, which is kept with it; a request that has less money than it costs in a year of the budget, or none, cannot be approved. One commitment is held for each year, the sum of the part of the people approved, and each person stands for a share of it. A request that turned out to be an exception since it was sent goes back to Finance, and one whose data is at fault goes back to its head; nobody is decided then.",
+            "description": "The person the spend step is given to answers one checklist for the group and decides all the people whose need is confirmed at once (or sends the whole group back to its head, RETURN), approving some and refusing others, each refusal with its reason. The request is checked again on the people approved and the decision is made on that check, which is kept with it; a request that has less money than it costs in a year of the budget, or none, cannot be approved. One commitment is held for each year, the sum of the part of the people approved, and each person stands for a share of it. A request that turned out to be an exception since it was sent goes back to Finance, and one whose data is at fault goes back to its head; nobody is decided then.",
             "content": {
               "application/json": {
                 "schema": {
@@ -57543,6 +57631,18 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "POLICY.VERSION_CHANGED": {
+                    "summary": "The policy of the step has a new version in force since the checklist was shown.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.VERSION_CHANGED",
+                        "message": "The policy of the step has a new version in force since the checklist was shown.",
+                        "details": { "stepCode": "1.2", "policyVersionId": "v3", "versionNumber": 3 },
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
@@ -57591,7 +57691,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR: a refusal without its reason); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who).",
+            "description": "The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, a group sent back in part); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -57616,6 +57716,33 @@
                         "code": "GROUP_REQUEST.LINES_MISMATCH",
                         "message": "The decision must name every line of the step, once.",
                         "details": { "missing": ["<employee-id>"], "extra": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_INCOMPLETE": {
+                    "summary": "The checklist of the step is not answered in full.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_INCOMPLETE",
+                        "message": "The checklist of the step is not answered in full.",
+                        "details": { "stepCode": "1.2", "missing": ["1.2-05"], "unexpected": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_HAS_NO": {
+                    "summary": "An answer of the checklist is No, so the decision cannot go on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_HAS_NO",
+                        "message": "An answer of the checklist is No, so the decision cannot go on.",
+                        "details": {
+                          "stepCode": "1.2",
+                          "items": [{ "code": "1.2-05", "text": "The tools they have do not meet the need" }]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -115815,17 +115942,43 @@
       "SpendDecisionBodyDto": {
         "type": "object",
         "properties": {
-          "decision": { "type": "string", "enum": ["APPROVE", "REJECT"] },
-          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          "decision": { "type": "string", "enum": ["APPROVE", "REJECT", "RETURN"] },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "checklist": {
+            "type": "object",
+            "properties": {
+              "policyVersionId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The version of the policy whose questions were shown (from the step of the policy)."
+              },
+              "answers": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemCode": { "type": "string", "minLength": 1, "maxLength": 30 },
+                    "answer": { "type": "string", "enum": ["YES", "NO"] }
+                  },
+                  "required": ["itemCode", "answer"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["policyVersionId", "answers"],
+            "additionalProperties": false,
+            "description": "The answers to the questions of the policy in force at this step. Every question the person answers needs an answer; a question the system answers is Yes by itself."
+          }
         },
-        "required": ["decision"],
-        "description": "A refusal (REJECT) gives its reason. An approval (APPROVE) gives no reason.",
+        "required": ["decision", "checklist"],
+        "description": "The checklist of the policy in force at this step, and the decision. A refusal (REJECT) and a return to the head (RETURN) give their reason, or leave it to be filled in from the questions answered No. An approval (APPROVE) gives no reason and is locked while an answer is No.",
         "additionalProperties": false
       },
       "BatchDecisionBodyDto": {
         "type": "object",
         "properties": {
-          "decision": { "type": "string", "enum": ["APPROVE", "REJECT"] },
+          "decision": { "type": "string", "enum": ["APPROVE", "REJECT", "RETURN"] },
           "requestIds": {
             "minItems": 1,
             "maxItems": 50,
@@ -115833,10 +115986,36 @@
             "items": { "type": "string", "format": "uuid" },
             "uniqueItems": true
           },
-          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "checklist": {
+            "type": "object",
+            "properties": {
+              "policyVersionId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The version of the policy whose questions were shown (from the step of the policy)."
+              },
+              "answers": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemCode": { "type": "string", "minLength": 1, "maxLength": 30 },
+                    "answer": { "type": "string", "enum": ["YES", "NO"] }
+                  },
+                  "required": ["itemCode", "answer"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["policyVersionId", "answers"],
+            "additionalProperties": false,
+            "description": "The answers to the questions of the policy in force at this step. Every question the person answers needs an answer; a question the system answers is Yes by itself."
+          }
         },
-        "required": ["decision", "requestIds"],
-        "description": "A refusal (REJECT) gives its reason; an approval (APPROVE) gives none. A request is decided once.",
+        "required": ["decision", "checklist"],
+        "description": "One checklist for the whole batch, written for each request decided. A refusal (REJECT) names the requests; a return (RETURN) takes every request of the batch the caller holds and names none; each gives its reason or leaves it to the answers No. An approval gives none and is locked while an answer is No. A request is decided once.",
         "additionalProperties": false
       },
       "BatchDecisionResponseDto": {
@@ -115853,7 +116032,7 @@
                   "type": "object",
                   "properties": {
                     "requestId": { "type": "string", "format": "uuid" },
-                    "outcome": { "type": "string", "enum": ["APPROVED", "REJECTED", "SKIPPED"] },
+                    "outcome": { "type": "string", "enum": ["APPROVED", "REJECTED", "RETURNED", "SKIPPED"] },
                     "reason": {
                       "type": "string",
                       "enum": [
@@ -119809,17 +119988,43 @@
               "type": "object",
               "properties": {
                 "employeeId": { "type": "string", "format": "uuid" },
-                "decision": { "type": "string", "enum": ["APPROVE", "REJECT"] },
+                "decision": { "type": "string", "enum": ["APPROVE", "REJECT", "RETURN"] },
                 "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
               },
               "required": ["employeeId", "decision"],
               "additionalProperties": false,
-              "description": "A refusal (REJECT) gives its reason; an approval (APPROVE) gives none."
+              "description": "A refusal (REJECT) and a return (RETURN) give a reason or leave it to the checklist; an approval (APPROVE) gives none."
             }
+          },
+          "checklist": {
+            "type": "object",
+            "properties": {
+              "policyVersionId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The version of the policy whose questions were shown (from the step of the policy)."
+              },
+              "answers": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemCode": { "type": "string", "minLength": 1, "maxLength": 30 },
+                    "answer": { "type": "string", "enum": ["YES", "NO"] }
+                  },
+                  "required": ["itemCode", "answer"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["policyVersionId", "answers"],
+            "additionalProperties": false,
+            "description": "The answers to the questions of the policy in force at this step. Every question the person answers needs an answer; a question the system answers is Yes by itself."
           }
         },
-        "required": ["lines"],
-        "description": "Each person is decided once.",
+        "required": ["lines", "checklist"],
+        "description": "Each person is decided once, with one checklist for the group. A group is sent back to its head (RETURN) as a whole: every person or none.",
         "additionalProperties": false
       },
       "LineWithdrawBodyDto": {

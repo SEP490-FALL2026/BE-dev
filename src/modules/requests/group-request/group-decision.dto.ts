@@ -6,23 +6,6 @@ import { GROUP_HEAD_MAX } from './group-request.policy';
 
 const reason = z.string().trim().min(1).max(REASON_MAX_LENGTH);
 
-/** What the decider says of one person: approve, or refuse with the reason (`US-05-04` AC-14). */
-const verdictSchema = z
-  .strictObject({
-    employeeId: z.uuid(),
-    decision: z.enum(['APPROVE', 'REJECT']),
-    reason: reason.optional(),
-  })
-  .superRefine((verdict, ctx) => {
-    if (verdict.decision === 'REJECT' && verdict.reason === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['reason'], message: 'A refusal gives its reason.' });
-    }
-    if (verdict.decision === 'APPROVE' && verdict.reason !== undefined) {
-      ctx.addIssue({ code: 'custom', path: ['reason'], message: 'Only a refusal gives a reason.' });
-    }
-  })
-  .meta({ description: 'A refusal (REJECT) gives its reason; an approval (APPROVE) gives none.' });
-
 /**
  * What the decider says of one person at the need step: approve, refuse, or send back (`QĐ-111ap`, `US-05-04` AC-22). A refusal and a return give
  * their reason, or leave it to be filled in from the questions of the checklist answered No.
@@ -72,15 +55,21 @@ export const lineNeedDecisionBodySchema = z
  */
 export const lineSpendDecisionBodySchema = z
   .strictObject({
-    lines: z.array(verdictSchema).min(1).max(GROUP_HEAD_MAX),
+    lines: z.array(needVerdictSchema).min(1).max(GROUP_HEAD_MAX),
+    checklist: checklistBodySchema,
   })
   .superRefine((body, ctx) => {
     if (new Set(body.lines.map((line) => line.employeeId)).size !== body.lines.length) {
       ctx.addIssue({ code: 'custom', path: ['lines'], message: 'A person is decided once.' });
     }
+    const returned = body.lines.filter((line) => line.decision === 'RETURN').length;
+    if (returned > 0 && returned < body.lines.length) {
+      ctx.addIssue({ code: 'custom', path: ['lines'], message: 'A group is sent back as a whole.' });
+    }
   })
   .meta({
-    description: 'Each person is decided once.',
+    description:
+      'Each person is decided once, with one checklist for the group. A group is sent back to its head (RETURN) as a whole: every person or none.',
   });
 
 /**

@@ -222,7 +222,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/spend-approval`,
     role: 'SPENDING_APPROVER',
-    body: { decision: 'APPROVE' },
+    body: { decision: 'APPROVE', checklist: CHECKLIST },
     dropped: { override: { reason: 'x', years: [2026] } },
   },
   {
@@ -230,7 +230,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/line-spend-decisions`,
     role: 'SPENDING_APPROVER',
-    body: { lines: [{ employeeId: ID, decision: 'APPROVE' }] },
+    body: { lines: [{ employeeId: ID, decision: 'APPROVE' }], checklist: CHECKLIST },
     dropped: { override: { reason: 'x', years: [2026] } },
   },
   ...['highValuePercent', 'highValueAmount'].map((field) => ({

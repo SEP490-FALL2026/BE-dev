@@ -304,7 +304,7 @@ export class SpendHarness extends BudgetHarness {
   approvalOf = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/access-requests/${id}/spend-approval`).set(this.as(account));
   decideSpend = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/spend-approval`).set(this.as(account)).send(body);
+    this.decisionPost(`/api/v1/access-requests/${id}/spend-approval`, account, '1.7', body);
   withdrawRequest = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/access-requests/${id}/withdraw`).set(this.as(account)).send(body);
   /**
@@ -353,7 +353,7 @@ export class SpendHarness extends BudgetHarness {
   commitmentReleases = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/budget-commitments/${id}/releases`).set(this.as(account));
   decideBatch = (batchId: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/spend-batches/${batchId}/decisions`).set(this.as(account)).send(body);
+    this.decisionPost(`/api/v1/spend-batches/${batchId}/decisions`, account, '1.7', body);
 
   /** A request sent on, so that its spend step waits for the approver: made, attached as the head approved it, and sent. */
   async waitingForApprover(unit: Unit, planId: string, spec: PaidSpec = {}): Promise<string> {

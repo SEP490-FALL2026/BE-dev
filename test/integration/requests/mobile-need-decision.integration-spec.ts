@@ -36,7 +36,10 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
   const get = (path: string, account: ApiAccount, label?: Label) =>
     request(h.server()).get(`/api/v1${path}`).set(headers(account, label));
   const decide = (id: string, body: object, account: ApiAccount, label?: Label) =>
-    request(h.server()).post(`/api/v1/access-requests/${id}/need-decision`).set(headers(account, label)).send(body);
+    request(h.server())
+      .post(`/api/v1/access-requests/${id}/need-decision`)
+      .set(headers(account, label))
+      .send(h.checklists.withYes('1.2', body));
   const sentBy = async (unit: Unit, planId: string, extra: Record<string, unknown> = {}) => {
     counter += 1;
     const member = await h.staff(unit.department, `${unit.department.code}-M${counter}`, 'EMPLOYEE');

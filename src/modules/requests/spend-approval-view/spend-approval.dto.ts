@@ -1,4 +1,5 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 import { z } from 'zod';
 import { responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
@@ -16,13 +17,11 @@ const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: z.strin
  */
 export const spendDecisionBodySchema = z
   .strictObject({
-    decision: z.enum(['APPROVE', 'REJECT']),
+    decision: z.enum(['APPROVE', 'REJECT', 'RETURN']),
     reason: text(1000).optional(),
+    checklist: checklistBodySchema,
   })
   .superRefine((body, ctx) => {
-    if (body.decision === 'REJECT' && body.reason === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['reason'], message: 'A refusal gives its reason.' });
-    }
     if (body.decision === 'APPROVE' && body.reason !== undefined) {
       ctx.addIssue({
         code: 'custom',
@@ -32,31 +31,38 @@ export const spendDecisionBodySchema = z
     }
   })
   .meta({
-    description: 'A refusal (REJECT) gives its reason. An approval (APPROVE) gives no reason.',
+    description:
+      'The checklist of the policy in force at this step, and the decision. A refusal (REJECT) and a return to the head (RETURN) give their reason, or leave it to be filled in from the questions answered No. An approval (APPROVE) gives no reason and is locked while an answer is No.',
   });
 
 /** Approving or refusing the requests of a batch the person holds, one by one, in the order chosen (`AC-19`, `AC-20`). */
 export const batchDecisionBodySchema = z
   .strictObject({
-    decision: z.enum(['APPROVE', 'REJECT']),
+    decision: z.enum(['APPROVE', 'REJECT', 'RETURN']),
     requestIds: z
       .array(z.uuid())
       .min(1)
       .max(BATCH_MAX)
       .refine((ids) => new Set(ids).size === ids.length, { message: 'A request is decided once.' })
-      .meta({ uniqueItems: true }),
+      .meta({ uniqueItems: true })
+      .optional(),
     reason: text(1000).optional(),
+    checklist: checklistBodySchema,
   })
   .superRefine((body, ctx) => {
-    if (body.decision === 'REJECT' && body.reason === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['reason'], message: 'A refusal gives its reason.' });
+    if (body.decision === 'RETURN' && body.requestIds !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['requestIds'], message: 'A return takes the whole batch.' });
+    }
+    if (body.decision !== 'RETURN' && body.requestIds === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['requestIds'], message: 'The requests to decide are named.' });
     }
     if (body.decision === 'APPROVE' && body.reason !== undefined) {
       ctx.addIssue({ code: 'custom', path: ['reason'], message: 'An approval gives no reason.' });
     }
   })
   .meta({
-    description: 'A refusal (REJECT) gives its reason; an approval (APPROVE) gives none. A request is decided once.',
+    description:
+      'One checklist for the whole batch, written for each request decided. A refusal (REJECT) names the requests; a return (RETURN) takes every request of the batch the caller holds and names none; each gives its reason or leaves it to the answers No. An approval gives none and is locked while an answer is No. A request is decided once.',
   });
 
 const pageQuery = {
@@ -239,7 +245,7 @@ const approvalDetailSchema = z.strictObject({
 
 const resultSchema = z.strictObject({
   requestId: z.uuid(),
-  outcome: z.enum(['APPROVED', 'REJECTED', 'SKIPPED']),
+  outcome: z.enum(['APPROVED', 'REJECTED', 'RETURNED', 'SKIPPED']),
   /** Why a request was not decided: it is not in the batch or not the caller's, it was checked again and went back, and so on. */
   reason: z
     .enum([

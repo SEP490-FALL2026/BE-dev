@@ -107,7 +107,9 @@ import { GroupRequestService } from './group-request-submission/group-request.se
 import { GroupRequestsController } from './group-request-submission/group-requests.controller';
 import { GroupResolutionEnding } from './group-request/group-resolution-ending.service';
 import { GroupResolutionService } from './group-request/group-resolution.service';
+import { GroupSpendChecklist } from './group-line-decisions/group-spend-checklist.service';
 import { GroupSpendDecisionService } from './group-line-decisions/group-spend-decision.service';
+import { GroupSpendPreconditions } from './group-line-decisions/group-spend-preconditions.service';
 import { GroupSpendHold } from './group-line-decisions/group-spend-hold.service';
 import { GroupSpendReport } from './group-line-decisions/group-spend-report.service';
 import { GroupSpendRecordService } from './group-line-decisions/group-spend-record.service';
@@ -419,6 +421,8 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     GroupSpendReport,
     GroupSpendRecordService,
     GroupSpendDecisionService,
+    GroupSpendChecklist,
+    GroupSpendPreconditions,
     GroupGrantService,
     GroupLineWithdrawer,
     GroupWithdrawalAftermath,

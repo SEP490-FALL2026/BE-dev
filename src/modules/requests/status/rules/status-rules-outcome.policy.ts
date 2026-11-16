@@ -41,6 +41,23 @@ export const OUTCOME_RULES: Readonly<Record<string, StatusRule>> = {
       ];
     },
   },
+  // The spending approver sent it back with the reason of the checklist (`QĐ-111ap`, R-24): the sender is told and so is the head, who sends it on
+  // again (a request of one step goes back to its sender).
+  'ACCESS_REQUEST.SPEND_RETURNED': {
+    subject: 'ACCESS_REQUEST',
+    needs: ['REQUEST', 'DECISION', 'DEPARTMENT_HEAD'],
+    build: (_event, facts): NotificationIntent[] => {
+      const request = requestOf(facts);
+
+      return [
+        {
+          recipients: [request.requesterEmployeeId, facts.departmentHeadEmployeeId],
+          code: 'REQUEST_RETURNED',
+          params: { requestId: request.id, by: 'SPEND', reason: facts.decision?.reason ?? null },
+        },
+      ];
+    },
+  },
   // 4: the IT Admin refused it at the gate of the assessment; the head of the department is told, the spending approver is not.
   'ACCESS_REQUEST.ASSESSMENT_REJECTED': {
     subject: 'ACCESS_REQUEST',

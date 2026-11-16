@@ -13,7 +13,7 @@ import { spendDecisionRecordOf, type ReturnReason } from '../spend/spend-decisio
 import type { SpendStepRecord } from '../spend/spend-step.repo';
 
 export type SpendDecisionResult =
-  | { status: 'DECIDED'; decision: 'APPROVED' | 'REJECTED'; requestState: string }
+  | { status: 'DECIDED'; decision: 'APPROVED' | 'REJECTED' | 'RETURNED'; requestState: string }
   /**
    * The request was checked again as the approver decided and it is not for them now: it is blocked, or uses a reserve nobody confirmed. It
    * went back to its head and nothing was decided (`US-06-01` AC-18, `BR-MF1-07c`).

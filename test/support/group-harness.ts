@@ -81,7 +81,7 @@ export class GroupHarness extends StatusHarness {
       .set(this.as(account))
       .send(this.checklists.withYes('1.2', body));
   decideSpendLines = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/line-spend-decisions`).set(this.as(account)).send(body);
+    this.decisionPost(`/api/v1/access-requests/${id}/line-spend-decisions`, account, '1.7', body);
   withdrawLine = (id: string, employeeId: string, body: object, account: ApiAccount) =>
     request(this.server())
       .post(`/api/v1/access-requests/${id}/lines/${employeeId}/withdraw`)

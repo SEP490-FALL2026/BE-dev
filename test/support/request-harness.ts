@@ -3,8 +3,9 @@ import type { PreviewWire } from '../../src/modules/requests/request-submission/
 import request from 'supertest';
 import { ApiAccount } from './api-accounts';
 import { clearSpendingApprover, insertEmployeeWithoutPlacement, setSpendingApprover } from './builders/account.builder';
+import type { DecisionStepCode } from '../../src/modules/policies/public/policy-checklist.types';
 import { assignHead } from './builders/organization.builder';
-import { DecisionChecklists } from './decision-checklist';
+import { DecisionChecklists, postDecision } from './decision-checklist';
 import { ProvisioningHarness } from './provisioning-harness';
 import { SeatHarness } from './seat-baseline-harness';
 
@@ -106,6 +107,9 @@ export class RequestHarness extends ProvisioningHarness {
 
   /** The checklist of each decision step, as the policies in force ask it (`QĐ-111ap`): every decision a suite makes sends one. */
   readonly checklists = new DecisionChecklists();
+  /** Posts the decision of a step with the checklist all Yes, unless the body has its own. */
+  decisionPost = (path: string, account: ApiAccount, step: DecisionStepCode, body: object) =>
+    postDecision(this, path, account, step, body);
 
   /**
    * Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. The suites of

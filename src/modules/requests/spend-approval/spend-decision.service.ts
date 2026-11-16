@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
+import type { ChecklistBody } from '../../policies/public/policy-checklist.types';
 import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
@@ -13,9 +15,11 @@ import { SpendStepRepo, type SpendStepRecord } from '../spend/spend-step.repo';
 import { SpendDecisionRecorder, type SpendDecisionResult } from './spend-decision-recorder.service';
 
 export interface SpendDecisionInput {
-  decision: 'APPROVE' | 'REJECT';
-  /** The reason of a refusal. */
+  decision: 'APPROVE' | 'REJECT' | 'RETURN';
+  /** The reason of a refusal or a return; left out, the answers No of the checklist give it. */
   reason?: string;
+  /** The checklist of the policy in force at the step (`QĐ-111ap`). */
+  checklist: ChecklistBody;
 }
 
 /**
@@ -36,6 +40,7 @@ export class SpendDecisionService {
     private readonly confirmations: ReserveConfirmationRepo,
     private readonly effects: SpendEffectsService,
     private readonly recorder: SpendDecisionRecorder,
+    private readonly checklists: PolicyChecklistApi,
   ) {}
 
   /** Throws AccessRequestNotFoundError and SpendDecisionRefusedError. */
@@ -46,21 +51,58 @@ export class SpendDecisionService {
   ): Promise<SpendDecisionResult> {
     return this.runner.run(async (tx) => {
       const { request, step } = await this.lockDecidable(tx, actor, requestId);
+      // What the checklist refuses is told before the budget is checked: a No locks an approval, a refusal or a return takes its reason from it.
+      const { verdict, reason } = await this.checklists.judge(tx, {
+        organizationId: request.organizationId,
+        stepCode: '1.7',
+        checklist: input.checklist,
+        decision: input.decision,
+        reason: input.reason,
+      });
       const now = new Date();
-      const outcome = await this.checks.run(tx, request, 'SPEND_DECISION', actor, now);
-      const of = { request, step, now };
-      if (input.decision === 'REJECT') {
-        return this.recorder.record(tx, actor, of, {
-          decision: 'REJECTED',
-          checkId: outcome.status === 'CHECKED' ? outcome.check.id : null,
-          reason: input.reason ?? null,
-          usesReserve: false,
-          reserveReason: null,
+      const result = await this.decideOn(tx, actor, { request, step, now }, { decision: input.decision, reason });
+      // The answers are kept with a decision that was made; a request that went back because the check made again blocked it was not decided.
+      if (result.status === 'DECIDED') {
+        await this.checklists.record(tx, {
+          organizationId: request.organizationId,
+          verdict,
+          decision: input.decision,
+          decidedByEmployeeId: actor.employeeId,
+          decidedAt: now,
+          subjects: [{ kind: 'ACCESS_REQUEST', id: request.id }],
         });
       }
 
-      return this.approve(tx, actor, of, outcome);
+      return result;
     });
+  }
+
+  private async decideOn(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    of: { request: AccessRequestRecord; step: SpendStepRecord; now: Date },
+    asked: { decision: 'APPROVE' | 'REJECT' | 'RETURN'; reason: string | null },
+  ): Promise<SpendDecisionResult> {
+    if (asked.decision === 'RETURN') {
+      const { requestState } = await this.effects.returnByApprover(tx, actor, of.request, of.step, {
+        now: of.now,
+        reason: asked.reason ?? '',
+      });
+
+      return { status: 'DECIDED', decision: 'RETURNED', requestState };
+    }
+    const outcome = await this.checks.run(tx, of.request, 'SPEND_DECISION', actor, of.now);
+    if (asked.decision === 'REJECT') {
+      return this.recorder.record(tx, actor, of, {
+        decision: 'REJECTED',
+        checkId: outcome.status === 'CHECKED' ? outcome.check.id : null,
+        reason: asked.reason,
+        usesReserve: false,
+        reserveReason: null,
+      });
+    }
+
+    return this.approve(tx, actor, of, outcome);
   }
 
   /**

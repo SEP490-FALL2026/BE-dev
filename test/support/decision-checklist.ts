@@ -1,3 +1,4 @@
+import request from 'supertest';
 import type { ChecklistBody, DecisionStepCode } from '../../src/modules/policies/public/policy-checklist.types';
 import { DECISION_STEP_CODES } from '../../src/modules/policies/public/policy-checklist.types';
 
@@ -74,3 +75,23 @@ export class DecisionChecklists {
 
 /** The steps, for a suite that goes through them. */
 export const CHECKLIST_STEPS = DECISION_STEP_CODES;
+
+/** What a harness gives to post a decision with the checklist of its step (`server`, the headers of an account, the checklists read). */
+export interface DecisionPoster {
+  server(): Parameters<typeof request>[0];
+  as(account: never): Record<string, string>;
+  checklists: DecisionChecklists;
+}
+
+/** Posts a decision to its route with the checklist all Yes at the step, unless the body brings its own. */
+export const postDecision = (
+  poster: DecisionPoster,
+  path: string,
+  account: unknown,
+  step: DecisionStepCode,
+  body: object,
+) =>
+  request(poster.server())
+    .post(path)
+    .set(poster.as(account as never))
+    .send(poster.checklists.withYes(step, body));
