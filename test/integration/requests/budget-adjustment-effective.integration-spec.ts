@@ -38,14 +38,14 @@ describe('the budget a request is checked against and the budget the views show 
   let counter = 0;
   const unit = async (): Promise<Unit> => h.departmentWithHead(`P-AE${(counter += 1)}`);
   /** Asked and approved while the cycle of the year is locked: an adjustment is made only then (FIX-AD1, AD1-01); the cycle is open again after, for the budgets the next case makes. */
-  const adjust = async (to: Unit, tr: number): Promise<string> =>
+  const adjust = async (to: Unit, tr: number, year = h.year): Promise<string> =>
     h.withLockedCycle(async () => {
       const asked = h.dataOf<{ id: string }>(
         await request(h.server())
           .post('/api/v1/budget-adjustments')
           .set(h.as(h.finance))
           .send({
-            year: h.year,
+            year,
             kind: 'SUPPLEMENT',
             toCostCenterId: to.department.unitId,
             amount: h.money(tr * M),
@@ -60,9 +60,9 @@ describe('the budget a request is checked against and the budget the views show 
         .expect(200);
 
       return asked.id;
-    });
-  const checkedYear = async (u: Unit, amountTr: number): Promise<YearRowWire> => {
-    const id = await h.paidRequest(u, plan, { amount: amountTr * M });
+    }, year);
+  const checkedYear = async (u: Unit, amountTr: number, year = h.year): Promise<YearRowWire> => {
+    const id = await h.paidRequest(u, plan, { amount: amountTr * M, year });
     const outcome = await h.route(id, u.head.account);
     if (outcome.status !== 'ROUTED') throw new Error(`not checkable: ${outcome.reason}`);
 
@@ -113,6 +113,33 @@ describe('the budget a request is checked against and the budget the views show 
       base: { amount: String(120 * M) },
       effectiveBudget: { base: { amount: String(120 * M) }, total: { amount: String(120 * M) } },
     });
+  });
+
+  it('QĐ-97c: each year reads its own effective budget: a supplement of 20 tr for this year leaves next year as it was (15 tr does not fit there), and the one for next year makes it fit', async () => {
+    const u = await unit();
+    await h.budgetFor(u, { total: 100 * M, spent: 90 * M });
+    await h.budgetFor(u, { total: 100 * M, spent: 90 * M, year: h.next });
+    await adjust(u, 20);
+
+    expect(await checkedYear(u, 15)).toMatchObject({
+      year: h.year,
+      code: 'BUDGET_OK',
+      base: { amount: String(120 * M) },
+    });
+    expect(await checkedYear(u, 15, h.next)).toMatchObject({
+      year: h.next,
+      code: 'INSUFFICIENT_BUDGET',
+      base: { amount: String(100 * M) },
+    });
+
+    await adjust(u, 20, h.next);
+
+    expect(await checkedYear(u, 15, h.next)).toMatchObject({
+      year: h.next,
+      code: 'BUDGET_OK',
+      base: { amount: String(120 * M) },
+    });
+    expect(await checkedYear(u, 15)).toMatchObject({ year: h.year, base: { amount: String(120 * M) } });
   });
 
   it('the table, the totals and the view of the head read the effective budget and keep the version: base and total of the version, effective base 120 tr, 30 tr left after 90 tr spent', async () => {
