@@ -1,5 +1,5 @@
 import { Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
@@ -7,10 +7,13 @@ import {
   VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import {
+  RequestLocale,
+  type RequestLocaleValue,
+} from '../../../infrastructure/http/decorators/request-locale.decorator';
 import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { InAppNotificationRecord } from '../public/notifications.types';
 import {
   NotificationIdParamDto,
   NotificationListQueryDto,
@@ -18,26 +21,20 @@ import {
   NotificationResponseDto,
   NotificationsMarkedResponseDto,
   NotificationUnreadCountResponseDto,
-  type NotificationWire,
 } from './inbox.dto';
 import { INBOX_ERROR_EXAMPLES, toInboxApiException } from './inbox.http-errors';
+import { toNotificationWire } from './inbox.mapper';
 import { InboxService } from './inbox.service';
+import { InboxViewService } from './inbox-view.service';
+
+const ACCEPT_LANGUAGE = {
+  name: 'Accept-Language',
+  required: false,
+  description:
+    'The language of the title and the message: vi or en, by the usual ranking of the header. Anything else, or no header, gives vi.',
+} as const;
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
-
-function wireOf(record: InAppNotificationRecord): NotificationWire {
-  return {
-    id: record.id,
-    code: record.code,
-    subject:
-      record.subjectType !== null && record.subjectId !== null
-        ? { type: record.subjectType, id: record.subjectId }
-        : null,
-    params: record.params,
-    createdAt: record.createdAt.toISOString(),
-    readAt: record.readAt?.toISOString() ?? null,
-  };
-}
 
 /**
  * The inbox of the application: the notices the caller was told, and only theirs. Every route reads the caller from the
@@ -47,26 +44,34 @@ function wireOf(record: InAppNotificationRecord): NotificationWire {
 @ApiTags('notifications')
 @Controller({ path: 'notifications', version: '1' })
 export class InboxController {
-  constructor(private readonly inbox: InboxService) {}
+  constructor(
+    private readonly inbox: InboxService,
+    private readonly view: InboxViewService,
+  ) {}
 
   @Get()
   @AuthenticatedOnly()
+  @ApiHeader(ACCEPT_LANGUAGE)
   @ApiOperation({ operationId: 'notificationList', summary: 'List the notifications of the caller' })
   @ApiSuccessResponse(NotificationListResponseDto, {
     message: 'NOTIFICATION.LISTED',
     description:
-      'The notifications of the caller, the newest first, optionally only the unread ones. Each carries a code, what it is about by id and flat parameters; the client turns them into words.',
+      'The notifications of the caller, the newest first, optionally only the unread ones. Each carries a code, what it is about by id, flat parameters, a title and a message in the language of Accept-Language, and the read route it opens.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
     examples: [VALIDATION_EXAMPLE],
   })
-  async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: NotificationListQueryDto) {
+  async list(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Query() query: NotificationListQueryDto,
+    @RequestLocale() locale: RequestLocaleValue,
+  ) {
     try {
       const page = await this.inbox.list(actor.employeeId, query);
 
-      return { items: page.items.map(wireOf), pagination: page.pagination };
+      return { items: (await this.view.view(page.items, locale)).map(toNotificationWire), pagination: page.pagination };
     } catch (error) {
       throw toInboxApiException(error);
     }
@@ -107,6 +112,7 @@ export class InboxController {
 
   @Post(':id/read')
   @AuthenticatedOnly()
+  @ApiHeader(ACCEPT_LANGUAGE)
   @ApiOperation({ operationId: 'notificationMarkRead', summary: 'Mark one notification as read' })
   @ApiSuccessResponse(NotificationResponseDto, {
     message: 'NOTIFICATION.READ',
@@ -126,9 +132,15 @@ export class InboxController {
       examples: [VALIDATION_EXAMPLE],
     },
   )
-  async markRead(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: NotificationIdParamDto) {
+  async markRead(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: NotificationIdParamDto,
+    @RequestLocale() locale: RequestLocaleValue,
+  ) {
     try {
-      return { notification: wireOf(await this.inbox.markRead(actor.employeeId, params.id)) };
+      const [view] = await this.view.view([await this.inbox.markRead(actor.employeeId, params.id)], locale);
+
+      return { notification: toNotificationWire(view) };
     } catch (error) {
       throw toInboxApiException(error);
     }

@@ -6,7 +6,7 @@ import {
   templateSyntaxIssues,
   templateVariables,
   type RenderContext,
-} from './notification-text.policy';
+} from './inbox-notification-text.policy';
 import { NAME_FALLBACK, NAME_KIND_BY_KEY, type NotificationLocale } from './notification-text.types';
 
 const UUID = '00000000-0000-4000-8000-000000000001';

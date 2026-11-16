@@ -86600,11 +86600,18 @@
             "required": false,
             "in": "query",
             "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "The language of the title and the message: vi or en, by the usual ranking of the header. Anything else, or no header, gives vi.",
+            "required": false,
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
           "200": {
-            "description": "The notifications of the caller, the newest first, optionally only the unread ones. Each carries a code, what it is about by id and flat parameters; the client turns them into words.",
+            "description": "The notifications of the caller, the newest first, optionally only the unread ones. Each carries a code, what it is about by id, flat parameters, a title and a message in the language of Accept-Language, and the read route it opens.",
             "content": {
               "application/json": {
                 "schema": {
@@ -86951,7 +86958,14 @@
       "post": {
         "operationId": "notificationMarkRead",
         "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "The language of the title and the message: vi or en, by the usual ranking of the header. Anything else, or no header, gives vi.",
+            "required": false,
+            "schema": { "type": "string" }
+          }
         ],
         "responses": {
           "200": {
@@ -130267,10 +130281,30 @@
                         "nullable": true
                       }
                     },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Plain text, never empty; the language of Accept-Language (vi by default)."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Plain text; may carry text a person typed, so show it as text. Empty only for an unknown code."
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "operationId": { "type": "string" },
+                        "pathParams": { "type": "object", "additionalProperties": { "type": "string" } }
+                      },
+                      "required": ["operationId", "pathParams"],
+                      "additionalProperties": false,
+                      "description": "The read route to open; null means open the list of notifications.",
+                      "nullable": true
+                    },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "readAt": { "type": "string", "format": "date-time", "nullable": true }
                   },
-                  "required": ["id", "code", "subject", "params", "createdAt", "readAt"],
+                  "required": ["id", "code", "subject", "params", "title", "message", "target", "createdAt", "readAt"],
                   "additionalProperties": false
                 }
               },
@@ -130358,10 +130392,30 @@
                       "nullable": true
                     }
                   },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Plain text, never empty; the language of Accept-Language (vi by default)."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Plain text; may carry text a person typed, so show it as text. Empty only for an unknown code."
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "operationId": { "type": "string" },
+                      "pathParams": { "type": "object", "additionalProperties": { "type": "string" } }
+                    },
+                    "required": ["operationId", "pathParams"],
+                    "additionalProperties": false,
+                    "description": "The read route to open; null means open the list of notifications.",
+                    "nullable": true
+                  },
                   "createdAt": { "type": "string", "format": "date-time" },
                   "readAt": { "type": "string", "format": "date-time", "nullable": true }
                 },
-                "required": ["id", "code", "subject", "params", "createdAt", "readAt"],
+                "required": ["id", "code", "subject", "params", "title", "message", "target", "createdAt", "readAt"],
                 "additionalProperties": false
               }
             },

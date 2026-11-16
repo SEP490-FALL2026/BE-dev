@@ -11,7 +11,7 @@ import {
   TEMPLATE_FORMATS,
   templateSyntaxIssues,
   templateVariables,
-} from './notification-text.policy';
+} from './inbox-notification-text.policy';
 import {
   NAME_KIND_BY_KEY,
   type NotificationLocale,
