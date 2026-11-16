@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
+import { BudgetFactsService } from '../budget/budget-facts.service';
 import { ProposalRepo } from '../budget/proposal.repo';
 import { VersionRepo } from '../budget/version.repo';
 import type { CycleRecord } from '../cycle/cycle.repo';
@@ -27,6 +28,7 @@ import type { AdjustmentShape, CostCenterPosition } from './budget-adjustment.ty
 export class BudgetAdjustmentJudgeService {
   constructor(
     private readonly budgets: BudgetFactsRepo,
+    private readonly facts: BudgetFactsService,
     private readonly figures: BudgetReviewFiguresService,
     private readonly versions: VersionRepo,
     private readonly proposals: ProposalRepo,
@@ -42,8 +44,9 @@ export class BudgetAdjustmentJudgeService {
   }
 
   /**
-   * Throws BudgetAdjustmentShapeError, BudgetAdjustmentVersionInFlightError, BudgetAdjustmentBudgetInPreparationError, BudgetAdjustmentOverUnallocatedError,
-   * BudgetAdjustmentOverBaseError, BudgetAdjustmentBelowForecastError, BudgetAdjustmentNoBudgetError.
+   * Throws BudgetAdjustmentShapeError, FinanceSetupIncompleteError (the Cost Center that receives was retired), BudgetAdjustmentVersionInFlightError,
+   * BudgetAdjustmentBudgetInPreparationError, BudgetAdjustmentOverUnallocatedError, BudgetAdjustmentOverBaseError, BudgetAdjustmentBelowForecastError,
+   * BudgetAdjustmentNoBudgetError.
    */
   async require(tx: DbTx, cycle: CycleRecord, shape: AdjustmentShape, today: BusinessDate): Promise<void> {
     const refusal = shapeRefusalOf(shape);
@@ -69,12 +72,15 @@ export class BudgetAdjustmentJudgeService {
   }
 
   /**
-   * A Cost Center that receives money and has no budget of the year is given the version of origin `ADJUSTMENT` when the adjustment is approved (`R-48`): that is for a Cost Center
-   * that has nothing in the making. One whose version is being decided waits for that decision, and one whose `BM-10` waits for Finance gets its version from the proposal; an
+   * The Cost Center that receives is one in use (`QĐ-87d`(1), `FIX-AD1` AD1-04): money given to a retired one sits where no Request is charged; the one that gives may be retired, since
+   * it is what a department that changed its Cost Center gives from. A Cost Center that receives money and has no budget of the year is given the version of origin `ADJUSTMENT` when
+   * the adjustment is approved (`R-48`): that is for a Cost Center that has nothing in the making. One whose version is being decided waits for that decision, and one whose `BM-10` waits for Finance gets its version from the proposal; an
    * adjustment that made the version first would leave the proposal with nothing to be built into (`BUDGET.CURRENT_EXISTS` for the whole year, `FIX-AD1` AD1-01).
    */
   private async requireReceiverReady(tx: DbTx, year: number, costCenterId: string | null): Promise<void> {
-    if (costCenterId === null || (await this.versions.reference(costCenterId, year, tx)) !== null) return;
+    if (costCenterId === null) return;
+    await this.facts.costCenterInUse(costCenterId, tx);
+    if ((await this.versions.reference(costCenterId, year, tx)) !== null) return;
     if ((await this.versions.inFlight(costCenterId, year, tx)) !== null) {
       throw new BudgetAdjustmentVersionInFlightError(costCenterId);
     }

@@ -2,7 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { BudgetCycleNotOpenError } from '../budget/budget.errors';
-import { toBudgetApiException } from '../budget/budget.http-errors';
+import { BUDGET_ERROR_EXAMPLES, toBudgetApiException } from '../budget/budget.http-errors';
 import {
   BudgetAdjustmentBelowForecastError,
   BudgetAdjustmentBudgetInPreparationError,
@@ -94,6 +94,7 @@ export const BUDGET_ADJUSTMENT_ERROR_EXAMPLES = {
   NO_BUDGET: example(new BudgetAdjustmentNoBudgetError(COST_CENTER)),
   ALREADY_DECIDED: example(new BudgetAdjustmentDecidedError()),
   VERSION_IN_FLIGHT: example(new BudgetAdjustmentVersionInFlightError(COST_CENTER)),
+  FINANCE_SETUP_INCOMPLETE: BUDGET_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
   CYCLE_NOT_LOCKED: example(new BudgetAdjustmentCycleNotLockedError(2026, '2026-11-30')),
   BUDGET_IN_PREPARATION: example(new BudgetAdjustmentBudgetInPreparationError(COST_CENTER)),
 } as const;

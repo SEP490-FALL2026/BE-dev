@@ -353,6 +353,31 @@ describe('Finance asks for an adjustment of the budget and the spending approver
     expect(await h.built(proposal.id)).toMatchObject({ state: 'DRAFT' });
   });
 
+  it('AD1-04: money is not given to a Cost Center that was retired: a supplement or a transfer to it is 409 FINANCE.SETUP_INCOMPLETE, asked or decided, while the retired one still gives', async () => {
+    await ceilingLeaving(100);
+    const old = await h.departmentWithHead('P-AD1R');
+    await h.reopenedCycle();
+    await h.budgetFor(old, { total: 50 * M });
+    await h.lockedCycle();
+    await ceilingLeaving(40);
+    const askedBefore = await made(supplement(old, 5));
+    await h.ctx.sql.query(`UPDATE cost_centers SET status = 'INACTIVE', deactivated_at = now() WHERE id = $1`, [
+      old.department.unitId,
+    ]);
+
+    expect(code(await supplement(old, 5).expect(409))).toBe('FINANCE.SETUP_INCOMPLETE');
+    expect(code(await transfer(sales, old, 5, { transferReason: 'COST_CENTER_CHANGE' }).expect(409))).toBe(
+      'FINANCE.SETUP_INCOMPLETE',
+    );
+    expect(code(await decide(askedBefore.id, { decision: 'APPROVE' }).expect(409))).toBe('FINANCE.SETUP_INCOMPLETE');
+    expect(await made(transfer(old, sales, 10, { transferReason: 'COST_CENTER_CHANGE' }))).toMatchObject({
+      kind: 'TRANSFER',
+    });
+    expect(
+      await made(ask({ kind: 'RETURN', fromCostCenterId: old.department.unitId, amount: h.money(5 * M) })),
+    ).toMatchObject({ kind: 'RETURN' });
+  });
+
   it('is read by Finance and the spending approver in full, by the manager of a department for the Cost Centers of their own, with the filters and the pages', async () => {
     const read = async (account: Parameters<typeof h.as>[0], query: Record<string, unknown> = {}) =>
       h.dataOf<PageWire>(
