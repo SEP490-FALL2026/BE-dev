@@ -74,7 +74,7 @@ describe('Mua/chứng từ: nộp hóa đơn → ký → thực chi tháng kỳ 
     // Only Finance signs (the IT Admin who sent it is refused by role), and the signature writes the spending of the month of service.
     expect((await call().post('NV-ITA2', `/purchase-invoices/${id}/confirmation`)).status).toBe(403);
     const signed = await call().post('NV-FIN1', `/purchase-invoices/${id}/confirmation`);
-    expect(signed.status).toBe(200);
+    expect(signed.status).toBe(201);
     expect(await stateOf(id)).toBe('CONFIRMED');
     const spent = await world.facts.one<{ month: string; net: string; unit: string | null }>(
       `SELECT to_char(service_month, 'YYYY-MM-DD') AS month, net_minor::text AS net, cost_center_id::text AS unit
@@ -99,7 +99,7 @@ describe('Mua/chứng từ: nộp hóa đơn → ký → thực chi tháng kỳ 
     expect(
       (await call().post('NV-FIN1', `/purchase-invoices/${id}/return`, { reason: 'Thiếu mã số thuế người bán' }))
         .status,
-    ).toBe(200);
+    ).toBe(201);
     expect(await stateOf(id)).toBe('RETURNED');
 
     // Sent again it names no link: it is the same subscription as the one returned, with everything else said again.
@@ -109,7 +109,7 @@ describe('Mua/chứng từ: nộp hóa đơn → ký → thực chi tháng kỳ 
     expect(again.status).toBe(201);
     const resent = wire<{ id: string }>(again).id;
     expect(await stateOf(resent)).toBe('SUBMITTED');
-    expect((await call().post('NV-FIN1', `/purchase-invoices/${resent}/confirmation`)).status).toBe(200);
+    expect((await call().post('NV-FIN1', `/purchase-invoices/${resent}/confirmation`)).status).toBe(201);
     expect(await stateOf(resent)).toBe('CONFIRMED');
   });
 
@@ -126,7 +126,7 @@ describe('Mua/chứng từ: nộp hóa đơn → ký → thực chi tháng kỳ 
     );
     expect(sent.status).toBe(201);
     const id = wire<{ id: string }>(sent).id;
-    expect((await call().post('NV-FIN1', `/purchase-invoices/${id}/confirmation`)).status).toBe(200);
+    expect((await call().post('NV-FIN1', `/purchase-invoices/${id}/confirmation`)).status).toBe(201);
     const spent = await world.facts.one<{ month: string; unit: string }>(
       `SELECT to_char(i.service_month, 'YYYY-MM-DD') AS month, c.code AS unit
          FROM invoices i JOIN budget_commitments m ON m.id = i.commitment_id JOIN cost_centers c ON c.id = m.cost_center_id

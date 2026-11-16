@@ -312,6 +312,7 @@ describe('MF-4 ngân sách năm: nháp → mở → BM-10 → chốt → phiên 
 
       // The day after the deadline the cycle is locked: a late BM-10 is refused, and nothing reopens it.
       world.clock.jumpDays(4);
+      for (const code of ['NV-FIN1', 'NV-DEP', 'NV-CEO']) await world.actors.signIn(code);
       expect((await cycle()).status).toBe('LOCKED');
       const late = await call().post('NV-DEP', '/budget-proposals', await bm10Body(world, 'NV-DEP', draftYear, '1000'));
       expect([late.status, call().codeOf(late)]).toEqual([409, 'BUDGET_CYCLE.LOCKED']);
