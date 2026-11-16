@@ -6,11 +6,12 @@ import {
   PolicyChecklistHasNoError,
   PolicyChecklistIncompleteError,
   PolicyDecisionReasonRequiredError,
+  PolicyStepNotInForceError,
   PolicyVersionChangedError,
 } from './policy-checklist.errors';
 
 /**
- * The answers of the checklist of a decision, turned into what the route says (`QĐ-111ap`): a version of the policy that is no longer in force is
+ * The answers of the checklist of a decision, turned into what the route says (`QĐ-111ap`): a version of the policy that is no longer in force, or a step with no policy in force at all, is
  * 409, a checklist not answered in full, a No against a decision that goes on, and a refusal or a return with no reason to keep are 422. Null for any
  * other error, so every route that decides on a checklist asks this first.
  */
@@ -20,6 +21,13 @@ export function toChecklistApiException(error: unknown): ApiException | null {
       code: 'POLICY.VERSION_CHANGED',
       message: error.message,
       details: { stepCode: error.stepCode, policyVersionId: error.policyVersionId, versionNumber: error.versionNumber },
+    });
+  }
+  if (error instanceof PolicyStepNotInForceError) {
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'POLICY.NOT_IN_FORCE',
+      message: error.message,
+      details: { stepCode: error.stepCode },
     });
   }
   if (error instanceof PolicyChecklistIncompleteError) {
@@ -51,6 +59,7 @@ const example = (error: Error) => errorExampleOf(toChecklistApiException(error))
 /** The examples of the answers above, for the routes that document them. */
 export const CHECKLIST_ERROR_EXAMPLES = {
   VERSION_CHANGED: example(new PolicyVersionChangedError('1.2', 'v3', 3)),
+  NOT_IN_FORCE: example(new PolicyStepNotInForceError('1.2')),
   INCOMPLETE: example(new PolicyChecklistIncompleteError('1.2', ['1.2-05'], [])),
   HAS_NO: example(
     new PolicyChecklistHasNoError('1.2', [{ code: '1.2-05', text: 'The tools they have do not meet the need' }]),

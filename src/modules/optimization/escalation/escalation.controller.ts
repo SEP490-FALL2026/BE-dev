@@ -22,8 +22,12 @@ import { EscalationService } from './escalation.service';
 const KEY_OR_VERSION = {
   status: HttpStatus.CONFLICT,
   description:
-    'The Idempotency-Key was used for another batch (GHOST_SEAT.ESCALATION_KEY_REUSED), or the policy of the checklist was changed since the IT Admin was shown it (POLICY.VERSION_CHANGED).',
-  examples: [ESCALATION_ERROR_EXAMPLES.KEY_REUSED, CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED],
+    'The Idempotency-Key was used for another batch (GHOST_SEAT.ESCALATION_KEY_REUSED), or the policy of the checklist was changed since the IT Admin was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
+  examples: [
+    ESCALATION_ERROR_EXAMPLES.KEY_REUSED,
+    CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+    CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
+  ],
 } as const;
 const NOT_PUSHABLE = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,

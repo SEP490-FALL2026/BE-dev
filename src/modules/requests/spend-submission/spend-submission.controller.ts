@@ -155,8 +155,12 @@ export class SpendSubmissionController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request does not wait for the confirmation of the reserve: its check is within the base or blocked, a spend step is open, it was withdrawn or is not in the queue, or another confirmation came first (SPEND.RESERVE_NOT_PENDING); or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED).',
-      examples: [SPEND_ERROR_EXAMPLES.RESERVE_NOT_PENDING, CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED],
+        'The request does not wait for the confirmation of the reserve: its check is within the base or blocked, a spend step is open, it was withdrawn or is not in the queue, or another confirmation came first (SPEND.RESERVE_NOT_PENDING); or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
+      examples: [
+        SPEND_ERROR_EXAMPLES.RESERVE_NOT_PENDING,
+        CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

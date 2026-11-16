@@ -301,8 +301,12 @@ export class BudgetVersionsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The version was not sent, or was already decided (BUDGET.VERSION_NOT_SENT); or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED).',
-      examples: [EXAMPLES.VERSION_NOT_SENT, CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED],
+        'The version was not sent, or was already decided (BUDGET.VERSION_NOT_SENT); or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
+      examples: [
+        EXAMPLES.VERSION_NOT_SENT,
+        CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

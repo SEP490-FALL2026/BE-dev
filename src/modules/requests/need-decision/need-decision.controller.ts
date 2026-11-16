@@ -66,8 +66,13 @@ export class NeedDecisionController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The step is not pending: it is decided, or waits for somebody to hold it (ACCESS_REQUEST.STEP_NOT_PENDING), or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED).',
-      examples: [EXAMPLES.STEP_NOT_PENDING, EXAMPLES.GROUP_USES_LINES, CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED],
+        'The step is not pending: it is decided, or waits for somebody to hold it (ACCESS_REQUEST.STEP_NOT_PENDING), or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
+      examples: [
+        EXAMPLES.STEP_NOT_PENDING,
+        EXAMPLES.GROUP_USES_LINES,
+        CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
+      ],
     },
     INVALID_DECISION,
   )

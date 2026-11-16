@@ -101,11 +101,12 @@ export class GroupLinesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched; or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED).',
+        'The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched; or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
       examples: [
         GROUP_REQUEST_ERROR_EXAMPLES.NEED_STEP_NOT_PENDING,
         GROUP_REQUEST_ERROR_EXAMPLES.LINE_HOLDS_ACCESS,
         CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
       ],
     },
     {
@@ -164,6 +165,7 @@ export class GroupLinesController {
         GROUP_REQUEST_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_HEAD,
         SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_REQUESTER,
         CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
       ],
     },
     {

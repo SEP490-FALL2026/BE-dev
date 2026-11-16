@@ -138,8 +138,8 @@ export class DecisionController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (NOT_DECIDABLE) or its seat cannot be revoked (SEAT_NOT_REVOCABLE), `details.items` names each; or the policy of the checklist was changed since the head was shown it (POLICY.VERSION_CHANGED). Nothing was saved.',
-      examples: [EXAMPLES.PAUSED, CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED],
+        'A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (NOT_DECIDABLE) or its seat cannot be revoked (SEAT_NOT_REVOCABLE), `details.items` names each; or the policy of the checklist was changed since the head was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE). Nothing was saved.',
+      examples: [EXAMPLES.PAUSED, CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED, CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

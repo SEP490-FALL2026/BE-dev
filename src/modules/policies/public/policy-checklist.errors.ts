@@ -42,3 +42,11 @@ export class PolicyDecisionReasonRequiredError extends Error {
     this.name = 'PolicyDecisionReasonRequiredError';
   }
 }
+
+/** The organization has no policy in force that carries the step: every decision of the step stays locked until a version is published. */
+export class PolicyStepNotInForceError extends Error {
+  constructor(readonly stepCode: DecisionStepCode) {
+    super('The policy of the step has no version in force.');
+    this.name = 'PolicyStepNotInForceError';
+  }
+}

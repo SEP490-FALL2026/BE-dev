@@ -4,6 +4,7 @@ import {
   PolicyChecklistHasNoError,
   PolicyChecklistIncompleteError,
   PolicyDecisionReasonRequiredError,
+  PolicyStepNotInForceError,
   PolicyVersionChangedError,
 } from '../public/policy-checklist.errors';
 import type {
@@ -25,7 +26,7 @@ export class ChecklistJudgeService {
   constructor(private readonly repo: ChecklistRepo) {}
 
   /**
-   * Throws PolicyVersionChangedError, PolicyChecklistIncompleteError, PolicyChecklistHasNoError and PolicyDecisionReasonRequiredError. Returns the
+   * Throws PolicyStepNotInForceError, PolicyVersionChangedError, PolicyChecklistIncompleteError, PolicyChecklistHasNoError and PolicyDecisionReasonRequiredError. Returns the
    * verdict, the reason the decision is kept with (the typed one, or the one filled in from the questions answered No) and that filled-in text itself
    * (null with no No), for a decision on many things that each give their own reason.
    */
@@ -71,6 +72,6 @@ export class ChecklistJudgeService {
       }
     }
 
-    throw new Error(`No policy of the organization ${organizationId} has the decision step ${stepCode} in force.`);
+    throw new PolicyStepNotInForceError(stepCode);
   }
 }

@@ -117,6 +117,7 @@ export class SpendApprovalsController {
         SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_REQUESTER,
         SPEND_ERROR_EXAMPLES.GROUP_USES_LINES,
         CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
       ],
     },
     {
@@ -159,8 +160,8 @@ export class SpendApprovalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The policy has a newer version in force than the checklist the caller answered (POLICY.VERSION_CHANGED): nothing is decided.',
-      examples: [CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED],
+        'The policy has a newer version in force than the checklist the caller answered (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE): nothing is decided.',
+      examples: [CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED, CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

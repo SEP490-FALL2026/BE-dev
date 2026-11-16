@@ -199,13 +199,14 @@ export class ProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE), or a short proposal names internal software, whose plans are free (ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN): add the plan to the catalog and reject the proposal as not eligible, naming that plan, for the person to ask for it from the catalog. The policy of the checklist was changed since the person was shown it (POLICY.VERSION_CHANGED).',
+        'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE), or a short proposal names internal software, whose plans are free (ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN): add the plan to the catalog and reject the proposal as not eligible, naming that plan, for the person to ask for it from the catalog. The policy of the checklist was changed since the person was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
       examples: [
         EXAMPLES.NOT_AWAITING_ASSESSMENT,
         EXAMPLES.INTERNAL_COMPLETES_BY_REGISTRATION,
         EXAMPLES.CONTROL_LEVEL_UNCONTROLLABLE,
         EXAMPLES.SHORT_PROPOSAL_FREE_PLAN,
         CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
       ],
     },
     {
@@ -256,8 +257,12 @@ export class ProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), or the policy of the checklist was changed since the person was shown it (POLICY.VERSION_CHANGED).',
-      examples: [EXAMPLES.NOT_AWAITING_ASSESSMENT, CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED],
+        'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), or the policy of the checklist was changed since the person was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
+      examples: [
+        EXAMPLES.NOT_AWAITING_ASSESSMENT,
+        CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
