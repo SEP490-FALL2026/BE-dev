@@ -132,7 +132,7 @@ Update/Delete/Open`, `budgetCycleBaseline`, `budgetCyclePackage`. Bảng `budget
   `state`) và `version` (`id`, `base`, `reserve`, `total`, `state`, `origin`); không còn Trần phòng đã phát hành và không còn dòng đề xuất. Chỉ phòng
   không có trưởng phòng hôm nay mới hỏi thêm "có người sắp làm trưởng phòng không" (song song).
 - `commitment/` — commitment của request, Finance xem (lọc `state`, kèm request, `invoiced`, `invoiceCount`, `hasDiscrepancy`) và nhả phần dư
-  (US-06-06, US-06-07, US-12-01); `budget-commitments.controller.ts`; `CommitmentService`.
+  (US-06-06, US-06-07, US-12-01); `budget-commitments.controller.ts`; `CommitmentService`. `GET /budget-commitments` đọc được bởi Finance và trưởng phòng (trưởng phòng chỉ thấy Cost Center của phòng mình; Cost Center khác là trang rỗng, D8) và có `longTerm=true` (RV-3, `QĐ-111aj`, US-12-21 AC-8): chỉ cam kết còn giữ và lập trước quý đang chạy, cho màn rà soát quý; màn đó không có thao tác thu hồi, thời hạn Request không bị rút.
 - `invoice/` — Finance đọc hóa đơn của một commitment (US-12-02, `C-16`): `GET /budget-commitments/{id}/invoices`
   (`budget-invoices.controller.ts`; `InvoiceService`), kèm `servicePeriodMonth` (từ `invoices.service_month`), `label` và `paymentSource` của hóa
   đơn mua đứng sau (điểm mở rộng `PurchaseInvoiceFactsHook`, `requests` bind); dòng cũ hoặc dòng không từ hóa đơn mua trả `null`. Finance không

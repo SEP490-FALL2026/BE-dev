@@ -25,7 +25,7 @@ import { BUDGET_ERROR_EXAMPLES as EXAMPLES, toBudgetApiException } from '../budg
 
 const READERS = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Only Finance reads the commitments.',
+  description: 'Only Finance, and the head of a department for the Cost Centers they head, read the commitments.',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const NOT_FOUND = {
@@ -50,7 +50,7 @@ export class BudgetCommitmentsController {
   constructor(private readonly commitments: CommitmentService) {}
 
   @Get()
-  @RequireRoles('FINANCE')
+  @RequireRoles('FINANCE', 'MANAGER')
   @ApiOperation({ operationId: 'budgetCommitmentList', summary: 'List the commitments held against the budgets' })
   @ApiSuccessResponse(CommitmentListResponseDto, {
     message: 'BUDGET_COMMITMENT.LISTED',
@@ -58,9 +58,9 @@ export class BudgetCommitmentsController {
       'The commitments, the newest first, each with its request (the software and plan, who sent it, how many people it is for, when the spend was approved), Cost Center, year and amount, what is still held, what invoices have turned into an expense, and whether it is attached to the budget of its year or waits for one (no budget yet). Narrowed by `state`, `attached`, the year, the Cost Center or the request.',
   })
   @ApiErrorResponses(UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE, READERS, INVALID_QUERY)
-  async list(@Query() query: CommitmentListQueryDto) {
+  async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: CommitmentListQueryDto) {
     try {
-      return await this.commitments.page(query);
+      return await this.commitments.list(actor, query);
     } catch (error) {
       throw toBudgetApiException(error);
     }

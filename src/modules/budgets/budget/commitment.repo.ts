@@ -468,6 +468,10 @@ export class CommitmentRepo {
     attached?: boolean;
     year?: number;
     costCenterId?: string;
+    /** Only the commitments of these Cost Centers (a head reads those of the department they head); an empty list is none. */
+    costCenterIds?: readonly string[];
+    /** Only what is still held and was made before this moment: the long-term commitments of the quarterly review (`QĐ-111aj`). */
+    longTermBefore?: Date;
     requestId?: string;
     state?: 'HELD' | 'RELEASED' | 'EXPENSED';
     skip: number;
@@ -480,15 +484,17 @@ export class CommitmentRepo {
       ...(filter.costCenterId ? { costCenterId: filter.costCenterId } : {}),
       ...(filter.requestId ? { requestId: filter.requestId } : {}),
       ...(filter.id ? { id: filter.id } : {}),
+      ...(filter.costCenterIds ? { AND: [{ costCenterId: { in: [...filter.costCenterIds] } }] } : {}),
     };
+    const longTerm = filter.longTermBefore ? { state: 'HELD' as const, createdAt: { lt: filter.longTermBefore } } : {};
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.budgetCommitment.findMany({
-        where,
+        where: { AND: [where, longTerm] },
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: filter.skip,
         take: filter.take,
       }),
-      this.prisma.budgetCommitment.count({ where }),
+      this.prisma.budgetCommitment.count({ where: { AND: [where, longTerm] } }),
     ]);
 
     return { rows, total };

@@ -25,6 +25,7 @@ import {
   BudgetCommitmentRefusedError,
 } from '../budget/budget.errors';
 import { checkHoldable } from './commitment-hold.policy';
+import { toDateColumn } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import {
   heldOf,
@@ -335,6 +336,28 @@ export class CommitmentService {
     return this.commitments.requestsHoldingYear(tx, requestIds, year);
   }
 
+  /**
+   * The commitments Finance reads, or the head of a department reads for the Cost Centers of the departments they head (`RV-3`, `QĐ-111aj`): `longTerm` narrows them to what is still held and
+   * was made before the quarter that is running began, the commitments the quarterly review shows beside the use. A head asks for a Cost Center that is not theirs and gets an empty page.
+   */
+  async list(
+    actor: AuthenticatedPrincipal,
+    query: Omit<Parameters<CommitmentService['page']>[0], 'costCenterIds' | 'longTermBefore'> & { longTerm?: boolean },
+  ): Promise<Page<CommitmentWire>> {
+    const { longTerm, ...rest } = query;
+    const today = await this.facts.today(new Date());
+    const quarterStart = `${today.slice(0, 4)}-${String(Math.floor((Number(today.slice(5, 7)) - 1) / 3) * 3 + 1).padStart(2, '0')}-01`;
+    const scope = actor.roles.includes('FINANCE')
+      ? {}
+      : { costCenterIds: await this.facts.headedCostCenters(actor.employeeId, today) };
+
+    return this.page({
+      ...rest,
+      ...scope,
+      ...(longTerm === true ? { longTermBefore: toDateColumn(quarterStart) } : {}),
+    });
+  }
+
   /** What each of the requests was committed for (one entry for each commitment), in one read. */
   committedBy(requestIds: readonly string[], tx?: DbTx): Promise<CommittedAmount[]> {
     return this.commitments.amountsOfRequests(requestIds, tx);
@@ -360,6 +383,8 @@ export class CommitmentService {
     attached?: boolean;
     year?: number;
     costCenterId?: string;
+    costCenterIds?: readonly string[];
+    longTermBefore?: Date;
     requestId?: string;
     state?: 'HELD' | 'RELEASED' | 'EXPENSED';
     page: number;

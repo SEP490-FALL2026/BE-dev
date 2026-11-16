@@ -13,6 +13,18 @@ export const commitmentListQuerySchema = z.strictObject({
     .optional(),
   year: z.coerce.number().int().min(2000).max(2200).optional(),
   costCenterId: z.uuid().optional(),
+  /**
+   * `true` lists the long-term commitments of the quarterly review (`QĐ-111aj`, US-12-21 AC-8): what is still held and was made before the quarter that is running began, so that
+   * it outlives the review of this quarter. The review never shortens the term of a request and shows no action of taking a seat back.
+   */
+  longTerm: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional()
+    .meta({
+      description:
+        'true lists the long-term commitments of the quarterly review: the ones still held that were made before the running quarter began. The term of the request is never shortened by it.',
+    }),
   requestId: z.uuid().optional(),
   /** `HELD` lists what is still held, `EXPENSED` what became an expense, `RELEASED` what went back to the budget. */
   state: z.enum(['HELD', 'RELEASED', 'EXPENSED']).optional(),
