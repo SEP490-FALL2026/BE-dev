@@ -1,10 +1,23 @@
 import type { NameKind } from '../../public/notifications.extension-points';
-import { NAME_FALLBACK, NAME_KIND_BY_KEY, type NotificationLocale, type TextTemplate } from './notification-text.types';
+import type { InAppNotificationCode } from '../../public/notifications.types';
+import { CODE_LABELS, SHARED_LABELS, type LabelText } from './notification-labels.types';
+import {
+  NAME_FALLBACK,
+  NAME_KIND_BY_KEY,
+  type NotificationLocale,
+  type NotificationTexts,
+  type TextTemplate,
+} from './notification-text.types';
+import { BUDGET_TEXTS } from './notification-texts-budget.types';
+import { LICENSING_TEXTS } from './notification-texts-licensing.types';
+import { MF1_SLA_TEXTS } from './notification-texts-mf1-sla.types';
+import { MF1_TEXTS } from './notification-texts-mf1.types';
+import { ORG_TEXTS } from './notification-texts-org.types';
 
 /**
  * Pure renderer of the sentence templates (entry of the `notification-text` group). Syntax, from the catalogue:
  * `{key}` raw, `{key:name|date|enum|list|quarter|vnd}`, `[ optional group ]` (shown only when every variable in it
- * has a value, no nesting) and `{ by, cases, otherwise }` variants chosen by one param. Never throws: a missing
+ * has a value, the number 0 counting as none; no nesting) and `{ by, cases, otherwise }` variants chosen by one param. Never throws: a missing
  * value prints nothing, a malformed value prints raw, a malformed bracket prints as the literal character.
  */
 
@@ -217,8 +230,11 @@ function branchOf(template: TextTemplate, params: Readonly<Record<string, unknow
   return chosen !== undefined && Object.hasOwn(template.cases, chosen) ? template.cases[chosen] : template.otherwise;
 }
 
+/** Inside a `[ ]` group the number 0 means "nothing to say" (`[ {overdueWorkingDays} ngày làm việc]`); `false` is still a value. */
+const hasGroupValue = (value: unknown): boolean => value !== 0 && hasValue(value);
+
 const groupShows = (group: GroupNode, params: Readonly<Record<string, unknown>>): boolean =>
-  group.nodes.every((n) => n.t !== 'var' || hasValue(params[n.key]));
+  group.nodes.every((n) => n.t !== 'var' || hasGroupValue(params[n.key]));
 
 export function renderTemplate(template: TextTemplate, ctx: RenderContext): string {
   const part = (n: VarNode | TextNode): string => (n.t === 'text' ? n.text : formatValue(n, ctx));
@@ -243,6 +259,73 @@ export function nameRefsOfTemplate(
   for (const n of parse(branchOf(template, params)).nodes) {
     if (n.t !== 'group') visit(n);
     else if (groupShows(n, params)) n.nodes.forEach(visit);
+  }
+  return [...refs.values()];
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// The table and its entry points
+
+/**
+ * Every sentence of the inbox, by code. A code missing here (or one that no longer exists) is a type error, so a new code cannot
+ * ship without its words. The files are merged by spread, so a code written in two files would silently keep the last one:
+ * `notification-text.table.spec.ts` checks that no code is in two files.
+ */
+export const NOTIFICATION_TEXTS = {
+  ...MF1_TEXTS,
+  ...MF1_SLA_TEXTS,
+  ...ORG_TEXTS,
+  ...BUDGET_TEXTS,
+  ...LICENSING_TEXTS,
+} satisfies Record<InAppNotificationCode, NotificationTexts>;
+
+const UNKNOWN_CODE_TITLE: Readonly<Record<NotificationLocale, string>> = {
+  vi: 'Thông báo mới',
+  en: 'New notification',
+};
+
+type LabelTree = Readonly<Record<string, Readonly<Record<string, Readonly<Record<string, LabelText>>>>>>;
+type SharedLabelTree = Readonly<Record<string, Readonly<Record<string, LabelText>>>>;
+const CODE_LABEL_TREE: LabelTree = CODE_LABELS;
+const SHARED_LABEL_TREE: SharedLabelTree = SHARED_LABELS;
+
+const own = <T>(table: Readonly<Record<string, T>> | undefined, key: string): T | undefined =>
+  table && Object.hasOwn(table, key) ? table[key] : undefined;
+
+function textsOf(code: string): NotificationTexts | undefined {
+  return Object.hasOwn(NOTIFICATION_TEXTS, code) ? NOTIFICATION_TEXTS[code as InAppNotificationCode] : undefined;
+}
+
+/** The label of a value: the labels of the code first, then the shared ones; undefined when neither knows it. */
+function labelFor(code: string, key: string, value: string, locale: NotificationLocale): string | undefined {
+  const byCode = own(own(own(CODE_LABEL_TREE, code), key), value);
+  return (byCode ?? own(own(SHARED_LABEL_TREE, key), value))?.[locale];
+}
+
+/** The title and the message of a notice in one language; a code outside the table gives a generic title and no message. */
+export function renderNotificationText(
+  code: string,
+  params: Readonly<Record<string, unknown>>,
+  locale: NotificationLocale,
+  names: ReadonlyMap<string, string>,
+): { title: string; message: string } {
+  const texts = textsOf(code);
+  if (!texts) return { title: UNKNOWN_CODE_TITLE[locale], message: '' };
+  const ctx: RenderContext = { params, locale, names, labelOf: (key, value) => labelFor(code, key, value, locale) };
+  return { title: renderTemplate(texts[locale].title, ctx), message: renderTemplate(texts[locale].message, ctx) };
+}
+
+/** The `{kind, id}` pairs `renderNotificationText` will print names for, so the caller can look them all up in one go. */
+export function nameRefsOf(
+  code: string,
+  params: Readonly<Record<string, unknown>>,
+  locale: NotificationLocale,
+): { kind: NameKind; id: string }[] {
+  const texts = textsOf(code);
+  if (!texts) return [];
+  const refs = new Map<string, { kind: NameKind; id: string }>();
+  for (const template of [texts[locale].title, texts[locale].message]) {
+    for (const ref of nameRefsOfTemplate(template, params)) refs.set(nameLookupKey(ref.kind, ref.id), ref);
   }
   return [...refs.values()];
 }

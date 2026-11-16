@@ -242,8 +242,8 @@ describe('renderTemplate: [ optional groups ]', () => {
     expect(render('Xong.[ Từ {a} đến {b}.]', 'vi', { a: 'X', b: 'Y' })).toBe('Xong. Từ X đến Y.');
   });
 
-  it('counts zero and false as present', () => {
-    expect(render('Xong.[ Còn {n}.][ Cờ {f}.]', 'vi', { n: 0, f: false })).toBe('Xong. Còn 0. Cờ false.');
+  it('counts false as present', () => {
+    expect(render('Xong.[ Cờ {f}.]', 'vi', { f: false })).toBe('Xong. Cờ false.');
   });
 
   it('shows a group that holds no variable', () => {
