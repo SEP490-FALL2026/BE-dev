@@ -32,8 +32,9 @@ export interface EscalationInput {
  * one), the way the routing of the hour would have put it; the others are named with their reason and nothing is refused for them. One batch is one
  * transaction: the key is taken first (so the same key again answers the same result and never acts twice), the recommendations are locked by id,
  * then licensing and personnel are read. Any IT Admin may push; the audit says whether it was the one in charge.
- * The checklist of the step is judged first, before the key is taken (`US-2-O6`): a batch refused for an answer No holds no key, the watch stays
- * as it was, and the answers are kept, at the hour of the push, for each recommendation that was pushed. Throws GhostSeatEscalationKeyReusedError and what the checklist
+ * A key that was used before answers the batch it made and judges nothing (the push was judged when it was made); a new batch has its checklist
+ * of the step judged before the key is taken (`US-2-O6`): a batch refused for an answer No holds no key, the watch stays as it was, and the
+ * answers are kept, at the hour of the push, for each recommendation that was pushed. Throws GhostSeatEscalationKeyReusedError and what the checklist
  * refuses (`PolicyVersionChangedError`, `PolicyChecklistIncompleteError`, `PolicyChecklistHasNoError`).
  */
 @Injectable()
@@ -66,6 +67,8 @@ export class EscalationService {
     const requestHash = sha256(JSON.stringify({ ids: [...ids].sort(), note }));
 
     return this.runner.run(async (tx) => {
+      // A key that was used before answers the batch it made, whatever the policy says now: the push was judged when it was made.
+      if (await this.batches.findByKey(tx, key)) return this.replay(tx, key, requestHash);
       const { verdict } = await this.checklists.judge(tx, {
         organizationId: day.organizationId,
         stepCode: '5.3',

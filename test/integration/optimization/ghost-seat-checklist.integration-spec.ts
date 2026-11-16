@@ -246,5 +246,30 @@ describe('the checklist of the wasted seats (integration, real PostgreSQL)', () 
       expect(w.codeOf(missing)).toBe('POLICY.CHECKLIST_INCOMPLETE');
       expect(await tierOf(id)).toBe('MONITOR');
     });
+
+    it('answers the batch it already pushed when the same key comes again after the policy has a new version, without judging the old checklist again', async () => {
+      const id = await watch('CE4');
+      const key = `escalation-${randomUUID()}`;
+      const body = { recommendationIds: [id], checklist: w.checklists.yes('5.3') };
+      const first = await escalate(body, key).expect(201);
+      const as = { Authorization: `Bearer ${w.admin}` };
+      await request(w.server()).put('/api/v1/policies/POL-USAGE/draft').set(as).send({}).expect(200);
+      await request(w.server())
+        .post('/api/v1/policies/POL-USAGE/draft/publish')
+        .set(as)
+        .send({ changeNote: 'Quyết định số 12', applicableRoles: ['IT_ADMIN'], requiresReacknowledgement: false })
+        .expect(201);
+
+      const again = await escalate(body, key).expect(201);
+      const other = await escalate({ ...body, recommendationIds: [randomUUID()] }, key).expect(409);
+
+      expect(w.dataOf<{ id: string }>(again).id).toBe(w.dataOf<{ id: string }>(first).id);
+      expect(w.dataOf<{ replayed: boolean }>(again).replayed).toBe(true);
+      expect(w.codeOf(other)).toBe('GHOST_SEAT.ESCALATION_KEY_REUSED');
+      // A new batch is judged against the new version: the checklist of the old one is turned away.
+      const fresh = await escalate({ ...body, recommendationIds: [id] }, `escalation-${randomUUID()}`).expect(409);
+      expect(w.codeOf(fresh)).toBe('POLICY.VERSION_CHANGED');
+      await w.checklists.load(w.ctx.sql, w.seed.organizationId);
+    });
   });
 });
