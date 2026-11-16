@@ -22,6 +22,13 @@ interface PageWire {
   items: AdjustmentWire[];
   pagination: { totalItems: number };
 }
+interface PackageWire {
+  available: { amount: string };
+  versionsTotal: { amount: string };
+  versionsAdjustment: { amount: string };
+  unallocated: { amount: string };
+  overBy: { amount: string };
+}
 
 /**
  * The adjustment of the budget in the year (`AD-1.2`, `T-AD1`): Finance asks and the spending approver decides; what is not allocated is 1.800 - 1.771 = 29 tr (here the ceiling
@@ -387,6 +394,36 @@ describe('Finance asks for an adjustment of the budget and the spending approver
     expect(
       await made(ask({ kind: 'RETURN', fromCostCenterId: old.department.unitId, amount: h.money(5 * M) })),
     ).toMatchObject({ kind: 'RETURN' });
+  });
+
+  it('AD1-03: the package of the cycle adds up the versions with the adjustments approved for them and says what is not allocated: 29 tr left, a supplement of 20 tr approved leaves 9 tr (not 29), a reduction of the ceiling of 9 tr leaves none', async () => {
+    const packageOf = async (account: Parameters<typeof h.as>[0] = h.finance) =>
+      h.dataOf<PackageWire>(
+        await request(h.server()).get(`/api/v1/budget-cycles/${h.year}/package`).set(h.as(account)).expect(200),
+      );
+    await ceilingLeaving(29);
+    const before = await packageOf();
+    expect(before.unallocated.amount).toBe(String(29 * M));
+
+    await decide((await made(supplement(sales, 20))).id, { decision: 'APPROVE' }).expect(200);
+    const afterSupplement = await packageOf();
+
+    expect(BigInt(afterSupplement.versionsTotal.amount) - BigInt(before.versionsTotal.amount)).toBe(BigInt(20 * M));
+    expect(BigInt(afterSupplement.versionsAdjustment.amount) - BigInt(before.versionsAdjustment.amount)).toBe(
+      BigInt(20 * M),
+    );
+    expect(afterSupplement.unallocated.amount).toBe(String(9 * M));
+    expect(afterSupplement.overBy.amount).toBe('0');
+
+    await decide((await made(ask({ kind: 'CEILING_REDUCTION', amount: h.money(9 * M) }))).id, {
+      decision: 'APPROVE',
+    }).expect(200);
+    const afterReduction = await packageOf();
+
+    expect(BigInt(before.available.amount) - BigInt(afterReduction.available.amount)).toBe(BigInt(9 * M));
+    expect(afterReduction.unallocated.amount).toBe('0');
+    expect(afterReduction.overBy.amount).toBe('0');
+    await request(h.server()).get(`/api/v1/budget-cycles/${h.year}/package`).set(h.as(sales.head.account)).expect(403);
   });
 
   it('is read by Finance and the spending approver in full, by the manager of a department for the Cost Centers of their own, with the filters and the pages', async () => {

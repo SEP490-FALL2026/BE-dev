@@ -294,7 +294,7 @@ export class BudgetCyclesController {
   @ApiSuccessResponse(PackageResponseDto, {
     message: 'BUDGET_CYCLE.PACKAGE_FETCHED',
     description:
-      'The year against its annual ceiling: the annual ceiling, the shared-pool reserve, what is available (the ceiling less the reserve), the proposals added up and whether they are over it, the versions counted at the annual check added up and by how much they are over, and for each department its open proposal and the version counted for it (with its origin).',
+      'The year against its annual ceiling: the annual ceiling, the shared-pool reserve, what is available (the ceiling less the reserve), the proposals added up and whether they are over it, the versions counted at the annual check added up with the adjustments approved for them, what is not allocated (what a supplement or a reduction of the annual ceiling may take) and by how much they are over, and for each department its open proposal and the version counted for it (with its origin).',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

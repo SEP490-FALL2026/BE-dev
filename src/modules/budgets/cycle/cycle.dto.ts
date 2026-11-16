@@ -224,7 +224,15 @@ export const packageSchema = z.strictObject({
   }),
   versionsTotal: moneyView.meta({
     description:
-      'The versions counted at the annual check, in the currency of the cycle, whether or not their department is listed below.',
+      'The versions counted at the annual check, in the currency of the cycle, whether or not their department is listed below, with the adjustments approved for them (the version of a row keeps its own figures).',
+  }),
+  versionsAdjustment: moneyView.meta({
+    description:
+      'Of versionsTotal, what the adjustments approved in the year gave to (positive) or took from (negative) the base of the approved versions; the versions in the rows are as they were approved.',
+  }),
+  unallocated: moneyView.meta({
+    description:
+      '`available` less versionsTotal, never below nothing: what is not allocated, which a supplement or a reduction of the annual ceiling may take.',
   }),
   versionsOutsideListed: moneyView.meta({
     description:
