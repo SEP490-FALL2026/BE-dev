@@ -114,6 +114,29 @@ describe('a transfer made because the department changed its Cost Center moves w
     });
   });
 
+  it('the boundary is one dong: exactly what is left (88.000.000) passes and one dong more is OVER_REMAINING', () => {
+    const changeDong = (amountMinor: bigint) =>
+      judgeAdjustment({
+        shape: {
+          kind: 'TRANSFER',
+          amountMinor,
+          fromCostCenterId: A,
+          toCostCenterId: B,
+          transferReason: 'COST_CENTER_CHANGE',
+        },
+        unallocatedMinor: 0n,
+        from: admin,
+      });
+
+    expect(changeDong(88n * M).kind).toBe('OK');
+    expect(changeDong(88n * M + 1n)).toEqual({
+      kind: 'OVER_REMAINING',
+      costCenterId: A,
+      remainingMinor: 88n * M,
+      usedMinor: 110n * M,
+    });
+  });
+
   it('refuses 170 tr, which the base of 180 tr would allow: the Cost Center would be left with 28 tr under the 110 tr it used', () => {
     expect(change(170n)).toEqual({
       kind: 'OVER_REMAINING',
