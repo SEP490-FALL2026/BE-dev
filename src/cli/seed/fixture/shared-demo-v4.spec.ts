@@ -128,6 +128,22 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
   });
 });
 
+describe('shared dataset v4: the functional groups', () => {
+  it('puts at least one application in each of the seven groups the installation writes (C-O5)', () => {
+    expect(new Set(F.applications.map((application) => application.functionalGroup))).toEqual(
+      new Set([
+        'Trợ lý AI',
+        'Thiết kế & sáng tạo',
+        'Lập trình & kỹ thuật',
+        'Văn phòng & cộng tác',
+        'Chuyên ngành',
+        'Khác',
+        'Liên lạc (email, chat, họp)',
+      ]),
+    );
+  });
+});
+
 describe('shared dataset v4: the budgets', () => {
   it('has an approved budget of the year for every department with a Cost Center and a head, and only for them', () => {
     // A department with no head sends no BM-10; its version from the baseline waits for the deadline (D-Z2-2).
