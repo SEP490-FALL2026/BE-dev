@@ -1,5 +1,6 @@
 import { Client } from 'pg';
 import request from 'supertest';
+import type { ChecklistBody } from '../../src/modules/policies/public/policy-checklist.types';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { AccessRequestRepo } from '../../src/modules/requests/access-request/access-request.repo';
@@ -273,15 +274,28 @@ export class SpendHarness extends BudgetHarness {
 
   spendQueue = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/spend-queue').query(query).set(this.as(account));
+  /**
+   * The head sends requests on (`spendBatchSubmit`). A batch that carries confirmations of the reserve carries the checklist of the step 1.6 too:
+   * all Yes unless the suite gives its own, or `null` to leave it out.
+   */
   sendOn = (
     requestIds: string[],
     account: ApiAccount,
     reserveConfirmations?: { requestId: string; reason: string }[],
+    checklist?: ChecklistBody | null,
   ) =>
     request(this.server())
       .post('/api/v1/spend-batches')
       .set(this.as(account))
-      .send(reserveConfirmations ? { requestIds, reserveConfirmations } : { requestIds });
+      .send(
+        reserveConfirmations
+          ? {
+              requestIds,
+              reserveConfirmations,
+              ...(checklist === null ? {} : { checklist: checklist ?? this.checklists.yes('1.6') }),
+            }
+          : { requestIds },
+      );
   /** The head confirms, with a line of reason, that a request uses the reserve (`spendReserveConfirm`). */
   confirmReserve = (id: string, body: object, account: ApiAccount) =>
     request(this.server())

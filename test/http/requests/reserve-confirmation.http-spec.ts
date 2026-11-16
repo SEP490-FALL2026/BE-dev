@@ -138,12 +138,14 @@ describe('the confirmation of the reserve (http contract, no database)', () => {
       const response = await post(SUBMIT, ['MANAGER'], {
         requestIds: [ID],
         reserveConfirmations: [{ requestId: ID, reason: 'Cần cho đợt phát hành' }],
+        checklist: CHECKLIST,
       }).expect(201);
 
       expect(submit).toHaveBeenCalledWith(
         expect.anything(),
         [ID],
         [{ requestId: ID, reason: 'Cần cho đợt phát hành' }],
+        CHECKLIST,
       );
       expect((bodyOf(response).data as Record<string, unknown>).results).toEqual([
         { requestId: ID, outcome: 'SENT_TO_APPROVER', stopReason: null, reserveConfirmation: 'APPLIED' },
@@ -168,6 +170,10 @@ describe('the confirmation of the reserve (http contract, no database)', () => {
         },
       ],
       ['an override, which no longer exists', { requestIds: [ID], override: { reason: 'x', years: [2026] } }],
+      [
+        'a confirmation of the reserve with no checklist of the step',
+        { requestIds: [ID], reserveConfirmations: [{ requestId: ID, reason: 'Gấp' }] },
+      ],
     ])('turns away %s with 422', async (_name, body) => {
       const response = await post(SUBMIT, ['MANAGER'], body).expect(422);
 
@@ -181,6 +187,7 @@ describe('the confirmation of the reserve (http contract, no database)', () => {
       const response = await post(SUBMIT, ['MANAGER'], {
         requestIds: [ID],
         reserveConfirmations: [{ requestId: OTHER, reason: 'Gấp' }],
+        checklist: CHECKLIST,
       }).expect(422);
 
       expect(bodyOf(response).error).toMatchObject({

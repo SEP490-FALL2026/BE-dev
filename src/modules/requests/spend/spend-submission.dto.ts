@@ -19,25 +19,35 @@ export const reserveReasonSchema = z
   .max(500)
   .refine((value) => !/[\r\n]/.test(value), { message: 'The reason is one line.' });
 
-export const submitBatchBodySchema = z.strictObject({
-  requestIds: z
-    .array(z.uuid())
-    .min(1)
-    .max(BATCH_MAX)
-    .refine((ids) => new Set(ids).size === ids.length, { message: 'A request is sent once in a batch.' })
-    .meta({ uniqueItems: true }),
-  /**
-   * The confirmations of the reserve the head gives in the same act (`RV-11`): each applies only to a request of the batch whose check
-   * says it uses the reserve now; one whose check says otherwise is left as it is and the answer says it was ignored.
-   */
-  reserveConfirmations: z
-    .array(z.strictObject({ requestId: z.uuid(), reason: reserveReasonSchema }))
-    .max(BATCH_MAX)
-    .refine((items) => new Set(items.map((item) => item.requestId)).size === items.length, {
-      message: 'A request is confirmed once.',
-    })
-    .optional(),
-});
+export const submitBatchBodySchema = z
+  .strictObject({
+    requestIds: z
+      .array(z.uuid())
+      .min(1)
+      .max(BATCH_MAX)
+      .refine((ids) => new Set(ids).size === ids.length, { message: 'A request is sent once in a batch.' })
+      .meta({ uniqueItems: true }),
+    /**
+     * The confirmations of the reserve the head gives in the same act (`RV-11`): each applies only to a request of the batch whose check
+     * says it uses the reserve now; one whose check says otherwise is left as it is and the answer says it was ignored.
+     */
+    reserveConfirmations: z
+      .array(z.strictObject({ requestId: z.uuid(), reason: reserveReasonSchema }))
+      .max(BATCH_MAX)
+      .refine((items) => new Set(items.map((item) => item.requestId)).size === items.length, {
+        message: 'A request is confirmed once.',
+      })
+      .optional(),
+    /**
+     * The checklist of the step 1.6 for the confirmations of the reserve of the batch, one for the whole batch (`QĐ-111ap`, `QĐ-111aq`): needed
+     * when the batch carries a confirmation, and left out otherwise.
+     */
+    checklist: checklistBodySchema.optional(),
+  })
+  .refine((body) => (body.reserveConfirmations ?? []).length === 0 || body.checklist !== undefined, {
+    path: ['checklist'],
+    message: 'A batch that confirms the reserve answers the checklist of the step.',
+  });
 
 export const reserveConfirmationBodySchema = z.strictObject({
   reason: reserveReasonSchema,

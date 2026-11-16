@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import type { ChecklistBody } from '../../policies/public/policy-checklist.types';
+import type { ChecklistBody, ChecklistVerdict } from '../../policies/public/policy-checklist.types';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -95,6 +95,21 @@ export class ReserveConfirmationService {
 
       return result;
     });
+  }
+
+  /** The one checklist of a batch that confirms the reserve (`QĐ-111aq`), judged before any request of it is checked; throws what the checklist refuses. */
+  judgeBatchChecklist(tx: DbTx, organizationId: string, checklist: ChecklistBody): Promise<ChecklistVerdict> {
+    return this.checklist.judgeFor(tx, organizationId, checklist);
+  }
+
+  /** The answers of that checklist, once for each request whose confirmation was applied. */
+  recordBatchChecklist(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    organizationId: string,
+    kept: { verdict: ChecklistVerdict; decidedAt: Date; requestIds: readonly string[] },
+  ): Promise<void> {
+    return this.checklist.recordFor(tx, actor, organizationId, kept);
   }
 
   /**
