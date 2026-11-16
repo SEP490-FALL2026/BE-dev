@@ -4,6 +4,12 @@ Nhánh `feat/z2-seed` (tách `feat/fe-feedback` @ `1f7ffa19`). Prompt: `Code/ver
 
 ## Dừng ở đâu
 
+- 16/11 (3) **Z2 dừng ở đây, chờ review.** Commit `8cc72054`…`7be1d5e0` trên `feat/z2-seed` (không push). Kiểm cuối trên code cuối:
+  `test/integration/installation/seed*` 4/4 suite (16 test) xanh; `test:integration:serial` 12/13 suite xanh, `seed-check-runtime` xanh, đỏ
+  một suite ngoài Z2 (`database-runtime-role-purchase-invoice`: hóa đơn không ghi/không trừ cam kết — file không đụng ở Z2, thuộc nợ test
+  FIX-TEST/chat "SEP-Start 83"); `test:flows` 11/12 suite (64 pass, 9 skip có sẵn ở mf3-transfer/mf2-abrupt-departure); `pnpm test` 530/530
+  suite; `typecheck`, `lint`, `test:gates` (sau sửa khóa `onepassword`), `rules:check` xanh. Việc còn lại: DEMO-5, seat tài khoản máy
+  (DEMO-8), `SBF-07a` + `SBF-08` hai giá trị (DEMO-11), NL-1 (Owner), 9 test `it.skip` cũ của MF-2/MF-3.
 - 16/11 (2): commit `8cc72054`…; seed suites 4/4 xanh, `test:flows` 64/64 (9 skip có sẵn), `seed:local` từ DB trống exit 0, chạy lại exit 2,
   bằng chứng API ghi ở dưới. Còn: DEMO-5, seat tài khoản máy (DEMO-8), `SBF-07a` + `SBF-08` hai giá trị (DEMO-11), NL-1 (DEMO-12) — xem
   bảng DEMO. Kiểm cuối: unit, gates, `test:integration:serial` (đang chạy lúc ghi).
