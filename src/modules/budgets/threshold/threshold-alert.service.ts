@@ -5,7 +5,7 @@ import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
 import { crossedThresholds } from './threshold.policy';
 import { ThresholdNotifierService } from './threshold-notifier.service';
-import { ThresholdRepo, type ThresholdAlert } from './threshold.repo';
+import { ThresholdRepo, type ThresholdCrossing } from './threshold.repo';
 
 /** A Cost Center and a year, the unit of the use of a budget. */
 export interface BudgetPair {
@@ -24,7 +24,8 @@ export interface ThresholdWatch {
  * the commitments that wait for a budget attached) is surrounded by `watch` before it and `settle` after it, in the same transaction; `watch` takes the lock of the budget year of each pair (the Cost Centers by id, the years
  * earliest first, the order of the module; taking it again is nothing) so that nobody else moves the use between the two reads and a crossing is never missed by two changes that each see only their own. What is used is what is spent and what is still held (what the check of a request reads); the base is the effective one, the base of the version with the
  * adjustments, read when the change is settled, so an adjustment that raises or lowers the base tells nothing by itself and the use that goes over the new base is told again. A Cost Center with no
- * budget has no base and tells nothing. An alert is written once for a Cost Center, a year, a threshold and a base, and told only when it was written.
+ * budget has no base and tells nothing. Every time the use goes from under a threshold to at it or over it is one crossing and is told (`RV2-01`): the use that goes over and stays is told once, the
+ * use that goes back under (a release, a reversal, an adjustment that raised the base) and over again is told again. A crossing is written with its number, read under the lock of the year, and told only when it was written.
  */
 @Injectable()
 export class ThresholdAlertService {
@@ -59,7 +60,7 @@ export class ThresholdAlertService {
     const usedNow = (pair: BudgetPair): bigint => usedAfter.get(heldKey(pair.costCenterId, pair.year)) ?? 0n;
     // Only a use that went up can cross a threshold: a release, a reversal or a change of the base alone reads no base.
     const raised = watch.pairs.filter((pair) => usedNow(pair) > usedBefore(pair));
-    const crossed: ThresholdAlert[] = [];
+    const crossed: ThresholdCrossing[] = [];
     for (const year of [...new Set(raised.map((pair) => pair.year))].sort((a, b) => a - b)) {
       const inYear = raised.filter((pair) => pair.year === year);
       const bases = await this.budgets.approvedOfCostCenters(
@@ -79,7 +80,7 @@ export class ThresholdAlertService {
         }
       }
     }
-    const told = await this.alerts.insertNew(tx, crossed, now);
+    const told = await this.alerts.insertNew(tx, await this.alerts.numbered(tx, crossed), now);
     await this.notifier.told(tx, told, now);
 
     return told.length;

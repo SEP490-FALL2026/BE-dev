@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../../../src/modules/budgets/budget/budget-facts.repo';
+import { BudgetsApi } from '../../../src/modules/budgets/public/budgets.api';
 import { ThresholdRepo } from '../../../src/modules/budgets/threshold/threshold.repo';
 import { InvoiceHarness } from '../../support/invoice-harness';
 import type { Unit } from '../../support/spend-harness';
@@ -149,6 +150,43 @@ describe('the use of a budget tells 80 and 100 percent of its base once each tim
     expect(await told(unit, 80)).toEqual(headAndFinance(unit));
   }, 120000);
 
+  it('RV2-01: the use that goes back under 80 percent (a release) and goes over again is told again; the use that goes over and stays is told once (QĐ-111af, US-12-21 OQ-111E12-6)', async () => {
+    const unit = await department(100);
+    const episodes = async (): Promise<Array<[number, number]>> =>
+      (
+        await h.ctx.sql.query<{ threshold: number; episode: number }>(
+          `SELECT threshold, episode FROM budget_threshold_alerts WHERE cost_center_id = $1 AND year = $2 ORDER BY threshold, episode`,
+          [unit.department.unitId, h.year],
+        )
+      ).rows.map((row): [number, number] => [row.threshold, row.episode]);
+
+    // 81 tr held against 100 tr goes over 80 percent and stays: one alert, told to the head and to Finance once.
+    const first = await h.waitingForApprover(unit, plan, { amount: 81 * M });
+    await h.decideSpend(first, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    expect(await alerts(unit)).toEqual([[80, BigInt(100 * M)]]);
+    expect(await told(unit, 80)).toEqual(headAndFinance(unit));
+
+    // 15 tr go back (the use is 66 tr, under 80 percent again): nothing new is written or told.
+    await h.ctx.app.get(TransactionRunner, { strict: false }).run((tx) =>
+      h.ctx.app.get(BudgetsApi, { strict: false }).releaseForRequest(tx, {
+        requestId: first,
+        reason: 'REQUEST_WITHDRAWN',
+        amounts: [{ year: h.year, amountMinor: BigInt(15 * M) }],
+        now: new Date(),
+      }),
+    );
+    expect(await alerts(unit)).toEqual([[80, BigInt(100 * M)]]);
+
+    // 16 tr more are held (82 tr): it goes over 80 percent of the same base again, a new crossing, told again to both.
+    const second = await h.waitingForApprover(unit, plan, { amount: 16 * M });
+    await h.decideSpend(second, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    expect(await told(unit, 80)).toEqual([...headAndFinance(unit), ...headAndFinance(unit)].sort());
+    expect(await episodes()).toEqual([
+      [80, 1],
+      [80, 2],
+    ]);
+  }, 120000);
+
   it('a Cost Center with no budget has no base, so it tells nothing however much it uses', async () => {
     const unit = await department(null);
 
@@ -158,13 +196,14 @@ describe('the use of a budget tells 80 and 100 percent of its base once each tim
     expect(await told(unit, 80)).toEqual([]);
   }, 120000);
 
-  it('MAJ-10: the same Cost Center, year, threshold and base is written once: a second change that crosses it writes nothing and tells nobody', async () => {
+  it('MAJ-10: the same crossing (Cost Center, year, threshold and number) is written once: a second write of it writes nothing and tells nobody; the next number is read, so a new crossing is written', async () => {
     const unit = await department(120);
     const repo = h.ctx.app.get(ThresholdRepo, { strict: false });
     const alert = {
       costCenterId: unit.department.unitId,
       year: h.year,
       threshold: 80 as const,
+      episode: 1,
       baseMinor: BigInt(120 * M),
     };
     const insert = () =>
@@ -173,5 +212,11 @@ describe('the use of a budget tells 80 and 100 percent of its base once each tim
     expect(await insert()).toEqual([alert]);
     expect(await insert()).toEqual([]);
     expect(await alerts(unit)).toEqual([[80, BigInt(120 * M)]]);
+
+    const { baseMinor, costCenterId, threshold, year } = alert;
+    const next = await h.ctx.app
+      .get(TransactionRunner, { strict: false })
+      .run((tx) => repo.numbered(tx, [{ baseMinor, costCenterId, threshold, year }]));
+    expect(next).toEqual([{ ...alert, episode: 2 }]);
   }, 120000);
 });

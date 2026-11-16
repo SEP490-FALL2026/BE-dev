@@ -6,8 +6,8 @@ import type { ThresholdAlert } from './threshold.repo';
 
 /**
  * Who is told that the use of a budget went over a threshold (`QĐ-111af`, `RV-2`): the head of the department of the Cost Center and Finance, in the transaction of the change that crossed it. The notice
- * says the Cost Center, the year and the threshold, never a figure. Each alert has one event key, so an alert that was told is never told twice to the same person; a department with no head today
- * tells Finance alone.
+ * says the Cost Center, the year and the threshold, never a figure. Each crossing has one event key (with its number), so a crossing that was told is never told twice to the same person and the use that
+ * goes over again after going back under is told again; a department with no head today tells Finance alone.
  */
 @Injectable()
 export class ThresholdNotifierService {
@@ -33,7 +33,7 @@ export class ThresholdNotifierService {
           code: 'BUDGET_THRESHOLD_REACHED',
           subject: null,
           params: { costCenterId: alert.costCenterId, year: alert.year, threshold: alert.threshold },
-          eventKey: `budgetThreshold:${alert.costCenterId}:${alert.year}:${alert.threshold}:${alert.baseMinor}`,
+          eventKey: `budgetThreshold:${alert.costCenterId}:${alert.year}:${alert.threshold}:${alert.episode}`,
         });
       }
     }
