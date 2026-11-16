@@ -54,6 +54,15 @@ describe('QĐ-111an: the quote of an assessment is in dong, the price the vendor
     ).rejects.toThrow(MoneyOutOfRangeError);
   });
 
+  it('names the field of the body in the money error it throws, and passes it to the finance facade', async () => {
+    await expect(service.read(quote({ amount: '-1', currency: 'VND' }))).rejects.toMatchObject({ path: 'unitPrice' });
+    await expect(
+      service.read(quote({ amount: '1', currency: 'VND' }, { amount: '-1.00', currency: 'USD' })),
+    ).rejects.toMatchObject({ path: 'originalPrice' });
+    expect(parseMoney).toHaveBeenCalledWith(expect.anything(), 'unitPrice');
+    expect(parseMoney).toHaveBeenCalledWith(expect.anything(), 'originalPrice');
+  });
+
   it('refuses to price a request from a quote kept in another currency (one an earlier release stored and no rate could convert): QUOTE_PRICE_NOT_VND', () => {
     const kept = {
       unitPrice: { amountMinor: 800n, currency: 'USD' },

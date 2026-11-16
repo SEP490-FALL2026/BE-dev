@@ -168,9 +168,9 @@ export class OutOfProcessCaseClosureService {
     const amountMinor =
       input.amount === undefined
         ? null
-        : (await this.finance.parseMoney({ amount: input.amount.amount, currency: 'VND' }, tx)).amountMinor;
+        : (await this.finance.parseMoney({ amount: input.amount.amount, currency: 'VND' }, 'amount', tx)).amountMinor;
     // An amount at or below nothing is out of range like every money field; the policy judges the rest.
-    if (amountMinor !== null && amountMinor <= 0n) throw new MoneyOutOfRangeError();
+    if (amountMinor !== null && amountMinor <= 0n) throw new MoneyOutOfRangeError('amount');
     const refusal = closureRefusal({
       outcome: input.outcome,
       documentCount: input.documentIds.length,

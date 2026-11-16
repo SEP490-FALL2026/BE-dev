@@ -71,7 +71,7 @@ export class ProposalSender {
     await this.requireOpenCycle(tx, input.year);
 
     const reporting = await this.facts.reportingCurrency(tx);
-    const total = await this.facts.money(input.requestedAmount, reporting, tx);
+    const total = await this.facts.money(input.requestedAmount, reporting, 'requestedAmount', tx);
 
     const successorOf = input.previous === null ? await this.proposalToFollow(tx, costCenter.id, input.year) : null;
     await this.yearLock.lock(tx, costCenter.id, [input.year]);

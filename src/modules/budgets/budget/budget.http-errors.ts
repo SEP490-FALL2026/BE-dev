@@ -311,7 +311,7 @@ export const BUDGET_ERROR_EXAMPLES = {
   PROPOSAL_NOT_SUBMITTED: example(new BudgetProposalStateError('REVIEW', 'WITHDRAWN')),
   VERSION_NOT_EDITABLE: example(new BudgetVersionNotEditableError('SENT')),
   VERSION_IN_FLIGHT: example(new BudgetVersionInFlightError()),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
-  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
-  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'requestedAmount')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('requestedAmount')),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'requestedAmount')),
 } as const;

@@ -23,16 +23,16 @@ export class SubscriptionPricingService {
   /** Reads the unit price in dong; another currency is refused before the amount is read, and a negative price is out of range. */
   async read(unitPrice: { amount: string; currency: string }): Promise<Money> {
     assertPriceInDong(unitPrice.currency);
-    const money = await this.finance.parseMoney(unitPrice);
-    if (money.amountMinor < 0n) throw new MoneyOutOfRangeError();
+    const money = await this.finance.parseMoney(unitPrice, 'unitPrice');
+    if (money.amountMinor < 0n) throw new MoneyOutOfRangeError('unitPrice');
 
     return money;
   }
 
   /** Reads the price the vendor quoted, in the minor units of its own currency; a negative price is out of range. */
   async readOriginal(originalPrice: { amount: string; currency: string }): Promise<OriginalPriceRecord> {
-    const money = await this.finance.parseMoney(originalPrice);
-    if (money.amountMinor < 0n) throw new MoneyOutOfRangeError();
+    const money = await this.finance.parseMoney(originalPrice, 'originalPrice');
+    if (money.amountMinor < 0n) throw new MoneyOutOfRangeError('originalPrice');
 
     return { amountMinor: money.amountMinor, currency: money.currency };
   }

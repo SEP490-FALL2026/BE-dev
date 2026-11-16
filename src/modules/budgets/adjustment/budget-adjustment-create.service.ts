@@ -32,7 +32,7 @@ export class BudgetAdjustmentCreateService {
    */
   async create(actor: AuthenticatedPrincipal, body: CreateAdjustmentBodyDto): Promise<AdjustmentWire> {
     this.facts.requireFinance(actor);
-    const amountMinor = await this.facts.money(body.amount, await this.facts.reportingCurrency());
+    const amountMinor = await this.facts.money(body.amount, await this.facts.reportingCurrency(), 'amount');
     const shape: AdjustmentShape = {
       kind: body.kind,
       amountMinor,

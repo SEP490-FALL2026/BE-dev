@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { formatAmount, parseDecimalAmount } from '../../../core/money/money';
+import { withMoneyPath } from '../../../core/money/money-path';
 import { CurrencyNotSupportedError, MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -319,37 +320,55 @@ export class BudgetFactsService {
     return new Map(found.map((center) => [center.id, center.departmentId]));
   }
 
-  /** Reads an amount in whole minor units. Throws the money errors, and BudgetCurrencyError for any currency but the reporting one. */
-  async money(input: { amount: string; currency?: string }, reporting: string, tx?: DbTx): Promise<bigint> {
+  /**
+   * Reads an amount in whole minor units. Throws the money errors, and BudgetCurrencyError for any currency but the reporting one.
+   * `path` is where the amount sits in the request body (`requestedAmount`, `base`), which the money errors carry.
+   */
+  async money(
+    input: { amount: string; currency?: string },
+    reporting: string,
+    path: string,
+    tx?: DbTx,
+  ): Promise<bigint> {
     // An amount of a budget is always in the reporting currency: whoever gives it does not name one (`QĐ-98`).
-    const parsed = await this.finance.parseMoney({ amount: input.amount, currency: input.currency ?? reporting }, tx);
+    const parsed = await this.finance.parseMoney(
+      { amount: input.amount, currency: input.currency ?? reporting },
+      path,
+      tx,
+    );
     if (parsed.currency !== reporting) throw new BudgetCurrencyError(parsed.currency, reporting);
     // A budget never holds a negative amount.
-    if (parsed.amountMinor < 0n) throw new MoneyOutOfRangeError();
+    if (parsed.amountMinor < 0n) throw new MoneyOutOfRangeError(path);
 
     return parsed.amountMinor;
   }
 
   /** `money` for a threshold: it must be more than nothing, since a threshold of nothing would flag every line. */
-  async positiveMoney(input: { amount: string; currency?: string }, reporting: string, tx?: DbTx): Promise<bigint> {
-    const minor = await this.money(input, reporting, tx);
-    if (minor <= 0n) throw new MoneyOutOfRangeError();
+  async positiveMoney(
+    input: { amount: string; currency?: string },
+    reporting: string,
+    path: string,
+    tx?: DbTx,
+  ): Promise<bigint> {
+    const minor = await this.money(input, reporting, path, tx);
+    if (minor <= 0n) throw new MoneyOutOfRangeError(path);
 
     return minor;
   }
 
   /** Reads amounts in whole minor units of one currency, the minor unit read once: a cycle keeps the currency it was opened in. */
-  async parserOf(currency: string, tx?: DbTx): Promise<(input: { amount: string }) => bigint> {
+  async parserOf(currency: string, tx?: DbTx): Promise<(input: { amount: string }, path: string) => bigint> {
     const found = await this.finance.findCurrency(currency, tx);
     if (!found) throw new CurrencyNotSupportedError(currency);
 
-    return (input) => {
-      const minor = parseDecimalAmount(input.amount, found.minorUnit);
-      // A budget never holds a negative amount.
-      if (minor < 0n) throw new MoneyOutOfRangeError();
+    return (input, path) =>
+      withMoneyPath(path, () => {
+        const minor = parseDecimalAmount(input.amount, found.minorUnit);
+        // A budget never holds a negative amount.
+        if (minor < 0n) throw new MoneyOutOfRangeError();
 
-      return minor;
-    };
+        return minor;
+      });
   }
 
   async formatter(currency: string): Promise<(minor: bigint) => MoneyView> {

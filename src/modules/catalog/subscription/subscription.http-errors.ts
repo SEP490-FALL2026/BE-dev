@@ -174,7 +174,7 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   PRIMARY_NOT_ELIGIBLE: example(new SubscriptionPrimaryNotEligibleError('NOT_ACTIVE')),
   PRIMARY_CONFLICT: example(new SubscriptionPrimaryConflictError()),
   DUPLICATE_PLAN: example(new SubscriptionDuplicatePlanError(['<subscription-id>'])),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
-  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
-  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'unitPrice')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('unitPrice')),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'originalPrice')),
 } as const;

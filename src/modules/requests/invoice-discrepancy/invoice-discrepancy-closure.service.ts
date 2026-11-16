@@ -31,7 +31,9 @@ export class InvoiceDiscrepancyClosureService {
     id: string,
     input: { outcome: InvoiceDiscrepancyOutcome; reason: string; differenceAmount: string },
   ): Promise<InvoiceDiscrepancyRow> {
-    const difference = (await this.finance.parseMoney({ amount: input.differenceAmount, currency: 'VND' })).amountMinor;
+    const difference = (
+      await this.finance.parseMoney({ amount: input.differenceAmount, currency: 'VND' }, 'differenceAmount')
+    ).amountMinor;
     if (closureRefusal({ outcome: input.outcome, differenceMinor: difference }) !== null) {
       throw new InvoiceDiscrepancyRefusedError('DIFFERENCE_INVALID');
     }

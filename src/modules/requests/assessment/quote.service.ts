@@ -24,10 +24,12 @@ export class QuoteService {
    */
   async read(input: NonNullable<AssessmentPatchDto['quote']>): Promise<Quote> {
     if (input.unitPrice.currency !== DONG) throw new AssessmentQuoteRefusedError('QUOTE_PRICE_NOT_VND');
-    const unitPrice = await this.finance.parseMoney(input.unitPrice);
-    if (unitPrice.amountMinor < 0n) throw new MoneyOutOfRangeError();
-    const originalPrice = input.originalPrice ? await this.finance.parseMoney(input.originalPrice) : null;
-    if (originalPrice !== null && originalPrice.amountMinor < 0n) throw new MoneyOutOfRangeError();
+    const unitPrice = await this.finance.parseMoney(input.unitPrice, 'unitPrice');
+    if (unitPrice.amountMinor < 0n) throw new MoneyOutOfRangeError('unitPrice');
+    const originalPrice = input.originalPrice
+      ? await this.finance.parseMoney(input.originalPrice, 'originalPrice')
+      : null;
+    if (originalPrice !== null && originalPrice.amountMinor < 0n) throw new MoneyOutOfRangeError('originalPrice');
     const validUntil = input.validUntil ?? null;
     if (validUntil !== null && validUntil < input.validFrom) {
       throw new AssessmentQuoteRefusedError('QUOTE_PERIOD_INVALID');

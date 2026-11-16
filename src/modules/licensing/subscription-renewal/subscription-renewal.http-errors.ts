@@ -119,6 +119,6 @@ export const RENEWAL_ERROR_EXAMPLES = {
   SEATS_HAVE_OPEN_TASKS: renewal('SEATS_HAVE_OPEN_TASKS', { seats: 1 }),
   PERIOD_REFUSED: renewal('PERIOD_REFUSED', { reason: 'ALREADY_RENEWED' }),
   REVOCATION_TYPE_NOT_SUPPORTED: example(new RevocationRefusedError('TYPE_NOT_SUPPORTED', 'K3')),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
-  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'unitPrice')),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'unitPrice')),
 } as const;

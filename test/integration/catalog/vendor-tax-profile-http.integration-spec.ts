@@ -80,6 +80,8 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
   const unique = (prefix: string): string => `${prefix} ${(counter += 1)}`;
   const dataOf = <T>(response: request.Response): T => (response.body as { data: T }).data;
   const codeOf = (response: request.Response): string => (response.body as { error: { code: string } }).error.code;
+  const detailsOf = (response: request.Response): unknown =>
+    (response.body as { error: { details: unknown } }).error.details;
   /** A vendor of the organization, made the way the catalog makes one: by declaring an application. */
   const vendor = async (name = unique('Vendor')): Promise<string> =>
     dataOf<{ vendor: { id: string } }>(
@@ -212,6 +214,15 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
       const id = await vendor();
 
       expect(codeOf(await estimate(id, 'abc', 'USD').expect(422))).toBe('VALIDATION_ERROR');
+      expect(detailsOf(await estimate(id, 'abc', 'USD').expect(422))).toEqual({
+        issues: [{ code: 'invalid_format', path: 'netAmount.amount' }],
+      });
+      expect(detailsOf(await estimate(id, '1.5', 'VND').expect(422))).toEqual({
+        allowedDecimals: 0,
+        path: 'netAmount',
+      });
+      expect(detailsOf(await estimate(id, '-5', 'VND').expect(422))).toEqual({ path: 'netAmount' });
+      expect(detailsOf(await estimate(id, '10', 'XYZ').expect(422))).toEqual({ currency: 'XYZ', path: 'netAmount' });
       expect(codeOf(await estimate(id, '1000.001', 'USD').expect(422))).toBe('MONEY_SCALE_EXCEEDED');
       expect(codeOf(await estimate(id, '1.5', 'VND').expect(422))).toBe('MONEY_SCALE_EXCEEDED');
       expect(codeOf(await estimate(id, '-5', 'VND').expect(422))).toBe('MONEY_OUT_OF_RANGE');

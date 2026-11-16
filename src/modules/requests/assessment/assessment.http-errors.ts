@@ -182,7 +182,7 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   ),
   NOT_INTERNAL: example(new InternalRegistrationRefusedError('NOT_INTERNAL')),
   NAME_TAKEN: example(new InternalRegistrationRefusedError('NAME_TAKEN')),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
-  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
-  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'unitPrice')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('unitPrice')),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'originalPrice')),
 } as const;
