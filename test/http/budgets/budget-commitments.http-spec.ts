@@ -83,6 +83,12 @@ describe('GET /budget-commitments (HTTP contract, no database)', () => {
       .query({ longTerm: 'maybe' })
       .set('Authorization', bearer(principal(['MANAGER'])))
       .expect(422);
+    // The long-term list is the one of a year (the year of the review): the year is asked for (RV3-02).
+    await request(app.getHttpServer())
+      .get('/api/v1/budget-commitments')
+      .query({ longTerm: 'true' })
+      .set('Authorization', bearer(principal(['MANAGER'])))
+      .expect(422);
 
     expect(list).toHaveBeenCalledTimes(1);
     expect(list).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ longTerm: true, year: 2026 }));
