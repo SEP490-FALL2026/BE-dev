@@ -187,6 +187,19 @@ describe('the use of a budget tells 80 and 100 percent of its base once each tim
     ]);
   }, 120000);
 
+  it('RV2-02: the approval of the first version of a Cost Center attaches the commitments that waited for a budget and tells the threshold they cross, as the adjustment that makes the version does (R-48)', async () => {
+    const unit = await department(null);
+    await h.commitWaiting(unit, h.year, 85 * M);
+    // Waiting for a budget, the commitment is not counted against a base that does not exist.
+    expect(await alerts(unit)).toEqual([]);
+
+    await h.budgetFor(unit, { total: 100 * M });
+
+    expect(await alerts(unit)).toEqual([[80, BigInt(100 * M)]]);
+    expect(await told(unit, 80)).toEqual(headAndFinance(unit));
+    expect(await told(unit, 100)).toEqual([]);
+  }, 120000);
+
   it('a Cost Center with no budget has no base, so it tells nothing however much it uses', async () => {
     const unit = await department(null);
 
