@@ -1438,3 +1438,22 @@ FE/mobile contract: create accepts `role?` (EMPLOYEE default), PUT `/app-users/{
 ## Gỡ Business Owner khỏi code đang chạy, 13/11/2026 (`QĐ-111g`, gói BUG-B)
 
 Nhánh `feat/mf2-mf3`: ứng dụng có cột `responsible_it_admin_employee_id` (người tạo, đổi bằng `POST /applications/{id}/responsibility-transfer`; `GET /it-admins` để chọn); năm route Business Owner đã xóa (`business-owner-warnings`, `applications/{id}/business-owners`, `retirement-confirmations`, `term-opinions` GET/POST), `retire` không chờ xác nhận. **Ngừng đọc/ghi, chưa drop:** các cột `applications.business_owner_employee_id`, `access_request_proposals.proposed_business_owner_employee_id`, `subscription_renewals.business_owner_opinion` và các bảng `application_business_owners`, `plan_term_opinions`, `application_retirement_confirmations` giữ nguyên dữ liệu; **drop ở đợt dọn** (expand–contract), cùng với migration xóa quan hệ Prisma `ApplicationLegacyBusinessOwner`.
+
+## Gói FE feedback 11/11 (`QĐ-111`), Z2 seed và flows, 16/11/2026
+
+Nhánh `feat/z2-seed` (từ `feat/fe-feedback`), chưa PR vào `dev`. Story của gói FE feedback chuyển `merged-dev` khi PR của
+`feat/fe-feedback` vào `dev`; trước đó giữ trạng thái `verified-local` ghi ở
+[HANDOFF-CODE](reviews/fe-feedback-2026-11-11/HANDOFF-CODE.md). Ghi chép, quyết định `D-Z2-n` và bằng chứng gọi API:
+[Z2-NOTES](reviews/fe-feedback-2026-11-11/Z2-NOTES.md).
+
+- **Seed `shared-demo-v4`** theo hợp đồng mới: kỳ ngân sách năm `Y` (hạn nộp = ngày seed, khóa từ hôm sau) và `Y+1` mở, `Y+2` nháp;
+  `BM-10` một số tiền + tệp; phiên bản có tệp; checklist PL-2 ở mọi quyết định; 7 nhóm chức năng; hợp đồng, hóa đơn mua, chốt tháng/quý,
+  điều chỉnh (từ lượt seed sau hạn), chính sách xuất bản lại chờ xác nhận. Kịch bản DEMO-1…15 và giới hạn của chúng ở Z2-NOTES.
+- **`test:flows`**: MF-4 vòng đời kỳ (nháp → mở → `BM-10` → khóa → phiên bản từ `BM-10`/số liệu nền → duyệt/trả về) và mua/chứng từ
+  (nộp → ký → thực chi tháng kỳ).
+- **Drop ở đợt dọn** (SPEC §6, expand–contract; hiện chỉ thôi đọc/ghi, dữ liệu giữ nguyên): bảng `exchange_rates` và các mã
+  `RATE_MISSING`/`NO_RATE`/`CURRENCY_MISMATCH` (FX-2); cột `many_paid_software*` (RQ-1); `comm*`, `is_communication_service` (CT-1, cùng
+  việc đặt `functional_group_id` NOT NULL); `budget_cycles.published_*` và bảng `budget_department_ceilings` (BG-1); cột `q1..q4_minor`,
+  dòng `BM-10`, `zbb`, `priority_rank` (BG-2). `access_requests.expected_end_date` vẫn ghi theo ngày suy ra, chỉ thôi nhận từ body (RQ-2).
+- **Chưa có:** file xuất dữ liệu cá nhân (US-14-02 AC-6, SPEC §7) — BE chưa có tính năng xuất; logo công ty (CT-1) — không có route tải
+  logo tổ chức, ứng dụng chỉ nhận `logoUrl` dạng liên kết.

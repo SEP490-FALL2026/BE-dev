@@ -43,6 +43,43 @@ Nhánh `feat/z2-seed` (tách `feat/fe-feedback` @ `1f7ffa19`). Prompt: `Code/ver
 
 ## Tài khoản demo
 
+Mật khẩu: Super Admin = `SEED_SUPER_ADMIN_PASSWORD`, mọi tài khoản demo = `SEED_DEMO_ACCOUNT_PASSWORD` (operator chọn, đọc từ stdin;
+không ghi ở đây). Super Admin: `system.admin@saoviet.example` (hoặc `SEED_SUPER_ADMIN_EMAIL`). Vai/phòng chi tiết ở
+[README fixture](../../../src/cli/seed/fixture/shared-demo-v4/README.md).
+
+| Mã      | Email đăng nhập            | Vai               | Phòng |
+| ------- | -------------------------- | ----------------- | ----- |
+| NV-CEO  | an.nguyen@saoviet.example  | SPENDING_APPROVER | BOD   |
+| NV-DEP  | bich.tran@saoviet.example  | MANAGER           | BOD   |
+| NV-ENGH | cuong.le@saoviet.example   | MANAGER           | ENG   |
+| NV-DEV1 | dung.pham@saoviet.example  | EMPLOYEE          | ENG   |
+| NV-DEV2 | em.hoang@saoviet.example   | EMPLOYEE          | ENG   |
+| NV-DEV3 | giang.vu@saoviet.example   | EMPLOYEE          | ENG   |
+| NV-DEV4 | phi.luong@saoviet.example  | EMPLOYEE          | ENG   |
+| NV-OFF1 | nam.ha@saoviet.example     | EMPLOYEE          | ENG   |
+| NV-CTR1 | phong.vu@saoviet.example   | EMPLOYEE          | ENG   |
+| NV-INT2 | hanh.le@saoviet.example    | EMPLOYEE          | ENG   |
+| NV-DESH | khanh.bui@saoviet.example  | MANAGER           | DES   |
+| NV-DES1 | lan.do@saoviet.example     | EMPLOYEE          | DES   |
+| NV-DES2 | manh.ngo@saoviet.example   | EMPLOYEE          | DES   |
+| NV-DES3 | hoa.truong@saoviet.example | EMPLOYEE          | DES   |
+| NV-FINH | ngoc.phan@saoviet.example  | MANAGER           | FIN   |
+| NV-FIN1 | phuc.trinh@saoviet.example | FINANCE           | FIN   |
+| NV-ITOH | thanh.tran@saoviet.example | MANAGER           | ITO   |
+| NV-ITA1 | quan.ly@saoviet.example    | IT_ADMIN          | ITO   |
+| NV-ITA2 | rang.mai@saoviet.example   | IT_ADMIN          | ITO   |
+| NV-ITA3 | sang.doan@saoviet.example  | IT_ADMIN          | ITO   |
+| NV-ITA4 | tu.kim@saoviet.example     | IT_ADMIN          | ITO   |
+| NV-MKTH | uyen.dinh@saoviet.example  | MANAGER           | MKT   |
+| NV-MKT1 | vinh.lam@saoviet.example   | EMPLOYEE          | MKT   |
+| NV-MKT2 | xuan.chau@saoviet.example  | EMPLOYEE          | MKT   |
+| NV-SALH | yen.truong@saoviet.example | MANAGER           | SAL   |
+| NV-SAL1 | anh.kieu@saoviet.example   | EMPLOYEE          | SAL   |
+| NV-SAL2 | bao.quach@saoviet.example  | EMPLOYEE          | SAL   |
+| NV-LGL1 | thu.ly@saoviet.example     | EMPLOYEE          | LGL   |
+| NV-OPSH | trang.quan@saoviet.example | MANAGER           | OPS   |
+| NV-OPS1 | son.ta@saoviet.example     | EMPLOYEE          | OPS   |
+
 ## Bằng chứng gọi API (DEMO-1…15, MF-1…5)
 
 ## Chuỗi lệnh deploy-từ-đầu (VPS, sau khi drop DB)
