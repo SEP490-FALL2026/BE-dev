@@ -69,7 +69,7 @@ worker đẩy sang kho ngoài sau khi commit (cách WDP đang làm) — nếu kh
 - Dịch vụ AI: `AI_SERVICE_BASE_URL`, `AI_SERVICE_TOKEN` (bearer cấp dịch vụ), `AI_SERVICE_TIMEOUT_MS`
   (`ai-service/ai-service-environment.policy.ts`). Không cấu hình: ở chế độ `MODEL` tính năng trả `AI.PROVIDER_UNAVAILABLE`
   (chế độ `SIMULATED` không cần dịch vụ AI); có địa chỉ mà thiếu token: chặn khởi động.
-- Nối dịch vụ AI trên Modal (SPEC §9.4 của repo `AI-SERVICE`): `.env` của VPS BE đặt (không commit giá trị thật)
+- Nối dịch vụ AI trên Modal (repo AI service bản WDP `WDP301-FA26-GR8/AI-service`, `modal_app.py` và README của repo đó): `.env` của VPS BE đặt (không commit giá trị thật)
 
   ```dotenv
   AI_SERVICE_BASE_URL=https://<workspace>--saas-sentry-ai-web.modal.run
@@ -147,7 +147,7 @@ worker đẩy sang kho ngoài sau khi commit (cách WDP đang làm) — nếu kh
   không phải của request chạm tới nó).
 - Production: `AI_SERVICE_BASE_URL` phải là `https://` hoặc `http://` tới chính máy (`localhost`, `127.0.0.0/8`, `::1`), sai
   thì module không mount được (thông báo nêu tên biến, không nêu giá trị).
-- Bộ kiểm đầu ra giữ cùng luật với `AI-SERVICE/eval/validators.py` (phiên bản `OUTPUT_CHECK_VERSION`); sửa một bên thì sửa cả bên kia.
+- Bộ kiểm đầu ra giữ cùng luật với `eval/validators.py` của repo AI service WDP (phiên bản `OUTPUT_CHECK_VERSION`); sửa một bên thì sửa cả bên kia.
 - Nội dung thô (`ai_invocation_contents`) chỉ Super Admin đọc, mỗi lần đọc có audit; chỉ `ops:ai-purge` xóa nó (khóa ngoại `RESTRICT`: nội
   dung bị xóa trước, `ai_invocations` được giữ).
 
