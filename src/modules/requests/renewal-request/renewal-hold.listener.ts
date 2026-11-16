@@ -2,12 +2,14 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { RenewalHoldHook, type RenewalHold } from '../../licensing/public/licensing.extension-points';
 import type { PendingRenewal } from '../../licensing/public/licensing-renewal.types';
+import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { RenewalRequestRepo } from '../renewal-apply/renewal-request.repo';
 
 /**
  * What licensing asks of the module of requests about a seat whose right is reaching its end (`RenewalHold`, bound to licensing's
  * `RenewalHoldHook` when the module starts): does it have a renewal waiting for its decision. A request sent up to the end of the
- * right leaves the right as it is until a decision comes; refused or withdrawn, it is no longer waiting (`US-05-14` AC-4).
+ * right leaves the right as it is until a decision comes; refused or withdrawn, it is no longer waiting (`US-05-14` AC-4). And how
+ * many requests for a plan are still open, which keeps the renewal of its subscription from being cancelled (`QĐ-103e`).
  */
 @Injectable()
 export class RenewalHoldReader implements RenewalHold, OnModuleInit {
@@ -16,6 +18,7 @@ export class RenewalHoldReader implements RenewalHold, OnModuleInit {
 
   constructor(
     private readonly renewals: RenewalRequestRepo,
+    private readonly requests: AccessRequestRepo,
     private readonly hook: RenewalHoldHook,
   ) {}
 
@@ -29,5 +32,9 @@ export class RenewalHoldReader implements RenewalHold, OnModuleInit {
 
   pendingRenewalsOf(assignmentIds: readonly string[], tx?: DbTx): Promise<Map<string, PendingRenewal>> {
     return this.renewals.pendingOf(assignmentIds, tx);
+  }
+
+  openRequestsOfPlan(planId: string, tx?: DbTx): Promise<number> {
+    return this.requests.countOpenOfPlan(planId, tx);
   }
 }

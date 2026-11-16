@@ -141,6 +141,7 @@ import { RenewalDecisionService } from './subscription-renewal/decision/renewal-
 import { RenewalOutcomeService } from './subscription-renewal/outcome/renewal-outcome.service';
 import { RenewalProposalService } from './subscription-renewal/proposal/renewal-proposal.service';
 import { RenewalNotifier } from './subscription-renewal/subscription-renewal-notifier.service';
+import { RenewalSeatsNeededService } from './subscription-renewal/seats-needed/renewal-seats-needed.service';
 import { RenewalPartiesService } from './subscription-renewal/subscription-renewal-parties.service';
 import { RenewalRankingService } from './subscription-renewal/subscription-renewal-ranking.service';
 import { SubscriptionRenewalSeatRepo } from './subscription-renewal/subscription-renewal-seat.repo';
@@ -278,6 +279,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     SubscriptionRenewalSeatRepo,
     RenewalPartiesService,
     RenewalRankingService,
+    RenewalSeatsNeededService,
     RenewalNotifier,
     RenewalProposalService,
     RenewalDecisionTrail,

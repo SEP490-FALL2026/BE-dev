@@ -6,15 +6,16 @@ import { pricingColumns } from './access-request-pricing.mapper';
 import { SELECT_REQUEST, toRecord } from './access-request-record.mapper';
 import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
 import { requestPolicyJson } from './access-request.json';
-import type {
-  AccessRequestState,
-  PricingRecord,
-  NewAccessRequest,
-  NewNeedDecision,
-  NewNeedStep,
-  WithdrawalRecord,
-  AccessRequestRecord,
-  CancellationRecord,
+import {
+  ENDED_STATES,
+  type AccessRequestState,
+  type PricingRecord,
+  type NewAccessRequest,
+  type NewNeedDecision,
+  type NewNeedStep,
+  type WithdrawalRecord,
+  type AccessRequestRecord,
+  type CancellationRecord,
 } from './access-request.types';
 
 /** The durable routing columns and policy come from the same need decision. */
@@ -359,6 +360,15 @@ export class AccessRequestRepo {
          )`;
 
     return new Set(rows.map((row) => row.employee_id));
+  }
+
+  /**
+   * How many requests for the plan are not in a final state (`QĐ-103e`): a request of one person, a request for a group (its own
+   * `plan_id`) and a request to go on using, each counted once, at any step (need, assessment, spend, execution). A draft is not a
+   * request yet and a request that waits for the IT Admin to close a withdrawal is still work, so it counts.
+   */
+  countOpenOfPlan(planId: string, tx?: DbTx): Promise<number> {
+    return (tx ?? this.prisma).accessRequest.count({ where: { planId, state: { notIn: ['DRAFT', ...ENDED_STATES] } } });
   }
 
   /**

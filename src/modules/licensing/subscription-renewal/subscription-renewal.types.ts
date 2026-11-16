@@ -106,6 +106,18 @@ export interface ReleasedSeat {
   position: number;
 }
 
+/** What the database says of the seats of a subscription for the count of the seats its next period needs (`SBF-20` §4.3). */
+export interface SeatsNeededFacts {
+  /** Seats not being taken back whose last day is after the renewal day (no end counts). */
+  heldPastRenewal: number;
+  /** The seats not being taken back that are in effect today and end by the renewal day: a request to go on using may wait for each. */
+  endingAssignmentIds: string[];
+  /** The seats not ended today (a seat that starts later and one being taken back included), as the renewal outcome counts them. */
+  activeSeatsToday: number;
+  /** The grants of the plan approved and not carried out, held by no subscription; zero when not asked for. */
+  approvedAwaitingGrant: number;
+}
+
 /** A seat held on a subscription on a day, with what the ranking of a reduction reads of it. */
 export interface HeldSeat {
   assignmentId: string;
