@@ -69,6 +69,10 @@ ném và map ở `invocation-content.http-errors.ts` của nhánh đó — khôn
   Vì sao `120000`: mặc định 90 000 ms thấp hơn hạn 105 s của dịch vụ và khởi động lạnh GPU ~110 s, nên lần gọi lúc GPU đang tắt
   hết giờ ở BE trong khi GPU vẫn chạy. Sau đó Super Admin bật hai công tắc và chọn `AI_PROVIDER_MODE`.
 
+  Dịch vụ AI phải chạy model thật: deploy có GPU (`AI_DEPLOY_GPU` khác `0`) và `/healthz` có `modelId` khác `stub`. Câu của runner
+  `stub` (câu mẫu, không qua model) bị BE từ chối ngay ở `ai-service-client.service.ts` — lần gọi `FAILED` với `AI.PROVIDER_UNAVAILABLE`,
+  không lưu kết quả — để không bao giờ có câu mẫu ghi là `MODEL`, hiện không nhãn _Giả lập_ (QĐ-102f).
+
 - Tham số vận hành `AI_PROVIDER_MODE` (nhóm `AI`, enum `SIMULATED` mặc định | `MODEL`; Super Admin đổi qua
   `PUT /operating-parameters/AI_PROVIDER_MODE`, có Audit Trail; chỉ có hiệu lực khi hai công tắc `ON`):
   `QueueSummaryService.create` đọc lúc tạo lần gọi (giá trị lạ ⇒ `SIMULATED` + log WARN, không nêu giá trị), lần gọi giữ chế độ đó

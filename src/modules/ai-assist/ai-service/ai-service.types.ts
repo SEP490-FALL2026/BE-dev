@@ -7,6 +7,9 @@ import { z } from 'zod';
  */
 export const AI_CONTRACT_VERSION = '1';
 
+/** The `modelId` of the stub runner of the AI service: a canned sentence, not an answer of a model (QĐ-102f). */
+export const STUB_MODEL_ID = 'stub';
+
 /** The most steps one summary sends: the rest of the queue is only counted. */
 export const QUEUE_MAX_REQUESTS = 20;
 
