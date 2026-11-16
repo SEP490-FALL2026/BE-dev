@@ -30,10 +30,10 @@ export class VersionDecisionService {
     private readonly checklists: PolicyChecklistApi,
   ) {}
 
-  /** Throws BudgetVersionNotFoundError, BudgetDecisionRefusedError, BudgetYearEndedError and what the checklist refuses. */
+  /** Throws BudgetVersionNotFoundError, BudgetDecisionRefusedError, BudgetYearEndedError, the errors of the annual ceiling an approval checks again and what the checklist refuses. */
   async decide(actor: AuthenticatedPrincipal, id: string, body: DecisionBodyDto): Promise<VersionWire> {
     const decided = await this.runner.run(async (tx) => {
-      const judged = await this.judge.judge(tx, actor, id);
+      const judged = await this.judge.judge(tx, actor, id, body.decision);
       // The checklist of the step (`QĐ-111ap`): a No locks the approval, and a return takes its reason from the answers when none is typed.
       const { verdict, reason } = await this.checklists.judge(tx, {
         organizationId: judged.version.organizationId,

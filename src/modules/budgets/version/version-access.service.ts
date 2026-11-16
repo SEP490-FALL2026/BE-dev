@@ -84,6 +84,14 @@ export class VersionAccessService {
     return cycle;
   }
 
+  /**
+   * The cycle of the version's year, locked `FOR UPDATE` before any version of it (the order of the module), whatever its state: a decision on a
+   * version that waits makes the check of the ceiling again, it does not take work in. Null for a year with no cycle.
+   */
+  lockCycleOfYear(tx: DbTx, version: Pick<VersionRecord, 'organizationId' | 'year'>): Promise<CycleRecord | null> {
+    return this.cycles.lockByYear(tx, version.organizationId, version.year, 'UPDATE');
+  }
+
   /** One file at least explains a version that is sent (`QĐ-111ac`); a draft is saved without one. Throws BudgetVersionAttachmentRequiredError. */
   async requireExplained(tx: DbTx, versionId: string): Promise<void> {
     if (versionAttachmentMissing(await this.versions.countAttachedFiles(tx, versionId))) {

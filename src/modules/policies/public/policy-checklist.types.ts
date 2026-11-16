@@ -29,6 +29,12 @@ export type ChecklistDecision = (typeof CHECKLIST_DECISIONS)[number];
 export const CHECKLIST_SUBJECT_KINDS = ['ACCESS_REQUEST', 'BUDGET_VERSION', 'GHOST_SEAT_RECOMMENDATION'] as const;
 export type ChecklistSubjectKind = (typeof CHECKLIST_SUBJECT_KINDS)[number];
 
+/** What the decision says of the thing it decides that changes which guards of the system ran (`system-guards.policy`). */
+export interface ChecklistContext {
+  /** The request has no step of the head (`QĐ-103b`): the head sent it, so nobody approved its need before the step that is decided. */
+  oneStep?: boolean;
+}
+
 /** The most answers a body carries: a step has at most 30 questions. */
 export const CHECKLIST_ANSWERS_MAX = 30;
 
@@ -53,7 +59,8 @@ export interface ChecklistVerdict {
   policyVersionId: string;
   versionNumber: number;
   stepCode: DecisionStepCode;
-  answers: { itemCode: string; answer: 'YES' | 'NO'; check: 'SYSTEM' | 'PERSON' }[];
+  /** `NOT_CHECKED` only for a question the system answers whose guard the decision did not run: the record never says Yes for what was not checked. */
+  answers: { itemCode: string; answer: 'YES' | 'NO' | 'NOT_CHECKED'; check: 'SYSTEM' | 'PERSON' }[];
   hasNo: boolean;
   noItems: { code: string; text: string }[];
 }

@@ -9,12 +9,14 @@ import {
 } from '../public/policy-checklist.errors';
 import type {
   ChecklistBody,
+  ChecklistContext,
   ChecklistDecision,
   ChecklistVerdict,
   DecisionStepCode,
 } from '../public/policy-checklist.types';
 import { autoReasonOf, evaluateChecklist, judgeDecision, type StepInForce } from './checklist.policy';
 import { ChecklistRepo } from './checklist.repo';
+import { uncheckedSystemItems } from './system-guards.policy';
 
 /**
  * Judges the checklist of a decision against the version of the policy in force at the step (`QĐ-111ap`): the version the person was shown,
@@ -38,10 +40,15 @@ export class ChecklistJudgeService {
       checklist: ChecklistBody;
       decision: ChecklistDecision;
       reason?: string | null;
+      context?: ChecklistContext;
     },
   ): Promise<{ verdict: ChecklistVerdict; reason: string | null; autoReason: string | null }> {
     const inForce = await this.stepInForce(tx, input.organizationId, input.stepCode);
-    const evaluated = evaluateChecklist(inForce, input.checklist);
+    const evaluated = evaluateChecklist(
+      inForce,
+      input.checklist,
+      uncheckedSystemItems(input.stepCode, input.decision, input.context),
+    );
     if (!evaluated.ok) {
       const { fault } = evaluated;
       if (fault.kind === 'VERSION_CHANGED') {

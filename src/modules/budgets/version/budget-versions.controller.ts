@@ -301,9 +301,11 @@ export class BudgetVersionsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The version was not sent, or was already decided (BUDGET.VERSION_NOT_SENT); or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
+        'The version was not sent, or was already decided (BUDGET.VERSION_NOT_SENT); an approval checks the annual ceiling again and the versions of the year no longer add up to no more than the ceiling less the shared-pool reserve (BUDGET_VERSION.OVER_CEILING, details.overBy: the version is returned instead) or the cycle is in another currency (BUDGET.CYCLE_CURRENCY_MISMATCH); or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
       examples: [
         EXAMPLES.VERSION_NOT_SENT,
+        EXAMPLES.OVER_ANNUAL_CEILING,
+        EXAMPLES.CYCLE_CURRENCY_MISMATCH,
         CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
         CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
       ],

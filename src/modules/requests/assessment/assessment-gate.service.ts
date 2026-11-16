@@ -106,7 +106,10 @@ export class AssessmentGate {
     request: AccessRequestRecord,
     input: { decision: 'COMPLETE' | 'REJECT' | 'RETURN'; checklist: ChecklistBody; reason?: string },
   ): Promise<{ verdict: ChecklistVerdict; reason: string | null }> {
-    return this.checklists.judge(tx, { organizationId: request.organizationId, stepCode: '1.3', ...input });
+    // A request the head sent has no step of the head: the question about their approval is not one the system checked (`QĐ-103b`).
+    const context = { oneStep: request.routing?.mode === 'ONE_STEP' };
+
+    return this.checklists.judge(tx, { organizationId: request.organizationId, stepCode: '1.3', context, ...input });
   }
 
   /** The same for a refusal or a return, which always has its reason: the checklist throws `PolicyDecisionReasonRequiredError` when it has none. */

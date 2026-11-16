@@ -74,6 +74,53 @@ describe('the checklist of the decision on a version of a budget (integration, r
     expect(decided.rows[0].checklist_at.toISOString()).toBe(decided.rows[0].decision_at.toISOString());
   });
 
+  const answersOf = async (id: string) =>
+    Object.fromEntries(
+      (
+        (
+          await h.ctx.sql.query<{ answers: { itemCode: string; answer: string }[] }>(
+            `SELECT answers FROM decision_checklists WHERE subject_id = $1 AND step_code = '4.7'`,
+            [id],
+          )
+        ).rows[0]?.answers ?? []
+      ).map((answer) => [answer.itemCode, answer.answer]),
+    );
+
+  it('keeps the questions of the system as Yes with an approval, which checks them all, and the ceiling as not checked with a return, which does not', async () => {
+    const approved = await sent();
+    const returned = await sent();
+
+    await h.decideVersion(approved.id, { decision: 'APPROVE' }, boss.account).expect(200);
+    await h
+      .decideVersion(returned.id, { decision: 'RETURN', checklist: h.checklists.answer('4.7', [no()]) }, boss.account)
+      .expect(200);
+
+    expect(await answersOf(approved.id)).toMatchObject({ '4.7-01': 'YES', '4.7-02': 'YES' });
+    expect(await answersOf(returned.id)).toMatchObject({ '4.7-01': 'YES', '4.7-02': 'NOT_CHECKED' });
+  });
+
+  it('checks the ceiling of the year again when it approves: a ceiling that no longer holds the versions refuses the approval, and a return still goes', async () => {
+    const version = await sent();
+    const year = (
+      await h.ctx.sql.query<{ year: number }>(`SELECT year FROM budget_versions WHERE id = $1`, [version.id])
+    ).rows[0].year;
+    await h.ctx.sql.query(`UPDATE budget_cycles SET annual_ceiling_minor = 1 WHERE year = $1`, [year]);
+
+    try {
+      const refused = await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account).expect(409);
+
+      expect(bodyOf(refused).error.code).toBe('BUDGET_VERSION.OVER_CEILING');
+      expect(await stateOf(version.id)).toBe('SENT');
+      expect(await rowsOf(version.id)).toEqual([]);
+      await h
+        .decideVersion(version.id, { decision: 'RETURN', reason: 'Over the ceiling now' }, boss.account)
+        .expect(200);
+      expect(await stateOf(version.id)).toBe('CHANGES_REQUESTED');
+    } finally {
+      await h.ctx.sql.query(`UPDATE budget_cycles SET annual_ceiling_minor = 100000000000000 WHERE year = $1`, [year]);
+    }
+  });
+
   it('locks the approval when an answer is No, and decides nothing', async () => {
     const version = await sent();
 

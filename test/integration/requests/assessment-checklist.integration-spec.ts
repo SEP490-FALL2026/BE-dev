@@ -62,6 +62,15 @@ describe('the checklist of the assessment of a proposal (integration, real Postg
         [subjectId],
       )
       .then((result) => result.rows);
+  const needAnswerOf = async (id: string) =>
+    (
+      (
+        await h.ctx.sql.query<{ answers: { itemCode: string; answer: string }[] }>(
+          `SELECT answers FROM decision_checklists WHERE subject_id = $1 AND step_code = '1.3'`,
+          [id],
+        )
+      ).rows[0]?.answers ?? []
+    ).find((answer) => answer.itemCode === '1.3-01')?.answer;
   const recordsOf = (requestId: string) =>
     h.ctx.sql
       .query<{ decision: string }>(`SELECT decision FROM approval_records WHERE request_id = $1 ORDER BY decided_at`, [
@@ -287,6 +296,33 @@ describe('the checklist of the assessment of a proposal (integration, real Postg
         'IT_ASSESSMENT:CLOSED',
         'IT_ASSESSMENT:PENDING',
       ]);
+    });
+  });
+
+  describe('the question about the head (1.3-01)', () => {
+    it('keeps it as Yes for a proposal whose need the head approved', async () => {
+      const proposed = await awaiting();
+
+      await post(proposed.id, 'completion', { checklist: h.checklists.yes('1.3') }).expect(200);
+
+      expect(await needAnswerOf(proposed.id)).toBe('YES');
+    });
+
+    it('keeps it as not checked for a proposal of the head, which has no step of the head, and for a refusal of it', async () => {
+      const completed = await h.proposed(head, { softwareName: 'Head tool done' });
+      await h.saveAssessment(completed.id, h.assessmentBody(), itInCharge.account).expect(200);
+      const refused = await h.proposed(head, { softwareName: 'Head tool refused' });
+
+      await post(completed.id, 'completion', { checklist: h.checklists.yes('1.3') }).expect(200);
+      await post(refused.id, 'rejection', {
+        decision: 'REJECT',
+        kind: 'NOT_ELIGIBLE',
+        reason: 'Not needed',
+        checklist: h.checklists.yes('1.3'),
+      }).expect(200);
+
+      expect(await needAnswerOf(completed.id)).toBe('NOT_CHECKED');
+      expect(await needAnswerOf(refused.id)).toBe('NOT_CHECKED');
     });
   });
 });

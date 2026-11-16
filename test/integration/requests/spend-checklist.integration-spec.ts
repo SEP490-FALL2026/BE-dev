@@ -53,6 +53,45 @@ describe('the checklist of the spend step (integration, real PostgreSQL)', () =>
       )
       .then((result) => result.rows);
 
+  const answersOf = async (id: string) =>
+    Object.fromEntries(
+      (
+        (
+          await h.ctx.sql.query<{ answers: { itemCode: string; answer: string }[] }>(
+            `SELECT answers FROM decision_checklists WHERE subject_id = $1 AND step_code = '1.7'`,
+            [id],
+          )
+        ).rows[0]?.answers ?? []
+      ).map((answer) => [answer.itemCode, answer.answer]),
+    );
+
+  describe('the questions the system answers (1.7-01 .. 1.7-03)', () => {
+    it('keeps them as Yes with an approval, which makes the check again at the decision', async () => {
+      const { ids } = await batchOf(1);
+
+      await h.decideSpend(ids[0], { decision: 'APPROVE' }, h.boss.account).expect(200);
+
+      expect(await answersOf(ids[0])).toMatchObject({ '1.7-01': 'YES', '1.7-02': 'YES', '1.7-03': 'YES' });
+    });
+
+    it.each(['REJECT', 'RETURN'])(
+      'keeps the ones of the check made again as not checked with a %s, which does not enforce it, and the one of the decider as Yes',
+      async (decision) => {
+        const { ids } = await batchOf(1);
+
+        await h
+          .decideSpend(ids[0], { decision, checklist: h.checklists.answer('1.7', [no()]) }, h.boss.account)
+          .expect(200);
+
+        expect(await answersOf(ids[0])).toMatchObject({
+          '1.7-01': 'YES',
+          '1.7-02': 'NOT_CHECKED',
+          '1.7-03': 'NOT_CHECKED',
+        });
+      },
+    );
+  });
+
   describe('one request', () => {
     it('keeps the answers with the approval when every question is Yes', async () => {
       const { ids } = await batchOf(1);

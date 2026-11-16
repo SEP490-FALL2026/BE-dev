@@ -26,11 +26,13 @@ export const REASON_MAX = 1000;
 /**
  * Judges the answers of a decision against the version of the policy in force (`QĐ-111ap`): the version first, then that every question the
  * person answers has its one answer. The question the system answers (`SYSTEM`) is Yes by itself: the answer may be left out or given as Yes,
- * never as No. The answers come out in the order of the questions with the system's among them.
+ * never as No. The answers come out in the order of the questions with the system's among them; the system's answer is not Yes for a
+ * question whose guard the decision did not run (`unchecked`, from `system-guards.policy`), which is kept as not checked.
  */
 export function evaluateChecklist(
   inForce: StepInForce,
   submitted: SubmittedChecklist,
+  unchecked: readonly string[] = [],
 ): { ok: true; verdict: ChecklistVerdict } | { ok: false; fault: ChecklistFault } {
   if (submitted.policyVersionId !== inForce.policyVersionId) {
     return {
@@ -57,7 +59,7 @@ export function evaluateChecklist(
 
   const answers = items.map((item) => ({
     itemCode: item.code,
-    answer: item.check === 'SYSTEM' ? ('YES' as const) : (given.get(item.code) ?? 'YES'),
+    answer: systemAnswerOf(item, unchecked) ?? given.get(item.code) ?? 'YES',
     check: item.check,
   }));
   const noItems = items
@@ -76,6 +78,13 @@ export function evaluateChecklist(
     },
   };
 }
+
+/** What is kept for a question the system answers: Yes, or not checked when the decision did not run its guard; none for a question of the person. */
+const systemAnswerOf = (item: PolicyChecklistItem, unchecked: readonly string[]): 'YES' | 'NOT_CHECKED' | null => {
+  if (item.check !== 'SYSTEM') return null;
+
+  return unchecked.includes(item.code) ? 'NOT_CHECKED' : 'YES';
+};
 
 /** The reason filled in from the questions answered No: each question with its code, cut to the longest reason a decision takes. */
 export function autoReasonOf(items: readonly { code: string; text: string }[]): string {

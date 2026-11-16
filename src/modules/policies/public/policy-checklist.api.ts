@@ -4,6 +4,7 @@ import { ChecklistJudgeService } from '../checklist/checklist-judge.service';
 import { ChecklistRecordService } from '../checklist/checklist-record.service';
 import type {
   ChecklistBody,
+  ChecklistContext,
   ChecklistDecision,
   ChecklistSubject,
   ChecklistVerdict,
@@ -21,7 +22,7 @@ export class PolicyChecklistApi {
     private readonly recording: ChecklistRecordService,
   ) {}
 
-  /** The answers against the version in force at the step, and what they allow of the decision; the reason is the typed one or the one filled in from the answers No. */
+  /** The answers against the version in force at the step, and what they allow of the decision; the reason is the typed one or the one filled in from the answers No. A question the system answers is kept as not checked where the decision does not run its guard (`context` says what of the request changes that). */
   judge(
     tx: DbTx,
     input: {
@@ -30,6 +31,7 @@ export class PolicyChecklistApi {
       checklist: ChecklistBody;
       decision: ChecklistDecision;
       reason?: string | null;
+      context?: ChecklistContext;
     },
   ): Promise<{ verdict: ChecklistVerdict; reason: string | null; autoReason: string | null }> {
     return this.judging.judge(tx, input);
