@@ -5,6 +5,7 @@ import {
   DevicesHarness,
   type CredentialWire,
   type DeviceWire,
+  type MyDeviceWire,
   type NoticeWire,
   type SessionWire,
   type StopRequestWire,
@@ -237,5 +238,102 @@ describe('stopping collection on the holder request (integration, real PostgreSQ
     expect(done.find((item) => item.id === earlyRequest.id)).toMatchObject({ state: 'COMPLETED', overdue: false });
     expect(h.codeOf(await h.listStopRequests('?state=NOPE').expect(422))).toBe('VALIDATION_ERROR');
     await h.listStopRequests('', early).expect(403);
+  });
+
+  it('TS-11 US-09-04 AC-11: after a stop the holder turns collection on again; days before that moment are refused and later ones accepted', async () => {
+    const person = await holder();
+    const { device, token } = await h.collected(person, notice);
+    const registrationId = device.registrationId as string;
+    const daysAgo = (days: number): string =>
+      new Date(Date.parse(`${h.today()}T00:00:00.000Z`) - days * 86_400_000).toISOString().slice(0, 10);
+    const tool = { tool: 'CODEX', coverage: 'PARTIAL', responses: 3, totalTokens: 900 };
+    const outcomes = async () =>
+      h
+        .dataOf<{ results: { date: string; outcome: string; reasonCode: string | null }[] }>(
+          await h
+            .sendUsage(token, {
+              generatedAt: new Date().toISOString(),
+              days: [daysAgo(7), daysAgo(3), h.today()].map((date) => ({ date, tools: [tool] })),
+            })
+            .expect(200),
+        )
+        .results.map((result) => `${result.date}:${result.outcome}:${result.reasonCode}`);
+    // The acknowledgement the holder gave long ago: the head of the chain goes back ten days.
+    await sql().query(`UPDATE device_registrations SET acknowledged_from = now() - interval '10 days' WHERE id = $1`, [
+      registrationId,
+    ]);
+    const created = stopOf(await h.requestStop(person, registrationId).expect(201));
+    await h.completeStop(created.id).expect(200);
+    expect(h.codeOf(await h.sendUsage(token, h.usageBatch(h.today(), new Date())).expect(403))).toBe(
+      'DEVICE.COLLECTION_STOPPED',
+    );
+    // The stop happened five days ago, as far as the intake is concerned.
+    await sql().query(
+      `UPDATE device_registrations SET collection_stopped_at = now() - interval '5 days' WHERE id = $1`,
+      [registrationId],
+    );
+
+    await h.acknowledge(person, registrationId, notice.id).expect(201);
+
+    const row = await projection(registrationId);
+    expect(row.collection_stopped_at).toBeNull();
+    const latest = await sql().query<{ acknowledged_at: Date }>(
+      `SELECT acknowledged_at FROM device_acknowledgements WHERE registration_id = $1 ORDER BY acknowledged_at DESC, id DESC LIMIT 1`,
+      [registrationId],
+    );
+    expect(row.acknowledged_from).toEqual(latest.rows[0].acknowledged_at);
+    expect(await outcomes()).toEqual([
+      `${daysAgo(7)}:REJECTED:OUTSIDE_WINDOW`,
+      `${daysAgo(3)}:REJECTED:OUTSIDE_WINDOW`,
+      `${h.today()}:ACCEPTED:null`,
+    ]);
+    expect(h.dataOf<SessionWire>(await h.session(token).expect(200)).state).toBe('ACTIVE');
+  });
+
+  it('US-09-04: a registration that ends while a request is open closes it as invalid, with the time it was handled', async () => {
+    const [person, next] = [await holder(), await holder()];
+    const device = await h.active(person, notice);
+    const registrationId = device.registrationId as string;
+    const created = stopOf(await h.requestStop(person, registrationId).expect(201));
+
+    await h.changeHolder(device.id, next.employeeId).expect(201);
+
+    const rows = await sql().query<{
+      state: string;
+      invalid_reason: string;
+      handled_at: Date | null;
+      by: string | null;
+      note: string | null;
+    }>(
+      `SELECT state, invalid_reason, handled_at, handled_by_app_user_id AS by, invalid_note AS note FROM device_stop_requests WHERE id = $1`,
+      [created.id],
+    );
+    expect(rows.rows[0]).toMatchObject({
+      state: 'INVALID',
+      invalid_reason: 'REGISTRATION_ENDED',
+      by: null,
+      note: null,
+    });
+    expect(rows.rows[0].handled_at).not.toBeNull();
+    expect(h.codeOf(await h.completeStop(created.id).expect(409))).toBe('DEVICE_STOP_REQUEST.NOT_OPEN');
+    const open = h.dataOf<{ items: StopRequestWire[] }>(await h.listStopRequests('?pageSize=100').expect(200));
+    expect(open.items.find((item) => item.id === created.id)).toBeUndefined();
+  });
+
+  it('GET /me/devices says whether a stop request of the registration is waiting', async () => {
+    const person = await holder();
+    const device = await h.active(person, notice);
+    const pending = async (): Promise<boolean[]> =>
+      h
+        .dataOf<{ items: MyDeviceWire[] }>(await h.myDevices(person).expect(200))
+        .items.map((item) => item.stopRequestPending);
+
+    expect(await pending()).toEqual([false]);
+    const created = stopOf(await h.requestStop(person, device.registrationId as string).expect(201));
+    expect(await pending()).toEqual([true]);
+    await h.requestStop(person, device.registrationId as string).expect(201);
+    expect(await pending()).toEqual([true]);
+    await h.completeStop(created.id).expect(200);
+    expect(await pending()).toEqual([false]);
   });
 });

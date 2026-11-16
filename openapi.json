@@ -126946,6 +126946,7 @@
                       "nullable": true
                     },
                     "signatureRecorded": { "type": "boolean" },
+                    "stopRequestPending": { "type": "boolean" },
                     "canAcknowledge": { "type": "boolean" },
                     "blockedReason": {
                       "type": "string",
@@ -126970,6 +126971,7 @@
                     "acknowledgementState",
                     "acknowledgedVersionNumber",
                     "signatureRecorded",
+                    "stopRequestPending",
                     "canAcknowledge",
                     "blockedReason"
                   ],

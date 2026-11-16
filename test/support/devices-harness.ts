@@ -49,6 +49,7 @@ export interface MyDeviceWire {
   signatureRecorded: boolean;
   canAcknowledge: boolean;
   blockedReason: string | null;
+  stopRequestPending: boolean;
 }
 
 export interface StopRequestWire {

@@ -206,6 +206,18 @@ export class RegistryRepo {
        WHERE id = ${id}::uuid`;
   }
 
+  /**
+   * The registration ended, so the stop requests still waiting on it can never be completed: each becomes invalid, handled at `at` by
+   * nobody. Written here, not in `stop-request`, which depends on this folder. Returns how many it closed.
+   */
+  async invalidateOpenStopRequests(tx: DbTx, registrationId: string, at: Date): Promise<number> {
+    return tx.$executeRaw`
+      UPDATE device_stop_requests
+         SET state = 'INVALID'::"DeviceStopRequestState", invalid_reason = 'REGISTRATION_ENDED'::"DeviceStopInvalidReason",
+             handled_at = ${at}
+       WHERE registration_id = ${registrationId}::uuid AND state = 'OPEN'::"DeviceStopRequestState"`;
+  }
+
   async hasSignatureRecord(registrationId: string, tx?: DbTx): Promise<boolean> {
     return (await (tx ?? this.prisma).deviceSignatureRecord.count({ where: { registrationId }, take: 1 })) > 0;
   }
