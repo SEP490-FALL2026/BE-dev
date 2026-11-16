@@ -114,6 +114,7 @@ flowchart BT
   optimization -->|6| operating_parameters
   optimization -->|19| organization
   optimization -->|7| personnel
+  optimization -->|9| policies
   optimization -->|9| usage
   organization -->|10| audit
   organization -->|5| notifications
@@ -130,7 +131,7 @@ flowchart BT
   policies -->|4| identity_access
   policies -->|2| notifications
   policies -->|7| organization
-  requests -->|63| audit
+  requests -->|64| audit
   requests -->|30| budgets
   requests -->|42| catalog
   requests -->|11| finance
@@ -139,7 +140,7 @@ flowchart BT
   requests -->|12| notifications
   requests -->|12| operating_parameters
   requests -->|97| organization
-  requests -->|26| policies
+  requests -->|31| policies
   usage -->|10| audit
   usage -->|3| budgets
   usage -->|15| catalog
@@ -154,4 +155,4 @@ flowchart BT
   usage -->|4| requests
 ```
 
-111 module edges.
+112 module edges.

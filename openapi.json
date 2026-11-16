@@ -45886,6 +45886,12 @@
         "parameters": [
           { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/AssessmentCompletionBodyDto" } }
+          }
+        },
         "responses": {
           "200": {
             "description": "The assessment is complete: the quote gives the request its amount and its payments, the step of the IT Admin ends, and the request waits for the head to send it on for a spend decision.",
@@ -45896,6 +45902,27 @@
                     { "$ref": "#/components/schemas/AccessRequestResponseDto" },
                     { "properties": { "message": { "example": "ACCESS_REQUEST.ASSESSMENT_COMPLETED" } } }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -45986,7 +46013,7 @@
             }
           },
           "409": {
-            "description": "The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE), or a short proposal names internal software, whose plans are free (ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN): add the plan to the catalog and reject the proposal as not eligible, naming that plan, for the person to ask for it from the catalog.",
+            "description": "The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE), or a short proposal names internal software, whose plans are free (ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN): add the plan to the catalog and reject the proposal as not eligible, naming that plan, for the person to ask for it from the catalog. The policy of the checklist was changed since the person was shown it (POLICY.VERSION_CHANGED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46034,13 +46061,67 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "POLICY.VERSION_CHANGED": {
+                    "summary": "The policy of the step has a new version in force since the checklist was shown.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.VERSION_CHANGED",
+                        "message": "The policy of the step has a new version in force since the checklist was shown.",
+                        "details": { "stepCode": "1.2", "policyVersionId": "v3", "versionNumber": 3 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
             }
           },
           "422": {
-            "description": "The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE, or QUOTE_PRICE_NOT_VND when the stored quote is not in dong: record it again in dong), or the time of use the person gave does not fit the kind of plan concluded (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: a plan bought by the month takes 1 to 9 months; reject the request for the person to propose again with months that fit). Nothing is written and the request stays with the IT Admin. A plan bought once takes no months: completing it clears any the person gave.",
+            "description": "The checklist is missing, lacks an answer or names a question the policy does not have (POLICY.CHECKLIST_INCOMPLETE), or an answer is No, which locks the completion (POLICY.CHECKLIST_HAS_NO, with the questions answered No in details.items); the assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE, or QUOTE_PRICE_NOT_VND when the stored quote is not in dong: record it again in dong), or the time of use the person gave does not fit the kind of plan concluded (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: a plan bought by the month takes 1 to 9 months; reject the request for the person to propose again with months that fit). Nothing is written and the request stays with the IT Admin. A plan bought once takes no months: completing it clears any the person gave.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46114,6 +46195,33 @@
                           "termMonths": 12,
                           "maxMonths": 9,
                           "reason": "TERM_MONTHS_OUT_OF_RANGE"
+                        },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_INCOMPLETE": {
+                    "summary": "The checklist of the step is not answered in full.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_INCOMPLETE",
+                        "message": "The checklist of the step is not answered in full.",
+                        "details": { "stepCode": "1.2", "missing": ["1.2-05"], "unexpected": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_HAS_NO": {
+                    "summary": "An answer of the checklist is No, so the decision cannot go on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_HAS_NO",
+                        "message": "An answer of the checklist is No, so the decision cannot go on.",
+                        "details": {
+                          "stepCode": "1.2",
+                          "items": [{ "code": "1.2-05", "text": "The tools they have do not meet the need" }]
                         },
                         "requestId": "req_example"
                       }
@@ -46194,7 +46302,7 @@
         },
         "responses": {
           "200": {
-            "description": "The IT Admin concludes that a tool cannot be controlled, or that the software is not eligible for the catalog, with the reason that must go with it and an alternative when there is one. The request ends as refused by IT: no spend step, no snapshot, no commitment, and nothing is added to the catalog. The person who asked and the head read the reason and the alternative in the assessment.",
+            "description": "With decision REJECT the IT Admin concludes that a tool cannot be controlled, or that the software is not eligible for the catalog, with the reason that must go with it and an alternative when there is one. The request ends as refused by IT: no spend step, no snapshot, no commitment, and nothing is added to the catalog. The person who asked and the head read the reason and the alternative in the assessment. With decision RETURN the proposal goes back to the person who asked, who adds what is missing and sends it again (POST /access-requests/{id}/resubmission): the request waits for its sender (AWAITING_REQUESTER_REVISION), the step of the IT Admin is closed and the assessment keeps what was filled in. Both carry the checklist of the policy in force at the step; the reason is typed or filled in from the questions answered No.",
             "content": {
               "application/json": {
                 "schema": {
@@ -46313,7 +46421,7 @@
             }
           },
           "409": {
-            "description": "The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT).",
+            "description": "The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), or the policy of the checklist was changed since the person was shown it (POLICY.VERSION_CHANGED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46325,6 +46433,18 @@
                       "error": {
                         "code": "ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT",
                         "message": "The assessment cannot be changed: NOT_AWAITING_ASSESSMENT.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.VERSION_CHANGED": {
+                    "summary": "The policy of the step has a new version in force since the checklist was shown.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.VERSION_CHANGED",
+                        "message": "The policy of the step has a new version in force since the checklist was shown.",
+                        "details": { "stepCode": "1.2", "policyVersionId": "v3", "versionNumber": 3 },
                         "requestId": "req_example"
                       }
                     }
@@ -46376,7 +46496,7 @@
             }
           },
           "422": {
-            "description": "The reason is missing or blank, or the kind is not one of the two (VALIDATION_ERROR); the alternative plan does not exist (ASSESSMENT.REFERENCE_NOT_FOUND). Nothing is written and the request stays with the IT Admin.",
+            "description": "A refusal has no kind, or an uncontrollable tool no alternative, or a refusal or a return has no reason and no answer No to give one (VALIDATION_ERROR); the checklist lacks an answer (POLICY.CHECKLIST_INCOMPLETE); the alternative plan does not exist (ASSESSMENT.REFERENCE_NOT_FOUND). Nothing is written and the request stays with the IT Admin.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46401,6 +46521,18 @@
                         "code": "ASSESSMENT.REFERENCE_NOT_FOUND",
                         "message": "The alternativePlanId of the assessment does not exist.",
                         "details": { "field": "alternativePlanId" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_INCOMPLETE": {
+                    "summary": "The checklist of the step is not answered in full.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_INCOMPLETE",
+                        "message": "The checklist of the step is not answered in full.",
+                        "details": { "stepCode": "1.2", "missing": ["1.2-05"], "unexpected": [] },
                         "requestId": "req_example"
                       }
                     }
@@ -46464,7 +46596,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Refuse a proposal at the gate",
+        "summary": "Refuse a proposal at the gate, or send it back to its sender",
         "tags": ["access-requests"]
       }
     },
@@ -96545,7 +96677,7 @@
         },
         "responses": {
           "201": {
-            "description": "The choice was saved for every recommendation of the batch: kept or exempted ones are closed, a reclaim opens the revocation with its grace (or is left to expire when the right ends within a month).",
+            "description": "The choice was saved for every recommendation of the batch: kept or exempted ones are closed, a reclaim opens the revocation with its grace (or is left to expire when the right ends within a month). The checklist of the policy in force is answered once for the batch and kept for each recommendation; an answer No leaves only the reclaim.",
             "content": {
               "application/json": {
                 "schema": {
@@ -96653,7 +96785,7 @@
             }
           },
           "409": {
-            "description": "A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (NOT_DECIDABLE) or its seat cannot be revoked (SEAT_NOT_REVOCABLE); `details.items` names each; nothing was saved.",
+            "description": "A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (NOT_DECIDABLE) or its seat cannot be revoked (SEAT_NOT_REVOCABLE), `details.items` names each; or the policy of the checklist was changed since the head was shown it (POLICY.VERSION_CHANGED). Nothing was saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -96666,6 +96798,18 @@
                         "code": "GHOST_SEAT.PAUSED",
                         "message": "The recommendation is paused while its holder is in a transfer.",
                         "details": { "items": [{ "recommendationId": "recommendation-id", "code": "PAUSED" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.VERSION_CHANGED": {
+                    "summary": "The policy of the step has a new version in force since the checklist was shown.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.VERSION_CHANGED",
+                        "message": "The policy of the step has a new version in force since the checklist was shown.",
+                        "details": { "stepCode": "1.2", "policyVersionId": "v3", "versionNumber": 3 },
                         "requestId": "req_example"
                       }
                     }
@@ -96717,7 +96861,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR) or an exemption has no end day (EXEMPTION_REQUIRED) or lasts beyond 12 months or into the past (EXEMPTION_TOO_LONG).",
+            "description": "The body is invalid (VALIDATION_ERROR), an exemption has no end day (EXEMPTION_REQUIRED) or lasts beyond 12 months or into the past (EXEMPTION_TOO_LONG), the checklist lacks an answer (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the choice is to keep or exempt (POLICY.CHECKLIST_HAS_NO, with the questions answered No in details.items): the head can only reclaim.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -96743,6 +96887,33 @@
                         "message": "An exemption lasts after today and at most 12 months.",
                         "details": {
                           "items": [{ "recommendationId": "recommendation-id", "code": "EXEMPTION_TOO_LONG" }]
+                        },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_INCOMPLETE": {
+                    "summary": "The checklist of the step is not answered in full.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_INCOMPLETE",
+                        "message": "The checklist of the step is not answered in full.",
+                        "details": { "stepCode": "1.2", "missing": ["1.2-05"], "unexpected": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_HAS_NO": {
+                    "summary": "An answer of the checklist is No, so the decision cannot go on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_HAS_NO",
+                        "message": "An answer of the checklist is No, so the decision cannot go on.",
+                        "details": {
+                          "stepCode": "1.2",
+                          "items": [{ "code": "1.2-05", "text": "The tools they have do not meet the need" }]
                         },
                         "requestId": "req_example"
                       }
@@ -96807,7 +96978,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Keep, reclaim or exempt the seats recommended to me, with a reason",
+        "summary": "Keep, reclaim or exempt the seats recommended to me, with a reason and the checklist",
         "tags": ["ghost-seats"]
       }
     },
@@ -97285,7 +97456,7 @@
         },
         "responses": {
           "201": {
-            "description": "One result for each recommendation named, in order: pushed to the queue of the head (or waiting for one) or left as it was with the reason. A recommendation that cannot be pushed is not an error.",
+            "description": "One result for each recommendation named, in order: pushed to the queue of the head (or waiting for one) or left as it was with the reason. A recommendation that cannot be pushed is not an error. The checklist of the policy in force is answered once for the batch and kept for each recommendation pushed; an answer No refuses the whole batch and the watch stays as it was.",
             "content": {
               "application/json": {
                 "schema": {
@@ -97372,7 +97543,7 @@
             }
           },
           "409": {
-            "description": "The Idempotency-Key was used for another batch (GHOST_SEAT.ESCALATION_KEY_REUSED).",
+            "description": "The Idempotency-Key was used for another batch (GHOST_SEAT.ESCALATION_KEY_REUSED), or the policy of the checklist was changed since the IT Admin was shown it (POLICY.VERSION_CHANGED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -97384,6 +97555,18 @@
                       "error": {
                         "code": "GHOST_SEAT.ESCALATION_KEY_REUSED",
                         "message": "The Idempotency-Key was used for another batch of recommendations.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.VERSION_CHANGED": {
+                    "summary": "The policy of the step has a new version in force since the checklist was shown.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.VERSION_CHANGED",
+                        "message": "The policy of the step has a new version in force since the checklist was shown.",
+                        "details": { "stepCode": "1.2", "policyVersionId": "v3", "versionNumber": 3 },
                         "requestId": "req_example"
                       }
                     }
@@ -97435,7 +97618,7 @@
             }
           },
           "422": {
-            "description": "The body or the Idempotency-Key is invalid (VALIDATION_ERROR).",
+            "description": "The body or the Idempotency-Key is invalid (VALIDATION_ERROR), the checklist lacks an answer (POLICY.CHECKLIST_INCOMPLETE), or an answer is No (POLICY.CHECKLIST_HAS_NO, with the questions answered No in details.items): the batch is refused, no key is taken and the watch stays as it was.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -97448,6 +97631,33 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_INCOMPLETE": {
+                    "summary": "The checklist of the step is not answered in full.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_INCOMPLETE",
+                        "message": "The checklist of the step is not answered in full.",
+                        "details": { "stepCode": "1.2", "missing": ["1.2-05"], "unexpected": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_HAS_NO": {
+                    "summary": "An answer of the checklist is No, so the decision cannot go on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_HAS_NO",
+                        "message": "An answer of the checklist is No, so the decision cannot go on.",
+                        "details": {
+                          "stepCode": "1.2",
+                          "items": [{ "code": "1.2-05", "text": "The tools they have do not meet the need" }]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -113586,17 +113796,118 @@
         "description": "Give at least one field; a field that is present is written, and the ones that can be cleared take null.",
         "additionalProperties": false
       },
-      "AssessmentRejectionBodyDto": {
+      "AssessmentCompletionBodyDto": {
         "type": "object",
         "properties": {
-          "kind": { "type": "string", "enum": ["UNCONTROLLABLE", "NOT_ELIGIBLE"] },
-          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "alternativePlanId": { "type": "string", "format": "uuid" },
-          "alternativeNote": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          "checklist": {
+            "type": "object",
+            "properties": {
+              "policyVersionId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The version of the policy whose questions were shown (from the step of the policy)."
+              },
+              "answers": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemCode": { "type": "string", "minLength": 1, "maxLength": 30 },
+                    "answer": { "type": "string", "enum": ["YES", "NO"] }
+                  },
+                  "required": ["itemCode", "answer"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["policyVersionId", "answers"],
+            "additionalProperties": false,
+            "description": "The answers to the questions of the policy in force at this step. Every question the person answers needs an answer; a question the system answers is Yes by itself."
+          }
         },
-        "required": ["kind", "reason"],
-        "description": "UNCONTROLLABLE requires alternativePlanId or alternativeNote.",
+        "required": ["checklist"],
+        "description": "The checklist of the policy in force at the step of the assessment. The assessment is completed only when every question is answered Yes.",
         "additionalProperties": false
+      },
+      "AssessmentRejectionBodyDto": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "decision": { "type": "string", "enum": ["REJECT"] },
+              "kind": { "type": "string", "enum": ["UNCONTROLLABLE", "NOT_ELIGIBLE"] },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+              "alternativePlanId": { "type": "string", "format": "uuid" },
+              "alternativeNote": { "type": "string", "minLength": 1, "maxLength": 1000 },
+              "checklist": {
+                "type": "object",
+                "properties": {
+                  "policyVersionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "The version of the policy whose questions were shown (from the step of the policy)."
+                  },
+                  "answers": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "itemCode": { "type": "string", "minLength": 1, "maxLength": 30 },
+                        "answer": { "type": "string", "enum": ["YES", "NO"] }
+                      },
+                      "required": ["itemCode", "answer"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["policyVersionId", "answers"],
+                "additionalProperties": false,
+                "description": "The answers to the questions of the policy in force at this step. Every question the person answers needs an answer; a question the system answers is Yes by itself."
+              }
+            },
+            "required": ["decision", "kind", "checklist"],
+            "additionalProperties": false,
+            "description": "UNCONTROLLABLE requires alternativePlanId or alternativeNote."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "decision": { "type": "string", "enum": ["RETURN"] },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+              "checklist": {
+                "type": "object",
+                "properties": {
+                  "policyVersionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "The version of the policy whose questions were shown (from the step of the policy)."
+                  },
+                  "answers": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "itemCode": { "type": "string", "minLength": 1, "maxLength": 30 },
+                        "answer": { "type": "string", "enum": ["YES", "NO"] }
+                      },
+                      "required": ["itemCode", "answer"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["policyVersionId", "answers"],
+                "additionalProperties": false,
+                "description": "The answers to the questions of the policy in force at this step. Every question the person answers needs an answer; a question the system answers is Yes by itself."
+              }
+            },
+            "required": ["decision", "checklist"],
+            "additionalProperties": false
+          }
+        ],
+        "description": "REJECT ends the request as refused by IT and needs the kind of the refusal; RETURN sends the proposal back to the person who asked and takes no kind. Both carry the checklist of the policy in force at the step, and a reason typed or left to be filled in from the questions answered No."
       },
       "InternalRegistrationBodyDto": {
         "type": "object",
@@ -132989,13 +133300,39 @@
             "maxLength": 1000,
             "description": "Why: 3 to 1000 characters, for every choice."
           },
+          "checklist": {
+            "type": "object",
+            "properties": {
+              "policyVersionId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The version of the policy whose questions were shown (from the step of the policy)."
+              },
+              "answers": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemCode": { "type": "string", "minLength": 1, "maxLength": 30 },
+                    "answer": { "type": "string", "enum": ["YES", "NO"] }
+                  },
+                  "required": ["itemCode", "answer"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["policyVersionId", "answers"],
+            "additionalProperties": false,
+            "description": "The answers to the questions of the policy in force at this step. Every question the person answers needs an answer; a question the system answers is Yes by itself."
+          },
           "exemptUntil": {
             "description": "Only for EXEMPT: the last day as YYYY-MM-DD, after today and at most 12 months from today; it must exist (2026-02-30 is refused).",
             "type": "string",
             "format": "date"
           }
         },
-        "required": ["items", "choice", "reason"],
+        "required": ["items", "choice", "reason", "checklist"],
         "additionalProperties": false
       },
       "DecisionCreatedResponseDto": {
@@ -133108,9 +133445,35 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 500
+          },
+          "checklist": {
+            "type": "object",
+            "properties": {
+              "policyVersionId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The version of the policy whose questions were shown (from the step of the policy)."
+              },
+              "answers": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemCode": { "type": "string", "minLength": 1, "maxLength": 30 },
+                    "answer": { "type": "string", "enum": ["YES", "NO"] }
+                  },
+                  "required": ["itemCode", "answer"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["policyVersionId", "answers"],
+            "additionalProperties": false,
+            "description": "The answers to the questions of the policy in force at this step. Every question the person answers needs an answer; a question the system answers is Yes by itself."
           }
         },
-        "required": ["recommendationIds"],
+        "required": ["recommendationIds", "checklist"],
         "additionalProperties": false
       },
       "EscalationResponseDto": {
