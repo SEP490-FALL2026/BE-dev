@@ -66,6 +66,25 @@ export class BudgetAdjustmentDecidedError extends Error {
   }
 }
 
+/** The cycle of the year still takes proposals (it is not locked yet): the budget of the year is not made, so there is nothing to adjust (`QĐ-103i` B6, `FIX-AD1` AD1-01). */
+export class BudgetAdjustmentCycleNotLockedError extends Error {
+  constructor(
+    readonly year: number,
+    readonly submissionDeadline: string,
+  ) {
+    super('The budget cycle of the year still takes proposals: an adjustment is made once it is locked.');
+    this.name = 'BudgetAdjustmentCycleNotLockedError';
+  }
+}
+
+/** The Cost Center that receives has no budget of the year yet and a proposal of `BM-10` waits for Finance to build it: the version is made from the proposal, an adjustment would take its place (`R-48`, AD1-01). */
+export class BudgetAdjustmentBudgetInPreparationError extends Error {
+  constructor(readonly costCenterId: string) {
+    super('The budget of the Cost Center is still being prepared: a proposal waits for Finance to build its version.');
+    this.name = 'BudgetAdjustmentBudgetInPreparationError';
+  }
+}
+
 /** The Cost Center that receives has a version of the year that is still being decided: that one is decided first, so that two current budgets are never made. */
 export class BudgetAdjustmentVersionInFlightError extends Error {
   constructor(readonly costCenterId: string) {

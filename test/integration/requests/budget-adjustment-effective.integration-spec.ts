@@ -37,28 +37,30 @@ describe('the budget a request is checked against and the budget the views show 
   let plan: string;
   let counter = 0;
   const unit = async (): Promise<Unit> => h.departmentWithHead(`P-AE${(counter += 1)}`);
-  const adjust = async (to: Unit, tr: number): Promise<string> => {
-    const asked = h.dataOf<{ id: string }>(
+  /** Asked and approved while the cycle of the year is locked: an adjustment is made only then (FIX-AD1, AD1-01); the cycle is open again after, for the budgets the next case makes. */
+  const adjust = async (to: Unit, tr: number): Promise<string> =>
+    h.withLockedCycle(async () => {
+      const asked = h.dataOf<{ id: string }>(
+        await request(h.server())
+          .post('/api/v1/budget-adjustments')
+          .set(h.as(h.finance))
+          .send({
+            year: h.year,
+            kind: 'SUPPLEMENT',
+            toCostCenterId: to.department.unitId,
+            amount: h.money(tr * M),
+            reason: 'Bổ sung trong năm',
+          })
+          .expect(201),
+      );
       await request(h.server())
-        .post('/api/v1/budget-adjustments')
-        .set(h.as(h.finance))
-        .send({
-          year: h.year,
-          kind: 'SUPPLEMENT',
-          toCostCenterId: to.department.unitId,
-          amount: h.money(tr * M),
-          reason: 'Bổ sung trong năm',
-        })
-        .expect(201),
-    );
-    await request(h.server())
-      .post(`/api/v1/budget-adjustments/${asked.id}/decision`)
-      .set(h.as(h.deciderOf()))
-      .send({ decision: 'APPROVE' })
-      .expect(200);
+        .post(`/api/v1/budget-adjustments/${asked.id}/decision`)
+        .set(h.as(h.deciderOf()))
+        .send({ decision: 'APPROVE' })
+        .expect(200);
 
-    return asked.id;
-  };
+      return asked.id;
+    });
   const checkedYear = async (u: Unit, amountTr: number): Promise<YearRowWire> => {
     const id = await h.paidRequest(u, plan, { amount: amountTr * M });
     const outcome = await h.route(id, u.head.account);
@@ -150,26 +152,28 @@ describe('the budget a request is checked against and the budget the views show 
     const u = await unit();
     const to = await unit();
     await h.budgetFor(u, { total: 100 * M, spent: 90 * M });
-    const asked = h.dataOf<{ id: string }>(
+    await h.withLockedCycle(async () => {
+      const asked = h.dataOf<{ id: string }>(
+        await request(h.server())
+          .post('/api/v1/budget-adjustments')
+          .set(h.as(h.finance))
+          .send({
+            year: h.year,
+            kind: 'TRANSFER',
+            fromCostCenterId: u.department.unitId,
+            toCostCenterId: to.department.unitId,
+            transferReason: 'COST_CENTER_CHANGE',
+            amount: h.money(15 * M),
+            reason: 'Phòng đổi Cost Center',
+          })
+          .expect(201),
+      );
       await request(h.server())
-        .post('/api/v1/budget-adjustments')
-        .set(h.as(h.finance))
-        .send({
-          year: h.year,
-          kind: 'TRANSFER',
-          fromCostCenterId: u.department.unitId,
-          toCostCenterId: to.department.unitId,
-          transferReason: 'COST_CENTER_CHANGE',
-          amount: h.money(15 * M),
-          reason: 'Phòng đổi Cost Center',
-        })
-        .expect(201),
-    );
-    await request(h.server())
-      .post(`/api/v1/budget-adjustments/${asked.id}/decision`)
-      .set(h.as(h.deciderOf()))
-      .send({ decision: 'APPROVE' })
-      .expect(200);
+        .post(`/api/v1/budget-adjustments/${asked.id}/decision`)
+        .set(h.as(h.deciderOf()))
+        .send({ decision: 'APPROVE' })
+        .expect(200);
+    });
 
     expect(await rowOf(u)).toMatchObject({
       effectiveBudget: { base: { amount: String(85 * M) }, adjustment: { amount: String(-15 * M) } },

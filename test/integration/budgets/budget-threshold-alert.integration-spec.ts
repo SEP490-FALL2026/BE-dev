@@ -102,24 +102,26 @@ describe('the use of a budget tells 80 and 100 percent of its base once each tim
 
     // The adjustment raises the base to 128 tr and moves no use, so it tells nothing (R-28).
     await ceilingLeaving(29);
-    const asked = h.dataOf<{ id: string }>(
+    await h.withLockedCycle(async () => {
+      const asked = h.dataOf<{ id: string }>(
+        await request(h.server())
+          .post('/api/v1/budget-adjustments')
+          .set(h.as(h.finance))
+          .send({
+            year: h.year,
+            kind: 'SUPPLEMENT',
+            toCostCenterId: unit.department.unitId,
+            amount: h.money(8 * M),
+            reason: 'Điều chỉnh trong năm',
+          })
+          .expect(201),
+      );
       await request(h.server())
-        .post('/api/v1/budget-adjustments')
-        .set(h.as(h.finance))
-        .send({
-          year: h.year,
-          kind: 'SUPPLEMENT',
-          toCostCenterId: unit.department.unitId,
-          amount: h.money(8 * M),
-          reason: 'Điều chỉnh trong năm',
-        })
-        .expect(201),
-    );
-    await request(h.server())
-      .post(`/api/v1/budget-adjustments/${asked.id}/decision`)
-      .set(h.as(h.deciderOf()))
-      .send({ decision: 'APPROVE' })
-      .expect(200);
+        .post(`/api/v1/budget-adjustments/${asked.id}/decision`)
+        .set(h.as(h.deciderOf()))
+        .send({ decision: 'APPROVE' })
+        .expect(200);
+    });
     const facts = (
       await h.ctx.app.get(BudgetFactsRepo, { strict: false }).yearFacts(unit.department.unitId, [h.year])
     ).get(h.year);

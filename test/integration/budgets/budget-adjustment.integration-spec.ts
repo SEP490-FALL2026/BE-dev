@@ -85,6 +85,7 @@ describe('Finance asks for an adjustment of the budget and the spending approver
     await h.budgetFor(admin, { total: 180 * M, reserve: 18 * M, spent: 80 * M, held: 30 * M });
     await h.budgetFor(sales, { total: 100 * M });
     await ceilingLeaving(29);
+    await h.lockedCycle();
   }, 300000);
 
   afterAll(async () => {
@@ -266,18 +267,19 @@ describe('Finance asks for an adjustment of the budget and the spending approver
     });
   });
 
-  it('a Cost Center whose version of the year is still being decided is not given another: the decision waits for that one (409)', async () => {
+  it('a Cost Center whose version of the year is still being decided is not given another: an adjustment for it is neither asked nor decided (409 VERSION_IN_FLIGHT)', async () => {
     await ceilingLeaving(40);
     const costCenterId = outsider.department.unitId;
+    const askedBefore = await made(supplement(outsider, 5));
     await h.ctx.sql.query(
       `INSERT INTO budget_versions (id, organization_id, cost_center_id, year, number, kind, state, origin, base_minor, reserve_minor, total_minor,
           currency, created_by_employee_id)
        VALUES (gen_random_uuid(), $1, $2, $3, 1, 'INITIAL', 'DRAFT', 'BASELINE_NO_PROPOSAL'::"BudgetVersionOrigin", 1000000, 0, 1000000, 'VND', $4)`,
       [h.seed.organizationId, costCenterId, h.year, h.finance.employeeId],
     );
-    const asked = await made(supplement(outsider, 5));
 
-    expect(code(await decide(asked.id, { decision: 'APPROVE' }).expect(409))).toBe(
+    expect(code(await supplement(outsider, 5).expect(409))).toBe('BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT');
+    expect(code(await decide(askedBefore.id, { decision: 'APPROVE' }).expect(409))).toBe(
       'BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT',
     );
   });
@@ -297,8 +299,58 @@ describe('Finance asks for an adjustment of the budget and the spending approver
     await decide(asked.id, { decision: 'APPROVE' }).expect(200);
     const another = await h.departmentWithHead('P-AD1X');
 
-    await expect(h.budgetFor(another, { total: 5 * M })).rejects.toBeDefined();
+    await h.reopenedCycle();
+    try {
+      await expect(h.budgetFor(another, { total: 5 * M })).rejects.toMatchObject({
+        name: 'BudgetOverAnnualCeilingError',
+      });
+    } finally {
+      await h.lockedCycle();
+    }
     expect(await facts(another)).toBeUndefined();
+  });
+
+  it('AD1-01: an adjustment is made only once the cycle of the year is locked: while it still takes proposals it is 409 CYCLE_NOT_LOCKED, to ask and to decide, and a year with no cycle is BUDGET_CYCLE.NOT_OPEN', async () => {
+    await ceilingLeaving(40);
+    const asked = await made(supplement(sales, 1));
+
+    await h.reopenedCycle();
+    try {
+      expect(code(await supplement(sales, 1).expect(409))).toBe('BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED');
+      expect(code(await ask({ kind: 'CEILING_REDUCTION', amount: h.money(M) }).expect(409))).toBe(
+        'BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED',
+      );
+      expect(code(await decide(asked.id, { decision: 'APPROVE' }).expect(409))).toBe(
+        'BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED',
+      );
+    } finally {
+      await h.lockedCycle();
+    }
+    expect(
+      code(
+        await ask({
+          year: h.year + 9,
+          kind: 'SUPPLEMENT',
+          toCostCenterId: sales.department.unitId,
+          amount: h.money(M),
+        }).expect(409),
+      ),
+    ).toBe('BUDGET_CYCLE.NOT_OPEN');
+    await decide(asked.id, { decision: 'APPROVE' }).expect(200);
+  });
+
+  it('AD1-01: a Cost Center whose BM-10 waits for Finance has no budget of the year yet: an adjustment for it is 409 BUDGET_IN_PREPARATION, and Finance still builds the version from the proposal', async () => {
+    await ceilingLeaving(40);
+    const waiting = await h.departmentWithHead('P-AD1W');
+    await h.reopenedCycle();
+    const proposal = await h.budgetProposed(waiting.head, waiting.department.unitId, 300 * M, h.year);
+    await h.lockedCycle();
+
+    expect(code(await supplement(waiting, 20).expect(409))).toBe('BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION');
+    expect(code(await transfer(sales, waiting, 5, { transferReason: 'COST_CENTER_CHANGE' }).expect(409))).toBe(
+      'BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION',
+    );
+    expect(await h.built(proposal.id)).toMatchObject({ state: 'DRAFT' });
   });
 
   it('is read by Finance and the spending approver in full, by the manager of a department for the Cost Centers of their own, with the filters and the pages', async () => {

@@ -61,8 +61,14 @@ export class BudgetAdjustmentController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description: 'The budget cycle of the year is not open yet (BUDGET_CYCLE.NOT_OPEN).',
-      examples: [EXAMPLES.CYCLE_NOT_OPEN],
+      description:
+        'The budget cycle of the year is not open yet (BUDGET_CYCLE.NOT_OPEN) or still takes proposals, so no budget of the year is made to adjust (BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED: asked once the cycle is locked, the day after its submission deadline); the Cost Center that receives has a version of the year still being decided (BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT) or a proposal that waits for its version (BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION).',
+      examples: [
+        EXAMPLES.CYCLE_NOT_OPEN,
+        EXAMPLES.CYCLE_NOT_LOCKED,
+        EXAMPLES.VERSION_IN_FLIGHT,
+        EXAMPLES.BUDGET_IN_PREPARATION,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -139,8 +145,14 @@ export class BudgetAdjustmentController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The adjustment was decided already (BUDGET_ADJUSTMENT.ALREADY_DECIDED), the Cost Center that receives has a version of the year still being decided (BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT), or the year has ended (BUDGET.YEAR_ENDED).',
-      examples: [EXAMPLES.ALREADY_DECIDED, EXAMPLES.VERSION_IN_FLIGHT],
+        'The adjustment was decided already (BUDGET_ADJUSTMENT.ALREADY_DECIDED), the cycle of the year does not stand locked (BUDGET_CYCLE.NOT_OPEN, BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED), or the Cost Center that receives has a version of the year still being decided (BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT) or a proposal that waits for its version (BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION).',
+      examples: [
+        EXAMPLES.ALREADY_DECIDED,
+        EXAMPLES.CYCLE_NOT_OPEN,
+        EXAMPLES.CYCLE_NOT_LOCKED,
+        EXAMPLES.VERSION_IN_FLIGHT,
+        EXAMPLES.BUDGET_IN_PREPARATION,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

@@ -6,7 +6,6 @@ import { VersionRepo } from '../budget/version.repo';
 import { CycleRepo, type CycleRecord } from '../cycle/cycle.repo';
 import { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import { VersionAdjustmentCreationService } from '../version/version-adjustment-creation.service';
-import { BudgetAdjustmentVersionInFlightError } from './budget-adjustment.errors';
 import type { AdjustmentRecord } from './budget-adjustment.repo';
 import { BudgetAdjustmentJudgeService } from './budget-adjustment-judge.service';
 
@@ -27,8 +26,8 @@ export class BudgetAdjustmentApplyService {
   ) {}
 
   /**
-   * The id of the version made for the Cost Center that receives, or null when none was needed. Throws every refusal of `BudgetAdjustmentJudgeService.require` and
-   * BudgetAdjustmentVersionInFlightError.
+   * The id of the version made for the Cost Center that receives, or null when none was needed. Throws every refusal of `BudgetAdjustmentJudgeService.require`, which holds the
+   * ones about the Cost Center that receives (a version still being decided, a proposal that waits).
    */
   async apply(
     tx: DbTx,
@@ -46,9 +45,6 @@ export class BudgetAdjustmentApplyService {
     }
     const receiver = adjustment.toCostCenterId;
     if (receiver === null || (await this.versions.reference(receiver, adjustment.year, tx)) !== null) return null;
-    if ((await this.versions.inFlight(receiver, adjustment.year, tx)) !== null) {
-      throw new BudgetAdjustmentVersionInFlightError(receiver);
-    }
 
     // The version takes the commitments that waited for a budget (R-48): the use of the Cost Center now counts them against a base that did not exist, which is the one change
     // of the use an approval makes, and so the one place it tells a threshold (`RV-2`). The base of another adjustment of a Cost Center that has a budget moves no use and tells nothing (R-28).

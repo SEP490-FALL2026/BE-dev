@@ -103,6 +103,34 @@ export class BudgetHarness extends RequestHarness {
     );
   }
 
+  /**
+   * The cycle of a year as it stands from the day after its submission deadline (`QĐ-111z`): locked, which is what an adjustment of the budget of the year needs (`FIX-AD1`,
+   * AD1-01). No route locks a cycle on a day of the test's choosing, so the fixture moves the deadline back; the decision deadline keeps its place.
+   */
+  async lockedCycle(year: number = this.year): Promise<void> {
+    await this.ctx.sql.query(
+      `UPDATE budget_cycles SET submission_deadline = make_date($1 - 1, 12, 31) WHERE year = $1`,
+      [year],
+    );
+  }
+
+  /** The fixture of `openedCycle` again: both deadlines the last day of the year, as a cycle that is still taking proposals. */
+  async reopenedCycle(year: number = this.year): Promise<void> {
+    await this.ctx.sql.query(`UPDATE budget_cycles SET submission_deadline = make_date($1, 12, 31) WHERE year = $1`, [
+      year,
+    ]);
+  }
+
+  /** Runs `work` with the cycle of the year locked and leaves it open as the other suites expect it (a proposal is taken only while it is open). */
+  async withLockedCycle<T>(work: () => Promise<T>, year: number = this.year): Promise<T> {
+    await this.lockedCycle(year);
+    try {
+      return await work();
+    } finally {
+      await this.reopenedCycle(year);
+    }
+  }
+
   money = (amount: string | number) => ({ amount: String(amount) });
 
   /** `BM-10` (`QĐ-111ab`): the amount asked for the year (70 million unless the suite says) and anything else the suite adds. */

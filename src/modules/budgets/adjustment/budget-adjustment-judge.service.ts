@@ -2,14 +2,18 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
+import { ProposalRepo } from '../budget/proposal.repo';
+import { VersionRepo } from '../budget/version.repo';
 import type { CycleRecord } from '../cycle/cycle.repo';
 import { BudgetReviewFiguresService } from '../review/budget-review-figures.service';
 import {
   BudgetAdjustmentBelowForecastError,
+  BudgetAdjustmentBudgetInPreparationError,
   BudgetAdjustmentNoBudgetError,
   BudgetAdjustmentOverBaseError,
   BudgetAdjustmentOverUnallocatedError,
   BudgetAdjustmentShapeError,
+  BudgetAdjustmentVersionInFlightError,
 } from './budget-adjustment.errors';
 import { judgeAdjustment, shapeRefusalOf, unallocatedOf } from './budget-adjustment.policy';
 import type { AdjustmentShape, CostCenterPosition } from './budget-adjustment.types';
@@ -24,6 +28,8 @@ export class BudgetAdjustmentJudgeService {
   constructor(
     private readonly budgets: BudgetFactsRepo,
     private readonly figures: BudgetReviewFiguresService,
+    private readonly versions: VersionRepo,
+    private readonly proposals: ProposalRepo,
   ) {}
 
   /** What of the annual ceiling is not allocated now. */
@@ -35,10 +41,14 @@ export class BudgetAdjustmentJudgeService {
     });
   }
 
-  /** Throws BudgetAdjustmentShapeError, BudgetAdjustmentOverUnallocatedError, BudgetAdjustmentOverBaseError, BudgetAdjustmentBelowForecastError, BudgetAdjustmentNoBudgetError. */
+  /**
+   * Throws BudgetAdjustmentShapeError, BudgetAdjustmentVersionInFlightError, BudgetAdjustmentBudgetInPreparationError, BudgetAdjustmentOverUnallocatedError,
+   * BudgetAdjustmentOverBaseError, BudgetAdjustmentBelowForecastError, BudgetAdjustmentNoBudgetError.
+   */
   async require(tx: DbTx, cycle: CycleRecord, shape: AdjustmentShape, today: BusinessDate): Promise<void> {
     const refusal = shapeRefusalOf(shape);
     if (refusal !== null) throw new BudgetAdjustmentShapeError(refusal);
+    await this.requireReceiverReady(tx, cycle.year, shape.toCostCenterId);
     const verdict = judgeAdjustment({
       shape,
       unallocatedMinor: await this.unallocatedOf(tx, cycle),
@@ -55,6 +65,21 @@ export class BudgetAdjustmentJudgeService {
         throw new BudgetAdjustmentOverBaseError(verdict.costCenterId, verdict.baseMinor);
       case 'NO_BUDGET':
         throw new BudgetAdjustmentNoBudgetError(verdict.costCenterId);
+    }
+  }
+
+  /**
+   * A Cost Center that receives money and has no budget of the year is given the version of origin `ADJUSTMENT` when the adjustment is approved (`R-48`): that is for a Cost Center
+   * that has nothing in the making. One whose version is being decided waits for that decision, and one whose `BM-10` waits for Finance gets its version from the proposal; an
+   * adjustment that made the version first would leave the proposal with nothing to be built into (`BUDGET.CURRENT_EXISTS` for the whole year, `FIX-AD1` AD1-01).
+   */
+  private async requireReceiverReady(tx: DbTx, year: number, costCenterId: string | null): Promise<void> {
+    if (costCenterId === null || (await this.versions.reference(costCenterId, year, tx)) !== null) return;
+    if ((await this.versions.inFlight(costCenterId, year, tx)) !== null) {
+      throw new BudgetAdjustmentVersionInFlightError(costCenterId);
+    }
+    if ((await this.proposals.openOfCostCenters([costCenterId], year, tx)).size > 0) {
+      throw new BudgetAdjustmentBudgetInPreparationError(costCenterId);
     }
   }
 

@@ -5,6 +5,8 @@ import { BudgetCycleNotOpenError } from '../budget/budget.errors';
 import { toBudgetApiException } from '../budget/budget.http-errors';
 import {
   BudgetAdjustmentBelowForecastError,
+  BudgetAdjustmentBudgetInPreparationError,
+  BudgetAdjustmentCycleNotLockedError,
   BudgetAdjustmentDecidedError,
   BudgetAdjustmentNoBudgetError,
   BudgetAdjustmentNotFoundError,
@@ -58,6 +60,17 @@ export function toBudgetAdjustmentApiException(error: unknown): unknown {
   if (error instanceof BudgetAdjustmentDecidedError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET_ADJUSTMENT.ALREADY_DECIDED', error.message);
   }
+  if (error instanceof BudgetAdjustmentCycleNotLockedError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED', error.message, {
+      year: error.year,
+      submissionDeadline: error.submissionDeadline,
+    });
+  }
+  if (error instanceof BudgetAdjustmentBudgetInPreparationError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION', error.message, {
+      costCenterId: error.costCenterId,
+    });
+  }
   if (error instanceof BudgetAdjustmentVersionInFlightError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT', error.message, {
       costCenterId: error.costCenterId,
@@ -81,4 +94,6 @@ export const BUDGET_ADJUSTMENT_ERROR_EXAMPLES = {
   NO_BUDGET: example(new BudgetAdjustmentNoBudgetError(COST_CENTER)),
   ALREADY_DECIDED: example(new BudgetAdjustmentDecidedError()),
   VERSION_IN_FLIGHT: example(new BudgetAdjustmentVersionInFlightError(COST_CENTER)),
+  CYCLE_NOT_LOCKED: example(new BudgetAdjustmentCycleNotLockedError(2026, '2026-11-30')),
+  BUDGET_IN_PREPARATION: example(new BudgetAdjustmentBudgetInPreparationError(COST_CENTER)),
 } as const;
