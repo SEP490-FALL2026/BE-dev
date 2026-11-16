@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { addDays } from '../../../src/core/business-date';
+import { EscalationRepo } from '../../../src/modules/optimization/escalation/escalation.repo';
 import { EscalationService } from '../../../src/modules/optimization/escalation/escalation.service';
 import type { ApiAccount } from '../../support/api-accounts';
 import { GhostSeatWorld } from '../../support/ghost-seat-world';
@@ -230,6 +231,26 @@ describe('the checklist of the wasted seats (integration, real PostgreSQL)', () 
         [id],
       );
       expect(kept.rows.map((row) => row.decided_at.toISOString())).toEqual([at.toISOString()]);
+    });
+
+    it('judges the checklist before it takes the key, so a refused batch never reaches the key', async () => {
+      const id = await watch('CE6');
+      const claim = jest.spyOn(w.ctx.app.get(EscalationRepo), 'claim');
+
+      try {
+        await escalate(
+          { recommendationIds: [id], checklist: w.checklists.answer('5.3', [noQuestion('5.3')]) },
+          `escalation-${randomUUID()}`,
+        ).expect(422);
+        expect(claim).not.toHaveBeenCalled();
+        await escalate(
+          { recommendationIds: [id], checklist: w.checklists.yes('5.3') },
+          `escalation-${randomUUID()}`,
+        ).expect(201);
+        expect(claim).toHaveBeenCalledTimes(1);
+      } finally {
+        claim.mockRestore();
+      }
     });
 
     it('asks for the checklist and for an answer to every question', async () => {
