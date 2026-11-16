@@ -118,6 +118,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_SHARED_POOL_OVER_RESERVE: ['year', 'month'],
   // The use of the budget of a Cost Center reached 80 or 100 percent of its base (`QĐ-111af`, RV-2): the Cost Center, the year and the threshold, never a figure.
   BUDGET_THRESHOLD_REACHED: ['costCenterId', 'year', 'threshold'],
+  // The head of a department is reminded to explain a Cost Center of a quarterly review (`QĐ-111ah`, B-7): on the due day and every Monday until they explain or Finance signs.
+  BUDGET_REVIEW_EXPLANATION_DUE: ['periodId', 'costCenterId', 'year', 'month', 'dueOn'],
   // An adjustment of the budget in the year (`QĐ-111ag`): asked of the spending approver, and decided for Finance and the head of a Cost Center it concerns; the id, the year, the kind and the decision, never a figure.
   BUDGET_ADJUSTMENT_REQUESTED: ['adjustmentId', 'year', 'kind'],
   BUDGET_ADJUSTMENT_DECIDED: ['adjustmentId', 'year', 'kind', 'decision', 'costCenterId'],

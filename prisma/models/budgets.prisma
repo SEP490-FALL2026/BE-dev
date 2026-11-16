@@ -648,6 +648,8 @@ model BudgetReviewPeriod {
   sharedPoolUnallocatedMinor BigInt    @map("shared_pool_unallocated_minor")
   sharedPoolReserveMinor     BigInt?   @map("shared_pool_reserve_minor")
   annualCeilingMinor         BigInt?   @map("annual_ceiling_minor")
+  // RV-3: the last day the heads of departments are asked to explain a quarter by (the fifth working day from the close); null for a month and for a quarter closed before RV-3.
+  explanationsDueOn          DateTime? @map("explanations_due_on") @db.Date
 
   lines BudgetReviewLine[]
 
@@ -678,6 +680,16 @@ model BudgetReviewLine {
   forecastMinor      BigInt  @map("forecast_minor")
   paceBasisPoints    BigInt? @map("pace_basis_points")
   light              String
+  // RV-3 (QĐ-111ah, R-10, R-17): the explanation the head of the department gives of a yellow, red or under line of a quarter. `explanationStatus`: NOT_REQUIRED, PENDING (asked), EXPLAINED,
+  // UNEXPLAINED or NO_HEAD (what a PENDING line becomes when Finance signs, with or without a head to ask). The figures above never change; these move only while the period waits for them (a trigger).
+  explanationStatus           String    @default("NOT_REQUIRED") @map("explanation_status")
+  explanationCause            String?   @map("explanation_cause")
+  explanationPersistence      String?   @map("explanation_persistence")
+  explanationAction           String?   @map("explanation_action")
+  explanationNeedsAmountMinor BigInt?   @map("explanation_needs_amount_minor")
+  explanationNeedsNote        String?   @map("explanation_needs_note")
+  explainedByEmployeeId       String?   @map("explained_by_employee_id") @db.Uuid
+  explainedAt                 DateTime? @map("explained_at") @db.Timestamptz(3)
 
   period BudgetReviewPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
 

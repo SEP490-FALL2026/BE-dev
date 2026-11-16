@@ -121,6 +121,11 @@ export class BudgetFactsService {
     return this.organizationReads.businessToday(now, tx);
   }
 
+  /** The days the organization does not work from `from` up to but not including `to`: what the days of a deadline are counted without. */
+  nonWorkingDates(from: BusinessDate, to: BusinessDate): Promise<Set<BusinessDate>> {
+    return this.parameters.getNonWorkingDates(from, to);
+  }
+
   async organizationId(tx?: DbTx): Promise<string> {
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('The installation has no organization.');

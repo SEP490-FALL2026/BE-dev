@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
+import { initialExplanationStatus, type ExplanationStatus } from './budget-review-explanation.policy';
 import type { ReviewKind, ReviewLight, ReviewState } from './budget-review.types';
 
 /** What the picture of a period keeps of the company and of the month. */
@@ -17,6 +19,8 @@ export interface NewReviewPeriod {
   sharedPoolUnallocatedMinor: bigint;
   sharedPoolReserveMinor: bigint | null;
   annualCeilingMinor: bigint | null;
+  /** The last day the heads are asked to explain a quarter by (the fifth working day from the close); null for a month. */
+  explanationsDueOn?: BusinessDate | null | undefined;
 }
 
 /** What the picture of a period keeps of one Cost Center. */
@@ -41,6 +45,7 @@ export interface NewReviewLine {
 }
 
 export interface ReviewPeriodRecord extends NewReviewPeriod {
+  explanationsDueOn: BusinessDate | null;
   id: string;
   state: ReviewState;
   signedByEmployeeId: string | null;
@@ -48,9 +53,22 @@ export interface ReviewPeriodRecord extends NewReviewPeriod {
   note: string | null;
 }
 
+/** What the head of a department gave as the explanation of a line (`RV-3`, `QĐ-111ah`). */
+export interface LineExplanation {
+  cause: string;
+  persistence: 'ONE_OFF' | 'ONGOING';
+  action: string;
+  needsAmountMinor: bigint | null;
+  needsNote: string;
+  explainedByEmployeeId: string;
+  explainedAt: Date;
+}
+
 export interface ReviewLineRecord extends NewReviewLine {
   id: string;
   periodId: string;
+  explanationStatus: ExplanationStatus;
+  explanation: LineExplanation | null;
 }
 
 export type ReviewLightCounts = Record<ReviewLight, number>;
@@ -72,6 +90,7 @@ const toPeriod = (row: Prisma.BudgetReviewPeriodGetPayload<object>): ReviewPerio
   sharedPoolUnallocatedMinor: row.sharedPoolUnallocatedMinor,
   sharedPoolReserveMinor: row.sharedPoolReserveMinor,
   annualCeilingMinor: row.annualCeilingMinor,
+  explanationsDueOn: row.explanationsDueOn === null ? null : fromDateColumn(row.explanationsDueOn),
 });
 
 interface LineRow {
@@ -92,6 +111,14 @@ interface LineRow {
   forecast_minor: bigint;
   pace_basis_points: bigint | null;
   light: string;
+  explanation_status: string;
+  explanation_cause: string | null;
+  explanation_persistence: string | null;
+  explanation_action: string | null;
+  explanation_needs_amount_minor: bigint | null;
+  explanation_needs_note: string | null;
+  explained_by_employee_id: string | null;
+  explained_at: Date | null;
 }
 
 const toLine = (row: LineRow): ReviewLineRecord => ({
@@ -112,6 +139,19 @@ const toLine = (row: LineRow): ReviewLineRecord => ({
   forecastMinor: row.forecast_minor,
   paceBasisPoints: row.pace_basis_points,
   light: row.light as ReviewLight,
+  explanationStatus: row.explanation_status as ExplanationStatus,
+  explanation:
+    row.explanation_status === 'EXPLAINED' && row.explanation_cause !== null && row.explained_at !== null
+      ? {
+          cause: row.explanation_cause,
+          persistence: row.explanation_persistence as 'ONE_OFF' | 'ONGOING',
+          action: row.explanation_action ?? '',
+          needsAmountMinor: row.explanation_needs_amount_minor,
+          needsNote: row.explanation_needs_note ?? '',
+          explainedByEmployeeId: row.explained_by_employee_id ?? '',
+          explainedAt: row.explained_at,
+        }
+      : null,
 });
 
 /**
@@ -124,13 +164,21 @@ export class BudgetReviewRepo {
 
   /** Writes the period and its lines. The unique key of the month refuses a second one: the caller reads that as "closed already". */
   async insert(tx: DbTx, period: NewReviewPeriod, lines: readonly NewReviewLine[]): Promise<ReviewPeriodRecord> {
-    const created = await tx.budgetReviewPeriod.create({ data: { ...period, state: 'SNAPSHOT' } });
+    // A quarter opens waiting for the explanations of its yellow, red and under Cost Centers (`RV-3`); a month is closed on its figures.
+    const created = await tx.budgetReviewPeriod.create({
+      data: {
+        ...period,
+        explanationsDueOn: period.explanationsDueOn ? toDateColumn(period.explanationsDueOn) : null,
+        state: period.kind === 'QUARTER' ? 'AWAITING_EXPLANATIONS' : 'SNAPSHOT',
+      },
+    });
     if (lines.length > 0) {
       await tx.budgetReviewLine.createMany({
         data: lines.map(({ invoiceBasisMinor, ...line }) => ({
           ...line,
           invoiceNetMinor: invoiceBasisMinor,
           periodId: created.id,
+          explanationStatus: initialExplanationStatus(period.kind, line.light),
         })),
       });
     }
@@ -250,6 +298,95 @@ export class BudgetReviewRepo {
     });
 
     return rows.map((row) => row.costCenterId);
+  }
+
+  /** The period read with a lock that the signature queues behind (`FOR SHARE`): what an explanation reads before it writes, so a period signed in between is read as signed. */
+  async findSharedLocked(tx: DbTx, id: string): Promise<ReviewPeriodRecord | null> {
+    await tx.$queryRaw`SELECT id FROM budget_review_periods WHERE id = ${id}::uuid FOR SHARE`;
+
+    return this.findById(id, tx);
+  }
+
+  /** The period read with a lock that nothing else takes at the same time (`FOR UPDATE`): what the signature reads before it marks the lines still waiting. */
+  async findExclusiveLocked(tx: DbTx, id: string): Promise<ReviewPeriodRecord | null> {
+    await tx.$queryRaw`SELECT id FROM budget_review_periods WHERE id = ${id}::uuid FOR UPDATE`;
+
+    return this.findById(id, tx);
+  }
+
+  async findLine(tx: DbTx, periodId: string, costCenterId: string): Promise<ReviewLineRecord | null> {
+    const rows = await tx.$queryRaw<LineRow[]>`
+      SELECT * FROM budget_review_lines WHERE period_id = ${periodId}::uuid AND cost_center_id = ${costCenterId}::uuid`;
+
+    return rows.length === 0 ? null : toLine(rows[0]);
+  }
+
+  /** Writes the explanation of a line that was asked, once or again while the period waits (a trigger refuses it otherwise). */
+  async explain(
+    tx: DbTx,
+    lineId: string,
+    explanation: Omit<LineExplanation, 'explainedAt'> & { at: Date },
+  ): Promise<void> {
+    await tx.budgetReviewLine.update({
+      where: { id: lineId },
+      data: {
+        explanationStatus: 'EXPLAINED',
+        explanationCause: explanation.cause,
+        explanationPersistence: explanation.persistence,
+        explanationAction: explanation.action,
+        explanationNeedsAmountMinor: explanation.needsAmountMinor,
+        explanationNeedsNote: explanation.needsNote,
+        explainedByEmployeeId: explanation.explainedByEmployeeId,
+        explainedAt: explanation.at,
+      },
+    });
+  }
+
+  /** The Cost Centers of the period that were asked and have not answered, in order of id. */
+  async pendingCostCenterIds(tx: DbTx, periodId: string): Promise<string[]> {
+    const rows = await tx.budgetReviewLine.findMany({
+      where: { periodId, explanationStatus: 'PENDING' },
+      select: { costCenterId: true },
+      orderBy: { costCenterId: 'asc' },
+    });
+
+    return rows.map((row) => row.costCenterId);
+  }
+
+  /** What the lines still waiting become when Finance signs: `UNEXPLAINED` for the Cost Centers whose department has a head, `NO_HEAD` for the others (R-10, R-17). */
+  async closePending(tx: DbTx, periodId: string, noHead: readonly string[]): Promise<void> {
+    await tx.budgetReviewLine.updateMany({
+      where: { periodId, explanationStatus: 'PENDING', costCenterId: { notIn: [...noHead] } },
+      data: { explanationStatus: 'UNEXPLAINED' },
+    });
+    await tx.budgetReviewLine.updateMany({
+      where: { periodId, explanationStatus: 'PENDING', costCenterId: { in: [...noHead] } },
+      data: { explanationStatus: 'NO_HEAD' },
+    });
+  }
+
+  /** The quarters that wait for explanations and are due on or before `today`, with the Cost Centers that were asked and have not answered: what the reminder reads. */
+  async awaitingUntil(
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Array<{ period: ReviewPeriodRecord; pendingCostCenterIds: string[] }>> {
+    const db = tx ?? this.prisma;
+    const periods = await db.budgetReviewPeriod.findMany({
+      where: { state: 'AWAITING_EXPLANATIONS', explanationsDueOn: { lte: toDateColumn(today) } },
+      orderBy: [{ year: 'asc' }, { month: 'asc' }],
+    });
+    const found: Array<{ period: ReviewPeriodRecord; pendingCostCenterIds: string[] }> = [];
+    for (const period of periods) {
+      const lines = await db.budgetReviewLine.findMany({
+        where: { periodId: period.id, explanationStatus: 'PENDING' },
+        select: { costCenterId: true },
+        orderBy: { costCenterId: 'asc' },
+      });
+      if (lines.length > 0)
+        found.push({ period: toPeriod(period), pendingCostCenterIds: lines.map((line) => line.costCenterId) });
+    }
+
+    return found;
   }
 
   /**

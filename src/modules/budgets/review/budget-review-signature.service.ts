@@ -5,9 +5,10 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { BudgetReviewQueryService } from './budget-review-query.service';
+import { statusWhenSigned } from './budget-review-explanation.policy';
 import type { ReviewPeriodWire } from './budget-review.dto';
 import { BudgetReviewNotFoundError, BudgetReviewSignedError } from './budget-review.errors';
-import { BudgetReviewRepo } from './budget-review.repo';
+import { BudgetReviewRepo, type ReviewPeriodRecord } from './budget-review.repo';
 
 /**
  * Finance signs a month that was closed (`RV-1`, `QĐ-111ae`): only Finance signs, never the spending approver, and the signature closes the period for good.
@@ -35,8 +36,9 @@ export class BudgetReviewSignatureService {
   ): Promise<ReviewPeriodWire> {
     this.facts.requireFinance(actor);
     const signed = await this.runner.run(async (tx) => {
-      const period = await this.repo.findById(id, tx);
+      const period = await this.repo.findExclusiveLocked(tx, id);
       if (!period) throw new BudgetReviewNotFoundError();
+      await this.closeUnanswered(tx, period, now);
       if (!(await this.repo.sign(tx, id, { employeeId: actor.employeeId, at: now, note: body.note ?? null }))) {
         throw new BudgetReviewSignedError();
       }
@@ -58,6 +60,25 @@ export class BudgetReviewSignatureService {
     });
 
     return this.query.wireOf(actor, signed);
+  }
+
+  /**
+   * Finance may sign a quarter whenever it wants (`R-10`): a Cost Center that was asked and has not answered is written down as UNEXPLAINED, or as NO_HEAD when its department
+   * has no head to ask (`R-17`), in the transaction of the signature, while the period still waits for explanations.
+   */
+  private async closeUnanswered(tx: DbTx, period: ReviewPeriodRecord, now: Date): Promise<void> {
+    if (period.state !== 'AWAITING_EXPLANATIONS') return;
+    const pending = await this.repo.pendingCostCenterIds(tx, period.id);
+    if (pending.length === 0) return;
+    const today = await this.facts.today(now, tx);
+    const departments = await this.facts.departmentsOf(pending, tx);
+    const noHead: string[] = [];
+    for (const costCenterId of pending) {
+      const departmentId = departments.get(costCenterId);
+      const head = departmentId === undefined ? null : await this.facts.currentHeadOf(departmentId, today, tx);
+      if (statusWhenSigned(head !== null) === 'NO_HEAD') noHead.push(costCenterId);
+    }
+    await this.repo.closePending(tx, period.id, noHead);
   }
 
   /** The summary of the month for the spending approver: the period and how many Cost Centers have each light. Nobody is told when nobody holds the role. */

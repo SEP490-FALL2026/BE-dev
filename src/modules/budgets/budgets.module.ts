@@ -95,6 +95,9 @@ import { BudgetAdjustmentRepo } from './adjustment/budget-adjustment.repo';
 import { BudgetReviewRepo } from './review/budget-review.repo';
 import { BudgetReviewController } from './review/budget-review.controller';
 import { BudgetReviewFiguresService } from './review/budget-review-figures.service';
+import { BudgetReviewExplanationController } from './review/budget-review-explanation.controller';
+import { BudgetReviewExplanationReminderService } from './review/budget-review-explanation-reminder.service';
+import { BudgetReviewExplanationService } from './review/budget-review-explanation.service';
 import { BudgetReviewPoolWatchService } from './review/budget-review-pool-watch.service';
 import { BudgetReviewPriceService } from './review/budget-review-price.service';
 import { BudgetReviewQueryService } from './review/budget-review-query.service';
@@ -149,6 +152,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BudgetAttachmentReadsController,
     SeatMonthChargesController,
     BudgetReviewController,
+    BudgetReviewExplanationController,
     BudgetAdjustmentController,
   ],
   providers: [
@@ -216,6 +220,8 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BudgetReviewPriceService,
     BudgetReviewFiguresService,
     BudgetReviewPoolWatchService,
+    BudgetReviewExplanationService,
+    BudgetReviewExplanationReminderService,
     BudgetReviewQueryService,
     BudgetReviewSnapshotService,
     BudgetReviewSignatureService,

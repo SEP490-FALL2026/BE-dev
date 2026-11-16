@@ -51,3 +51,27 @@ export class BudgetReviewSeatMonthsError extends Error {
     this.name = 'BudgetReviewSeatMonthsError';
   }
 }
+
+/** The period no longer waits for explanations: a month has none to give, and a quarter that was signed is closed for good (`RV-3`). */
+export class BudgetReviewNotAwaitingError extends Error {
+  constructor(readonly state: string) {
+    super(`The review period is ${state}, not waiting for explanations.`);
+    this.name = 'BudgetReviewNotAwaitingError';
+  }
+}
+
+/** The period has no line for the Cost Center. */
+export class BudgetReviewLineNotFoundError extends Error {
+  constructor() {
+    super('The review period has no line for this Cost Center.');
+    this.name = 'BudgetReviewLineNotFoundError';
+  }
+}
+
+/** The line was not asked for an explanation: it is green, or the quarter was signed before the head answered (`QĐ-111ah`). */
+export class BudgetReviewNotAskedError extends Error {
+  constructor(readonly status: string) {
+    super(`The line is ${status}: it is not asked for an explanation.`);
+    this.name = 'BudgetReviewNotAskedError';
+  }
+}

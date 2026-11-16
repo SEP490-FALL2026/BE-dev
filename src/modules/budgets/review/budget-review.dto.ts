@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { explanationStatusSchema, explanationViewSchema } from './budget-review-explanation.dto';
 
 const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
 const light = z.enum(['GREEN', 'YELLOW', 'RED', 'UNDER']).meta({
@@ -60,6 +62,10 @@ const periodSchema = z.strictObject({
   currency: z.string(),
   closedBy: person.nullable(),
   closedAt: z.iso.datetime(),
+  explanationsDueOn: responseBusinessDate.nullable().meta({
+    description:
+      'For a quarter, the last day the heads of departments are asked to explain by (the fifth working day from the close); null for a month. Past it an explanation is still taken: the heads are reminded on that day and every Monday until they explain or Finance signs.',
+  }),
   signedBy: person.nullable(),
   signedAt: z.iso.datetime().nullable(),
   note: z.string().nullable(),
@@ -128,6 +134,10 @@ const lineSchema = z.strictObject({
       'The spent through the end of the month over the base of the months gone, in hundredths of a percent (11.200 is 112 %), rounded up; null when the Cost Center has no base.',
   }),
   light,
+  explanationStatus: explanationStatusSchema,
+  explanation: explanationViewSchema.nullable().meta({
+    description: 'What the head of the department explained of the line; null until they do.',
+  }),
 });
 
 const pagination = z.strictObject({

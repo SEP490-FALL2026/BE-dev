@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { addDays, type BusinessDate } from '../../../core/business-date';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { SeatMonthService } from '../seat-month/seat-month.service';
+import { explanationDueOn } from './budget-review-explanation.policy';
 import { BudgetReviewFiguresService } from './budget-review-figures.service';
 import { BudgetReviewPoolWatchService, type SharedPoolFigures } from './budget-review-pool-watch.service';
 import { BudgetReviewQueryService } from './budget-review-query.service';
@@ -26,6 +28,8 @@ interface CloseInput {
   currency: string;
   pool: SharedPoolFigures;
   companyMinor: bigint;
+  /** The day the heads are asked to explain a quarter by; null for a month. */
+  explanationsDueOn: BusinessDate | null;
   now: Date;
 }
 
@@ -69,7 +73,19 @@ export class BudgetReviewSnapshotService {
       this.poolWatch.figuresOf(organizationId, body.year, body.month),
       this.figures.companySpentMinor(body.year),
     ]);
-    const created = await this.write(actor, { organizationId, ...body, currency, pool, companyMinor, now });
+    const explanationsDueOn =
+      reviewKindOf(body.month) === 'QUARTER'
+        ? explanationDueOn(today, await this.facts.nonWorkingDates(today, addDays(today, 30)))
+        : null;
+    const created = await this.write(actor, {
+      organizationId,
+      ...body,
+      currency,
+      pool,
+      companyMinor,
+      explanationsDueOn,
+      now,
+    });
 
     return this.query.wireOf(actor, created);
   }
@@ -125,6 +141,7 @@ export class BudgetReviewSnapshotService {
         sharedPoolUnallocatedMinor: input.pool.unallocatedMinor,
         sharedPoolReserveMinor: input.pool.reserveMinor,
         annualCeilingMinor: input.pool.annualCeilingMinor,
+        explanationsDueOn: input.explanationsDueOn,
       },
       lines,
     );

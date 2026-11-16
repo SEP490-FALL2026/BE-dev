@@ -5,6 +5,7 @@ import { describeForOperator, traceForOperator } from '../../../infrastructure/o
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { BudgetFactsService } from '../budget/budget-facts.service';
+import { BudgetReviewExplanationReminderService } from './budget-review-explanation-reminder.service';
 import { BudgetReviewPoolWatchService } from './budget-review-pool-watch.service';
 import { reviewReminderFor } from './budget-review.policy';
 import { BudgetReviewRepo } from './budget-review.repo';
@@ -26,6 +27,7 @@ export class BudgetReviewReminderService {
     private readonly parameters: OperatingParametersApi,
     private readonly notifications: NotificationsApi,
     private readonly poolWatch: BudgetReviewPoolWatchService,
+    private readonly explanations: BudgetReviewExplanationReminderService,
   ) {}
 
   /** One pass for the day `now` is in the calendar of the organization; the number of notices written. `now` is a parameter for tests. */
@@ -36,6 +38,7 @@ export class BudgetReviewReminderService {
     let notices = 0;
     if (due !== null) notices += await this.askToClose(due);
     notices += await this.warnAboutPool(today);
+    notices += await this.explanations.remind(today);
 
     return { notices };
   }

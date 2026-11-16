@@ -5,6 +5,7 @@ import { monthBoundsOf } from '../../../core/business-date';
 import { BudgetFactsService, type MoneyView } from '../budget/budget-facts.service';
 import { heldKey } from '../budget/commitment.repo';
 import { InvoiceRepo } from '../budget/invoice.repo';
+import { explanationViewOf } from './budget-review-explanation.mapper';
 import { BudgetReviewNotFoundError } from './budget-review.errors';
 import type { ReviewLineWire, ReviewPeriodWire } from './budget-review.dto';
 import {
@@ -110,6 +111,7 @@ export class BudgetReviewQueryService {
         currency: period.currency,
         closedBy: people.get(period.snapshotByEmployeeId) ?? null,
         closedAt: period.snapshotAt.toISOString(),
+        explanationsDueOn: period.explanationsDueOn,
         signedBy: period.signedByEmployeeId ? (people.get(period.signedByEmployeeId) ?? null) : null,
         signedAt: period.signedAt?.toISOString() ?? null,
         note: period.note,
@@ -140,6 +142,9 @@ export class BudgetReviewQueryService {
       this.facts.formatter(period.currency),
     ]);
     const now = await this.spentNow(period, rows);
+    const people = await this.facts.people(
+      rows.flatMap((row) => (row.explanation ? [row.explanation.explainedByEmployeeId] : [])),
+    );
 
     return rows.map((row) => ({
       id: row.id,
@@ -157,6 +162,8 @@ export class BudgetReviewQueryService {
       forecast: money(row.forecastMinor),
       paceBasisPoints: row.paceBasisPoints === null ? null : Number(row.paceBasisPoints),
       light: row.light,
+      explanationStatus: row.explanationStatus,
+      explanation: explanationViewOf(row.explanation, money, people),
     }));
   }
 

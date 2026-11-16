@@ -4,8 +4,11 @@ import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examp
 import { toBudgetApiException } from '../budget/budget.http-errors';
 import {
   BudgetReviewExistsError,
+  BudgetReviewLineNotFoundError,
   BudgetReviewMonthNotEndedError,
   BudgetReviewNoBudgetError,
+  BudgetReviewNotAskedError,
+  BudgetReviewNotAwaitingError,
   BudgetReviewNotFoundError,
   BudgetReviewSeatMonthsError,
   BudgetReviewSignedError,
@@ -43,6 +46,19 @@ export function toBudgetReviewApiException(error: unknown): unknown {
   if (error instanceof BudgetReviewSignedError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET_REVIEW.ALREADY_SIGNED', error.message);
   }
+  if (error instanceof BudgetReviewNotAwaitingError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET_REVIEW.NOT_AWAITING_EXPLANATIONS', error.message, {
+      state: error.state,
+    });
+  }
+  if (error instanceof BudgetReviewLineNotFoundError) {
+    return refuse(HttpStatus.NOT_FOUND, 'BUDGET_REVIEW.LINE_NOT_FOUND', error.message);
+  }
+  if (error instanceof BudgetReviewNotAskedError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED', error.message, {
+      explanationStatus: error.status,
+    });
+  }
   if (error instanceof BudgetReviewSeatMonthsError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET_REVIEW.SEAT_MONTHS_NOT_READY', error.message);
   }
@@ -60,4 +76,7 @@ export const BUDGET_REVIEW_ERROR_EXAMPLES = {
   PERIOD_EXISTS: example(new BudgetReviewExistsError(2026, 10)),
   ALREADY_SIGNED: example(new BudgetReviewSignedError()),
   SEAT_MONTHS_NOT_READY: example(new BudgetReviewSeatMonthsError()),
+  NOT_AWAITING_EXPLANATIONS: example(new BudgetReviewNotAwaitingError('SIGNED')),
+  LINE_NOT_FOUND: example(new BudgetReviewLineNotFoundError()),
+  EXPLANATION_NOT_REQUIRED: example(new BudgetReviewNotAskedError('NOT_REQUIRED')),
 } as const;

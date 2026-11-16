@@ -276,8 +276,8 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       // 395 with PI-1.4 (the five routes of purchase invoices); 397 with PI-1.6 (Finance signs or returns one); 396 with PI-1.7 (Finance no longer records an invoice by hand); 397 with PI-2 (the periods that have no invoice); 400 with RC-1 (the cases of invoices that differ: list, read, close); 404 with RC-2 (the differences of the accounts at the vendors: list, decide; the cases outside the process: list, close).
       // 414 once lane B (FIX-LB1…LB4) and lane A (RC-1, RC-2: discrepancies of invoices and of vendor accounts, out-of-process cases) are merged again.
       // 418 with RV-1.3 (close a month, list the months closed, read one); 419 with RV-1.4 (sign one).
-      // 422 with AD-1.2 (ask for an adjustment, list them, decide one).
-      expect(operations).toHaveLength(422);
+      // 422 with AD-1.2 (ask for an adjustment, list them, decide one); 423 with RV-3.1 (a head explains a Cost Center of a quarter).
+      expect(operations).toHaveLength(423);
       expect(missing).toEqual([]);
     });
 

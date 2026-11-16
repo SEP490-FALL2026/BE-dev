@@ -116,6 +116,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   budgetReviewPeriodGet: 'BUDGET_REVIEW.RETRIEVED',
   budgetReviewPeriodList: 'BUDGET_REVIEW.LISTED',
   budgetReviewPeriodSign: 'BUDGET_REVIEW.SIGNED',
+  budgetReviewLineExplain: 'BUDGET_REVIEW.LINE_EXPLAINED',
   budgetAdjustmentCreate: 'BUDGET_ADJUSTMENT.CREATED',
   budgetAdjustmentDecide: 'BUDGET_ADJUSTMENT.DECIDED',
   budgetAdjustmentList: 'BUDGET_ADJUSTMENT.LISTED',
@@ -373,7 +374,6 @@ export const BODYLESS_RESPONSES: Readonly<Record<string, string>> = {
   'importTemplateGet 200': 'A file (xlsx or csv) sent as raw bytes with its own content type (@RawResponse).',
 };
 export const NO_EXAMPLE_RESPONSES: Readonly<Record<string, string>> = {};
-
 /**
  * The route-specific codes, in one file per owning module to keep each support file small (TEST-HARDEN.1); a module whose
  * routes do not fit one file has a second named by its area. An operationId listed twice is a mistake the inventory test reports.

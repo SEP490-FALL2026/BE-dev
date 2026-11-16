@@ -12,6 +12,7 @@ export const API_COVERAGE_REVIEW: readonly string[] = [
   'GET /api/v1/budget-review-periods',
   'GET /api/v1/budget-review-periods/{id}',
   'POST /api/v1/budget-review-periods/{id}/signature',
+  'PUT /api/v1/budget-review-periods/{id}/lines/{costCenterId}/explanation',
   'POST /api/v1/budget-adjustments',
   'GET /api/v1/budget-adjustments',
   'POST /api/v1/budget-adjustments/{id}/decision',

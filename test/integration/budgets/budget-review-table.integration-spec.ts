@@ -69,7 +69,7 @@ describe('the tables of the review periods keep a picture that is never changed 
     const lines = [line(), line({ light: 'GREEN', forecastMinor: 100n, paceBasisPoints: null })];
     const created = await write(header, lines);
 
-    expect(created).toMatchObject({ state: 'SNAPSHOT', kind: 'QUARTER', year: header.year, month: 6 });
+    expect(created).toMatchObject({ state: 'AWAITING_EXPLANATIONS', kind: 'QUARTER', year: header.year, month: 6 });
     const read = await repo.findByMonth(organizationId, header.year, 6);
     expect(read?.companySpentMinor).toBe(900_000_000n);
     const { rows, total } = await repo.linesPage({ periodId: created.id, skip: 0, take: 10 });

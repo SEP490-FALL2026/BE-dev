@@ -122,7 +122,7 @@ describe('Finance closes a month and the picture of each Cost Center is kept (in
   it('T-RV1: base 300 tr, reserve 30 tr, spent 168 tr (160 + 8 tax), held 135 tr, June ⟹ k = 0,05, forecast 309,75 tr, pace 112 %, Vàng, 27 tr left', async () => {
     const line = lineOf(await detail(closed.id), a);
 
-    expect(closed).toMatchObject({ year: h.year, month: 6, kind: 'QUARTER', state: 'SNAPSHOT' });
+    expect(closed).toMatchObject({ year: h.year, month: 6, kind: 'QUARTER', state: 'AWAITING_EXPLANATIONS' });
     expect(line).toMatchObject({
       base: { amount: String(300 * M) },
       spent: { amount: String(168 * M) },
