@@ -35,7 +35,7 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
   `GHOST_SEAT.RULE_RUN_REQUESTED`), `ghostSeatKpi5Get`
   (SUPER_ADMIN). Quyền: IT_ADMIN cho bảng/chi tiết/tóm tắt/thu hồi; IT_ADMIN và SUPER_ADMIN cho lượt chạy; SUPER_ADMIN cho `KPI-5`.
 
-- `decision/` (L3, không import `board`; dùng `ghost-seat` L0) — hàng đợi trưởng phòng cho `G3`/`G4` (`qd103-ghost-seat-manager-decision`):
+- `decision/` (L3, không import `board`; dùng `ghost-seat` L0) — `POST /ghost-seat-decisions` nhận `checklist` của bước `5.4` (`QĐ-111ap`): MỘT bộ cho cả lô, chấm sau khi kiểm quyền và trạng thái từng thẻ, _Không_ khóa `KEEP` và `EXEMPT` (chỉ `RECLAIM`, không có trả về), câu trả lời ghi cho từng thẻ của lô; hàng đợi trưởng phòng cho `G3`/`G4` (`qd103-ghost-seat-manager-decision`):
   `decision-routing.service.ts` (định tuyến `OPEN` REVIEW/ACTION tới trưởng phòng có hiệu lực của phòng người giữ, chờ trưởng phòng, mất/có trưởng phòng),
   `decision-transfer.service.ts` (tạm dừng/tiếp tục khi điều chuyển), `decision-reminder.service.ts` (quá hạn, miễn trừ sắp hết),
   `decision-follow-up.service.ts` + `decision-follow-up.job.ts` (`DecisionFollowUpSweeper`, mỗi giờ), `decision.service.ts` (Giữ / Thu hồi / Miễn trừ,
@@ -46,7 +46,7 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
   `ghostSeatRecommendationReclaim` mở lại `G3`/`G4` `RECLAIM_DECIDED` sau đóng thất bại (Q-95). SQL quyết định/trả lại/miễn trừ ở
   `ghost-seat/ghost-seat-decision.repo.ts` (L0, dùng chung `board` và `decision`).
 
-- `escalation/` (L3, import `decision` để định tuyến và `ghost-seat` L0; không ai import) — `QĐ-111ay`: IT đẩy sớm khuyến nghị `G3`/`G4` tầng _Theo dõi_ (`MONITOR`, còn `OPEN`) sang
+- `escalation/` (L3, import `decision` để định tuyến và `ghost-seat` L0; không ai import) — `POST /ghost-seat-recommendations/escalations` nhận `checklist` của bước `5.3` (`QĐ-111ap`): chấm TRƯỚC khi lấy khóa của lô, _Không_ ⟹ 422 cho cả lô và thẻ giữ _Theo dõi_, câu trả lời ghi cho từng thẻ được đẩy. `QĐ-111ay`: IT đẩy sớm khuyến nghị `G3`/`G4` tầng _Theo dõi_ (`MONITOR`, còn `OPEN`) sang
   _Cần xem xét_ trước lượt tuần: `escalation.policy.ts` (ai đủ điều kiện: không phải tài khoản máy `QĐ-110m`, không ở ân hạn điều chuyển `QĐ-110p`, seat còn giữ ghế, người giữ có phòng),
   `escalation.service.ts` (một lô một transaction: lấy khóa `Idempotency-Key` trước, khóa khuyến nghị theo `id` tăng dần, nâng tầng `GhostSeatService.raiseTierEarly` — chỉ đổi `tier`, bằng chứng giữ nguyên —
   rồi `DecisionRoutingService.enterQueue` vào hàng của trưởng phòng hoặc chờ), `escalation.repo.ts` + `escalation-results.json.ts` (bảng khóa/kết quả để cùng khóa trả lại đúng kết quả cũ, khác danh sách ⟹ 409).

@@ -9,7 +9,7 @@ thấp hơn). Được dùng bởi: `src/app/app.module.ts`; module trên gọi 
 
 ## Trạng thái
 
-Gói PL-1 (thư viện, xác nhận đã đọc, 8 chính sách khởi tạo) và PL-3 (file mẫu import) đã nối. PL-2 (checklist khi quyết định) đang làm dần: nền (`PolicyChecklistApi`, bảng `decision_checklists`) đã có (PL-2.1); từng bước quyết định gọi nó ở các task PL-2.2…PL-2.6 của module chủ bước.
+Gói PL-1 (thư viện, xác nhận đã đọc, 8 chính sách khởi tạo) và PL-3 (file mẫu import) đã nối. PL-2 (checklist khi quyết định) đã nối đủ bảy bước: nền (`PolicyChecklistApi`, bảng `decision_checklists`) ở PL-2.1; nhu cầu `1.2`, dùng dự phòng `1.6` và duyệt chi `1.7` (`requests`), đánh giá case B `1.3` (`requests/assessment-decision`), phiên bản ngân sách `4.7` (`budgets/version`), quyết định ghost seat `5.4` và đẩy sớm `5.3` (`optimization`) gọi `judge` rồi `record` trong giao dịch của quyết định; mỗi module ghi bước của mình ở README của nó.
 
 ## Public API (`public/`)
 
