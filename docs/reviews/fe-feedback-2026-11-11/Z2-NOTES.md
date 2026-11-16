@@ -8,7 +8,10 @@ Nhánh `feat/z2-seed` (tách `feat/fe-feedback` @ `1f7ffa19`). Prompt: `Code/ver
   `SV-INV-002` = 9 ghế (thêm ghế Slack của NV-ITA3 làm kho Slack 9 ⟹ hóa đơn 8 ghế mở thêm một ca lệch, không chủ đích). `seed:local` từ DB
   trống: exit 0 (`ĐÃ CÓ 1 · ĐÃ GHI 64`); API: R33 `PENDING`, NV-ITA3 `isMachineAccount=true`, `vendor-account-discrepancies`
   `NO_ASSIGNMENT:2, UNMATCHED_IDENTITY:1`, `out-of-process-cases` `CLOSED/RECORD_SPENT`. DEMO-7 "xin lại và cấp lại" không dựng được ở D0 (lý
-  do và demo thay thế ở bảng DEMO).
+  do và demo thay thế ở bảng DEMO). Kiểm cuối trên `40ad87dc`: `installation/seed*` 4/4 suite (16 test) xanh; trên `ebfe0076`:
+  `test:flows` 11/12 suite (64 pass, 9 skip có sẵn), `test:integration:serial` 12/13 (đỏ duy nhất: suite hóa đơn chạy bằng runtime role,
+  nợ test chat 83 đã sửa trên `feat/fe-feedback`), `typecheck`/`lint`/`test:gates`/`rules:check` exit 0; `seed:local` từ DB trống chạy trên
+  `ebfe0076` (bản sửa `SV-INV-002` chỉ đổi số lượng).
 - 16/11 (3) **Z2 dừng ở đây, chờ review.** Commit `8cc72054`…`7be1d5e0` trên `feat/z2-seed` (không push). Kiểm cuối trên code cuối:
   `test/integration/installation/seed*` 4/4 suite (16 test) xanh; `test:integration:serial` 12/13 suite xanh, `seed-check-runtime` xanh, đỏ
   một suite ngoài Z2 (`database-runtime-role-purchase-invoice`: hóa đơn không ghi/không trừ cam kết — file không đụng ở Z2, thuộc nợ test
