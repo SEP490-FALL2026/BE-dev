@@ -63184,6 +63184,13 @@
             "in": "query",
             "schema": { "format": "uuid", "type": "string" }
           },
+          {
+            "name": "longTerm",
+            "required": false,
+            "in": "query",
+            "description": "true lists the long-term commitments of the quarterly review: the ones still held that were made before the running quarter began. The term of the request is never shortened by it.",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
           { "name": "requestId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
           {
             "name": "state",
@@ -63257,7 +63264,7 @@
             }
           },
           "403": {
-            "description": "Only Finance reads the commitments.",
+            "description": "Only Finance, and the head of a department for the Cost Centers they head, read the commitments.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -63429,7 +63436,7 @@
             }
           },
           "403": {
-            "description": "Only Finance reads the commitments.",
+            "description": "Only Finance, and the head of a department for the Cost Centers they head, read the commitments.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
