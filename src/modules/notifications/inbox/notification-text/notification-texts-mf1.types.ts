@@ -185,11 +185,11 @@ export const MF1_TEXTS = {
   STEP_ASSIGNED: {
     vi: {
       title: 'Bạn có việc cần xử lý',
-      message: 'Bạn được giao bước {stepKind:enum} của yêu cầu {requestId:name} ({cause:enum}).',
+      message: 'Bạn được giao bước[ {stepKind:enum}] của yêu cầu {requestId:name} ({cause:enum}).',
     },
     en: {
       title: 'You have a task to handle',
-      message: 'You have been assigned the {stepKind:enum} step of request {requestId:name} ({cause:enum}).',
+      message: 'You have been assigned the[ {stepKind:enum}] step of request {requestId:name} ({cause:enum}).',
     },
   },
   STEP_CLOSED_BY_WITHDRAWAL: {
@@ -256,10 +256,10 @@ export const MF1_TEXTS = {
         by: 'source',
         cases: {
           HEAD_CONFIRMATION:
-            'Trưởng phòng đã xác nhận bạn không còn cần dùng {planId:name}. IT Admin sẽ thu hồi quyền này.',
-          EMPLOYEE_RETURN: 'Yêu cầu trả quyền {planId:name} của bạn đã được gửi; IT Admin sẽ thu hồi quyền này.',
+            'Trưởng phòng đã xác nhận bạn không còn cần dùng quyền[ {planId:name}]. IT Admin sẽ thu hồi quyền này.',
+          EMPLOYEE_RETURN: 'Yêu cầu trả quyền[ {planId:name}] của bạn đã được gửi; IT Admin sẽ thu hồi quyền này.',
         },
-        otherwise: 'IT Admin sẽ thu hồi quyền {planId:name} của bạn.',
+        otherwise: 'IT Admin sẽ thu hồi quyền[ {planId:name}] của bạn.',
       },
     },
     en: {
@@ -268,10 +268,10 @@ export const MF1_TEXTS = {
         by: 'source',
         cases: {
           HEAD_CONFIRMATION:
-            'Your head of department confirmed you no longer need {planId:name}. The IT Admin will revoke it.',
-          EMPLOYEE_RETURN: 'Your request to return {planId:name} was sent; the IT Admin will revoke it.',
+            'Your head of department confirmed you no longer need access[ to {planId:name}]. The IT Admin will revoke it.',
+          EMPLOYEE_RETURN: 'Your request to return access[ to {planId:name}] was sent; the IT Admin will revoke it.',
         },
-        otherwise: 'The IT Admin will revoke your access to {planId:name}.',
+        otherwise: 'The IT Admin will revoke your access[ to {planId:name}].',
       },
     },
   },
@@ -311,12 +311,12 @@ export const MF1_TEXTS = {
     vi: {
       title: 'Chưa gia hạn được quyền',
       message:
-        'Yêu cầu gia hạn {requestId:name} đã được duyệt nhưng chưa áp dụng được: {problem:enum}. Quyền giữ nguyên ngày hết hạn cũ.',
+        'Yêu cầu gia hạn {requestId:name} đã được duyệt nhưng chưa áp dụng được[: {problem:enum}]. Quyền giữ nguyên ngày hết hạn cũ.',
     },
     en: {
       title: 'Renewal could not be applied',
       message:
-        'Renewal request {requestId:name} was approved but could not be applied: {problem:enum}. The access keeps its old end date.',
+        'Renewal request {requestId:name} was approved but could not be applied[: {problem:enum}]. The access keeps its old end date.',
     },
   },
   REQUEST_FINANCE_REVIEW_OPENED: {
@@ -343,24 +343,24 @@ export const MF1_TEXTS = {
     vi: {
       title: 'Yêu cầu chờ ngân sách',
       message:
-        'Yêu cầu {requestId:name} đang chờ ngân sách năm {year} của {costCenterId:name} được lập hoặc điều chỉnh.',
+        'Yêu cầu {requestId:name} đang chờ ngân sách[ năm {year}][ của {costCenterId:name}] được lập hoặc điều chỉnh.',
     },
     en: {
       title: 'Request is waiting for budget',
       message:
-        'Request {requestId:name} is waiting for the {year} budget of {costCenterId:name} to be made or revised.',
+        'Request {requestId:name} is waiting for the[ {year}] budget[ of {costCenterId:name}] to be made or revised.',
     },
   },
   REQUEST_BUDGET_VERSION_ENDED: {
     vi: {
       title: 'Phiên bản ngân sách mà yêu cầu chờ đã kết thúc',
       message:
-        'Phiên bản ngân sách năm {year} của {costCenterId:name} mà yêu cầu {requestId:name} đang chờ đã kết thúc ({decision}).',
+        'Phiên bản ngân sách[ năm {year}][ của {costCenterId:name}] mà yêu cầu {requestId:name} đang chờ đã kết thúc[ ({decision})].',
     },
     en: {
       title: 'The budget version a request waited for has ended',
       message:
-        'The {year} budget version of {costCenterId:name} that request {requestId:name} was waiting for has ended ({decision}).',
+        'The[ {year}] budget version[ of {costCenterId:name}] that request {requestId:name} was waiting for has ended[ ({decision})].',
     },
   },
   REQUEST_RESERVE_CONFIRMATION_NEEDED: {
@@ -402,11 +402,11 @@ export const MF1_TEXTS = {
         by: 'reasonKind',
         cases: {
           DEPARTURE:
-            'Yêu cầu {requestId:name} cho {beneficiaryEmployeeId:name} đã được hệ thống đóng vì người này đã nghỉ việc. Khoản ngân sách đã giữ (nếu có) được trả về.',
+            'Yêu cầu {requestId:name}[ cho {beneficiaryEmployeeId:name}] đã được hệ thống đóng vì người này đã nghỉ việc. Khoản ngân sách đã giữ (nếu có) được trả về.',
           TRANSFER:
-            'Yêu cầu {requestId:name} cho {beneficiaryEmployeeId:name} đã được hệ thống đóng vì người này chuyển sang phòng khác. Nếu vẫn cần, vui lòng gửi yêu cầu mới ở phòng mới.',
+            'Yêu cầu {requestId:name}[ cho {beneficiaryEmployeeId:name}] đã được hệ thống đóng vì người này chuyển sang phòng khác. Nếu vẫn cần, vui lòng gửi yêu cầu mới ở phòng mới.',
         },
-        otherwise: 'Yêu cầu {requestId:name} cho {beneficiaryEmployeeId:name} đã được hệ thống đóng.',
+        otherwise: 'Yêu cầu {requestId:name}[ cho {beneficiaryEmployeeId:name}] đã được hệ thống đóng.',
       },
     },
     en: {
@@ -415,11 +415,11 @@ export const MF1_TEXTS = {
         by: 'reasonKind',
         cases: {
           DEPARTURE:
-            'Request {requestId:name} for {beneficiaryEmployeeId:name} was closed by the system because the person has left the company. Any budget held was released.',
+            'Request {requestId:name}[ for {beneficiaryEmployeeId:name}] was closed by the system because the person has left the company. Any budget held was released.',
           TRANSFER:
-            'Request {requestId:name} for {beneficiaryEmployeeId:name} was closed by the system because the person moved to another department. If it is still needed, please send a new request in the new department.',
+            'Request {requestId:name}[ for {beneficiaryEmployeeId:name}] was closed by the system because the person moved to another department. If it is still needed, please send a new request in the new department.',
         },
-        otherwise: 'Request {requestId:name} for {beneficiaryEmployeeId:name} was closed by the system.',
+        otherwise: 'Request {requestId:name}[ for {beneficiaryEmployeeId:name}] was closed by the system.',
       },
     },
   },

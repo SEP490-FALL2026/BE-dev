@@ -10,22 +10,23 @@ export const MF1_SLA_TEXTS = {
     vi: {
       title: 'Yêu cầu đang chờ người xử lý',
       message:
-        'Bước {stepKind:enum} của yêu cầu {requestId:name} hiện chưa có người xử lý nên đang chờ. Quản trị viên đã được báo; bạn không cần làm thêm gì.',
+        'Bước[ {stepKind:enum}] của yêu cầu {requestId:name} hiện chưa có người xử lý nên đang chờ. Quản trị viên đã được báo; bạn không cần làm thêm gì.',
     },
     en: {
       title: 'Request is waiting for an assignee',
       message:
-        'The {stepKind:enum} step of your request {requestId:name} has nobody to handle it right now and is waiting. An administrator has been told; nothing more is needed from you.',
+        'The[ {stepKind:enum}] step of your request {requestId:name} has nobody to handle it right now and is waiting. An administrator has been told; nothing more is needed from you.',
     },
   },
   REQUEST_WAITING_ENDED: {
     vi: {
       title: 'Yêu cầu đã có người xử lý',
-      message: 'Bước {stepKind:enum} của yêu cầu {requestId:name} đã có người phụ trách và được xử lý tiếp.',
+      message: 'Bước[ {stepKind:enum}] của yêu cầu {requestId:name} đã có người phụ trách và được xử lý tiếp.',
     },
     en: {
       title: 'Request has an assignee again',
-      message: 'The {stepKind:enum} step of your request {requestId:name} now has someone in charge and is moving on.',
+      message:
+        'The[ {stepKind:enum}] step of your request {requestId:name} now has someone in charge and is moving on.',
     },
   },
   STEP_SLA_REMINDER: {
@@ -58,12 +59,12 @@ export const MF1_SLA_TEXTS = {
     vi: {
       title: 'Cấp dưới chưa xử lý một bước',
       message:
-        'Bước {stepKind:enum} của yêu cầu {requestId:name} do {holderEmployeeId:name} phụ trách đã quá hạn[ {overdueWorkingDays} ngày làm việc] (nhắc lần {reminderNumber}). Bạn nhận thông báo này vì là cấp trên.',
+        'Bước {stepKind:enum} của yêu cầu {requestId:name}[ do {holderEmployeeId:name} phụ trách] đã quá hạn[ {overdueWorkingDays} ngày làm việc] (nhắc lần {reminderNumber}). Bạn nhận thông báo này vì là cấp trên.',
     },
     en: {
       title: 'A step handled by your report is late',
       message:
-        'The {stepKind:enum} step of request {requestId:name}, handled by {holderEmployeeId:name}, is overdue[ by {overdueWorkingDays} working days] (reminder {reminderNumber}). You are told because you are their superior.',
+        'The {stepKind:enum} step of request {requestId:name}[, handled by {holderEmployeeId:name},] is overdue[ by {overdueWorkingDays} working days] (reminder {reminderNumber}). You are told because you are their superior.',
     },
   },
   STEP_SLA_NO_SUPERIOR: {
