@@ -117,6 +117,13 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(definitionOf('PAID_SOFTWARE_FLAG_THRESHOLD')).toBeUndefined();
   });
 
+  it('QĐ-111ab: a budget line carries no zero-based-budget explanation, so no ZBB threshold is known, set or read', () => {
+    for (const key of ['BUDGET_ZBB_KPI3_BELOW_PERCENT', 'BUDGET_ZBB_PRICE_INCREASE_PERCENT']) {
+      expect(defaultValues()).not.toHaveProperty(key);
+      expect(definitionOf(key)).toBeUndefined();
+    }
+  });
+
   it('knows its own keys and nothing else', () => {
     expect(definitionOf('APPROVAL_SLA_WORKING_DAYS')?.unit).toBe('working days');
     expect(definitionOf('TIME_ZONE')).toBeUndefined();
@@ -132,8 +139,6 @@ const EXPECTED_KEYS = [
   'RENEWAL_WINDOW_DAYS',
   'FORECAST_ERROR_THRESHOLD_PERCENT',
   'BUDGET_RESERVE_DEFAULT_PERCENT',
-  'BUDGET_ZBB_KPI3_BELOW_PERCENT',
-  'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
   'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
   'DEPARTURE_REVOCATION_WORKING_DAYS',
   'TRANSFER_GRACE_WORKING_DAYS',
@@ -157,7 +162,7 @@ const EXPECTED_KEYS = [
 ];
 
 describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
-  it('pins the twenty-nine keys, ordered by group and, inside a group, as the spec table lists them', () => {
+  it('pins the twenty-seven keys, ordered by group and, inside a group, as the spec table lists them', () => {
     expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
   });
 
@@ -221,14 +226,6 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['RENEWAL_WINDOW_DAYS', 'Cửa sổ gửi Request tiếp tục trước ngày kết thúc', 'WORKFLOW', 'days', 'ngày'],
       ['FORECAST_ERROR_THRESHOLD_PERCENT', 'Ngưỡng sai số dự báo chi phí', 'BUDGET', 'percent', '%'],
       ['BUDGET_RESERVE_DEFAULT_PERCENT', 'Tỷ lệ dự phòng mặc định của ngân sách năm', 'BUDGET', 'percent', '%'],
-      [
-        'BUDGET_ZBB_KPI3_BELOW_PERCENT',
-        'Ngưỡng sử dụng dưới đó dòng ngân sách cần giải trình ZBB',
-        'BUDGET',
-        'percent',
-        '%',
-      ],
-      ['BUDGET_ZBB_PRICE_INCREASE_PERCENT', 'Ngưỡng tăng đơn giá cần giải trình ZBB', 'BUDGET', 'percent', '%'],
       [
         'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
         'Hạn xử lý thông báo biến động nhân sự',
