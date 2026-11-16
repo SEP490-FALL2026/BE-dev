@@ -30,6 +30,7 @@ export function checkProposedQuantity(
   quantity: number | null,
   purchasedQuantity: number | null,
 ): RenewalProblem | null {
+  if (choice === 'INCREASE') return 'QUANTITY_INVALID';
   if (choice !== 'REDUCE') return quantity === null ? null : 'QUANTITY_INVALID';
   if (quantity === null || quantity < 0) return 'QUANTITY_INVALID';
 

@@ -59,7 +59,8 @@ export class SubscriptionRenewalSweepService {
 
     for (const period of subjects) {
       const people = await this.parties.peopleOf(period, shared);
-      const renewal = renewals.get(period.subscriptionId) ?? null;
+      // Until the sweep reads the case of the period itself (S20-T6): the latest live case of the subscription.
+      const renewal = renewals.get(period.subscriptionId)?.at(-1) ?? null;
       const base = { organizationId: organization.id, today, period, renewal, people };
       result.told += await this.alerts.sendDue({ ...base, daysBefore, usageAvailable });
       if (await this.deadlines.flagLateIfDue({ ...base, now, hasDeadlineEvent: events.has(period.subscriptionId) })) {

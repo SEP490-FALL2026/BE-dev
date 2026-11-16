@@ -76,6 +76,7 @@ export class RenewalProposalService {
         proposedChoice: input.choice,
         proposedQuantity: input.proposedQuantity ?? null,
         proposalNote: textOf(input.note),
+        seatsNeeded: null,
         proposedByEmployeeId: actor.employeeId,
         proposedByAppUserId: actor.appUserId,
       });

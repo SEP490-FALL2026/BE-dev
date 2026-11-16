@@ -56,5 +56,8 @@ describe('whether a renewal can be proposed (US-11-05 AC-1, AC-15, QĐ-49c)', ()
     expect(checkProposedQuantity('REDUCE', null, 100)).toBe('QUANTITY_INVALID');
     expect(checkProposedQuantity('CANCEL', null, 100)).toBeNull();
     expect(checkProposedQuantity('RENEW', 100, 100)).toBe('QUANTITY_INVALID');
+    // The raise belongs to the one-write renewal at the adjustment point; the proposal of before cannot carry it.
+    expect(checkProposedQuantity('INCREASE', 120, 100)).toBe('QUANTITY_INVALID');
+    expect(checkProposedQuantity('INCREASE', null, 100)).toBe('QUANTITY_INVALID');
   });
 });

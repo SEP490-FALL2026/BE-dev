@@ -101,7 +101,7 @@ export const renewalSummarySchema = z.strictObject({
   subscription: subscriptionBrief,
   /** The milestone the period was proposed against and where it comes from. */
   milestone: z.strictObject({
-    basis: z.enum(['DECLARED', 'INFERRED_UNCONFIRMED', 'BY_END_DATE']),
+    basis: z.enum(['DECLARED', 'INFERRED_UNCONFIRMED', 'BY_END_DATE', 'BY_RENEWAL_DATE', 'BY_PAYMENT_DATE']),
     baseDate: z.string(),
   }),
   proposedChoice: choice,
@@ -164,7 +164,7 @@ export const renewalDetailSchema = renewalSummarySchema.extend({
       reason: z.string().nullable(),
       decidedByEmployeeId: z.uuid(),
       /** `SPENDING_APPROVER` and `CONFLICT_SUBSTITUTE` are historical: a decision of before `QĐ-94d`(2); none is written now. */
-      deciderRole: z.enum(['OWNER_DEPARTMENT_HEAD', 'SPENDING_APPROVER', 'CONFLICT_SUBSTITUTE']),
+      deciderRole: z.enum(['OWNER_DEPARTMENT_HEAD', 'SPENDING_APPROVER', 'CONFLICT_SUBSTITUTE', 'IT_ADMIN_IN_CHARGE']),
       decidedAt: z.iso.datetime(),
       decidedOn: z.string(),
       decidedAfterDeadline: z.boolean(),
