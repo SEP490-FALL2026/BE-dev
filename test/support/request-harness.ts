@@ -5,7 +5,7 @@ import { ApiAccount } from './api-accounts';
 import { clearSpendingApprover, insertEmployeeWithoutPlacement, setSpendingApprover } from './builders/account.builder';
 import type { DecisionStepCode } from '../../src/modules/policies/public/policy-checklist.types';
 import { assignHead } from './builders/organization.builder';
-import { DecisionChecklists, postDecision } from './decision-checklist';
+import { DecisionChecklists, postAssessment, postDecision } from './decision-checklist';
 import { ProvisioningHarness } from './provisioning-harness';
 import { SeatHarness } from './seat-baseline-harness';
 
@@ -259,10 +259,9 @@ export class RequestHarness extends ProvisioningHarness {
     request(this.server()).get(`/api/v1/access-requests/${id}/assessment`).set(this.as(account));
   saveAssessment = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).put(`/api/v1/access-requests/${id}/assessment`).set(this.as(account)).send(body);
-  completeAssessment = (id: string, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/assessment/completion`).set(this.as(account));
+  completeAssessment = (id: string, account: ApiAccount) => postAssessment(this, id, 'completion', account);
   rejectAssessment = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/assessment/rejection`).set(this.as(account)).send(body);
+    postAssessment(this, id, 'rejection', account, body);
   registerInternal = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/access-requests/${id}/internal-registration`).set(this.as(account)).send(body);
   linkPlan = (id: string, planId: string, account: ApiAccount) =>

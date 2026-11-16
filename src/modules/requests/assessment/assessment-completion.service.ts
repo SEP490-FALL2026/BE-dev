@@ -6,6 +6,7 @@ import { accessRequestAuditEvent } from '../access-request/access-request-audit-
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
 import type { AssessmentRecord, Quote } from '../access-request/assessment-record.types';
+import type { ChecklistBody } from '../../policies/public/policy-checklist.types';
 import { SpendRoutingService } from '../spend/spend-routing.service';
 import {
   AssessmentFreePlanError,
@@ -39,15 +40,24 @@ export class AssessmentCompletionService {
 
   /**
    * Throws AssessmentRefusedError, AssessmentIncompleteError, AssessmentInternalByRegistrationError, AssessmentFreePlanError (a short proposal
-   * for a plan of internal software), AssessmentUncontrollableError, AssessmentTermNotFitError, AssessmentQuoteRefusedError and AccessRequestNotFoundError.
+   * for a plan of internal software), AssessmentUncontrollableError, AssessmentTermNotFitError, AssessmentQuoteRefusedError and AccessRequestNotFoundError,
+   * and what the checklist of the step refuses (`QĐ-111ap`): a version left behind, answers missing, an answer No, which locks the completion.
    */
-  async complete(actor: AuthenticatedPrincipal, requestId: string): Promise<AccessRequestRecord> {
+  async complete(
+    actor: AuthenticatedPrincipal,
+    requestId: string,
+    input: { checklist: ChecklistBody },
+  ): Promise<AccessRequestRecord> {
     return this.runner.run(async (tx) => {
       const request = await this.gate.lockProposal(tx, requestId);
       this.gate.requireAssessor(actor, request);
       const { assessment, proposal } = await this.gate.requireProposalFacts(tx, requestId);
       const scope = assessmentScopeOf(proposal);
       const quote = this.completableQuote(assessment, scope, await this.gate.namesInternalApplication(tx, proposal));
+      const { verdict } = await this.gate.judgeChecklist(tx, request, {
+        decision: 'COMPLETE',
+        checklist: input.checklist,
+      });
       // A plan alone is never classified by the IT Admin (the application is in the catalog) and is always paid or licensed: a completed assessment says so.
       const concluded: AssessmentRecord =
         scope === 'PLAN_ONLY' ? { ...assessment, classification: 'PAID_LICENSED' } : assessment;
@@ -58,6 +68,7 @@ export class AssessmentCompletionService {
       await this.requests.setPriced(tx, requestId, pricing, 'AWAITING_SPEND_SUBMISSION');
       const standsIn = await this.gate.finishStep(tx, requestId, actor, { now });
       await this.assessments.complete(tx, requestId, actor.employeeId, now, concluded.classification);
+      await this.gate.keepChecklist(tx, actor, request, { verdict, decision: 'COMPLETE', decidedAt: now });
       await this.audit.record(
         tx,
         accessRequestAuditEvent(

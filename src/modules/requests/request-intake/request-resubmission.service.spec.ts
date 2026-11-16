@@ -11,16 +11,25 @@ describe('BR-MF1-02: requester resubmission', () => {
     state: 'AWAITING_REQUESTER_REVISION',
     routing: { mode: 'ONE_STEP' },
   };
-  const repo = { lockById: jest.fn(), findById: jest.fn(), addNeedStep: jest.fn(), setState: jest.fn() };
+  const repo = {
+    lockById: jest.fn(),
+    findById: jest.fn(),
+    addNeedStep: jest.fn(),
+    setState: jest.fn(),
+    assessmentSentBack: jest.fn(),
+    reopenAssessmentStep: jest.fn(),
+  };
   const spend = { route: jest.fn() };
   const lines = { lock: jest.fn(), repointNeed: jest.fn() };
   const audit = { record: jest.fn() };
+  const targets = { assessmentTarget: jest.fn() };
   const service = new RequestResubmissionService(
     { run: (fn: (tx: unknown) => unknown) => fn(tx) } as never,
     repo as never,
     spend as never,
     lines as never,
     audit as never,
+    targets as never,
   );
   const actor = { employeeId: 'requester' } as never;
   beforeEach(() => {
@@ -63,16 +72,25 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
     routing: { mode: 'VIA_HEAD' },
     needSteps: [returned('step-1')],
   };
-  const repo = { lockById: jest.fn(), findById: jest.fn(), addNeedStep: jest.fn(), setState: jest.fn() };
+  const repo = {
+    lockById: jest.fn(),
+    findById: jest.fn(),
+    addNeedStep: jest.fn(),
+    setState: jest.fn(),
+    assessmentSentBack: jest.fn(),
+    reopenAssessmentStep: jest.fn(),
+  };
   const spend = { route: jest.fn() };
   const lines = { lock: jest.fn(), repointNeed: jest.fn() };
   const audit = { record: jest.fn() };
+  const targets = { assessmentTarget: jest.fn() };
   const service = new RequestResubmissionService(
     { run: (fn: (tx: unknown) => unknown) => fn(tx) } as never,
     repo as never,
     spend as never,
     lines as never,
     audit as never,
+    targets as never,
   );
   const actor = { employeeId: 'requester' } as never;
   beforeEach(() => {
@@ -121,5 +139,89 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
 
     expect(repo.addNeedStep).toHaveBeenCalledTimes(1);
     expect(lines.repointNeed).toHaveBeenCalledWith(tx, 'request', ['e1', 'e2'], 'step-2');
+  });
+});
+
+describe('PL-2.4 (QĐ-111ap, R-24): the sender sends on again a proposal the IT Admin sent back at the assessment', () => {
+  const tx = {};
+  const proposal = {
+    id: 'request',
+    organizationId: 'org',
+    type: 'GRANT',
+    requesterEmployeeId: 'requester',
+    state: 'AWAITING_REQUESTER_REVISION',
+    routing: { mode: 'VIA_HEAD' },
+    policy: { slaWorkingDays: 2 },
+    needSteps: [{ id: 'need', state: 'APPROVED', decision: { decision: 'APPROVED' } }],
+  };
+  const repo = {
+    lockById: jest.fn(),
+    findById: jest.fn(),
+    addNeedStep: jest.fn(),
+    setState: jest.fn(),
+    assessmentSentBack: jest.fn(),
+    reopenAssessmentStep: jest.fn(),
+  };
+  const spend = { route: jest.fn() };
+  const lines = { lock: jest.fn(), repointNeed: jest.fn() };
+  const audit = { record: jest.fn() };
+  const targets = { assessmentTarget: jest.fn() };
+  const service = new RequestResubmissionService(
+    { run: (fn: (tx: unknown) => unknown) => fn(tx) } as never,
+    repo as never,
+    spend as never,
+    lines as never,
+    audit as never,
+    targets as never,
+  );
+  const actor = { employeeId: 'requester' } as never;
+  beforeEach(() => {
+    jest.resetAllMocks();
+    repo.lockById.mockResolvedValue(proposal);
+    repo.findById.mockResolvedValue(proposal);
+    repo.assessmentSentBack.mockResolvedValue(true);
+    targets.assessmentTarget.mockResolvedValue('it-admin');
+  });
+
+  it('opens a new step for the IT Admin in charge of today and waits for the assessment, not for the head or the spend step', async () => {
+    await service.resubmit(actor, 'request');
+
+    expect(repo.reopenAssessmentStep).toHaveBeenCalledWith(tx, {
+      requestId: 'request',
+      assignee: 'it-admin',
+      slaWorkingDays: 2,
+      now: expect.any(Date) as unknown,
+    });
+    expect(repo.setState).toHaveBeenCalledWith(tx, 'request', 'AWAITING_IT_ASSESSMENT');
+    expect(repo.addNeedStep).not.toHaveBeenCalled();
+    expect(spend.route).not.toHaveBeenCalled();
+    expect(audit.record).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the step waiting for any IT Admin when none is in charge who still works', async () => {
+    targets.assessmentTarget.mockResolvedValue(null);
+
+    await service.resubmit(actor, 'request');
+
+    expect(repo.reopenAssessmentStep).toHaveBeenCalledWith(tx, expect.objectContaining({ assignee: null }));
+  });
+
+  it('goes to the assessment and not to the spending approver for a request of one step whose proposal was sent back', async () => {
+    repo.lockById.mockResolvedValue({ ...proposal, routing: { mode: 'ONE_STEP' }, needSteps: [] });
+
+    await service.resubmit(actor, 'request');
+
+    expect(repo.reopenAssessmentStep).toHaveBeenCalledTimes(1);
+    expect(spend.route).not.toHaveBeenCalled();
+  });
+
+  it('does not open the assessment of a request whose last step of the assessment was decided', async () => {
+    repo.assessmentSentBack.mockResolvedValue(false);
+    repo.lockById.mockResolvedValue({ ...proposal, routing: { mode: 'ONE_STEP' } });
+
+    await service.resubmit(actor, 'request');
+
+    expect(repo.reopenAssessmentStep).not.toHaveBeenCalled();
+    expect(spend.route).toHaveBeenCalledTimes(1);
   });
 });

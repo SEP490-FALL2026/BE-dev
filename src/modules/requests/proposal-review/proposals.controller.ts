@@ -15,6 +15,7 @@ import { AccessRequestResponseDto, RequestIdParamDto } from '../access-request/a
 import { AccessRequestQueryService } from '../request-view/access-request-query.service';
 import { toWire } from '../request-view/access-request.mapper';
 import {
+  AssessmentCompletionBodyDto,
   AssessmentPatchDto,
   AssessmentRejectionBodyDto,
   AssessmentResponseDto,
@@ -26,7 +27,8 @@ import {
 import { ASSESSMENT_ERROR_EXAMPLES as EXAMPLES, toAssessmentApiException } from '../assessment/assessment.http-errors';
 import { AssessmentCompletionService } from '../assessment/assessment-completion.service';
 import { AssessmentQueryService } from '../assessment/assessment-query.service';
-import { AssessmentRejectionService } from '../assessment/assessment-rejection.service';
+import { AssessmentDecisionService } from '../assessment-decision/assessment-decision.service';
+import { CHECKLIST_ERROR_EXAMPLES, toChecklistApiException } from '../../policies/public/policy-checklist.http-errors';
 import { AssessmentService } from '../assessment/assessment.service';
 import { CatalogLinkService } from '../catalog-link/catalog-link.service';
 import { InternalRegistrationService } from '../assessment/internal-registration.service';
@@ -72,7 +74,7 @@ export class ProposalsController {
     private readonly assessments: AssessmentService,
     private readonly assessmentReads: AssessmentQueryService,
     private readonly completions: AssessmentCompletionService,
-    private readonly rejections: AssessmentRejectionService,
+    private readonly decisions: AssessmentDecisionService,
     private readonly links: CatalogLinkService,
     private readonly registrations: InternalRegistrationService,
     private readonly queries: AccessRequestQueryService,
@@ -197,18 +199,19 @@ export class ProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE), or a short proposal names internal software, whose plans are free (ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN): add the plan to the catalog and reject the proposal as not eligible, naming that plan, for the person to ask for it from the catalog.',
+        'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE), or a short proposal names internal software, whose plans are free (ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN): add the plan to the catalog and reject the proposal as not eligible, naming that plan, for the person to ask for it from the catalog. The policy of the checklist was changed since the person was shown it (POLICY.VERSION_CHANGED).',
       examples: [
         EXAMPLES.NOT_AWAITING_ASSESSMENT,
         EXAMPLES.INTERNAL_COMPLETES_BY_REGISTRATION,
         EXAMPLES.CONTROL_LEVEL_UNCONTROLLABLE,
         EXAMPLES.SHORT_PROPOSAL_FREE_PLAN,
+        CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE, or QUOTE_PRICE_NOT_VND when the stored quote is not in dong: record it again in dong), or the time of use the person gave does not fit the kind of plan concluded (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: a plan bought by the month takes 1 to 9 months; reject the request for the person to propose again with months that fit). Nothing is written and the request stays with the IT Admin. A plan bought once takes no months: completing it clears any the person gave.',
+        'The checklist is missing, lacks an answer or names a question the policy does not have (POLICY.CHECKLIST_INCOMPLETE), or an answer is No, which locks the completion (POLICY.CHECKLIST_HAS_NO, with the questions answered No in details.items); the assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE, or QUOTE_PRICE_NOT_VND when the stored quote is not in dong: record it again in dong), or the time of use the person gave does not fit the kind of plan concluded (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: a plan bought by the month takes 1 to 9 months; reject the request for the person to propose again with months that fit). Nothing is written and the request stays with the IT Admin. A plan bought once takes no months: completing it clears any the person gave.',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.INCOMPLETE,
@@ -216,44 +219,64 @@ export class ProposalsController {
         EXAMPLES.AMOUNT_TOO_LARGE,
         EXAMPLES.QUOTE_PRICE_NOT_VND,
         EXAMPLES.TERM_NOT_FIT_KIND,
+        CHECKLIST_ERROR_EXAMPLES.INCOMPLETE,
+        CHECKLIST_ERROR_EXAMPLES.HAS_NO,
       ],
     },
   )
-  async completeAssessment(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RequestIdParamDto) {
+  async completeAssessment(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: RequestIdParamDto,
+    @Body() body: AssessmentCompletionBodyDto,
+  ) {
     try {
-      const record = await this.completions.complete(actor, params.id);
+      const record = await this.completions.complete(actor, params.id, body);
 
       return { request: toWire(await this.queries.view(record)) };
     } catch (error) {
-      throw toAssessmentApiException(error);
+      throw toChecklistApiException(error) ?? toAssessmentApiException(error);
     }
   }
 
   @Post(':id/assessment/rejection')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'accessRequestAssessmentReject', summary: 'Refuse a proposal at the gate' })
+  @ApiOperation({
+    operationId: 'accessRequestAssessmentReject',
+    summary: 'Refuse a proposal at the gate, or send it back to its sender',
+  })
   @ApiSuccessResponse(AccessRequestResponseDto, {
     message: 'ACCESS_REQUEST.ASSESSMENT_REJECTED',
     description:
-      'The IT Admin concludes that a tool cannot be controlled, or that the software is not eligible for the catalog, with the reason that must go with it and an alternative when there is one. The request ends as refused by IT: no spend step, no snapshot, no commitment, and nothing is added to the catalog. The person who asked and the head read the reason and the alternative in the assessment.',
+      'With decision REJECT the IT Admin concludes that a tool cannot be controlled, or that the software is not eligible for the catalog, with the reason that must go with it and an alternative when there is one. The request ends as refused by IT: no spend step, no snapshot, no commitment, and nothing is added to the catalog. The person who asked and the head read the reason and the alternative in the assessment. With decision RETURN the proposal goes back to the person who asked, who adds what is missing and sends it again (POST /access-requests/{id}/resubmission): the request waits for its sender (AWAITING_REQUESTER_REVISION), the step of the IT Admin is closed and the assessment keeps what was filled in. Both carry the checklist of the policy in force at the step; the reason is typed or filled in from the questions answered No.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, NOT_AWAITING_ASSESSMENT, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description:
-      'The reason is missing or blank, or the kind is not one of the two (VALIDATION_ERROR); the alternative plan does not exist (ASSESSMENT.REFERENCE_NOT_FOUND). Nothing is written and the request stays with the IT Admin.',
-    examples: [VALIDATION_EXAMPLE, EXAMPLES.ALTERNATIVE_PLAN_NOT_FOUND],
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    IT_ONLY,
+    NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), or the policy of the checklist was changed since the person was shown it (POLICY.VERSION_CHANGED).',
+      examples: [EXAMPLES.NOT_AWAITING_ASSESSMENT, CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'A refusal has no kind, or an uncontrollable tool no alternative, or a refusal or a return has no reason and no answer No to give one (VALIDATION_ERROR); the checklist lacks an answer (POLICY.CHECKLIST_INCOMPLETE); the alternative plan does not exist (ASSESSMENT.REFERENCE_NOT_FOUND). Nothing is written and the request stays with the IT Admin.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.ALTERNATIVE_PLAN_NOT_FOUND, CHECKLIST_ERROR_EXAMPLES.INCOMPLETE],
+    },
+  )
   async rejectAssessment(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: RequestIdParamDto,
     @Body() body: AssessmentRejectionBodyDto,
   ) {
     try {
-      const record = await this.rejections.reject(actor, params.id, body);
+      const record = await this.decisions.decide(actor, params.id, body);
 
       return { request: toWire(await this.queries.view(record)) };
     } catch (error) {
-      throw toAssessmentApiException(error);
+      throw toChecklistApiException(error) ?? toAssessmentApiException(error);
     }
   }
 

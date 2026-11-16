@@ -47,6 +47,8 @@ import { AssessmentPatchService } from './assessment/assessment-patch.service';
 import { AssessmentPricingService } from './assessment/assessment-pricing.service';
 import { AssessmentQueryService } from './assessment/assessment-query.service';
 import { AssessmentRejectionService } from './assessment/assessment-rejection.service';
+import { AssessmentDecisionService } from './assessment-decision/assessment-decision.service';
+import { AssessmentReturnService } from './assessment-decision/assessment-return.service';
 import { AssessmentService } from './assessment/assessment.service';
 import { AssessmentViewService } from './assessment/assessment-view.service';
 import { AssessmentStepRepo } from './assessment/assessment-step.repo';
@@ -303,6 +305,8 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     AssessmentTermFitService,
     AssessmentCompletionService,
     AssessmentRejectionService,
+    AssessmentDecisionService,
+    AssessmentReturnService,
     AssessmentService,
     CatalogLinkDepartmentListService,
     CatalogLinkService,

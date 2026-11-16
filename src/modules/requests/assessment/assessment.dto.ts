@@ -10,6 +10,7 @@ import {
   termMonthsSchema,
 } from '../access-request/access-request.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
+import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 
 /** A web address with a host: the homepage of the software, which a screen links to. */
 function isWebAddress(value: string): boolean {
@@ -134,16 +135,27 @@ export const catalogLinkBodySchema = z.strictObject({
 });
 
 /**
+ * Completing the assessment (`QĐ-111ap`): the answers to the questions of the policy in force at the step. An answer No locks the completion.
+ */
+export const assessmentCompletionBodySchema = z.strictObject({ checklist: checklistBodySchema }).meta({
+  description:
+    'The checklist of the policy in force at the step of the assessment. The assessment is completed only when every question is answered Yes.',
+});
+
+/**
  * The refusal at the gate of the assessment (`US-05-18`): the kind, which is either a tool that cannot be controlled or
  * software that is not eligible for the catalog (there is no outcome for free software, `QĐ-82n`), the reason that must
- * go with it, and the alternative when the IT Admin has one: a plan of the catalog, a note, or neither.
+ * go with it (typed, or filled in from the questions answered No), and the alternative when the IT Admin has one: a plan of
+ * the catalog, a note, or neither.
  */
-export const assessmentRejectionBodySchema = z
+const assessmentRefusalBodySchema = z
   .strictObject({
+    decision: z.literal('REJECT'),
     kind: z.enum(['UNCONTROLLABLE', 'NOT_ELIGIBLE']),
-    reason: text(REASON_MAX_LENGTH),
+    reason: text(REASON_MAX_LENGTH).optional(),
     alternativePlanId: z.uuid().optional(),
     alternativeNote: text(REASON_MAX_LENGTH).optional(),
+    checklist: checklistBodySchema,
   })
   .superRefine((body, context) => {
     if (body.kind === 'UNCONTROLLABLE' && body.alternativePlanId === undefined && body.alternativeNote === undefined) {
@@ -155,6 +167,26 @@ export const assessmentRejectionBodySchema = z
     }
   })
   .meta({ description: 'UNCONTROLLABLE requires alternativePlanId or alternativeNote.' });
+
+/**
+ * Sending the proposal back to the person who asked, to add what is missing and send it again (`QĐ-111ap`, R-24): no kind and no alternative,
+ * the request is not refused. The reason is typed, or filled in from the questions answered No.
+ */
+const assessmentReturnBodySchema = z.strictObject({
+  decision: z.literal('RETURN'),
+  reason: text(REASON_MAX_LENGTH).optional(),
+  checklist: checklistBodySchema,
+});
+
+/** What the IT Admin does at the gate of the assessment besides completing it: refuse the proposal (`REJECT`) or send it back to its sender (`RETURN`). */
+export const assessmentRejectionBodySchema = z
+  .discriminatedUnion('decision', [assessmentRefusalBodySchema, assessmentReturnBodySchema])
+  .meta({
+    description:
+      'REJECT ends the request as refused by IT and needs the kind of the refusal; RETURN sends the proposal back to the person who asked and takes no kind. Both carry the checklist of the policy in force at the step, and a reason typed or left to be filled in from the questions answered No.',
+  });
+export type AssessmentRefusalBody = z.output<typeof assessmentRefusalBodySchema>;
+export type AssessmentReturnBody = z.output<typeof assessmentReturnBodySchema>;
 
 /**
  * Registering software the company built itself (`US-05-20`): the name when it is not the one proposed; the IT Admin who registers it answers for
@@ -264,7 +296,12 @@ export class CatalogLinkResponseDto extends createZodDto(
     }),
   ),
 ) {}
-export class AssessmentRejectionBodyDto extends createZodDto(assessmentRejectionBodySchema) {}
+export class AssessmentCompletionBodyDto extends createZodDto(assessmentCompletionBodySchema) {}
+/** A union is not a class to extend: the value makes the DTO of the route and the same name is the type of what it validates. */
+export const AssessmentRejectionBodyDto = Object.defineProperty(createZodDto(assessmentRejectionBodySchema), 'name', {
+  value: 'AssessmentRejectionBodyDto',
+});
+export type AssessmentRejectionBodyDto = z.infer<typeof assessmentRejectionBodySchema>;
 export class InternalRegistrationBodyDto extends createZodDto(internalRegistrationBodySchema) {}
 export class AssessmentResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ assessment: assessmentSchema })),

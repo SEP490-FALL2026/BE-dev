@@ -12,16 +12,18 @@ import {
 import type { AccessRequestRecord, NeedStepWithDecision } from '../access-request/access-request.types';
 import { RequestLineRepo } from '../group-request/request-line.repo';
 import { SpendRoutingService } from '../spend/spend-routing.service';
+import { StepTargetService } from '../step-routing/step-target.service';
 
 /** A need step that its head sent back: closed, with a record of approval that says it was returned. */
 const isReturned = (step: NeedStepWithDecision): boolean =>
   step.state === 'CLOSED' && step.decision?.decision === 'RETURNED';
 
 /**
- * The sender sends a request on again after it came back to them (`FR-11.2`, R-24): a request of one step goes to the spending approver again;
- * a request that went through the head, and that the head sent back at the need step (`QĐ-111ap`), goes to the head again, at a new need step
- * given as the returned one was. For a group the people who still wait for their need move to the new step. Request lock precedes the
- * budget-year lock; a concurrent second submission sees the resulting state.
+ * The sender sends a request on again after it came back to them (`FR-11.2`, R-24): a proposal that the IT Admin sent back at the assessment
+ * (`QĐ-111ap`) goes to the IT Admin again, at a new step; a request of one step goes to the spending approver again; a request that went through
+ * the head, and that the head sent back at the need step, goes to the head again, at a new need step given as the returned one was. For a group the
+ * people who still wait for their need move to the new step. Request lock precedes the budget-year lock; a concurrent second submission sees the
+ * resulting state.
  */
 @Injectable()
 export class RequestResubmissionService {
@@ -31,6 +33,7 @@ export class RequestResubmissionService {
     private readonly spending: SpendRoutingService,
     private readonly lines: RequestLineRepo,
     private readonly audit: AuditApi,
+    private readonly targets: StepTargetService,
   ) {}
 
   async resubmit(actor: AuthenticatedPrincipal, id: string) {
@@ -39,7 +42,9 @@ export class RequestResubmissionService {
       if (!request) throw new AccessRequestNotFoundError();
       if (request.requesterEmployeeId !== actor.employeeId) throw new AccessRequestNotRequesterError();
       if (request.state !== 'AWAITING_REQUESTER_REVISION') throw new AccessRequestNotAwaitingRevisionError();
-      if (request.routing?.mode === 'ONE_STEP') {
+      if (await this.returnedAtAssessment(tx, request.id)) {
+        await this.reopenAssessment(tx, actor, request, new Date());
+      } else if (request.routing?.mode === 'ONE_STEP') {
         await this.spending.route(tx, actor, request, 'SUBMISSION', new Date());
       } else {
         await this.reopenNeed(tx, actor, request, new Date());
@@ -48,6 +53,33 @@ export class RequestResubmissionService {
       if (!record) throw new AccessRequestNotFoundError();
       return record;
     });
+  }
+
+  /** Whether the last step the request had is the assessment of the IT Admin, closed because the proposal was sent back (a request waits for its sender at one step only). */
+  private async returnedAtAssessment(tx: DbTx, requestId: string): Promise<boolean> {
+    return this.requests.assessmentSentBack(tx, requestId);
+  }
+
+  /** A new step for the IT Admin in charge of today (any IT Admin when none works), and the request back to waiting for its assessment. */
+  private async reopenAssessment(tx: DbTx, actor: AuthenticatedPrincipal, request: AccessRequestRecord, now: Date) {
+    await this.requests.reopenAssessmentStep(tx, {
+      requestId: request.id,
+      assignee: await this.targets.assessmentTarget(tx, request.requesterEmployeeId, now),
+      slaWorkingDays: request.policy.slaWorkingDays,
+      now,
+    });
+    await this.requests.setState(tx, request.id, 'AWAITING_IT_ASSESSMENT');
+    await this.audit.record(
+      tx,
+      accessRequestAuditEvent(
+        actor,
+        request.organizationId,
+        'ACCESS_REQUEST.RESUBMITTED',
+        'ACCESS_REQUEST',
+        request.id,
+        { requestId: request.id, reopenedStepKind: 'IT_ASSESSMENT', requestState: 'AWAITING_IT_ASSESSMENT' },
+      ),
+    );
   }
 
   /** A new need step for each returned one that something still waits on, and the request back to waiting for its head. */

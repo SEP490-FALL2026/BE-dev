@@ -95,3 +95,22 @@ export const postDecision = (
     .post(path)
     .set(poster.as(account as never))
     .send(poster.checklists.withYes(step, body));
+
+/**
+ * The completion or the refusal of the assessment of a proposal (`PL-2.4`, step `1.3`) with the checklist all Yes: a refusal is a `REJECT` unless
+ * the body says `RETURN`.
+ */
+export const postAssessment = (
+  poster: DecisionPoster,
+  id: string,
+  route: 'completion' | 'rejection',
+  account: unknown,
+  body: object = {},
+) =>
+  postDecision(
+    poster,
+    `/api/v1/access-requests/${id}/assessment/${route}`,
+    account,
+    '1.3',
+    route === 'rejection' ? { decision: 'REJECT', ...body } : body,
+  );
