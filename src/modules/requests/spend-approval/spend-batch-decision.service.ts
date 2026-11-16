@@ -4,7 +4,8 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
 import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
-import { SpendDecisionService, type SpendDecisionInput } from './spend-decision.service';
+import { SpendBatchGroupReturnService } from './spend-batch-group-return.service';
+import { SpendDecisionService, type JudgedSpendChecklist, type SpendDecisionInput } from './spend-decision.service';
 import { SpendBatchNotFoundError, SpendDecisionRefusedError } from '../spend/spend.errors';
 import type { BatchDecisionResultWire } from '../spend-approval-view/spend-approval.dto';
 
@@ -16,9 +17,10 @@ import type { BatchDecisionResultWire } from '../spend-approval-view/spend-appro
  * confirmed) are skipped and say why; the requester and the head are told of each one that went back. A refusal gives one reason for all (`AC-20`). The batch
  * has no decision of its own.
  *
- * One checklist answers for the whole batch and is kept for each request decided (`QĐ-111aq`): what it refuses is told once before any request is
- * decided, and a return (the only thing a No leaves besides a refusal) takes every request of the batch the person holds, so a batch with a problem
- * goes back whole and the head drops the request at fault and sends a new batch.
+ * One checklist answers for the whole batch and is kept for each request decided (`QĐ-111aq`): it is judged once, before any request is decided, and
+ * every request is decided on that judgement (a policy published meanwhile leaves no batch half decided); what it refuses is told once, and a return
+ * (the only thing a No leaves besides a refusal) takes every request of the batch the person holds, a request for a group too (sent back whole, its
+ * people decided by none), so a batch with a problem goes back whole and the head drops the request at fault and sends a new batch.
  */
 @Injectable()
 export class SpendBatchDecisionService {
@@ -27,6 +29,7 @@ export class SpendBatchDecisionService {
     private readonly decisions: SpendDecisionService,
     private readonly runner: TransactionRunner,
     private readonly checklists: PolicyChecklistApi,
+    private readonly groupReturns: SpendBatchGroupReturnService,
   ) {}
 
   /** Throws SpendBatchNotFoundError for a batch the caller holds nothing of, and what the checklist refuses. */
@@ -39,20 +42,22 @@ export class SpendBatchDecisionService {
     const batch = await this.batches.findById(batchId);
     if (held.length === 0 || !batch) throw new SpendBatchNotFoundError();
     const inBatch = new Set(await this.batches.requestIdsOf(batchId));
-    await this.runner.run((tx) =>
-      this.checklists.judge(tx, {
+    const judged = await this.runner.run(async (tx) => {
+      const { verdict, reason } = await this.checklists.judge(tx, {
         organizationId: batch.organizationId,
         stepCode: '1.7',
         checklist: body.checklist,
         decision: body.decision,
         reason: body.reason,
-      }),
-    );
+      });
+
+      return { verdict, reason };
+    });
     const requestIds = body.decision === 'RETURN' ? [...new Set(held)] : (body.requestIds ?? []);
 
     const results: BatchDecisionResultWire[] = [];
     for (const requestId of requestIds) {
-      results.push(await this.decideOne(actor, requestId, body, inBatch));
+      results.push(await this.decideOne(actor, requestId, body, { inBatch, judged }));
     }
 
     return results;
@@ -62,29 +67,52 @@ export class SpendBatchDecisionService {
     actor: AuthenticatedPrincipal,
     requestId: string,
     body: SpendDecisionInput,
-    inBatch: ReadonlySet<string>,
+    of: { inBatch: ReadonlySet<string>; judged: JudgedSpendChecklist },
   ): Promise<BatchDecisionResultWire> {
     const skipped = (reason: NonNullable<BatchDecisionResultWire['reason']>): BatchDecisionResultWire => ({
       requestId,
       outcome: 'SKIPPED',
       reason,
     });
-    if (!inBatch.has(requestId)) return skipped('NOT_IN_BATCH');
+    if (!of.inBatch.has(requestId)) return skipped('NOT_IN_BATCH');
 
     try {
-      const result = await this.decisions.decide(actor, requestId, {
-        decision: body.decision,
-        reason: body.reason,
-        checklist: body.checklist,
-      });
+      const result = await this.decisions.decide(
+        actor,
+        requestId,
+        { decision: body.decision, reason: body.reason, checklist: body.checklist },
+        of.judged,
+      );
       if (result.status === 'DECIDED') return { requestId, outcome: result.decision, reason: null };
 
       return skipped('RECHECKED_RETURNED_TO_HEAD');
     } catch (error) {
       if (error instanceof AccessRequestNotFoundError) return skipped('NO_SPEND_STEP');
-      // A request for a group is decided for each person, never in bulk (`US-05-17`).
-      if (error instanceof AccessRequestGroupUsesLinesError) return skipped('GROUP_NEEDS_LINES');
+      if (error instanceof AccessRequestGroupUsesLinesError) {
+        // A request for a group is decided for each person, never in bulk (`US-05-17`); but a return of the batch takes the whole group back.
+        if (body.decision === 'RETURN') return this.returnGroup(actor, requestId, of.judged);
+
+        return skipped('GROUP_NEEDS_LINES');
+      }
       if (error instanceof SpendDecisionRefusedError) return skipped(error.reason);
+      throw error;
+    }
+  }
+
+  /** The group goes back whole on the judgement of the batch; refused like any request of the batch when the person does not hold its step. */
+  private async returnGroup(
+    actor: AuthenticatedPrincipal,
+    requestId: string,
+    judged: JudgedSpendChecklist,
+  ): Promise<BatchDecisionResultWire> {
+    try {
+      await this.groupReturns.returnWhole(actor, requestId, judged);
+
+      return { requestId, outcome: 'RETURNED', reason: null };
+    } catch (error) {
+      if (error instanceof AccessRequestNotFoundError)
+        return { requestId, outcome: 'SKIPPED', reason: 'NO_SPEND_STEP' };
+      if (error instanceof SpendDecisionRefusedError) return { requestId, outcome: 'SKIPPED', reason: error.reason };
       throw error;
     }
   }

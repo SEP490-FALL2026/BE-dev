@@ -149,6 +149,7 @@ import { SpendBatchDecisionService } from './spend-approval/spend-batch-decision
 import { SpendBatchRepo } from './spend/spend-batch.repo';
 import { SpendDecisionRepo } from './spend/spend-decision.repo';
 import { SpendDecisionRecorder } from './spend-approval/spend-decision-recorder.service';
+import { SpendBatchGroupReturnService } from './spend-approval/spend-batch-group-return.service';
 import { SpendDecisionService } from './spend-approval/spend-decision.service';
 import { SpendBatchService } from './spend-submission/spend-batch.service';
 import { SpendBatchListService } from './spend-submission/spend-batch-list.service';
@@ -364,6 +365,7 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     SpendDecisionRepo,
     SpendDecisionRecorder,
     SpendDecisionService,
+    SpendBatchGroupReturnService,
     SpendBatchDecisionService,
     SpendApprovalQueueService,
     SpendApprovalSourcesService,

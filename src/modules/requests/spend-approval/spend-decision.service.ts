@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
-import type { ChecklistBody } from '../../policies/public/policy-checklist.types';
+import type { ChecklistBody, ChecklistVerdict } from '../../policies/public/policy-checklist.types';
 import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
@@ -20,6 +20,12 @@ export interface SpendDecisionInput {
   reason?: string;
   /** The checklist of the policy in force at the step (`QĐ-111ap`). */
   checklist: ChecklistBody;
+}
+
+/** The checklist of a decision already judged: the answers against the version in force, and the reason the decision is kept with. */
+export interface JudgedSpendChecklist {
+  verdict: ChecklistVerdict;
+  reason: string | null;
 }
 
 /**
@@ -43,22 +49,26 @@ export class SpendDecisionService {
     private readonly checklists: PolicyChecklistApi,
   ) {}
 
-  /** Throws AccessRequestNotFoundError and SpendDecisionRefusedError. */
+  /** Throws AccessRequestNotFoundError, SpendDecisionRefusedError and, unless the checklist was judged already, what the checklist refuses. */
   async decide(
     actor: AuthenticatedPrincipal,
     requestId: string,
     input: SpendDecisionInput,
+    judged?: JudgedSpendChecklist,
   ): Promise<SpendDecisionResult> {
     return this.runner.run(async (tx) => {
       const { request, step } = await this.lockDecidable(tx, actor, requestId);
       // What the checklist refuses is told before the budget is checked: a No locks an approval, a refusal or a return takes its reason from it.
-      const { verdict, reason } = await this.checklists.judge(tx, {
-        organizationId: request.organizationId,
-        stepCode: '1.7',
-        checklist: input.checklist,
-        decision: input.decision,
-        reason: input.reason,
-      });
+      // A request of a batch is decided on the checklist the batch was judged by, once and before any of them (`QĐ-111aq`).
+      const { verdict, reason } =
+        judged ??
+        (await this.checklists.judge(tx, {
+          organizationId: request.organizationId,
+          stepCode: '1.7',
+          checklist: input.checklist,
+          decision: input.decision,
+          reason: input.reason,
+        }));
       const now = new Date();
       const result = await this.decideOn(tx, actor, { request, step, now }, { decision: input.decision, reason });
       // The answers are kept with a decision that was made; a request that went back because the check made again blocked it was not decided.
