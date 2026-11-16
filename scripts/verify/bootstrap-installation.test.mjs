@@ -833,7 +833,9 @@ describe('the template and the ignore rules', () => {
 
   it('is accepted by the parser: copied unfilled, the wrapper reports the first required setting empty, not a syntax error', () => {
     const world = host();
-    writeConfig(world, readFileSync(TEMPLATE, 'utf8'));
+    // Git keeps the template with LF; a Windows checkout with `core.autocrlf` writes it with CRLF, which the wrapper refuses by design.
+    // The test is about the content of the template, so it copies it as Git stores it, whatever the line endings of the checkout.
+    writeConfig(world, readFileSync(TEMPLATE, 'utf8').replace(/\r\n/g, '\n'));
 
     assertRefusedBeforeDocker(world, run(world), /BOOTSTRAP_TIMEZONE.*(empty|required)/i);
   });
