@@ -162,8 +162,16 @@ const toLine = (row: LineRow): ReviewLineRecord => ({
 export class BudgetReviewRepo {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Writes the period and its lines. The unique key of the month refuses a second one: the caller reads that as "closed already". */
-  async insert(tx: DbTx, period: NewReviewPeriod, lines: readonly NewReviewLine[]): Promise<ReviewPeriodRecord> {
+  /**
+   * Writes the period and its lines. The unique key of the month refuses a second one: the caller reads that as "closed already". `withoutHead` names the Cost Centers whose department has no head
+   * the day the quarter opens: their lines are NO_HEAD from the start (US-12-21 AC-12).
+   */
+  async insert(
+    tx: DbTx,
+    period: NewReviewPeriod,
+    lines: readonly NewReviewLine[],
+    withoutHead: ReadonlySet<string> = new Set(),
+  ): Promise<ReviewPeriodRecord> {
     // A quarter opens waiting for the explanations of its yellow, red and under Cost Centers (`RV-3`); a month is closed on its figures.
     const created = await tx.budgetReviewPeriod.create({
       data: {
@@ -178,7 +186,7 @@ export class BudgetReviewRepo {
           ...line,
           invoiceNetMinor: invoiceBasisMinor,
           periodId: created.id,
-          explanationStatus: initialExplanationStatus(period.kind, line.light),
+          explanationStatus: initialExplanationStatus(period.kind, line.light, !withoutHead.has(line.costCenterId)),
         })),
       });
     }
@@ -364,15 +372,11 @@ export class BudgetReviewRepo {
     return rows.map((row) => ({ costCenterId: row.costCenterId, light: row.light as ReviewLight }));
   }
 
-  /** What the lines still waiting become when Finance signs: `UNEXPLAINED` for the Cost Centers whose department has a head, `NO_HEAD` for the others (R-10, R-17). */
-  async closePending(tx: DbTx, periodId: string, noHead: readonly string[]): Promise<void> {
+  /** What the lines still waiting become when Finance signs: `UNEXPLAINED`, the head who was asked did not answer (R-10). A line of a department that had no head when the quarter opened is NO_HEAD already (R-17). */
+  async closePending(tx: DbTx, periodId: string): Promise<void> {
     await tx.budgetReviewLine.updateMany({
-      where: { periodId, explanationStatus: 'PENDING', costCenterId: { notIn: [...noHead] } },
+      where: { periodId, explanationStatus: 'PENDING' },
       data: { explanationStatus: 'UNEXPLAINED' },
-    });
-    await tx.budgetReviewLine.updateMany({
-      where: { periodId, explanationStatus: 'PENDING', costCenterId: { in: [...noHead] } },
-      data: { explanationStatus: 'NO_HEAD' },
     });
   }
 

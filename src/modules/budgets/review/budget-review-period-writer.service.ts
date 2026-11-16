@@ -50,9 +50,21 @@ export class BudgetReviewPeriodWriterService {
           throw new BudgetReviewExistsError(input.year, input.month);
         }
         const lines = await this.figures.linesOf(tx, input.year, input.month, input.currency);
-        const period = await this.insert(tx, actor, input, lines);
-        // A quarter asks the heads of the Cost Centers it needs explained the day it opens, not only when the due day comes (US-12-21 AC-4).
-        await this.explanations.request(tx, period, input.today);
+        // A quarter asks the heads of the Cost Centers it needs explained the day it opens, not only when the due day comes (US-12-21 AC-4); a department with no head that day is not
+        // asked and not waited for (AC-12).
+        const heads =
+          reviewKindOf(input.month) === 'QUARTER'
+            ? await this.explanations.headsOf(
+                tx,
+                lines.filter((line) => line.light !== 'GREEN').map((line) => line.costCenterId),
+                input.today,
+              )
+            : new Map<string, string | null>();
+        const withoutHead = new Set(
+          [...heads].filter(([, head]) => head === null).map(([costCenterId]) => costCenterId),
+        );
+        const period = await this.insert(tx, actor, input, lines, withoutHead);
+        await this.explanations.request(tx, period, heads);
         await this.poolWatch.tellFinance(tx, input.organizationId, input.year, input.month, input.pool);
 
         return period;
@@ -72,6 +84,7 @@ export class BudgetReviewPeriodWriterService {
     actor: AuthenticatedPrincipal,
     input: CloseInput,
     lines: readonly NewReviewLine[],
+    withoutHead: ReadonlySet<string>,
   ): Promise<ReviewPeriodRecord> {
     const period = await this.repo.insert(
       tx,
@@ -90,6 +103,7 @@ export class BudgetReviewPeriodWriterService {
         explanationsDueOn: input.explanationsDueOn,
       },
       lines,
+      withoutHead,
     );
     await this.audit.record(
       tx,

@@ -1,26 +1,24 @@
 import type { BusinessDate } from '../../../core/business-date';
-import {
-  explanationDueOn,
-  explanationReminderDay,
-  initialExplanationStatus,
-  statusWhenSigned,
-} from './budget-review-explanation.policy';
+import { explanationDueOn, explanationReminderDay, initialExplanationStatus } from './budget-review-explanation.policy';
 
 const day = (value: string): BusinessDate => value;
 const NONE = new Set<BusinessDate>();
 
 describe('who is asked to explain (RV-3, QĐ-111ah)', () => {
-  it('only a yellow, red or under Cost Center of a quarter is asked; green and every month are not', () => {
-    expect(initialExplanationStatus('QUARTER', 'YELLOW')).toBe('PENDING');
-    expect(initialExplanationStatus('QUARTER', 'RED')).toBe('PENDING');
-    expect(initialExplanationStatus('QUARTER', 'UNDER')).toBe('PENDING');
-    expect(initialExplanationStatus('QUARTER', 'GREEN')).toBe('NOT_REQUIRED');
-    expect(initialExplanationStatus('MONTH', 'RED')).toBe('NOT_REQUIRED');
+  it('only a yellow, red or under Cost Center of a quarter whose department has a head is asked; green and every month are not', () => {
+    expect(initialExplanationStatus('QUARTER', 'YELLOW', true)).toBe('PENDING');
+    expect(initialExplanationStatus('QUARTER', 'RED', true)).toBe('PENDING');
+    expect(initialExplanationStatus('QUARTER', 'UNDER', true)).toBe('PENDING');
+    expect(initialExplanationStatus('QUARTER', 'GREEN', true)).toBe('NOT_REQUIRED');
+    expect(initialExplanationStatus('MONTH', 'RED', true)).toBe('NOT_REQUIRED');
   });
 
-  it('a line left unanswered is UNEXPLAINED when the department has a head and NO_HEAD when it has none (R-10, R-17)', () => {
-    expect(statusWhenSigned(true)).toBe('UNEXPLAINED');
-    expect(statusWhenSigned(false)).toBe('NO_HEAD');
+  it('a department that has no head when the quarter opens is NO_HEAD from the start, not asked and not waited for (US-12-21 AC-12, R-17); green and a month are not asked whoever heads them', () => {
+    expect(initialExplanationStatus('QUARTER', 'YELLOW', false)).toBe('NO_HEAD');
+    expect(initialExplanationStatus('QUARTER', 'RED', false)).toBe('NO_HEAD');
+    expect(initialExplanationStatus('QUARTER', 'UNDER', false)).toBe('NO_HEAD');
+    expect(initialExplanationStatus('QUARTER', 'GREEN', false)).toBe('NOT_REQUIRED');
+    expect(initialExplanationStatus('MONTH', 'RED', false)).toBe('NOT_REQUIRED');
   });
 });
 

@@ -20,21 +20,32 @@ export class BudgetReviewExplanationReminderService {
     private readonly notifications: NotificationsApi,
   ) {}
 
+  /** The head each of the Cost Centers has on `today`, or null when its department has none: who a quarter can ask the day it opens (US-12-21 AC-12). */
+  async headsOf(tx: DbTx, costCenterIds: readonly string[], today: BusinessDate): Promise<Map<string, string | null>> {
+    const departments = await this.facts.departmentsOf(costCenterIds, tx);
+    const heads = new Map<string, string | null>();
+    for (const costCenterId of costCenterIds) {
+      const departmentId = departments.get(costCenterId);
+      heads.set(
+        costCenterId,
+        departmentId === undefined ? null : await this.facts.currentHeadOf(departmentId, today, tx),
+      );
+    }
+
+    return heads;
+  }
+
   /**
-   * The request that goes to the head of each Cost Center the quarter asks, in the transaction that opens it: the period, the Cost Center, the due day and the light, never a figure. One notice for a Cost
-   * Center and a quarter (`review:<period>:<Cost Center>:open`, `D12`); a department with no head has nobody to ask. Returns how many were written.
+   * The request that goes to the head of each Cost Center the quarter asks (`heads`, read when it opens), in the transaction that opens it: the period, the Cost Center, the due day and the
+   * light, never a figure. One notice for a Cost Center and a quarter (`review:<period>:<Cost Center>:open`, `D12`). Only the lines that are PENDING are asked, and a department with no head
+   * is not PENDING. Returns how many were written.
    */
-  async request(tx: DbTx, period: ReviewPeriodRecord, today: BusinessDate): Promise<number> {
+  async request(tx: DbTx, period: ReviewPeriodRecord, heads: ReadonlyMap<string, string | null>): Promise<number> {
     if (period.explanationsDueOn === null) return 0;
     const asked = await this.repo.pendingLines(tx, period.id);
-    const departments = await this.facts.departmentsOf(
-      asked.map((line) => line.costCenterId),
-      tx,
-    );
     let written = 0;
     for (const { costCenterId, light } of asked) {
-      const departmentId = departments.get(costCenterId);
-      const head = departmentId === undefined ? null : await this.facts.currentHeadOf(departmentId, today, tx);
+      const head = heads.get(costCenterId) ?? null;
       if (head === null) continue;
       const told = await this.notifications.notifyInApp(tx, {
         organizationId: period.organizationId,
