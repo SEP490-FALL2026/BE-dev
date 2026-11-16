@@ -19,7 +19,7 @@ import { auditOf } from './budget-adjustment-create.service';
  * the decision, because what was true when Finance asked may not be true now (another adjustment may have taken what was not allocated, a Cost Center may have spent what it
  * would give). An approval changes the budget: a supplement or a transfer adds to the base of the Cost Center that receives (the approved version of origin `ADJUSTMENT` is made
  * for it when it had none, `R-48`), a return or a transfer takes from the one that gives, a reduction of the ceiling lowers the annual ceiling of the cycle. The reserve is never
- * touched. A refusal changes nothing and needs a reason.
+ * touched. A refusal changes nothing and needs a reason, and is still possible after the year has ended, when an approval no longer is.
  */
 @Injectable()
 export class BudgetAdjustmentDecisionService {
@@ -60,7 +60,10 @@ export class BudgetAdjustmentDecisionService {
       if (adjustment.state !== 'PENDING') throw new BudgetAdjustmentDecidedError();
       if (adjustment.createdByEmployeeId === actor.employeeId)
         throw new BudgetDecisionRefusedError('CONFLICT_OF_INTEREST');
-      if (yearHasEnded(adjustment.year, today)) throw new BudgetYearEndedError(adjustment.year);
+      // A year that has ended is not adjusted any more, but what was left pending is refused with a reason, so that the inbox of the approver empties (AD1-07).
+      if (body.decision === 'APPROVE' && yearHasEnded(adjustment.year, today)) {
+        throw new BudgetYearEndedError(adjustment.year);
+      }
       const now = new Date();
       const createdVersionId =
         body.decision === 'APPROVE' ? await this.applier.apply(tx, actor, cycle, adjustment, today, now) : null;

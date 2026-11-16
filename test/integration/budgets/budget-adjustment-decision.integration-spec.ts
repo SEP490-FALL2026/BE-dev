@@ -140,7 +140,7 @@ describe('an approved adjustment moves the budget the way the story says, and th
     });
   });
 
-  it('a year that has ended is not adjusted any more: asked or decided on 10 January of the year after, it is 422 BUDGET.YEAR_ENDED', async () => {
+  it('a year that has ended is not adjusted any more: asked or approved on 10 January of the year after, it is 422 BUDGET.YEAR_ENDED, and what was left pending can still be refused with a reason (AD1-07)', async () => {
     await c.ceilingLeaving(10);
     const asked = await c.made(c.supplement(sales, 1));
     const day = pretendBusinessToday(h.ctx.app, `${h.year + 1}-01-10`);
@@ -148,6 +148,17 @@ describe('an approved adjustment moves the budget the way the story says, and th
     try {
       expect(c.code(await c.decide(asked.id, { decision: 'APPROVE' }).expect(422))).toBe('BUDGET.YEAR_ENDED');
       expect(c.code(await c.supplement(sales, 1).expect(422))).toBe('BUDGET.YEAR_ENDED');
+      expect(c.code(await c.decide(asked.id, { decision: 'REJECT' }).expect(422))).toBe(
+        'BUDGET.ADJUSTMENT_REASON_REQUIRED',
+      );
+      expect(
+        h.dataOf<{ state: string; decisionReason: string }>(
+          await c.decide(asked.id, { decision: 'REJECT', reason: 'Năm đã kết thúc' }).expect(200),
+        ),
+      ).toMatchObject({ state: 'REJECTED', decisionReason: 'Năm đã kết thúc' });
+      expect(c.code(await c.decide(asked.id, { decision: 'APPROVE' }).expect(409))).toBe(
+        'BUDGET_ADJUSTMENT.ALREADY_DECIDED',
+      );
     } finally {
       day.mockRestore();
     }
