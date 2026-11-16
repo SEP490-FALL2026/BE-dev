@@ -119,7 +119,7 @@ export class DecisionController {
   @RequireRoles('MANAGER')
   @ApiOperation({
     operationId: 'ghostSeatDecisionCreate',
-    summary: 'Keep, reclaim or exempt the seats recommended to me, with a reason and the checklist',
+    summary: 'Keep, reclaim or exempt the seats recommended to me, with a reason',
   })
   @ApiSuccessResponse(DecisionCreatedResponseDto, {
     status: HttpStatus.CREATED,

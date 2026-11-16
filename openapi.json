@@ -96978,7 +96978,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Keep, reclaim or exempt the seats recommended to me, with a reason and the checklist",
+        "summary": "Keep, reclaim or exempt the seats recommended to me, with a reason",
         "tags": ["ghost-seats"]
       }
     },
