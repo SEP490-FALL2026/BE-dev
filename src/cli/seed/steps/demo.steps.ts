@@ -247,6 +247,119 @@ async function adjustments(ctx: DemoRunContext): Promise<StepOutcome> {
   return { status: 'done', detail: 'Bổ sung chờ duyệt, Chuyển đã duyệt' };
 }
 
+interface DiscrepancyRow {
+  id: string;
+  source: string;
+  identity: string | null;
+  employeeId: string | null;
+  outOfProcessCaseId: string | null;
+}
+
+/**
+ * DEMO-11 (`SBF-07a`): of the accounts the Jira usage file shows with no seat (`SBF-08`), the IT Admin of Jira sends NV-SAL1's out of
+ * process (not a company asset), and Finance records what it cost with the receipt, charged to Sales: the case closes. The other account
+ * and the unknown identity of the Figma file stay open (`SBF-08` keeps two values).
+ */
+async function outOfProcess(ctx: DemoRunContext): Promise<StepOutcome> {
+  const admin = await as(ctx, subscriptionOf(ctx, 'jira').responsible);
+  const finance = await as(ctx, financePerson(ctx));
+  const identity = `${ctx.fixture.people.find((p) => p.code === 'NV-SAL1')?.email}@${ctx.fixture.emailDomain}`;
+  const rows = await listAll<DiscrepancyRow>(ctx, admin, '/vendor-account-discrepancies');
+  const employeeId = ctx.ids.employees.get('NV-SAL1');
+  const found = rows.find(
+    (row) =>
+      row.source === 'NO_ASSIGNMENT' && (row.employeeId === employeeId || row.identity?.toLowerCase() === identity),
+  );
+  if (!found) {
+    const seen = rows.map((row) => `${row.source}:${row.employeeId ?? row.identity ?? '?'}`).join(', ');
+    return { status: 'conflict', detail: `không có sai lệch NO_ASSIGNMENT của ${identity} (có: ${seen || 'không'})` };
+  }
+  let caseId = found.outOfProcessCaseId;
+  if (caseId) {
+    const cases = await listAll<{ id: string; outcome: string | null }>(ctx, finance, '/out-of-process-cases');
+    if (cases.find((row) => row.id === caseId)?.outcome)
+      return { status: 'present', detail: 'ca ngoài quy trình đã ghi phần đã chi' };
+  }
+  if (ctx.mode === 'plan') return { status: 'planned', detail: 'quyết OUT_OF_PROCESS rồi Finance ghi phần đã chi' };
+  if (!caseId) {
+    const decided = await ctx.api.call<{ outOfProcessCaseId: string | null }>(
+      admin,
+      'POST',
+      `/vendor-account-discrepancies/${found.id}/decision`,
+      {
+        decision: 'OUT_OF_PROCESS',
+        companyAsset: false,
+        note: `${tag(ctx, 'SBF07')} Nhân viên Kinh doanh tự mua Jira bằng thẻ cá nhân, không qua Request.`,
+      },
+    );
+    caseId = decided.outOfProcessCaseId;
+  }
+  if (!caseId) return { status: 'conflict', detail: 'quyết định không mở ca ngoài quy trình' };
+  const receipt = await uploadDocument(ctx, finance, 'PURCHASE_DOCUMENT', 'bien-nhan-jira-ca-nhan.pdf');
+  await ctx.api.call(finance, 'POST', `/out-of-process-cases/${caseId}/closure`, {
+    outcome: 'RECORD_SPENT',
+    note: `${tag(ctx, 'SBF07')} Ghi phần đã chi theo biên nhận, tính cho phòng Kinh doanh.`,
+    documentIds: [receipt],
+    amount: money('200000'),
+    costCenterId: ctx.ids.costCenters.get('SAL'),
+  });
+
+  return { status: 'done', detail: 'ca ngoài quy trình: đã ghi phần đã chi kèm chứng từ' };
+}
+
+/** DEMO-8: the Slack seat an IT Admin holds for the bot of IT alerts is marked a machine account, so no ghost-seat rule reports it. */
+async function machineAccount(ctx: DemoRunContext): Promise<StepOutcome> {
+  const admin = await as(ctx, subscriptionOf(ctx, 'slack').responsible);
+  const holder = ctx.ids.employees.get('NV-ITA3');
+  const rows = await listAll<{ id: string; isMachineAccount?: boolean }>(
+    ctx,
+    admin,
+    `/license-assignments?employeeId=${holder}&subscriptionId=${ctx.ids.subscriptions.get('slack')}`,
+  );
+  const seat = rows[0];
+  if (!seat) return { status: 'conflict', detail: 'NV-ITA3 không có ghế Slack' };
+  if (seat.isMachineAccount) return { status: 'present', detail: 'ghế Slack của NV-ITA3 là tài khoản máy' };
+  if (ctx.mode === 'plan') return { status: 'planned', detail: 'đánh dấu tài khoản máy' };
+  await ctx.api.call(admin, 'POST', `/license-assignments/${seat.id}/machine-account`, {
+    isMachineAccount: true,
+    note: 'Bot đăng cảnh báo của phòng IT lên kênh #it-alerts.',
+  });
+
+  return { status: 'done', detail: 'ghế Slack của NV-ITA3 là tài khoản máy' };
+}
+
+/** DEMO-5: the holder of a Postman seat that ends in 7 days asks to carry it on 3 months; the request waits for the head (R33). */
+async function renewal(ctx: DemoRunContext): Promise<StepOutcome> {
+  const holderCode = 'NV-SAL2';
+  const holder = await as(ctx, holderCode);
+  const marker = tag(ctx, 'R33');
+  // The list of one's own requests carries no reason: each is read whole to find the one of the dataset.
+  for (const row of await listAll<{ id: string }>(ctx, holder, '/me/access-requests')) {
+    const read = await ctx.api.call<{ request: { state: string; businessReason?: string | null } }>(
+      holder,
+      'GET',
+      `/access-requests/${row.id}`,
+    );
+    if (read.request.businessReason?.startsWith(marker))
+      return { status: 'present', detail: `R33 ${read.request.state}` };
+  }
+  if (ctx.mode === 'plan') return { status: 'planned', detail: 'gửi Request tiếp tục' };
+  const admin = await as(ctx, subscriptionOf(ctx, 'postman').responsible);
+  const seats = await listAll<{ id: string }>(
+    ctx,
+    admin,
+    `/license-assignments?employeeId=${ctx.ids.employees.get(holderCode)}&subscriptionId=${ctx.ids.subscriptions.get('postman')}`,
+  );
+  if (!seats[0]) return { status: 'conflict', detail: `${holderCode} không có ghế Postman` };
+  const sent = await ctx.api.call<{ outcome: string }>(holder, 'POST', '/access-requests/renewals', {
+    assignmentId: seats[0].id,
+    extensionMonths: 3,
+    businessReason: `${marker} Dự án kiểm thử API với khách hàng kéo dài thêm một quý.`,
+  });
+
+  return { status: 'done', detail: `R33 ${sent.outcome}` };
+}
+
 /** The policy published again with a re-acknowledgement asked (SPEC Z2 "1 bản chờ xác nhận"): every person it applies to must read it. */
 const REPUBLISHED_POLICY = 'POL-MF2';
 
@@ -294,6 +407,24 @@ export const DEMO_STEPS: readonly DemoStep[] = [
     title: 'Điều chỉnh ngân sách năm khi kỳ đã khóa: Bổ sung chờ duyệt, Chuyển đã duyệt (DEMO-14)',
     needs: ['budget.year', 'org.approval-roles'],
     run: adjustments,
+  },
+  {
+    key: 'demo.out-of-process',
+    title: 'Sai lệch tài khoản nhà cung cấp → ca ngoài quy trình, Finance ghi phần đã chi kèm chứng từ (DEMO-11)',
+    needs: ['usage.imports', 'finance.cost-centers'],
+    run: outOfProcess,
+  },
+  {
+    key: 'demo.machine-account',
+    title: 'Ghế Slack của IT Admin là tài khoản máy, không bị báo ghost seat (DEMO-8)',
+    needs: ['catalog.baseline-close'],
+    run: machineAccount,
+  },
+  {
+    key: 'demo.renewal',
+    title: 'Quyền Postman hết sau 7 ngày, Request tiếp tục chờ trưởng phòng (DEMO-5, R33)',
+    needs: ['catalog.baseline-close', 'org.heads'],
+    run: renewal,
   },
   {
     key: 'demo.policy-reacknowledgement',

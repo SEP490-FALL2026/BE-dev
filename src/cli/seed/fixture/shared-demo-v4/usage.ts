@@ -59,7 +59,16 @@ const JIRA: DemoUsageSource = {
   windowFromDaysAgo: 120,
   windowToDaysAgo: 1,
   notice: 'CONFIRMED_DELIVERED',
-  rows: [row('NV-ENGH', 3), row('NV-DEV1', 1), row('NV-DEV4', 5), row('NV-OFF1', 2)],
+  // NV-DEV2 and NV-SAL1 use Jira with no seat of the pool: two accounts with no Assignment (SBF-08, DEMO-11); the seed sends NV-SAL1's out of
+  // process and Finance records what was spent (SBF-07a).
+  rows: [
+    row('NV-ENGH', 3),
+    row('NV-DEV1', 1),
+    row('NV-DEV4', 5),
+    row('NV-OFF1', 2),
+    row('NV-DEV2', 4),
+    row('NV-SAL1', 6),
+  ],
 };
 
 /** A report 10 days old: older than a week, so the source is stale and Canva is left out of the rules. */

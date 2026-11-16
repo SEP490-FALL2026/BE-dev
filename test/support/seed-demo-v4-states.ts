@@ -32,4 +32,5 @@ export const SHARED_DEMO_V4_REQUEST_STATES: Record<string, string> = {
   R30: 'WAITING_CONTROLLED',
   R31: 'AWAITING_SPEND_DECISION',
   R32: 'COMPLETED',
+  R33: 'PENDING',
 };

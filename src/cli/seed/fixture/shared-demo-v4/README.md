@@ -274,6 +274,15 @@ Ba nguồn usage nhập bằng tệp CSV theo mẫu (cột `email`, `last_activi
 4. Trưởng phòng quyết: NV-DESH `GET /ghost-seat-queue`, `POST /ghost-seat-decisions` (DES1, DES3 còn chờ); Super Admin xem tự quyết `GET /ghost-seat-decisions?selfDecided=true`.
 5. IT thu hồi G2: NV-ITA1 `POST /ghost-seat-recommendations/{id}/reclaim`, rồi `…/claim`, `…/revocation-completion` trên `/provisioning-tasks`.
 
+## Dữ liệu demo hội đồng thêm ở Z2 (DEMO-1…15)
+
+Bước `demo.*` chạy cuối (chi tiết, giới hạn và bằng chứng: [Z2-NOTES](../../../../../docs/reviews/fe-feedback-2026-11-11/Z2-NOTES.md)):
+hợp đồng `SV-HD-ATL-01` (Jira, K2) và `SV-HD-JB-01` (JetBrains, K4) có tệp; hóa đơn mua `SV-INV-001` chờ ký, `-002` đã ký, `-003` bị trả,
+`-004` ký với 12 ghế so với 7 đã mua (ca lệch `SBF-11a`); chốt tháng 1–10 của năm (quý 9 chờ giải trình, Thiết kế đã giải trình); điều chỉnh
+năm `Y` ở lượt seed chạy lại từ D0+1; NV-SAL1 dùng Jira ngoài quy trình (Finance ghi phần đã chi, `SBF-07a`), NV-DEV2 dùng Jira không ghế
+(`SBF-08`); ghế Slack của NV-ITA3 là tài khoản máy; ghế Postman của NV-SAL2 hết hạn D0+7 có Request tiếp tục R33 chờ trưởng phòng; POL-MF2
+bản 2 chờ xác nhận lại. Seed lại ≤ 1 ngày trước demo.
+
 ## Giới hạn
 
 - Seed **không** chèn SQL; mọi trạng thái trên đều do API cho phép. Không có trạng thái nào bị bỏ vì luật code chặn, trừ các mục sau.

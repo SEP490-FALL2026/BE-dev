@@ -256,6 +256,10 @@ const SEATS: DemoSeat[] = [
   ...seat('figma', ['NV-DES10'], { endInDays: 20 }),
   ...seat('figma', ['NV-DES12'], { endInDays: 35 }),
   ...seat('slack', ['NV-ENGH', 'NV-FINH']),
+  // The seat of the bot that posts the alerts of IT in Slack, held by an IT Admin: marked a machine account, never a ghost seat (DEMO-8).
+  ...seat('slack', ['NV-ITA3']),
+  // A right that ends in 7 days: its holder asked to carry it on, the request waits for the head (DEMO-5, R33).
+  ...seat('postman', ['NV-SAL2'], { endInDays: 7 }),
   // Legal has no head, so its budget is built from the baseline: the seats its people hold are what that baseline is made of.
   ...seat('github', ['NV-ENGH', 'NV-DEV1', 'NV-OFF1', 'NV-LGL1']),
   ...seat('onepassword', ['NV-ENGH', 'NV-DEV1', 'NV-DEV4']),
