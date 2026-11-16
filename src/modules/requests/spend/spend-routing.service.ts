@@ -101,7 +101,23 @@ export class SpendRoutingService {
     request: AccessRequestRecord,
     outcome: { status: 'NOT_CHECKABLE'; reason: NotCheckable },
   ): Promise<RoutingOutcome> {
-    if (request.routing?.mode !== 'ONE_STEP') return outcome;
+    if (request.routing?.mode !== 'ONE_STEP') {
+      // A batch stops the item here: the one who asked and the IT Admin in charge are told why (`BRD 5.5.4`). A confirmation of the reserve
+      // that finds the same throws after this, so the audit rolls back with the transaction and tells nobody.
+      await this.audit.record(
+        tx,
+        accessRequestAuditEvent(
+          actor,
+          request.organizationId,
+          'ACCESS_REQUEST.SPEND_NOT_CHECKABLE',
+          'ACCESS_REQUEST',
+          request.id,
+          { requestId: request.id, reason: outcome.reason, routingMode: 'VIA_HEAD' },
+        ),
+      );
+
+      return outcome;
+    }
     await this.requests.setOneStepBlockedReason(tx, request.id, outcome.reason);
     await this.requests.setState(tx, request.id, 'AWAITING_REQUESTER_REVISION');
     await this.audit.record(

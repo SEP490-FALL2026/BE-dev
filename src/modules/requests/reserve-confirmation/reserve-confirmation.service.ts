@@ -11,7 +11,7 @@ import type { BlockReason, BudgetOutcome } from '../spend/budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord } from '../spend/budget-check.repo';
 import { SpendNotHeadError, SpendReserveRefusedError } from '../spend/spend.errors';
 import { SpendRoutingService, type RoutingOutcome } from '../spend/spend-routing.service';
-import { SpendStepRepo } from '../spend/spend-step.repo';
+import { SpendStepRepo, type SpendStepRecord } from '../spend/spend-step.repo';
 import { ReserveConfirmationChecklist } from './reserve-confirmation-checklist.service';
 import { ReserveConfirmationRepo } from './reserve-confirmation.repo';
 import { awaitsReserveConfirmation, checkConfirmer } from './reserve-confirmation.policy';
@@ -115,14 +115,16 @@ export class ReserveConfirmationService {
   /**
    * The confirmation the head gave in the act of sending a batch, for a request whose check just said it uses the reserve (the check was
    * made in the same transaction, so it is not made again): opens the spend step, keeps the confirmation with it and moves the request.
+   * Returns the step it opened, whose holder the batch tells (`SPEND_BATCH_SUBMITTED`); `via` says whether the batch or the confirmation alone
+   * gave it, since only the second tells the approver of this request by itself (the batch has no id yet when this runs).
    */
   async confirmOnCheck(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     request: AccessRequestRecord,
     check: CheckRecord,
-    by: { reason: string; now: Date },
-  ): Promise<void> {
+    by: { reason: string; now: Date; via: 'BATCH' | 'CONFIRMATION' },
+  ): Promise<SpendStepRecord> {
     const { state, step } = await this.routing.openSpend(tx, request, by.now);
     await this.requests.setState(tx, request.id, state);
     await this.confirmations.insert(tx, {
@@ -149,9 +151,14 @@ export class ReserveConfirmationService {
           reason: by.reason,
           overBaseBy: check.overBaseByMinor?.toString() ?? null,
           state,
+          via: by.via,
+          // Who holds the step just opened, for the notice of a confirmation given alone (null while it waits).
+          spendAssigneeEmployeeId: step.assigneeEmployeeId,
         },
       ),
     );
+
+    return step;
   }
 
   private async resultOf(
@@ -165,7 +172,11 @@ export class ReserveConfirmationService {
     if (routed.outcome === 'BLOCKED') return { ...base, result: 'BLOCKED', confirmationKept: false };
     if (routed.outcome === 'WITHIN_BASE') return { ...base, result: 'SPEND_STEP_OPENED', confirmationKept: false };
 
-    await this.confirmOnCheck(tx, actor, request, routed.check, { reason: by.reason, now: by.now });
+    await this.confirmOnCheck(tx, actor, request, routed.check, {
+      reason: by.reason,
+      now: by.now,
+      via: 'CONFIRMATION',
+    });
 
     return { ...base, result: 'SPEND_STEP_OPENED', confirmationKept: true };
   }
