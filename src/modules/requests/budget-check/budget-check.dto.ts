@@ -75,7 +75,7 @@ const yearSchema = z.strictObject({
   code: z.enum(['BUDGET_OK', 'HIGH_VALUE', 'INSUFFICIENT_BUDGET', 'NO_ACTIVE_BUDGET']).nullable(),
   /** The effective base and the reserve together. Null when the year has no approved version: that is not a budget of 0. */
   budget: money.nullable(),
-  /** The effective base: the base of the approved version plus the adjustments approved for the year. */
+  /** The effective base: the base of the approved version plus the adjustments approved for the year, the same figure as effectiveBudget.base (the table of budgets names the base of the version `base`). */
   base: money.nullable(),
   reserve: money.nullable(),
   /** The budget the check was made against: the approved version with the adjustments approved for it, the reserve as it is. Null when the year has no approved version. */

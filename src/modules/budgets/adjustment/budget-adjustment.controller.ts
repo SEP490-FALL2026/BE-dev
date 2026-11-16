@@ -77,6 +77,7 @@ export class BudgetAdjustmentController {
         'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), a transfer for COST_CENTER_CHANGE is more than what is left after what the Cost Center used (BUDGET_ADJUSTMENT.OVER_REMAINING), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).',
       examples: [
         VALIDATION_EXAMPLE,
+        EXAMPLES.YEAR_ENDED,
         EXAMPLES.INVALID_SHAPE,
         EXAMPLES.OVER_UNALLOCATED,
         EXAMPLES.BELOW_FORECAST_FLOOR,
@@ -135,8 +136,7 @@ export class BudgetAdjustmentController {
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description:
-        'Only the spending approver decides, and never an adjustment they asked for (BUDGET.CONFLICT_OF_INTEREST).',
+      description: 'Only the spending approver decides.',
       examples: [FORBIDDEN_EXAMPLE],
     },
     {
@@ -160,9 +160,10 @@ export class BudgetAdjustmentController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        "The body or the id is invalid (VALIDATION_ERROR), a refusal has no reason (BUDGET.ADJUSTMENT_REASON_REQUIRED), or a condition no longer holds on today's figures (BUDGET_ADJUSTMENT.OVER_UNALLOCATED, BELOW_FORECAST_FLOOR, OVER_BASE, OVER_REMAINING, NO_BUDGET).",
+        "The body or the id is invalid (VALIDATION_ERROR), a refusal has no reason (BUDGET.ADJUSTMENT_REASON_REQUIRED), the year has ended so that an approval is no longer possible (BUDGET.YEAR_ENDED; a refusal still is), or a condition no longer holds on today's figures (BUDGET_ADJUSTMENT.OVER_UNALLOCATED, BELOW_FORECAST_FLOOR, OVER_BASE, OVER_REMAINING, NO_BUDGET).",
       examples: [
         VALIDATION_EXAMPLE,
+        EXAMPLES.YEAR_ENDED,
         EXAMPLES.OVER_UNALLOCATED,
         EXAMPLES.BELOW_FORECAST_FLOOR,
         EXAMPLES.OVER_BASE,

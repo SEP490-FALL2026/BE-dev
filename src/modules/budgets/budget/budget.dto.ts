@@ -297,7 +297,10 @@ const effectiveBudgetSchema = z.strictObject({
   }),
 });
 const budgetNumbersSchema = {
-  base: moneyView.nullable().meta({ description: 'The base of the approved version, before the adjustments.' }),
+  base: moneyView.nullable().meta({
+    description:
+      'The base of the approved version, before the adjustments (the base with them is effectiveBudget.base; the check of a request names that one `base`).',
+  }),
   reserve: moneyView.nullable(),
   total: moneyView
     .nullable()
