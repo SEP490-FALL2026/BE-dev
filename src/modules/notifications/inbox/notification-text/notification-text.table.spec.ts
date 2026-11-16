@@ -207,6 +207,7 @@ describe('NOTIFICATION_TEXTS: the whole table', () => {
 
   it.each(codes)('%s: renders without syntax or placeholder, for empty and for sample params', (code) => {
     for (const locale of LOCALES) {
+      expect(renderNotificationText(code, baseParams(code), locale, new Map()).message).not.toBe('');
       for (const params of sampleParamSets(code)) {
         const { title, message } = renderNotificationText(code, params, locale, new Map());
         expect(title).not.toBe('');

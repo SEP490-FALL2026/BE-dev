@@ -137,12 +137,13 @@ describe('MAY_BE_ABSENT: a variable that can be absent stays inside [ ] or is th
   );
 
   it.each(entries.map(({ code, key }) => [code, key] as const))(
-    '%s with %s null renders no hole ("()", a space before punctuation)',
+    '%s with %s null renders a sentence with no hole ("()", a space before punctuation)',
     (code, key) => {
       if (`${code}.${key}` in ABSENT_OUTSIDE_GROUP_OK) return;
       for (const locale of LOCALES) {
         for (const params of branchParamSets(code, key)) {
           const { message } = renderNotificationText(code, params, locale, new Map());
+          expect(message).not.toBe('');
           expect(message).not.toContain('()');
           expect(message).not.toMatch(/\s[.,;:)]/);
         }

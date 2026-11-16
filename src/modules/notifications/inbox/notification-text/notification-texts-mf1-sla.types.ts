@@ -131,15 +131,17 @@ export const MF1_SLA_TEXTS = {
     },
   },
   CONTROLLED_WAIT_ALERT: {
+    // One sentence: the subject is the group of the context the notice is about (they exclude each other), then the optional reason
+    // and hint. A null reason or hint, or a context whose key is null, never makes the whole message empty (catalogue: `null`).
     vi: {
       title: 'Có việc đang chờ vì thiếu người phụ trách',
       message:
-        '[Bước {stepKind:enum} của yêu cầu {requestId:name} đang chờ vì {waitingReason:enum}. Cần: {configurationHint:enum}.][Phiên bản ngân sách {year} của {costCenterId:name} đang chờ vì {waitingReason:enum}. Cần: {configurationHint:enum}.][Hồ sơ gia hạn thuê bao {subscriptionId:name} đang chờ vì {waitingReason:enum}. Cần: {configurationHint:enum}.]',
+        '[Bước {stepKind:enum} của yêu cầu {requestId:name}][Phiên bản ngân sách {year} của {costCenterId:name}][Hồ sơ gia hạn thuê bao {subscriptionId:name}] đang chờ[ vì {waitingReason:enum}].[ Cần: {configurationHint:enum}.]',
     },
     en: {
       title: 'Work is waiting for someone to be in charge',
       message:
-        '[The {stepKind:enum} step of request {requestId:name} is waiting because {waitingReason:enum}. Needed: {configurationHint:enum}.][The {year} budget version of {costCenterId:name} is waiting because {waitingReason:enum}. Needed: {configurationHint:enum}.][The renewal case for subscription {subscriptionId:name} is waiting because {waitingReason:enum}. Needed: {configurationHint:enum}.]',
+        '[The {stepKind:enum} step of request {requestId:name}][The {year} budget version of {costCenterId:name}][The renewal case for subscription {subscriptionId:name}] is waiting[ because {waitingReason:enum}].[ Needed: {configurationHint:enum}.]',
     },
   },
 } satisfies Partial<Record<InAppNotificationCode, NotificationTexts>>;
