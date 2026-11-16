@@ -17,6 +17,7 @@ import {
   EmployeeTerminatedError,
   FinanceAlreadyAssignedError,
   LoginEmailInvalidError,
+  LoginEmailNotWorkEmailError,
   LoginEmailRequiredError,
   RoleRequestRefusedError,
   SpendingApproverAccountNotUsableError,
@@ -68,10 +69,7 @@ export class AccountInvitationService {
         const current = await this.organizationReads.getEmployee(input.employeeId, tx);
         if (!current) throw new EmployeeNotFoundError(input.employeeId);
         if (!employeeHasNotLeft(current)) throw new EmployeeTerminatedError();
-        // Resolved from the employee as locked, not from the earlier unlocked read (lock protocol rule 2).
-        const rawEmail = input.loginEmail ?? current.workEmail;
-        if (!rawEmail) throw new LoginEmailRequiredError();
-        const normalized = this.normalizeLoginEmail(rawEmail);
+        const { loginEmail, normalized } = this.resolveLoginEmail(current.workEmail, input.loginEmail);
         if ((await this.accounts.findAccountIdByEmployee(tx, input.employeeId)) !== null) {
           throw new AccountAlreadyExistsError();
         }
@@ -83,7 +81,7 @@ export class AccountInvitationService {
         const user = await this.accounts.createAppUser(tx, {
           organizationId: organization.id,
           employeeId: input.employeeId,
-          loginEmail: rawEmail.trim(),
+          loginEmail,
           normalizedLoginEmail: normalized,
           status: 'ACTIVE',
           activationState: 'INVITED',
@@ -101,13 +99,13 @@ export class AccountInvitationService {
           tx,
           accountAuditEvent(actor, organization.id, 'APP_USER.CREATED', user.id, null, {
             employeeId: input.employeeId,
-            loginEmail: rawEmail.trim(),
+            loginEmail,
             status: 'ACTIVE',
             activationState: 'INVITED',
             roles: [role],
           }),
         );
-        await this.invitations.send(tx, actor, organization.id, user.id, rawEmail.trim(), current, now);
+        await this.invitations.send(tx, actor, organization.id, user.id, loginEmail, current, now);
 
         return user.id;
       })
@@ -138,6 +136,22 @@ export class AccountInvitationService {
         new Date(),
       );
     });
+  }
+
+  /**
+   * The login email is the work email of the employee as locked, not of the earlier unlocked read (lock protocol rule 2).
+   * `sent` is the deprecated `loginEmail` of the body: it must be the same address (case aside) and is never stored.
+   */
+  private resolveLoginEmail(
+    workEmail: string | null,
+    sent: string | undefined,
+  ): { loginEmail: string; normalized: string } {
+    if (!workEmail) throw new LoginEmailRequiredError();
+    const loginEmail = workEmail.trim();
+    const normalized = this.normalizeLoginEmail(loginEmail);
+    if (sent !== undefined && this.normalizeLoginEmail(sent) !== normalized) throw new LoginEmailNotWorkEmailError();
+
+    return { loginEmail, normalized };
   }
 
   private normalizeLoginEmail(value: string): string {

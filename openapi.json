@@ -93032,12 +93032,12 @@
                     }
                   },
                   "APP_USER.LOGIN_EMAIL_REQUIRED": {
-                    "summary": "The employee has no work email and none was supplied.",
+                    "summary": "The employee has no work email.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "APP_USER.LOGIN_EMAIL_REQUIRED",
-                        "message": "The employee has no work email and none was supplied.",
+                        "message": "The employee has no work email.",
                         "requestId": "req_example"
                       }
                     }
@@ -93049,6 +93049,18 @@
                       "error": {
                         "code": "APP_USER.LOGIN_EMAIL_INVALID",
                         "message": "The login email is not a valid address.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APP_USER.LOGIN_EMAIL_NOT_WORK_EMAIL": {
+                    "summary": "The login email must be the work email of the employee.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APP_USER.LOGIN_EMAIL_NOT_WORK_EMAIL",
+                        "message": "The login email must be the work email of the employee.",
+                        "details": { "field": "loginEmail" },
                         "requestId": "req_example"
                       }
                     }
@@ -131763,7 +131775,12 @@
         "type": "object",
         "properties": {
           "employeeId": { "type": "string", "format": "uuid" },
-          "loginEmail": { "type": "string", "maxLength": 254 },
+          "loginEmail": {
+            "deprecated": true,
+            "description": "Deprecated, to be removed: the account always logs in with the work email of the employee. Omit it. When sent, it must equal the work email (case aside), otherwise the answer is 422 APP_USER.LOGIN_EMAIL_NOT_WORK_EMAIL.",
+            "type": "string",
+            "maxLength": 254
+          },
           "role": {
             "default": "EMPLOYEE",
             "type": "string",
