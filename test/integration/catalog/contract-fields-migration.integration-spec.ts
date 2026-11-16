@@ -6,6 +6,7 @@ import { PROJECT_ROOT, stopCliProcesses } from '../../support/cli-process';
 import { dropDisposableDatabase, provisionDisposableDatabase } from '../../support/disposable-database';
 import {
   DEPLOY_TIMEOUT_MS,
+  committedMigrations,
   deployMigrations,
   migrationBefore,
   migrationEndingWith,
@@ -200,6 +201,11 @@ describe('the migration that gives a contract its fields and links its subscript
           ),
         ).toBe('55000');
 
+        // The migrations written after this one are applied the same way (as `year-start-commitments-migration` does), so the schema is
+        // whole before it is read against `prisma/models`: the history was only deployed up to the one before this migration.
+        for (const later of committedMigrations().slice(committedMigrations().indexOf(TARGET) + 1)) {
+          await sql.query(sqlOf(later));
+        }
         // What Prisma reads of `prisma/models` is what the migrations made.
         const drift = await schemaDrift(database);
         expect(drift.code).toBe(0);
