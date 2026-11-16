@@ -7,10 +7,10 @@ import { bearer, createHttpContractApp, principal } from '../../support/http-con
 
 describe('GET /budget-commitments (HTTP contract, no database)', () => {
   let app: INestApplication<App>;
-  const page = jest.fn();
+  const list = jest.fn();
 
   beforeAll(async () => {
-    app = await createHttpContractApp({ overrides: [{ token: CommitmentService, useValue: { page } }] });
+    app = await createHttpContractApp({ overrides: [{ token: CommitmentService, useValue: { list } }] });
   });
 
   afterAll(async () => {
@@ -18,7 +18,7 @@ describe('GET /budget-commitments (HTTP contract, no database)', () => {
   });
 
   beforeEach(() => {
-    page.mockReset().mockResolvedValue({
+    list.mockReset().mockResolvedValue({
       items: [],
       pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 },
     });
@@ -29,15 +29,15 @@ describe('GET /budget-commitments (HTTP contract, no database)', () => {
     expect(bodyOf(response).error.code).toBe('AUTHENTICATION_REQUIRED');
   });
 
-  it('refuses every role but Finance with 403 and reads nothing', async () => {
-    for (const roles of [['MANAGER'], ['EMPLOYEE'], ['IT_ADMIN'], ['SUPER_ADMIN'], ['SPENDING_APPROVER'], []]) {
+  it('refuses every role but Finance and the head of a department with 403 and reads nothing', async () => {
+    for (const roles of [['EMPLOYEE'], ['IT_ADMIN'], ['SUPER_ADMIN'], ['SPENDING_APPROVER'], []]) {
       const response = await request(app.getHttpServer())
         .get('/api/v1/budget-commitments?state=HELD')
         .set('Authorization', bearer(principal(roles)))
         .expect(403);
       expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
     }
-    expect(page).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
   });
 
   it.each([['PENDING'], ['held'], ['']])('turns away the state %p with 422', async (state) => {
@@ -47,7 +47,7 @@ describe('GET /budget-commitments (HTTP contract, no database)', () => {
       .set('Authorization', bearer(principal(['FINANCE'])))
       .expect(422);
     expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
-    expect(page).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
   });
 
   it.each([['HELD'], ['RELEASED'], ['EXPENSED']])('narrows the list to the state %s', async (state) => {
@@ -57,7 +57,7 @@ describe('GET /budget-commitments (HTTP contract, no database)', () => {
       .set('Authorization', bearer(principal(['FINANCE'])))
       .expect(200);
 
-    expect(page).toHaveBeenCalledWith(expect.objectContaining({ state }));
+    expect(list).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ state }));
   });
 
   it('does not narrow the list when no state is given', async () => {
@@ -66,6 +66,25 @@ describe('GET /budget-commitments (HTTP contract, no database)', () => {
       .set('Authorization', bearer(principal(['FINANCE'])))
       .expect(200);
 
-    expect(page).toHaveBeenCalledWith(expect.not.objectContaining({ state: expect.anything() as unknown }));
+    expect(list).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ state: expect.anything() as unknown }),
+    );
+  });
+
+  it('lets the head of a department read, and passes the long-term filter down as a boolean (RV-3)', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/budget-commitments')
+      .query({ longTerm: 'true', year: 2026 })
+      .set('Authorization', bearer(principal(['MANAGER'])))
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v1/budget-commitments')
+      .query({ longTerm: 'maybe' })
+      .set('Authorization', bearer(principal(['MANAGER'])))
+      .expect(422);
+
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(list).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ longTerm: true, year: 2026 }));
   });
 });
