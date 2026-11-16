@@ -50,6 +50,18 @@ export class BudgetAdjustmentOverBaseError extends Error {
   }
 }
 
+/** A transfer because the department changed its Cost Center takes more than what is left of the effective budget of the old one (what it used stays with it). */
+export class BudgetAdjustmentOverRemainingError extends Error {
+  constructor(
+    readonly costCenterId: string,
+    readonly remainingMinor: bigint,
+    readonly usedMinor: bigint,
+  ) {
+    super('The amount is more than what is left of the budget of the Cost Center after what it used.');
+    this.name = 'BudgetAdjustmentOverRemainingError';
+  }
+}
+
 /** The Cost Center that gives has no budget of the year. */
 export class BudgetAdjustmentNoBudgetError extends Error {
   constructor(readonly costCenterId: string) {

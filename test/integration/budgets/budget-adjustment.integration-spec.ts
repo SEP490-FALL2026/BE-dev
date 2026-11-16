@@ -130,9 +130,20 @@ describe('Finance asks for an adjustment of the budget and the spending approver
     ).toMatchObject({ kind: 'RETURN' });
   });
 
-  it('T-AD1: a transfer because the department changed its Cost Center is not held to the floor: 170 tr passes, 181 tr is more than the base', async () => {
-    expect(await made(transfer(admin, sales, 170, { transferReason: 'COST_CENTER_CHANGE' }))).toMatchObject({
+  it('T-AD1 (QĐ-111bh, AC-10): a transfer because the department changed its Cost Center moves what is left, 198 - 110 used = 88 tr, and no floor of the forecast: 88 tr passes, 170 tr is 422 although it is under the base, 181 tr is more than the base', async () => {
+    const over = await transfer(admin, sales, 170, { transferReason: 'COST_CENTER_CHANGE' }).expect(422);
+    expect(code(over)).toBe('BUDGET_ADJUSTMENT.OVER_REMAINING');
+    expect((over.body as { error: { details: Record<string, string> } }).error.details).toMatchObject({
+      costCenterId: admin.department.unitId,
+      remainingMinor: String(88 * M),
+      usedMinor: String(110 * M),
+    });
+    expect(code(await transfer(admin, sales, 89, { transferReason: 'COST_CENTER_CHANGE' }).expect(422))).toBe(
+      'BUDGET_ADJUSTMENT.OVER_REMAINING',
+    );
+    expect(await made(transfer(admin, sales, 88, { transferReason: 'COST_CENTER_CHANGE' }))).toMatchObject({
       kind: 'TRANSFER',
+      transferReason: 'COST_CENTER_CHANGE',
     });
     expect(code(await transfer(admin, sales, 181, { transferReason: 'COST_CENTER_CHANGE' }).expect(422))).toBe(
       'BUDGET_ADJUSTMENT.OVER_BASE',

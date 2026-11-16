@@ -25,10 +25,14 @@ export type ShapeRefusal =
   | 'TRANSFER_REASON_NOT_ALLOWED'
   | 'AMOUNT_NOT_POSITIVE';
 
-/** What a Cost Center that gives money stands on: its effective base and reserve, and the forecast of the end of the year of the review (`RV-1`). */
+/**
+ * What a Cost Center that gives money stands on: its effective base and reserve, what it has used (what was spent plus what its commitments still hold, the same figure the check of a
+ * Request reads) and the forecast of the end of the year of the review (`RV-1`).
+ */
 export interface CostCenterPosition {
   baseMinor: bigint;
   reserveMinor: bigint;
+  usedMinor: bigint;
   forecastMinor: bigint;
 }
 
@@ -37,4 +41,5 @@ export type AdjustmentVerdict =
   | { kind: 'OVER_UNALLOCATED'; availableMinor: bigint; overByMinor: bigint }
   | { kind: 'BELOW_FORECAST_FLOOR'; costCenterId: string; floorMinor: bigint; afterMinor: bigint }
   | { kind: 'OVER_BASE'; costCenterId: string; baseMinor: bigint }
+  | { kind: 'OVER_REMAINING'; costCenterId: string; remainingMinor: bigint; usedMinor: bigint }
   | { kind: 'NO_BUDGET'; costCenterId: string };

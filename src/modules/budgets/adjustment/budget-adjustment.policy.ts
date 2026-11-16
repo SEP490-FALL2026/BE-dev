@@ -49,8 +49,10 @@ export function unallocatedOf(input: {
 /**
  * Whether the adjustment may be made on the figures of now. A supplement and a reduction of the ceiling come out of what is not allocated. A return and the
  * source of a transfer must leave the Cost Center with an effective budget, its base after the adjustment and its reserve, not below its forecast of the end of
- * the year (`R-40`: the forecast already holds what was spent, so spent is never added to it again); a transfer made because the department changed its Cost
- * Center (`COST_CENTER_CHANGE`) has no such floor. No Cost Center gives more than its base, and a Cost Center with no budget gives nothing.
+ * the year (`R-40`: the forecast already holds what was spent, so spent is never added to it again). A transfer made because the department changed its Cost
+ * Center (`COST_CENTER_CHANGE`) has no such floor, and moves what is left, the effective budget less what was used (`QĐ-111bh`, `US-06-20` AC-10: the old Cost Center keeps
+ * exactly what it used, never less, so that what was spent and what is held is not left without a budget and the two Cost Centers never hold more than the old one did). No
+ * Cost Center gives more than its base, and a Cost Center with no budget gives nothing.
  */
 export function judgeAdjustment(input: {
   shape: AdjustmentShape;
@@ -73,7 +75,18 @@ export function judgeAdjustment(input: {
   if (shape.amountMinor > input.from.baseMinor) {
     return { kind: 'OVER_BASE', costCenterId, baseMinor: input.from.baseMinor };
   }
-  if (shape.kind === 'TRANSFER' && shape.transferReason === 'COST_CENTER_CHANGE') return { kind: 'OK' };
+  if (shape.kind === 'TRANSFER' && shape.transferReason === 'COST_CENTER_CHANGE') {
+    const remainingMinor = input.from.baseMinor + input.from.reserveMinor - input.from.usedMinor;
+
+    return shape.amountMinor > remainingMinor
+      ? {
+          kind: 'OVER_REMAINING',
+          costCenterId,
+          remainingMinor: remainingMinor > 0n ? remainingMinor : 0n,
+          usedMinor: input.from.usedMinor,
+        }
+      : { kind: 'OK' };
+  }
   const afterMinor = input.from.baseMinor - shape.amountMinor + input.from.reserveMinor;
 
   return afterMinor < input.from.forecastMinor

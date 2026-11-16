@@ -12,6 +12,7 @@ import {
   BudgetAdjustmentBudgetInPreparationError,
   BudgetAdjustmentNoBudgetError,
   BudgetAdjustmentOverBaseError,
+  BudgetAdjustmentOverRemainingError,
   BudgetAdjustmentOverUnallocatedError,
   BudgetAdjustmentShapeError,
   BudgetAdjustmentVersionInFlightError,
@@ -66,6 +67,8 @@ export class BudgetAdjustmentJudgeService {
         throw new BudgetAdjustmentBelowForecastError(verdict.costCenterId, verdict.floorMinor, verdict.afterMinor);
       case 'OVER_BASE':
         throw new BudgetAdjustmentOverBaseError(verdict.costCenterId, verdict.baseMinor);
+      case 'OVER_REMAINING':
+        throw new BudgetAdjustmentOverRemainingError(verdict.costCenterId, verdict.remainingMinor, verdict.usedMinor);
       case 'NO_BUDGET':
         throw new BudgetAdjustmentNoBudgetError(verdict.costCenterId);
     }
@@ -89,7 +92,7 @@ export class BudgetAdjustmentJudgeService {
     }
   }
 
-  /** The effective budget and the forecast of the Cost Center that gives; null when it has no budget of the year. */
+  /** The effective budget, what it used and the forecast of the Cost Center that gives; null when it has no budget of the year. */
   private async positionOf(
     tx: DbTx,
     year: number,
@@ -97,10 +100,15 @@ export class BudgetAdjustmentJudgeService {
     today: BusinessDate,
   ): Promise<CostCenterPosition | null> {
     if (costCenterId === null) return null;
-    const budget = (await this.budgets.approvedOfCostCenters([costCenterId], year, tx)).get(costCenterId);
+    const budget = (await this.budgets.yearFacts(costCenterId, [year], tx)).get(year);
     if (!budget) return null;
     const forecast = (await this.figures.forecastsOf(tx, year, [costCenterId], today)).get(costCenterId) ?? 0n;
 
-    return { baseMinor: budget.baseMinor, reserveMinor: budget.reserveMinor, forecastMinor: forecast };
+    return {
+      baseMinor: budget.baseMinor,
+      reserveMinor: budget.reserveMinor,
+      usedMinor: budget.heldMinor + budget.spentMinor,
+      forecastMinor: forecast,
+    };
   }
 }

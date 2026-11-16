@@ -32,7 +32,7 @@ export const createAdjustmentBodySchema = z.strictObject({
   reason: z.string().trim().min(1).max(1000),
   transferReason: z.enum(['COST_CENTER_CHANGE']).optional().meta({
     description:
-      'Only for TRANSFER: the department changed its Cost Center in the year and what is left moves to the new one; such a transfer is not held to the forecast of the end of the year.',
+      'Only for TRANSFER: the department changed its Cost Center in the year and what is left moves to the new one; such a transfer is not held to the forecast of the end of the year, and takes at most what is left of the budget of the old Cost Center after what it used.',
   }),
 });
 

@@ -50,7 +50,7 @@ export class BudgetAdjustmentController {
     status: HttpStatus.CREATED,
     message: 'BUDGET_ADJUSTMENT.CREATED',
     description:
-      'Finance asks, with the reason, to give a Cost Center money from what is not allocated under the annual ceiling (SUPPLEMENT), to move money between two Cost Centers (TRANSFER, with COST_CENTER_CHANGE when a department changed its Cost Center), to give money back (RETURN), or to lower the annual ceiling (CEILING_REDUCTION). A supplement and a reduction of the ceiling cannot be more than what is not allocated; a return and the Cost Center that gives in a transfer are never left with less than the forecast of the end of their year (a transfer for COST_CENTER_CHANGE is not held to that) and never give more than their base. The spending approver is asked to decide; nothing in the budget changes until then.',
+      'Finance asks, with the reason, to give a Cost Center money from what is not allocated under the annual ceiling (SUPPLEMENT), to move money between two Cost Centers (TRANSFER, with COST_CENTER_CHANGE when a department changed its Cost Center), to give money back (RETURN), or to lower the annual ceiling (CEILING_REDUCTION). A supplement and a reduction of the ceiling cannot be more than what is not allocated; a return and the Cost Center that gives in a transfer are never left with less than the forecast of the end of their year and never give more than their base; a transfer for COST_CENTER_CHANGE is not held to the forecast but moves only what is left of the budget of the old Cost Center after what it used (BUDGET_ADJUSTMENT.OVER_REMAINING). The spending approver is asked to decide; nothing in the budget changes until then.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -74,13 +74,14 @@ export class BudgetAdjustmentController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).',
+        'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), a transfer for COST_CENTER_CHANGE is more than what is left after what the Cost Center used (BUDGET_ADJUSTMENT.OVER_REMAINING), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.INVALID_SHAPE,
         EXAMPLES.OVER_UNALLOCATED,
         EXAMPLES.BELOW_FORECAST_FLOOR,
         EXAMPLES.OVER_BASE,
+        EXAMPLES.OVER_REMAINING,
         EXAMPLES.NO_BUDGET,
       ],
     },
@@ -159,12 +160,13 @@ export class BudgetAdjustmentController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        "The body or the id is invalid (VALIDATION_ERROR), a refusal has no reason (BUDGET.ADJUSTMENT_REASON_REQUIRED), or a condition no longer holds on today's figures (BUDGET_ADJUSTMENT.OVER_UNALLOCATED, BELOW_FORECAST_FLOOR, OVER_BASE, NO_BUDGET).",
+        "The body or the id is invalid (VALIDATION_ERROR), a refusal has no reason (BUDGET.ADJUSTMENT_REASON_REQUIRED), or a condition no longer holds on today's figures (BUDGET_ADJUSTMENT.OVER_UNALLOCATED, BELOW_FORECAST_FLOOR, OVER_BASE, OVER_REMAINING, NO_BUDGET).",
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.OVER_UNALLOCATED,
         EXAMPLES.BELOW_FORECAST_FLOOR,
         EXAMPLES.OVER_BASE,
+        EXAMPLES.OVER_REMAINING,
         EXAMPLES.NO_BUDGET,
       ],
     },

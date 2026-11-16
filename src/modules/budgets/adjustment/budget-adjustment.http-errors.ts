@@ -11,6 +11,7 @@ import {
   BudgetAdjustmentNoBudgetError,
   BudgetAdjustmentNotFoundError,
   BudgetAdjustmentOverBaseError,
+  BudgetAdjustmentOverRemainingError,
   BudgetAdjustmentOverUnallocatedError,
   BudgetAdjustmentShapeError,
   BudgetAdjustmentVersionInFlightError,
@@ -52,6 +53,13 @@ export function toBudgetAdjustmentApiException(error: unknown): unknown {
       baseMinor: error.baseMinor.toString(),
     });
   }
+  if (error instanceof BudgetAdjustmentOverRemainingError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET_ADJUSTMENT.OVER_REMAINING', error.message, {
+      costCenterId: error.costCenterId,
+      remainingMinor: error.remainingMinor.toString(),
+      usedMinor: error.usedMinor.toString(),
+    });
+  }
   if (error instanceof BudgetAdjustmentNoBudgetError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET_ADJUSTMENT.NO_BUDGET', error.message, {
       costCenterId: error.costCenterId,
@@ -91,6 +99,7 @@ export const BUDGET_ADJUSTMENT_ERROR_EXAMPLES = {
   OVER_UNALLOCATED: example(new BudgetAdjustmentOverUnallocatedError(29_000_000n, 30_000_000n)),
   BELOW_FORECAST_FLOOR: example(new BudgetAdjustmentBelowForecastError(COST_CENTER, 110_000_000n, 108_000_000n)),
   OVER_BASE: example(new BudgetAdjustmentOverBaseError(COST_CENTER, 180_000_000n)),
+  OVER_REMAINING: example(new BudgetAdjustmentOverRemainingError(COST_CENTER, 88_000_000n, 110_000_000n)),
   NO_BUDGET: example(new BudgetAdjustmentNoBudgetError(COST_CENTER)),
   ALREADY_DECIDED: example(new BudgetAdjustmentDecidedError()),
   VERSION_IN_FLIGHT: example(new BudgetAdjustmentVersionInFlightError(COST_CENTER)),

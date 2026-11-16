@@ -148,13 +148,13 @@ describe('the budget a request is checked against and the budget the views show 
     expect(BigInt(summary.effectiveBudget.adjustment?.amount ?? 0)).toBeGreaterThanOrEqual(BigInt(20 * M));
   });
 
-  it('a Cost Center that gave more than it received is shown with a negative adjustment and is over its budget when it spent what it no longer has', async () => {
+  it('a Cost Center that gave what it had left is shown with a negative adjustment and nothing left: base 100 tr, 90 tr spent, a transfer of 15 tr is 422 and one of 10 tr leaves 90 tr, all of it used', async () => {
     const u = await unit();
     const to = await unit();
     await h.budgetFor(u, { total: 100 * M, spent: 90 * M });
     await h.withLockedCycle(async () => {
-      const asked = h.dataOf<{ id: string }>(
-        await request(h.server())
+      const transfer = (tr: number) =>
+        request(h.server())
           .post('/api/v1/budget-adjustments')
           .set(h.as(h.finance))
           .send({
@@ -163,11 +163,12 @@ describe('the budget a request is checked against and the budget the views show 
             fromCostCenterId: u.department.unitId,
             toCostCenterId: to.department.unitId,
             transferReason: 'COST_CENTER_CHANGE',
-            amount: h.money(15 * M),
+            amount: h.money(tr * M),
             reason: 'Phòng đổi Cost Center',
-          })
-          .expect(201),
-      );
+          });
+      const over = await transfer(15).expect(422);
+      expect((over.body as { error: { code: string } }).error.code).toBe('BUDGET_ADJUSTMENT.OVER_REMAINING');
+      const asked = h.dataOf<{ id: string }>(await transfer(10).expect(201));
       await request(h.server())
         .post(`/api/v1/budget-adjustments/${asked.id}/decision`)
         .set(h.as(h.deciderOf()))
@@ -176,11 +177,12 @@ describe('the budget a request is checked against and the budget the views show 
     });
 
     expect(await rowOf(u)).toMatchObject({
-      effectiveBudget: { base: { amount: String(85 * M) }, adjustment: { amount: String(-15 * M) } },
-      overBudget: true,
+      effectiveBudget: { base: { amount: String(90 * M) }, adjustment: { amount: String(-10 * M) } },
+      remainingWithReserve: { amount: '0' },
+      overBudget: false,
     });
     expect(await rowOf(to)).toMatchObject({
-      effectiveBudget: { base: { amount: String(15 * M) }, adjustment: { amount: '0' } },
+      effectiveBudget: { base: { amount: String(10 * M) }, adjustment: { amount: '0' } },
     });
   });
 });
