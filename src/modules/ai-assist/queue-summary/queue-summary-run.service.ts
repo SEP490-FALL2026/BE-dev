@@ -17,6 +17,7 @@ import {
   type QueueContext,
   type QueueSummaryServiceResponse,
 } from '../ai-service/ai-service.types';
+import { AiInvocationHistoryStore } from '../invocation/invocation-history-store.types';
 import { AiInvocationRepo } from '../invocation/invocation.repo';
 import type { InvocationMetadata, InvocationOutcome } from '../invocation/invocation.types';
 import { type SummaryActor, summaryEndedEvent } from './queue-summary-audit-event.mapper';
@@ -106,6 +107,7 @@ export class QueueSummaryRunService implements OnModuleDestroy {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly repo: AiInvocationRepo,
+    private readonly history: AiInvocationHistoryStore,
     private readonly source: RequestsAiSourceApi,
     private readonly audit: AuditApi,
     private readonly clients: AiServiceClients,
@@ -117,6 +119,11 @@ export class QueueSummaryRunService implements OnModuleDestroy {
       .catch((error: unknown) => this.logFailure(job, 'record', error))
       .finally(() => this.running.delete(run));
     this.running.add(run);
+  }
+
+  /** Whether the source that answers a call of this mode is ready: the AI service configured, or the simulation. */
+  canAnswerIn(providerMode: AiProviderMode): boolean {
+    return this.clients.forMode(providerMode).configured();
   }
 
   /** Resolves when every run started so far has ended. */
@@ -217,7 +224,17 @@ export class QueueSummaryRunService implements OnModuleDestroy {
   private async finish(job: QueueSummaryJob, outcome: RunOutcome): Promise<void> {
     const result = outcome.content?.result ?? null;
     const recorded = await this.runner.run(async (tx) => {
-      if (!(await this.repo.finish(tx, job.invocationId, outcome, new Date()))) return false;
+      const at = new Date();
+      if (!(await this.repo.finish(tx, job.invocationId, outcome, at))) return false;
+      if (outcome.content !== null) {
+        await this.history.recordAnswered(tx, {
+          invocationId: job.invocationId,
+          organizationId: job.organizationId,
+          context: job.context,
+          answer: outcome.content,
+          at,
+        });
+      }
       await this.audit.record(
         tx,
         summaryEndedEvent(job.actor, job.organizationId, job.invocationId, {

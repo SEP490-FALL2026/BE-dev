@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { aiInvocationContextJson, aiInvocationParsedJson, aiInvocationResultJson } from './invocation-content.json';
+import { aiInvocationResultJson } from './invocation-content.json';
 import type {
   InvocationKey,
   InvocationMetadata,
@@ -60,14 +60,14 @@ const stuckSince = (startedBefore: Date) => ({
 });
 
 /**
- * The calls of the AI and what was said in them (`ai_invocations`, `ai_invocation_contents`). Every change of status is conditional
+ * The calls of the AI (`ai_invocations`); what was said in them is the history store's (`AiInvocationHistoryStore`). Every change of status is conditional
  * on the status it leaves, so a run that finishes late never overwrites a call that was taken for stuck, and the other way round.
  */
 @Injectable()
 export class AiInvocationRepo {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** A new call with its context. A second call kept for the same revision is refused by the unique index (P2002). */
+  /** A new call. Its content row is written by the history store in the same transaction. A second call kept for the same revision is refused by the unique index (P2002). */
   async insert(tx: DbTx, input: NewInvocation): Promise<{ id: string }> {
     const row = await tx.aiInvocation.create({
       data: {
@@ -81,7 +81,6 @@ export class AiInvocationRepo {
         errorCode: input.errorCode,
         createdAt: input.at,
         finishedAt: input.status === 'FAILED' ? input.at : null,
-        content: { create: { context: aiInvocationContextJson.encode(input.context), createdAt: input.at } },
       },
       select: { id: true },
     });
@@ -131,7 +130,7 @@ export class AiInvocationRepo {
     return count === 1;
   }
 
-  /** RUNNING → the outcome, with what the service answered; false (and nothing written) when the call is no longer running. */
+  /** RUNNING → the outcome's status, code and metadata; false (and nothing written) when the call is no longer running. The content is the history store's. */
   async finish(tx: DbTx, id: string, outcome: InvocationOutcome, at: Date): Promise<boolean> {
     const { count } = await tx.aiInvocation.updateMany({
       where: { id, status: 'RUNNING' },
@@ -142,20 +141,8 @@ export class AiInvocationRepo {
         ...metadataColumns(outcome.metadata),
       },
     });
-    if (count !== 1) return false;
-    if (outcome.content !== null) {
-      await tx.aiInvocationContent.update({
-        where: { invocationId: id },
-        data: {
-          promptText: outcome.content.promptText,
-          rawResponse: outcome.content.rawResponse,
-          parsed: aiInvocationParsedJson.encode(outcome.content.parsed),
-          result: aiInvocationResultJson.encode(outcome.content.result),
-        },
-      });
-    }
 
-    return true;
+    return count === 1;
   }
 
   /**

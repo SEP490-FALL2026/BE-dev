@@ -107,7 +107,7 @@ describe('QueueSummaryService.create', () => {
       actorEmployeeId: EMPLOYEE,
       sourceRevision: revision(),
     });
-    expect(row?.context.requests.map((line) => line.sourceRef)).toEqual(['R001', 'R002', 'R003']);
+    expect(row?.context?.requests.map((line) => line.sourceRef)).toEqual(['R001', 'R002', 'R003']);
     expect(events[0]).toMatchObject({
       organizationId: ORGANIZATION_ID,
       actorKind: 'USER',
@@ -186,6 +186,8 @@ describe('QueueSummaryService.create', () => {
 
     expect(created).toEqual({ invocationId: expect.any(String) as unknown, status: 'FAILED' });
     expect(repo.rows.get(created.invocationId)).toMatchObject({ status: 'FAILED', errorCode: 'AI.SOURCE_UNREADABLE' });
+    expect(repo.rows.get(created.invocationId)?.context).toMatchObject({ requests: [] });
+    expect(repo.steps[0].step).toBe('recordAdmitted');
     expect(ai.summarizeQueue).not.toHaveBeenCalled();
   });
 

@@ -34,7 +34,6 @@ export interface StuckInvocation {
 export interface NewInvocation extends InvocationKey {
   actorEmployeeId: string;
   sourceRevision: string;
-  context: QueueContext;
   /** PENDING for a call that will run; FAILED for one recorded as it failed (its source could not be read). */
   status: 'PENDING' | 'FAILED';
   errorCode: string | null;
