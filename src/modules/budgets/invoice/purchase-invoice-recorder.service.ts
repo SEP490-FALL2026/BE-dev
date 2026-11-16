@@ -90,7 +90,8 @@ export class PurchaseInvoiceRecorderService {
 
   /**
    * Locks the budget year and reads the use of the Cost Center and year the invoice moves, to tell the threshold it crosses (`RV-2`): the Cost Center of the commitment it takes down, or the one that bears the
-   * expense. A line of the subscription or of no Cost Center moves the use of none, and nothing is watched.
+   * expense. A line of the subscription or of no Cost Center moves the use of none, and nothing is watched. Neither is a commitment that waits for a budget (attached to no version): with no version there is
+   * no base and no threshold, and the year lock taken after the row of that commitment would meet the approval of a version, which holds the year and then takes the rows that wait (FIX-RV23 RV2-03).
    */
   private async watchUse(
     tx: DbTx,
@@ -103,7 +104,7 @@ export class PurchaseInvoiceRecorderService {
     const pair =
       booking.kind === 'COST_CENTER'
         ? { costCenterId: booking.costCenterId, year: serviceYear }
-        : row
+        : row && row.attachedVersionId !== null
           ? { costCenterId: row.costCenterId, year: row.year }
           : null;
 

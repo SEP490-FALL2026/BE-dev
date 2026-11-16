@@ -23,6 +23,7 @@ const commitment = (over: Record<string, unknown> = {}) => ({
   state: 'HELD' as const,
   origin: 'APPROVAL' as const,
   seatMonthlyMinor: null,
+  attachedVersionId: 'v-1' as string | null,
   ...over,
 });
 const input = (over: Partial<PurchaseInvoiceRecordInput> = {}): PurchaseInvoiceRecordInput => ({
@@ -71,6 +72,8 @@ function build(opts: { commitments?: ReturnType<typeof commitment>[]; exists?: b
 
     return Promise.resolve();
   });
+  const watch = jest.fn().mockResolvedValue({ pairs: [], usedBefore: new Map() });
+  const settle = jest.fn().mockResolvedValue(0);
   const service = new PurchaseInvoiceRecorderService(
     { lockOfRequest, applyInvoice } as unknown as CommitmentRepo,
     {
@@ -79,13 +82,10 @@ function build(opts: { commitments?: ReturnType<typeof commitment>[]; exists?: b
     } as unknown as InvoiceRepo,
     { lock },
     { record } as unknown as AuditApi,
-    {
-      watch: jest.fn().mockResolvedValue({ pairs: [], usedBefore: new Map() }),
-      settle: jest.fn().mockResolvedValue(0),
-    } as unknown as ThresholdAlertService,
+    { watch, settle } as unknown as ThresholdAlertService,
   );
 
-  return { service, calls, lockOfRequest, applyInvoice, insert, lock, record };
+  return { service, calls, lockOfRequest, applyInvoice, insert, lock, record, watch, settle };
 }
 
 describe('PurchaseInvoiceRecorderService.record (PI-1.5, PI-1.7)', () => {
@@ -95,6 +95,21 @@ describe('PurchaseInvoiceRecorderService.record (PI-1.5, PI-1.7)', () => {
     await service.record(TX, ACTOR, input());
 
     expect(calls).toEqual(['lock', 'apply', 'insert', 'audit']);
+  });
+
+  it('RV2-03: the threshold of the year is watched for a commitment that is attached to a version, and not for one that still waits for a budget (the lock of the year after the row of the commitment would meet the approval of a version, which holds the year and then takes the row)', async () => {
+    const attached = build();
+    await attached.service.record(TX, ACTOR, input());
+    expect(attached.watch).toHaveBeenCalledWith(TX, [{ costCenterId: 'cc-1', year: 2027 }]);
+    expect(attached.settle).toHaveBeenCalledTimes(1);
+
+    const waiting = build({ commitments: [commitment({ attachedVersionId: null })] });
+    const recorded = await waiting.service.record(TX, ACTOR, input());
+    expect(waiting.watch).not.toHaveBeenCalled();
+    expect(waiting.settle).not.toHaveBeenCalled();
+    // The invoice is still written against the commitment, the row of which is the only lock it took.
+    expect(recorded).toMatchObject({ booking: 'COMMITMENT', commitmentId: 'c-1' });
+    expect(waiting.calls).toEqual(['lock', 'apply', 'insert', 'audit']);
   });
 
   it('writes the invoice of a K1 whose grant failed to the line not allocated with the department of the user, and neither locks nor takes down any commitment (FX3-01, QĐ-104k(4))', async () => {

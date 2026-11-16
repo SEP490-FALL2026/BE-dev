@@ -141,6 +141,7 @@ export class CommitmentRepo {
       costCenterId: row.costCenterId,
       origin: row.origin,
       seatMonthlyMinor: row.seatMonthlyMinor,
+      attachedVersionId: row.attachedVersionId,
     }));
   }
 
@@ -613,6 +614,8 @@ export interface CommitmentOfRequest extends CommitmentRow {
 export interface LockedCommitmentOfRequest extends CommitmentOfRequest {
   origin: 'APPROVAL' | 'YEAR_START';
   seatMonthlyMinor: bigint | null;
+  /** The version it is attached to; null while it waits for a budget (R-48). */
+  attachedVersionId: string | null;
 }
 
 /** A commitment still held that knows what one seat costs a month, with what it still holds. */
