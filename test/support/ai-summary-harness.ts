@@ -114,7 +114,23 @@ export class AiSummaryHarness extends GroupHarness {
     const response = await request(this.server())
       .post('/api/v1/subscription-renewals')
       .set(this.as(this.it1))
-      .send({ subscriptionId, choice: 'CANCEL', outcome: 'VENDOR_REFUSED', outcomeNote: opinion });
+      .send({
+        subscriptionId,
+        choice: 'CANCEL',
+        outcome: 'VENDOR_REFUSED',
+        outcomeNote: opinion,
+        // The vendor kept the period anyway (V-2): the period it made, starting on the renewal day.
+        nextPeriod: {
+          purchasedQuantity: 10,
+          unitPrice: { amount: '1000000', currency: 'VND' },
+          billingCycle: 'ANNUAL',
+          startDate: inDays(50),
+          endDate: inDays(414),
+          noticeDeadline: inDays(385),
+          autoRenew: true,
+          allowsMidTermReduction: false,
+        },
+      });
     if (response.status !== 201) throw new Error(`record: ${response.status} ${JSON.stringify(response.body)}`);
 
     return { renewalId: this.dataOf<{ renewal: { id: string } }>(response).renewal.id, subscriptionId };

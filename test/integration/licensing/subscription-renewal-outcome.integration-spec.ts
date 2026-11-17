@@ -256,21 +256,24 @@ describe('the outcome of a renewal and the chain of periods (integration, real P
       .revoked(task?.id as string, { completion: 'ACCOUNT_REMOVED', evidence: 'Removed from the workspace' })
       .expect(200);
 
-    const renewal = await record({
+    // The vendor kept the period anyway: the period it made is recorded, never a cancellation with nothing after it (V-2).
+    const bare = {
       subscriptionId,
       choice: 'CANCEL',
       outcome: 'VENDOR_REFUSED',
       outcomeNote: 'The contract cannot be cancelled this year',
-    });
+    };
+    expect(h.codeOf(await refuse(bare, 422))).toBe('SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED');
+    const renewal = await record({ ...bare, nextPeriod: nextYear(10) });
 
     expect(renewal.outcomeDetail).toMatchObject({
       kind: 'VENDOR_REFUSED',
       vendorFollowUpOpen: true,
-      nextSubscriptionId: null,
       realisedSavings: null,
     });
+    expect(renewal.outcomeDetail?.nextSubscriptionId).not.toBeNull();
     const { rows } = await h.ctx.sql.query(`SELECT 1 FROM subscriptions WHERE renewed_from_id = $1`, [subscriptionId]);
-    expect(rows).toHaveLength(0);
+    expect(rows).toHaveLength(1);
   });
 
   it('closes a subscription nobody uses: no new period, the closure confirmed, and nothing revoked (QĐ-99i)', async () => {

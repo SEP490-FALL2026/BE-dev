@@ -171,6 +171,50 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     expect(rows[0].n).toBe(0);
   });
 
+  it('needs the new period of a cancellation the vendor did not carry out, whatever the plan: nobody is told otherwise (V-2)', async () => {
+    const unit = await h.unit(0);
+    for (const outcome of [
+      { outcome: 'VENDOR_REFUSED', outcomeNote: 'The vendor renewed it on its own.' },
+      { outcome: 'DIFFERENT', outcomeNote: 'The vendor closed it another way.' },
+    ]) {
+      const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
+      const before = await h.count('subscriptions');
+
+      const refused = await record({ subscriptionId, choice: 'CANCEL', ...outcome });
+
+      expect(refused.status).toBe(422);
+      expect(h.codeOf(refused)).toBe('SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED');
+      expect(await h.count('subscriptions')).toBe(before);
+      const { rows } = await h.ctx.sql.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM subscription_renewals WHERE subscription_id = $1`,
+        [subscriptionId],
+      );
+      expect(rows[0].n).toBe(0);
+    }
+  });
+
+  it('records the period the vendor made of a cancellation and tells the spending approver, the IT Admin and Finance (V-2, QĐ-106i(4))', async () => {
+    const unit = await h.unit(0);
+    const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
+
+    const response = await record({
+      subscriptionId,
+      choice: 'CANCEL',
+      outcome: 'VENDOR_REFUSED',
+      outcomeNote: 'The vendor renewed it on its own.',
+      nextPeriod: nextYear(10),
+    });
+
+    expect(response.status).toBe(201);
+    const renewal = h.dataOf<{ renewal: CaseWire }>(response).renewal;
+    expect(renewal.outcomeDetail?.nextSubscriptionId).not.toBeNull();
+    const incident = await h.notices('SUBSCRIPTION_AUTO_RENEWAL_INCIDENT', subscriptionId);
+    expect(incident.map((notice) => notice.recipient_employee_id).sort()).toEqual(
+      [h.boss.employeeId, h.it1.employeeId, h.finance.employeeId].sort(),
+    );
+    expect(incident[0].params).toMatchObject({ renewalId: renewal.id });
+  });
+
   it('lets a plan by the month record that the vendor refused with no new period: the next payment day is another point (A1C-03)', async () => {
     const unit = await h.unit(2);
     const subscriptionId = await h.term({

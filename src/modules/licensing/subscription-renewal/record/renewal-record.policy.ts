@@ -136,10 +136,11 @@ export function countsRefusal(
 }
 
 /**
- * Whether a result with no new period can be recorded (`A1C-03`): the case is written complete in one write and the period then has its result
+ * Whether a result with no new period can be recorded (`A1C-03`, `V-2`): the case is written complete in one write and the period then has its result
  * for good, so a renewal, a reduction or an increase with no new period would leave the period with no way to ever record it (the seats would not
  * carry and Finance would not be told). Only a vendor that refused a plan by the month leaves it out: the next payment day opens another point.
- * A cancellation names no new period. Null when the result can be recorded.
+ * A cancellation as decided names no new period; one the vendor refused or did otherwise means the vendor made a period anyway, which is recorded
+ * (and told as an incident), whatever the plan. Null when the result can be recorded.
  */
 export function nextPeriodProblem(input: {
   choice: RenewalChoice;
@@ -147,7 +148,8 @@ export function nextPeriodProblem(input: {
   hasNextPeriod: boolean;
   commitment: PeriodAdjustment['commitment'];
 }): RecordRefusal | null {
-  if (input.hasNextPeriod || input.choice === 'CANCEL') return null;
+  if (input.hasNextPeriod) return null;
+  if (input.choice === 'CANCEL') return input.outcome === 'AS_DECIDED' ? null : { problem: 'NEXT_PERIOD_REQUIRED' };
   if (input.outcome === 'VENDOR_REFUSED' && input.commitment === 'MONTHLY') return null;
 
   return { problem: 'NEXT_PERIOD_REQUIRED' };
