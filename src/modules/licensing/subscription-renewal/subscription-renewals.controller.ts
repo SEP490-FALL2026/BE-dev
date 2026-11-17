@@ -231,7 +231,7 @@ export class SubscriptionRenewalsController {
   @RequireRoles('IT_ADMIN')
   @ApiOperation({
     operationId: 'subscriptionRenewalRecordOutcome',
-    summary: 'Record the outcome of a renewal decided before the one-write renewal (legacy)',
+    summary: 'Record the outcome of a renewal decided before (legacy)',
   })
   @ApiSuccessResponse(SubscriptionRenewalResponseDto, {
     message: 'SUBSCRIPTION_RENEWAL.OUTCOME_RECORDED',

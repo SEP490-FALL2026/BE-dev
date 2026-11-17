@@ -41186,7 +41186,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Record the outcome of a renewal decided before the one-write renewal (legacy)",
+        "summary": "Record the outcome of a renewal decided before (legacy)",
         "tags": ["subscription-renewals"]
       }
     },
