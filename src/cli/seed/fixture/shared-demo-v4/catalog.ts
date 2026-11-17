@@ -1,5 +1,5 @@
 import type { DemoApplication, DemoFixture, DemoSeat, DemoSubscription } from '../demo-fixture.types';
-import { EXTRA_APPLICATIONS, EXTRA_SUBSCRIPTIONS } from './catalog-extra';
+import { EXTRA_APPLICATIONS, EXTRA_SUBSCRIPTIONS, PLAN_TERMS } from './catalog-extra';
 import { app, groupOf, k2, k4, monthly } from './catalog-kit';
 
 /*
@@ -198,8 +198,9 @@ const SEATS: DemoSeat[] = [
   ...seat('grammarly', ['NV-OFF1']),
 ];
 
-export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats'> = {
+export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats' | 'planTerms'> = {
   applications: [...APPLICATIONS, ...EXTRA_APPLICATIONS],
   subscriptions: [...SUBSCRIPTIONS, ...EXTRA_SUBSCRIPTIONS],
   seats: SEATS,
+  planTerms: PLAN_TERMS,
 };

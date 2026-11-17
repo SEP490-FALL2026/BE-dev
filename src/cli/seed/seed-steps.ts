@@ -4,6 +4,7 @@ import { SHARED_DEMO_V4 } from './fixture/shared-demo-v4';
 import { ASSET_STEPS } from './steps/assets.steps';
 import { BASELINE_STEPS } from './steps/baseline.steps';
 import { budgetSteps } from './steps/budget.steps';
+import { CATALOG_EXTRA_STEPS } from './steps/catalog-extra.steps';
 import { CATALOG_STEPS } from './steps/catalog.steps';
 import { DEMO_STEPS } from './steps/demo.steps';
 import { extraSteps } from './steps/extras.steps';
@@ -32,6 +33,7 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     ...PEOPLE_ADMIN_STEPS,
     pick('finance.cost-centers'),
     ...CATALOG_STEPS,
+    ...CATALOG_EXTRA_STEPS,
     pick('finance.tax-profile'),
     ...BASELINE_STEPS,
     ...ASSET_STEPS,

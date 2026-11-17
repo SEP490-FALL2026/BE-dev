@@ -123,6 +123,23 @@ export interface DemoSubscription {
   quantity?: number;
 }
 
+/**
+ * What IT read in the terms of a plan (`US-04-11`), the points of the checklist as free text; the day of the last review counts back from today.
+ * A plan the fixture gives none, or an old review, is what `GET /plan-warnings` shows for the subscription whose window of review has opened.
+ */
+export interface DemoPlanTerms {
+  plan: string;
+  termsUrl?: string;
+  /** Days before today the terms were last reviewed; none: the review is not dated. */
+  lastReviewedDaysAgo?: number;
+  aiTraining?: string;
+  dataLocation?: string;
+  /** For a K4 plan the number of machines a key may be installed on. */
+  installLimit?: { maxDevicesPerKey: number; note?: string };
+  commercialUse?: string;
+  cancellationRefund?: string;
+}
+
 /** A seat the baseline file puts in the pool before the dataset starts, granted in the past. */
 export interface DemoSeat {
   subscription: string;
@@ -312,6 +329,8 @@ export interface DemoFixture {
   applications: DemoApplication[];
   subscriptions: DemoSubscription[];
   seats: DemoSeat[];
+  /** The terms IT recorded for some plans; the others have none yet (the warning of a review due). */
+  planTerms: DemoPlanTerms[];
   /** A Finance-declared tax profile for the vendor of one application. */
   taxProfile: {
     application: string;

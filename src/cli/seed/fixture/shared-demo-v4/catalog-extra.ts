@@ -1,4 +1,4 @@
-import type { DemoApplication, DemoPlan, DemoSubscription } from '../demo-fixture.types';
+import type { DemoApplication, DemoPlan, DemoPlanTerms, DemoSubscription } from '../demo-fixture.types';
 import { app, groupOf, k2, k4, monthly } from './catalog-kit';
 
 /** A per-seat plan bought one by one (K1): the control the company has over the seat is the one the vendor allows. */
@@ -157,4 +157,40 @@ export const EXTRA_SUBSCRIPTIONS: DemoSubscription[] = [
   perpetual('visio-pro', '13000000', 3),
   perpetual('sublime-license', '2500000', 2),
   byMonth('hubspot-starter', '450000', 'NV-ITA1', 2, 1),
+];
+
+/*
+ * The terms IT recorded for four plans (the text is simulated; the links are the vendors' home pages). Notion Plus was reviewed 400 days ago, long
+ * before the window of review of its subscription opened, and Confluence Premium has no terms at all: those two are the warnings of
+ * `GET /plan-warnings`. Microsoft 365 Standard was reviewed 10 days ago, before its window opens, so it raises none.
+ */
+export const PLAN_TERMS: DemoPlanTerms[] = [
+  {
+    plan: 'notion-plus',
+    termsUrl: 'https://www.notion.com',
+    lastReviewedDaysAgo: 400,
+    aiTraining: 'Dữ liệu khách hàng không dùng để huấn luyện mô hình (văn bản mô phỏng).',
+  },
+  {
+    plan: 'm365-standard',
+    termsUrl: 'https://www.microsoft.com',
+    lastReviewedDaysAgo: 10,
+    aiTraining: 'Không dùng dữ liệu tenant để huấn luyện mô hình nền tảng (văn bản mô phỏng).',
+    dataLocation: 'Dữ liệu lưu tại trung tâm dữ liệu khu vực châu Á - Thái Bình Dương (văn bản mô phỏng).',
+  },
+  {
+    plan: 'visio-pro',
+    termsUrl: 'https://www.microsoft.com',
+    lastReviewedDaysAgo: 30,
+    installLimit: {
+      maxDevicesPerKey: 2,
+      note: 'Mỗi khóa cài tối đa trên hai máy của cùng một người dùng (văn bản mô phỏng).',
+    },
+  },
+  {
+    plan: 'claude-team',
+    termsUrl: 'https://www.anthropic.com',
+    lastReviewedDaysAgo: 20,
+    aiTraining: 'Không dùng dữ liệu khách hàng để huấn luyện (văn bản mô phỏng).',
+  },
 ];
