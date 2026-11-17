@@ -183,4 +183,75 @@ describe('catalog subscription read model (integration, real PostgreSQL)', () =>
       expect(terms.warningTotal).toBe(60);
     }, 120_000);
   });
+
+  describe('S20-T9b: the days of the point of adjustment are the ones of the period, not the ones of today (FR-1.4, FR-8.2, QĐ-106h)', () => {
+    /** A value of a parameter that took effect at the start of `from`: what the Super Admin would have set then. */
+    const setSince = async (key: string, value: number, from: string): Promise<void> => {
+      await sql().query(
+        `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
+         SELECT gen_random_uuid(), id, $1, $2::jsonb, $3::date FROM organizations`,
+        [key, JSON.stringify(value), from],
+      );
+    };
+    const unset = (key: string) => sql().query(`DELETE FROM parameter_values WHERE key = $1`, [key]);
+    const rowOf = async (id: string) =>
+      h.dataOf<{ alerts: { baseDate: string | null; dates: string[] } }>(
+        await request(h.server()).get(`/api/v1/subscriptions/${id}`).set(as()).expect(200),
+      );
+
+    it('counts the point of a plan by the month from the days of the month that runs: one row that lives many months reads each month on its own', async () => {
+      const day = await today();
+      await setSince('SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY', 14, addDays(day, -5));
+      try {
+        // Both started long ago. A's month began about 10 days ago (before the change), B's begins in about 20 days (after it).
+        const older = await h.subscription(5, 'K2');
+        const later = await h.subscription(5, 'K2');
+        for (const [id, payment] of [
+          [older, addDays(day, 20)],
+          [later, addDays(day, 50)],
+        ]) {
+          await sql().query(
+            `UPDATE subscriptions SET start_date = $2, renewal_date = $3, end_date = NULL, notice_deadline = NULL, auto_renew = true WHERE id = $1`,
+            [id, addDays(day, -100), payment],
+          );
+        }
+
+        expect((await rowOf(older)).alerts).toEqual({ baseDate: addDays(day, 20), dates: [addDays(day, 13)] });
+        expect((await rowOf(later)).alerts).toEqual({ baseDate: addDays(day, 50), dates: [addDays(day, 36)] });
+      } finally {
+        await unset('SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY');
+      }
+    }, 120_000);
+
+    it('lists the plans to review by the window of the period of each subscription, the widest the parameter allows included', async () => {
+      const day = await today();
+      await setSince('SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL', 60, addDays(day, -50));
+      try {
+        // Both have a deadline 40 days ahead: A began before the change (30 days: not yet), B after it (60 days: due).
+        const before = await h.subscription(5, 'K2');
+        const after = await h.subscription(5, 'K2');
+        for (const [id, started] of [
+          [before, addDays(day, -100)],
+          [after, addDays(day, -10)],
+        ]) {
+          await sql().query(
+            `UPDATE subscriptions SET start_date = $2, notice_deadline = $3, renewal_date = NULL, end_date = NULL, notice_period_days = NULL, auto_renew = true
+              WHERE id = $1`,
+            [id, started, addDays(day, 40)],
+          );
+        }
+
+        const listed = h
+          .dataOf<{ items: { subscriptionId: string }[] }>(
+            await request(h.server()).get('/api/v1/plan-warnings?pageSize=100').set(as()).expect(200),
+          )
+          .items.map((item) => item.subscriptionId);
+
+        expect(listed).toContain(after);
+        expect(listed).not.toContain(before);
+      } finally {
+        await unset('SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL');
+      }
+    }, 120_000);
+  });
 });

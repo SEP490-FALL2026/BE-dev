@@ -300,6 +300,42 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'US-04-04 AC-10',
   },
   {
+    key: 'SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY',
+    label: 'Mở điểm điều chỉnh gói tháng trước ngày thanh toán',
+    group: 'SUBSCRIPTION',
+    shape: { kind: 'int', min: 1, max: 28 },
+    default: 7,
+    unit: 'days',
+    unitLabel: 'ngày',
+    description:
+      'How many days before the next payment day of a subscription by the month the IT Admin is asked to adjust it; a period already running keeps the value it began with.',
+    source: 'FR-1.4, FR-8.2',
+  },
+  {
+    key: 'SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL',
+    label: 'Mở điểm điều chỉnh gói năm trước hạn báo hủy',
+    group: 'SUBSCRIPTION',
+    shape: { kind: 'int', min: 1, max: 180 },
+    default: 30,
+    unit: 'days',
+    unitLabel: 'ngày',
+    description:
+      'How many days before the cancellation deadline of a subscription by the year the IT Admin is asked to adjust it; a period already running keeps the value it began with.',
+    source: 'FR-1.4, FR-8.2',
+  },
+  {
+    key: 'SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL',
+    label: 'Cảnh báo đỏ gói năm trước hạn báo hủy',
+    group: 'SUBSCRIPTION',
+    shape: { kind: 'int', min: 1, max: 90 },
+    default: 7,
+    unit: 'days',
+    unitLabel: 'ngày',
+    description:
+      'How many days before the cancellation deadline of a subscription by the year the alert turns red; a period already running keeps the value it began with.',
+    source: 'FR-1.4, FR-8.2',
+  },
+  {
     key: 'ACTIVITY_WINDOW_MINUTES',
     label: 'Số phút tính là một ngày có hoạt động',
     group: 'USAGE',

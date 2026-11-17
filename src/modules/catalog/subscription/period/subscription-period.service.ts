@@ -14,7 +14,12 @@ import type {
   RenewalPeriodFacts,
   SubscriptionPurchaseFacts,
 } from '../../public/subscription-period.types';
-import { adjustmentCommitmentOf, adjustmentPointOf, redAlertOf } from '../obligation/subscription-obligation.policy';
+import {
+  adjustmentCommitmentOf,
+  adjustmentPointOf,
+  redAlertOf,
+  type AdjustmentWindows,
+} from '../obligation/subscription-obligation.policy';
 import { assertPoolTerms } from '../pool/subscription-pool.policy';
 import { SubscriptionPoolService } from '../pool/subscription-pool.service';
 import { snapshotOf } from '../subscription.mapper';
@@ -30,14 +35,19 @@ import { SubscriptionPriceNotVndError } from '../subscription.errors';
 import { SubscriptionPeriodRepo } from './subscription-period.repo';
 import { SubscriptionRepo, type PaidTermRow } from '../subscription.repo';
 import { SubscriptionPricingService } from '../subscription-pricing.service';
+import { SubscriptionWindowsService } from '../subscription-windows.service';
 import type { ApplicationKind, BillingCycle, ProvisioningType, SubscriptionRecord } from '../subscription.types';
 
 /** How many periods one pass of the renewal sweep reads at most; the next pass takes the rest. */
 const SWEEP_LIMIT = 500;
 
 /** The point of adjustment of a period on `today`, with the red alert of a plan by the year; null when no date gives a point. */
-function adjustmentOf(record: SubscriptionRecord, today: BusinessDate): PeriodAdjustment | null {
-  const point = adjustmentPointOf(record, today);
+function adjustmentOf(
+  record: SubscriptionRecord,
+  today: BusinessDate,
+  windows: AdjustmentWindows,
+): PeriodAdjustment | null {
+  const point = adjustmentPointOf(record, today, windows);
   if (point === null) return null;
   const commitment = adjustmentCommitmentOf(record);
 
@@ -46,12 +56,17 @@ function adjustmentOf(record: SubscriptionRecord, today: BusinessDate): PeriodAd
     deadline: point.deadline,
     point: point.point,
     end: point.end,
-    redAlertOn: redAlertOf(point.deadline, commitment),
+    redAlertOn: redAlertOf(point.deadline, commitment, windows.redAlertDaysAnnual),
     commitment,
   };
 }
 
-function factsOf(record: SubscriptionRecord, renewedById: string | null, today: BusinessDate): RenewalPeriodFacts {
+function factsOf(
+  record: SubscriptionRecord,
+  renewedById: string | null,
+  today: BusinessDate,
+  windows: AdjustmentWindows,
+): RenewalPeriodFacts {
   const notice = deriveNotice(noticeInputOf(record));
 
   return {
@@ -79,7 +94,7 @@ function factsOf(record: SubscriptionRecord, renewedById: string | null, today: 
     autoRenew: record.autoRenew,
     allowsMidTermReduction: record.allowsMidTermReduction,
     notice: { source: notice.source, deadline: notice.deadline, baseDate: notice.baseDate },
-    adjustment: adjustmentOf(record, today),
+    adjustment: adjustmentOf(record, today, windows),
     renewedFromId: record.renewedFromId,
     renewedById,
   };
@@ -118,6 +133,7 @@ export class SubscriptionPeriodService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly pool: SubscriptionPoolService,
+    private readonly windows: SubscriptionWindowsService,
   ) {}
 
   /** The periods with these ids, by id; an id that does not exist is absent. */
@@ -229,7 +245,14 @@ export class SubscriptionPeriodService {
       }),
     );
 
-    return factsOf(created, null, await this.organizationReads.businessToday(new Date(), tx));
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+
+    return factsOf(
+      created,
+      null,
+      today,
+      (await this.windows.of([created], today, tx)).get(created.id) as AdjustmentWindows,
+    );
   }
 
   /**
@@ -273,7 +296,10 @@ export class SubscriptionPeriodService {
     );
 
     const today = await this.organizationReads.businessToday(new Date(), tx);
+    const windows = await this.windows.of(records, today, tx);
 
-    return records.map((record) => factsOf(record, successors.get(record.id) ?? null, today));
+    return records.map((record) =>
+      factsOf(record, successors.get(record.id) ?? null, today, windows.get(record.id) as AdjustmentWindows),
+    );
   }
 }

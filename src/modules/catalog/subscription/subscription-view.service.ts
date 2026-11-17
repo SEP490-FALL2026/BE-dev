@@ -14,12 +14,14 @@ import {
   redAlertOf,
   runsAPeriod,
   type AdjustmentPoint,
+  type AdjustmentWindows,
 } from './obligation/subscription-obligation.policy';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
 import { isPricedInDong } from './price/subscription-price.policy';
 import { liveIdsByPlan, liveSiblingsOf, poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
 import { SubscriptionGrantingRepo } from './subscription-granting.repo';
 import { SubscriptionRepo } from './subscription.repo';
+import { SubscriptionWindowsService } from './subscription-windows.service';
 import type {
   DeadlineKind,
   ExpiryState,
@@ -60,12 +62,19 @@ const seatsOfPool = (record: SubscriptionRecord, counts: SeatCounts): Subscripti
 };
 
 /** The alerts of a subscription: the deadline of its point of adjustment, and the days it counts back to (the point, then the red alert of a plan by the year). */
-const alertsOf = (point: AdjustmentPoint | null, record: SubscriptionRecord): SubscriptionView['alerts'] => ({
+const alertsOf = (
+  point: AdjustmentPoint | null,
+  record: SubscriptionRecord,
+  windows: AdjustmentWindows | undefined,
+): SubscriptionView['alerts'] => ({
   baseDate: point?.deadline ?? null,
   dates: alertDates(
-    point === null
+    point === null || windows === undefined
       ? null
-      : { point: point.point, redAlertOn: redAlertOf(point.deadline, adjustmentCommitmentOf(record)) },
+      : {
+          point: point.point,
+          redAlertOn: redAlertOf(point.deadline, adjustmentCommitmentOf(record), windows.redAlertDaysAnnual),
+        },
   ),
 });
 
@@ -86,6 +95,7 @@ export class SubscriptionViewService {
     private readonly planFacts: PlanFactsService,
     private readonly occupancy: SeatOccupancyHook,
     private readonly periods: SubscriptionGrantingRepo,
+    private readonly windows: SubscriptionWindowsService,
   ) {}
 
   /**
@@ -95,8 +105,9 @@ export class SubscriptionViewService {
   async expiryReadings(records: readonly SubscriptionRecord[]): Promise<Map<string, ExpiryReadingView>> {
     const today = await this.organizationReads.businessToday();
     const [seats, continued] = await Promise.all([this.seatsOf(records, today), this.continuedAmong(records)]);
+    const points = await this.pointsOf(records, today, continued);
 
-    return this.readingsOf(records, today, seats, continued);
+    return this.readingsAt(records, points.points, today, seats);
   }
 
   /** Which of these subscriptions a later period continues: one read for all of them. */
@@ -104,30 +115,29 @@ export class SubscriptionViewService {
     return this.periods.idsWithSuccessor(records.map((record) => record.id));
   }
 
-  private readingsOf(
-    records: readonly SubscriptionRecord[],
-    today: BusinessDate,
-    seats: SeatCounts,
-    continued: ReadonlySet<string>,
-  ): Map<string, ExpiryReadingView> {
-    return this.readingsAt(records, this.pointsOf(records, today, continued), today, seats);
-  }
-
   /**
-   * The point of adjustment of each of these subscriptions today, null where there is none. Only a subscription that runs a period has a
-   * point: the rule of the filter by expiry, so a badge, the alert dates and the filter never disagree.
+   * The point of adjustment of each of these subscriptions today, null where there is none, with the windows each was counted with. Only a
+   * subscription that runs a period has a point: the rule of the filter by expiry, so a badge, the alert dates and the filter never disagree. The
+   * windows are those of the period of each (`QĐ-106h`), read once for all of them by the one rule of the instant (`adjustmentPeriodInstantOf`).
    */
-  private pointsOf(
+  private async pointsOf(
     records: readonly SubscriptionRecord[],
     today: BusinessDate,
     continued: ReadonlySet<string>,
-  ): Map<string, AdjustmentPoint | null> {
-    return new Map(
-      records.map((record) => [
-        record.id,
-        runsAPeriod({ ...record, hasSuccessor: continued.has(record.id) }) ? adjustmentPointOf(record, today) : null,
-      ]),
-    );
+  ): Promise<{ points: Map<string, AdjustmentPoint | null>; windows: Map<string, AdjustmentWindows> }> {
+    const running = records.filter((record) => runsAPeriod({ ...record, hasSuccessor: continued.has(record.id) }));
+    const windows = await this.windows.of(running, today);
+
+    return {
+      windows,
+      points: new Map(
+        records.map((record) => {
+          const own = windows.get(record.id);
+
+          return [record.id, own === undefined ? null : adjustmentPointOf(record, today, own)];
+        }),
+      ),
+    };
   }
 
   private readingsAt(
@@ -209,7 +219,7 @@ export class SubscriptionViewService {
     const vendorAdmins = await this.vendorAdminsOf(records);
     const today = await this.organizationReads.businessToday();
     const seatCounts = await this.seatsOf(records, today);
-    const points = this.pointsOf(records, today, await this.continuedAmong(records));
+    const { points, windows } = await this.pointsOf(records, today, await this.continuedAmong(records));
     const readings = this.readingsAt(records, points, today, seatCounts);
     const answerer = await this.answerersOf(records);
     const adjustment = (record: SubscriptionRecord) => ({
@@ -288,7 +298,7 @@ export class SubscriptionViewService {
         isPrimaryForPlan: record.isPrimaryForPlan,
         ...adjustment(record),
         noticeDeadline: { value: notice.deadline, source: notice.source },
-        alerts: alertsOf(points.get(record.id) ?? null, record),
+        alerts: alertsOf(points.get(record.id) ?? null, record, windows.get(record.id)),
         warnings: [...noticeWarnings(notice.source), ...poolWarnings(record), ...mergeWarnings(mergeCandidateIds)],
         mergeCandidateIds,
         ...vendorAdmins(record),

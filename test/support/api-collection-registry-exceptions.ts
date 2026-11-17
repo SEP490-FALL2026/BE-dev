@@ -78,7 +78,7 @@ export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     classification: 'bounded',
     findings: [],
     owner: 'g2-operating-parameters',
-    businessMaximum: { maxItems: 28, source: 'PARAMETER_DEFINITIONS in parameter-definitions.policy.ts' },
+    businessMaximum: { maxItems: 31, source: 'PARAMETER_DEFINITIONS in parameter-definitions.policy.ts' },
     rationale: 'The fixed set of parameter definitions with their current values.',
     removeWhen: 'Review on any definition added or removed, or any change of parameter-definitions.ts.',
     itemProperties: [

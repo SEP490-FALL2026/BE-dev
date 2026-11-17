@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import request from 'supertest';
 import { Client } from 'pg';
+import { ANNUAL_WINDOW_DAYS_MAX } from '../../../src/modules/catalog/subscription/subscription-windows.service';
 import { OperatingParametersApi } from '../../../src/modules/operating-parameters/public/operating-parameters.api';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
@@ -120,8 +121,11 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect(parameters.has('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS')).toBe(false);
       expect(parameters.has('HANDOVER_SHORT_DEADLINE_WORKING_DAYS')).toBe(false);
       expect(parameters.get('DETECTION_THRESHOLD_DAYS')?.value).toEqual([30, 60, 90]);
-      // The alerts of a subscription follow its point of adjustment now (S20-T9a): the list of days is gone.
+      // The alerts of a subscription follow its point of adjustment now (S20-T9a): the list of days is gone, three parameters set the point (S20-T9b).
       expect(parameters.has('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE')).toBe(false);
+      expect(parameters.get('SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY')).toMatchObject({ value: 7, isDefault: true });
+      expect(parameters.get('SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL')).toMatchObject({ value: 30, isDefault: true });
+      expect(parameters.get('SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL')).toMatchObject({ value: 7, isDefault: true });
       expect(parameters.get('RULE_SCHEDULE_G1_G2')?.value).toBe('DAILY');
       expect(parameters.get('RULE_SCHEDULE_G3_G4')?.value).toBe('WEEKLY');
       for (const parameter of parameters.values()) {
@@ -154,6 +158,9 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'INVITATION_REMINDER_DAYS',
         'INVITATION_WITHDRAW_DAYS',
         'DOCUMENT_MAX_SIZE_MB',
+        'SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY',
+        'SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL',
+        'SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL',
         'ACTIVITY_WINDOW_MINUTES',
         'DETECTION_THRESHOLD_DAYS',
         'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
@@ -171,6 +178,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'PROVISIONING',
         'ACCOUNT',
         'DOCUMENT',
+        'SUBSCRIPTION',
         'USAGE',
         'AI',
       ]);
@@ -325,6 +333,41 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       });
     });
 
+    it('keeps the days of the point of adjustment within 1–28, 1–180 and 1–90, and a change reaches only the periods that begin after it (S20-T9b, FR-1.4, FR-8.2, QĐ-106h)', async () => {
+      const service = ctx.app.get(OperatingParametersApi);
+      const cases = [
+        ['SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY', 7, 28, 14],
+        ['SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL', 30, 180, 45],
+        ['SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL', 7, 90, 10],
+      ] as const;
+      const beforeAny = new Date(Date.now() - 60_000);
+
+      for (const [key, standard, max, chosen] of cases) {
+        for (const refused of [0, max + 1]) {
+          expect(errorOf(await setParameter(key, refused).expect(422)).details).toMatchObject({
+            key,
+            problem: 'OUT_OF_RANGE',
+          });
+        }
+        expect(errorOf(await setParameter(key, 7.5).expect(422)).details).toMatchObject({ problem: 'WRONG_TYPE' });
+        await setParameter(key, max).expect(200);
+        const atMax = new Date();
+        await setParameter(key, chosen).expect(200);
+        const [first, second, third] = await service.getValuesAt(key, [
+          beforeAny,
+          atMax,
+          new Date(Date.now() + 60_000),
+        ]);
+
+        // A period that began before the change keeps the value it began with; one that begins after reads the new one.
+        expect([first, second, third]).toEqual([standard, max, chosen]);
+        expect((await list()).get(key)).toMatchObject({ value: chosen, isDefault: false });
+      }
+      expect((await list()).get('SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL')?.constraints).toMatchObject({
+        max: ANNUAL_WINDOW_DAYS_MAX,
+      });
+    });
+
     it('keeps the backlog threshold between 1 and 500, records before and after, and answers what was in force at a moment (US-05-10 AC-1)', async () => {
       const service = ctx.app.get(OperatingParametersApi);
       const beforeAny = new Date(Date.now() - 60_000);
@@ -424,8 +467,8 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       // threshold of GH-3 that went with it (PAID_SOFTWARE_FLAG_THRESHOLD, QĐ-111h), then the three of MF-2 and MF-3 (DEPARTURE_REVOCATION_WORKING_DAYS, TRANSFER_GRACE_WORKING_DAYS, TRANSFER_GRACE_REMINDER_WORKING_DAYS), less the
       // two of the handover that went (ABRUPT_DEPARTURE_HOLD_WORKING_DAYS, HANDOVER_SHORT_DEADLINE_WORKING_DAYS, QĐ-110g) and the deadline of the
       // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p), less the list of alert days before the deadline
-      // (RENEWAL_ALERT_DAYS_BEFORE_DEADLINE, S20-T9a).
-      expect(parameters.size).toBe(28);
+      // (RENEWAL_ALERT_DAYS_BEFORE_DEADLINE, S20-T9a), plus the three of the point of adjustment (S20-T9b).
+      expect(parameters.size).toBe(31);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {

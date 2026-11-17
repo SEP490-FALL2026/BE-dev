@@ -2,6 +2,7 @@ import type { DbTx } from '../../../../infrastructure/database/transaction-runne
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../../audit/public/audit.api';
 import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import type { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
 import type { PlanFactsService } from '../../plan/plan-facts.service';
 import { SubscriptionPeriodRefusedError } from '../../public/subscription-period.errors';
 import type { SubscriptionPoolService } from '../pool/subscription-pool.service';
@@ -9,6 +10,7 @@ import type { SubscriptionPeriodRepo } from './subscription-period.repo';
 import { SubscriptionPeriodService } from './subscription-period.service';
 import type { SubscriptionPricingService } from '../subscription-pricing.service';
 import type { SubscriptionRepo } from '../subscription.repo';
+import { SubscriptionWindowsService } from '../subscription-windows.service';
 import type { SubscriptionRecord } from '../subscription.types';
 
 const TODAY = '2026-11-17';
@@ -67,6 +69,12 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
   const organization = { businessToday: jest.fn(), getOrganization: jest.fn() };
   const audit = { record: jest.fn() };
   const pool = { releasePrimary: jest.fn() };
+  const STANDARD_DAYS: Record<string, number> = {
+    SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY: 7,
+    SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL: 30,
+    SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL: 7,
+  };
+  const parameters = { getValuesAt: jest.fn() };
   const service = new SubscriptionPeriodService(
     subscriptions as unknown as SubscriptionRepo,
     periodRepo as unknown as SubscriptionPeriodRepo,
@@ -75,12 +83,16 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
     organization as unknown as OrganizationReadApi,
     audit as unknown as AuditApi,
     pool as unknown as SubscriptionPoolService,
+    new SubscriptionWindowsService(parameters as unknown as OperatingParametersApi),
   );
 
   beforeEach(() => {
     jest.resetAllMocks();
     subscriptions.successorsOf.mockResolvedValue(new Map());
     organization.businessToday.mockResolvedValue(TODAY);
+    parameters.getValuesAt.mockImplementation((key: string, instants: Date[]) =>
+      Promise.resolve(instants.map(() => STANDARD_DAYS[key])),
+    );
   });
 
   it('returns the facts of a shared-pool subscription with no owner department, not leaving it out', async () => {
@@ -112,6 +124,30 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
       redAlertOn: '2026-11-24',
       commitment: 'ANNUAL',
     });
+  });
+
+  it('counts the point and the red alert with the days the parameters held when the period began, read once for all the periods (S20-T9b, QĐ-106h)', async () => {
+    subscriptions.findMany.mockResolvedValue([record(), record({ id: 'sub-2', startDate: '2026-03-01' })]);
+    parameters.getValuesAt.mockImplementation((key: string, instants: Date[]) =>
+      Promise.resolve(
+        instants.map((instant) =>
+          instant.toISOString().startsWith('2026-03')
+            ? { ...STANDARD_DAYS, SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL: 45, SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL: 10 }[key]
+            : STANDARD_DAYS[key],
+        ),
+      ),
+    );
+
+    const facts = await service.facts(['sub-1', 'sub-2']);
+
+    expect(parameters.getValuesAt).toHaveBeenCalledTimes(3);
+    expect(parameters.getValuesAt).toHaveBeenCalledWith(
+      'SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL',
+      [new Date('2026-01-01T00:00:00Z'), new Date('2026-03-01T00:00:00Z')],
+      undefined,
+    );
+    expect(facts[0].adjustment).toMatchObject({ point: '2026-11-01', redAlertOn: '2026-11-24' });
+    expect(facts[1].adjustment).toMatchObject({ point: '2026-10-17', redAlertOn: '2026-11-21' });
   });
 
   it('reads the point of a plan by the month from the next payment day today (7 days before), with no red alert', async () => {

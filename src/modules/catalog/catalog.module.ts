@@ -75,6 +75,7 @@ import { SubscriptionService } from './subscription/subscription.service';
 import { SubscriptionPoolService } from './subscription/pool/subscription-pool.service';
 import { SubscriptionPricingService } from './subscription/subscription-pricing.service';
 import { SubscriptionViewService } from './subscription/subscription-view.service';
+import { SubscriptionWindowsService } from './subscription/subscription-windows.service';
 import { SubscriptionsController } from './subscription/subscriptions.controller';
 import { VendorDictionaryController } from './vendor-dictionary/vendor-dictionary.controller';
 import { VendorDictionaryFactsService } from './vendor-dictionary/vendor-dictionary-facts.service';
@@ -175,6 +176,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionGrantingRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,
+    SubscriptionWindowsService,
     SubscriptionPeriodRepo,
     SubscriptionPeriodService,
     SeatTargetService,

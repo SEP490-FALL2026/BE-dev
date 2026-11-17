@@ -58,7 +58,7 @@ flowchart BT
   catalog -->|10| finance
   catalog -->|8| identity_access
   catalog -->|2| notifications
-  catalog -->|2| operating_parameters
+  catalog -->|3| operating_parameters
   catalog -->|33| organization
   dashboards -->|2| catalog
   dashboards -->|2| devices
