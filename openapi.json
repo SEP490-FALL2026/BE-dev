@@ -45883,7 +45883,7 @@
                       "error": {
                         "code": "MONEY_SCALE_EXCEEDED",
                         "message": "This currency allows at most 2 decimal digit(s).",
-                        "details": { "allowedDecimals": 2, "path": "unitPrice" },
+                        "details": { "allowedDecimals": 2, "path": "quote.unitPrice" },
                         "requestId": "req_example"
                       }
                     }
@@ -45895,7 +45895,7 @@
                       "error": {
                         "code": "MONEY_OUT_OF_RANGE",
                         "message": "The amount is outside the range a money value may hold.",
-                        "details": { "path": "unitPrice" },
+                        "details": { "path": "quote.unitPrice" },
                         "requestId": "req_example"
                       }
                     }
@@ -45907,7 +45907,7 @@
                       "error": {
                         "code": "CURRENCY_NOT_SUPPORTED",
                         "message": "The currency XYZ is not supported.",
-                        "details": { "currency": "XYZ", "path": "originalPrice" },
+                        "details": { "currency": "XYZ", "path": "quote.originalPrice" },
                         "requestId": "req_example"
                       }
                     }
@@ -47017,7 +47017,7 @@
                       "error": {
                         "code": "MONEY_SCALE_EXCEEDED",
                         "message": "This currency allows at most 2 decimal digit(s).",
-                        "details": { "allowedDecimals": 2, "path": "unitPrice" },
+                        "details": { "allowedDecimals": 2, "path": "spend.quote.unitPrice" },
                         "requestId": "req_example"
                       }
                     }
@@ -47029,7 +47029,7 @@
                       "error": {
                         "code": "MONEY_OUT_OF_RANGE",
                         "message": "The amount is outside the range a money value may hold.",
-                        "details": { "path": "unitPrice" },
+                        "details": { "path": "spend.quote.unitPrice" },
                         "requestId": "req_example"
                       }
                     }
@@ -47041,7 +47041,7 @@
                       "error": {
                         "code": "CURRENCY_NOT_SUPPORTED",
                         "message": "The currency XYZ is not supported.",
-                        "details": { "currency": "XYZ", "path": "originalPrice" },
+                        "details": { "currency": "XYZ", "path": "spend.quote.originalPrice" },
                         "requestId": "req_example"
                       }
                     }

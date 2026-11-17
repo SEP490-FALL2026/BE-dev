@@ -183,7 +183,12 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   ),
   NOT_INTERNAL: example(new InternalRegistrationRefusedError('NOT_INTERNAL')),
   NAME_TAKEN: example(new InternalRegistrationRefusedError('NAME_TAKEN')),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'unitPrice')),
-  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('unitPrice')),
-  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'originalPrice')),
+  /** The quote of the assessment sits at `quote` in the body of `accessRequestAssessmentSave`. */
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'quote.unitPrice')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('quote.unitPrice')),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'quote.originalPrice')),
+  /** The quote of the payment sits at `spend.quote` in the body of `accessRequestInternalRegister`. */
+  SPEND_MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'spend.quote.unitPrice')),
+  SPEND_MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('spend.quote.unitPrice')),
+  SPEND_CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'spend.quote.originalPrice')),
 } as const;
