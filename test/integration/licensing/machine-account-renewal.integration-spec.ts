@@ -30,15 +30,23 @@ describe('a seat flagged as a machine account keeps its flag when the renewal ca
     await h.stop();
   });
 
-  /** A subscription of a unit of two people, decided to be renewed as it is, and its outcome recorded: the seats are carried. */
+  /**
+   * A subscription of a unit of two people and the seats of the IT Admin that `seatsOfTheItAdmin` makes, its result recorded at the point of
+   * adjustment as the reduction to the seats counted (a machine account holds a seat like anybody): the seats are carried.
+   */
   const renewedSubscription = async (seatsOfTheItAdmin: (subscriptionId: string) => Promise<string[]>) => {
     const unit = await h.unit(2);
     const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
     const itAdminSeats = await seatsOfTheItAdmin(subscriptionId);
-    const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
-    await h.confirmRenewal(id, unit.head.account, {}).expect(200);
+    const seatsNeeded = unit.members.length + itAdminSeats.length;
 
-    const response = await h.outcome(id, { outcome: 'AS_DECIDED', nextPeriod: nextYear(10) });
+    const response = await h.propose({
+      subscriptionId,
+      choice: 'REDUCE',
+      proposedQuantity: seatsNeeded,
+      outcome: 'AS_DECIDED',
+      nextPeriod: nextYear(seatsNeeded),
+    });
 
     return { response, itAdminSeats };
   };
@@ -49,7 +57,7 @@ describe('a seat flagged as a machine account keeps its flag when the renewal ca
       await itAdminSeat(h, { subscriptionId }, 'ci-bot@acme.vn', { flagged: true, validFrom: h.inDays(-300) }),
     ]);
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     const carried = await machineSeatFollowers(h, itAdminSeats);
     expect(carried).toHaveLength(2);
     expect(carried.every((row) => row.source === 'RENEWAL_CARRY')).toBe(true);
@@ -67,7 +75,7 @@ describe('a seat flagged as a machine account keeps its flag when the renewal ca
       await itAdminSeat(h, { subscriptionId }, 'release-bot@acme.vn', { flagged: true, validFrom: h.inDays(-300) }),
     ]);
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     expect(await machineSeatFollowers(h, itAdminSeats)).toEqual([
       expect.objectContaining({
         is_machine_account: true,

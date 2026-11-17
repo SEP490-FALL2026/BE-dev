@@ -1,5 +1,3 @@
-import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { SubscriptionRenewalRepo } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal.repo';
 import { RenewalHarness } from '../../support/renewal-harness';
 import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
 import { takeOwnerOff } from '../../support/shared-pool-subscription';
@@ -328,37 +326,10 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
   it('refuses a new result while a case decided before this rule still waits for its outcome (R2-1)', async () => {
     const unit = await h.unit(2);
     const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
-    const repo = h.ctx.app.get(SubscriptionRenewalRepo, { strict: false });
-    const legacy = await h.ctx.app.get(TransactionRunner).run(async (tx) => {
-      const proposed = await repo.insert(tx, {
-        organizationId: h.seed.organizationId,
-        subscriptionId,
-        noticeBasis: 'DECLARED',
-        noticeBaseDate: h.inDays(60),
-        proposedChoice: 'REDUCE',
-        proposedQuantity: 4,
-        proposalNote: null,
-        seatsNeeded: null,
-        proposedByEmployeeId: h.it1.employeeId,
-        proposedByAppUserId: h.it1.appUserId,
-      });
-      if (!proposed) throw new Error('the legacy case was not written');
-      await repo.recordDecision(tx, proposed.id, {
-        choice: 'REDUCE',
-        quantity: 4,
-        reason: null,
-        decidedByEmployeeId: unit.head.employeeId,
-        decidedByAppUserId: unit.head.account.appUserId,
-        deciderRole: 'OWNER_DEPARTMENT_HEAD',
-        decidedAt: new Date(),
-        decidedOn: h.inDays(0),
-        decidedAfterDeadline: false,
-        executionPoint: 'AS_PLANNED',
-        activeSeatsAtDecision: 2,
-        snapshot: { source: 'NOT_CONNECTED', takenAt: new Date().toISOString() },
-      });
-
-      return proposed.id;
+    const legacy = await h.legacyDecidedRenewal(subscriptionId, {
+      choice: 'REDUCE',
+      quantity: 4,
+      decidedBy: unit.head,
     });
 
     const response = await record({
