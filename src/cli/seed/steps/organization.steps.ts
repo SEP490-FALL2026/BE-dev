@@ -147,9 +147,13 @@ async function stillUnplaced(ctx: DemoRunContext, person: DemoPerson): Promise<R
     : { status: 'conflict', label: `${person.code} đã có với họ tên khác` };
 }
 
-function accountSpecs(ctx: DemoRunContext): DemoAccountSpec[] {
+/**
+ * The accounts the run describes against the fixture. A person the dataset locks is left out once the account is locked: the demo account
+ * contract reports a locked account as different from its spec (`ACCOUNT_DIFFERS`), which would stop every later run (C-1).
+ */
+export function accountSpecsToCheck(ctx: DemoRunContext, lockedCodes: ReadonlySet<string>): DemoAccountSpec[] {
   return ctx.fixture.people
-    .filter((person) => person.account !== null)
+    .filter((person) => person.account !== null && !(person.lockedInDemo && lockedCodes.has(person.code)))
     .map((person) => ({
       employeeCode: person.code,
       loginEmail: emailOf(ctx, person.code),
@@ -160,8 +164,25 @@ function accountSpecs(ctx: DemoRunContext): DemoAccountSpec[] {
     }));
 }
 
+/** The locked accounts of the dataset's own people, by employee code (the Super Admin reads the list; there is no filter by employee). */
+async function lockedAccounts(ctx: DemoRunContext): Promise<Map<string, string>> {
+  const rows = await listAll<{ id: string; employee: { employeeCode: string } | null }>(
+    ctx,
+    ctx.superAdminEmail,
+    '/app-users?status=LOCKED',
+  );
+  const wanted = new Set(ctx.fixture.people.filter((person) => person.lockedInDemo).map((person) => person.code));
+
+  return new Map(
+    rows
+      .filter((row) => row.employee !== null && wanted.has(row.employee.employeeCode))
+      .map((row) => [row.employee!.employeeCode, row.id]),
+  );
+}
+
 async function accounts(ctx: DemoRunContext): Promise<StepOutcome> {
-  const specs = accountSpecs(ctx);
+  const locked = await lockedAccounts(ctx);
+  const specs = accountSpecsToCheck(ctx, new Set(locked.keys()));
   const before = await ctx.accounts.describe(specs);
   const after = ctx.mode === 'apply' ? await ctx.accounts.create(specs) : before;
   const results: Result[] = after.map((item) => {
@@ -173,6 +194,10 @@ async function accounts(ctx: DemoRunContext): Promise<StepOutcome> {
 
     return { status: wasAbsent ? 'done' : 'present', label: item.employeeCode };
   });
+  for (const [code, id] of locked) {
+    ctx.ids.appUsers.set(code, id);
+    results.push({ status: 'present', label: `${code} (đã khóa)` });
+  }
 
   return summarize(results);
 }

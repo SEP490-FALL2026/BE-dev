@@ -1,5 +1,6 @@
+import { DemoApiError } from '../demo-api-client';
 import { dayOffset } from '../demo-dates';
-import { emailOf, listAll, summarize } from '../demo-step-kit';
+import { emailOf, listAll, summarize, tag } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoEmployeeImport, DemoImportRow } from '../fixture/demo-fixture.types';
 import { EMPLOYEE_IMPORT_COLUMNS, csvCell } from './file-builders';
@@ -105,11 +106,81 @@ async function employeeImports(ctx: DemoRunContext): Promise<StepOutcome> {
   return summarize(results);
 }
 
+interface AccountRow {
+  id: string;
+  employee: { employeeCode: string } | null;
+}
+
+const codesOf = (rows: readonly AccountRow[]): Set<string> =>
+  new Set(rows.flatMap((row) => (row.employee ? [row.employee.employeeCode] : [])));
+
+/** The body of the lock: the reason starts with the tag of the dataset, so the Audit Trail names where the lock came from (`QĐ-81`). */
+export const lockBody = (ctx: DemoRunContext, reason: string): { reason: string } => ({
+  reason: `${tag(ctx, 'LOCK')} ${reason}`,
+});
+
+async function lockOne(
+  ctx: DemoRunContext,
+  state: { employee: string; reason: string },
+  locked: Set<string>,
+): Promise<Result> {
+  const label = `khóa ${state.employee}`;
+  if (locked.has(state.employee)) return { status: 'present', label };
+  const id = ctx.ids.appUsers.get(state.employee);
+  if (!id)
+    return ctx.mode === 'plan'
+      ? { status: 'planned', label }
+      : { status: 'conflict', label: `${label}: chưa có tài khoản` };
+  if (ctx.mode === 'plan') return { status: 'planned', label };
+  await ctx.api.call(ctx.superAdminEmail, 'POST', `/app-users/${id}/lock`, lockBody(ctx, state.reason));
+
+  return { status: 'done', label };
+}
+
+/** An invitation not redeemed yet is an account in `INVITED`; a person who already has an account, whichever state, is left as they are. */
+async function inviteOne(ctx: DemoRunContext, code: string, invited: Set<string>): Promise<Result> {
+  const label = `mời ${code}`;
+  if (invited.has(code)) return { status: 'present', label };
+  const employeeId = ctx.ids.employees.get(code);
+  if (!employeeId) return { status: 'conflict', label: `${label}: chưa có nhân viên` };
+  if (ctx.mode === 'plan') return { status: 'planned', label };
+  try {
+    await ctx.api.call(ctx.superAdminEmail, 'POST', '/app-users', { employeeId });
+  } catch (error) {
+    if (
+      error instanceof DemoApiError &&
+      error.status === 409 &&
+      error.code === 'APP_USER.ALREADY_EXISTS_FOR_EMPLOYEE'
+    ) {
+      return { status: 'present', label };
+    }
+    throw error;
+  }
+
+  return { status: 'done', label };
+}
+
+async function accountStates(ctx: DemoRunContext): Promise<StepOutcome> {
+  const locked = codesOf(await listAll<AccountRow>(ctx, ctx.superAdminEmail, '/app-users?status=LOCKED'));
+  const invited = codesOf(await listAll<AccountRow>(ctx, ctx.superAdminEmail, '/app-users?activationState=INVITED'));
+  const results: Result[] = [];
+  for (const state of ctx.fixture.accountStates.locked) results.push(await lockOne(ctx, state, locked));
+  for (const code of ctx.fixture.accountStates.invited) results.push(await inviteOne(ctx, code, invited));
+
+  return summarize(results);
+}
+
 export const PEOPLE_ADMIN_STEPS: readonly DemoStep[] = [
   {
     key: 'org.employee-imports',
     title: 'Nhập nhân sự: một file đã xác nhận, một bản xem trước có dòng lỗi (Super Admin)',
     needs: ['org.employees'],
     run: employeeImports,
+  },
+  {
+    key: 'org.account-states',
+    title: 'Một tài khoản bị khóa và một lời mời chưa kích hoạt (Super Admin)',
+    needs: ['org.accounts'],
+    run: accountStates,
   },
 ];

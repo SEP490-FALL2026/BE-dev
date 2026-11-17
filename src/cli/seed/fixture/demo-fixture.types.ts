@@ -34,6 +34,8 @@ export interface DemoPerson {
    * request, which names months, is cut there (`QĐ-111i`, R-38); a staff member has none (the API refuses one).
    */
   contractEndInDays?: number;
+  /** The dataset locks this person's account (`org.account-states`): the later runs do not check that account against its spec (C-1). */
+  lockedInDemo?: true;
 }
 
 /** A line of a people file the Super Admin imports (`SBF-01a`): the department is a code that may be wrong on purpose. */
@@ -294,6 +296,8 @@ export interface DemoFixture {
   people: DemoPerson[];
   /** The people files of the Super Admin: one is confirmed, one is left as a preview with lines to fix (`SBF-01a`). */
   employeeImports: DemoEmployeeImport[];
+  /** What the Super Admin does to accounts after they exist: locks one with a reason, invites a person who has none (`SPEC S03`). */
+  accountStates: { locked: { employee: string; reason: string }[]; invited: string[] };
   /** The one approval role left, the spending approver (a role grant, `QĐ-93b`). */
   approvalRoles: { SPENDING_APPROVER: string };
   applications: DemoApplication[];

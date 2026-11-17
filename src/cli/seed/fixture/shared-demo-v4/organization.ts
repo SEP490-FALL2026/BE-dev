@@ -99,7 +99,7 @@ const PEOPLE: DemoPerson[] = [
   person('NV-BOD1', 'Trần Quốc Khải', 'khai.tran', 'BOD', 'EMPLOYEE'),
   person('NV-BOD2', 'Nguyễn Thị Lụa', 'lua.nguyen', 'BOD', 'EMPLOYEE'),
   // Board people for the usage, locked-account and invitation scenarios: one account is locked, one has none and an invitation waits.
-  person('NV-BOD3', 'Hoàng Văn Minh', 'minh.hoang', 'BOD', 'EMPLOYEE'),
+  { ...person('NV-BOD3', 'Hoàng Văn Minh', 'minh.hoang', 'BOD', 'EMPLOYEE'), lockedInDemo: true },
   person('NV-BOD4', 'Phùng Thị Nga', 'nga.phung', 'BOD', 'EMPLOYEE'),
   person('NV-BOD5', 'Lương Văn Ơn', 'on.luong', 'BOD', null),
   person('NV-BOD6', 'Tống Thị Quyên', 'quyen.tong', 'BOD', null),
@@ -201,9 +201,19 @@ const EMPLOYEE_IMPORTS: DemoEmployeeImport[] = [
   },
 ];
 
-export const ORGANIZATION: Pick<DemoFixture, 'departments' | 'people' | 'employeeImports' | 'approvalRoles'> = {
+export const ORGANIZATION: Pick<
+  DemoFixture,
+  'departments' | 'people' | 'employeeImports' | 'accountStates' | 'approvalRoles'
+> = {
   departments: DEPARTMENTS,
   people: PEOPLE,
   employeeImports: EMPLOYEE_IMPORTS,
+  // NV-BOD3 sends and receives no request, so locking the account never stops a step (`QĐ-81`); NV-NEW3 has no account until the invitation.
+  accountStates: {
+    locked: [
+      { employee: 'NV-BOD3', reason: 'Demo khóa tài khoản: nghi ngờ lộ mật khẩu, chờ Bảo mật xác minh (QĐ-81).' },
+    ],
+    invited: ['NV-NEW3'],
+  },
   approvalRoles: { SPENDING_APPROVER: 'NV-CEO' },
 };

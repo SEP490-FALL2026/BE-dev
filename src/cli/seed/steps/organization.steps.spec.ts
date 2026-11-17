@@ -1,6 +1,6 @@
 import type { DemoRunContext } from '../demo-run.types';
 import { SHARED_DEMO_V4 } from '../fixture/shared-demo-v4';
-import { ORGANIZATION_STEPS, employeeBodyOf } from './organization.steps';
+import { ORGANIZATION_STEPS, accountSpecsToCheck, employeeBodyOf } from './organization.steps';
 import type { DemoPerson } from '../fixture/demo-fixture.types';
 
 /** RQ-2, D-21: the end of a person's contract is a field of the employee the Super Admin writes; a request names months and is cut there. */
@@ -81,5 +81,29 @@ describe('an employee the dataset leaves without a department (QĐ-93g)', () => 
     await expect(runWith({ fullName: 'Người khác', department: null }).run).resolves.toMatchObject({
       status: 'conflict',
     });
+  });
+});
+
+describe('the accounts the run checks (C-1)', () => {
+  const people = SHARED_DEMO_V4.people;
+
+  it('leaves a locked account of the dataset out of the check, so the rerun does not report ACCOUNT_DIFFERS', () => {
+    const ctx = { fixture: SHARED_DEMO_V4 } as unknown as DemoRunContext;
+    const kept = accountSpecsToCheck(ctx, new Set(['NV-BOD3'])).map((spec) => spec.employeeCode);
+
+    expect(kept).not.toContain('NV-BOD3');
+    expect(kept).toHaveLength(people.filter((person) => person.account !== null).length - 1);
+  });
+
+  it('keeps it while it is not locked yet (the first run creates it, the next step locks it)', () => {
+    const ctx = { fixture: SHARED_DEMO_V4 } as unknown as DemoRunContext;
+
+    expect(accountSpecsToCheck(ctx, new Set()).map((spec) => spec.employeeCode)).toContain('NV-BOD3');
+  });
+
+  it('never drops a person the fixture does not mark as locked, even when the account is locked', () => {
+    const ctx = { fixture: SHARED_DEMO_V4 } as unknown as DemoRunContext;
+
+    expect(accountSpecsToCheck(ctx, new Set(['NV-DEV1'])).map((spec) => spec.employeeCode)).toContain('NV-DEV1');
   });
 });

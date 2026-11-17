@@ -127,3 +127,84 @@ describe('org.employee-imports', () => {
     await outcome;
   });
 });
+
+describe('org.account-states (SPEC S03)', () => {
+  const step = PEOPLE_ADMIN_STEPS.find((candidate) => candidate.key === 'org.account-states')!;
+  const states = SHARED_DEMO_V4.accountStates;
+  type Row = { id: string; employee: { employeeCode: string } };
+  const run = (lists: { locked: Row[]; invited: Row[] }, extra: Record<string, unknown> = {}) => {
+    const call = jest.fn((...[, method, path]: [string, string, string, unknown?]): Promise<unknown> => {
+      if (method === 'GET' && path.includes('status=LOCKED'))
+        return Promise.resolve({ items: lists.locked, pagination: { totalPages: 1 } });
+      if (method === 'GET' && path.includes('activationState=INVITED'))
+        return Promise.resolve({ items: lists.invited, pagination: { totalPages: 1 } });
+      return Promise.resolve({});
+    });
+    const ctx = ctxOf({
+      api: { call },
+      ids: {
+        employees: new Map([
+          ['NV-BOD3', 'e-3'],
+          ['NV-NEW3', 'e-n'],
+        ]),
+        appUsers: new Map([['NV-BOD3', 'u-3']]),
+      },
+      ...extra,
+    });
+
+    return { outcome: step.run(ctx), call };
+  };
+  type Args = [string, string, string, unknown?];
+  const writes = (call: jest.Mock<Promise<unknown>, Args>): Args[] =>
+    call.mock.calls.filter((args) => args[1] === 'POST');
+
+  it('comes after the accounts', () => {
+    expect(step.needs).toEqual(['org.accounts']);
+  });
+
+  it('locks the one person with a reason that carries the tag, and invites the one with no account', async () => {
+    const { outcome, call } = run({ locked: [], invited: [] });
+
+    await expect(outcome).resolves.toMatchObject({ status: 'done' });
+    const [lock, invite] = writes(call);
+    expect(lock[2]).toBe('/app-users/u-3/lock');
+    expect((lock[3] as { reason: string }).reason.startsWith('[SV-LOCK]')).toBe(true);
+    expect(invite.slice(2)).toEqual(['/app-users', { employeeId: 'e-n' }]);
+  });
+
+  it('writes nothing when the account is locked and the invitation is waiting', async () => {
+    const { outcome, call } = run({
+      locked: [{ id: 'u-3', employee: { employeeCode: 'NV-BOD3' } }],
+      invited: [{ id: 'u-n', employee: { employeeCode: 'NV-NEW3' } }],
+    });
+
+    await expect(outcome).resolves.toMatchObject({ status: 'present' });
+    expect(writes(call)).toHaveLength(0);
+  });
+
+  it('counts an invited person who already has an account as present (the API answers a second account with 409)', async () => {
+    const { outcome, call } = run({ locked: [{ id: 'u-3', employee: { employeeCode: 'NV-BOD3' } }], invited: [] });
+    call.mockImplementation((...[, method, path]: [string, string, string, unknown?]) => {
+      if (method === 'GET')
+        return Promise.resolve({
+          items: path.includes('LOCKED') ? [{ id: 'u-3', employee: { employeeCode: 'NV-BOD3' } }] : [],
+          pagination: { totalPages: 1 },
+        });
+      return Promise.reject(new DemoApiError(method, path, 409, 'APP_USER.ALREADY_EXISTS_FOR_EMPLOYEE'));
+    });
+
+    await expect(outcome).resolves.toMatchObject({ status: 'present' });
+  });
+
+  it('declares the locked person as one the fixture marks, and never one who sends or receives a request', () => {
+    const locked = SHARED_DEMO_V4.people.filter((person) => person.lockedInDemo).map((person) => person.code);
+    expect(locked).toEqual(states.locked.map((state) => state.employee));
+    for (const code of locked) {
+      for (const scenario of SHARED_DEMO_V4.requests) {
+        expect([scenario.requester, ...(scenario.beneficiaries ?? [])]).not.toContain(code);
+      }
+    }
+    expect(states.invited).toEqual(['NV-NEW3']);
+    expect(SHARED_DEMO_V4.people.find((person) => person.code === 'NV-NEW3')!.account).toBeNull();
+  });
+});
