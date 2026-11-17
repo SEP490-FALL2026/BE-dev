@@ -190,7 +190,8 @@ export function noticeBasisOf(kind: PeriodAdjustment['kind'], noticeSource: Peri
 
 /**
  * A renewal the vendor made that the company did not choose, known the day the result is recorded (`QĐ-106i`(4), `SBF-20` §4.4 step 10): a
- * reduction or a cancellation of which the vendor kept more seats than chosen, or a period when none was to be. The detection by invoice is another item.
+ * cancellation of which the vendor made a period anyway, or any other choice of which the period bought more seats than the one chosen (a count
+ * the system made is the most the company may pay for, `QĐ-104d`, `A1C-05`). The detection by invoice is another item.
  */
 export function unintendedRenewalOf(input: {
   choice: RenewalChoice;
@@ -202,7 +203,7 @@ export function unintendedRenewalOf(input: {
   if (input.nextQuantity === null) return false;
   if (input.choice === 'CANCEL') return true;
 
-  return input.choice === 'REDUCE' && input.nextQuantity > (input.quantity ?? 0);
+  return input.nextQuantity > (input.quantity ?? 0);
 }
 
 /**

@@ -278,7 +278,9 @@ describe('the notice basis written with the case (R2-6)', () => {
 describe('a renewal the vendor made that the company did not choose (QĐ-106i(4), SBF-20 §4.4 step 10)', () => {
   const incident = (input: Parameters<typeof unintendedRenewalOf>[0]) => unintendedRenewalOf(input);
 
-  it('is a reduction the vendor did not follow with more seats than chosen, or a cancellation with a new period', () => {
+  it('is a period of more seats than chosen, whatever the choice, or a cancellation with a new period (A1C-05)', () => {
+    expect(incident({ choice: 'RENEW', quantity: 8, outcome: 'DIFFERENT', nextQuantity: 20 })).toBe(true);
+    expect(incident({ choice: 'INCREASE', quantity: 12, outcome: 'VENDOR_REFUSED', nextQuantity: 20 })).toBe(true);
     expect(incident({ choice: 'REDUCE', quantity: 8, outcome: 'VENDOR_REFUSED', nextQuantity: 10 })).toBe(true);
     expect(incident({ choice: 'REDUCE', quantity: 8, outcome: 'DIFFERENT', nextQuantity: 9 })).toBe(true);
     expect(incident({ choice: 'CANCEL', quantity: null, outcome: 'VENDOR_REFUSED', nextQuantity: 10 })).toBe(true);
@@ -289,8 +291,7 @@ describe('a renewal the vendor made that the company did not choose (QĐ-106i(4)
     expect(incident({ choice: 'REDUCE', quantity: 8, outcome: 'VENDOR_REFUSED', nextQuantity: null })).toBe(false);
     expect(incident({ choice: 'CANCEL', quantity: null, outcome: 'UNCONFIRMED', nextQuantity: null })).toBe(false);
     expect(incident({ choice: 'REDUCE', quantity: 8, outcome: 'AS_DECIDED', nextQuantity: 8 })).toBe(false);
-    expect(incident({ choice: 'RENEW', quantity: 10, outcome: 'DIFFERENT', nextQuantity: 12 })).toBe(false);
-    expect(incident({ choice: 'INCREASE', quantity: 12, outcome: 'DIFFERENT', nextQuantity: 14 })).toBe(false);
+    expect(incident({ choice: 'RENEW', quantity: 10, outcome: 'DIFFERENT', nextQuantity: 10 })).toBe(false);
   });
 });
 

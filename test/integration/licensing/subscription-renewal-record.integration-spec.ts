@@ -279,6 +279,30 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     expect(incident.length).toBeGreaterThanOrEqual(2);
     expect(incident[0].params).toMatchObject({ renewalId: id });
   });
+
+  it('is also an incident when a recorded increase bought more seats than the system counted, told to the approver, the IT Admin and Finance (A1C-05, QĐ-104d)', async () => {
+    const unit = await h.unit(2);
+    const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 3, ...year() });
+    await h.ctx.sql.query(`UPDATE subscriptions SET vendor_minimum_seats = 5 WHERE id = $1`, [subscriptionId]);
+
+    const response = await record({
+      subscriptionId,
+      choice: 'INCREASE',
+      proposedQuantity: 5,
+      note: 'The vendor sells nothing under five seats (contract 4.2).',
+      outcome: 'DIFFERENT',
+      outcomeNote: 'The vendor invoiced nine seats.',
+      nextPeriod: nextYear(9),
+    });
+
+    expect(response.status).toBe(201);
+    const id = h.dataOf<{ renewal: CaseWire }>(response).renewal.id;
+    const incident = await h.notices('SUBSCRIPTION_AUTO_RENEWAL_INCIDENT', subscriptionId);
+    expect(incident.map((notice) => notice.recipient_employee_id).sort()).toEqual(
+      [h.boss.employeeId, h.it1.employeeId, h.finance.employeeId].sort(),
+    );
+    expect(incident[0].params).toMatchObject({ renewalId: id });
+  });
   it('leaves on the old period a seat that ends on the renewal day, so the exact count is recorded (R2-2, QĐ-106i(2))', async () => {
     const unit = await h.unit(2);
     const { subscriptionId, seats } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
