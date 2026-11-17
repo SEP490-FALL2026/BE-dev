@@ -3,9 +3,10 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 /**
- * Only the shape and a generous bound are checked here. Whether a tax name is empty or repeated, a rate is a percentage
- * of at most two decimals between 0 and 100, or there are more than twenty taxes is judged by the profile policy and
- * answers with its own `VENDOR_TAX_PROFILE.*` code. Money is text, never a JSON number (ADR-0007).
+ * The shape and the sizes the profile policy keeps (at most twenty lines, a name of at most 100 characters) are checked
+ * here, so a body over them is a `VALIDATION_ERROR`. Whether a tax name is empty or repeated, or a rate is a percentage
+ * of at most two decimals between 0 and 100, is judged by the profile policy and answers with its own
+ * `VENDOR_TAX_PROFILE.*` code. Money is text, never a JSON number (ADR-0007).
  */
 const group = z.enum(['T1', 'T2', 'T3']);
 const payer = z.enum(['VENDOR_COLLECTS', 'BUYER_REMITS']);
@@ -13,8 +14,8 @@ const payer = z.enum(['VENDOR_COLLECTS', 'BUYER_REMITS']);
 export const declareTaxProfileBodySchema = z.strictObject({
   group: group.optional(),
   lines: z
-    .array(z.strictObject({ taxType: z.string().max(1000), ratePercent: z.string().max(20), deductible: z.boolean() }))
-    .max(100),
+    .array(z.strictObject({ taxType: z.string().max(100), ratePercent: z.string().max(20), deductible: z.boolean() }))
+    .max(20),
 });
 
 const pageQuery = {

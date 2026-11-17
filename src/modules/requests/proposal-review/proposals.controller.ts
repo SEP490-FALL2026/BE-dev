@@ -267,7 +267,7 @@ export class ProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'A refusal has no kind, or an uncontrollable tool no alternative, or a refusal or a return has no reason and no answer No to give one (VALIDATION_ERROR); the checklist lacks an answer (POLICY.CHECKLIST_INCOMPLETE); the alternative plan does not exist (ASSESSMENT.REFERENCE_NOT_FOUND). Nothing is written and the request stays with the IT Admin.',
+        'A refusal has no kind, or an uncontrollable tool no alternative, or a refusal or a return has no reason and no answer No to give one (VALIDATION_ERROR, issues[0].path = reason); the checklist lacks an answer (POLICY.CHECKLIST_INCOMPLETE); the alternative plan does not exist (ASSESSMENT.REFERENCE_NOT_FOUND). Nothing is written and the request stays with the IT Admin.',
       examples: [VALIDATION_EXAMPLE, EXAMPLES.ALTERNATIVE_PLAN_NOT_FOUND, CHECKLIST_ERROR_EXAMPLES.INCOMPLETE],
     },
   )

@@ -364,11 +364,7 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
 
     it.each([
       ['an empty tax name', { lines: [{ ...VAT, taxType: '  ' }] }, 'VENDOR_TAX_PROFILE.TAX_TYPE_INVALID'],
-      [
-        'a tax name over 100 characters',
-        { lines: [{ ...VAT, taxType: 'T'.repeat(101) }] },
-        'VENDOR_TAX_PROFILE.TAX_TYPE_INVALID',
-      ],
+      ['a tax name over 100 characters', { lines: [{ ...VAT, taxType: 'T'.repeat(101) }] }, 'VALIDATION_ERROR'],
       ['a tax name used twice', { lines: [VAT, { ...CIT, taxType: 'gtgt' }] }, 'VENDOR_TAX_PROFILE.TAX_TYPE_DUPLICATE'],
       ['a negative rate', { lines: [{ ...VAT, ratePercent: '-1' }] }, 'VENDOR_TAX_PROFILE.RATE_INVALID'],
       ['a rate over 100', { lines: [{ ...VAT, ratePercent: '100.01' }] }, 'VENDOR_TAX_PROFILE.RATE_INVALID'],
@@ -383,7 +379,7 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
             deductible: false,
           })),
         },
-        'VENDOR_TAX_PROFILE.TOO_MANY_LINES',
+        'VALIDATION_ERROR',
       ],
     ])('refuses a profile with %s: 422 %s and nothing recorded', async (_name, body, code) => {
       const id = await vendor();
@@ -392,6 +388,23 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
       expect(codeOf(await declare(id, body).expect(422))).toBe(code);
       expect(await n('vendor_tax_profile_versions')).toBe(before);
       expect((await ctx.sql.query(`SELECT 1 FROM vendor_tax_profiles WHERE vendor_id = $1`, [id])).rowCount).toBe(0);
+    });
+
+    it('names the field of a body over the limits (21 lines, a name over 100 characters) and takes the limits themselves', async () => {
+      const id = await vendor();
+      const line = (taxType: string) => ({ taxType, ratePercent: '1', deductible: false });
+
+      const tooMany = await declare(id, {
+        lines: Array.from({ length: 21 }, (_, index) => line(`Tax ${index}`)),
+      }).expect(422);
+      expect(detailsOf(tooMany)).toMatchObject({ issues: [{ path: 'lines' }] });
+      const tooLong = await declare(id, { lines: [line('T'.repeat(101))] }).expect(422);
+      expect(detailsOf(tooLong)).toMatchObject({ issues: [{ path: 'lines.0.taxType' }] });
+
+      const atLimit = await profileOf(id, {
+        lines: [line('T'.repeat(100)), ...Array.from({ length: 19 }, (_, index) => line(`Tax ${index}`))],
+      });
+      expect(atLimit.lines).toHaveLength(20);
     });
 
     it('answers 404 VENDOR.NOT_FOUND on every route for a vendor that does not exist, writing nothing', async () => {

@@ -324,7 +324,6 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'VENDOR_TAX_PROFILE.RATE_INVALID',
         'VENDOR_TAX_PROFILE.TAX_TYPE_DUPLICATE',
         'VENDOR_TAX_PROFILE.TAX_TYPE_INVALID',
-        'VENDOR_TAX_PROFILE.TOO_MANY_LINES',
       ],
     },
   };

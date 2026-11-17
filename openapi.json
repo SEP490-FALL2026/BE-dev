@@ -23347,7 +23347,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a tax line is refused: VENDOR_TAX_PROFILE.TAX_TYPE_INVALID, TAX_TYPE_DUPLICATE, RATE_INVALID or TOO_MANY_LINES.",
+            "description": "The request is invalid (VALIDATION_ERROR, among others more than 20 lines or a tax name over 100 characters) or a tax line is refused: VENDOR_TAX_PROFILE.TAX_TYPE_INVALID (an empty name), TAX_TYPE_DUPLICATE or RATE_INVALID.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -23394,17 +23394,6 @@
                         "code": "VENDOR_TAX_PROFILE.RATE_INVALID",
                         "message": "A rate is a percentage from 0 to 100 with at most two decimals.",
                         "details": { "taxType": "VAT" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "VENDOR_TAX_PROFILE.TOO_MANY_LINES": {
-                    "summary": "A profile has at most 20 taxes.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VENDOR_TAX_PROFILE.TOO_MANY_LINES",
-                        "message": "A profile has at most 20 taxes.",
                         "requestId": "req_example"
                       }
                     }
@@ -44183,7 +44172,7 @@
             }
           },
           "422": {
-            "description": "The decision is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, or a field the decision does not take), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO).",
+            "description": "The decision is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from (issues[0].path = reason), or a field the decision does not take), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46626,7 +46615,7 @@
             }
           },
           "422": {
-            "description": "A refusal has no kind, or an uncontrollable tool no alternative, or a refusal or a return has no reason and no answer No to give one (VALIDATION_ERROR); the checklist lacks an answer (POLICY.CHECKLIST_INCOMPLETE); the alternative plan does not exist (ASSESSMENT.REFERENCE_NOT_FOUND). Nothing is written and the request stays with the IT Admin.",
+            "description": "A refusal has no kind, or an uncontrollable tool no alternative, or a refusal or a return has no reason and no answer No to give one (VALIDATION_ERROR, issues[0].path = reason); the checklist lacks an answer (POLICY.CHECKLIST_INCOMPLETE); the alternative plan does not exist (ASSESSMENT.REFERENCE_NOT_FOUND). Nothing is written and the request stays with the IT Admin.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -50319,7 +50308,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, or a field that is not of the body, such as the override that no longer exists), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO).",
+            "description": "The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from (issues[0].path = reason), or a field that is not of the body, such as the override that no longer exists), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -50601,7 +50590,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO): nothing is decided.",
+            "description": "The request is invalid (VALIDATION_ERROR; a refusal or a return with no reason and no answer No to take it from has issues[0].path = reason), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO): nothing is decided.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -57775,7 +57764,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, a person twice, a group sent back in part); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO). Nothing is saved.",
+            "description": "The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from (issues[0].path = reason), a person twice, a group sent back in part); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO). Nothing is saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -58171,7 +58160,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, a group sent back in part); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO).",
+            "description": "The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from (issues[0].path = reason), a group sent back in part); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -63135,7 +63124,7 @@
             }
           },
           "422": {
-            "description": "The decision is invalid (VALIDATION_ERROR): REJECT or REQUEST_CHANGES, which are no longer decisions, a RETURN with no reason and no answer No to take it from, an approval with a reason; the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO); or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).",
+            "description": "The decision is invalid (VALIDATION_ERROR): REJECT or REQUEST_CHANGES, which are no longer decisions, a RETURN with no reason and no answer No to take it from (issues[0].path = reason), an approval with a reason; the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO); or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -105170,12 +105159,12 @@
               "emptyState": {
                 "type": "object",
                 "properties": {
-                  "reason": { "type": "string", "enum": ["NO_APPLICATIONS", "NO_SUBSCRIPTIONS"] },
+                  "reason": { "type": "string", "enum": ["NO_APPLICATIONS"] },
                   "nextStep": {
                     "type": "object",
                     "properties": {
-                      "step": { "type": "integer", "minimum": 2, "maximum": 3 },
-                      "key": { "type": "string", "enum": ["APPLICATIONS", "CONTRACTS_AND_SUBSCRIPTIONS"] }
+                      "step": { "type": "number", "enum": [2] },
+                      "key": { "type": "string", "enum": ["APPLICATIONS"] }
                     },
                     "required": ["step", "key"],
                     "additionalProperties": false
@@ -106506,12 +106495,12 @@
         "properties": {
           "group": { "type": "string", "enum": ["T1", "T2", "T3"] },
           "lines": {
-            "maxItems": 100,
+            "maxItems": 20,
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "taxType": { "type": "string", "maxLength": 1000 },
+                "taxType": { "type": "string", "maxLength": 100 },
                 "ratePercent": { "type": "string", "maxLength": 20 },
                 "deductible": { "type": "boolean" }
               },

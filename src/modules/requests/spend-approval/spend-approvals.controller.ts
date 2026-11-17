@@ -130,7 +130,7 @@ export class SpendApprovalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, or a field that is not of the body, such as the override that no longer exists), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO).',
+        'The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from (issues[0].path = reason), or a field that is not of the body, such as the override that no longer exists), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO).',
       examples: [VALIDATION_EXAMPLE, CHECKLIST_ERROR_EXAMPLES.INCOMPLETE, CHECKLIST_ERROR_EXAMPLES.HAS_NO],
     },
   )
@@ -173,7 +173,7 @@ export class SpendApprovalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO): nothing is decided.',
+        'The request is invalid (VALIDATION_ERROR; a refusal or a return with no reason and no answer No to take it from has issues[0].path = reason), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO): nothing is decided.',
       examples: [VALIDATION_EXAMPLE, CHECKLIST_ERROR_EXAMPLES.INCOMPLETE, CHECKLIST_ERROR_EXAMPLES.HAS_NO],
     },
   )

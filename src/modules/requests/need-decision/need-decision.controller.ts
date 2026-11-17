@@ -30,7 +30,7 @@ const NOT_FOUND = {
 const INVALID_DECISION = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
-    'The decision is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, or a field the decision does not take), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO).',
+    'The decision is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from (issues[0].path = reason), or a field the decision does not take), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO).',
   examples: [VALIDATION_EXAMPLE, CHECKLIST_ERROR_EXAMPLES.INCOMPLETE, CHECKLIST_ERROR_EXAMPLES.HAS_NO],
 } as const;
 
