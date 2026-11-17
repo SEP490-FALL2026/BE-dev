@@ -158,6 +158,16 @@ describe('Finance asks for an adjustment of the budget and the spending approver
     expect(code(await transfer(fresh, sales, 1).expect(422))).toBe('BUDGET_ADJUSTMENT.NO_BUDGET');
   });
 
+  it('FIX-E-O4: refuses an amount of nothing as INVALID_SHAPE (AMOUNT_NOT_POSITIVE) and an amount below nothing as MONEY_OUT_OF_RANGE', async () => {
+    const supplementOf = (amount: string) =>
+      ask({ kind: 'SUPPLEMENT', toCostCenterId: sales.department.unitId, amount: h.money(amount) });
+
+    const nothing = await supplementOf('0').expect(422);
+    expect(code(nothing)).toBe('BUDGET_ADJUSTMENT.INVALID_SHAPE');
+    expect((nothing.body as { error: { details: unknown } }).error.details).toEqual({ refusal: 'AMOUNT_NOT_POSITIVE' });
+    expect(code(await supplementOf('-1').expect(422))).toBe('MONEY_OUT_OF_RANGE');
+  });
+
   it('refuses the shapes a kind does not have, and a Cost Center that is not one', async () => {
     expect(
       code(
