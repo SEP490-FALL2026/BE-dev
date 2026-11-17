@@ -133,7 +133,11 @@ export const OFFBOARDING_ERROR_EXAMPLES = {
     new OffboardingRefusedError('SUCCESSOR_NOT_A_MEMBER_ON_DATE', { reason: 'NOT_A_MEMBER_ON_DATE' }),
   ),
   PENDING_EVENT_EXISTS: example(
-    new OffboardingRefusedError('PENDING_EVENT_EXISTS', { kind: 'TRANSFER', effectiveOn: '2026-01-01' }),
+    new OffboardingRefusedError('PENDING_EVENT_EXISTS', {
+      kind: 'TRANSFER',
+      effectiveOn: '2026-01-01',
+      eventId: '<transfer-id>',
+    }),
   ),
   TRANSFER_CANCELLATION_REQUIRED: example(new OffboardingRefusedError('TRANSFER_CANCELLATION_REQUIRED')),
   NOTHING_TO_REVOKE: example(new OffboardingRefusedError('NOTHING_TO_REVOKE')),

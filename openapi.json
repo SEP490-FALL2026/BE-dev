@@ -5893,7 +5893,7 @@
                       "error": {
                         "code": "DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS",
                         "message": "The person has another event waiting, or a transfer before that is not closed.",
-                        "details": { "kind": "TRANSFER", "effectiveOn": "2026-01-01" },
+                        "details": { "kind": "TRANSFER", "effectiveOn": "2026-01-01", "eventId": "<transfer-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -9113,7 +9113,7 @@
                       "error": {
                         "code": "OFFBOARDING_CASE.PENDING_EVENT_EXISTS",
                         "message": "The person has another event waiting.",
-                        "details": { "kind": "TRANSFER", "effectiveOn": "2026-01-01" },
+                        "details": { "kind": "TRANSFER", "effectiveOn": "2026-01-01", "eventId": "<transfer-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -11278,7 +11278,7 @@
                       "error": {
                         "code": "OFFBOARDING_CASE.PENDING_EVENT_EXISTS",
                         "message": "The person has another event waiting.",
-                        "details": { "kind": "TRANSFER", "effectiveOn": "2026-01-01" },
+                        "details": { "kind": "TRANSFER", "effectiveOn": "2026-01-01", "eventId": "<transfer-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -11654,7 +11654,7 @@
                       "error": {
                         "code": "DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS",
                         "message": "The person has another event waiting, or a transfer before that is not closed.",
-                        "details": { "kind": "TRANSFER", "effectiveOn": "2026-01-01" },
+                        "details": { "kind": "TRANSFER", "effectiveOn": "2026-01-01", "eventId": "<transfer-id>" },
                         "requestId": "req_example"
                       }
                     }

@@ -52,6 +52,8 @@ export class AssignmentConflictError extends Error {
     readonly index: number,
     /** For `SEAT_CAPACITY` of a K2 or K4 grant: the seats still free in the other subscriptions of the plan, so the IT Admin grants from there (`BR-MF1-09a`). */
     readonly freeSeatsInPool?: number,
+    /** For `OVERLAP` and `IDENTIFIER_IN_USE`: the seat that blocks, when the site that throws knows it (the database does not say it). */
+    readonly conflictingAssignmentId?: string,
   ) {
     super(`An assignment conflicts with the data as it is now: ${conflict}.`);
     this.name = 'AssignmentConflictError';

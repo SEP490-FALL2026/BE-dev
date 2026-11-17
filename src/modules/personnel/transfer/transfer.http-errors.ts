@@ -95,7 +95,7 @@ const ACCEPTED_TRANSFER: NewTransferFacts = {
   groundsNote: undefined,
   pending: null,
   unclosed: null,
-  namedAsSuccessor: false,
+  namedAsSuccessor: null,
   successor: { required: false, chosen: undefined, candidate: null },
 };
 
@@ -121,7 +121,11 @@ export const TRANSFER_ERROR_EXAMPLES = {
     destinationDepartment: { active: true, effectiveFrom: '2027-01-01' },
   }),
   PENDING_EVENT_EXISTS: example(
-    new TransferRefusedError('PENDING_EVENT_EXISTS', { kind: 'TRANSFER', effectiveOn: '2026-01-01' }),
+    new TransferRefusedError('PENDING_EVENT_EXISTS', {
+      kind: 'TRANSFER',
+      effectiveOn: '2026-01-01',
+      eventId: '<transfer-id>',
+    }),
   ),
   NO_CHANGE: example(new TransferRefusedError('NO_CHANGE')),
   EFFECTIVE_DATE_IN_PAST: example(new TransferRefusedError('EFFECTIVE_DATE_IN_PAST', { today: '2026-01-01' })),

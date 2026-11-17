@@ -23,7 +23,7 @@ const record = (extra: Partial<RecordFacts> = {}): RecordFacts => ({
   groundsNote: NOTE,
   pendingTransfer: null,
   cancelPendingTransfer: false,
-  namedAsSuccessor: false,
+  namedAsSuccessor: null,
   successor: null,
   ...extra,
 });

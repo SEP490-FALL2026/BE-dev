@@ -180,7 +180,7 @@ describe('the system closes the transfer of a person who moved (integration, rea
     expect([refused.status, h.codeOf(refused), h.detailsOf(refused)]).toEqual([
       409,
       'DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS',
-      { kind: 'TRANSFER_SETTLING', effectiveOn: h.today() },
+      { kind: 'TRANSFER_SETTLING', effectiveOn: h.today(), eventId: wire.id },
     ]);
     // The last day is still the grace: nothing is closed yet.
     const pass = await revocation().sweep(at(grace().endsOn));

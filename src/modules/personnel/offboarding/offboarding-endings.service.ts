@@ -78,6 +78,12 @@ export class OffboardingEndings {
       { reason: DEPARTURE_BEFORE_TRANSFER, groundsNote: input.groundsNote },
       today,
     );
-    if (refused) throw new OffboardingRefusedError('PENDING_EVENT_EXISTS', { kind: 'TRANSFER', reason: refused.code });
+    if (refused) {
+      throw new OffboardingRefusedError('PENDING_EVENT_EXISTS', {
+        kind: 'TRANSFER',
+        reason: refused.code,
+        eventId: transferId,
+      });
+    }
   }
 }

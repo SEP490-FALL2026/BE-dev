@@ -30,7 +30,7 @@ const record = (extra: Partial<RecordFacts> = {}): RecordFacts => ({
   groundsNote: NOTE,
   pendingTransfer: null,
   cancelPendingTransfer: false,
-  namedAsSuccessor: false,
+  namedAsSuccessor: null,
   successor: null,
   ...extra,
 });
@@ -96,15 +96,15 @@ describe('whether a departure may be recorded', () => {
     ['a basis that is the code of a notice', { groundsNote: 'BM09-2026-000001' }, 'GROUNDS_IS_NOTICE'],
     [
       'a transfer that takes effect first, without the confirmation to cancel it',
-      { pendingTransfer: { effectiveOn: '2026-12-01' } },
+      { pendingTransfer: { id: 't-1', effectiveOn: '2026-12-01' } },
       'TRANSFER_CANCELLATION_REQUIRED',
     ],
     [
       'a transfer that takes effect by the last day',
-      { pendingTransfer: { effectiveOn: '2026-11-03' }, cancelPendingTransfer: true },
+      { pendingTransfer: { id: 't-1', effectiveOn: '2026-11-03' }, cancelPendingTransfer: true },
       'PENDING_EVENT_EXISTS',
     ],
-    ['a person named to follow a head', { namedAsSuccessor: true }, 'PENDING_EVENT_EXISTS'],
+    ['a person named to follow a head', { namedAsSuccessor: 't-2' }, 'PENDING_EVENT_EXISTS'],
     [
       'a successor who cannot follow',
       { successor: { code: 'SUCCESSOR_NOT_A_MEMBER_ON_DATE' } },
@@ -115,7 +115,7 @@ describe('whether a departure may be recorded', () => {
   });
 
   it('cancels the transfer that waits only when the Super Admin confirms it', () => {
-    const waiting = { pendingTransfer: { effectiveOn: '2026-12-01' } };
+    const waiting = { pendingTransfer: { id: 't-1', effectiveOn: '2026-12-01' } };
 
     expect(code(recordRefusal(record(waiting)))).toBe('TRANSFER_CANCELLATION_REQUIRED');
     expect(recordRefusal(record({ ...waiting, cancelPendingTransfer: true }))).toBeNull();
@@ -336,12 +336,12 @@ describe('what a departure is recorded for, before and after the locks', () => {
   });
 
   it('refuses a departure that comes after the transfer takes effect, or before it without the confirmation to cancel it', () => {
-    const waiting = { effectiveOn: '2026-11-10' };
+    const waiting = { id: 't-1', effectiveOn: '2026-11-10' };
 
     expect(pendingTransferRefusal(null, '2026-11-12', false)).toBeNull();
     expect(pendingTransferRefusal(waiting, '2026-11-10', true)).toEqual({
       code: 'PENDING_EVENT_EXISTS',
-      details: { kind: 'TRANSFER', effectiveOn: '2026-11-10' },
+      details: { kind: 'TRANSFER', effectiveOn: '2026-11-10', eventId: 't-1' },
     });
     expect(pendingTransferRefusal(waiting, '2026-11-09', false)).toEqual({ code: 'TRANSFER_CANCELLATION_REQUIRED' });
     expect(pendingTransferRefusal(waiting, '2026-11-09', true)).toBeNull();

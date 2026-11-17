@@ -351,6 +351,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       const response = await h.recordCase(h.body(person, { lastWorkingDay: h.day(25) }));
 
       expect([response.status, h.codeOf(response)]).toEqual([409, 'OFFBOARDING_CASE.PENDING_EVENT_EXISTS']);
+      expect(h.detailsOf(response)).toEqual({ kind: 'TRANSFER', effectiveOn: h.day(20), eventId: transfer.id });
       expect(h.dataOf<TransferWire>(await h.readTransfer(transfer.id).expect(200)).status).toBe('PENDING');
       expect(await h.caseCount(person.employeeId)).toBe(0);
     });
