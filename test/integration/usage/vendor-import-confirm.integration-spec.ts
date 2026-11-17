@@ -269,7 +269,12 @@ describe('the confirmation of a vendor usage report over HTTP (integration, real
       expect(rows).toEqual([{ import_id: late.id, n: 1 }]);
     });
 
-    it('two confirmations of the same import at once write once: one of them answers the result, the other is refused with another key', async () => {
+    /**
+     * The three calls run one after the other, in the order the lock gives them, so the winner is whoever gets the lock first: the key `a` and `b`
+     * share (the later of them replays the answer, 200) or the other key of `c` (then `a` and `b` are refused, 409). Either order is right; the
+     * same key always gets the same answer, the import is written once, and the winner is one group, not both.
+     */
+    it('two confirmations of the same import at once write once: the group of the key that comes first wins, the other is refused', async () => {
       const { applicationId } = await h.usageApp();
       await h.person('RACE2');
       const source = await h.source(applicationId);
@@ -282,9 +287,34 @@ describe('the confirmation of a vendor usage report over HTTP (integration, real
         h.confirmReport(preview.id, 1, { notice: 'SYSTEM_SENT' }),
       ]);
 
-      expect([a.status, b.status].sort()).toEqual([200, 200]);
-      expect(c.status).toBe(409);
+      expect(a.status).toBe(b.status);
+      expect(new Set([a.status, c.status])).toEqual(new Set([200, 409]));
       expect(await h.days(preview.id)).toHaveLength(1);
+    });
+
+    it('either order of the same two keys is right: the first key wins and the same key replays, the other key is refused', async () => {
+      const { applicationId } = await h.usageApp();
+      await h.person('RACE3');
+      const source = await h.source(applicationId);
+      const keyedFirst = await h.previewReport(source.id, aggregate([['race3@acme.vn', '2026-08-02']]), WINDOW);
+      const otherFirst = await h.previewReport(source.id, aggregate([['race3@acme.vn', '2026-08-03']]), WINDOW);
+      const key = randomUUID();
+
+      const keyed = [
+        await h.confirmReport(keyedFirst.id, 1, { key, notice: 'SYSTEM_SENT' }),
+        await h.confirmReport(keyedFirst.id, 1, { key, notice: 'SYSTEM_SENT' }),
+        await h.confirmReport(keyedFirst.id, 1, { notice: 'SYSTEM_SENT' }),
+      ].map((answer) => answer.status);
+      const other = [
+        await h.confirmReport(otherFirst.id, 1, { notice: 'SYSTEM_SENT' }),
+        await h.confirmReport(otherFirst.id, 1, { key, notice: 'SYSTEM_SENT' }),
+        await h.confirmReport(otherFirst.id, 1, { key, notice: 'SYSTEM_SENT' }),
+      ].map((answer) => answer.status);
+
+      expect(keyed).toEqual([200, 200, 409]);
+      expect(other).toEqual([200, 409, 409]);
+      expect(await h.days(keyedFirst.id)).toHaveLength(1);
+      expect(await h.days(otherFirst.id)).toHaveLength(1);
     });
   });
 
