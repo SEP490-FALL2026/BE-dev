@@ -11,13 +11,21 @@ const line = (
 
 export const FINANCE: Pick<
   DemoFixture,
-  'taxProfile' | 'cycle' | 'nextCycle' | 'draftCycle' | 'budgets' | 'nextYear' | 'budgetLines'
+  'taxProfiles' | 'cycle' | 'nextCycle' | 'draftCycle' | 'budgets' | 'nextYear' | 'budgetLines'
 > = {
-  taxProfile: {
-    application: 'figma',
-    group: 'T2',
-    lines: [{ taxType: 'VAT', ratePercent: '10', deductible: true }],
-  },
+  /*
+   * Six vendors with a declared profile, the lines simulated after the one of Figma: the foreign vendors that sell through a platform and whose
+   * tax the buyer remits (T2: Figma, Microsoft, Adobe, Notion Labs, Atlassian), and Zoom, sold here through a domestic distributor that collects
+   * the VAT on the invoice (T3). A profile is never advice: the screen of the tax estimate shows both ways to pay.
+   */
+  taxProfiles: [
+    { application: 'figma', group: 'T2', lines: [{ taxType: 'VAT', ratePercent: '10', deductible: true }] },
+    { application: 'm365', group: 'T2', lines: [{ taxType: 'VAT', ratePercent: '10', deductible: true }] },
+    { application: 'adobe', group: 'T2', lines: [{ taxType: 'VAT', ratePercent: '10', deductible: true }] },
+    { application: 'notion', group: 'T2', lines: [{ taxType: 'VAT', ratePercent: '10', deductible: true }] },
+    { application: 'jira', group: 'T2', lines: [{ taxType: 'VAT', ratePercent: '10', deductible: true }] },
+    { application: 'zoom', group: 'T3', lines: [{ taxType: 'VAT', ratePercent: '10', deductible: true }] },
+  ],
   /*
    * The cycle of the year: a ceiling far above the budgets of the dataset. Its submission deadline is the day the seed runs, so the heads
    * send `BM-10` that day and the cycle stands locked from the next (the demo day, "seed ≤ 1 day before"): an adjustment is asked only of a

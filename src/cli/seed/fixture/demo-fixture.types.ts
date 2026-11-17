@@ -331,12 +331,12 @@ export interface DemoFixture {
   seats: DemoSeat[];
   /** The terms IT recorded for some plans; the others have none yet (the warning of a review due). */
   planTerms: DemoPlanTerms[];
-  /** A Finance-declared tax profile for the vendor of one application. */
-  taxProfile: {
+  /** The tax profiles Finance declares, one per vendor (named by one of its applications); simulated, never advice (`QĐ-60b`). */
+  taxProfiles: {
     application: string;
-    group: 'T2';
+    group: 'T2' | 'T3';
     lines: { taxType: string; ratePercent: string; deductible: boolean }[];
-  };
+  }[];
   /** The budget cycle of the year, then of the next one, each opened before any proposal (`QĐ-111z`); the year after stays a draft. */
   cycle: DemoCycle;
   nextCycle: DemoCycle;
