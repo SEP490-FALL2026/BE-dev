@@ -215,7 +215,7 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
 
       expect(codeOf(await estimate(id, 'abc', 'USD').expect(422))).toBe('VALIDATION_ERROR');
       expect(detailsOf(await estimate(id, 'abc', 'USD').expect(422))).toEqual({
-        issues: [{ code: 'invalid_format', path: 'netAmount.amount' }],
+        issues: [{ code: 'invalid_format', path: 'netAmount' }],
       });
       expect(detailsOf(await estimate(id, '1.5', 'VND').expect(422))).toEqual({
         allowedDecimals: 0,

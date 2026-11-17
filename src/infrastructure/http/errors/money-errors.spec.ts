@@ -68,6 +68,16 @@ describe('toMoneyApiException', () => {
       });
     });
 
+    it('points a malformed text of a flat field at the field itself, not at an amount inside it (FIX-E-O1)', () => {
+      const flat = withPath(new MoneyMalformedError(), 'netAmount');
+      flat.flat = true;
+
+      expect(detailsOf(flat)).toMatchObject({
+        code: 'VALIDATION_ERROR',
+        details: { issues: [{ code: 'invalid_format', path: 'netAmount' }] },
+      });
+    });
+
     it('names the path of an amount out of range', () => {
       const answer = detailsOf(withPath(new MoneyOutOfRangeError(), 'lines.2.amount')) as Record<string, unknown>;
 

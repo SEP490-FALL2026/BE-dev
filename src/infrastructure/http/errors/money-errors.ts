@@ -28,11 +28,14 @@ const pathDetails = (error: { path: string | null }): Record<string, unknown> | 
  */
 export function toMoneyApiException(error: unknown): unknown {
   if (error instanceof MoneyMalformedError) {
-    // The same `{ code, path }` issue as every other VALIDATION_ERROR, pointing at the text of the amount.
+    // The same `{ code, path }` issue as every other VALIDATION_ERROR, pointing at the text of the amount: the `amount` of a
+    // money object, or the field itself when the amount is a flat field (a query).
     return unprocessable(
       'VALIDATION_ERROR',
       error.message,
-      error.path === null ? undefined : { issues: [{ code: 'invalid_format', path: `${error.path}.amount` }] },
+      error.path === null
+        ? undefined
+        : { issues: [{ code: 'invalid_format', path: error.flat ? error.path : `${error.path}.amount` }] },
     );
   }
   if (error instanceof RateMalformedError) return unprocessable('VALIDATION_ERROR', error.message);

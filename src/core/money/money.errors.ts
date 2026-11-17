@@ -1,5 +1,11 @@
 /** The amount text is not a plain decimal: exponent, separators, sign `+`, blanks, or too many integer digits. */
 export class MoneyMalformedError extends Error {
+  /**
+   * `flat`: the text is a field of its own (a query `netAmount`), not the `amount` of a money object, so `path` already
+   * names the text and the answer does not add `.amount`.
+   */
+  flat = false;
+
   /** `path`: where the amount sits in the request body (`unitPrice`, `lines.2.amount`) when known; the facade that read it sets it, else null. */
   constructor(public path: string | null = null) {
     super('An amount is a plain decimal string such as "1200.00".');

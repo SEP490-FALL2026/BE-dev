@@ -1,4 +1,4 @@
-import { withMoneyPath } from './money-path';
+import { withFlatMoneyField, withMoneyPath } from './money-path';
 import {
   CurrencyNotSupportedError,
   MoneyMalformedError,
@@ -39,5 +39,19 @@ describe('withMoneyPath', () => {
       }),
     ).toThrow(other);
     expect(other).not.toHaveProperty('path');
+  });
+});
+
+describe('withFlatMoneyField', () => {
+  it('marks a malformed amount as the text of a flat field, and leaves the others and the value alone (FIX-E-O1)', async () => {
+    const malformed = new MoneyMalformedError();
+    const outOfRange = new MoneyOutOfRangeError();
+
+    await expect(withFlatMoneyField(() => Promise.reject(malformed))).rejects.toBe(malformed);
+    await expect(withFlatMoneyField(() => Promise.reject(outOfRange))).rejects.toBe(outOfRange);
+    await expect(withFlatMoneyField(() => Promise.resolve(7n))).resolves.toBe(7n);
+    expect(malformed.flat).toBe(true);
+    expect(outOfRange).not.toHaveProperty('flat');
+    expect(new MoneyMalformedError().flat).toBe(false);
   });
 });
