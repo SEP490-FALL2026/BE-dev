@@ -141,6 +141,11 @@ export const CODE_LABELS = {
         vi: 'chuyển cho bạn do thay đổi tổ chức hoặc vai trò',
         en: 'moved to you after an organisation or role change',
       },
+      RESUBMITTED: { vi: 'người gửi đã gửi lại sau khi bổ sung', en: 'sent again after revision' },
+      SPEND_SENT: {
+        vi: 'dự phòng đã được xác nhận, chờ bạn duyệt chi',
+        en: 'reserve confirmed, awaiting your spend decision',
+      },
     },
   },
   REQUEST_RENEWAL_NOT_APPLIED: {

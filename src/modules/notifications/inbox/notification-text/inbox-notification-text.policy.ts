@@ -12,6 +12,7 @@ import { BUDGET_TEXTS } from './notification-texts-budget.types';
 import { LICENSING_TEXTS } from './notification-texts-licensing.types';
 import { MF1_SLA_TEXTS } from './notification-texts-mf1-sla.types';
 import { MF1_TEXTS } from './notification-texts-mf1.types';
+import { OPS_TEXTS } from './notification-texts-ops.types';
 import { ORG_TEXTS } from './notification-texts-org.types';
 
 /**
@@ -277,6 +278,7 @@ export const NOTIFICATION_TEXTS = {
   ...ORG_TEXTS,
   ...BUDGET_TEXTS,
   ...LICENSING_TEXTS,
+  ...OPS_TEXTS,
 } satisfies Record<InAppNotificationCode, NotificationTexts>;
 
 const UNKNOWN_CODE_TITLE: Readonly<Record<NotificationLocale, string>> = {

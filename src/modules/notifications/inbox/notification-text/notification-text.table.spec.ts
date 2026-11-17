@@ -23,6 +23,7 @@ import { BUDGET_TEXTS } from './notification-texts-budget.types';
 import { LICENSING_TEXTS } from './notification-texts-licensing.types';
 import { MF1_SLA_TEXTS } from './notification-texts-mf1-sla.types';
 import { MF1_TEXTS } from './notification-texts-mf1.types';
+import { OPS_TEXTS } from './notification-texts-ops.types';
 import { ORG_TEXTS } from './notification-texts-org.types';
 
 /**
@@ -190,7 +191,7 @@ describe('NOTIFICATION_TEXTS: the whole table', () => {
   });
 
   it('has no code in two of the data files (a spread would overwrite one silently)', () => {
-    const files = { MF1_TEXTS, MF1_SLA_TEXTS, ORG_TEXTS, BUDGET_TEXTS, LICENSING_TEXTS };
+    const files = { MF1_TEXTS, MF1_SLA_TEXTS, ORG_TEXTS, BUDGET_TEXTS, LICENSING_TEXTS, OPS_TEXTS };
     const owners = new Map<string, string[]>();
     for (const [file, table] of Object.entries(files)) {
       for (const code of Object.keys(table)) owners.set(code, [...(owners.get(code) ?? []), file]);

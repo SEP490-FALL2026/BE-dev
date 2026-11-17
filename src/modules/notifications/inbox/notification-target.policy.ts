@@ -115,6 +115,7 @@ export const TARGET_BY_SUBJECT_TYPE: Readonly<Record<string, RouteRef>> = {
   PROVISIONING_TASK: route('provisioningTaskGet', { id: 'subject' }),
   PURCHASE_INVOICE: route('purchaseInvoiceGet', { id: 'subject' }),
   RETURN_REQUEST: route('returnRequestGet', { id: 'subject' }),
+  SPEND_BATCH: route('spendBatchGet', { id: 'subject' }),
   SUBSCRIPTION: route('subscriptionGet', { id: 'subject' }),
   SUBSCRIPTION_RENEWAL: route('subscriptionRenewalGet', { id: 'subject' }),
 };

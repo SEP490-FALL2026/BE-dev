@@ -50,6 +50,7 @@ const CATALOGUE_SUBJECT_TYPES = [
   'PROVISIONING_TASK',
   'PURCHASE_INVOICE',
   'RETURN_REQUEST',
+  'SPEND_BATCH',
   'SUBSCRIPTION',
   'SUBSCRIPTION_RENEWAL',
   'TRANSFER_REVIEW',
@@ -159,6 +160,16 @@ describe('notificationTarget', () => {
       notificationTarget('LICENSE_EXPIRY_REMINDER', { type: 'LicenseAssignment', id: ID }, { audience: 'HEAD' }),
     ).toEqual({ operationId: 'assignmentExpiryReminderList', pathParams: {} });
     expect(notificationTarget('LICENSE_EXPIRY_REMINDER', { type: 'LicenseAssignment', id: ID }, {})).toBeNull();
+  });
+
+  it('opens the batch of a notice that a batch of spend requests was sent', () => {
+    expect(
+      notificationTarget(
+        'SPEND_BATCH_SUBMITTED',
+        { type: 'SPEND_BATCH', id: ID },
+        { batchId: ID, departmentId: OTHER, sentCount: 3 },
+      ),
+    ).toEqual({ operationId: 'spendBatchGet', pathParams: { id: ID } });
   });
 
   it('gives a screen without a subject when the catalogue names one', () => {
