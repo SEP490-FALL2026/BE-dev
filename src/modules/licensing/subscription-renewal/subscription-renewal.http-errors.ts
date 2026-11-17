@@ -98,7 +98,7 @@ export const RENEWAL_ERROR_EXAMPLES = {
   READ_FORBIDDEN: renewal('READ_FORBIDDEN'),
   NOT_RENEWABLE: renewal('NOT_RENEWABLE', { reason: 'ALREADY_CONTINUED' }),
   CONTRACT_DATA_INCOMPLETE: renewal('CONTRACT_DATA_INCOMPLETE'),
-  ALREADY_PROPOSED: renewal('ALREADY_PROPOSED', { renewalId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11' }),
+  ALREADY_PROPOSED: renewal('ALREADY_PROPOSED', { renewalId: '<renewal-id>' }),
   BEFORE_ADJUSTMENT_POINT: renewal('BEFORE_ADJUSTMENT_POINT', {
     adjustmentPointOn: '2026-11-24',
     deadline: '2026-12-01',

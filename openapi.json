@@ -40041,7 +40041,7 @@
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED",
                         "message": "The result of this period is already recorded, or a renewal of before still waits for its outcome (details.renewalId, when it is known).",
-                        "details": { "renewalId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11" },
+                        "details": { "renewalId": "<renewal-id>" },
                         "requestId": "req_example"
                       }
                     }
