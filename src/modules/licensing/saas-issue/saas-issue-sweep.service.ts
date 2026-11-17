@@ -69,6 +69,7 @@ export class SaasIssueSweepService {
         },
         correlationId: issue.id,
       });
+      await this.notifier.reopenWindowLapsed(tx, issue);
 
       return true;
     });

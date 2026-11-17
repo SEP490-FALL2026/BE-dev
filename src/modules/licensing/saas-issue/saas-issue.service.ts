@@ -118,7 +118,7 @@ export class SaasIssueService {
 
       const resumes = role === 'REPORTER' && issue.state === 'WAITING_REPORTER';
       const updated = resumes ? await this.issues.update(tx, id, { state: 'IN_PROGRESS' }) : issue;
-      await this.issues.insertEntry(tx, {
+      const entry = await this.issues.insertEntry(tx, {
         issueId: id,
         kind: resumes ? 'TRANSITION' : 'MESSAGE',
         authorEmployeeId: actor.employeeId,
@@ -152,6 +152,7 @@ export class SaasIssueService {
             { state: 'IN_PROGRESS', trigger: 'REPORTER_REPLY', notifyEmployeeId: issue.assignedItAdminEmployeeId },
           ),
         );
+        await this.notifier.stateChanged(tx, issue, entry, 'REPORTER_REPLY', actor.employeeId);
       }
 
       return updated;
@@ -171,7 +172,7 @@ export class SaasIssueService {
       if (refusal) throw new SaasIssueError(refusal);
 
       const updated = await this.issues.update(tx, id, { state: 'IN_PROGRESS', reopenCount: issue.reopenCount + 1 });
-      await this.issues.insertEntry(tx, {
+      const entry = await this.issues.insertEntry(tx, {
         issueId: id,
         kind: 'TRANSITION',
         authorEmployeeId: actor.employeeId,
@@ -198,6 +199,7 @@ export class SaasIssueService {
           },
         ),
       );
+      await this.notifier.stateChanged(tx, issue, entry, 'REPORTER_REOPEN', actor.employeeId);
 
       return updated;
     });
