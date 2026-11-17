@@ -218,7 +218,17 @@ export type DemoRequestTarget =
   | 'AWAITING_IT_ASSESSMENT'
   | 'RESERVE_UNCONFIRMED'
   | 'BLOCKED'
-  | 'COMPLETED';
+  | 'COMPLETED'
+  | 'AWAITING_REQUESTER_REVISION'
+  | 'IT_REJECTED'
+  | 'EXECUTING'
+  | 'FAILED'
+  | 'AWAITING_IT_CLOSE'
+  /** Where a request is that a job may cancel later (the head of its sender is blocked): both are the end of the scenario. */
+  | 'PENDING_OR_CANCELLED';
+
+/** The step that refuses, or sends back, a request the scenario does not bring to the end. */
+export type DemoRequestStep = 'NEED' | 'ASSESSMENT' | 'SPEND';
 
 export interface DemoRequestScenario {
   key: string;
@@ -245,6 +255,14 @@ export interface DemoRequestScenario {
    */
   termMonths: number | null;
   target: DemoRequestTarget;
+  /** For `REJECTED`: the step that refuses (default `NEED`, the head); `SPEND` is the spending approver, and the request then stands at the stage `REFUSED`. */
+  rejectAt?: Extract<DemoRequestStep, 'NEED' | 'SPEND'>;
+  /** For `AWAITING_REQUESTER_REVISION`: the step that sends it back to its requester (`SPEND` only for a request of one step). */
+  returnAt?: DemoRequestStep;
+  /** For a group request: the people the spending approver refuses (the others are approved) and who get no task of grant. */
+  rejectedLines?: string[];
+  /** The person who reads the request instead of its requester, when the requester cannot sign in any more (R57, C-2). */
+  readAs?: string;
   /** The head confirms the use of the reserve with the batch, so the request goes on to the spending approver. */
   confirmReserve?: boolean;
   /** For COMPLETED or AWAITING_EXECUTION, how IT grants the seat: from the pool, buying a seat (or a key), or a free key of the key store. */
