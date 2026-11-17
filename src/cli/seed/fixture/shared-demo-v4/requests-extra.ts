@@ -1,4 +1,4 @@
-import type { DemoRequestScenario } from '../demo-fixture.types';
+import type { DemoFixture, DemoRequestScenario } from '../demo-fixture.types';
 
 const r = (scenario: DemoRequestScenario): DemoRequestScenario => scenario;
 
@@ -14,6 +14,27 @@ const r = (scenario: DemoRequestScenario): DemoRequestScenario => scenario;
  * (`budget-targets.ts`, counted for the requests that hold or wait for money at the end) never holds both at once. A request of one month costs
  * the same on every day of the seed; the ones with no end cost what the year has left.
  */
+/*
+ * Two seats of the baseline returned by their holders (SPEC S11). The notion-business seat of NV-DEV6 is taken away by IT (it is no longer in the
+ * Notion usage file of T17, where NV-DEV6 has no row); the photoshop seat of NV-BOD2 waits for IT. Their requests of the same plan are not sent.
+ */
+export const RETURNS: DemoFixture['returns'] = [
+  {
+    key: 'RET1',
+    holder: 'NV-DEV6',
+    subscription: 'notion-business',
+    reason: 'Đã chuyển sang dùng Confluence cho tài liệu của nhóm, không cần ghế Notion nữa.',
+    complete: true,
+  },
+  {
+    key: 'RET2',
+    holder: 'NV-BOD2',
+    subscription: 'adobe-photoshop',
+    reason: 'Không còn chỉnh ảnh cho tài liệu của Ban Giám đốc, xin trả ghế Photoshop.',
+    complete: false,
+  },
+];
+
 export const REQUESTS_EXTRA: DemoRequestScenario[] = [
   r({
     key: 'R50',

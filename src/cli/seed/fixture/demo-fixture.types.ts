@@ -274,6 +274,20 @@ export interface DemoRequestScenario {
   summary: string;
 }
 
+/**
+ * The return of a seat of the baseline (`SBF-03a`): its holder sends it with a reason that carries the tag of the return. IT takes the revocation of
+ * one and completes it; the other waits for IT, so the screen shows both ends of the flow.
+ */
+export interface DemoReturn {
+  key: string;
+  holder: string;
+  /** The key of the subscription (the key of its plan) the seat is in. */
+  subscription: string;
+  reason: string;
+  /** IT completes the revocation of the seat (the return is `COMPLETED`); otherwise it stays `AWAITING_REVOCATION`. */
+  complete: boolean;
+}
+
 export interface DemoKeys {
   /** The K4 subscription the keys are imported into. */
   subscription: string;
@@ -375,6 +389,8 @@ export interface DemoFixture {
   /** The lines of the `BM-10` file of each department (by code), this year and next; what they leave short of the amount asked is one balancing line. */
   budgetLines: Record<string, DemoBudgetLine[]>;
   requests: DemoRequestScenario[];
+  /** The seats returned by their holders (`SBF-03a`). */
+  returns: DemoReturn[];
   keys: DemoKeys[];
   usageSources: DemoUsageSource[];
   ghostDecisions: DemoGhostDecision[];

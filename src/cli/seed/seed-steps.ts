@@ -13,6 +13,7 @@ import { ORGANIZATION_STEPS } from './steps/organization.steps';
 import { PEOPLE_ADMIN_STEPS } from './steps/people-admin.steps';
 import { PERSONNEL_STEPS } from './steps/personnel.steps';
 import { requestSteps } from './steps/request.steps';
+import { RETURN_STEPS } from './steps/returns.steps';
 import { SOFTWARE_LIST_STEPS } from './steps/software-list.steps';
 import { USAGE_STEPS } from './steps/usage.steps';
 
@@ -41,6 +42,7 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     pick('budget.cycles'),
     ...budgetSteps(),
     ...requestSteps(fixture.requests),
+    ...RETURN_STEPS,
     ...extraSteps(fixture.saasIssue.request),
     ...PERSONNEL_STEPS,
     ...USAGE_STEPS,
