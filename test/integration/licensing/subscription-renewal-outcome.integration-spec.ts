@@ -102,7 +102,7 @@ describe('the outcome of a renewal and the chain of periods (integration, real P
     expect(carried.map((row) => row.predecessor_id).sort()).toEqual([...seats].sort());
     expect(await h.count('budget_commitments')).toBe(commitmentsBefore);
     // The period has its result: a second write is refused and nothing else is chained.
-    const again = await refuse({ subscriptionId, choice: 'RENEW', proposedQuantity: 2, outcome: 'UNCONFIRMED' }, 409);
+    const again = await refuse({ subscriptionId, choice: 'RENEW', proposedQuantity: 2, outcome: 'AS_DECIDED' }, 409);
     expect(h.codeOf(again)).toBe('SUBSCRIPTION_RENEWAL.NOT_RENEWABLE');
     expect(h.detailsOf(again)).toMatchObject({ reason: 'ALREADY_CONTINUED' });
     // The database keeps the chain single whoever writes it.
@@ -328,7 +328,13 @@ describe('the outcome of a renewal and the chain of periods (integration, real P
   it('lets only an IT Admin record, never the head, Finance, the spending approver or an employee (SoD-7, US-11-02 AC-17)', async () => {
     const unit = await h.unit(1);
     const { subscriptionId } = await ownYear(unit);
-    const body = { subscriptionId, choice: 'RENEW', proposedQuantity: 1, outcome: 'UNCONFIRMED' };
+    const body = {
+      subscriptionId,
+      choice: 'RENEW',
+      proposedQuantity: 1,
+      outcome: 'AS_DECIDED',
+      nextPeriod: nextYear(1),
+    };
 
     for (const account of [unit.head.account, h.finance, h.boss.account, h.employee]) {
       expect((await h.propose(body, account)).status).toBe(403);

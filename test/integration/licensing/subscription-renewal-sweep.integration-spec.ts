@@ -15,6 +15,18 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
   const year = (deadlineInDays: number, extra: Record<string, unknown> = {}) =>
     h.termWithSeats(unit, deadlineInDays, { quantity: 10, startDate: h.inDays(-300), endDate: h.inDays(64), ...extra });
 
+  /** The year the vendor confirmed after `year()`: it starts the day after the renewal day, 65 days from today. */
+  const nextYear = (quantity: number) => ({
+    purchasedQuantity: quantity,
+    unitPrice: { amount: '1000000', currency: 'VND' },
+    billingCycle: 'ANNUAL',
+    startDate: h.inDays(65),
+    endDate: h.inDays(429),
+    noticeDeadline: h.inDays(400),
+    autoRenew: true,
+    allowsMidTermReduction: false,
+  });
+
   beforeAll(async () => {
     await h.start();
     await h.withApprover();
@@ -102,7 +114,15 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
 
     it('tells nothing once the IT Admin has recorded the period, and nothing past its renewal day either', async () => {
       const { subscriptionId } = await year(20);
-      await h.propose({ subscriptionId, choice: 'REDUCE', proposedQuantity: 2, outcome: 'UNCONFIRMED' }).expect(201);
+      await h
+        .propose({
+          subscriptionId,
+          choice: 'REDUCE',
+          proposedQuantity: 2,
+          outcome: 'AS_DECIDED',
+          nextPeriod: nextYear(2),
+        })
+        .expect(201);
 
       await h.sweepOn(h.inDays(13));
       await h.sweepOn(h.inDays(65));
@@ -175,7 +195,8 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
           subscriptionId: recorded.subscriptionId,
           choice: 'REDUCE',
           proposedQuantity: 2,
-          outcome: 'UNCONFIRMED',
+          outcome: 'AS_DECIDED',
+          nextPeriod: nextYear(2),
         })
         .expect(201);
 

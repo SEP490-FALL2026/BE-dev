@@ -114,13 +114,13 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
       subscriptionId: early.subscriptionId,
       choice: 'REDUCE',
       proposedQuantity: 2,
-      outcome: 'UNCONFIRMED',
+      outcome: 'AS_DECIDED',
     });
     expect(before.status).toBe(409);
     expect(h.codeOf(before)).toBe('SUBSCRIPTION_RENEWAL.BEFORE_ADJUSTMENT_POINT');
 
     const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
-    const wrong = await record({ subscriptionId, choice: 'REDUCE', proposedQuantity: 5, outcome: 'UNCONFIRMED' });
+    const wrong = await record({ subscriptionId, choice: 'REDUCE', proposedQuantity: 5, outcome: 'AS_DECIDED' });
     expect(wrong.status).toBe(409);
     expect(h.codeOf(wrong)).toBe('SUBSCRIPTION_RENEWAL.QUANTITY_NOT_SEATS_NEEDED');
     expect(detailsOf(wrong)).toMatchObject({ seatsNeeded: 2, target: 2, quantity: 5 });
@@ -140,6 +140,64 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
       [subscriptionId],
     );
     expect(rows[0].n).toBe(0);
+  });
+
+  it('needs the new period of a renewal, a reduction or an increase, and a result the vendor has not confirmed is not one the route takes (A1C-03)', async () => {
+    const unit = await h.unit(2);
+    const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
+    const periods = () => h.count('subscriptions');
+    const before = await periods();
+
+    // A period the vendor has not confirmed yet is not recorded: the IT Admin records once the vendor confirmed.
+    const unconfirmed = await record({ subscriptionId, choice: 'REDUCE', proposedQuantity: 2, outcome: 'UNCONFIRMED' });
+    expect(unconfirmed.status).toBe(422);
+    expect(h.codeOf(unconfirmed)).toBe('VALIDATION_ERROR');
+    // Every other outcome of a plan by the year carries the period, else the case would be written with no way to ever record it.
+    const bodies = [
+      { outcome: 'AS_DECIDED' },
+      { outcome: 'DIFFERENT', outcomeNote: 'The vendor sold another bundle.' },
+      { outcome: 'VENDOR_REFUSED', outcomeNote: 'The vendor kept the seats.' },
+    ];
+    for (const body of bodies) {
+      const response = await record({ subscriptionId, choice: 'REDUCE', proposedQuantity: 2, ...body });
+      expect(response.status).toBe(422);
+      expect(h.codeOf(response)).toBe('SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED');
+    }
+    expect(await periods()).toBe(before);
+    const { rows } = await h.ctx.sql.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM subscription_renewals WHERE subscription_id = $1`,
+      [subscriptionId],
+    );
+    expect(rows[0].n).toBe(0);
+  });
+
+  it('lets a plan by the month record that the vendor refused with no new period: the next payment day is another point (A1C-03)', async () => {
+    const unit = await h.unit(2);
+    const subscriptionId = await h.term({
+      quantity: 10,
+      billingCycle: 'MONTHLY',
+      startDate: h.inDays(-25),
+      renewalDate: h.inDays(5),
+      endDate: h.inDays(5),
+      autoRenew: true,
+      ownerDepartmentId: unit.department.id,
+    });
+    for (const member of unit.members) await h.seatOf(member, { subscriptionId });
+    await takeOwnerOff(h, subscriptionId);
+
+    const response = await record({
+      subscriptionId,
+      choice: 'REDUCE',
+      proposedQuantity: 2,
+      outcome: 'VENDOR_REFUSED',
+      outcomeNote: 'The vendor will not lower the seats this month.',
+    });
+
+    expect(response.status).toBe(201);
+    expect(h.dataOf<{ renewal: CaseWire }>(response).renewal).toMatchObject({
+      state: 'OUTCOME_RECORDED',
+      outcomeDetail: { kind: 'VENDOR_REFUSED', nextSubscriptionId: null },
+    });
   });
 
   it('lets another IT Admin record for the one responsible: the audit says so and the one responsible is told (QĐ-58b)', async () => {

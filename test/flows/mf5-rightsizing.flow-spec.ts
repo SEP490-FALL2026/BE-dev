@@ -228,7 +228,7 @@ describe('F5-02 thu hồi ghế rảnh rồi IT ghi kết quả điều chỉnh 
   });
 
   it('chỉ IT Admin ghi; Finance đọc ca, Người duyệt chi và trưởng phòng không thấy; route xác nhận cũ không còn #9 @B5', async () => {
-    const body = { subscriptionId, choice: 'RENEW', outcome: 'UNCONFIRMED' };
+    const body = { subscriptionId, choice: 'RENEW', outcome: 'AS_DECIDED' };
     for (const code of ['NV-DESH', 'NV-CEO', 'NV-FIN1', 'NV-DES1']) {
       const refused = await call().post(code, '/subscription-renewals', body);
       expect([code, refused.status]).toEqual([code, 403]);
@@ -252,7 +252,7 @@ describe('F5-02 thu hồi ghế rảnh rồi IT ghi kết quả điều chỉnh 
     const again = await call().post('NV-ITA1', '/subscription-renewals', {
       subscriptionId,
       choice: 'RENEW',
-      outcome: 'UNCONFIRMED',
+      outcome: 'AS_DECIDED',
     });
     expect([again.status, call().codeOf(again), call().detailsOf(again)]).toEqual([
       409,

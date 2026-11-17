@@ -56,6 +56,12 @@ export const recordOutcomeBodySchema = z
   });
 
 /**
+ * What the vendor did that the one write records: it is recorded once the vendor confirmed, so a result the vendor has not confirmed
+ * (`UNCONFIRMED`) is not one the route takes (`A1C-03`); the route of the outcome of a case of before still reads it.
+ */
+const writtenOutcome = z.enum(['AS_DECIDED', 'VENDOR_REFUSED', 'DIFFERENT']);
+
+/**
  * The one write of the result at the point of adjustment (`SBF-20` §4.4): the choice and the seats, what the vendor did and the new period, and
  * for a cancellation the two confirmations of closing the subscription (`QĐ-99i`). Only the shape is judged here; which number the seats must be
  * is the count of the system (`QĐ-104d`), answered with its own code.
@@ -67,7 +73,7 @@ export const proposeRenewalBodySchema = z
     proposedQuantity: quantity.optional(),
     /** The evidence of the vendor minimum when the seats are that minimum above the need. */
     note: text.optional(),
-    outcome,
+    outcome: writtenOutcome,
     outcomeNote: text.optional(),
     nextPeriod: nextPeriodSchema.optional(),
     closure: z.strictObject({ dataExported: z.boolean(), adminsTransferred: z.boolean() }).optional(),

@@ -1,3 +1,4 @@
+import { addDays } from '../../src/core/business-date';
 import { FlowWorld } from '../support/flows/flow-world';
 
 /**
@@ -43,8 +44,9 @@ describe('MF-5 thuê bao kho không có phòng sở hữu, phòng không có tr�
       effectiveFrom: call().today(),
     });
     expect(vacated.status).toBe(200);
-    world.clock.jumpDays(1);
-    for (const code of ['NV-ITA2', 'NV-FIN1', 'NV-SA', 'NV-CEO']) await world.actors.signIn(code);
+    // A week on: the revocation the dataset already decided is not done before then, and it is completed before the new period is recorded.
+    world.clock.jumpDays(8);
+    for (const code of ['NV-ITA1', 'NV-ITA2', 'NV-FIN1', 'NV-SA', 'NV-CEO']) await world.actors.signIn(code);
 
     const seen = call().data<{
       adjustment: {
@@ -60,11 +62,37 @@ describe('MF-5 thuê bao kho không có phòng sở hữu, phòng không có tr�
       responsibleItAdminEmployeeId: await world.facts.employeeId('NV-ITA2'),
     });
 
+    // The seat the dataset already decided to take back is still held until its revocation completes: the new period buys the seats the system
+    // counts, so the IT Admin completes the revocation first (the seat is then no longer carried).
+    const tasks = await world.facts.rows<{ id: string }>(
+      `SELECT t.id FROM provisioning_tasks t JOIN license_assignments a ON a.id = t.assignment_id
+        WHERE t.kind = 'REVOKE' AND a.subscription_id = $1 AND t.status = 'QUEUED'`,
+      [subscriptionId],
+    );
+    for (const task of tasks) {
+      expect((await call().post('NV-ITA1', `/provisioning-tasks/${task.id}/claim`)).status).toBe(200);
+      const done = await call().post('NV-ITA1', `/provisioning-tasks/${task.id}/revocation-completion`, {
+        completion: 'ACCOUNT_REMOVED',
+        evidence: 'đã gỡ tài khoản Figma',
+      });
+      expect(done.status).toBe(200);
+    }
     const recorded = await call().post('NV-ITA2', '/subscription-renewals', {
       subscriptionId,
       choice: seen.target < seen.purchasedQuantity ? 'REDUCE' : 'RENEW',
       proposedQuantity: seen.target,
-      outcome: 'UNCONFIRMED',
+      outcome: 'AS_DECIDED',
+      nextPeriod: {
+        purchasedQuantity: seen.target,
+        unitPrice: { amount: '4500000', currency: 'VND' },
+        billingCycle: 'ANNUAL',
+        startDate: seen.renewalOn,
+        endDate: addDays(seen.renewalOn, 364),
+        renewalDate: addDays(seen.renewalOn, 365),
+        noticePeriodDays: 30,
+        autoRenew: true,
+        allowsMidTermReduction: false,
+      },
     });
 
     expect(recorded.status).toBe(201);
@@ -95,7 +123,7 @@ describe('MF-5 thuê bao kho không có phòng sở hữu, phòng không có tr�
       const refused = await call().post(code, '/subscription-renewals', {
         subscriptionId,
         choice: 'RENEW',
-        outcome: 'UNCONFIRMED',
+        outcome: 'AS_DECIDED',
       });
       expect([code, refused.status]).toEqual([code, 403]);
     }

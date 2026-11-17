@@ -66,6 +66,11 @@ const ANSWERS: Readonly<Record<RenewalProblem, { status: HttpStatus; message: st
     status: HttpStatus.CONFLICT,
     message: 'The new period cannot be recorded as the continuation of this one.',
   },
+  NEXT_PERIOD_REQUIRED: {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message:
+      'A renewal, a reduction or an increase is recorded with the new period the vendor confirmed; only a vendor that refused a plan by the month leaves it out.',
+  },
 };
 
 /**
@@ -127,6 +132,7 @@ export const RENEWAL_ERROR_EXAMPLES = {
   EXCESS_NOT_REVOKED: renewal('EXCESS_NOT_REVOKED', { seatsInUse: 89, quantity: 88 }),
   SEATS_HAVE_OPEN_TASKS: renewal('SEATS_HAVE_OPEN_TASKS', { seats: 1 }),
   PERIOD_REFUSED: renewal('PERIOD_REFUSED', { reason: 'ALREADY_RENEWED' }),
+  NEXT_PERIOD_REQUIRED: renewal('NEXT_PERIOD_REQUIRED'),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
   CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
 } as const;

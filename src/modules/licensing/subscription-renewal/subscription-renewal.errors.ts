@@ -28,7 +28,9 @@ export type RenewalProblem =
   /** A seat to carry still has an open task of the provisioning queue. */
   | 'SEATS_HAVE_OPEN_TASKS'
   /** The new period cannot be recorded as the continuation of this one. */
-  | 'PERIOD_REFUSED';
+  | 'PERIOD_REFUSED'
+  /** A result with no new period leaves the period with no way to be recorded: a renewal, a reduction or an increase carries it (`A1C-03`). */
+  | 'NEXT_PERIOD_REQUIRED';
 
 /** A request about the renewal of a subscription was refused; nothing is written. */
 export class RenewalError extends Error {

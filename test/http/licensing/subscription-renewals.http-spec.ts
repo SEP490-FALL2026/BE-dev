@@ -360,6 +360,17 @@ describe('subscription renewal routes (e2e, no database)', () => {
         ['IT_ADMIN'],
       ],
       [
+        'a result with no new period that leaves the period with no way to be recorded (A1C-03)',
+        new RenewalError('NEXT_PERIOD_REQUIRED'),
+        422,
+        'SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED',
+        (s) =>
+          request(s)
+            .post('/api/v1/subscription-renewals')
+            .send({ subscriptionId: SUB, choice: 'REDUCE', proposedQuantity: 8, outcome: 'AS_DECIDED' }),
+        ['IT_ADMIN'],
+      ],
+      [
         'a quantity that does not fit the choice',
         new RenewalError('QUANTITY_INVALID'),
         422,
@@ -449,6 +460,14 @@ describe('subscription renewal routes (e2e, no database)', () => {
           request(s)
             .post('/api/v1/subscription-renewals')
             .send({ subscriptionId: SUB, choice: 'REDUCE', proposedQuantity: 8 }),
+      ],
+      [
+        'a result whose vendor has not confirmed (the result is recorded once the vendor confirmed, A1C-03)',
+        ['IT_ADMIN'],
+        (s) =>
+          request(s)
+            .post('/api/v1/subscription-renewals')
+            .send({ ...RECORD, outcome: 'UNCONFIRMED' }),
       ],
       [
         'a result with an unknown field',

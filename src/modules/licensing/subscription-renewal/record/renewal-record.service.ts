@@ -17,7 +17,14 @@ import { RenewalError } from '../subscription-renewal.errors';
 import { SubscriptionRenewalRepo } from '../subscription-renewal.repo';
 import type { RenewalChoice, RenewalOutcomeKind, RenewalRecord } from '../subscription-renewal.types';
 import { RenewalRecordTrail, type RecordedBy } from './renewal-record-trail.service';
-import { countsRefusal, existingCaseOf, noticeBasisOf, preflightOf, type RecordRefusal } from './renewal-record.policy';
+import {
+  countsRefusal,
+  existingCaseOf,
+  nextPeriodProblem,
+  noticeBasisOf,
+  preflightOf,
+  type RecordRefusal,
+} from './renewal-record.policy';
 
 export interface RecordRenewalInput {
   subscriptionId: string;
@@ -69,7 +76,7 @@ export class RenewalRecordService {
 
   /**
    * Throws RenewalError (`NOT_FOUND`, `NOT_RENEWABLE`, `CONTRACT_DATA_INCOMPLETE`, `BEFORE_ADJUSTMENT_POINT`, `QUANTITY_INVALID`,
-   * `CANCEL_NOT_ALLOWED`, `QUANTITY_NOT_SEATS_NEEDED`, `VENDOR_MINIMUM_EVIDENCE_REQUIRED`, `ALREADY_PROPOSED` and the refusals of the
+   * `CANCEL_NOT_ALLOWED`, `QUANTITY_NOT_SEATS_NEEDED`, `VENDOR_MINIMUM_EVIDENCE_REQUIRED`, `ALREADY_PROPOSED`, `NEXT_PERIOD_REQUIRED` and the refusals of the
    * outcome: `OUTCOME_MISMATCH`, `EXCESS_NOT_REVOKED`, `SEATS_HAVE_OPEN_TASKS`, `PERIOD_REFUSED`); nothing is written then.
    */
   async record(actor: AuthenticatedPrincipal, input: RecordRenewalInput, now = new Date()): Promise<RenewalRecord> {
@@ -134,6 +141,13 @@ export class RenewalRecordService {
     const cases = (await this.repo.ofSubscriptions([period.subscriptionId], tx)).get(period.subscriptionId) ?? [];
     const standing = existingCaseOf(cases, adjustment.deadline);
     if (standing) throw new RenewalError('ALREADY_PROPOSED', { renewalId: standing.id });
+    const nextPeriod = nextPeriodProblem({
+      choice: input.choice,
+      outcome: input.outcome,
+      hasNextPeriod: input.nextPeriod !== undefined,
+      commitment: adjustment.commitment,
+    });
+    if (nextPeriod) throw errorOf(nextPeriod);
 
     return { adjustment, counts, quantity, note };
   }

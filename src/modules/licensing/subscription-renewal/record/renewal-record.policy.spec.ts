@@ -1,10 +1,11 @@
 import type { PeriodAdjustment, RenewalPeriodFacts } from '../../../catalog/public/subscription-period.types';
 import type { SeatsNeededCounts } from '../seats-needed/renewal-seats-needed.policy';
-import type { RenewalChoice, RenewalRecord } from '../subscription-renewal.types';
+import type { RenewalChoice, RenewalOutcomeKind, RenewalRecord } from '../subscription-renewal.types';
 import {
   countsRefusal,
   existingCaseOf,
   lateRenewalOf,
+  nextPeriodProblem,
   noticeBasisOf,
   pointOf,
   preflightOf,
@@ -337,5 +338,37 @@ describe('the point of adjustment read before a result is recorded (SBF-20 §5, 
 
   it('asks for the contract data when no date gives a point', () => {
     expect(pointOf(period({ adjustment: null }), false)).toEqual({ refusal: { problem: 'CONTRACT_DATA_INCOMPLETE' } });
+  });
+});
+
+describe('a result with no new period (A1C-03)', () => {
+  const refusal = { problem: 'NEXT_PERIOD_REQUIRED' };
+  const without = (choice: RenewalChoice, outcome: RenewalOutcomeKind, commitment: 'MONTHLY' | 'ANNUAL' = 'ANNUAL') =>
+    nextPeriodProblem({ choice, outcome, hasNextPeriod: false, commitment });
+
+  it('is a dead end for a renewal, a reduction and an increase, so the new period is required', () => {
+    for (const choice of ['RENEW', 'REDUCE', 'INCREASE'] as const) {
+      expect(without(choice, 'AS_DECIDED')).toEqual(refusal);
+      expect(without(choice, 'DIFFERENT')).toEqual(refusal);
+      expect(without(choice, 'VENDOR_REFUSED')).toEqual(refusal);
+    }
+  });
+
+  it('is allowed for a plan by the month when the vendor refused: the next payment day opens another point', () => {
+    expect(without('REDUCE', 'VENDOR_REFUSED', 'MONTHLY')).toBeNull();
+    expect(without('REDUCE', 'DIFFERENT', 'MONTHLY')).toEqual(refusal);
+    expect(without('REDUCE', 'AS_DECIDED', 'MONTHLY')).toEqual(refusal);
+  });
+
+  it('is left as it was for a cancellation, whatever the outcome', () => {
+    for (const outcome of ['AS_DECIDED', 'VENDOR_REFUSED', 'DIFFERENT'] as const) {
+      expect(without('CANCEL', outcome)).toBeNull();
+    }
+  });
+
+  it('asks nothing when the new period is given', () => {
+    expect(
+      nextPeriodProblem({ choice: 'REDUCE', outcome: 'DIFFERENT', hasNextPeriod: true, commitment: 'ANNUAL' }),
+    ).toBeNull();
   });
 });

@@ -57,7 +57,8 @@ describe('who records and reads a renewal and what is refused (integration, real
       subscriptionId,
       choice: 'RENEW',
       proposedQuantity: unit.members.length,
-      outcome: 'UNCONFIRMED',
+      outcome: 'AS_DECIDED',
+      nextPeriod: nextYear(unit.members.length),
     });
   };
 
@@ -92,7 +93,8 @@ describe('who records and reads a renewal and what is refused (integration, real
         subscriptionId,
         choice: 'REDUCE',
         proposedQuantity: 3,
-        outcome: 'UNCONFIRMED',
+        outcome: 'AS_DECIDED',
+        nextPeriod: nextYear(3),
       });
       type Ranking = {
         items: {
@@ -207,7 +209,7 @@ describe('who records and reads a renewal and what is refused (integration, real
         ...year(),
       });
       const write = (subscriptionId: string) =>
-        h.propose({ subscriptionId, choice: 'RENEW', proposedQuantity: 1, outcome: 'UNCONFIRMED' });
+        h.propose({ subscriptionId, choice: 'RENEW', proposedQuantity: 1, outcome: 'AS_DECIDED' });
 
       expect(h.codeOf(await write(undated).expect(409))).toBe('SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE');
       for (const [subscriptionId, reason] of [
@@ -223,7 +225,7 @@ describe('who records and reads a renewal and what is refused (integration, real
       expect(
         h.codeOf(
           await h
-            .propose({ subscriptionId: randomUUID(), choice: 'RENEW', proposedQuantity: 1, outcome: 'UNCONFIRMED' })
+            .propose({ subscriptionId: randomUUID(), choice: 'RENEW', proposedQuantity: 1, outcome: 'AS_DECIDED' })
             .expect(404),
         ),
       ).toBe('SUBSCRIPTION_RENEWAL.NOT_FOUND');
@@ -233,12 +235,12 @@ describe('who records and reads a renewal and what is refused (integration, real
     it('refuses a quantity that is not one of the choice and a field the route does not know (a seat to release)', async () => {
       const unit = await h.unit(3);
       const { subscriptionId, seats } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
-      const body = { subscriptionId, outcome: 'UNCONFIRMED' };
+      const body = { subscriptionId, outcome: 'AS_DECIDED' };
 
       // A reduction to the quantity bought, a cancellation with a number and a raise to fewer: none of them is the choice it says.
       const same = await h.propose({ ...body, choice: 'REDUCE', proposedQuantity: 10 }).expect(422);
       expect(h.codeOf(same)).toBe('SUBSCRIPTION_RENEWAL.QUANTITY_INVALID');
-      const cancel = await h.propose({ ...body, choice: 'CANCEL', proposedQuantity: 0 }).expect(422);
+      const cancel = await h.propose({ ...body, choice: 'CANCEL', proposedQuantity: 0, closure }).expect(422);
       expect(h.codeOf(cancel)).toBe('SUBSCRIPTION_RENEWAL.QUANTITY_INVALID');
       const raise = await h.propose({ ...body, choice: 'INCREASE', proposedQuantity: 3 }).expect(422);
       expect(h.codeOf(raise)).toBe('SUBSCRIPTION_RENEWAL.QUANTITY_INVALID');

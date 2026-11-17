@@ -136,6 +136,24 @@ export function countsRefusal(
 }
 
 /**
+ * Whether a result with no new period can be recorded (`A1C-03`): the case is written complete in one write and the period then has its result
+ * for good, so a renewal, a reduction or an increase with no new period would leave the period with no way to ever record it (the seats would not
+ * carry and Finance would not be told). Only a vendor that refused a plan by the month leaves it out: the next payment day opens another point.
+ * A cancellation names no new period. Null when the result can be recorded.
+ */
+export function nextPeriodProblem(input: {
+  choice: RenewalChoice;
+  outcome: RenewalOutcomeKind;
+  hasNextPeriod: boolean;
+  commitment: PeriodAdjustment['commitment'];
+}): RecordRefusal | null {
+  if (input.hasNextPeriod || input.choice === 'CANCEL') return null;
+  if (input.outcome === 'VENDOR_REFUSED' && input.commitment === 'MONTHLY') return null;
+
+  return { problem: 'NEXT_PERIOD_REQUIRED' };
+}
+
+/**
  * The case that already stands for the period (`SBF-20` §4.4 step 7, R2-1): the live case of the same deadline, or a case left `DECIDED` before
  * the one-write renewal, whose base date followed the old rule and still waits for its outcome (the route of the outcome closes it first). Null
  * when none does. A `STALE` case is not among the cases given.

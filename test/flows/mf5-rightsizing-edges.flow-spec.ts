@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import { addDays } from '../../src/core/business-date';
 import { FlowWorld } from '../support/flows/flow-world';
 
 interface Adjustment {
   adjustmentPointOn: string;
   deadline: string;
+  renewalOn: string;
   purchasedQuantity: number;
   seatsNeeded: { total: number; heldPastRenewal: number };
   target: number;
@@ -33,7 +35,19 @@ describe('MF-5 ghi kết quả điều chỉnh: các biên của F5-02 @MF5 @D1'
       await call().get(code, `/subscription-renewals/adjustment?subscriptionId=${subscriptionId}`),
     ).adjustment;
   const record = (body: Record<string, unknown>, code = 'NV-ITA1') =>
-    call().post(code, '/subscription-renewals', { subscriptionId: figma, outcome: 'UNCONFIRMED', ...body });
+    call().post(code, '/subscription-renewals', { subscriptionId: figma, outcome: 'AS_DECIDED', ...body });
+  /** The year the vendor confirmed, starting on the renewal day (A1C-03, A1C-04). */
+  const nextYear = (renewalOn: string, quantity: number) => ({
+    purchasedQuantity: quantity,
+    unitPrice: { amount: '4500000', currency: 'VND' },
+    billingCycle: 'ANNUAL',
+    startDate: renewalOn,
+    endDate: addDays(renewalOn, 364),
+    renewalDate: addDays(renewalOn, 365),
+    noticePeriodDays: 30,
+    autoRenew: true,
+    allowsMidTermReduction: false,
+  });
   const cases = () => world.facts.count('subscription_renewals');
 
   beforeAll(async () => {
@@ -143,7 +157,7 @@ describe('MF-5 ghi kết quả điều chỉnh: các biên của F5-02 @MF5 @D1'
       const unknown = await call().post('NV-ITA1', '/subscription-renewals', {
         subscriptionId: randomUUID(),
         choice: 'RENEW',
-        outcome: 'UNCONFIRMED',
+        outcome: 'AS_DECIDED',
       });
       expect([unknown.status, call().codeOf(unknown)]).toEqual([404, 'SUBSCRIPTION_RENEWAL.NOT_FOUND']);
       expect(await cases()).toBe(written);
@@ -158,7 +172,7 @@ describe('MF-5 ghi kết quả điều chỉnh: các biên của F5-02 @MF5 @D1'
         subscriptionId: jira,
         choice: 'REDUCE',
         proposedQuantity: seen.target,
-        outcome: 'UNCONFIRMED',
+        outcome: 'AS_DECIDED',
       });
 
       expect([early.status, call().codeOf(early)]).toEqual([409, 'SUBSCRIPTION_RENEWAL.BEFORE_ADJUSTMENT_POINT']);
@@ -171,7 +185,7 @@ describe('MF-5 ghi kết quả điều chỉnh: các biên của F5-02 @MF5 @D1'
   });
 
   describe('số cần đổi giữa lúc xem và lúc ghi (QĐ-104d) @B5', () => {
-    it('một ghế nữa được cấp sau khi IT đọc số: ghi số cũ ⟹ 409 kèm số mới, IT đọc lại và ghi được một lần, ghi lần hai ⟹ ALREADY_PROPOSED #9', async () => {
+    it('một ghế nữa được cấp sau khi IT đọc số: ghi số cũ ⟹ 409 kèm số mới, IT đọc lại và ghi được một lần, ghi lần hai ⟹ NOT_RENEWABLE (kỳ đã nối tiếp) #9', async () => {
       const first = await adjustmentOf(figma);
       // A person of the department gets a seat with no end after the IT Admin read the number: the seat is needed after the renewal.
       await world.ctx.sql.query(
@@ -194,18 +208,47 @@ describe('MF-5 ghi kết quả điều chỉnh: các biên của F5-02 @MF5 @D1'
       const second = await adjustmentOf(figma);
       expect(second.target).toBe(first.target + 1);
 
-      const written = await cases();
-      const recorded = await record({ choice: 'REDUCE', proposedQuantity: second.target });
-      expect(recorded.status).toBe(201);
-      const renewalId = call().data<{ renewal: { id: string; state: string } }>(recorded).renewal.id;
-      expect(await cases()).toBe(written + 1);
-      expect((await adjustmentOf(figma)).recordedRenewalId).toBe(renewalId);
+      // The seats the dataset already decided to take back stay held until their revocation completes (not before the day the task names), and the
+      // new period buys the seats the system counts: the IT Admin completes them first, as the flow of the adjustment does.
+      const tasks = await world.facts.rows<{ id: string }>(
+        `SELECT t.id FROM provisioning_tasks t JOIN license_assignments a ON a.id = t.assignment_id
+          WHERE t.kind = 'REVOKE' AND a.subscription_id = $1 AND t.status = 'QUEUED'`,
+        [figma],
+      );
+      world.clock.jumpDays(7);
+      await world.actors.signIn('NV-ITA1');
+      for (const task of tasks) {
+        expect((await call().post('NV-ITA1', `/provisioning-tasks/${task.id}/claim`)).status).toBe(200);
+        const done = await call().post('NV-ITA1', `/provisioning-tasks/${task.id}/revocation-completion`, {
+          completion: 'ACCOUNT_REMOVED',
+          evidence: 'đã gỡ tài khoản Figma',
+        });
+        expect(done.status).toBe(200);
+      }
+      const third = await adjustmentOf(figma);
+      expect(third.target).toBe(second.target);
 
-      const twice = await record({ choice: 'REDUCE', proposedQuantity: second.target });
+      const written = await cases();
+      const recorded = await record({
+        choice: 'REDUCE',
+        proposedQuantity: third.target,
+        nextPeriod: nextYear(third.renewalOn, third.target),
+      });
+      expect(recorded.status).toBe(201);
+      expect(await cases()).toBe(written + 1);
+      // The period has its successor: no number is read for it any more and a second write is refused.
+      const read = await call().get('NV-ITA1', `/subscription-renewals/adjustment?subscriptionId=${figma}`);
+      expect([read.status, call().codeOf(read)]).toEqual([409, 'SUBSCRIPTION_RENEWAL.NOT_RENEWABLE']);
+
+      const twice = await record({
+        choice: 'REDUCE',
+        proposedQuantity: third.target,
+        nextPeriod: nextYear(third.renewalOn, third.target),
+      });
       expect([twice.status, call().codeOf(twice), call().detailsOf(twice)]).toEqual([
         409,
-        'SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED',
-        { renewalId },
+        'SUBSCRIPTION_RENEWAL.NOT_RENEWABLE',
+        { reason: 'ALREADY_CONTINUED' },
       ]);
       expect(await cases()).toBe(written + 1);
     });
