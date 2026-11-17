@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { pretendBusinessToday } from '../../support/pretend-today';
+import { SeatMonthChargeError } from '../../../src/modules/budgets/seat-month/seat-month.errors';
 import { SeatMonthService } from '../../../src/modules/budgets/seat-month/seat-month.service';
 import { InvoiceHarness } from '../../support/invoice-harness';
 import type { Unit } from '../../support/spend-harness';
@@ -294,7 +295,7 @@ describe('The figures of the close of a month are worked out as the documents de
     const seatMonths = h.ctx.app.get(SeatMonthService, { strict: false });
     const failing = jest
       .spyOn(seatMonths, 'chargeMonth')
-      .mockRejectedValueOnce(new Error('a subscription has no price'));
+      .mockRejectedValueOnce(new SeatMonthChargeError(['s-1', 's-2'], new Error('a subscription has no price')));
 
     const refused = await closing({ year: h.year, month: 2 }).expect(409);
     const listed = h.dataOf<{ items: PeriodWire[] }>(
@@ -307,6 +308,9 @@ describe('The figures of the close of a month are worked out as the documents de
     failing.mockRestore();
 
     expect((refused.body as { error: { code: string } }).error.code).toBe('BUDGET_REVIEW.SEAT_MONTHS_NOT_READY');
+    expect((refused.body as { error: { details: unknown } }).error.details).toEqual({
+      subscriptionIds: ['s-1', 's-2'],
+    });
     expect(listed.items.map((one) => one.month)).not.toContain(2);
     await closing({ year: h.year, month: 2 }).expect(201);
   });

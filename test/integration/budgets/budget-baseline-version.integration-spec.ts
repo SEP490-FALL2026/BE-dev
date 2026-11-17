@@ -250,6 +250,7 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
     const refused = await create(baselineBody(department)).expect(409);
 
     expect(h.codeOf(refused)).toBe('FINANCE.SETUP_INCOMPLETE');
+    expect(h.detailsOf(refused)).toEqual({ departmentId: department.id });
   });
 
   it('builds the version of a department whatever its head: one that submitted nothing by the deadline, or is to head it from tomorrow (QĐ-111bb)', async () => {
@@ -332,11 +333,12 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
   describe('the second call for the same Cost Center and year (F-079)', () => {
     it('answers 409 BUDGET.VERSION_IN_FLIGHT while the first version is a draft, and builds nothing more', async () => {
       const department = await headless();
-      await create(baselineBody(department)).expect(201);
+      const first = h.dataOf<VersionBody>(await create(baselineBody(department)).expect(201)).version;
 
       const second = await create(baselineBody(department)).expect(409);
 
       expect(h.codeOf(second)).toBe('BUDGET.VERSION_IN_FLIGHT');
+      expect(h.detailsOf(second)).toEqual({ versionId: first.id });
       const { rows } = await h.ctx.sql.query(`SELECT 1 FROM budget_versions WHERE cost_center_id = $1 AND year = $2`, [
         department.unitId,
         h.year,
@@ -355,6 +357,7 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
       const second = await create(baselineBody(department)).expect(409);
 
       expect(h.codeOf(second)).toBe('BUDGET.CURRENT_EXISTS');
+      expect(h.detailsOf(second)).toEqual({ versionId: made.id });
     });
   });
 

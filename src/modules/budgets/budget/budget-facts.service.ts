@@ -220,7 +220,11 @@ export class BudgetFactsService {
       if (units.length === 1 && units[0].costCenter === null) return units[0];
       throw new BudgetNotYourCostCenterError();
     }
-    if (units.length > 1) throw new BudgetCostCenterRequiredError();
+    if (units.length > 1) {
+      throw new BudgetCostCenterRequiredError(
+        units.flatMap((unit) => (unit.costCenter === null ? [] : [unit.costCenter.id])),
+      );
+    }
 
     return units[0];
   }

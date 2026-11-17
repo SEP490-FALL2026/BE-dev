@@ -60,7 +60,12 @@ export function toBudgetReviewApiException(error: unknown): unknown {
     });
   }
   if (error instanceof BudgetReviewSeatMonthsError) {
-    return refuse(HttpStatus.CONFLICT, 'BUDGET_REVIEW.SEAT_MONTHS_NOT_READY', error.message);
+    return refuse(
+      HttpStatus.CONFLICT,
+      'BUDGET_REVIEW.SEAT_MONTHS_NOT_READY',
+      error.message,
+      error.subscriptionIds.length > 0 ? { subscriptionIds: [...error.subscriptionIds] } : undefined,
+    );
   }
 
   return toBudgetApiException(error);
@@ -75,7 +80,7 @@ export const BUDGET_REVIEW_ERROR_EXAMPLES = {
   NO_BUDGET_FOR_YEAR: example(new BudgetReviewNoBudgetError(2025)),
   PERIOD_EXISTS: example(new BudgetReviewExistsError(2026, 10)),
   ALREADY_SIGNED: example(new BudgetReviewSignedError()),
-  SEAT_MONTHS_NOT_READY: example(new BudgetReviewSeatMonthsError()),
+  SEAT_MONTHS_NOT_READY: example(new BudgetReviewSeatMonthsError(undefined, ['<subscription-id>'])),
   NOT_AWAITING_EXPLANATIONS: example(new BudgetReviewNotAwaitingError('SIGNED')),
   LINE_NOT_FOUND: example(new BudgetReviewLineNotFoundError()),
   EXPLANATION_NOT_REQUIRED: example(new BudgetReviewNotAskedError('NOT_REQUIRED')),

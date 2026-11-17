@@ -165,7 +165,11 @@ describe('toBudgetApiException: the answers of the budget lifecycle (F27, F37, F
   it('a department without a Cost Center in use is the 409 FINANCE.SETUP_INCOMPLETE of the requests', () => {
     expect(answer(new FinanceSetupIncompleteError('d'))).toEqual({
       status: HttpStatus.CONFLICT,
-      body: { code: 'FINANCE.SETUP_INCOMPLETE', message: new FinanceSetupIncompleteError('d').message },
+      body: {
+        code: 'FINANCE.SETUP_INCOMPLETE',
+        message: new FinanceSetupIncompleteError('d').message,
+        details: { departmentId: 'd' },
+      },
     });
   });
 

@@ -60,7 +60,7 @@ export function toSubscriptionApiException(error: unknown): unknown {
   }
   // The owner department has no Cost Center in use yet and the change would create, raise or extend what is owed (`QĐ-88a`(2)).
   if (error instanceof FinanceSetupIncompleteError) {
-    return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
+    return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message, { departmentId: error.departmentId });
   }
   if (error instanceof SubscriptionPlanHasNoSubscriptionError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PLAN_HAS_NO_SUBSCRIPTION', error.message);

@@ -24839,6 +24839,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -42147,6 +42148,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -42775,6 +42777,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -43376,6 +43379,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -45156,6 +45160,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -48043,6 +48048,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -52345,6 +52351,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -56506,6 +56513,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -56805,6 +56813,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -59715,6 +59724,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -59726,6 +59736,7 @@
                       "error": {
                         "code": "BUDGET.PROPOSAL_ALREADY_OPEN",
                         "message": "The Cost Center already has a proposal for this year that is waiting or being reviewed.",
+                        "details": { "proposalId": "<proposal-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -59897,6 +59908,7 @@
                       "error": {
                         "code": "BUDGET.COST_CENTER_REQUIRED",
                         "message": "The person answers for more than one Cost Center for that year: name the one the work is for.",
+                        "details": { "costCenterIds": ["<cost-center-id>", "<cost-center-id>"] },
                         "requestId": "req_example"
                       }
                     }
@@ -60960,6 +60972,7 @@
                       "error": {
                         "code": "BUDGET.PROPOSAL_ALREADY_OPEN",
                         "message": "The Cost Center already has a proposal for this year that is waiting or being reviewed.",
+                        "details": { "proposalId": "<proposal-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -60971,6 +60984,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -61339,6 +61353,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -61362,6 +61377,7 @@
                       "error": {
                         "code": "BUDGET.VERSION_IN_FLIGHT",
                         "message": "The Cost Center already has a version for this year that is not decided.",
+                        "details": { "versionId": "<version-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -63222,6 +63238,7 @@
                       "error": {
                         "code": "BUDGET.COST_CENTER_REQUIRED",
                         "message": "The person answers for more than one Cost Center for that year: name the one the work is for.",
+                        "details": { "costCenterIds": ["<cost-center-id>", "<cost-center-id>"] },
                         "requestId": "req_example"
                       }
                     }
@@ -63428,6 +63445,7 @@
                       "error": {
                         "code": "BUDGET.COST_CENTER_REQUIRED",
                         "message": "The person answers for more than one Cost Center for that year: name the one the work is for.",
+                        "details": { "costCenterIds": ["<cost-center-id>", "<cost-center-id>"] },
                         "requestId": "req_example"
                       }
                     }
@@ -67129,6 +67147,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -67438,6 +67457,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -68799,6 +68819,7 @@
                       "error": {
                         "code": "BUDGET_REVIEW.SEAT_MONTHS_NOT_READY",
                         "message": "The seat-months of the month could not be worked out; the month was not closed.",
+                        "details": { "subscriptionIds": ["<subscription-id>"] },
                         "requestId": "req_example"
                       }
                     }
@@ -70021,6 +70042,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -70623,6 +70645,7 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }

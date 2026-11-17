@@ -49,8 +49,10 @@ export class VersionBaselineCreationService {
       // The cycle first (the order of the module), then the year.
       const allowed = await this.baselines.requireVersionAllowed(tx, input.costCenterId, input.year, today);
       await this.yearLock.lock(tx, input.costCenterId, [input.year]);
-      if (await this.versions.current(input.costCenterId, input.year, tx)) throw new BudgetCurrentExistsError();
-      if (await this.versions.inFlight(input.costCenterId, input.year, tx)) throw new BudgetVersionInFlightError();
+      const current = await this.versions.current(input.costCenterId, input.year, tx);
+      if (current) throw new BudgetCurrentExistsError(current.id);
+      const inFlight = await this.versions.inFlight(input.costCenterId, input.year, tx);
+      if (inFlight) throw new BudgetVersionInFlightError(inFlight.id);
 
       const carriedOverMinor = await this.figures.carriedOverOf(input.costCenterId, input.year, tx);
       const figures = await this.figures.figures(tx, allowed.currency, { ...input, defaultPercent, carriedOverMinor });

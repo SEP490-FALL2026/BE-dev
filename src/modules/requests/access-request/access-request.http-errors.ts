@@ -65,7 +65,11 @@ export function toAccessRequestApiException(error: unknown): unknown {
   }
   // The department has no Cost Center in use yet (`QĐ-87d(1)`): Finance creates it first. Nothing was written.
   if (error instanceof FinanceSetupIncompleteError) {
-    return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'FINANCE.SETUP_INCOMPLETE',
+      message: error.message,
+      details: { departmentId: error.departmentId },
+    });
   }
 
   // The spending approver, whatever the route, is no party of a Request (`D-S21`): one code, one body.

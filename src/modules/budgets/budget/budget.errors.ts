@@ -33,7 +33,10 @@ export class BudgetNotYourCostCenterError extends Error {
 
 /** The person heads a department now and another one that starts next year: the Cost Center the work is for must be named. */
 export class BudgetCostCenterRequiredError extends Error {
-  constructor() {
+  constructor(
+    /** The Cost Centers (in use) the person answers for that year: the ones to choose from. */
+    readonly costCenterIds: readonly string[] = [],
+  ) {
     super('The person answers for more than one Cost Center for that year: name the one the work is for.');
     this.name = 'BudgetCostCenterRequiredError';
   }
@@ -79,7 +82,10 @@ export class BudgetCommitmentRefusedError extends Error {
 
 /** The Cost Center and year already have a proposal that waits or is being reviewed (`US-06-10` AC-1). */
 export class BudgetProposalOpenError extends Error {
-  constructor() {
+  constructor(
+    /** The proposal that waits or is being reviewed; null when two writers met at the index and the loser does not know it. */
+    readonly proposalId: string | null = null,
+  ) {
     super('The Cost Center already has a proposal for this year that is waiting or being reviewed.');
     this.name = 'BudgetProposalOpenError';
   }
@@ -109,7 +115,10 @@ export class BudgetVersionNotEditableError extends Error {
 
 /** The Cost Center and year already have a version being built or waiting for a decision. */
 export class BudgetVersionInFlightError extends Error {
-  constructor() {
+  constructor(
+    /** The version that is not decided; null when two writers met at the index and the loser does not know it. */
+    readonly versionId: string | null = null,
+  ) {
     super('The Cost Center already has a version for this year that is not decided.');
     this.name = 'BudgetVersionInFlightError';
   }
@@ -117,7 +126,10 @@ export class BudgetVersionInFlightError extends Error {
 
 /** A first version is built from a proposal only while there is no current budget (`INV-21`). */
 export class BudgetCurrentExistsError extends Error {
-  constructor() {
+  constructor(
+    /** The current version; null when two writers met at the index and the loser does not know it. */
+    readonly versionId: string | null = null,
+  ) {
     super('The Cost Center already has a current budget for this year.');
     this.name = 'BudgetCurrentExistsError';
   }
