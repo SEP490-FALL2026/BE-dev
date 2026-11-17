@@ -454,9 +454,17 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     ],
   ])('answers %s with 422 and its code, never 500, and keeps nothing (RC-1-O2)', async (_name, over, code) => {
     const { requestId } = await approved();
+    const field = Object.keys(over)[0];
     const answered = (response: request.Response): void => {
       expect(response.status).toBe(422);
-      expect((response.body as { error: { code: string } }).error.code).toBe(code);
+      const { error } = response.body as { error: { code: string; details: Record<string, unknown> } };
+      expect(error.code).toBe(code);
+      // B2: the answer names the money object of the body that was refused, or the issue of its amount text.
+      if (code === 'VALIDATION_ERROR') {
+        expect(error.details).toEqual({ issues: [{ code: 'invalid_format', path: `${field}.amount` }] });
+      } else {
+        expect(error.details).toMatchObject({ path: field });
+      }
     };
 
     answered(await api('post', '/preview', h.it1).send(form(requestId, over)));

@@ -55,6 +55,7 @@ import { PlansController } from './plan/plans.controller';
 import { PlanTermsController } from './plan-terms/plan-terms.controller';
 import { PlanTermsRepo } from './plan-terms/plan-terms.repo';
 import { PlanTermsService } from './plan-terms/plan-terms.service';
+import { CatalogNotificationNamesListener } from './requestable-software/catalog-notification-names.listener';
 import { RequestableSoftwareController } from './requestable-software/requestable-software.controller';
 import { RequestableSoftwareRepo } from './requestable-software/requestable-software.repo';
 import { RequestableSoftwareService } from './requestable-software/requestable-software.service';
@@ -63,7 +64,8 @@ import { SeatTargetService } from './subscription/seat-target.service';
 import { SubscriptionDepartmentUseReader } from './subscription/subscription-department-use.listener';
 import { SubscriptionFactsService } from './subscription/subscription-facts.service';
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
-import { SubscriptionPeriodService } from './subscription/subscription-period.service';
+import { SubscriptionPeriodRepo } from './subscription/period/subscription-period.repo';
+import { SubscriptionPeriodService } from './subscription/period/subscription-period.service';
 import { SubscriptionPeriodApi } from './public/subscription-period.api';
 import { SubscriptionSeatIncreaseService } from './subscription/seat-increase/subscription-seat-increase.service';
 import { SubscriptionObligationService } from './subscription/obligation/subscription-obligation.service';
@@ -74,6 +76,7 @@ import { SubscriptionService } from './subscription/subscription.service';
 import { SubscriptionPoolService } from './subscription/pool/subscription-pool.service';
 import { SubscriptionPricingService } from './subscription/subscription-pricing.service';
 import { SubscriptionViewService } from './subscription/subscription-view.service';
+import { SubscriptionWindowsService } from './subscription/subscription-windows.service';
 import { SubscriptionsController } from './subscription/subscriptions.controller';
 import { VendorDictionaryController } from './vendor-dictionary/vendor-dictionary.controller';
 import { VendorDictionaryFactsService } from './vendor-dictionary/vendor-dictionary-facts.service';
@@ -174,6 +177,8 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionGrantingRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,
+    SubscriptionWindowsService,
+    SubscriptionPeriodRepo,
     SubscriptionPeriodService,
     SeatTargetService,
     OnboardingFactsService,
@@ -196,6 +201,8 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionPeriodApi,
     RequestableSoftwareRepo,
     RequestableSoftwareService,
+    // Names an application, a plan and a subscription in a notification sentence: added to the name sources of `notifications` when the module starts.
+    CatalogNotificationNamesListener,
   ],
   // The facade licensing reads the seat targets through (ADR-0013), and the hook licensing binds its reader of occupied seats to
   // (`public/catalog.extension-points.ts`), and the facade the hand-over of an IT Admin who leaves moves their subscriptions and applications through

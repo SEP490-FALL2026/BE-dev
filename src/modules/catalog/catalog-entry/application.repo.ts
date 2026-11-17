@@ -349,4 +349,15 @@ export class ApplicationRepo {
       isCommunicationService: functionalGroup?.systemKey === 'COMMUNICATION',
     }));
   }
+
+  /** The name of each of these applications, by id, in one read; an id that does not exist is absent (a retired application keeps its name). */
+  async namesOf(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).application.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, name: true },
+    });
+
+    return new Map(rows.map((row) => [row.id, row.name]));
+  }
 }

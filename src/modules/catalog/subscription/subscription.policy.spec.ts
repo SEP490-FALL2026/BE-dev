@@ -101,21 +101,16 @@ describe('noticeWarnings', () => {
 });
 
 describe('alertDates', () => {
-  it('AC-1: counts back from the base date by each number of days of the parameter', () => {
-    expect(alertDates('2026-12-01', [15, 7])).toEqual(['2026-11-16', '2026-11-24']);
+  it('a plan by the year: the point of adjustment, then the red alert', () => {
+    expect(alertDates({ point: '2026-11-01', redAlertOn: '2026-11-24' })).toEqual(['2026-11-01', '2026-11-24']);
   });
 
-  it('AC-7: counts from the end date when that is the base', () => {
-    expect(alertDates('2026-12-31', [15, 7])).toEqual(['2026-12-16', '2026-12-24']);
+  it('a plan by the month: the point of adjustment only, it has no red alert', () => {
+    expect(alertDates({ point: '2026-11-24', redAlertOn: null })).toEqual(['2026-11-24']);
   });
 
-  it('is empty without a base date', () => {
-    expect(alertDates(null, [15, 7])).toEqual([]);
-  });
-
-  it('follows the parameter: one alert, or five', () => {
-    expect(alertDates('2026-12-31', [30])).toEqual(['2026-12-01']);
-    expect(alertDates('2026-12-31', [60, 30, 15, 7, 1])).toHaveLength(5);
+  it('is empty without a point of adjustment', () => {
+    expect(alertDates(null)).toEqual([]);
   });
 });
 

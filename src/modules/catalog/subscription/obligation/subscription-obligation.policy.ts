@@ -1,11 +1,13 @@
-import { addDays, type BusinessDate } from '../../../../core/business-date';
-import { addMonths } from '../../../../core/fiscal-year';
+import { addDays, fromDateColumn, toDateColumn, type BusinessDate } from '../../../../core/business-date';
+import { addMonths, firstGridOffsetFrom } from '../../../../core/fiscal-year';
 import { deriveNotice } from '../subscription.policy';
 import type {
+  ApplicationKind,
   BillingCycle,
   CommitmentTermMonths,
   DeadlineKind,
   ExpiryState,
+  ProvisioningType,
   SubscriptionKind,
   SubscriptionState,
   SubscriptionStatus,
@@ -58,9 +60,24 @@ export function increasesObligation(current: ObligationState, next: ObligationSt
   return priceRaised(current, next);
 }
 
-/** The days before the payment day of a plan by the month, and before the deadline of a plan by the year, that the point of adjustment opens (`FR-1.4`). */
-const MONTHLY_WINDOW_DAYS = 7;
-const ANNUAL_WINDOW_DAYS = 30;
+/**
+ * The days that open a point of adjustment and the red alert, as the Super Admin set them for the period (`FR-1.4`, `FR-8.2`): the days before the
+ * payment day of a plan by the month, before the deadline of a plan by the year, and before that deadline again for the red alert of a plan by the year.
+ */
+export interface AdjustmentWindows {
+  monthlyDays: number;
+  annualDays: number;
+  redAlertDaysAnnual: number;
+}
+
+/** The day the red alert opens for a plan by the year, `redAlertDays` before its deadline; a plan by the month has none. */
+export function redAlertOf(
+  deadline: BusinessDate,
+  commitment: 'MONTHLY' | 'ANNUAL',
+  redAlertDays: number,
+): BusinessDate | null {
+  return commitment === 'ANNUAL' ? addDays(deadline, -redAlertDays) : null;
+}
 
 export interface AdjustmentInput {
   kind: SubscriptionKind;
@@ -68,6 +85,8 @@ export interface AdjustmentInput {
   billingCycle: BillingCycle | null;
   noticeDeadline: BusinessDate | null;
   noticePeriodDays: number | null;
+  /** The day the plan began: no payment day of a plan by the month falls before it (a bound, never an anchor: nothing is guessed from it). */
+  startDate: BusinessDate | null;
   renewalDate: BusinessDate | null;
   endDate: BusinessDate | null;
   autoRenew: boolean;
@@ -97,6 +116,16 @@ export const runsAPeriod = (record: {
 }): boolean => record.kind === 'TERM' && record.status === 'ACTIVE' && !record.hasSuccessor;
 
 /**
+ * Whether the plan of a subscription has a point of adjustment at all, whatever its dates: only a term of a workspace of the shared pool
+ * (`K2`) of software that is not internal has one. The renewal answers the others `NOT_POOL_TERM` / `INTERNAL`, so a list gives them no alert dates
+ * (`K1` has no point, `FR-1.12`(9)).
+ */
+export const hasAdjustmentPoint = (record: {
+  planProvisioningType: ProvisioningType;
+  applicationKind: ApplicationKind;
+}): boolean => record.planProvisioningType === 'K2' && record.applicationKind !== 'INTERNAL';
+
+/**
  * A plan by the month commits to one month, or names no commitment and is paid by the month (a personal plan, K1): the rest are plans by
  * the year, whose commitment is twelve months (`QĐ-103e`).
  */
@@ -104,16 +133,41 @@ function isByTheMonth(input: AdjustmentInput): boolean {
   return input.commitmentTermMonths === 1 || (input.commitmentTermMonths === null && input.billingCycle === 'MONTHLY');
 }
 
+/** The commitment a point of adjustment follows: a month or a year, by the same rule `adjustmentPointOf` picks its window with. */
+export function adjustmentCommitmentOf(input: AdjustmentInput): 'MONTHLY' | 'ANNUAL' {
+  return isByTheMonth(input) ? 'MONTHLY' : 'ANNUAL';
+}
+
 /**
- * The point of adjustment of the period a subscription runs in on `today` (`FR-1.4`, `QĐ-103e`, `QĐ-111o`): a plan by the month opens 7 days
- * before its next payment day whatever the deadline to cancel says: the payment day (the renewal day, else the end day) is rolled by whole
- * months to the first one that is not before today, since a plan by the month nobody adjusted goes on with the same seats (`QĐ-103e`,
- * `QĐ-103v`(5)); only a plan that does not renew itself and has an end day stops at that day, its period really ends there. A plan by the year opens 30
- * days before the deadline to cancel (declared, or counted back from the renewal day by the days of notice) and runs to the renewal day (else the
- * end day); with no deadline and no days of notice, 30 days before the renewal day when it renews itself (`QĐ-106i`) or before the end day when
+ * The point of adjustment of the period a subscription runs in on `today` (`FR-1.4`, `QĐ-103e`, `QĐ-111o`): a plan by the month opens `windows.monthlyDays`
+ * days (7 to begin with) before its next payment day whatever the deadline to cancel says: the payment day (the renewal day, else the end day) is rolled by whole
+ * months, forward or back, to the first one that is not before today and is after the day the plan starts, since a plan by the month nobody adjusted goes on with the same seats (`QĐ-103e`,
+ * `QĐ-103v`(5)); only a plan that does not renew itself and has an end day stops at that day, its period really ends there. A plan by the year opens `windows.annualDays`
+ * days (30 to begin with) before the deadline to cancel (declared, or counted back from the renewal day by the days of notice) and runs to the renewal day (else the
+ * end day); with no deadline and no days of notice, the same days before the renewal day when it renews itself (`QĐ-106i`) or before the end day when
  * it does not. A purchase made once has no period and so no point, and nothing is guessed: with no date to count from there is none. Pure.
  */
-export function adjustmentPointOf(input: AdjustmentInput, today: BusinessDate): AdjustmentPoint | null {
+export function adjustmentPointOf(
+  input: AdjustmentInput,
+  today: BusinessDate,
+  windows: AdjustmentWindows,
+): AdjustmentPoint | null {
+  const period = periodOf(input, today);
+  if (period === null) return null;
+
+  return {
+    ...period,
+    point: addDays(
+      period.deadline,
+      -(adjustmentCommitmentOf(input) === 'MONTHLY' ? windows.monthlyDays : windows.annualDays),
+    ),
+  };
+}
+
+/** What a point of adjustment is counted from, which no window changes: the deadline and the end of the period the subscription runs in on `today`. */
+type PeriodOf = Omit<AdjustmentPoint, 'point'>;
+
+function periodOf(input: AdjustmentInput, today: BusinessDate): PeriodOf | null {
   if (input.kind === 'PERPETUAL') return null;
   if (isByTheMonth(input)) return monthly(input, today);
   const notice = deriveNotice(input);
@@ -127,34 +181,48 @@ export function adjustmentPointOf(input: AdjustmentInput, today: BusinessDate): 
   return input.autoRenew && input.renewalDate !== null ? annual(input, 'RENEWAL_DATE', input.renewalDate) : null;
 }
 
+/** What the period of a subscription is read from, with the day it began and the day it was recorded when none was declared. */
+export type PeriodStartInput = AdjustmentInput & { createdAt: Date };
+
 /**
- * A plan by the month: the next payment day (`addMonths` from the stored day, so a short month does not move the day of the next), which a plan
- * that does not renew itself and ends on a day never passes: no payment day comes after its end day.
+ * The instant the parameters of the period a subscription runs in on `today` are read at (`QĐ-106h`, R2-9): the start of the day the period began, so a
+ * change of a parameter applies to the periods that begin after it and never moves one that runs. A plan by the year runs from its start day
+ * (the record's day when none is declared); a plan by the month is one row that lives many months, so its period is the month that runs, from the
+ * month before its next payment day, never before the plan starts. The start of a UTC day stands for the day of the organization: the two differ
+ * by less than a day, which no setting can tell apart. The deadline does not depend on the windows, so it is counted first. Pure.
  */
-function monthly(input: AdjustmentInput, today: BusinessDate): AdjustmentPoint | null {
+export function adjustmentPeriodInstantOf(input: PeriodStartInput, today: BusinessDate): Date {
+  const began = input.startDate ?? fromDateColumn(input.createdAt);
+  if (!isByTheMonth(input)) return toDateColumn(began);
+  const period = periodOf(input, today);
+  if (period === null) return toDateColumn(began);
+  const month = addMonths(period.deadline, -1);
+
+  return toDateColumn(month > began ? month : began);
+}
+
+/**
+ * A plan by the month: the next payment day, the first day of the monthly grid counted from the stored day (the renewal day, else the end day) that is not before
+ * today and comes strictly after the day the plan starts (the day of a purchase is not a payment day to adjust: a new line that starts on a day of the grid pays a month later). The grid runs both ways from the stored day, so an end day months away does not hold the payment
+ * day back (`QĐ-106i`(2), the same reading the mark of a period with no invoice makes of the payment day of a subscription), and a short month does not move the
+ * day of the next. A plan that does not renew itself and ends on a day never passes it: no payment day comes after its end day.
+ */
+function monthly(input: AdjustmentInput, today: BusinessDate): PeriodOf | null {
   const stored = input.renewalDate ?? input.endDate;
   if (stored === null) return null;
-  const next = nextPayment(stored, today);
+  const from = input.startDate !== null && input.startDate >= today ? addDays(input.startDate, 1) : today;
+  const next = addMonths(stored, firstGridOffsetFrom(stored, 1, from));
   const payment = !input.autoRenew && input.endDate !== null && input.endDate < next ? input.endDate : next;
 
   return {
     kind: 'PAYMENT_DATE',
     deadline: payment,
-    point: addDays(payment, -MONTHLY_WINDOW_DAYS),
     end: payment,
     endKind: 'PAYMENT_DATE',
   };
 }
 
-/** The first monthly payment day from `stored` that is not before `today`: `stored` itself while it has not passed. */
-function nextPayment(stored: BusinessDate, today: BusinessDate): BusinessDate {
-  let months = 0;
-  while (addMonths(stored, months) < today) months += 1;
-
-  return addMonths(stored, months);
-}
-
-function annual(input: AdjustmentInput, kind: DeadlineKind, deadline: BusinessDate): AdjustmentPoint {
+function annual(input: AdjustmentInput, kind: DeadlineKind, deadline: BusinessDate): PeriodOf {
   const last: { day: BusinessDate; kind: DeadlineKind } | null =
     input.renewalDate !== null
       ? { day: input.renewalDate, kind: 'RENEWAL_DATE' }
@@ -166,7 +234,6 @@ function annual(input: AdjustmentInput, kind: DeadlineKind, deadline: BusinessDa
   return {
     kind,
     deadline,
-    point: addDays(deadline, -ANNUAL_WINDOW_DAYS),
     end: ends ? last.day : deadline,
     endKind: ends ? last.kind : kind,
   };

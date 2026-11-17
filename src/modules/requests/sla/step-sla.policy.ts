@@ -199,11 +199,16 @@ export interface ReminderNoticeFacts {
   holderEmployeeId: string | null;
 }
 
-/** The parameters of the notice of `code`, exactly the keys the closed table of the inbox allows for it. */
+/**
+ * The parameters of the notice of `code`, exactly the keys the closed table of the inbox allows for it. `role` is what the
+ * recipient is to the step: only the reminder of a late step carries it (`recipientRole`), so its sentence can tell the
+ * requester from the holder.
+ */
 export function noticeParamsOf(
   code: ReminderNoticeCode,
   facts: ReminderNoticeFacts,
   cause: ReminderCause | null,
+  role: SlaReminderRole,
 ): Record<string, string | number | null> {
   const numbers = {
     reminderNumber: facts.reminderNumber,
@@ -212,7 +217,7 @@ export function noticeParamsOf(
   };
   switch (code) {
     case 'STEP_SLA_REMINDER':
-      return { requestId: facts.requestId, stepKind: facts.stepKind, ...numbers };
+      return { requestId: facts.requestId, stepKind: facts.stepKind, ...numbers, recipientRole: role };
     case 'STEP_SLA_ESCALATION':
       return {
         requestId: facts.requestId,

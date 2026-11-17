@@ -67,6 +67,7 @@ import { VendorAccountDecisionService } from './vendor-account-review/vendor-acc
 import { VendorAccountEvidenceSweeper } from './vendor-account-review/vendor-account-evidence-retention.job';
 import { VendorAccountEvidenceRetentionService } from './vendor-account-review/vendor-account-evidence-retention.service';
 import { VendorAccountIntakeService } from './vendor-account-review/vendor-account-intake.service';
+import { VendorAccountReviewNotifier } from './vendor-account-review/vendor-account-review-notifier.service';
 import { VendorAccountReviewListener } from './vendor-account-review/vendor-account-review-import.listener';
 import { VendorAccountReviewRepo } from './vendor-account-review/vendor-account-review.repo';
 import { OutOfProcessCasesController } from './vendor-account-review-queue/out-of-process-cases.controller';
@@ -113,6 +114,7 @@ import { VendorImportTemplateListener } from './vendor-import/vendor-import-temp
   providers: [
     VendorAccountReviewRepo,
     VendorAccountIntakeService,
+    VendorAccountReviewNotifier,
     VendorAccountDecisionService,
     OutOfProcessCaseClosureService,
     OutOfProcessRevocationService,

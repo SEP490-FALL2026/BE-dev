@@ -1,5 +1,6 @@
 import type { AssignmentRecord } from '../public/licensing.types';
 import {
+  carriedPast,
   effectiveFromLabel,
   nextPeriodStart,
   replacedByGrant,
@@ -187,5 +188,33 @@ describe('the next period a seat granted today goes on into (FX2-R1, QĐ-35c)', 
     expect(nextPeriodStart({ status: 'DRAFT', startDate: '2027-01-01' }, '2026-11-15')).toBeNull();
     expect(nextPeriodStart({ status: 'ACTIVE', startDate: null }, '2026-11-15')).toBeNull();
     expect(nextPeriodStart(undefined, '2026-11-15')).toBeNull();
+  });
+});
+
+describe('the seats that go on into the new period when the renewal day ends some (R2-2, QĐ-106i(2))', () => {
+  const seat = (id: string, validUntil: string | null, expectedEndDate: string | null) => ({
+    id,
+    validFrom: '2026-01-05',
+    validUntil,
+    expectedEndDate,
+  });
+
+  it('leaves on the old period a seat whose last day is the renewal day or before, and carries the others', () => {
+    const seats = [
+      seat('open', null, null),
+      seat('ends-on-renewal-expected', null, '2026-12-31'),
+      seat('ends-on-renewal-until', '2027-01-01', null),
+      seat('ends-after', null, '2027-01-01'),
+      seat('until-after', '2027-01-03', null),
+      seat('expected-before', null, '2026-12-30'),
+    ];
+
+    expect(carriedPast(seats, '2026-12-31').map((s) => s.id)).toEqual(['open', 'ends-after', 'until-after']);
+  });
+
+  it('counts the earlier of the day before the end of the right and the expected end', () => {
+    expect(carriedPast([seat('both', '2027-01-10', '2026-12-31')], '2026-12-31')).toEqual([]);
+    expect(carriedPast([seat('both', '2027-01-01', '2027-02-01')], '2026-12-31')).toEqual([]);
+    expect(carriedPast([seat('both', '2027-01-02', '2027-02-01')], '2026-12-31')).toHaveLength(1);
   });
 });

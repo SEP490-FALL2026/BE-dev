@@ -52,6 +52,8 @@ export class AssignmentConflictError extends Error {
     readonly index: number,
     /** For `SEAT_CAPACITY` of a K2 or K4 grant: the seats still free in the other subscriptions of the plan, so the IT Admin grants from there (`BR-MF1-09a`). */
     readonly freeSeatsInPool?: number,
+    /** For `OVERLAP` and `IDENTIFIER_IN_USE`: the seat that blocks, when the site that throws knows it (the database does not say it). */
+    readonly conflictingAssignmentId?: string,
   ) {
     super(`An assignment conflicts with the data as it is now: ${conflict}.`);
     this.name = 'AssignmentConflictError';
@@ -143,7 +145,7 @@ export type ProvisioningSubscriptionProblem =
 
 /**
  * A grant names a subscription when it needs none (K5), none when it needs one (K1, K2), one of another plan, or one of the plan a seat
- * cannot be taken from today (its period ended, or a next period that runs took it over); or a seat the next period recorded ahead of
+ * cannot be taken from today (its period ended, a next period that runs took it over, or it was recorded as cancelled); or a seat the next period recorded ahead of
  * its start buys no seat for (`NEXT_PERIOD_SEATS`: the seat goes on into it, so it needs one).
  */
 export class ProvisioningSubscriptionError extends Error {

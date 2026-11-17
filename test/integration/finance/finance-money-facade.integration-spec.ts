@@ -37,26 +37,41 @@ describe('the finance facade: money in, the snapshot of the same currency out (i
 
   describe('parseMoney', () => {
     it('reads the amount with the minor digits of its currency', async () => {
-      expect(await finance.parseMoney({ amount: '1200.5', currency: 'USD' })).toEqual({
+      expect(await finance.parseMoney({ amount: '1200.5', currency: 'USD' }, 'unitPrice')).toEqual({
         amountMinor: 120050n,
         currency: 'USD',
       });
-      expect(await finance.parseMoney({ amount: '30000000', currency: 'VND' })).toEqual({
+      expect(await finance.parseMoney({ amount: '30000000', currency: 'VND' }, 'unitPrice')).toEqual({
         amountMinor: 30000000n,
         currency: 'VND',
       });
     });
 
     it('refuses decimals a currency does not have, a currency it does not know, and an amount too large', async () => {
-      await expect(finance.parseMoney({ amount: '1200.5', currency: 'VND' })).rejects.toBeInstanceOf(
+      await expect(finance.parseMoney({ amount: '1200.5', currency: 'VND' }, 'unitPrice')).rejects.toBeInstanceOf(
         MoneyScaleExceededError,
       );
-      await expect(finance.parseMoney({ amount: '1.00', currency: 'XYZ' })).rejects.toBeInstanceOf(
+      await expect(finance.parseMoney({ amount: '1.00', currency: 'XYZ' }, 'unitPrice')).rejects.toBeInstanceOf(
         CurrencyNotSupportedError,
       );
-      await expect(finance.parseMoney({ amount: '10000000000000.01', currency: 'USD' })).rejects.toBeInstanceOf(
-        MoneyOutOfRangeError,
-      );
+      await expect(
+        finance.parseMoney({ amount: '10000000000000.01', currency: 'USD' }, 'unitPrice'),
+      ).rejects.toBeInstanceOf(MoneyOutOfRangeError);
+    });
+
+    it('says where the amount sat in the body on every money error it throws', async () => {
+      await expect(finance.parseMoney({ amount: '1200.5', currency: 'VND' }, 'lines.2.amount')).rejects.toMatchObject({
+        path: 'lines.2.amount',
+      });
+      await expect(finance.parseMoney({ amount: '1.00', currency: 'XYZ' }, 'originalPrice')).rejects.toMatchObject({
+        path: 'originalPrice',
+      });
+      await expect(
+        finance.parseMoney({ amount: '10000000000000.01', currency: 'USD' }, 'requestedAmount'),
+      ).rejects.toMatchObject({ path: 'requestedAmount' });
+      await expect(finance.parseMoney({ amount: '1e5', currency: 'USD' }, 'unitPrice')).rejects.toMatchObject({
+        path: 'unitPrice',
+      });
     });
   });
 

@@ -61,12 +61,13 @@ describe('which seat may be returned, and what the return leaves behind over Pos
   describe('what is refused, and leaves nothing behind', () => {
     it('refuses a second return of a seat that waits for its revocation', async () => {
       const { unit, assignmentId } = await unitWithSeat();
-      await h.returned(unit.member.account, { assignmentId, ...reason });
+      const first = await h.returned(unit.member.account, { assignmentId, ...reason });
       const before = await counts();
 
       const again = await h.returnSeat({ assignmentId, ...reason }, unit.head.account).expect(409);
 
       expect(h.codeOf(again)).toBe('RETURN_REQUEST.ALREADY_REQUESTED');
+      expect(h.detailsOf(again)).toEqual({ requestId: first.id });
       expect(await counts()).toEqual(before);
     });
 

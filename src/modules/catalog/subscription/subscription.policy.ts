@@ -62,11 +62,17 @@ export function noticeWarnings(source: NoticeSource): SubscriptionWarning[] {
   return source === 'MISSING' ? ['NO_ALERT_ANCHOR'] : [];
 }
 
-/** The alert dates: the base date minus each number of days the parameter sets, in the parameter's order. */
-export function alertDates(baseDate: BusinessDate | null, daysBefore: readonly number[]): BusinessDate[] {
-  if (baseDate === null) return [];
+/**
+ * The alert dates of a subscription are the days it needs the IT Admin (`FR-8.2`): the point of adjustment, and for a plan by the year
+ * the red alert after it. A subscription with no point of adjustment (a purchase made once, a draft, a period a later one continues,
+ * no date to count from) has none.
+ */
+export function alertDates(
+  adjustment: { point: BusinessDate; redAlertOn: BusinessDate | null } | null,
+): BusinessDate[] {
+  if (adjustment === null) return [];
 
-  return daysBefore.map((days) => addDays(baseDate, -days));
+  return adjustment.redAlertOn === null ? [adjustment.point] : [adjustment.point, adjustment.redAlertOn];
 }
 
 export interface CompletenessInput {

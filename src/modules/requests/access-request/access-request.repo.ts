@@ -6,15 +6,16 @@ import { pricingColumns } from './access-request-pricing.mapper';
 import { SELECT_REQUEST, toRecord } from './access-request-record.mapper';
 import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
 import { requestPolicyJson } from './access-request.json';
-import type {
-  AccessRequestState,
-  PricingRecord,
-  NewAccessRequest,
-  NewNeedDecision,
-  NewNeedStep,
-  WithdrawalRecord,
-  AccessRequestRecord,
-  CancellationRecord,
+import {
+  ENDED_STATES,
+  type AccessRequestState,
+  type PricingRecord,
+  type NewAccessRequest,
+  type NewNeedDecision,
+  type NewNeedStep,
+  type WithdrawalRecord,
+  type AccessRequestRecord,
+  type CancellationRecord,
 } from './access-request.types';
 
 /** The durable routing columns and policy come from the same need decision. */
@@ -359,6 +360,37 @@ export class AccessRequestRepo {
          )`;
 
     return new Set(rows.map((row) => row.employee_id));
+  }
+
+  /**
+   * How many requests for the plan are not in a final state (`QĐ-103e`): a request of one person, a request for a group (its own
+   * `plan_id`) and a request to go on using, each counted once, at any step (need, assessment, spend, execution). A draft is not a
+   * request yet and a request that waits for the IT Admin to close a withdrawal is still work, so it counts.
+   */
+  countOpenOfPlan(planId: string, tx?: DbTx): Promise<number> {
+    return (tx ?? this.prisma).accessRequest.count({ where: { planId, state: { notIn: ['DRAFT', ...ENDED_STATES] } } });
+  }
+
+  /**
+   * The people the requests for the plan approved in full are still to be granted for (`QĐ-103e`, `QĐ-103v`(2)): a request of one person
+   * (or of a service account) that waits for the IT Admin (`AWAITING_EXECUTION`) is one; a request for a group is one for each person
+   * whose line is approved and not taken yet. They are the people the queue of grants shows as waiting. A request to go on using is no
+   * grant (its seat is held and read as a renewal waiting), and a request whose task was made is read by the seat it holds.
+   */
+  async countApprovedAwaitingGrantOfPlan(planId: string, tx?: DbTx): Promise<number> {
+    const db = tx ?? this.prisma;
+    // One query at a time: the client of a transaction runs one statement at once.
+    const single = await db.accessRequest.count({
+      where: { planId, type: { in: ['GRANT', 'SERVICE_ACCOUNT'] }, state: 'AWAITING_EXECUTION' },
+    });
+    const grouped = await db.accessRequestLine.count({
+      where: {
+        state: 'APPROVED',
+        request: { planId, type: 'GROUP_GRANT', state: { in: ['AWAITING_EXECUTION', 'EXECUTING'] } },
+      },
+    });
+
+    return single + grouped;
   }
 
   /**

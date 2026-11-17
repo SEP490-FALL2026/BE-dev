@@ -5,7 +5,12 @@ import { AssignmentRenewalService } from '../assignment/renewal/assignment-renew
 import type { BusinessDate } from '../../../core/business-date';
 import { ExpiryRenewalWindowRepo } from '../expiry/expiry-renewal-window.repo';
 import { ProvisioningExtensionService } from '../provisioning/tasks/provisioning-extension.service';
-import type { AssignmentFacts, RenewAssignmentInput, RenewedAssignment } from './licensing-renewal.types';
+import type {
+  AssignmentFacts,
+  PendingRenewal,
+  RenewAssignmentInput,
+  RenewedAssignment,
+} from './licensing-renewal.types';
 import { RenewalHoldHook } from './licensing.extension-points';
 import { AssignmentRenewalRefusedError } from './licensing.errors';
 
@@ -85,5 +90,12 @@ export class LicensingRenewalApi {
    */
   hasPendingRenewal(assignmentId: string, tx?: DbTx): Promise<boolean> {
     return this.renewalHold.get().hasPendingRenewal(assignmentId, tx);
+  }
+
+  /** The renewal a seat has waiting for its decision, with the request that holds it, or null (the same answer as `hasPendingRenewal`). */
+  async pendingRenewalOf(assignmentId: string, tx?: DbTx): Promise<PendingRenewal | null> {
+    const waiting = await this.renewalHold.get().pendingRenewalsOf([assignmentId], tx);
+
+    return waiting.get(assignmentId) ?? null;
   }
 }

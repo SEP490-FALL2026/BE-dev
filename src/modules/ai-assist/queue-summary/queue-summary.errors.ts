@@ -8,7 +8,7 @@ export class AiDisabledError extends Error {
   }
 }
 
-/** `AI.PROVIDER_UNAVAILABLE`: no AI service is configured; nothing was written. */
+/** `AI.PROVIDER_UNAVAILABLE`: the MODEL mode with no AI service configured; nothing was written. */
 export class AiProviderUnavailableError extends Error {
   constructor() {
     super('No AI service is available.');

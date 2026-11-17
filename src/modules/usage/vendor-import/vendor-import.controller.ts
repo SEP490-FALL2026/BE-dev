@@ -138,9 +138,12 @@ const CONFIRM_ERRORS = [
   {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The request or the Idempotency-Key is invalid (VALIDATION_ERROR), the report has types of event nobody sorted (USAGE_IMPORT.EVENT_TYPE_UNMAPPED), the holders of the first report were not told (TRACKING_NOTICE_REQUIRED), or the application became a communication service (USAGE_SOURCE.COMMUNICATION_APP).',
+      'The request or the Idempotency-Key is invalid (VALIDATION_ERROR), the report has types of event nobody sorted (USAGE_IMPORT.EVENT_TYPE_UNMAPPED), the holders of the first report were not told (TRACKING_NOTICE_REQUIRED), or the application of the source no longer allows an import: it does not exist (USAGE_SOURCE.APPLICATION_NOT_FOUND), is internal software (APPLICATION_INTERNAL), was retired (APPLICATION_RETIRED) or became a communication service (COMMUNICATION_APP).',
     examples: [
       VALIDATION_EXAMPLE,
+      USAGE_SOURCE_ERROR_EXAMPLES.APPLICATION_NOT_FOUND,
+      USAGE_SOURCE_ERROR_EXAMPLES.APPLICATION_INTERNAL,
+      USAGE_SOURCE_ERROR_EXAMPLES.APPLICATION_RETIRED,
       EXAMPLES.EVENT_TYPE_UNMAPPED,
       EXAMPLES.TRACKING_NOTICE_REQUIRED,
       USAGE_SOURCE_ERROR_EXAMPLES.COMMUNICATION_APP,

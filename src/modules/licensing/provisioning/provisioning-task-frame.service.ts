@@ -121,7 +121,7 @@ export class ProvisioningTaskFrame {
       organizationId,
       recipientEmployeeId: recipient,
       code: 'IT_ADMIN_SELF_EXECUTED',
-      subject: { type: 'ProvisioningTask', id: taskId },
+      subject: { type: 'PROVISIONING_TASK', id: taskId },
       params: { taskId, employeeId: itAdminEmployeeId },
       eventKey: `IT_ADMIN_SELF_EXECUTED:${taskId}`,
     });

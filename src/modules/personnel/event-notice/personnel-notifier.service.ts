@@ -17,8 +17,7 @@ export type PersonnelEventKind =
   | 'LONG_LEAVE_RETURNED'
   | 'DEPARTURE_RECORDED'
   | 'DEPARTURE_LAST_DAY_CHANGED'
-  | 'DEPARTURE_CANCELLED'
-  | 'DEPARTURE_MARKED_LEFT';
+  | 'DEPARTURE_CANCELLED';
 
 /** The events of a departure that the IT Admin in charge is told as well as the person and the heads: the block and the revocations follow them. */
 const IT_ADMIN_TOLD_OF: ReadonlySet<PersonnelEventKind> = new Set([

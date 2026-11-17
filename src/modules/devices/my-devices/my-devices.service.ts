@@ -42,6 +42,7 @@ export class MyDevicesService {
           acknowledgementState: state,
           acknowledgedVersionNumber: row.acknowledgedVersionNumber,
           signatureRecorded: row.signatureRecorded,
+          stopRequestPending: row.stopRequestPending,
           canAcknowledge: blockedReason === null,
           blockedReason,
         };

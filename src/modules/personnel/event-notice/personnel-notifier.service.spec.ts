@@ -337,9 +337,7 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
   });
 
   describe('the IT Admin who answers for the department is told when a departure is recorded, moved or cancelled (SPEC MF2-E)', () => {
-    const departure = (
-      eventKind: 'DEPARTURE_RECORDED' | 'DEPARTURE_LAST_DAY_CHANGED' | 'DEPARTURE_CANCELLED' | 'DEPARTURE_MARKED_LEFT',
-    ) => ({
+    const departure = (eventKind: 'DEPARTURE_RECORDED' | 'DEPARTURE_LAST_DAY_CHANGED' | 'DEPARTURE_CANCELLED') => ({
       organizationId: ORGANIZATION,
       employeeId: 'leaver',
       departmentId: 'd1',
@@ -360,11 +358,11 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
       },
     );
 
-    it('does not add them for the departure marked as left, nor for a transfer or a leave', async () => {
+    it('does not add them for a transfer or a leave', async () => {
       const { notifier, told } = notifierOf({ heads: { d1: 'head' }, itAdminOfDepartment: 'it1' });
 
-      await notifier.eventRecorded(TX, departure('DEPARTURE_MARKED_LEFT'));
       await notifier.eventRecorded(TX, { ...departure('DEPARTURE_RECORDED'), eventKind: 'TRANSFER_RECORDED' });
+      await notifier.eventRecorded(TX, { ...departure('DEPARTURE_RECORDED'), eventKind: 'LONG_LEAVE_STARTED' });
 
       expect(recipients(told, 'PERSONNEL_EVENT_RECORDED')).toEqual(['head', 'head', 'leaver', 'leaver']);
     });

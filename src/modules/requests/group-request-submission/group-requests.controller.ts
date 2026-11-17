@@ -104,7 +104,7 @@ export class GroupRequestsController {
     status: HttpStatus.CREATED,
     message: 'GROUP_REQUEST.SUBMITTED',
     description:
-      'One request for the people named, each a line with a state of its own, charged to the Unit Cost Center of the department of the sender on the day with one amount for all of them. A head who sends confirms the need of the others by sending, and the head named among them is decided by the person who decides a head’s own request; an Employee who sends has the people decided by the head of the department. Everything is written or nothing is.',
+      'One request for the people named, each a line with a state of its own, charged to the Unit Cost Center of the department of the sender on the day with one amount for all of them. A head who sends confirms the need of the others by sending; an Employee who sends has the people decided by the head of the department. The head of a department cannot be one of the people: that line is refused with the reason HEAD_IN_GROUP. Everything is written or nothing is.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -131,7 +131,7 @@ export class GroupRequestsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE); too many people are named (GROUP_REQUEST.TOO_MANY_LINES), fewer than two different people (GROUP_REQUEST.TOO_FEW_LINES, with min), a time of use the plan refuses (ACCESS_REQUEST.TERM_REQUIRED, TERM_MONTHS_OUT_OF_RANGE or TERM_NOT_ASKED) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER. Nothing is written.',
+        'The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE, with details.reason KIND_NOT_MULTI_SEAT for a plan that gives no account of its own to each person, NOT_PAID_SOFTWARE for internal software); too many people are named (GROUP_REQUEST.TOO_MANY_LINES), fewer than two different people (GROUP_REQUEST.TOO_FEW_LINES, with min), a time of use the plan refuses (ACCESS_REQUEST.TERM_REQUIRED, TERM_MONTHS_OUT_OF_RANGE or TERM_NOT_ASKED) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER, one that is a head of a department with the reason HEAD_IN_GROUP. Nothing is written.',
       examples: [
         VALIDATION_EXAMPLE,
         GROUP_REQUEST_ERROR_EXAMPLES.PLAN_NOT_ELIGIBLE,

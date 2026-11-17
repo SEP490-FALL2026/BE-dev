@@ -11,6 +11,7 @@ import { InboxService } from './inbox/inbox.service';
 import { NotificationsRepo } from './notifications.repo';
 import { EmailDeliveryApi } from './public/email-delivery.api';
 import { NotificationsApi } from './public/notifications.api';
+import { NotificationNameContributions } from './public/notifications.extension-points';
 import { PayloadCipher } from './email/payload-cipher.service';
 
 /** `id:base64` pairs separated by commas. */
@@ -38,6 +39,7 @@ function parsePreviousKeys(value: string): Record<string, string> {
     NotificationsApi,
     EmailDeliveryApi,
     EmailDispatcher,
+    NotificationNameContributions,
     { provide: MailTransport, useClass: SmtpMailTransport },
     {
       provide: PayloadCipher,
@@ -53,7 +55,8 @@ function parsePreviousKeys(value: string): Record<string, string> {
     },
   ],
   // The facade for the business modules, the delivery contract for the worker loop and the inbox for the routes of
-  // `NotificationsHttpModule` (the same context); the dispatcher stays private.
-  exports: [NotificationsApi, EmailDeliveryApi, InboxService],
+  // `NotificationsHttpModule` (the same context); the dispatcher stays private. The extension point the owners of names add to
+  // is provided here, not in the HTTP module, so their listeners resolve it in every graph.
+  exports: [NotificationsApi, EmailDeliveryApi, InboxService, NotificationNameContributions],
 })
 export class NotificationsModule {}

@@ -39,6 +39,28 @@ describe('QĐ-111an: the pricing of a subscription reads dong and no exchange ra
     await expect(service.readOriginal({ amount: '-4.00', currency: 'USD' })).rejects.toThrow(MoneyOutOfRangeError);
   });
 
+  it('names the field of the body in the money error it throws, and passes it to the finance facade', async () => {
+    await expect(service.read({ amount: '-1', currency: 'VND' })).rejects.toMatchObject({ path: 'unitPrice' });
+    await expect(service.readOriginal({ amount: '-4.00', currency: 'USD' })).rejects.toMatchObject({
+      path: 'originalPrice',
+    });
+    expect(parseMoney).toHaveBeenCalledWith(expect.anything(), 'unitPrice');
+    expect(parseMoney).toHaveBeenCalledWith(expect.anything(), 'originalPrice');
+  });
+
+  it('names the field where the caller says the price sits in its body, such as the new period of a renewal (FIX-E-R2)', async () => {
+    await expect(service.read({ amount: '-1', currency: 'VND' }, 'nextPeriod.unitPrice')).rejects.toMatchObject({
+      path: 'nextPeriod.unitPrice',
+    });
+    expect(parseMoney).toHaveBeenLastCalledWith(expect.anything(), 'nextPeriod.unitPrice');
+    await expect(
+      service.readOriginal({ amount: '-4.00', currency: 'USD' }, 'nextPeriod.originalPrice'),
+    ).rejects.toMatchObject({
+      path: 'nextPeriod.originalPrice',
+    });
+    expect(parseMoney).toHaveBeenLastCalledWith(expect.anything(), 'nextPeriod.originalPrice');
+  });
+
   it('records a price today with the snapshot of the same currency: rate 1, `SAME_CURRENCY`, the price as the reporting price, no rate row', async () => {
     const priced = await service.priceToday(tx, { amountMinor: 600000n, currency: 'VND' });
 

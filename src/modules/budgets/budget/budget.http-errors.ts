@@ -11,6 +11,7 @@ import { toUnavailableApiException } from '../../../infrastructure/http/errors/s
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { BudgetCommitmentExistsError, BudgetCommitmentNotHoldableError } from '../public/budgets.errors';
 import {
   BudgetCycleDeadlinesInvalidError,
   BudgetCycleExistsError,
@@ -22,8 +23,6 @@ import {
   BudgetCycleNotOpenError,
   BudgetCycleReasonRequiredError,
   BudgetCycleYearPastError,
-  BudgetCommitmentExistsError,
-  BudgetCommitmentNotHoldableError,
   BudgetCommitmentNotFoundError,
   BudgetCommitmentRefusedError,
   BudgetCostCenterNotFoundError,
@@ -116,7 +115,7 @@ export function toBudgetApiException(error: unknown): unknown {
   }
   // The department has no Cost Center in use yet (`QĐ-87d(1)`): Finance makes one first. Nothing was written (F27).
   if (error instanceof FinanceSetupIncompleteError) {
-    return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
+    return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message, { departmentId: error.departmentId });
   }
   if (error instanceof BudgetVersionAttachmentRequiredError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET_VERSION.ATTACHMENT_REQUIRED', error.message);
@@ -143,7 +142,12 @@ export function toBudgetApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.BASE_REASON_REQUIRED', error.message);
   }
   if (error instanceof BudgetCostCenterRequiredError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.COST_CENTER_REQUIRED', error.message);
+    return refuse(
+      HttpStatus.UNPROCESSABLE_ENTITY,
+      'BUDGET.COST_CENTER_REQUIRED',
+      error.message,
+      error.costCenterIds.length > 0 ? { costCenterIds: [...error.costCenterIds] } : undefined,
+    );
   }
   if (error instanceof BudgetNotYourCostCenterError) {
     return refuse(HttpStatus.FORBIDDEN, 'BUDGET.NOT_YOUR_COST_CENTER', error.message);
@@ -191,7 +195,12 @@ export function toBudgetApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `BUDGET.${error.what}_REASON_REQUIRED`, error.message);
   }
   if (error instanceof BudgetProposalOpenError) {
-    return refuse(HttpStatus.CONFLICT, 'BUDGET.PROPOSAL_ALREADY_OPEN', error.message);
+    return refuse(
+      HttpStatus.CONFLICT,
+      'BUDGET.PROPOSAL_ALREADY_OPEN',
+      error.message,
+      error.proposalId === null ? undefined : { proposalId: error.proposalId },
+    );
   }
   if (error instanceof BudgetProposalStateError) {
     return refuse(HttpStatus.CONFLICT, PROPOSAL_ACTIONS[error.action], error.message, { state: error.state });
@@ -200,10 +209,21 @@ export function toBudgetApiException(error: unknown): unknown {
     return refuse(HttpStatus.CONFLICT, 'BUDGET.VERSION_NOT_EDITABLE', error.message, { state: error.state });
   }
   if (error instanceof BudgetVersionInFlightError) {
-    return refuse(HttpStatus.CONFLICT, 'BUDGET.VERSION_IN_FLIGHT', error.message);
+    return refuse(
+      HttpStatus.CONFLICT,
+      'BUDGET.VERSION_IN_FLIGHT',
+      error.message,
+      error.versionId === null ? undefined : { versionId: error.versionId },
+    );
   }
-  if (error instanceof BudgetCurrentExistsError)
-    return refuse(HttpStatus.CONFLICT, 'BUDGET.CURRENT_EXISTS', error.message);
+  if (error instanceof BudgetCurrentExistsError) {
+    return refuse(
+      HttpStatus.CONFLICT,
+      'BUDGET.CURRENT_EXISTS',
+      error.message,
+      error.versionId === null ? undefined : { versionId: error.versionId },
+    );
+  }
   // A race between two writers of the same Cost Center and year is stopped by the partial unique indexes. The loser
   // answers exactly what the check before the write answers: one code, one message (Owner, Prompt 02, 26/10/2026).
   // A unique violation names the index (in the message of the driver) and, with the pg adapter, its columns. An index is recognised by
@@ -284,7 +304,7 @@ export const BUDGET_ERROR_EXAMPLES = {
   // Not shown in the routes: the year lock lets two writers of a Cost Center and year take the number one after the other.
   VERSION_NUMBER_TAKEN: example(new BudgetVersionNumberTakenError()),
   NOT_YOUR_COST_CENTER: example(new BudgetNotYourCostCenterError()),
-  COST_CENTER_REQUIRED: example(new BudgetCostCenterRequiredError()),
+  COST_CENTER_REQUIRED: example(new BudgetCostCenterRequiredError(['<cost-center-id>', '<cost-center-id>'])),
   OVER_ANNUAL_CEILING: example(new BudgetOverAnnualCeilingError(1n, 100n)),
   BASELINE_VERSION_NOT_ALLOWED: example(new BudgetBaselineVersionNotAllowedError('HAS_PROPOSAL')),
   CYCLE_CURRENCY_MISMATCH: example(new BudgetCycleCurrencyMismatchError('VND', 'USD')),
@@ -304,14 +324,16 @@ export const BUDGET_ERROR_EXAMPLES = {
   CURRENCY_NOT_REPORTING: example(new BudgetCurrencyError('USD', 'VND')),
   RESERVE_REASON_REQUIRED: example(new BudgetReasonRequiredError('RESERVE')),
   // Not shown yet: two writers at once answer the same code with the message given for the unique index above.
-  PROPOSAL_ALREADY_OPEN: example(new BudgetProposalOpenError()),
+  PROPOSAL_ALREADY_OPEN: example(new BudgetProposalOpenError('<proposal-id>')),
   PROPOSAL_CANNOT_WITHDRAW: example(new BudgetProposalStateError('WITHDRAW', 'REVIEWED')),
   PROPOSAL_CANNOT_RETURN: example(new BudgetProposalStateError('RETURN', 'REVIEWED')),
   PROPOSAL_CANNOT_RESUBMIT: example(new BudgetProposalStateError('RESUBMIT', 'SUBMITTED')),
   PROPOSAL_NOT_SUBMITTED: example(new BudgetProposalStateError('REVIEW', 'WITHDRAWN')),
   VERSION_NOT_EDITABLE: example(new BudgetVersionNotEditableError('SENT')),
-  VERSION_IN_FLIGHT: example(new BudgetVersionInFlightError()),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
-  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
-  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
+  VERSION_IN_FLIGHT: example(new BudgetVersionInFlightError('<version-id>')),
+  CURRENT_EXISTS: example(new BudgetCurrentExistsError('<version-id>')),
+  ADJUSTMENT_REASON_REQUIRED: example(new BudgetReasonRequiredError('ADJUSTMENT')),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'requestedAmount')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('requestedAmount')),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'requestedAmount')),
 } as const;

@@ -56,7 +56,7 @@ export const VENDOR_ERROR_EXAMPLES = {
   TAX_TYPE_DUPLICATE: example(new TaxProfileTaxTypeDuplicateError()),
   RATE_INVALID: example(new TaxProfileRateInvalidError('VAT')),
   TOO_MANY_LINES: example(new TaxProfileTooManyLinesError()),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
-  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
-  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'netAmount')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('netAmount')),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'netAmount')),
 } as const;

@@ -69,6 +69,9 @@ export function toLicensingApiException(error: unknown): unknown {
       UNPROCESSABLE,
       error.conflict === 'IDENTIFIER_IN_USE' ? 'LICENSE_ASSIGNMENT.IDENTIFIER_IN_USE' : 'LICENSE_ASSIGNMENT.OVERLAP',
       error.message,
+      error.conflictingAssignmentId === undefined
+        ? undefined
+        : { conflictingAssignmentId: error.conflictingAssignmentId },
     );
   }
 

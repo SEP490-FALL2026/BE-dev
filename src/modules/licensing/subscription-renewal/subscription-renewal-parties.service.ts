@@ -4,9 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { renewalDeciderOf } from './decision/renewal-decision.policy';
 import { renewalNamedItAdminOf } from './renewal-it-admin.policy';
-import type { DeciderRole } from './subscription-renewal.types';
 
 /** The people a renewal concerns, as they hold their roles now (an unlocked read unless a transaction is given). */
 export interface RenewalPeople {
@@ -20,11 +18,9 @@ export interface RenewalPeople {
 export type RenewalReadScope = { kind: 'ALL'; itAdmin: boolean } | { kind: 'DEPARTMENT'; departmentId: string };
 
 /**
- * Who a renewal concerns (`US-11-01`, `US-11-05`, `QĐ-94d`(2)): the IT Admin in charge of the department that owns the subscription
- * (any usable IT Admin while that department names none or theirs is not usable), Finance, the head of the owner department — who
- * confirms the proposal on the day of the decision, whatever role their account holds, and nobody in their place — and the Super
- * Admin. The person who decides spending is no longer among those who decide a renewal, but still hears of an incident
- * (`QĐ-98f`).
+ * Who a renewal concerns (`US-11-01`, `US-11-05`, `QĐ-103e`, `QĐ-104l`): the IT Admin who answers for the subscription (else the one in charge
+ * of the department that owns it, else any usable IT Admin), Finance, who is told of every result, and the person who decides spending, who
+ * hears of an incident only (`QĐ-99h`). Nobody confirms a renewal: the head of the owner department only reads the cases of their department.
  */
 @Injectable()
 export class RenewalPartiesService {
@@ -39,10 +35,13 @@ export class RenewalPartiesService {
    * department is read first and both named are tested in ONE read; the first usable IT Admin is read only when neither is usable.
    */
   async itAdminOf(
-    period: { ownerDepartmentId: string; responsibleItAdminEmployeeId: string | null },
+    period: { ownerDepartmentId: string | null; responsibleItAdminEmployeeId: string | null },
     tx?: DbTx,
   ): Promise<string | null> {
-    const inCharge = await this.organizationReads.getItAdminInChargeOfDepartment(period.ownerDepartmentId, tx);
+    const inCharge =
+      period.ownerDepartmentId === null
+        ? null
+        : await this.organizationReads.getItAdminInChargeOfDepartment(period.ownerDepartmentId, tx);
     const named = [...new Set([period.responsibleItAdminEmployeeId, inCharge].filter((id) => id !== null))];
     const usable = await this.identity.findUsableItAdminEmployeeIds(named, tx);
 
@@ -55,23 +54,23 @@ export class RenewalPartiesService {
     );
   }
 
-  /** The person assigned head of the department on `today`, or null: the department names none, or its head period has not begun. */
-  async ownerHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
-    return (
-      (await this.organizationReads.getDepartmentHeads([departmentId], today, tx)).get(departmentId)?.employeeId ?? null
-    );
-  }
+  /**
+   * Whether the IT Admin who records stands in for the one responsible for the subscription (`QĐ-104l`, `QĐ-58b`): the one responsible
+   * still works as an IT Admin and is someone else. Any IT Admin records; this only tells the audit trail and the notice who answers for it.
+   * `responsibleItAdminEmployeeId` is that person while they are usable, else null (nobody to tell, nobody replaced).
+   */
+  async substituteOf(
+    actor: Pick<AuthenticatedPrincipal, 'employeeId'>,
+    period: { responsibleItAdminEmployeeId: string | null },
+    tx?: DbTx,
+  ): Promise<{ substitute: boolean; responsibleItAdminEmployeeId: string | null }> {
+    const responsible = period.responsibleItAdminEmployeeId;
+    if (responsible === null) return { substitute: false, responsibleItAdminEmployeeId: null };
+    const usable = (await this.identity.findUsableItAdminEmployeeIds([responsible], tx)).has(responsible);
 
-  /** The heads of these departments on `today`, by department id (a department with none is absent): one read for a page. */
-  async ownerHeadsOf(departmentIds: readonly string[], today: BusinessDate, tx?: DbTx): Promise<Map<string, string>> {
-    const heads = await this.organizationReads.getDepartmentHeads([...new Set(departmentIds)], today, tx);
-
-    return new Map([...heads].map(([departmentId, head]) => [departmentId, head.employeeId]));
-  }
-
-  /** The Super Admin of today, whatever the state of their account, or null: who is told that a case waits for a head. */
-  async superAdminOf(tx?: DbTx): Promise<string | null> {
-    return (await this.identity.getSuperAdminHolder(tx))?.employeeId ?? null;
+    return usable
+      ? { substitute: responsible !== actor.employeeId, responsibleItAdminEmployeeId: responsible }
+      : { substitute: false, responsibleItAdminEmployeeId: null };
   }
 
   /** Finance, when they still work: who is told the result of a decision (`QĐ-94d`(2)). */
@@ -79,14 +78,9 @@ export class RenewalPartiesService {
     return this.identity.findUsableFinanceEmployeeId(tx);
   }
 
-  /** Who confirms a case proposed by this person now: the head of the owner department, and nobody in their place. */
-  async deciderOf(
-    ownerDepartmentId: string,
-    proposerEmployeeId: string,
-    today: BusinessDate,
-    tx?: DbTx,
-  ): Promise<{ employeeId: string | null; role: Extract<DeciderRole, 'OWNER_DEPARTMENT_HEAD'> }> {
-    return renewalDeciderOf(await this.ownerHeadOf(ownerDepartmentId, today, tx), proposerEmployeeId);
+  /** The person who decides spending, or null: who hears of an incident but of nothing else of a renewal (`QĐ-99h`). */
+  approverOf(tx?: DbTx): Promise<string | null> {
+    return this.identity.getSpendingApproverEmployeeId(tx);
   }
 
   /**
@@ -113,7 +107,7 @@ export class RenewalPartiesService {
 
   /** Everyone a milestone of the period may be sent to: the shared people and those of the period itself. */
   async peopleOf(
-    period: { ownerDepartmentId: string; responsibleItAdminEmployeeId: string | null },
+    period: { ownerDepartmentId: string | null; responsibleItAdminEmployeeId: string | null },
     shared: Pick<RenewalPeople, 'finance' | 'approver' | 'superAdmin'>,
   ): Promise<RenewalPeople> {
     return {

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import request from 'supertest';
 import { Client } from 'pg';
+import { ANNUAL_WINDOW_DAYS_MAX } from '../../../src/modules/catalog/subscription/subscription-windows.service';
 import { OperatingParametersApi } from '../../../src/modules/operating-parameters/public/operating-parameters.api';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
@@ -120,7 +121,11 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect(parameters.has('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS')).toBe(false);
       expect(parameters.has('HANDOVER_SHORT_DEADLINE_WORKING_DAYS')).toBe(false);
       expect(parameters.get('DETECTION_THRESHOLD_DAYS')?.value).toEqual([30, 60, 90]);
-      expect(parameters.get('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE')?.value).toEqual([15, 7]);
+      // The alerts of a subscription follow its point of adjustment now (S20-T9a): the list of days is gone, three parameters set the point (S20-T9b).
+      expect(parameters.has('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE')).toBe(false);
+      expect(parameters.get('SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY')).toMatchObject({ value: 7, isDefault: true });
+      expect(parameters.get('SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL')).toMatchObject({ value: 30, isDefault: true });
+      expect(parameters.get('SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL')).toMatchObject({ value: 7, isDefault: true });
       expect(parameters.get('RULE_SCHEDULE_G1_G2')?.value).toBe('DAILY');
       expect(parameters.get('RULE_SCHEDULE_G3_G4')?.value).toBe('WEEKLY');
       for (const parameter of parameters.values()) {
@@ -141,8 +146,6 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'RENEWAL_WINDOW_DAYS',
         'FORECAST_ERROR_THRESHOLD_PERCENT',
         'BUDGET_RESERVE_DEFAULT_PERCENT',
-        'BUDGET_ZBB_KPI3_BELOW_PERCENT',
-        'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
         'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
         'DEPARTURE_REVOCATION_WORKING_DAYS',
         'TRANSFER_GRACE_WORKING_DAYS',
@@ -153,7 +156,9 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'INVITATION_REMINDER_DAYS',
         'INVITATION_WITHDRAW_DAYS',
         'DOCUMENT_MAX_SIZE_MB',
-        'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
+        'SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY',
+        'SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL',
+        'SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL',
         'ACTIVITY_WINDOW_MINUTES',
         'DETECTION_THRESHOLD_DAYS',
         'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
@@ -163,6 +168,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'RULE_SCHEDULE_G3_G4',
         'AI_ENABLED',
         'AI_ACCESS_REQUEST_SUMMARY_ENABLED',
+        'AI_PROVIDER_MODE',
       ]);
       expect([...new Set(items.map((item) => item.group))]).toEqual([
         'WORKFLOW',
@@ -326,6 +332,41 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       });
     });
 
+    it('keeps the days of the point of adjustment within 1–28, 1–180 and 1–90, and a change reaches only the periods that begin after it (S20-T9b, FR-1.4, FR-8.2, QĐ-106h)', async () => {
+      const service = ctx.app.get(OperatingParametersApi);
+      const cases = [
+        ['SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY', 7, 28, 14],
+        ['SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL', 30, 180, 45],
+        ['SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL', 7, 90, 10],
+      ] as const;
+      const beforeAny = new Date(Date.now() - 60_000);
+
+      for (const [key, standard, max, chosen] of cases) {
+        for (const refused of [0, max + 1]) {
+          expect(errorOf(await setParameter(key, refused).expect(422)).details).toMatchObject({
+            key,
+            problem: 'OUT_OF_RANGE',
+          });
+        }
+        expect(errorOf(await setParameter(key, 7.5).expect(422)).details).toMatchObject({ problem: 'WRONG_TYPE' });
+        await setParameter(key, max).expect(200);
+        const atMax = new Date();
+        await setParameter(key, chosen).expect(200);
+        const [first, second, third] = await service.getValuesAt(key, [
+          beforeAny,
+          atMax,
+          new Date(Date.now() + 60_000),
+        ]);
+
+        // A period that began before the change keeps the value it began with; one that begins after reads the new one.
+        expect([first, second, third]).toEqual([standard, max, chosen]);
+        expect((await list()).get(key)).toMatchObject({ value: chosen, isDefault: false });
+      }
+      expect((await list()).get('SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL')?.constraints).toMatchObject({
+        max: ANNUAL_WINDOW_DAYS_MAX,
+      });
+    });
+
     it('keeps the backlog threshold between 1 and 500, records before and after, and answers what was in force at a moment (US-05-10 AC-1)', async () => {
       const service = ctx.app.get(OperatingParametersApi);
       const beforeAny = new Date(Date.now() - 60_000);
@@ -411,6 +452,84 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect(rows[0].valid_to).not.toBeNull();
     });
 
+    it('does not return the two thresholds of the zero-based-budget explanation, and the migration closes a stored value without deleting it (QĐ-111ab)', async () => {
+      await ctx.sql.query(
+        `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
+         VALUES (gen_random_uuid(), $1, 'BUDGET_ZBB_KPI3_BELOW_PERCENT', '60'::jsonb, now() - interval '1 day'),
+                (gen_random_uuid(), $1, 'BUDGET_ZBB_PRICE_INCREASE_PERCENT', '10'::jsonb, now() - interval '1 day')`,
+        [seed.organizationId],
+      );
+      const migration = readFileSync(
+        join(
+          __dirname,
+          '..',
+          '..',
+          '..',
+          'prisma',
+          'migrations',
+          '20261117100000_drop_zbb_parameters',
+          'migration.sql',
+        ),
+        'utf8',
+      );
+
+      await ctx.sql.query(migration);
+      await ctx.sql.query(migration);
+
+      const parameters = await list();
+      expect(parameters.has('BUDGET_ZBB_KPI3_BELOW_PERCENT')).toBe(false);
+      expect(parameters.has('BUDGET_ZBB_PRICE_INCREASE_PERCENT')).toBe(false);
+      const rows = (
+        await ctx.sql.query<{ valid_to: Date | null }>(
+          `SELECT valid_to FROM parameter_values WHERE key LIKE 'BUDGET_ZBB_%'`,
+        )
+      ).rows;
+      expect(rows).toHaveLength(2);
+      expect(rows.every((row) => row.valid_to !== null)).toBe(true);
+    });
+
+    it('starts the source of the AI answers at the simulation, lets the Super Admin choose the model with an audit, and takes nothing else', async () => {
+      const key = 'AI_PROVIDER_MODE';
+
+      expect((await list()).get(key)).toMatchObject({
+        value: 'SIMULATED',
+        default: 'SIMULATED',
+        isDefault: true,
+        label: 'Nguồn trả lời của AI',
+        group: 'AI',
+        groupLabel: 'Trợ lý AI',
+        unit: 'mode',
+        unitLabel: 'chế độ',
+        constraints: {
+          kind: 'enum',
+          options: ['SIMULATED', 'MODEL'],
+          optionLabels: { SIMULATED: 'Giả lập (không gọi model)', MODEL: 'Model AI' },
+        },
+      });
+
+      await setParameter(key, 'MODEL').expect(200);
+      expect((await list()).get(key)).toMatchObject({ value: 'MODEL', isDefault: false });
+      expect(await auditFor(key)).toEqual([
+        { action: 'PARAMETER.CHANGED', before: { value: 'SIMULATED' }, after: { value: 'MODEL' } },
+      ]);
+      await expect(ctx.app.get(OperatingParametersApi).getValue(key)).resolves.toBe('MODEL');
+      for (const refused of ['OPENAI', 'model', 'ON']) {
+        expect(errorOf(await setParameter(key, refused).expect(422)).details).toMatchObject({
+          key,
+          problem: 'OUT_OF_RANGE',
+        });
+      }
+      await setParameter(key, 'MODEL', as(it1)).expect(403);
+      expect((await list()).get(key)).toMatchObject({ value: 'MODEL' });
+
+      await setParameter(key, 'SIMULATED').expect(200);
+      expect((await list()).get(key)).toMatchObject({ value: 'SIMULATED' });
+      expect((await auditFor(key)).map((event) => [event.before, event.after])).toEqual([
+        [{ value: 'SIMULATED' }, { value: 'MODEL' }],
+        [{ value: 'MODEL' }, { value: 'SIMULATED' }],
+      ]);
+    });
+
     it('does not return, and does not fail on, a budget period kind stored before it was removed (AC-8)', async () => {
       await ctx.sql.query(
         `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
@@ -424,8 +543,11 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       // 27 before GH-1/2/3 and the renewal window (REQUEST_OPEN_NEW_LIMIT, PAID_SOFTWARE_FLAG_THRESHOLD, RENEWAL_WINDOW_DAYS), less the
       // threshold of GH-3 that went with it (PAID_SOFTWARE_FLAG_THRESHOLD, QĐ-111h), then the three of MF-2 and MF-3 (DEPARTURE_REVOCATION_WORKING_DAYS, TRANSFER_GRACE_WORKING_DAYS, TRANSFER_GRACE_REMINDER_WORKING_DAYS), less the
       // two of the handover that went (ABRUPT_DEPARTURE_HOLD_WORKING_DAYS, HANDOVER_SHORT_DEADLINE_WORKING_DAYS, QĐ-110g) and the deadline of the
-      // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p).
-      expect(parameters.size).toBe(29);
+      // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p), less the two ZBB thresholds that went with the
+      // zero-based-budget explanation of a line (QĐ-111ab) and the list of alert days before the deadline (RENEWAL_ALERT_DAYS_BEFORE_DEADLINE,
+      // S20-T9a), plus the three of the point of adjustment (S20-T9b),
+      // then AI_PROVIDER_MODE (QĐ-102f).
+      expect(parameters.size).toBe(30);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {

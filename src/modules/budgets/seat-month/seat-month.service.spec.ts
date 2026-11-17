@@ -3,6 +3,7 @@ import type { LicensingSeatMonthApi } from '../../licensing/public/licensing-sea
 import type { SeatOfMonth } from '../../licensing/public/licensing-seat-month.types';
 import type { SeatMonthSubscriptionService } from './seat-month-subscription.service';
 import type { SeatMonthRepo } from './seat-month.repo';
+import { SeatMonthChargeError } from './seat-month.errors';
 import { SeatMonthService } from './seat-month.service';
 
 const seatOn = (subscriptionId: string): SeatOfMonth => ({
@@ -67,7 +68,10 @@ describe('SeatMonthService.chargeEndedMonths (SM1-03)', () => {
   it('charges a month on request for every subscription again, and says it failed when one did, after it tried the others', async () => {
     const { service, charge, failing } = build({ failing: ['B'] });
 
-    await expect(service.chargeMonth('2026-01-01')).rejects.toThrow('deadlock on B');
+    const refused: unknown = await service.chargeMonth('2026-01-01').catch((error: unknown) => error);
+
+    expect(refused).toBeInstanceOf(SeatMonthChargeError);
+    expect(refused).toMatchObject({ message: 'deadlock on B', subscriptionIds: ['B'] });
     expect(charge.mock.calls.map((call) => call[1])).toEqual(['A', 'B', 'C']);
 
     failing.clear();

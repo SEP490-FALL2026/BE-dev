@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { fromDateColumn } from '../../../core/business-date';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { DevicesApi } from '../../devices/public/devices.api';
 import { DeviceNotFoundError } from '../../devices/public/devices.errors';
+import { UsageOverviewScopeService } from '../usage-overview/usage-overview-scope.service';
 import { AI_TOOL_EXPERIMENTAL } from '../allowlist/allowlist.policy';
 import { AiUsageRepo, type UsageDayRow } from './ai-usage.repo';
 
@@ -32,19 +34,28 @@ interface UsageQuery {
   pageSize: number;
 }
 
-/** What is read of the counted days of a machine: all of it by the IT Admin, only the registrations they held by the person. */
+/**
+ * What is read of the counted days of a machine: by the IT Admin the registrations held by the people of the departments they work (`QĐ-111ax`),
+ * by the person only the registrations they held.
+ */
 @Injectable()
 export class AiUsageQueryService {
   constructor(
     private readonly usage: AiUsageRepo,
     private readonly devices: DevicesApi,
+    private readonly scope: UsageOverviewScopeService,
   ) {}
 
-  /** Throws DeviceNotFoundError. */
-  async ofDevice(deviceId: string, query: UsageQuery) {
+  /**
+   * Throws DeviceNotFoundError. A machine none of whose registrations was held by a person of the scope of the IT Admin is an empty page, not
+   * an error (D8).
+   */
+  async ofDevice(actor: AuthenticatedPrincipal, deviceId: string, query: UsageQuery) {
     if (!(await this.devices.deviceExists(deviceId))) throw new DeviceNotFoundError();
+    const registrationIds = await this.scope.registrationIdsOfDevice(actor, deviceId);
+    if (registrationIds.length === 0) return { items: [], pagination: paginationOf(query.page, query.pageSize, 0) };
     const { rows, total } = await this.usage.page(
-      { deviceId, from: query.from, to: query.to },
+      { deviceId, registrationIds, from: query.from, to: query.to },
       (query.page - 1) * query.pageSize,
       query.pageSize,
     );

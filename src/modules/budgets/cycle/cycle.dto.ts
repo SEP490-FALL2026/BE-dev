@@ -77,7 +77,7 @@ const softwareView = z.strictObject({
   }),
   seatsAssigned: z.number().int().meta({
     description:
-      'The seats the people of the department hold, counted the way the warehouse counts them: a future start and a service account they answer for included.',
+      'The seats the people of the department hold, counted the way the warehouse counts them: a seat that starts later is included.',
   }),
   monthlyUnitPrice: moneyView.nullable(),
   monthsRunning: z.number().int().min(0).max(12),
@@ -100,7 +100,7 @@ const baselineDepartmentView = z.strictObject({
   costCenterId: z.uuid().nullable(),
   spentThisYear: moneyView.meta({
     description:
-      'The invoices recorded this year against every Cost Center the department ever had (the seat-months of K2 are not in it yet).',
+      'The invoices recorded this year, with the seat-months charged to them, against every Cost Center the department ever had.',
   }),
   carriedOverNextYear: moneyView.meta({
     description:
@@ -169,7 +169,7 @@ export const baselineSchema = z.strictObject({
     .meta({ description: 'The departments of the year; the first 500 by id are listed.' }),
   departments: z.array(baselineDepartmentView).max(500).meta({
     description:
-      'The departments of the year, by id: at most 500 are listed (the most a division of the ceiling names); departmentsTotal says how many there are.',
+      'The departments of the year, by id: at most 500 are listed; departmentsTotal says how many there are.',
   }),
   sharedPoolUnallocated: sharedPoolLineView.nullable().meta({
     description:
@@ -246,7 +246,7 @@ export const packageSchema = z.strictObject({
   departmentsTotal: z.number().int(),
   departments: z.array(packageDepartmentView).max(500).meta({
     description:
-      'The departments of the year, by id: at most 500 are listed (the most a division of the ceiling names); departmentsTotal says how many there are.',
+      'The departments of the year, by id: at most 500 are listed; departmentsTotal says how many there are.',
   }),
 });
 

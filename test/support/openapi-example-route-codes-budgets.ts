@@ -57,6 +57,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '422': ['BUDGET_REVIEW.MONTH_NOT_ENDED', 'BUDGET_REVIEW.NO_BUDGET_FOR_YEAR'],
     },
     budgetAdjustmentCreate: {
+      '404': ['BUDGET.COST_CENTER_NOT_FOUND'],
       '409': [
         'BUDGET_CYCLE.NOT_OPEN',
         'BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED',
@@ -65,6 +66,8 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
         'BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION',
       ],
       '422': [
+        'MONEY_OUT_OF_RANGE',
+        'MONEY_SCALE_EXCEEDED',
         'BUDGET.YEAR_ENDED',
         'BUDGET_ADJUSTMENT.INVALID_SHAPE',
         'BUDGET_ADJUSTMENT.OVER_UNALLOCATED',
@@ -75,6 +78,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       ],
     },
     budgetAdjustmentDecide: {
+      '403': ['BUDGET.CONFLICT_OF_INTEREST', 'BUDGET.NOT_SPENDING_APPROVER'],
       '404': ['BUDGET_ADJUSTMENT.NOT_FOUND'],
       '409': [
         'BUDGET_ADJUSTMENT.ALREADY_DECIDED',
@@ -85,6 +89,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
         'BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION',
       ],
       '422': [
+        'BUDGET.ADJUSTMENT_REASON_REQUIRED',
         'BUDGET.YEAR_ENDED',
         'BUDGET_ADJUSTMENT.OVER_UNALLOCATED',
         'BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR',
@@ -97,9 +102,10 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '404': ['BUDGET_REVIEW.NOT_FOUND'],
     },
     budgetReviewLineExplain: {
+      '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
       '404': ['BUDGET_REVIEW.LINE_NOT_FOUND', 'BUDGET_REVIEW.NOT_FOUND'],
       '409': ['BUDGET_REVIEW.NOT_AWAITING_EXPLANATIONS'],
-      '422': ['BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED'],
+      '422': ['BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED', 'MONEY_OUT_OF_RANGE', 'MONEY_SCALE_EXCEEDED'],
     },
     budgetReviewPeriodSign: {
       '404': ['BUDGET_REVIEW.NOT_FOUND'],
@@ -216,6 +222,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '404': ['BUDGET.COST_CENTER_NOT_FOUND', 'BUDGET.PROPOSAL_NOT_FOUND'],
       '409': [
         'BUDGET.BASELINE_VERSION_NOT_ALLOWED',
+        'BUDGET.CURRENT_EXISTS',
         'BUDGET.PROPOSAL_NOT_SUBMITTED',
         'BUDGET.VERSION_IN_FLIGHT',
         'FINANCE.SETUP_INCOMPLETE',

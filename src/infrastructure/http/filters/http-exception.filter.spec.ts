@@ -1,6 +1,7 @@
 import { ArgumentsHost, BadRequestException, HttpStatus, InternalServerErrorException } from '@nestjs/common';
 import { createRequire } from 'node:module';
 import { brotliDecompressSync, gunzipSync, gzipSync } from 'node:zlib';
+import { TransientDatabaseError } from '../../database/transaction-runner';
 import { ApiException } from '../errors/api.exception';
 import { RequestContextService } from '../../observability/request-context.service';
 import { HttpExceptionFilter } from './http-exception.filter';
@@ -100,6 +101,62 @@ describe('HttpExceptionFilter', () => {
 
   it('always carries a request id', () => {
     expect(captureResponse(filter, new Error('boom')).body.error.requestId).toEqual(expect.stringMatching(/\S/));
+  });
+
+  describe('a dependency outage on a route without a mapper (FX-T2)', () => {
+    const outage = () =>
+      new TransientDatabaseError('40P01', Object.assign(new Error('deadlock detected'), { code: '40P01' }));
+
+    it('answers a TransientDatabaseError with 503 SERVICE_UNAVAILABLE', () => {
+      const captured = captureResponse(filter, outage());
+
+      expect(captured.status).toBe(503);
+      expect(captured.body.error.code).toBe('SERVICE_UNAVAILABLE');
+      expect(captured.body.error.requestId).toEqual(expect.stringMatching(/\S/));
+    });
+
+    it('logs a warning with the request id and the cause before answering 503', () => {
+      const warned = jest.spyOn(filter['logger'], 'warn').mockImplementation(() => undefined);
+      const errored = jest.spyOn(filter['logger'], 'error');
+
+      const captured = captureResponse(filter, outage());
+
+      expect(warned).toHaveBeenCalledTimes(1);
+      const line = String(warned.mock.calls[0][0]);
+      expect(line).toContain(`requestId=${captured.body.error.requestId}`);
+      expect(line).toContain('TransientDatabaseError');
+      expect(line).toContain('sqlState=40P01');
+      expect(line).toContain('retryable=true');
+      expect(errored).not.toHaveBeenCalled();
+    });
+
+    it('keeps any other Error a 500 INTERNAL_SERVER_ERROR and logs it as before', () => {
+      const warned = jest.spyOn(filter['logger'], 'warn').mockImplementation(() => undefined);
+      const errored = jest.spyOn(filter['logger'], 'error');
+
+      const captured = captureResponse(filter, new Error('x'));
+
+      expect(captured.status).toBe(500);
+      expect(captured.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+      expect(errored).toHaveBeenCalledTimes(1);
+      expect(warned).not.toHaveBeenCalled();
+    });
+
+    it('lets an ApiException and an HttpException through unchanged, with no warning', () => {
+      const warned = jest.spyOn(filter['logger'], 'warn').mockImplementation(() => undefined);
+
+      const api = captureResponse(
+        filter,
+        new ApiException(HttpStatus.SERVICE_UNAVAILABLE, { code: 'X.Y', message: 'deliberate' }),
+      );
+      const http = captureResponse(filter, new BadRequestException());
+
+      expect(api.status).toBe(503);
+      expect(api.body.error).toMatchObject({ code: 'X.Y', message: 'deliberate' });
+      expect(http.status).toBe(400);
+      expect(http.body.error.code).toBe('HTTP_BAD_REQUEST');
+      expect(warned).not.toHaveBeenCalled();
+    });
   });
 
   describe('refusals of the request parsers (P29-N1, P29-N2)', () => {

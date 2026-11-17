@@ -89,7 +89,7 @@ describe('the inbox alert that a right is about to end (integration, real Postgr
       await request(h.server()).get('/api/v1/notifications?pageSize=50').set(h.as(member.account)).expect(200),
     ).items;
     expect(own.filter((notice) => notice.code === 'LICENSE_EXPIRY_REMINDER')).toEqual([
-      expect.objectContaining({ subject: { type: 'LicenseAssignment', id: assignmentId }, readAt: null }),
+      expect.objectContaining({ subject: { type: 'LICENSE_ASSIGNMENT', id: assignmentId }, readAt: null }),
     ]);
 
     // The same pass, and the pass of the next day, write nothing more.

@@ -47,7 +47,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   GRANT_TASK_CANCELLED: ['requestId', 'taskId'],
   // The reminders of a late step and of the queue of the head, and the alert of a backlog (`g5-step-sla-and-alerts`): ids, the kind
   // of step, how many reminders, how old and how late in working days, and the cause when the Super Admin is told. No figure of money.
-  STEP_SLA_REMINDER: [...STEP, ...REMINDER_NUMBERS],
+  STEP_SLA_REMINDER: [...STEP, ...REMINDER_NUMBERS, 'recipientRole'],
   STEP_SLA_ESCALATION: [...STEP, ...REMINDER_NUMBERS, 'holderEmployeeId'],
   STEP_SLA_NO_SUPERIOR: [...STEP, ...REMINDER_NUMBERS, 'holderEmployeeId', 'cause'],
   SPEND_QUEUE_REMINDER: ['requestId', ...REMINDER_NUMBERS, 'cause'],
@@ -154,22 +154,41 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   REVOCATION_CANCELLED: ['planId', 'applicationId', 'source'],
   // The renewal of a subscription: ids, the milestone and where it comes from, the choice and when it is carried out. The
   // usage of the seats is only said to be available or not; no figure of money, no person but the recipient.
+  // The point of adjustment (`SBF-20` §4.5): `baseDate` is the deadline of the period, `renewalOn` the day the next one begins, `commitment` MONTHLY or ANNUAL;
+  // `renewalId` is null. The keys from `milestoneDays` on belong to the old milestones, kept so a notice already stored is still read.
   SUBSCRIPTION_RENEWAL_ALERT: [
     'subscriptionId',
     'renewalId',
-    'milestoneDays',
     'baseDate',
+    'renewalOn',
+    'seatsNeeded',
+    'commitment',
+    'milestoneDays',
     'noticeBasis',
     'audience',
     'decisionRecorded',
     'outcomeRecorded',
     'usageData',
   ],
+  // The red alert of a plan by the year with no outcome near its deadline, and the seats a plan by the month keeps when nothing was recorded before its payment day (`QĐ-103e`).
+  SUBSCRIPTION_RENEWAL_RED_ALERT: ['subscriptionId', 'baseDate', 'renewalOn', 'seatsNeeded'],
+  SUBSCRIPTION_RENEWAL_KEPT: ['subscriptionId', 'renewalOn', 'purchasedQuantity', 'seatsNeeded'],
   SUBSCRIPTION_RENEWAL_DATA_QUALITY: ['subscriptionId', 'problem'],
   SUBSCRIPTION_RENEWAL_PROPOSED: ['renewalId', 'subscriptionId', 'choice'],
   SUBSCRIPTION_RENEWAL_DECIDED: ['renewalId', 'subscriptionId', 'choice', 'executionPoint'],
   SUBSCRIPTION_RENEWAL_LATE: ['renewalId', 'subscriptionId', 'baseDate'],
-  SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate'],
+  // The result of the adjustment of a subscription (`SBF-20` §13): what the IT Admin chose and the vendor did, the seats and the new period; no figure of money.
+  SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED: [
+    'renewalId',
+    'subscriptionId',
+    'choice',
+    'quantity',
+    'outcome',
+    'nextSubscriptionId',
+    'substitute',
+  ],
+  // `renewalId` is the case that chose a smaller period when the vendor renewed more (`QĐ-106i`(4)); null when the sweep found it.
+  SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate', 'renewalId'],
   SUBSCRIPTION_EXPIRY_MARKED: ['subscriptionId', 'baseDate', 'endDate'],
   // What the person is told before the usage of an application they hold is written (`US-08-05` AC-2): the application by id (the interface turns it into a name), what counts as activity,
   // the kinds of data, why, how long the usage is kept, and where to read it. Words and one number; never a name or a figure of money.
@@ -210,6 +229,18 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   DEPARTURE_REVOCATION_IT_CLOSE: ['caseId', 'employeeId', 'taskCount'],
   // A new version of a policy: which policy, which version, and whether the reader is asked to acknowledge it (`QĐ-111bi`).
   POLICY_PUBLISHED: ['policyCode', 'versionNumber', 'requiresReacknowledgement'],
+  // A batch of spend requests sent to the spending approver: which batch, from which department, and how many steps it opened for them (`FR-3.21`).
+  SPEND_BATCH_SUBMITTED: ['batchId', 'departmentId', 'sentCount'],
+  // The reports of errors in SaaS rights (`FR-2.15`): ids, the code of the report and the words of its kind and states. Never what the reporter or the IT Admin wrote, because the head of the department does not read it.
+  SAAS_ISSUE_SUBMITTED: ['issueId', 'issueCode', 'category', 'impact', 'applicationId'],
+  SAAS_ISSUE_RESPONSE_OVERDUE: ['issueId', 'issueCode', 'responseDueOn'],
+  SAAS_ISSUE_STATE_CHANGED: ['issueId', 'issueCode', 'fromState', 'toState', 'trigger'],
+  // A case outside the process closed as a report only, and a difference with a vendor opened (`SBF-07a`, `SBF-08`): ids and the source, never the account's identifier or what it did.
+  OUT_OF_PROCESS_CASE_REPORTED: ['caseId', 'applicationId', 'vendorId', 'employeeId'],
+  VENDOR_ACCOUNT_DISCREPANCY_OPENED: ['applicationId', 'vendorId', 'source', 'newCount'],
+  // A holder asked to stop the collection of a machine (`US-09-04`, E1): ids, the deadline and its day in the time of the company; never what the machine collected.
+  DEVICE_STOP_REQUESTED: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
+  DEVICE_STOP_REQUEST_OVERDUE: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
 };
 
 /** Whether the code is one of the closed table. */

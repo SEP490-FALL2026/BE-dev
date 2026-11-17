@@ -90,6 +90,14 @@ export const ROUTE_ERROR_CODES_DEVICES: Readonly<Record<string, Partial<Record<R
     monitoringNoticeVersionCreate: {
       '422': ['MONITORING_NOTICE.REACKNOWLEDGEMENT_REQUIRED'],
     },
+    deviceStopRequestComplete: {
+      '404': ['DEVICE_STOP_REQUEST.NOT_FOUND'],
+      '409': ['DEVICE_STOP_REQUEST.NOT_OPEN'],
+    },
+    myDeviceStopRequestCreate: {
+      '404': ['DEVICE_REGISTRATION.NOT_FOUND'],
+      '409': ['DEVICE_REGISTRATION.ENDED'],
+    },
     myDeviceAcknowledgementCreate: {
       '404': ['DEVICE_REGISTRATION.NOT_FOUND'],
       '409': [

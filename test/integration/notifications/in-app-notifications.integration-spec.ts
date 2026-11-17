@@ -332,4 +332,189 @@ describe('the inbox of the application over PostgreSQL (FR-3.11, US-05-15 AC-7, 
       expect(dataStatements(many.statements)).toHaveLength(dataStatements(few.statements).length);
     });
   });
+  describe('the words of a notice and the screen it opens (SPEC-5B A2, A5, A6)', () => {
+    const asEnglish = (account: typeof alice.account) =>
+      request(h.server()).get('/api/v1/notifications').set(h.as(account)).set('Accept-Language', 'en-US,en;q=0.9');
+    const nameOfEmployee = async (employeeId: string) =>
+      (await h.ctx.sql.query<{ name: string }>('SELECT full_name AS name FROM employees WHERE id = $1', [employeeId]))
+        .rows[0].name;
+
+    it('says the real name of the request and of the employee in the language asked, vi without a header', async () => {
+      const grace = await h.staff(await h.departmentWithUnit('P-WORDS1'), 'INB-W1');
+      const proposal = await h.proposed(grace);
+      await give(
+        notice(grace.employeeId, {
+          subject: { type: 'ACCESS_REQUEST', id: proposal.id },
+          params: { requestId: proposal.id, accessGuide: 'LOGIN_WITH_WORK_ACCOUNT', homepageUrl: null },
+        }),
+      );
+      await give(
+        notice(grace.employeeId, {
+          code: 'EMPLOYEE_PROFILE_UPDATED',
+          subject: { type: 'EMPLOYEE', id: grace.employeeId },
+          params: { employeeId: grace.employeeId, departmentId: null },
+        }),
+      );
+
+      const vi = (await list(grace.account)).items;
+      const en = h.dataOf<{ items: NoticeWire[] }>(await asEnglish(grace.account).expect(200)).items;
+
+      const granted = vi.find((item) => item.code === 'REQUEST_GRANTED');
+      const profile = vi.find((item) => item.code === 'EMPLOYEE_PROFILE_UPDATED');
+      expect(granted).toMatchObject({ title: 'Đã cấp quyền' });
+      expect(granted?.message).toContain('Miro');
+      expect(granted?.target).toEqual({ operationId: 'accessRequestGet', pathParams: { id: proposal.id } });
+      // The employee reads the sentence written for them, not their own name (R-3).
+      expect(profile?.message).toBe('Hồ sơ của bạn vừa được cập nhật thông tin chính thức.');
+      // The employee does not read the directory (the Super Admin does): they are sent to their own profile.
+      expect(profile?.target).toEqual({ operationId: 'meGet', pathParams: {} });
+      const grantedEn = en.find((item) => item.code === 'REQUEST_GRANTED');
+      expect(grantedEn).toMatchObject({ title: 'Access granted' });
+      expect(grantedEn?.message).toContain('Miro');
+      expect(en.find((item) => item.code === 'EMPLOYEE_PROFILE_UPDATED')?.message).toBe(
+        "Your profile's official details were just updated.",
+      );
+      const unknown = await h.inbox(grace.account).set('Accept-Language', 'de, fr;q=0.5').expect(200);
+      expect(h.dataOf<{ items: NoticeWire[] }>(unknown).items.map((item) => item.title)).toContain('Đã cấp quyền');
+    });
+
+    it('says the name of the employee to the head who is told, and "your profile" only to the employee (R-3)', async () => {
+      const department = await h.departmentWithUnit('P-WORDS9');
+      const employee = await h.staff(department, 'INB-W8');
+      const head = await h.staff(department, 'INB-W9');
+      const about = (recipientEmployeeId: string) =>
+        notice(recipientEmployeeId, {
+          code: 'EMPLOYEE_PROFILE_UPDATED',
+          subject: { type: 'EMPLOYEE', id: employee.employeeId },
+          params: { employeeId: employee.employeeId, departmentId: null },
+        });
+      await give(about(employee.employeeId));
+      await give(about(head.employeeId));
+      const employeeName = await nameOfEmployee(employee.employeeId);
+
+      const ofEmployee = (await list(employee.account)).items[0];
+      const ofHead = (await list(head.account)).items[0];
+      const ofHeadEn = h.dataOf<{ items: NoticeWire[] }>(await asEnglish(head.account).expect(200)).items[0];
+
+      expect(ofEmployee.message).toBe('Hồ sơ của bạn vừa được cập nhật thông tin chính thức.');
+      expect(ofHead.message).toContain(employeeName);
+      expect(ofHead.message).not.toContain('của bạn');
+      expect(ofHeadEn.message).toContain(employeeName);
+      // The words change, the stored params do not.
+      expect(ofEmployee.params).toEqual(ofHead.params);
+    });
+
+    it('opens a route the reader may read: the head is not sent to the cycle, the version or the case that only Finance or the Super Admin read (F1)', async () => {
+      const department = await h.departmentWithUnit('P-WORDS8');
+      const head = await h.staff(department, 'INB-F1H');
+      await h.makeHead(department, head);
+      const employee = await h.staff(department, 'INB-F1E');
+      const cycle = randomUUID();
+      const version = randomUUID();
+      const departure = randomUUID();
+      const event = (recipient: string, subject: { type: string; id: string }, code: string, params: object) =>
+        notice(recipient, { code: code as InAppNotificationInput['code'], subject, params: params as never });
+      await give(
+        event(head.employeeId, { type: 'BUDGET_CYCLE', id: cycle }, 'BUDGET_CYCLE_OPENED', {
+          cycleId: cycle,
+          year: 2031,
+        }),
+      );
+      await give(
+        event(head.employeeId, { type: 'BUDGET_VERSION', id: version }, 'BUDGET_VERSION_DECIDED', {
+          versionId: version,
+        }),
+      );
+      const left = { employeeId: employee.employeeId, departmentId: department.id, eventKind: 'DEPARTURE_RECORDED' };
+      await give(event(head.employeeId, { type: 'OFFBOARDING_CASE', id: departure }, 'PERSONNEL_EVENT_RECORDED', left));
+      await give(
+        event(employee.employeeId, { type: 'OFFBOARDING_CASE', id: departure }, 'PERSONNEL_EVENT_RECORDED', left),
+      );
+
+      const ofHead = (await list(head.account)).items;
+      const ofEmployee = (await list(employee.account)).items;
+
+      const targetOf = (items: NoticeWire[], code: string) => items.find((item) => item.code === code)?.target;
+      expect(targetOf(ofHead, 'BUDGET_CYCLE_OPENED')).toEqual({ operationId: 'budgetMine', pathParams: {} });
+      expect(targetOf(ofHead, 'BUDGET_VERSION_DECIDED')).toEqual({
+        operationId: 'budgetMineVersionList',
+        pathParams: {},
+      });
+      expect(targetOf(ofHead, 'PERSONNEL_EVENT_RECORDED')).toBeNull();
+      expect(targetOf(ofEmployee, 'PERSONNEL_EVENT_RECORDED')).toEqual({
+        operationId: 'meDepartureNoticeGet',
+        pathParams: {},
+      });
+    });
+
+    it('uses the generic phrase for an id that does not exist, and still answers 200', async () => {
+      const hana = await h.staff(await h.departmentWithUnit('P-WORDS2'), 'INB-W2');
+      await give(notice(hana.employeeId));
+
+      const vi = (await list(hana.account)).items[0];
+      const en = h.dataOf<{ items: NoticeWire[] }>(await asEnglish(hana.account).expect(200)).items[0];
+
+      expect(vi.message).toContain('(không rõ tên)');
+      expect(en.message).toContain('(unnamed)');
+    });
+
+    it('keeps the six old fields as they are stored, and reads the old spelling of a subject type in UPPER_SNAKE', async () => {
+      const ivan = await h.staff(await h.departmentWithUnit('P-WORDS3'), 'INB-W3');
+      const assignmentId = randomUUID();
+      await h.ctx.sql.query(
+        `INSERT INTO in_app_notifications (id, organization_id, recipient_employee_id, code, subject_type, subject_id, params, event_key)
+         VALUES (gen_random_uuid(), $1, $2, 'LICENSE_EXPIRY_REMINDER', 'LicenseAssignment', $3, $4::jsonb, $5)`,
+        [
+          h.seed.organizationId,
+          ivan.employeeId,
+          assignmentId,
+          JSON.stringify({ assignmentId, audience: 'EMPLOYEE' }),
+          randomUUID(),
+        ],
+      );
+      const stored = (await h.noticesOf(ivan.employeeId))[0];
+
+      const [item] = (await list(ivan.account)).items;
+
+      expect(item).toMatchObject({
+        id: stored.id,
+        code: 'LICENSE_EXPIRY_REMINDER',
+        subject: { type: 'LICENSE_ASSIGNMENT', id: assignmentId },
+        params: { assignmentId, audience: 'EMPLOYEE' },
+        createdAt: stored.created_at.toISOString(),
+        readAt: null,
+      });
+      expect(item.title.length).toBeGreaterThan(0);
+      expect(Object.keys(item).sort()).toEqual(
+        ['code', 'createdAt', 'id', 'message', 'params', 'readAt', 'subject', 'target', 'title'].sort(),
+      );
+    });
+
+    it('answers the three new fields when one notice is marked as read, in the language asked', async () => {
+      const jane = await h.staff(await h.departmentWithUnit('P-WORDS4'), 'INB-W4');
+      const proposal = await h.proposed(jane);
+      await give(
+        notice(jane.employeeId, {
+          subject: { type: 'ACCESS_REQUEST', id: proposal.id },
+          params: { requestId: proposal.id, accessGuide: 'LOGIN_WITH_WORK_ACCOUNT', homepageUrl: null },
+        }),
+      );
+      const [one] = (await list(jane.account)).items;
+
+      const marked = h.dataOf<{ notification: NoticeWire }>(
+        await h.markRead(one.id, jane.account).set('Accept-Language', 'en').expect(200),
+      ).notification;
+
+      expect(marked).toMatchObject({
+        id: one.id,
+        code: one.code,
+        subject: one.subject,
+        params: one.params,
+        title: 'Access granted',
+        target: { operationId: 'accessRequestGet', pathParams: { id: proposal.id } },
+      });
+      expect(marked.message).toContain('Miro');
+      expect(marked.readAt).not.toBeNull();
+    });
+  });
 });

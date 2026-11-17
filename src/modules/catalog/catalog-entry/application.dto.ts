@@ -127,11 +127,8 @@ export class ApplicationPageResponseDto extends createZodDto(
       }),
       emptyState: z
         .strictObject({
-          reason: z.enum(['NO_APPLICATIONS', 'NO_SUBSCRIPTIONS']),
-          nextStep: z.strictObject({
-            step: z.number().int().min(2).max(3),
-            key: z.enum(['APPLICATIONS', 'CONTRACTS_AND_SUBSCRIPTIONS']),
-          }),
+          reason: z.literal('NO_APPLICATIONS'),
+          nextStep: z.strictObject({ step: z.literal(2), key: z.literal('APPLICATIONS') }),
         })
         .nullable(),
     }),

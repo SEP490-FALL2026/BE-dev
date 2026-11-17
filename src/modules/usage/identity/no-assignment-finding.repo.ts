@@ -82,11 +82,17 @@ export class NoAssignmentFindingRepo {
 
   async page(filter: {
     applicationId?: string;
+    /** Only the findings of these people (the ones the reader may read). */
+    employeeIds: readonly string[];
     status: 'OPEN' | 'CLOSED';
     skip: number;
     take: number;
   }): Promise<{ items: FindingRecord[]; total: number }> {
-    const where = { status: filter.status, ...(filter.applicationId ? { applicationId: filter.applicationId } : {}) };
+    const where = {
+      status: filter.status,
+      employeeId: { in: [...filter.employeeIds] },
+      ...(filter.applicationId ? { applicationId: filter.applicationId } : {}),
+    };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.usageNoAssignmentFinding.findMany({
         where,

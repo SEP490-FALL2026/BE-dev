@@ -235,6 +235,13 @@ export class VendorAccountReviewRepo {
     return toCase(row);
   }
 
+  /** The person the difference is about; null when it names none (an identifier nobody owns, an invoice, a tool of the collector). */
+  async employeeIdOfDiscrepancy(tx: DbTx, id: string): Promise<string | null> {
+    const row = await tx.vendorAccountDiscrepancy.findUnique({ where: { id }, select: { employeeId: true } });
+
+    return row?.employeeId ?? null;
+  }
+
   /** The person each of the cases is about, from the difference it came from; null where the difference names none (an identifier nobody owns). One statement. */
   async employeeIdsOfCases(caseIds: readonly string[]): Promise<Map<string, string | null>> {
     if (caseIds.length === 0) return new Map();

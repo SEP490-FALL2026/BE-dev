@@ -3,6 +3,8 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { DEVICE_CREDENTIAL_VERIFIER } from '../../infrastructure/security/tokens/device-credential-verifier.port';
 import { AcknowledgementController } from './acknowledgement/acknowledgement.controller';
@@ -33,6 +35,14 @@ import { RegistryRepo } from './registry/registry.repo';
 import { RegistryService } from './registry/registry.service';
 import { SignatureRecordController } from './registry/signature-record.controller';
 import { SignatureRecordService } from './registry/signature-record.service';
+import { StopRequestController } from './stop-request/stop-request.controller';
+import { StopRequestSweeper } from './stop-request/stop-request.job';
+import { StopRequestRepo } from './stop-request/stop-request.repo';
+import { StopRequestService } from './stop-request/stop-request.service';
+import { StopRequestCompletionService } from './stop-request/stop-request-completion.service';
+import { StopRequestNotifier } from './stop-request/stop-request-notifier.service';
+import { StopRequestQueryService } from './stop-request/stop-request-query.service';
+import { StopRequestSweepService } from './stop-request/stop-request-sweep.service';
 
 /**
  * The register of company machines that one person uses each (`G7`): who holds which machine, the notice about what is collected,
@@ -40,7 +50,15 @@ import { SignatureRecordService } from './registry/signature-record.service';
  * facade `DevicesApi`, which `personnel` calls when a person leaves.
  */
 @Module({
-  imports: [DatabaseModule, AuditModule, OrganizationModule, CatalogModule, IdentityAccessFacadeModule],
+  imports: [
+    DatabaseModule,
+    AuditModule,
+    OrganizationModule,
+    OperatingParametersModule,
+    CatalogModule,
+    IdentityAccessFacadeModule,
+    NotificationsModule,
+  ],
   controllers: [
     NoticeController,
     RegistryController,
@@ -50,6 +68,7 @@ import { SignatureRecordService } from './registry/signature-record.service';
     CredentialController,
     DeviceEnrollmentController,
     DeviceSessionController,
+    StopRequestController,
   ],
   providers: [
     NoticeRepo,
@@ -62,6 +81,13 @@ import { SignatureRecordService } from './registry/signature-record.service';
     SignatureRecordService,
     AcknowledgementRepo,
     AcknowledgementService,
+    StopRequestRepo,
+    StopRequestService,
+    StopRequestCompletionService,
+    StopRequestQueryService,
+    StopRequestNotifier,
+    StopRequestSweepService,
+    StopRequestSweeper,
     MyDevicesRepo,
     MyDevicesService,
     CredentialRepo,

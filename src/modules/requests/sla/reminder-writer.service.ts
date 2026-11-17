@@ -79,6 +79,7 @@ export class ReminderWriter {
             holderEmployeeId: input.holderEmployeeId,
           },
           recipient.cause,
+          recipient.role,
         ),
         eventKey: `SLA:${reminderId}`,
       });

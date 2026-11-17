@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { DevicesApi } from '../../devices/public/devices.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 
@@ -26,6 +27,7 @@ export class UsageOverviewScopeService {
   constructor(
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
+    private readonly devices: DevicesApi,
   ) {}
 
   /** The departments the IT Admin reads. */
@@ -70,6 +72,25 @@ export class UsageOverviewScopeService {
     today: BusinessDate,
   ): Promise<ScopedEmployee | null> {
     return this.employeeIn(employeeId, await this.scopeOf(actor), today);
+  }
+
+  /**
+   * The registrations of a machine, ended ones too, held by a person the IT Admin reads: the days a collector counted on a machine are the usage
+   * of whoever held it that day, so a machine that changed hands shows each IT Admin only the registrations of the people of their departments.
+   * Empty when none is (the caller answers an empty page, D8).
+   */
+  async registrationIdsOfDevice(actor: AuthenticatedPrincipal, deviceId: string): Promise<string[]> {
+    const registrations = await this.devices.registrationsOfDevice(deviceId);
+    if (registrations.length === 0) return [];
+    const today = await this.organizationReads.businessToday();
+    const inScope = new Map<string, boolean>();
+    for (const { holderEmployeeId } of registrations) {
+      if (!inScope.has(holderEmployeeId)) {
+        inScope.set(holderEmployeeId, (await this.employeeInScope(actor, holderEmployeeId, today)) !== null);
+      }
+    }
+
+    return registrations.filter(({ holderEmployeeId }) => inScope.get(holderEmployeeId)).map(({ id }) => id);
   }
 
   private async employeeIn(

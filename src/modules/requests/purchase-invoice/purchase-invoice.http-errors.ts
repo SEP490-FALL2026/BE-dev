@@ -55,7 +55,7 @@ export const PURCHASE_INVOICE_ERROR_EXAMPLES = {
   SAME_PERSON: example(new PurchaseInvoiceRefusedError('SAME_PERSON')),
   NOT_SUBMITTED: example(new PurchaseInvoiceRefusedError('NOT_SUBMITTED')),
   NO_PLACE: example(new PurchaseInvoiceRefusedError('NO_PLACE')),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(0)),
-  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
-  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('ZZZ')),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(0, 'netAmount')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('netAmount')),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('ZZZ', 'unitPriceOriginal')),
 } as const;

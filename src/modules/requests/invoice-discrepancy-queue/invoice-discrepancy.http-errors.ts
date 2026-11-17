@@ -34,6 +34,6 @@ export const INVOICE_DISCREPANCY_ERROR_EXAMPLES = {
   NOT_FOUND: example(new InvoiceDiscrepancyRefusedError('NOT_FOUND')),
   ALREADY_CLOSED: example(new InvoiceDiscrepancyRefusedError('ALREADY_CLOSED')),
   DIFFERENCE_INVALID: example(new InvoiceDiscrepancyRefusedError('DIFFERENCE_INVALID')),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(0)),
-  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(0, 'differenceAmount')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('differenceAmount')),
 } as const;

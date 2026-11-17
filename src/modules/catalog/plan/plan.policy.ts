@@ -27,6 +27,11 @@ export function cleanPlanName(raw: string): string {
   return name;
 }
 
+/** A plan as a sentence names it: its application, then itself ("Figma – Professional"). */
+export function applicationPlanName(applicationName: string, planName: string): string {
+  return `${applicationName} – ${planName}`;
+}
+
 /** The note on what is lost when a user is removed: nothing or blanks is null; at most 2000 characters. */
 export function cleanRevocationNote(raw: string | null | undefined): string | null {
   if (raw === null || raw === undefined) return null;

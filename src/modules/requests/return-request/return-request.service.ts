@@ -59,11 +59,10 @@ export class ReturnRequestService {
         reason,
         now,
       });
-      if (await this.returns.findAwaitingOf(facts.assignmentId, tx))
-        throw new ReturnRequestRefusedError('ALREADY_REQUESTED');
-      if (await this.seat.hasPendingRenewal(facts.assignmentId, tx)) {
-        throw new ReturnRequestRefusedError('RENEWAL_PENDING');
-      }
+      const awaiting = await this.returns.findAwaitingOf(facts.assignmentId, tx);
+      if (awaiting) throw new ReturnRequestRefusedError('ALREADY_REQUESTED', null, awaiting.id);
+      const renewal = await this.seat.pendingRenewalOf(facts.assignmentId, tx);
+      if (renewal) throw new ReturnRequestRefusedError('RENEWAL_PENDING', null, renewal.requestId);
 
       const organization = await this.organizationReads.getOrganization(tx);
       if (!organization) throw new Error('A return was sent before installation');

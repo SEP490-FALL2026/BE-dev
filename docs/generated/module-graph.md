@@ -57,8 +57,8 @@ flowchart BT
   catalog -->|23| audit
   catalog -->|10| finance
   catalog -->|8| identity_access
-  catalog -->|2| notifications
-  catalog -->|4| operating_parameters
+  catalog -->|3| notifications
+  catalog -->|3| operating_parameters
   catalog -->|33| organization
   dashboards -->|2| catalog
   dashboards -->|2| devices
@@ -76,10 +76,12 @@ flowchart BT
   data_import -->|2| notifications
   data_import -->|11| organization
   data_import -->|5| policies
-  devices -->|10| audit
+  devices -->|12| audit
   devices -->|3| catalog
-  devices -->|2| identity_access
-  devices -->|12| organization
+  devices -->|3| identity_access
+  devices -->|2| notifications
+  devices -->|2| operating_parameters
+  devices -->|16| organization
   finance -->|3| audit
   finance -->|3| organization
   identity_access -->|18| audit
@@ -92,12 +94,12 @@ flowchart BT
   installation -->|8| organization
   installation -->|2| policies
   licensing -->|30| audit
-  licensing -->|55| catalog
+  licensing -->|57| catalog
   licensing -->|2| finance
   licensing -->|12| identity_access
-  licensing -->|8| notifications
-  licensing -->|7| operating_parameters
-  licensing -->|56| organization
+  licensing -->|10| notifications
+  licensing -->|6| operating_parameters
+  licensing -->|55| organization
   licensing -->|4| policies
   onboarding -->|2| catalog
   onboarding -->|2| data_import
@@ -108,7 +110,7 @@ flowchart BT
   operating_parameters -->|6| organization
   optimization -->|7| audit
   optimization -->|8| catalog
-  optimization -->|5| identity_access
+  optimization -->|6| identity_access
   optimization -->|25| licensing
   optimization -->|7| notifications
   optimization -->|6| operating_parameters
@@ -117,7 +119,7 @@ flowchart BT
   optimization -->|9| policies
   optimization -->|9| usage
   organization -->|10| audit
-  organization -->|5| notifications
+  organization -->|8| notifications
   personnel -->|24| audit
   personnel -->|11| catalog
   personnel -->|3| devices
@@ -132,27 +134,27 @@ flowchart BT
   policies -->|2| notifications
   policies -->|7| organization
   requests -->|64| audit
-  requests -->|30| budgets
-  requests -->|42| catalog
+  requests -->|32| budgets
+  requests -->|43| catalog
   requests -->|11| finance
   requests -->|38| identity_access
   requests -->|60| licensing
-  requests -->|12| notifications
+  requests -->|14| notifications
   requests -->|12| operating_parameters
   requests -->|97| organization
   requests -->|34| policies
   usage -->|10| audit
   usage -->|3| budgets
-  usage -->|15| catalog
-  usage -->|16| devices
+  usage -->|16| catalog
+  usage -->|17| devices
   usage -->|3| finance
-  usage -->|2| identity_access
+  usage -->|3| identity_access
   usage -->|8| licensing
-  usage -->|2| notifications
+  usage -->|3| notifications
   usage -->|2| operating_parameters
-  usage -->|18| organization
+  usage -->|19| organization
   usage -->|4| policies
   usage -->|4| requests
 ```
 
-112 module edges.
+114 module edges.

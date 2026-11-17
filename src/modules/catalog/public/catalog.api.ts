@@ -302,6 +302,11 @@ export class CatalogApi {
     return this.plans.vendorIdsOf(planIds);
   }
 
+  /** The IT Admin responsible for the application now (`QĐ-111g`), or null when it does not exist. */
+  getApplicationResponsibleItAdminId(applicationId: string, tx?: DbTx): Promise<string | null> {
+    return this.applicationLookup.responsibleItAdminIdOf(applicationId, tx);
+  }
+
   /** The IT Admin responsible for the application of the plan now (`QĐ-111g`), or null when there is none or the plan does not exist. */
   getPlanResponsibleItAdminId(planId: string, tx?: DbTx): Promise<string | null> {
     return this.plans.responsibleItAdminIdOf(planId, tx);

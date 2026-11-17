@@ -1,7 +1,8 @@
 import { HttpStatus } from '@nestjs/common';
+import { MoneyOutOfRangeError, MoneyScaleExceededError } from '../../../core/money/money.errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
-import { toBudgetApiException } from '../budget/budget.http-errors';
+import { BUDGET_ERROR_EXAMPLES, toBudgetApiException } from '../budget/budget.http-errors';
 import {
   BudgetReviewExistsError,
   BudgetReviewLineNotFoundError,
@@ -60,7 +61,12 @@ export function toBudgetReviewApiException(error: unknown): unknown {
     });
   }
   if (error instanceof BudgetReviewSeatMonthsError) {
-    return refuse(HttpStatus.CONFLICT, 'BUDGET_REVIEW.SEAT_MONTHS_NOT_READY', error.message);
+    return refuse(
+      HttpStatus.CONFLICT,
+      'BUDGET_REVIEW.SEAT_MONTHS_NOT_READY',
+      error.message,
+      error.subscriptionIds.length > 0 ? { subscriptionIds: [...error.subscriptionIds] } : undefined,
+    );
   }
 
   return toBudgetApiException(error);
@@ -75,8 +81,11 @@ export const BUDGET_REVIEW_ERROR_EXAMPLES = {
   NO_BUDGET_FOR_YEAR: example(new BudgetReviewNoBudgetError(2025)),
   PERIOD_EXISTS: example(new BudgetReviewExistsError(2026, 10)),
   ALREADY_SIGNED: example(new BudgetReviewSignedError()),
-  SEAT_MONTHS_NOT_READY: example(new BudgetReviewSeatMonthsError()),
+  SEAT_MONTHS_NOT_READY: example(new BudgetReviewSeatMonthsError(undefined, ['<subscription-id>'])),
   NOT_AWAITING_EXPLANATIONS: example(new BudgetReviewNotAwaitingError('SIGNED')),
   LINE_NOT_FOUND: example(new BudgetReviewLineNotFoundError()),
   EXPLANATION_NOT_REQUIRED: example(new BudgetReviewNotAskedError('NOT_REQUIRED')),
+  NOT_YOUR_COST_CENTER: BUDGET_ERROR_EXAMPLES.NOT_YOUR_COST_CENTER,
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(0, 'knownNeedsToYearEnd.amount')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('knownNeedsToYearEnd.amount')),
 } as const;

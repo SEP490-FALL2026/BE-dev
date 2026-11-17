@@ -22,6 +22,8 @@ export class ReturnRequestRefusedError extends Error {
     readonly reason: ReturnRefusal,
     /** Why the seat cannot be returned, for `ASSIGNMENT_NOT_RETURNABLE`. */
     readonly problem: ReturnableProblem | null = null,
+    /** The request that blocks the return, for `ALREADY_REQUESTED` (a return) and `RENEWAL_PENDING` (a renewal). */
+    readonly blockingRequestId: string | null = null,
   ) {
     super(`The return of the seat is refused: ${reason}.`);
     this.name = 'ReturnRequestRefusedError';

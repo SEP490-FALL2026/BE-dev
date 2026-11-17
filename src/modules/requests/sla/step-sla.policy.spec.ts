@@ -226,25 +226,50 @@ describe('what the notice of a reminder says', () => {
   });
 
   it('carries the cause to the Super Admin and the holder to the superior, and no amount, no check and no reason', () => {
-    expect(noticeParamsOf('STEP_SLA_REMINDER', facts, null)).toEqual({
+    expect(noticeParamsOf('STEP_SLA_REMINDER', facts, null, 'HOLDER')).toEqual({
       requestId: 'r1',
       stepKind: 'NEED',
       reminderNumber: 2,
       ageWorkingDays: 4,
       overdueWorkingDays: 2,
+      recipientRole: 'HOLDER',
     });
-    expect(noticeParamsOf('STEP_SLA_ESCALATION', facts, null)).toMatchObject({ holderEmployeeId: 'holder' });
-    expect(noticeParamsOf('STEP_SLA_NO_SUPERIOR', facts, 'NO_SUPERIOR')).toMatchObject({
+    expect(noticeParamsOf('STEP_SLA_ESCALATION', facts, null, 'SUPERIOR')).toMatchObject({
+      holderEmployeeId: 'holder',
+    });
+    expect(noticeParamsOf('STEP_SLA_NO_SUPERIOR', facts, 'NO_SUPERIOR', 'SUPER_ADMIN')).toMatchObject({
       holderEmployeeId: 'holder',
       cause: 'NO_SUPERIOR',
     });
-    expect(noticeParamsOf('SPEND_QUEUE_REMINDER', { ...facts, stepKind: null }, null)).toEqual({
+    expect(noticeParamsOf('SPEND_QUEUE_REMINDER', { ...facts, stepKind: null }, null, 'HOLDER')).toEqual({
       requestId: 'r1',
       reminderNumber: 2,
       ageWorkingDays: 4,
       overdueWorkingDays: 2,
       cause: null,
     });
+  });
+});
+
+describe('who the reminder of a late step is told to (A8 #3)', () => {
+  const facts = {
+    requestId: 'r1',
+    stepKind: 'NEED' as const,
+    reminderNumber: 1,
+    ageWorkingDays: 3,
+    overdueWorkingDays: 1,
+    holderEmployeeId: 'holder',
+  };
+
+  it.each(['HOLDER', 'REQUESTER'] as const)('names the %s on the reminder, so the text can differ', (role) => {
+    expect(noticeParamsOf('STEP_SLA_REMINDER', facts, null, role)).toMatchObject({ recipientRole: role });
+  });
+
+  it('gives the key to no other code', () => {
+    const others = ['STEP_SLA_ESCALATION', 'STEP_SLA_NO_SUPERIOR', 'SPEND_QUEUE_REMINDER'] as const;
+    for (const code of others) {
+      expect(noticeParamsOf(code, facts, null, 'HOLDER')).not.toHaveProperty('recipientRole');
+    }
   });
 });
 

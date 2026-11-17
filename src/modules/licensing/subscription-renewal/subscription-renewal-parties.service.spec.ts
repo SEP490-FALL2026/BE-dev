@@ -112,3 +112,72 @@ describe('the IT Admin of a renewal period (QĐ-111g, BB-9)', () => {
     expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub'], undefined);
   });
 });
+
+describe('the IT Admin of a subscription of the shared pool (SBF-20, QĐ-104l)', () => {
+  const pool = { ownerDepartmentId: null, responsibleItAdminEmployeeId: 'it-sub' as string | null };
+
+  const world = (usable: readonly string[], firstUsable: string | null = null) => {
+    const getItAdminInChargeOfDepartment = jest.fn().mockResolvedValue('never-read');
+    const findUsableItAdminEmployeeIds = jest.fn().mockResolvedValue(new Set(usable));
+    const service = new RenewalPartiesService(
+      { getItAdminInChargeOfDepartment } as unknown as OrganizationReadApi,
+      {
+        findUsableItAdminEmployeeIds,
+        findFirstUsableItAdminEmployeeId: jest.fn().mockResolvedValue(firstUsable),
+      } as unknown as IdentityAccessApi,
+    );
+
+    return { service, getItAdminInChargeOfDepartment, findUsableItAdminEmployeeIds };
+  };
+
+  it('names the one responsible while they are usable and never asks for the IT Admin in charge of a department that is not there', async () => {
+    const w = world(['it-sub'], 'it-first');
+
+    expect(await w.service.itAdminOf(pool)).toBe('it-sub');
+    expect(w.getItAdminInChargeOfDepartment).not.toHaveBeenCalled();
+    expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub'], undefined);
+  });
+
+  it('names the first usable IT Admin when the one responsible is gone or none is named', async () => {
+    expect(await world([], 'it-first').service.itAdminOf(pool)).toBe('it-first');
+    expect(await world([], 'it-first').service.itAdminOf({ ...pool, responsibleItAdminEmployeeId: null })).toBe(
+      'it-first',
+    );
+  });
+
+  describe('who records on behalf of the one responsible (QĐ-58b)', () => {
+    it('is a substitute when the one responsible still works and is someone else', async () => {
+      const w = world(['it-sub']);
+
+      expect(await w.service.substituteOf({ employeeId: 'it-other' }, pool)).toEqual({
+        substitute: true,
+        responsibleItAdminEmployeeId: 'it-sub',
+      });
+    });
+
+    it('is not a substitute for the one responsible, and nobody is replaced when they are gone or none is named', async () => {
+      expect(await world(['it-sub']).service.substituteOf({ employeeId: 'it-sub' }, pool)).toEqual({
+        substitute: false,
+        responsibleItAdminEmployeeId: 'it-sub',
+      });
+      expect(await world([]).service.substituteOf({ employeeId: 'it-other' }, pool)).toEqual({
+        substitute: false,
+        responsibleItAdminEmployeeId: null,
+      });
+      const none = world([]);
+      expect(
+        await none.service.substituteOf({ employeeId: 'it-other' }, { responsibleItAdminEmployeeId: null }),
+      ).toEqual({ substitute: false, responsibleItAdminEmployeeId: null });
+      expect(none.findUsableItAdminEmployeeIds).not.toHaveBeenCalled();
+    });
+
+    it('hands the transaction of the caller to the read', async () => {
+      const tx = {} as unknown as DbTx;
+      const w = world(['it-sub']);
+
+      await w.service.substituteOf({ employeeId: 'it-other' }, pool, tx);
+
+      expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub'], tx);
+    });
+  });
+});

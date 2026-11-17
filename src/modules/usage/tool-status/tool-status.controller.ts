@@ -64,7 +64,7 @@ export class ToolStatusController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'The credential is not an AI collector’s (DEVICE.WRONG_COLLECTOR_KIND), the holder has not acknowledged the notice (DEVICE.NOT_ACKNOWLEDGED), collection was stopped (DEVICE.COLLECTION_STOPPED), or the notice in force that names the status of tools is not acknowledged (DEVICE.TOOL_STATUS_NOT_ACKNOWLEDGED).',
+        'The credential is not an AI collector’s (DEVICE.WRONG_COLLECTOR_KIND), the holder has not acknowledged the notice (DEVICE.NOT_ACKNOWLEDGED), collection was stopped (DEVICE.COLLECTION_STOPPED), or the holder acknowledged the notice but the version in force does not cover the status of tools (DEVICE.TOOL_STATUS_NOT_ACKNOWLEDGED).',
       examples: [
         EXAMPLES.WRONG_COLLECTOR_KIND,
         EXAMPLES.NOT_ACKNOWLEDGED,
@@ -106,7 +106,8 @@ export class ToolStatusController {
   @ApiOperation({ operationId: 'deviceToolStatusList', summary: 'List the latest tool status of a machine' })
   @ApiSuccessResponse(ToolStatusPageResponseDto, {
     message: 'DEVICE_TOOL_STATUS.LISTED',
-    description: 'The latest login and quota of each tool, a row for each window.',
+    description:
+      'The latest login and quota of each tool, a row for each window; only the registrations held by people of the departments the IT Admin works (and of a department with no IT Admin), an empty page when there are none.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -118,9 +119,13 @@ export class ToolStatusController {
     DEVICE_NOT_FOUND,
     QUERY_INVALID,
   )
-  async ofDevice(@Param() params: DeviceIdParamDto, @Query() query: ToolStatusListQueryDto) {
+  async ofDevice(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: DeviceIdParamDto,
+    @Query() query: ToolStatusListQueryDto,
+  ) {
     try {
-      return await this.queries.ofDevice(params.id, query);
+      return await this.queries.ofDevice(actor, params.id, query);
     } catch (error) {
       throw toUsageApiException(error);
     }

@@ -159,6 +159,7 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   ALTERNATIVE_PLAN_NOT_FOUND: example(new AssessmentReferenceNotFoundError('alternativePlanId')),
   // One message template whose field varies (details.field names it): the vendor stands for the fields of the save.
   REFERENCE_NOT_FOUND: example(new AssessmentReferenceNotFoundError('vendorId')),
+  EXISTING_APPLICATION_NOT_FOUND: example(new AssessmentReferenceNotFoundError('existingApplicationId')),
   CATALOG_LINK_NOT_ALLOWED: example(new CatalogLinkRefusedError('NOT_LINKABLE')),
   CATALOG_LINK_APPLICATION_MISMATCH: example(new CatalogLinkApplicationMismatchError('<application-id>')),
   DEPARTMENT_OUT_OF_SCOPE: example(new CatalogLinkRefusedError('DEPARTMENT_OUT_OF_SCOPE')),
@@ -182,7 +183,12 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   ),
   NOT_INTERNAL: example(new InternalRegistrationRefusedError('NOT_INTERNAL')),
   NAME_TAKEN: example(new InternalRegistrationRefusedError('NAME_TAKEN')),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
-  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
-  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
+  /** The quote of the assessment sits at `quote` in the body of `accessRequestAssessmentSave`. */
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'quote.unitPrice')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('quote.unitPrice')),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'quote.originalPrice')),
+  /** The quote of the payment sits at `spend.quote` in the body of `accessRequestInternalRegister`. */
+  SPEND_MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'spend.quote.unitPrice')),
+  SPEND_MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('spend.quote.unitPrice')),
+  SPEND_CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'spend.quote.originalPrice')),
 } as const;

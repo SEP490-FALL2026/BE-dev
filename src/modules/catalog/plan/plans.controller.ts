@@ -198,7 +198,7 @@ export class PlansController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED, WORKSPACE_TEXT_INVALID or VENDOR_ADMINS_INVALID (fewer than two different IT Admins).',
+      'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED (details.role is OWNER when there are more owners than ownerLimit, ADMIN when more admins than adminLimit), WORKSPACE_TEXT_INVALID or VENDOR_ADMINS_INVALID (fewer than two different IT Admins).',
     examples: [
       VALIDATION_EXAMPLE,
       EXAMPLES.WORKSPACE_PROFILE_NOT_APPLICABLE,

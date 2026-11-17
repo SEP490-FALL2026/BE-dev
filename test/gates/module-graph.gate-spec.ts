@@ -177,6 +177,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'NotificationsModule: EmailDeliveryApi',
   // G5 (FR-3.11): the inbox the routes of `NotificationsHttpModule` read, held once in the module that gives the notices.
   'NotificationsModule: InboxService',
+  // P5-B (A5): the extension point the owners of names (organization, catalog, requests) add their `NotificationNameSource` to (public/notifications.extension-points.ts).
+  'NotificationsModule: NotificationNameContributions',
   'OperatingParametersModule: OperatingParametersApi',
   // G6 (ADR-0017): the extension point the flows that follow a personnel file (the owner of a service account) add their hooks to.
   'PersonnelModule: PersonnelFileHookContributions',

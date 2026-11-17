@@ -23,7 +23,7 @@ describe('QĐ-111an: the quote of an assessment is in dong, the price the vendor
   beforeEach(() => jest.clearAllMocks());
 
   it('reads a quote in dong with no original price', async () => {
-    await expect(service.read(quote({ amount: '200000', currency: 'VND' }))).resolves.toEqual({
+    await expect(service.read(quote({ amount: '200000', currency: 'VND' }), 'quote')).resolves.toEqual({
       unitPrice: { amountMinor: 200000n, currency: 'VND' },
       originalPrice: null,
       billingCycle: 'MONTHLY',
@@ -33,14 +33,17 @@ describe('QĐ-111an: the quote of an assessment is in dong, the price the vendor
   });
 
   it('keeps the price the vendor quoted in its own currency beside the quote in dong', async () => {
-    const read = await service.read(quote({ amount: '203200', currency: 'VND' }, { amount: '8.00', currency: 'USD' }));
+    const read = await service.read(
+      quote({ amount: '203200', currency: 'VND' }, { amount: '8.00', currency: 'USD' }),
+      'quote',
+    );
 
     expect(read.unitPrice).toEqual({ amountMinor: 203200n, currency: 'VND' });
     expect(read.originalPrice).toEqual({ amountMinor: 800n, currency: 'USD' });
   });
 
   it('refuses a quote in another currency with QUOTE_PRICE_NOT_VND, before the amount is read', async () => {
-    const refused = service.read(quote({ amount: '8.00', currency: 'USD' }));
+    const refused = service.read(quote({ amount: '8.00', currency: 'USD' }), 'quote');
 
     await expect(refused).rejects.toThrow(AssessmentQuoteRefusedError);
     await expect(refused).rejects.toMatchObject({ reason: 'QUOTE_PRICE_NOT_VND' });
@@ -48,11 +51,25 @@ describe('QĐ-111an: the quote of an assessment is in dong, the price the vendor
   });
 
   it('refuses a negative quote and a negative original price', async () => {
-    await expect(service.read(quote({ amount: '-1', currency: 'VND' }))).rejects.toThrow(MoneyOutOfRangeError);
+    await expect(service.read(quote({ amount: '-1', currency: 'VND' }), 'quote')).rejects.toThrow(MoneyOutOfRangeError);
     await expect(
-      service.read(quote({ amount: '1', currency: 'VND' }, { amount: '-1.00', currency: 'USD' })),
+      service.read(quote({ amount: '1', currency: 'VND' }, { amount: '-1.00', currency: 'USD' }), 'quote'),
     ).rejects.toThrow(MoneyOutOfRangeError);
   });
+
+  it.each([['quote'], ['spend.quote']])(
+    'names the field of the body in the money error it throws, and passes it to the finance facade, where the quote sits at %s',
+    async (at) => {
+      await expect(service.read(quote({ amount: '-1', currency: 'VND' }), at)).rejects.toMatchObject({
+        path: `${at}.unitPrice`,
+      });
+      await expect(
+        service.read(quote({ amount: '1', currency: 'VND' }, { amount: '-1.00', currency: 'USD' }), at),
+      ).rejects.toMatchObject({ path: `${at}.originalPrice` });
+      expect(parseMoney).toHaveBeenCalledWith(expect.anything(), `${at}.unitPrice`);
+      expect(parseMoney).toHaveBeenCalledWith(expect.anything(), `${at}.originalPrice`);
+    },
+  );
 
   it('refuses to price a request from a quote kept in another currency (one an earlier release stored and no rate could convert): QUOTE_PRICE_NOT_VND', () => {
     const kept = {
@@ -84,7 +101,7 @@ describe('QĐ-111an: the quote of an assessment is in dong, the price the vendor
 
   it('still refuses a quote that ends before it begins', async () => {
     await expect(
-      service.read({ ...quote({ amount: '1', currency: 'VND' }), validUntil: '2026-10-31' }),
+      service.read({ ...quote({ amount: '1', currency: 'VND' }), validUntil: '2026-10-31' }, 'quote'),
     ).rejects.toMatchObject({ reason: 'QUOTE_PERIOD_INVALID' });
   });
 });

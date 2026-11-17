@@ -29,6 +29,24 @@ describe('an outcome against the decision (US-11-03 AC-15, AC-18, US-11-05 AC-11
     );
   });
 
+  it('expects the number decided for a raise or a reduction, whatever the seats bought before (R2-3, SBF-20 §4.4 step 8)', () => {
+    const raised = {
+      ...base,
+      outcome: 'AS_DECIDED' as const,
+      decidedChoice: 'INCREASE' as const,
+      decidedQuantity: 120,
+    };
+    expect(checkOutcome({ ...raised, nextQuantity: 120 })).toBeNull();
+    expect(checkOutcome({ ...raised, nextQuantity: 100 })).toBe('OUTCOME_MISMATCH');
+    expect(checkOutcome({ ...raised, nextQuantity: null })).toBe('OUTCOME_MISMATCH');
+    // A renewal as it is that names its number (the one-write renewal) is held to it; one of before names none and keeps the seats bought.
+    const renewed = { ...base, outcome: 'AS_DECIDED' as const, decidedChoice: 'RENEW' as const };
+    expect(checkOutcome({ ...renewed, decidedQuantity: 100, nextQuantity: 100 })).toBeNull();
+    expect(checkOutcome({ ...renewed, decidedQuantity: 100, nextQuantity: 90 })).toBe('OUTCOME_MISMATCH');
+    expect(checkOutcome({ ...renewed, decidedQuantity: null, nextQuantity: 100 })).toBeNull();
+    expect(checkOutcome({ ...renewed, decidedQuantity: null, nextQuantity: 90 })).toBe('OUTCOME_MISMATCH');
+  });
+
   it('records what the vendor really did, with or without a period', () => {
     expect(
       checkOutcome({

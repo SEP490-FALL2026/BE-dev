@@ -273,13 +273,13 @@ export class ProvisioningGrantWriter {
 
   /**
    * A subscription the IT Admin names must be one a seat can be taken from today (`BR-MF1-09a`): of the plan, active, its period not over
-   * and not taken over by a next period that runs. A period that ended or was taken over would get the seat (or the seat bought) on a term
-   * that no longer runs, never carried on. Read before the subscription is locked, like the choice of one. Throws
+   * and not taken over by a next period that runs, and not recorded as cancelled (`A1C-02`). A period that ended, was taken over or is to be
+   * closed would get the seat (or the seat bought) on a term that no longer runs, never carried on. Read before the subscription is locked, like the choice of one. Throws
    * ProvisioningSubscriptionError (`NOT_GRANTABLE`).
    */
   private async requireGrantable(tx: DbTx, plan: SeatTarget, named: string | undefined, today: string): Promise<void> {
     if (named === undefined || plan.provisioningType === 'K5') return;
-    const grantable = await this.catalog.getGrantableSubscriptions(plan.planId, today, tx);
+    const grantable = await this.sharedPool.grantableOf(tx, plan.planId, today);
     if (grantable.some((subscription) => subscription.subscriptionId === named)) return;
     // Another plan's subscription, a draft or none at all keeps the answer it had (`lockTarget`).
     const target = await this.catalog.findSeatTarget({ subscriptionId: named }, tx);

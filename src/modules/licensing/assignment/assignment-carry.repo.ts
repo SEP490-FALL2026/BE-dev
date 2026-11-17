@@ -47,6 +47,33 @@ export class AssignmentCarryRepo {
   }
 
   /**
+   * `carry` behind a savepoint, for a caller that can answer a refusal of the database (INV-01, the next period holds no free seat) by changing the
+   * seats and trying again: a statement the database refuses aborts the whole transaction, so what it wrote is undone to the savepoint and the
+   * transaction of the caller goes on. Returns null when the seats were carried, else what the database refused with, for the caller to read.
+   */
+  async carryBehindSavepoint(
+    tx: DbTx,
+    input: {
+      assignmentIds: readonly string[];
+      nextSubscriptionId: string;
+      startDate: BusinessDate;
+      actorAppUserId: string;
+    },
+  ): Promise<Error | null> {
+    await tx.$executeRaw`SAVEPOINT carry_to_next_period`;
+    try {
+      await this.carry(tx, input);
+      await tx.$executeRaw`RELEASE SAVEPOINT carry_to_next_period`;
+
+      return null;
+    } catch (error) {
+      await tx.$executeRaw`ROLLBACK TO SAVEPOINT carry_to_next_period`;
+
+      return error as Error;
+    }
+  }
+
+  /**
    * Takes back the carrying of a seat whose grant did not come to be (failed or cancelled): the seat it was carried to on the next
    * period is voided the way the grant is (it ends the day it started, so no day counts it) and the seat itself is open again, so the
    * grant can be voided as an open one. Returns whether there was a carrying to take back: a carried seat that is no longer open

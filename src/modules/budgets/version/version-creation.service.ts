@@ -59,9 +59,10 @@ export class VersionCreationService {
       const source = versionSourceOf(proposal, latest?.state ?? null);
       if (source === null) throw new BudgetProposalStateError('REVIEW', proposal.state);
       await this.yearLock.lock(tx, proposal.costCenterId, [proposal.year]);
-      if (await this.versions.current(proposal.costCenterId, proposal.year, tx)) throw new BudgetCurrentExistsError();
-      if (await this.versions.inFlight(proposal.costCenterId, proposal.year, tx))
-        throw new BudgetVersionInFlightError();
+      const current = await this.versions.current(proposal.costCenterId, proposal.year, tx);
+      if (current) throw new BudgetCurrentExistsError(current.id);
+      const inFlight = await this.versions.inFlight(proposal.costCenterId, proposal.year, tx);
+      if (inFlight) throw new BudgetVersionInFlightError(inFlight.id);
 
       const carriedOverMinor = await this.figures.carriedOverOf(proposal.costCenterId, proposal.year, tx);
       const figures = await this.figures.figures(tx, proposal.currency, { ...body, defaultPercent, carriedOverMinor });

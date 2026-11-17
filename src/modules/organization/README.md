@@ -65,6 +65,9 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
   - `EmployeeAccountsHook` (`organization.employee-accounts`) — identity-access `accounts/employee-accounts`.
   - `DepartmentCreationWindowHook` (`organization.department-creation-window`) — budgets `cycle/department-creation-window`; chỉ `department-management/department.service.ts` hỏi lúc tạo phòng (API), không hỏi ở đường cài đặt.
 - Đăng ký vào: chỉ point của chính module (`department/held-notice-handover.listener.ts`).
+- Đăng ký vào `notifications.name-sources` (`NotificationNameContributions`, một `*.listener.ts` cho mỗi capability sở hữu bảng, khai ở `organization-http.module.ts` — không ở `organization.module.ts`, vì
+  `InstallationModule` import nó và graph cài đặt không có `NotificationsModule`): `employee-directory/employee-notification-names` (EMPLOYEE, họ tên; để ở `employee-directory` vì `employee/` đã đủ 25 file),
+  `department/department-notification-names` (DEPARTMENT, tên phòng), `cost-center/cost-center-notification-names` (COST_CENTER, `<mã> · <tên>`). Mỗi bên một truy vấn `namesOf(ids)` cho cả trang, id lạ hoặc không phải uuid thì vắng.
 
 ## Hướng phụ thuộc giữa capability (R6)
 

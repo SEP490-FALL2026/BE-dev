@@ -46,7 +46,11 @@ export class BudgetReviewSignedError extends Error {
 
 /** The seat-months of the month could not all be worked out, so the figures of the month would be wrong: nothing was closed. */
 export class BudgetReviewSeatMonthsError extends Error {
-  constructor(cause?: unknown) {
+  constructor(
+    cause?: unknown,
+    /** The subscriptions whose seat-months could not be worked out, when the cause says them. */
+    readonly subscriptionIds: readonly string[] = [],
+  ) {
     super('The seat-months of the month could not be worked out; the month was not closed.', { cause });
     this.name = 'BudgetReviewSeatMonthsError';
   }

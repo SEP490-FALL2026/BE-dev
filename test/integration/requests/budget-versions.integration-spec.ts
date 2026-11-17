@@ -93,7 +93,7 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
 
     it('is the only one in progress for a Cost Center and a year: a second draft is refused, another year is not', async () => {
       const { proposal, head, department } = await waiting();
-      await h.built(proposal.id);
+      const firstVersion = await h.built(proposal.id);
       const nextYear = await h.budgetProposed(head, department.unitId, undefined, h.next + 1);
 
       const sameYear = await h
@@ -102,6 +102,7 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
       const otherYear = await h.built(nextYear.id);
 
       expect(h.codeOf(sameYear)).toBe('BUDGET.VERSION_IN_FLIGHT');
+      expect(h.detailsOf(sameYear)).toEqual({ versionId: firstVersion.id });
       expect(otherYear).toMatchObject({ year: h.next + 1, number: 1 });
     });
 

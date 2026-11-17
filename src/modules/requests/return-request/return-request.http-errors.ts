@@ -17,6 +17,16 @@ const STATUS: Record<ReturnRefusal, HttpStatus> = {
   ORIGIN_MISMATCH: HttpStatus.UNPROCESSABLE_ENTITY,
 };
 
+/** The reason a seat cannot be returned, or the request that blocks the return (nothing when the error knows neither). */
+function refusalDetailsOf(error: ReturnRequestRefusedError): { details?: Record<string, unknown> } {
+  const details = {
+    ...(error.problem ? { reason: error.problem } : {}),
+    ...(error.blockingRequestId ? { requestId: error.blockingRequestId } : {}),
+  };
+
+  return Object.keys(details).length > 0 ? { details } : {};
+}
+
 /** Maps the errors of the routes of returns to their HTTP answers and leaves the rest to the request mapper. */
 export function toReturnApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
@@ -25,7 +35,7 @@ export function toReturnApiException(error: unknown): unknown {
     return new ApiException(STATUS[error.reason], {
       code: `RETURN_REQUEST.${error.reason}`,
       message: error.message,
-      ...(error.problem ? { details: { reason: error.problem } } : {}),
+      ...refusalDetailsOf(error),
     });
   }
 
@@ -49,7 +59,7 @@ export const RETURN_ERROR_EXAMPLES = {
     }),
   ),
   ASSIGNMENT_NOT_RETURNABLE: example(new ReturnRequestRefusedError('ASSIGNMENT_NOT_RETURNABLE', 'NOT_OPEN')),
-  ALREADY_REQUESTED: example(new ReturnRequestRefusedError('ALREADY_REQUESTED')),
-  RENEWAL_PENDING: example(new ReturnRequestRefusedError('RENEWAL_PENDING')),
+  ALREADY_REQUESTED: example(new ReturnRequestRefusedError('ALREADY_REQUESTED', null, '<request-id>')),
+  RENEWAL_PENDING: example(new ReturnRequestRefusedError('RENEWAL_PENDING', null, '<request-id>')),
   ORIGIN_MISMATCH: example(new ReturnRequestRefusedError('ORIGIN_MISMATCH')),
 } as const;

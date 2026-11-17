@@ -6,6 +6,7 @@ import {
   requestPartyRefusalBody,
 } from '../../identity-access/public/request-party.errors';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { termRuleOf } from '../../../core/term-limit';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   AccessRequestAlreadyHoldsAccessError,
@@ -33,6 +34,15 @@ import {
 const refuse = (status: HttpStatus, code: string, message: string): ApiException =>
   new ApiException(status, { code, message });
 
+/** What the client needs to act on a refused time of use: the contract end, or the most months the kind of plan takes. */
+function termDetailsOf(error: AccessRequestTermRefusedError): { details?: Record<string, unknown> } {
+  if (error.reason === 'TERM_CONTRACT_ENDED') return { details: { contractEndDate: error.contractEndDate } };
+  if (error.reason !== 'TERM_MONTHS_OUT_OF_RANGE') return {};
+  const { maxMonths } = termRuleOf(error.kind ?? 'K2');
+
+  return { details: { maxMonths, ...(error.kind === null ? {} : { provisioningType: error.kind }) } };
+}
+
 /** Maps the errors of the request routes to their HTTP answers; a database that cannot answer is a 503. */
 export function toAccessRequestApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
@@ -55,7 +65,11 @@ export function toAccessRequestApiException(error: unknown): unknown {
   }
   // The department has no Cost Center in use yet (`QĐ-87d(1)`): Finance creates it first. Nothing was written.
   if (error instanceof FinanceSetupIncompleteError) {
-    return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'FINANCE.SETUP_INCOMPLETE',
+      message: error.message,
+      details: { departmentId: error.departmentId },
+    });
   }
 
   // The spending approver, whatever the route, is no party of a Request (`D-S21`): one code, one body.
@@ -84,7 +98,7 @@ export function toAccessRequestApiException(error: unknown): unknown {
     return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
       code: `ACCESS_REQUEST.${error.reason}`,
       message: error.message,
-      ...(error.reason === 'TERM_CONTRACT_ENDED' ? { details: { contractEndDate: error.contractEndDate } } : {}),
+      ...termDetailsOf(error),
     });
   }
   if (error instanceof AccessRequestAlreadyHoldsAccessError) {
@@ -170,7 +184,7 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   TERM_REQUIRED: example(new AccessRequestTermRefusedError('TERM_REQUIRED')),
-  TERM_MONTHS_OUT_OF_RANGE: example(new AccessRequestTermRefusedError('TERM_MONTHS_OUT_OF_RANGE')),
+  TERM_MONTHS_OUT_OF_RANGE: example(new AccessRequestTermRefusedError('TERM_MONTHS_OUT_OF_RANGE', null, 'K1')),
   TERM_NOT_ASKED: example(new AccessRequestTermRefusedError('TERM_NOT_ASKED')),
   TERM_LONG_TERM_NOT_ALLOWED: example(new AccessRequestTermRefusedError('TERM_LONG_TERM_NOT_ALLOWED')),
   TERM_CONTRACT_ENDED: example(new AccessRequestTermRefusedError('TERM_CONTRACT_ENDED', '2026-10-31')),

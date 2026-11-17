@@ -60,7 +60,7 @@ export class SpendApprovalsController {
   @ApiSuccessResponse(ApprovalListResponseDto, {
     message: 'SPEND_APPROVAL.LISTED',
     description:
-      'The spend steps given to the caller that are open, the oldest first: what each request is, what it costs, the first code of its check, whether the same person holds the need step and this one, whether the head confirmed the reserve for it, and the batch it was sent in.',
+      'The spend steps given to the caller that are open, the oldest first: what each request is, what it costs, the first code of its check and what that check said (within the base, or uses the reserve the head confirmed), and the batch it was sent in.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ApprovalQueryDto) {
@@ -105,16 +105,23 @@ export class SpendApprovalsController {
       examples: [SPEND_ERROR_EXAMPLES.NOT_THE_ASSIGNEE, SPEND_ERROR_EXAMPLES.OWN_REQUEST],
     },
     // The decision reads the request itself first: a request that does not exist is ACCESS_REQUEST.NOT_FOUND here.
-    { ...NOT_FOUND, examples: [SPEND_ERROR_EXAMPLES.REQUEST_NOT_FOUND] },
+    {
+      ...NOT_FOUND,
+      description: 'The request does not exist (ACCESS_REQUEST.NOT_FOUND).',
+      examples: [SPEND_ERROR_EXAMPLES.REQUEST_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD or SPEND.RECHECKED_RETURNED_TO_REQUESTER for a one-step request, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED).',
+        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD or SPEND.RECHECKED_RETURNED_TO_REQUESTER for a one-step request, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED), or the commitment of the approval could not be held (BUDGET.COMMITMENT_NOT_HOLDABLE, BUDGET.COMMITMENT_EXISTS: a safety net after the check of the budget; nothing was decided).',
       examples: [
         SPEND_ERROR_EXAMPLES.NO_SPEND_STEP,
+        SPEND_ERROR_EXAMPLES.STEP_NOT_PENDING,
         SPEND_ERROR_EXAMPLES.NOT_CHECKABLE,
         SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_HEAD,
         SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_REQUESTER,
+        SPEND_ERROR_EXAMPLES.COMMITMENT_NOT_HOLDABLE,
+        SPEND_ERROR_EXAMPLES.COMMITMENT_EXISTS,
         SPEND_ERROR_EXAMPLES.GROUP_USES_LINES,
         CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
         CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
@@ -123,7 +130,7 @@ export class SpendApprovalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, or a field that is not of the body, such as the override that no longer exists), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO).',
+        'The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from (issues[0].path = reason), or a field that is not of the body, such as the override that no longer exists), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO).',
       examples: [VALIDATION_EXAMPLE, CHECKLIST_ERROR_EXAMPLES.INCOMPLETE, CHECKLIST_ERROR_EXAMPLES.HAS_NO],
     },
   )
@@ -148,7 +155,7 @@ export class SpendApprovalsController {
   @ApiSuccessResponse(BatchDecisionResponseDto, {
     message: 'SPEND_BATCH.DECIDED',
     description:
-      'Answers one checklist for the whole batch and approves or refuses the requests chosen of a batch the caller holds, one by one in the order given, or sends the whole batch back to the head (RETURN: every request the caller holds of it, with the reason of the answers No; the head drops the request at fault and sends a new batch). Each is checked and decided on its own, with its own record and the same answers. One that is not in the batch or is not the caller one, has no spend step, or went back to its head when checked again (the requester and the head are told) is skipped with its reason and the others go on. A refusal gives one reason for all.',
+      'Answers one checklist for the whole batch and approves or refuses the requests chosen of a batch the caller holds, one by one in the order given, or sends the whole batch back to the head (RETURN: every request the caller holds of it, with the reason of the answers No; the head drops the request at fault and sends a new batch). Each is checked and decided on its own, with its own record and the same answers. One that is not in the batch or is not the caller one, has no spend step, went back to its head when checked again (the requester and the head are told), or could not hold its commitment (COMMITMENT_NOT_HOLDABLE) is skipped with its reason and the others go on. A refusal gives one reason for all.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -166,7 +173,7 @@ export class SpendApprovalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO): nothing is decided.',
+        'The request is invalid (VALIDATION_ERROR; a refusal or a return with no reason and no answer No to take it from has issues[0].path = reason), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO): nothing is decided.',
       examples: [VALIDATION_EXAMPLE, CHECKLIST_ERROR_EXAMPLES.INCOMPLETE, CHECKLIST_ERROR_EXAMPLES.HAS_NO],
     },
   )

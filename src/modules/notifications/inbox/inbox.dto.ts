@@ -16,15 +16,29 @@ export const notificationIdParamSchema = z.strictObject({ id: z.uuid() });
 // Nullable union rather than a null member: the same values, rendered as `anyOf` + `nullable` like the document shows.
 const paramValue = z.union([z.string(), z.number(), z.boolean()]).nullable();
 
+/** The screen a notice opens: the `operationId` of the read route in this contract and the values of its path parameters. */
+const notificationTargetSchema = z.strictObject({
+  operationId: z.string(),
+  pathParams: z.record(z.string(), z.string()),
+});
+
 /**
- * One notice as its recipient reads it: a code, what it is about by id, and flat parameters. It has no text: web and mobile
- * turn the code and the parameters into the same words, so nothing in it depends on the client that asked.
+ * One notice as its recipient reads it: a code, what it is about by id, flat parameters, and the words made from them in the
+ * language of `Accept-Language` (`vi` by default), so web and mobile show the same sentence. `target` says which read route to open,
+ * `null` when no single screen is known.
  */
 export const notificationSchema = z.strictObject({
   id: z.uuid(),
   code: z.string(),
   subject: z.strictObject({ type: z.string(), id: z.uuid() }).nullable(),
   params: z.record(z.string(), paramValue),
+  title: z.string().min(1).describe('Plain text, never empty; the language of Accept-Language (vi by default).'),
+  message: z
+    .string()
+    .describe('Plain text; may carry text a person typed, so show it as text. Empty only for an unknown code.'),
+  target: notificationTargetSchema
+    .nullable()
+    .describe('The read route to open; null means open the list of notifications.'),
   createdAt: z.iso.datetime(),
   readAt: z.iso.datetime().nullable(),
 });

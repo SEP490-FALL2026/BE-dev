@@ -141,6 +141,7 @@ export class AppUsersController {
         ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_ACCOUNT_NOT_USABLE,
         ACCOUNT_ERROR_EXAMPLES.LOGIN_EMAIL_REQUIRED,
         ACCOUNT_ERROR_EXAMPLES.LOGIN_EMAIL_INVALID,
+        ACCOUNT_ERROR_EXAMPLES.LOGIN_EMAIL_NOT_WORK_EMAIL,
       ],
     },
   )
@@ -330,12 +331,13 @@ export class AppUsersController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'Self change, a Manager still heading a department, an occupied Finance or spending approver role, or open work blocking the spending approver.',
+        'Self change, a Manager still heading a department, an occupied Finance or spending approver role, an employee who heads a department or is named to take one over becoming the spending approver (APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT, details.headPeriods), or open work blocking the spending approver.',
       examples: [
         ACCOUNT_ERROR_EXAMPLES.SELF_CHANGE_FORBIDDEN,
         ACCOUNT_ERROR_EXAMPLES.MANAGER_STILL_HEADING,
         ACCOUNT_ERROR_EXAMPLES.FINANCE_ALREADY_ASSIGNED,
         ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_ALREADY_ASSIGNED,
+        ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_HEADS_DEPARTMENT,
         ACCOUNT_ERROR_EXAMPLES.SPENDING_APPROVER_HAS_OPEN_WORK,
       ],
     },

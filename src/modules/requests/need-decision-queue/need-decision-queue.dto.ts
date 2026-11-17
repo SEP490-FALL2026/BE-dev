@@ -22,7 +22,7 @@ export const needQueueQuerySchema = z.strictObject({
   pageSize: z.coerce.number().int().positive().max(100).default(20),
   type: requestType.optional().meta({
     description:
-      'Only the requests of this kind: GRANT (one person), GROUP_GRANT (several people, decided line by line), RENEWAL (a right that is renewed) or SERVICE_ACCOUNT.',
+      'Only the requests of this kind: GRANT (one person), GROUP_GRANT (several people, decided line by line), RENEWAL (a right that is renewed) or SERVICE_ACCOUNT (only on records of the earlier releases; no new request has it).',
   }),
 });
 
@@ -38,7 +38,9 @@ const needQueueItemSchema = z.strictObject({
   stepKind: z.literal('NEED'),
   /** The role the caller holds in this step as the system gave it: the head, the spending approver or the fallback approver. */
   deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER']),
-  type: requestType,
+  type: requestType.describe(
+    'SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more.',
+  ),
   openedAt: z.iso.datetime(),
   /** When the step was given to the caller; it is later than `openedAt` when the step was handed over. */
   assignedAt: z.iso.datetime().nullable(),
@@ -60,13 +62,11 @@ const needQueueItemSchema = z.strictObject({
   termMonths: z.number().int().positive().nullable(),
   /** The day the right ends as the sender chose it; null for a right with no end (`QĐ-104a`). */
   expectedEndDate: z.string().nullable(),
-  /** Approving needs the caller to confirm the term in so many words (a term over twelve months). */
   /** What this request costs, as the request itself says; never what is left of a budget. */
   pricing: z.strictObject({
     status: z.enum(['NOT_APPLICABLE', 'PRICED', 'MISSING']),
     amount: moneySchema.nullable(),
   }),
-  /** The same person holds this step and the spend step of the request. */
 });
 
 export class NeedQueueQueryDto extends createZodDto(needQueueQuerySchema) {}

@@ -166,7 +166,6 @@ const approvalSummarySchema = z.strictObject({
   outcome: budgetOutcomeSchema.nullable(),
   /** The part of the year after of the request against the approved budget of that year; null when it keeps nothing of it. */
   nextYearBudget: nextYearBudgetSchema,
-  /** The same person holds the need step and this one. */
   /** The batch it was last sent in, when it was sent in one. */
   batchId: z.uuid().nullable(),
 });
@@ -258,6 +257,8 @@ const resultSchema = z.strictObject({
       'NO_SPEND_STEP',
       'NOT_CHECKABLE',
       'RECHECKED_RETURNED_TO_HEAD',
+      /** The approval could not hold its commitment (a safety net after the check of the budget); the request stays as it was. */
+      'COMMITMENT_NOT_HOLDABLE',
     ])
     .nullable(),
 });

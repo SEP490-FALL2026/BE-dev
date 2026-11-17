@@ -158,6 +158,7 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
 
       // An end date past a year from today is refused as the domain says it (`US-05-23` AC-9), the confirmation in words as a field that is gone.
       expect(h.codeOf(long)).toBe('ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE');
+      expect(h.detailsOf(long)).toMatchObject({ maxMonths: 12 });
       expect(h.codeOf(confirmed)).toBe('VALIDATION_ERROR');
       expect(await h.requestRows()).toBe(rows);
       expect((await sent(u.head.account, h.groupBody(paid, [e1, e2], { termMonths: 12 }))).type).toBe('GROUP_GRANT');

@@ -44,7 +44,7 @@ export class WithdrawalController {
   @ApiSuccessResponse(AccessRequestResponseDto, {
     message: 'ACCESS_REQUEST.WITHDRAWN',
     description:
-      'The requester withdraws the request while it waits or while the grant has not been carried out; the head of the department does too, with a reason, once Finance gave it back, it waits for a budget or the data stopped it. The open steps and the questions to Finance close, the request leaves the batch it was sent in, what was held for it goes back to the budget and a task nobody has worked is cancelled with its assignment (never failed). When the grant had failed the request waits (AWAITING_IT_CLOSE) until the IT Admin cancels the task, and it then ends as withdrawn.',
+      'The requester withdraws the request while it waits or while the grant has not been carried out; the head of the department does too, with a reason, only while the budget or the data stopped the request or it waits for the head to confirm the reserve. The open steps close, the request leaves the batch it was sent in, what was held for it goes back to the budget and a task nobody has worked is cancelled with its assignment (never failed). When the grant had failed the request waits (AWAITING_IT_CLOSE) until the IT Admin cancels the task, and it then ends as withdrawn.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
