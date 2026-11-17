@@ -11,6 +11,7 @@ import {
   adjustmentCommitmentOf,
   adjustmentPointOf,
   expiryReading,
+  hasAdjustmentPoint,
   redAlertOf,
   runsAPeriod,
   type AdjustmentPoint,
@@ -61,22 +62,29 @@ const seatsOfPool = (record: SubscriptionRecord, counts: SeatCounts): Subscripti
   };
 };
 
-/** The alerts of a subscription: the deadline of its point of adjustment, and the days it counts back to (the point, then the red alert of a plan by the year). */
+/**
+ * The alerts of a subscription: the deadline of its point of adjustment, and the days it counts back to (the point, then the red alert of a plan by the year).
+ * A subscription that has no point of adjustment (not a `K2` term, or internal software) has no alert: the renewal says `NOT_POOL_TERM` / `INTERNAL` for it.
+ */
 const alertsOf = (
-  point: AdjustmentPoint | null,
+  found: AdjustmentPoint | null,
   record: SubscriptionRecord,
   windows: AdjustmentWindows | undefined,
-): SubscriptionView['alerts'] => ({
-  baseDate: point?.deadline ?? null,
-  dates: alertDates(
-    point === null || windows === undefined
-      ? null
-      : {
-          point: point.point,
-          redAlertOn: redAlertOf(point.deadline, adjustmentCommitmentOf(record), windows.redAlertDaysAnnual),
-        },
-  ),
-});
+): SubscriptionView['alerts'] => {
+  const point = hasAdjustmentPoint(record) ? found : null;
+
+  return {
+    baseDate: point?.deadline ?? null,
+    dates: alertDates(
+      point === null || windows === undefined
+        ? null
+        : {
+            point: point.point,
+            redAlertOn: redAlertOf(point.deadline, adjustmentCommitmentOf(record), windows.redAlertDaysAnnual),
+          },
+    ),
+  };
+};
 
 const mergeWarnings = (mergeCandidateIds: readonly string[]): 'SHOULD_MERGE'[] =>
   mergeCandidateIds.length > 0 ? ['SHOULD_MERGE'] : [];

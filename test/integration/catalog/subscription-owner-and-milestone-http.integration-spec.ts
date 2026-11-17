@@ -198,10 +198,10 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
     });
 
     it('AC-7: Zoom ends 31/12 with no deadline, no notice period and no auto renewal: the point of adjustment counts from the end date, no warning', async () => {
-      const { planId } = await plan({ pricing: 'FLAT_RATE', type: 'K1' });
+      const { planId } = await plan({ pricing: 'FLAT_RATE', type: 'K2' });
       today('2026-09-01');
 
-      // A K1 plan is paid by the month (R-E01): its payment day is the day of the end day in each month (R-1), so on 1/9 the next is 30/9 (the 31st of
+      // A plan paid by the month (R-E01): its payment day is the day of the end day in each month (R-1), so on 1/9 the next is 30/9 (the 31st of
       // December counted back by three months) and the point opens 7 days before it; the last payment day is the end day; no red alert for a plan by the month.
       const created = await subscription(planId, {
         endDate: '2026-12-31',
@@ -215,6 +215,21 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       expect(created.noticeDeadline).toEqual({ value: null, source: 'BY_END_DATE' });
       expect(created.alerts).toEqual({ baseDate: '2026-09-30', dates: ['2026-09-23'] });
       expect(created.warnings).toEqual([]);
+    });
+
+    it('F5: a K1 term has no point of adjustment, so its alerts are empty whatever its dates say (the renewal says NOT_POOL_TERM)', async () => {
+      const { planId } = await plan({ pricing: 'FLAT_RATE', type: 'K1' });
+      today('2026-09-01');
+
+      const created = await subscription(planId, {
+        endDate: '2026-12-31',
+        autoRenew: false,
+        billingCycle: 'MONTHLY',
+        startDate: '2026-01-01',
+        unitPrice: VND_30M,
+      });
+
+      expect(created.alerts).toEqual({ baseDate: null, dates: [] });
     });
 
     it('AC-12: a term with no deadline, no notice period, no auto renewal and no end date sets no milestone and warns', async () => {

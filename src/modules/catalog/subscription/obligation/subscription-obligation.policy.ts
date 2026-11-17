@@ -2,10 +2,12 @@ import { addDays, fromDateColumn, toDateColumn, type BusinessDate } from '../../
 import { addMonths, firstGridOffsetFrom } from '../../../../core/fiscal-year';
 import { deriveNotice } from '../subscription.policy';
 import type {
+  ApplicationKind,
   BillingCycle,
   CommitmentTermMonths,
   DeadlineKind,
   ExpiryState,
+  ProvisioningType,
   SubscriptionKind,
   SubscriptionState,
   SubscriptionStatus,
@@ -112,6 +114,16 @@ export const runsAPeriod = (record: {
   status: SubscriptionStatus;
   hasSuccessor: boolean;
 }): boolean => record.kind === 'TERM' && record.status === 'ACTIVE' && !record.hasSuccessor;
+
+/**
+ * Whether the plan of a subscription has a point of adjustment at all, whatever its dates: only a term of a workspace of the shared pool
+ * (`K2`) of software that is not internal has one. The renewal answers the others `NOT_POOL_TERM` / `INTERNAL`, so a list gives them no alert dates
+ * (`K1` has no point, `FR-1.12`(9)).
+ */
+export const hasAdjustmentPoint = (record: {
+  planProvisioningType: ProvisioningType;
+  applicationKind: ApplicationKind;
+}): boolean => record.planProvisioningType === 'K2' && record.applicationKind !== 'INTERNAL';
 
 /**
  * A plan by the month commits to one month, or names no commitment and is paid by the month (a personal plan, K1): the rest are plans by
