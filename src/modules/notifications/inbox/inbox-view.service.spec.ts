@@ -56,7 +56,7 @@ describe('InboxViewService', () => {
   it('asks nothing for an empty page', async () => {
     const source = sourceOf(['REQUEST'], {});
 
-    await expect(serviceWith(source).view([], 'vi')).resolves.toEqual([]);
+    await expect(serviceWith(source).view([], 'vi', null)).resolves.toEqual([]);
 
     expect(source.spy).not.toHaveBeenCalled();
   });
@@ -65,8 +65,8 @@ describe('InboxViewService', () => {
     const source = sourceOf(['REQUEST'], { [REQUEST_A]: 'Figma – Professional' });
     const service = serviceWith(source);
 
-    const [vi] = await service.view([record()], 'vi');
-    const [en] = await service.view([record()], 'en');
+    const [vi] = await service.view([record()], 'vi', null);
+    const [en] = await service.view([record()], 'en', null);
 
     expect(vi.title).toBe('Nhu cầu đã được duyệt');
     expect(vi.message).toContain('Figma – Professional');
@@ -95,6 +95,7 @@ describe('InboxViewService', () => {
         { ...created, id: 'c' },
       ],
       'vi',
+      null,
     );
 
     expect(requests.spy).toHaveBeenCalledTimes(1);
@@ -111,7 +112,7 @@ describe('InboxViewService', () => {
     const source = sourceOf(['REQUEST', 'EMPLOYEE'], { [REQUEST_A]: 'Figma – Pro' });
     const withUnusedName = record({ params: { requestId: REQUEST_A, next: 'SPEND_SUBMISSION', employeeId: EMPLOYEE } });
 
-    await serviceWith(source).view([withUnusedName], 'vi');
+    await serviceWith(source).view([withUnusedName], 'vi', null);
 
     expect(source.spy.mock.calls.map(([kind]) => kind)).toEqual(['REQUEST']);
   });
@@ -123,6 +124,7 @@ describe('InboxViewService', () => {
     const views = await serviceWith(first, second).view(
       [record(), record({ id: 'b', params: { requestId: REQUEST_B, next: 'SPEND_SUBMISSION' } })],
       'vi',
+      null,
     );
 
     expect(views[0].message).toContain('From first');
@@ -131,7 +133,7 @@ describe('InboxViewService', () => {
   });
 
   it('uses the generic phrase for an id nobody knows, and logs nothing', async () => {
-    const [view] = await serviceWith(sourceOf(['REQUEST'], {})).view([record()], 'vi');
+    const [view] = await serviceWith(sourceOf(['REQUEST'], {})).view([record()], 'vi', null);
 
     expect(view.message).toContain('(không rõ tên)');
     expect(warn).not.toHaveBeenCalled();
@@ -141,7 +143,7 @@ describe('InboxViewService', () => {
     const failing = sourceOf(['REQUEST'], {});
     failing.spy.mockRejectedValue(new Error(`boom for ${REQUEST_A} Figma`));
 
-    const [view] = await serviceWith(failing).view([record()], 'en');
+    const [view] = await serviceWith(failing).view([record()], 'en', null);
 
     expect(view.message).toContain('(unnamed)');
     expect(warn).toHaveBeenCalledTimes(1);
@@ -162,7 +164,7 @@ describe('InboxViewService', () => {
       params: { employeeId: EMPLOYEE, departmentId: DEPARTMENT },
     });
 
-    const [view] = await serviceWith(failing, working).view([created], 'vi');
+    const [view] = await serviceWith(failing, working).view([created], 'vi', null);
 
     expect(view.message).toContain('một nhân viên');
     expect(view.message).toContain('Phong Ke toan');
@@ -170,7 +172,7 @@ describe('InboxViewService', () => {
   });
 
   it('uses the generic phrase and logs one line for a kind nobody registered', async () => {
-    const [view] = await serviceWith().view([record()], 'vi');
+    const [view] = await serviceWith().view([record()], 'vi', null);
 
     expect(view.message).toContain('(không rõ tên)');
     expect(warn).toHaveBeenCalledTimes(1);
@@ -181,6 +183,7 @@ describe('InboxViewService', () => {
     const [view] = await serviceWith().view(
       [record({ code: 'LICENSE_EXPIRY_REMINDER', subjectType: 'LicenseAssignment', subjectId: REQUEST_B, params: {} })],
       'vi',
+      null,
     );
 
     expect(view.record.subjectType).toBe('LICENSE_ASSIGNMENT');
@@ -191,6 +194,7 @@ describe('InboxViewService', () => {
     const [view] = await serviceWith().view(
       [record({ code: 'EMPLOYEE_PROFILE_UPDATED', subjectType: null, subjectId: null, params: {} })],
       'vi',
+      null,
     );
 
     expect(view.record.subjectType).toBeNull();
@@ -198,12 +202,101 @@ describe('InboxViewService', () => {
   });
 
   it('answers a code that left the table with a generic title, no message and the target of its subject, without throwing', async () => {
-    const [vi] = await serviceWith().view([record({ code: 'GONE_CODE' })], 'vi');
-    const [en] = await serviceWith().view([record({ code: 'GONE_CODE' })], 'en');
+    const [vi] = await serviceWith().view([record({ code: 'GONE_CODE' })], 'vi', null);
+    const [en] = await serviceWith().view([record({ code: 'GONE_CODE' })], 'en', null);
 
     expect(vi).toMatchObject({ title: 'Thông báo mới', message: '' });
     expect(en).toMatchObject({ title: 'New notification', message: '' });
     expect(vi.target).toEqual({ operationId: 'accessRequestGet', pathParams: { id: REQUEST_A } });
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  describe('when the viewer is the employee the notice is about (R-3)', () => {
+    const MANAGER = '66666666-6666-4666-8666-666666666666';
+    const people = (): NotificationNameSource => sourceOf(['EMPLOYEE'], { [EMPLOYEE]: 'An Nguyen' });
+    const updated = record({
+      code: 'EMPLOYEE_PROFILE_UPDATED',
+      subjectType: 'EMPLOYEE',
+      subjectId: EMPLOYEE,
+      params: { employeeId: EMPLOYEE },
+    });
+    const revoking = record({
+      code: 'TRANSFER_RIGHTS_REVOKING',
+      subjectType: 'DEPARTMENT_TRANSFER',
+      subjectId: REQUEST_B,
+      params: { transferId: REQUEST_B, employeeId: EMPLOYEE, toDepartmentId: DEPARTMENT, rightCount: 3 },
+    });
+    const personnel = record({
+      code: 'PERSONNEL_EVENT_RECORDED',
+      subjectType: 'DEPARTMENT_TRANSFER',
+      subjectId: REQUEST_B,
+      params: { employeeId: EMPLOYEE, eventKind: 'TRANSFER_RECORDED', effectiveOn: '2026-12-01' },
+    });
+
+    it('says "your profile" to the employee, and the name to anyone else', async () => {
+      const service = serviceWith(people());
+
+      const [selfVi] = await service.view([updated], 'vi', EMPLOYEE);
+      const [selfEn] = await service.view([updated], 'en', EMPLOYEE);
+      const [headVi] = await service.view([updated], 'vi', MANAGER);
+
+      expect(selfVi.message).toBe('Hồ sơ của bạn vừa được cập nhật thông tin chính thức.');
+      expect(selfEn.message).toBe("Your profile's official details were just updated.");
+      expect(headVi.message).toContain('An Nguyen');
+      expect(headVi.message).not.toContain('của bạn');
+    });
+
+    it('names the employee when the viewer has no employee record', async () => {
+      const [view] = await serviceWith(people()).view([updated], 'vi', null);
+
+      expect(view.message).toContain('An Nguyen');
+    });
+
+    it('says "your old department" to the moved employee, and the name to the IT Admin', async () => {
+      const service = serviceWith(people());
+
+      const [selfVi] = await service.view([revoking], 'vi', EMPLOYEE);
+      const [selfEn] = await service.view([revoking], 'en', EMPLOYEE);
+      const [admin] = await service.view([revoking], 'vi', MANAGER);
+
+      expect(selfVi.message).toBe('3 quyền phần mềm của phòng cũ của bạn đang được thu hồi.');
+      expect(selfEn.message).toBe('3 software rights from your old department are being revoked.');
+      expect(admin.message).toContain('An Nguyen');
+    });
+
+    it('says "You" instead of the name in a personnel change, and asks no name for it', async () => {
+      const source = sourceOf(['EMPLOYEE'], { [EMPLOYEE]: 'An Nguyen' });
+      const service = serviceWith(source);
+
+      const [selfVi] = await service.view([personnel], 'vi', EMPLOYEE);
+      const [selfEn] = await service.view([personnel], 'en', EMPLOYEE);
+      expect(selfVi.message).toBe('Bạn: được điều chuyển, có hiệu lực từ 01/12/2026.');
+      expect(selfEn.message).toBe('You: was transferred, effective 01 Dec 2026.');
+      expect(source.spy).not.toHaveBeenCalled();
+
+      const [head] = await service.view([personnel], 'vi', MANAGER);
+      expect(head.message).toBe('An Nguyen: được điều chuyển, có hiệu lực từ 01/12/2026.');
+    });
+
+    it('does not turn the name of the viewer into "You" in another notice of the same page', async () => {
+      const created = record({
+        id: 'c',
+        code: 'EMPLOYEE_PROFILE_CREATED',
+        subjectType: 'EMPLOYEE',
+        subjectId: EMPLOYEE,
+        params: { employeeId: EMPLOYEE, departmentId: DEPARTMENT },
+      });
+
+      const views = await serviceWith(people()).view([personnel, created], 'vi', EMPLOYEE);
+
+      expect(views[0].message.startsWith('Bạn:')).toBe(true);
+      expect(views[1].message).toContain('An Nguyen');
+    });
+
+    it('keeps the params on the wire as they were stored', async () => {
+      const [view] = await serviceWith(people()).view([updated], 'vi', EMPLOYEE);
+
+      expect(view.record.params).toEqual({ employeeId: EMPLOYEE });
+    });
   });
 });

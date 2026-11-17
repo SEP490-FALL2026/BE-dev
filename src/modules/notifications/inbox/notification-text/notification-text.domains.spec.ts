@@ -48,6 +48,9 @@ const VARIANT_DOMAINS: Readonly<Record<string, Domain>> = {
   // `false` is the ordinary case: the sentence of a rejection that has an alternative is the `otherwise`.
   'REQUEST_IT_REJECTED.noAlternative': { values: ['true', 'false'], viaOtherwise: ['false'] },
   'REQUEST_SUBMITTED.stage': { values: ['WAITING_NEED_DECISION', 'WAITING_CONTROLLED', 'CONFIRMED'] },
+  // `false` (the viewer is someone else, or has no employee record) is the sentence with the name: the `otherwise`.
+  'EMPLOYEE_PROFILE_UPDATED.recipientIsSubject': { values: ['true', 'false'], viaOtherwise: ['false'] },
+  'TRANSFER_RIGHTS_REVOKING.recipientIsSubject': { values: ['true', 'false'], viaOtherwise: ['false'] },
   'REQUEST_WITHDRAWN.byRequester': { values: ['true', 'false'] },
   'RETURN_REQUESTED.source': { values: ['EMPLOYEE_RETURN', 'HEAD_CONFIRMATION'] },
   // `null`/absent (the head) and an old row without the key take the `otherwise`; only `NO_HOLDER` has a case.

@@ -3,6 +3,7 @@ import { IN_APP_NOTIFICATION_CODES, type InAppNotificationCode } from '../../pub
 import { CODE_LABELS, SHARED_LABELS } from './notification-labels.types';
 import {
   NOTIFICATION_TEXTS,
+  RECIPIENT_IS_SUBJECT,
   nameLookupKey,
   nameRefsOf,
   nameRefsOfTemplate,
@@ -40,6 +41,9 @@ const VARIABLE_SET_EXCEPTIONS: Readonly<Record<string, readonly string[]>> = {
   USAGE_TRACKING_NOTICE: ['dataKinds', 'purpose'],
 };
 
+/** Params only the renderer knows (never stored, never on the wire), so a variant may choose by them though no code carries them. */
+const RENDER_ONLY_KEYS = [RECIPIENT_IS_SUBJECT];
+
 type LabelTree = Readonly<
   Record<string, Readonly<Record<string, Readonly<Record<string, Record<NotificationLocale, string>>>>>>
 >;
@@ -73,13 +77,14 @@ function problemsOf(code: InAppNotificationCode): string[] {
   const texts = NOTIFICATION_TEXTS[code] as NotificationTexts | undefined;
   if (!texts) return ['no sentences'];
   const allowedKeys = new Set(PARAM_KEYS_BY_CODE[code]);
+  const allowedBy = new Set([...allowedKeys, ...RENDER_ONLY_KEYS]);
   const problems: string[] = [];
   const usedBy: Record<NotificationLocale, Set<string>> = { vi: new Set(), en: new Set() };
   for (const { locale, part, template } of templatesOf(texts)) {
     if (branchesOf(template).some((branch) => branch.trim() === '')) problems.push(`${part}: an empty branch`);
     for (const issue of templateSyntaxIssues(template)) problems.push(`${part}: ${issue}`);
     if (typeof template !== 'string') {
-      if (!allowedKeys.has(template.by)) problems.push(`${part}: by "${template.by}" is not a param of the code`);
+      if (!allowedBy.has(template.by)) problems.push(`${part}: by "${template.by}" is not a param of the code`);
       for (const key of Object.keys(template.cases)) {
         if (key === 'null' || key === 'undefined') {
           problems.push(`${part}: case "${key}" is unreachable: params null/absent select \`otherwise\``);

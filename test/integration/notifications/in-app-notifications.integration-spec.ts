@@ -355,7 +355,6 @@ describe('the inbox of the application over PostgreSQL (FR-3.11, US-05-15 AC-7, 
           params: { employeeId: grace.employeeId, departmentId: null },
         }),
       );
-      const employeeName = await nameOfEmployee(grace.employeeId);
 
       const vi = (await list(grace.account)).items;
       const en = h.dataOf<{ items: NoticeWire[] }>(await asEnglish(grace.account).expect(200)).items;
@@ -365,14 +364,43 @@ describe('the inbox of the application over PostgreSQL (FR-3.11, US-05-15 AC-7, 
       expect(granted).toMatchObject({ title: 'Đã cấp quyền' });
       expect(granted?.message).toContain('Miro');
       expect(granted?.target).toEqual({ operationId: 'accessRequestGet', pathParams: { id: proposal.id } });
-      expect(profile?.message).toContain(employeeName);
+      // The employee reads the sentence written for them, not their own name (R-3).
+      expect(profile?.message).toBe('Hồ sơ của bạn vừa được cập nhật thông tin chính thức.');
       expect(profile?.target).toEqual({ operationId: 'employeeGet', pathParams: { id: grace.employeeId } });
       const grantedEn = en.find((item) => item.code === 'REQUEST_GRANTED');
       expect(grantedEn).toMatchObject({ title: 'Access granted' });
       expect(grantedEn?.message).toContain('Miro');
-      expect(en.find((item) => item.code === 'EMPLOYEE_PROFILE_UPDATED')?.message).toContain(employeeName);
+      expect(en.find((item) => item.code === 'EMPLOYEE_PROFILE_UPDATED')?.message).toBe(
+        "Your profile's official details were just updated.",
+      );
       const unknown = await h.inbox(grace.account).set('Accept-Language', 'de, fr;q=0.5').expect(200);
       expect(h.dataOf<{ items: NoticeWire[] }>(unknown).items.map((item) => item.title)).toContain('Đã cấp quyền');
+    });
+
+    it('says the name of the employee to the head who is told, and "your profile" only to the employee (R-3)', async () => {
+      const department = await h.departmentWithUnit('P-WORDS9');
+      const employee = await h.staff(department, 'INB-W8');
+      const head = await h.staff(department, 'INB-W9');
+      const about = (recipientEmployeeId: string) =>
+        notice(recipientEmployeeId, {
+          code: 'EMPLOYEE_PROFILE_UPDATED',
+          subject: { type: 'EMPLOYEE', id: employee.employeeId },
+          params: { employeeId: employee.employeeId, departmentId: null },
+        });
+      await give(about(employee.employeeId));
+      await give(about(head.employeeId));
+      const employeeName = await nameOfEmployee(employee.employeeId);
+
+      const ofEmployee = (await list(employee.account)).items[0];
+      const ofHead = (await list(head.account)).items[0];
+      const ofHeadEn = h.dataOf<{ items: NoticeWire[] }>(await asEnglish(head.account).expect(200)).items[0];
+
+      expect(ofEmployee.message).toBe('Hồ sơ của bạn vừa được cập nhật thông tin chính thức.');
+      expect(ofHead.message).toContain(employeeName);
+      expect(ofHead.message).not.toContain('của bạn');
+      expect(ofHeadEn.message).toContain(employeeName);
+      // The words change, the stored params do not.
+      expect(ofEmployee.params).toEqual(ofHead.params);
     });
 
     it('uses the generic phrase for an id that does not exist, and still answers 200', async () => {

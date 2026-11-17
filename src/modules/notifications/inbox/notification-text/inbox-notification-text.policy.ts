@@ -302,6 +302,30 @@ function labelFor(code: string, key: string, value: string, locale: Notification
   return (byCode ?? own(own(SHARED_LABEL_TREE, key), value))?.[locale];
 }
 
+/**
+ * The param only the renderer knows: `'true'` when the person reading the notice is the employee it is about (`params.employeeId`),
+ * else `'false'`. A sentence may choose by it (`{ by: 'recipientIsSubject' }`); it is never stored and never on the wire, so it is not
+ * a key of `PARAM_KEYS_BY_CODE`. A viewer with no employee record is never the subject.
+ */
+export const RECIPIENT_IS_SUBJECT = 'recipientIsSubject';
+
+export function withRecipientIsSubject(
+  params: Readonly<Record<string, unknown>>,
+  recipientEmployeeId: string | null,
+): Record<string, unknown> {
+  const subject = rawOf(params.employeeId);
+  const isSubject = !!recipientEmployeeId && subject === recipientEmployeeId;
+
+  return { ...params, [RECIPIENT_IS_SUBJECT]: String(isSubject) };
+}
+
+/** Codes whose sentence prints the employee as a name even to the employee, who is told "Bạn" / "You" instead (catalogue, `PERSONNEL_EVENT_RECORDED`). */
+const SELF_NAMED_CODES: ReadonlySet<string> = new Set(['PERSONNEL_EVENT_RECORDED']);
+const SELF_NAME: Readonly<Record<NotificationLocale, string>> = { vi: 'Bạn', en: 'You' };
+
+const isSelfNamed = (code: string, params: Readonly<Record<string, unknown>>): boolean =>
+  SELF_NAMED_CODES.has(code) && params[RECIPIENT_IS_SUBJECT] === 'true' && !!rawOf(params.employeeId);
+
 /** The title and the message of a notice in one language; a code outside the table gives a generic title and no message. */
 export function renderNotificationText(
   code: string,
@@ -311,7 +335,15 @@ export function renderNotificationText(
 ): { title: string; message: string } {
   const texts = textsOf(code);
   if (!texts) return { title: UNKNOWN_CODE_TITLE[locale], message: '' };
-  const ctx: RenderContext = { params, locale, names, labelOf: (key, value) => labelFor(code, key, value, locale) };
+  const named = isSelfNamed(code, params)
+    ? new Map(names).set(nameLookupKey('EMPLOYEE', rawOf(params.employeeId) ?? ''), SELF_NAME[locale])
+    : names;
+  const ctx: RenderContext = {
+    params,
+    locale,
+    names: named,
+    labelOf: (key, value) => labelFor(code, key, value, locale),
+  };
   return { title: renderTemplate(texts[locale].title, ctx), message: renderTemplate(texts[locale].message, ctx) };
 }
 
@@ -327,5 +359,7 @@ export function nameRefsOf(
   for (const template of [texts[locale].title, texts[locale].message]) {
     for (const ref of nameRefsOfTemplate(template, params)) refs.set(nameLookupKey(ref.kind, ref.id), ref);
   }
+  // The employee who reads "Bạn" / "You" needs no name looked up.
+  if (isSelfNamed(code, params)) refs.delete(nameLookupKey('EMPLOYEE', rawOf(params.employeeId) ?? ''));
   return [...refs.values()];
 }

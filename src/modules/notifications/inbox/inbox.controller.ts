@@ -71,7 +71,10 @@ export class InboxController {
     try {
       const page = await this.inbox.list(actor.employeeId, query);
 
-      return { items: (await this.view.view(page.items, locale)).map(toNotificationWire), pagination: page.pagination };
+      return {
+        items: (await this.view.view(page.items, locale, actor.employeeId)).map(toNotificationWire),
+        pagination: page.pagination,
+      };
     } catch (error) {
       throw toInboxApiException(error);
     }
@@ -138,7 +141,11 @@ export class InboxController {
     @RequestLocale() locale: RequestLocaleValue,
   ) {
     try {
-      const [view] = await this.view.view([await this.inbox.markRead(actor.employeeId, params.id)], locale);
+      const [view] = await this.view.view(
+        [await this.inbox.markRead(actor.employeeId, params.id)],
+        locale,
+        actor.employeeId,
+      );
 
       return { notification: toNotificationWire(view) };
     } catch (error) {

@@ -152,13 +152,21 @@ export const ORG_TEXTS = {
   TRANSFER_RIGHTS_REVOKING: {
     vi: {
       title: 'Đang thu hồi quyền của phòng cũ',
-      message:
-        'Thời gian giữ quyền đã hết; {rightCount} quyền phần mềm của {employeeId:name} thuộc phòng cũ đang được thu hồi.',
+      message: {
+        by: 'recipientIsSubject',
+        cases: { true: '{rightCount} quyền phần mềm của phòng cũ của bạn đang được thu hồi.' },
+        otherwise:
+          'Thời gian giữ quyền đã hết; {rightCount} quyền phần mềm của {employeeId:name} thuộc phòng cũ đang được thu hồi.',
+      },
     },
     en: {
       title: 'Revoking access from the old department',
-      message:
-        'The grace period is over; {rightCount} software rights of {employeeId:name} from the old department are being revoked.',
+      message: {
+        by: 'recipientIsSubject',
+        cases: { true: '{rightCount} software rights from your old department are being revoked.' },
+        otherwise:
+          'The grace period is over; {rightCount} software rights of {employeeId:name} from the old department are being revoked.',
+      },
     },
   },
   DEPARTMENT_WITHOUT_HEAD: {
@@ -188,12 +196,21 @@ export const ORG_TEXTS = {
   EMPLOYEE_PROFILE_UPDATED: {
     vi: {
       title: 'Hồ sơ nhân viên đã được cập nhật',
-      message: 'Hồ sơ của {employeeId:name} vừa được cập nhật thông tin chính thức. Hãy mở hồ sơ để xem nội dung mới.',
+      message: {
+        by: 'recipientIsSubject',
+        cases: { true: 'Hồ sơ của bạn vừa được cập nhật thông tin chính thức.' },
+        otherwise:
+          'Hồ sơ của {employeeId:name} vừa được cập nhật thông tin chính thức. Hãy mở hồ sơ để xem nội dung mới.',
+      },
     },
     en: {
       title: 'Employee profile updated',
-      message:
-        "The official details in {employeeId:name}'s profile were updated. Open the profile to see the new details.",
+      message: {
+        by: 'recipientIsSubject',
+        cases: { true: "Your profile's official details were just updated." },
+        otherwise:
+          "The official details in {employeeId:name}'s profile were updated. Open the profile to see the new details.",
+      },
     },
   },
   PERSONNEL_EVENT_RECORDED: {

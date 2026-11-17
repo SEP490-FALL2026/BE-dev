@@ -8,7 +8,12 @@ import {
 } from '../public/notifications.extension-points';
 import type { InAppNotificationRecord } from '../public/notifications.types';
 import { canonicalSubjectType, notificationTarget, type NotificationTarget } from './notification-target.policy';
-import { nameLookupKey, nameRefsOf, renderNotificationText } from './notification-text/inbox-notification-text.policy';
+import {
+  nameLookupKey,
+  nameRefsOf,
+  renderNotificationText,
+  withRecipientIsSubject,
+} from './notification-text/inbox-notification-text.policy';
 
 /** One notice ready for the wire: the record with its subject type in `UPPER_SNAKE`, the words in the language asked and the screen it opens. */
 export interface NotificationView {
@@ -22,6 +27,7 @@ export interface NotificationView {
  * Puts words on a page of notices (`SPEC-5B` A2, A5): for the language asked it finds the display names the sentences print, one
  * lookup per kind of entity for the whole page, renders each sentence and gives each notice the screen it opens. A name nobody can
  * give (no owner registered, the owner failed, the id is gone) becomes a generic phrase and one line in the log, never a failed route.
+ * `recipientEmployeeId` is the employee reading: a notice about that same employee gets the sentence written for them (R-3).
  */
 @Injectable()
 export class InboxViewService {
@@ -29,16 +35,21 @@ export class InboxViewService {
 
   constructor(private readonly nameSources: NotificationNameContributions) {}
 
-  async view(records: readonly InAppNotificationRecord[], locale: RequestLocaleValue): Promise<NotificationView[]> {
+  async view(
+    records: readonly InAppNotificationRecord[],
+    locale: RequestLocaleValue,
+    recipientEmployeeId: string | null,
+  ): Promise<NotificationView[]> {
     if (records.length === 0) return [];
-    const names = await this.namesOf(records, locale);
+    const forRender = records.map((record) => withRecipientIsSubject(record.params, recipientEmployeeId));
+    const names = await this.namesOf(records, forRender, locale);
 
-    return records.map((record) => {
+    return records.map((record, index) => {
       const subject =
         record.subjectType !== null && record.subjectId !== null
           ? { type: canonicalSubjectType(record.subjectType), id: record.subjectId }
           : null;
-      const { title, message } = renderNotificationText(record.code, record.params, locale, names);
+      const { title, message } = renderNotificationText(record.code, forRender[index], locale, names);
 
       return {
         record: { ...record, subjectType: subject?.type ?? record.subjectType },
@@ -52,11 +63,12 @@ export class InboxViewService {
   /** The display names of the whole page, keyed by `nameLookupKey`: each kind is asked once, with the unique ids of that kind. */
   private async namesOf(
     records: readonly InAppNotificationRecord[],
+    renderParams: readonly Readonly<Record<string, unknown>>[],
     locale: RequestLocaleValue,
   ): Promise<ReadonlyMap<string, string>> {
     const idsByKind = new Map<NameKind, Set<string>>();
-    for (const record of records) {
-      for (const ref of nameRefsOf(record.code, record.params, locale)) {
+    for (const [index, record] of records.entries()) {
+      for (const ref of nameRefsOf(record.code, renderParams[index], locale)) {
         const ids = idsByKind.get(ref.kind) ?? new Set<string>();
         ids.add(ref.id);
         idsByKind.set(ref.kind, ids);
