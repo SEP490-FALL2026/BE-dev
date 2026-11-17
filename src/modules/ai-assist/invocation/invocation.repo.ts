@@ -1,14 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { aiInvocationContextJson, aiInvocationParsedJson, aiInvocationResultJson } from './invocation-content.json';
+import { aiInvocationResultJson } from './invocation-content.json';
 import type {
   InvocationKey,
   InvocationMetadata,
   InvocationOutcome,
+  InvocationOwner,
   InvocationRecord,
   LiveInvocation,
   NewInvocation,
+  StuckInvocation,
 } from './invocation.types';
 
 /** The statuses that hold the place of a queue revision: the partial unique index of the migration. */
@@ -38,12 +40,18 @@ function metadataColumns(metadata: InvocationMetadata | null) {
   return { ...columns, configHash: configFingerprint };
 }
 
-/** The calls of one person and feature, whatever else the key object carries. */
-const whose = (key: InvocationKey) => ({
-  organizationId: key.organizationId,
-  actorAppUserId: key.actorAppUserId,
-  feature: key.feature,
+/** The calls of one person and feature, in every mode, whatever else the key object carries. */
+const ownedBy = (owner: InvocationOwner) => ({
+  organizationId: owner.organizationId,
+  actorAppUserId: owner.actorAppUserId,
+  feature: owner.feature,
 });
+
+/**
+ * The calls of one person and feature made in one mode: the columns of the partial unique index but the revision. The mode is
+ * written out, not left to the spread of the key, so the call kept in the other mode is never given back.
+ */
+const whose = (key: InvocationKey) => ({ ...ownedBy(key), providerMode: key.providerMode });
 
 /** A live call that started (or, never started, was made) before `startedBefore`. */
 const stuckSince = (startedBefore: Date) => ({
@@ -52,14 +60,14 @@ const stuckSince = (startedBefore: Date) => ({
 });
 
 /**
- * The calls of the AI and what was said in them (`ai_invocations`, `ai_invocation_contents`). Every change of status is conditional
+ * The calls of the AI (`ai_invocations`); what was said in them is the history store's (`AiInvocationHistoryStore`). Every change of status is conditional
  * on the status it leaves, so a run that finishes late never overwrites a call that was taken for stuck, and the other way round.
  */
 @Injectable()
 export class AiInvocationRepo {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** A new call with its context. A second call kept for the same revision is refused by the unique index (P2002). */
+  /** A new call. Its content row is written by the history store in the same transaction. A second call kept for the same revision is refused by the unique index (P2002). */
   async insert(tx: DbTx, input: NewInvocation): Promise<{ id: string }> {
     const row = await tx.aiInvocation.create({
       data: {
@@ -68,11 +76,11 @@ export class AiInvocationRepo {
         actorAppUserId: input.actorAppUserId,
         actorEmployeeId: input.actorEmployeeId,
         status: input.status,
+        providerMode: input.providerMode,
         sourceRevision: input.sourceRevision,
         errorCode: input.errorCode,
         createdAt: input.at,
         finishedAt: input.status === 'FAILED' ? input.at : null,
-        content: { create: { context: aiInvocationContextJson.encode(input.context), createdAt: input.at } },
       },
       select: { id: true },
     });
@@ -80,7 +88,7 @@ export class AiInvocationRepo {
     return { id: row.id };
   }
 
-  /** The call kept for this queue revision of the person, if any. */
+  /** The call kept for this queue revision of the person in the mode of the key, if any. */
   async findLive(key: InvocationKey & { sourceRevision: string }, tx?: DbTx): Promise<LiveInvocation | null> {
     const row = await (tx ?? this.prisma).aiInvocation.findFirst({
       where: { ...whose(key), sourceRevision: key.sourceRevision, status: { in: [...KEPT_STATUSES] } },
@@ -90,15 +98,16 @@ export class AiInvocationRepo {
     return row && isKept(row.status) ? { id: row.id, status: row.status } : null;
   }
 
-  /** The live calls of the person that started before `startedBefore`. */
-  async stuckOf(tx: DbTx, key: InvocationKey, startedBefore: Date): Promise<string[]> {
-    const rows = await tx.aiInvocation.findMany({
-      where: { ...whose(key), ...stuckSince(startedBefore) },
-      select: { id: true },
+  /**
+   * The live calls of the person that started before `startedBefore`, in every mode (a run stuck is stuck whatever its source), each
+   * with the mode it was made in.
+   */
+  async stuckOf(tx: DbTx, owner: InvocationOwner, startedBefore: Date): Promise<StuckInvocation[]> {
+    return tx.aiInvocation.findMany({
+      where: { ...ownedBy(owner), ...stuckSince(startedBefore) },
+      select: { id: true, providerMode: true },
       orderBy: { id: 'asc' },
     });
-
-    return rows.map((row) => row.id);
   }
 
   /** Takes the call for stuck: FAILED with `AI.PROVIDER_TIMEOUT`, when it is still live and started before `startedBefore`. */
@@ -121,7 +130,7 @@ export class AiInvocationRepo {
     return count === 1;
   }
 
-  /** RUNNING → the outcome, with what the service answered; false (and nothing written) when the call is no longer running. */
+  /** RUNNING → the outcome's status, code and metadata; false (and nothing written) when the call is no longer running. The content is the history store's. */
   async finish(tx: DbTx, id: string, outcome: InvocationOutcome, at: Date): Promise<boolean> {
     const { count } = await tx.aiInvocation.updateMany({
       where: { id, status: 'RUNNING' },
@@ -132,20 +141,8 @@ export class AiInvocationRepo {
         ...metadataColumns(outcome.metadata),
       },
     });
-    if (count !== 1) return false;
-    if (outcome.content !== null) {
-      await tx.aiInvocationContent.update({
-        where: { invocationId: id },
-        data: {
-          promptText: outcome.content.promptText,
-          rawResponse: outcome.content.rawResponse,
-          parsed: aiInvocationParsedJson.encode(outcome.content.parsed),
-          result: aiInvocationResultJson.encode(outcome.content.result),
-        },
-      });
-    }
 
-    return true;
+    return count === 1;
   }
 
   /**
@@ -163,6 +160,7 @@ export class AiInvocationRepo {
         actorAppUserId: true,
         actorEmployeeId: true,
         status: true,
+        providerMode: true,
         sourceRevision: true,
         errorCode: true,
         createdAt: true,

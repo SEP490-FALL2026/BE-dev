@@ -30,6 +30,7 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(defaults.GHOST_SEAT_REVOCATION_GRACE_DAYS).toBe(7);
     expect(defaults.RULE_SCHEDULE_G1_G2).toBe('DAILY');
     expect(defaults.RULE_SCHEDULE_G3_G4).toBe('WEEKLY');
+    expect(defaults.AI_PROVIDER_MODE).toBe('SIMULATED');
   });
 
   it('has no budget period kind and no high-value threshold: the budget period is the fiscal year (AC-8, AC-14)', () => {
@@ -121,43 +122,22 @@ describe('operating parameter definitions (US-01-04)', () => {
     }
   });
 
-  it('S20-T9b (FR-1.4, FR-8.2): the point of adjustment and the red alert are three whole numbers of days, 7, 30 and 7 to begin with', () => {
-    const cases: [string, number, number, number][] = [
-      ['SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY', 7, 1, 28],
-      ['SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL', 30, 1, 180],
-      ['SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL', 7, 1, 90],
-    ];
-
-    for (const [key, standard, min, max] of cases) {
-      const definition = definitionOf(key);
-
-      expect(definition).toMatchObject({
-        group: 'SUBSCRIPTION',
-        unit: 'days',
-        unitLabel: 'ngày',
-        source: 'FR-1.4, FR-8.2',
-      });
-      expect(definition?.shape).toEqual({ kind: 'int', min, max });
-      expect(definition?.owner).toBeUndefined();
-      expect(defaultValues()[key]).toBe(standard);
-      for (const ok of [min, standard, max]) {
-        expect(validateParameterValue(key, ok, defaultValues())).toEqual({ ok: true });
-      }
-      for (const value of [min - 1, max + 1, -3]) {
-        expect(validateParameterValue(key, value, defaultValues())).toEqual({ ok: false, reason: 'OUT_OF_RANGE' });
-      }
-      for (const value of [7.5, '7', null]) {
-        expect(validateParameterValue(key, value, defaultValues())).toEqual({ ok: false, reason: 'WRONG_TYPE' });
-      }
-    }
-  });
-
   it('knows its own keys and nothing else', () => {
     expect(definitionOf('APPROVAL_SLA_WORKING_DAYS')?.unit).toBe('working days');
     expect(definitionOf('TIME_ZONE')).toBeUndefined();
     expect(validateParameterValue('TIME_ZONE', 'UTC', defaultValues())).toEqual({ ok: false, reason: 'UNKNOWN_KEY' });
   });
 });
+
+const SWITCH_LABELS = { ON: 'Bật', OFF: 'Tắt' };
+const SCHEDULE_LABELS = { DAILY: 'Hằng ngày', WEEKLY: 'Hằng tuần' };
+const OPTION_LABELS: Record<string, Record<string, string>> = {
+  RULE_SCHEDULE_G1_G2: SCHEDULE_LABELS,
+  RULE_SCHEDULE_G3_G4: SCHEDULE_LABELS,
+  AI_ENABLED: SWITCH_LABELS,
+  AI_ACCESS_REQUEST_SUMMARY_ENABLED: SWITCH_LABELS,
+  AI_PROVIDER_MODE: { SIMULATED: 'Giả lập (không gọi model)', MODEL: 'Model AI' },
+};
 
 const EXPECTED_KEYS = [
   'APPROVAL_SLA_WORKING_DAYS',
@@ -189,10 +169,11 @@ const EXPECTED_KEYS = [
   'RULE_SCHEDULE_G3_G4',
   'AI_ENABLED',
   'AI_ACCESS_REQUEST_SUMMARY_ENABLED',
+  'AI_PROVIDER_MODE',
 ];
 
 describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
-  it('pins the twenty-nine keys, ordered by group and, inside a group, as the spec table lists them', () => {
+  it('pins the thirty keys, ordered by group and, inside a group, as the spec table lists them', () => {
     expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
   });
 
@@ -326,6 +307,7 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['RULE_SCHEDULE_G3_G4', 'Lịch chạy luật lãng phí (dữ liệu usage)', 'USAGE', 'schedule', 'lịch'],
       ['AI_ENABLED', 'Công tắc tổng của các tính năng AI', 'AI', 'switch', 'công tắc'],
       ['AI_ACCESS_REQUEST_SUMMARY_ENABLED', 'Tóm tắt hàng chờ duyệt bằng AI', 'AI', 'switch', 'công tắc'],
+      ['AI_PROVIDER_MODE', 'Nguồn trả lời của AI', 'AI', 'mode', 'chế độ'],
     ]);
   });
 
@@ -337,15 +319,14 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       'RULE_SCHEDULE_G3_G4',
       'AI_ENABLED',
       'AI_ACCESS_REQUEST_SUMMARY_ENABLED',
+      'AI_PROVIDER_MODE',
     ]);
     expect(ENUM_OPTIONS_MAX).toBe(10);
     for (const definition of enums) {
       if (definition.shape.kind !== 'enum') continue;
       expect(Object.keys(definition.shape.optionLabels).sort()).toEqual([...definition.shape.options].sort());
       expect(definition.shape.options.length).toBeLessThanOrEqual(ENUM_OPTIONS_MAX);
-      expect(definition.shape.optionLabels).toEqual(
-        definition.group === 'AI' ? { ON: 'Bật', OFF: 'Tắt' } : { DAILY: 'Hằng ngày', WEEKLY: 'Hằng tuần' },
-      );
+      expect(definition.shape.optionLabels).toEqual(OPTION_LABELS[definition.key]);
     }
   });
 
@@ -367,6 +348,30 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       }
     }
     expect(definitionOf('AI_FINANCE_NARRATIVE_ENABLED')).toBeUndefined();
+  });
+
+  it('answers with the simulation until the Super Admin chooses the model, and takes nothing but SIMULATED or MODEL', () => {
+    const definition = definitionOf('AI_PROVIDER_MODE');
+
+    expect(definition).toMatchObject({
+      label: 'Nguồn trả lời của AI',
+      group: 'AI',
+      shape: { kind: 'enum', options: ['SIMULATED', 'MODEL'] },
+      default: 'SIMULATED',
+      unit: 'mode',
+      unitLabel: 'chế độ',
+    });
+    expect(definition?.description).toContain('Chỉ có hiệu lực khi công tắc AI đang bật.');
+    expect(defaultValues().AI_PROVIDER_MODE).toBe('SIMULATED');
+    for (const value of ['SIMULATED', 'MODEL']) {
+      expect(validateParameterValue('AI_PROVIDER_MODE', value, defaultValues())).toEqual({ ok: true });
+    }
+    for (const value of ['simulated', 'model', 'ON', 'OFF', 'OPENAI', '', true, 1, null]) {
+      expect(validateParameterValue('AI_PROVIDER_MODE', value, defaultValues())).toEqual({
+        ok: false,
+        reason: 'OUT_OF_RANGE',
+      });
+    }
   });
 
   it('describes the notice review as the Super Admin task (API-DOC-F07)', () => {

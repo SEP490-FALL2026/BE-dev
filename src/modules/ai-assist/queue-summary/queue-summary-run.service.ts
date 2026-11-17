@@ -10,12 +10,14 @@ import {
   AiServiceTimeoutError,
   AiServiceUnavailableError,
 } from '../ai-service/ai-service.errors';
+import { AiServiceClients } from '../ai-service/ai-service-clients.service';
 import {
   AI_CONTRACT_VERSION,
-  AiServiceClient,
+  type AiProviderMode,
   type QueueContext,
   type QueueSummaryServiceResponse,
 } from '../ai-service/ai-service.types';
+import { AiInvocationHistoryStore } from '../invocation/invocation-history-store.types';
 import { AiInvocationRepo } from '../invocation/invocation.repo';
 import type { InvocationMetadata, InvocationOutcome } from '../invocation/invocation.types';
 import { type SummaryActor, summaryEndedEvent } from './queue-summary-audit-event.mapper';
@@ -32,6 +34,8 @@ export interface QueueSummaryJob {
   lines: ContextLine[];
   /** How many steps waited for the person when the summary was composed. */
   total: number;
+  /** The mode the call was recorded with: the run asks that source and never reads `AI_PROVIDER_MODE` again. */
+  providerMode: AiProviderMode;
 }
 
 /** The fingerprint of what shaped an answer: the model, the prompt, the output schema and the checks of the backend. */
@@ -81,11 +85,17 @@ const failed = (errorCode: string, metadata: InvocationMetadata | null = null): 
 });
 
 /**
+ * How a run ended, and, when the AI service refused the call or could not be reached, its HTTP status and the code of the contract
+ * it answered with (never its body): for the operator log, to tell a token refused (401) from a model that failed (500).
+ */
+type RunOutcome = InvocationOutcome & { refusal?: { httpStatus: number | null; serviceCode: string | null } };
+
+/**
  * Runs a recorded call in the background of the API: RUNNING, the AI service, the checks of the answer, the source read again,
  * then COMPLETED, NO_VALID_OUTPUT or FAILED with the audit event, in one transaction. A failure of any kind ends as a state with a
  * stable code, never as an error of the request that started it; the log names the call, the feature, the status, the time and the
- * code, never what was said. A run that cannot even record its end stays RUNNING until a request of its owner takes it for
- * stuck.
+ * code (for a failed call, also the HTTP status and the contract code the AI service answered with), never what was said. A run
+ * that cannot even record its end stays RUNNING until a request of its owner takes it for stuck.
  */
 @Injectable()
 export class QueueSummaryRunService implements OnModuleDestroy {
@@ -97,9 +107,10 @@ export class QueueSummaryRunService implements OnModuleDestroy {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly repo: AiInvocationRepo,
+    private readonly history: AiInvocationHistoryStore,
     private readonly source: RequestsAiSourceApi,
     private readonly audit: AuditApi,
-    private readonly client: AiServiceClient,
+    private readonly clients: AiServiceClients,
   ) {}
 
   /** Starts the run and returns at once: the caller has already answered the person. */
@@ -108,6 +119,11 @@ export class QueueSummaryRunService implements OnModuleDestroy {
       .catch((error: unknown) => this.logFailure(job, 'record', error))
       .finally(() => this.running.delete(run));
     this.running.add(run);
+  }
+
+  /** Whether the source that answers a call of this mode is ready: the AI service configured, or the simulation. */
+  canAnswerIn(providerMode: AiProviderMode): boolean {
+    return this.clients.forMode(providerMode).configured();
   }
 
   /** Resolves when every run started so far has ended. */
@@ -122,7 +138,7 @@ export class QueueSummaryRunService implements OnModuleDestroy {
 
   private async run(job: QueueSummaryJob): Promise<void> {
     if (!(await this.repo.markRunning(job.invocationId, new Date()))) return;
-    let outcome: InvocationOutcome;
+    let outcome: RunOutcome;
     try {
       outcome = await this.outcomeOf(job);
     } catch (error) {
@@ -132,18 +148,22 @@ export class QueueSummaryRunService implements OnModuleDestroy {
     await this.finish(job, outcome);
   }
 
-  private async outcomeOf(job: QueueSummaryJob): Promise<InvocationOutcome> {
+  private async outcomeOf(job: QueueSummaryJob): Promise<RunOutcome> {
+    // The source of the mode of the call, whatever the parameter says now; a failure is the failure of that source, never a reason
+    // to ask the other one (QĐ-102b).
+    const client = this.clients.forMode(job.providerMode);
     let answer: QueueSummaryServiceResponse;
     try {
-      answer = await this.client.summarizeQueue(
+      answer = await client.summarizeQueue(
         { contractVersion: AI_CONTRACT_VERSION, invocationId: job.invocationId, locale: 'vi', context: job.context },
         this.stopping.signal,
       );
     } catch (error) {
       const code = failureCodeOf(error);
       if (code === null) throw error;
+      if (!(error instanceof AiServiceUnavailableError)) return failed(code);
 
-      return failed(code);
+      return { ...failed(code), refusal: { httpStatus: error.status, serviceCode: error.serviceCode } };
     }
     const metadata = metadataOf(answer);
     const content = {
@@ -201,14 +221,25 @@ export class QueueSummaryRunService implements OnModuleDestroy {
     };
   }
 
-  private async finish(job: QueueSummaryJob, outcome: InvocationOutcome): Promise<void> {
+  private async finish(job: QueueSummaryJob, outcome: RunOutcome): Promise<void> {
     const result = outcome.content?.result ?? null;
     const recorded = await this.runner.run(async (tx) => {
-      if (!(await this.repo.finish(tx, job.invocationId, outcome, new Date()))) return false;
+      const at = new Date();
+      if (!(await this.repo.finish(tx, job.invocationId, outcome, at))) return false;
+      if (outcome.content !== null) {
+        await this.history.recordAnswered(tx, {
+          invocationId: job.invocationId,
+          organizationId: job.organizationId,
+          context: job.context,
+          answer: outcome.content,
+          at,
+        });
+      }
       await this.audit.record(
         tx,
         summaryEndedEvent(job.actor, job.organizationId, job.invocationId, {
           status: outcome.status,
+          providerMode: job.providerMode,
           errorCode: outcome.errorCode,
           metadata: outcome.metadata,
           acceptedCount: result?.accepted.length ?? 0,
@@ -219,9 +250,14 @@ export class QueueSummaryRunService implements OnModuleDestroy {
       return true;
     });
     const latency = outcome.metadata === null ? '' : ` latencyMs=${outcome.metadata.latencyMs}`;
+    // A failed call names what the AI service answered: its HTTP status and contract code only (`none` when it gave neither).
+    const refusal =
+      outcome.status === 'FAILED'
+        ? ` httpStatus=${outcome.refusal?.httpStatus ?? 'none'} serviceCode=${outcome.refusal?.serviceCode ?? 'none'}`
+        : '';
     this.logger.log(
       `invocation=${job.invocationId} feature=${QUEUE_SUMMARY_FEATURE} status=${recorded ? outcome.status : 'SUPERSEDED'}` +
-        `${latency} errorCode=${outcome.errorCode ?? 'none'}`,
+        `${latency} errorCode=${outcome.errorCode ?? 'none'}${refusal}`,
     );
   }
 

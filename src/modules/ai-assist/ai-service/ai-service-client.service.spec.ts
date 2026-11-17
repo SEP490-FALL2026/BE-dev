@@ -96,6 +96,16 @@ describe('HttpAiServiceClient', () => {
     expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it('refuses the answer of a stub as the service being unavailable, never as an answer of the model (QĐ-102f)', async () => {
+    const { client, fetch } = clientWith(json(200, answer({ modelId: 'stub' })));
+
+    const failure = await failureOf(client.summarizeQueue(REQUEST, never));
+
+    expect(failure).toBeInstanceOf(AiServiceUnavailableError);
+    expect(failure).toMatchObject({ status: 200, serviceCode: null });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps a path of the base address and drops its trailing slash', async () => {
     const fetch: FetchLike = jest.fn(() => Promise.resolve(json(200, answer())));
     const client = new HttpAiServiceClient({ ...SETTINGS, baseUrl: 'https://ai.internal/base/' }, { fetch });
