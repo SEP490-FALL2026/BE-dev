@@ -10,6 +10,7 @@ const annual = (extra: Partial<AdjustmentInput> = {}): AdjustmentInput => ({
   billingCycle: 'ANNUAL',
   noticeDeadline: null,
   noticePeriodDays: null,
+  startDate: null,
   renewalDate: '2026-12-31',
   endDate: null,
   autoRenew: true,

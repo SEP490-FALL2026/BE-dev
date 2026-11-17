@@ -1,3 +1,5 @@
+import { addDays } from '../../../src/core/business-date';
+import { addMonths } from '../../../src/core/fiscal-year';
 import { RenewalHarness, type RenewalUnit } from '../../support/renewal-harness';
 
 const h = new RenewalHarness();
@@ -270,6 +272,46 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
       expect(kept[0].event_key).toBe(`subscription-renewal-kept:${subscriptionId}:${h.inDays(5)}`);
       // No red alert for a plan by the month, and no incident: its end rolls on.
       expect(await h.notices('SUBSCRIPTION_RENEWAL_RED_ALERT', subscriptionId)).toEqual([]);
+      expect(await deadlineEventOf(subscriptionId)).toEqual([]);
+    });
+  });
+
+  describe('a plan by the month that names only its end date (R-1)', () => {
+    /** The payment day by the oldest rule that needs no clock: the day of the grid counted back from `anchor` that is the earliest not before `from`. */
+    const paymentDayFrom = (anchor: string, from: string): string => {
+      let day = anchor;
+      for (let back = 1; addMonths(anchor, -back) >= from; back += 1) day = addMonths(anchor, -back);
+
+      return day;
+    };
+
+    it('counts its payment day from the end date back to the nearest one that is not before today, so its point opens every month and not only before the end', async () => {
+      const endDate = h.inDays(70);
+      const due = paymentDayFrom(endDate, h.today());
+      expect(due < endDate).toBe(true);
+      const subscriptionId = await h.term({
+        ownerDepartmentId: unit.department.id,
+        quantity: 10,
+        billingCycle: 'MONTHLY',
+        startDate: h.inDays(-60),
+        endDate,
+        autoRenew: true,
+      });
+      await h.seatOf(unit.members[0], { subscriptionId });
+      await h.seatOf(unit.members[1], { subscriptionId });
+
+      await h.sweepOn(addDays(due, -8));
+      expect(await h.notices('SUBSCRIPTION_RENEWAL_ALERT', subscriptionId)).toEqual([]);
+      await h.sweepOn(addDays(due, -7));
+      await h.sweepOn(due);
+
+      const alert = await h.notices('SUBSCRIPTION_RENEWAL_ALERT', subscriptionId);
+      expect(alert.map((row) => row.recipient_employee_id)).toEqual([h.it1.employeeId]);
+      expect(alert[0].params).toMatchObject({ commitment: 'MONTHLY', baseDate: due, renewalOn: due });
+      expect(alert[0].event_key).toBe(`subscription-adjustment-point:${subscriptionId}:${due}`);
+      const kept = await h.notices('SUBSCRIPTION_RENEWAL_KEPT', subscriptionId);
+      expect(kept.map((row) => row.recipient_employee_id)).toEqual([h.it1.employeeId]);
+      expect(kept[0].event_key).toBe(`subscription-renewal-kept:${subscriptionId}:${due}`);
       expect(await deadlineEventOf(subscriptionId)).toEqual([]);
     });
   });

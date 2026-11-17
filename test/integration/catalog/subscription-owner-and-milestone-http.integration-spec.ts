@@ -201,7 +201,8 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       const { planId } = await plan({ pricing: 'FLAT_RATE', type: 'K1' });
       today('2026-09-01');
 
-      // A K1 plan is paid by the month (R-E01): 7 days before its last payment day, which is the end day; no red alert for a plan by the month.
+      // A K1 plan is paid by the month (R-E01): its payment day is the day of the end day in each month (R-1), so on 1/9 the next is 30/9 (the 31st of
+      // December counted back by three months) and the point opens 7 days before it; the last payment day is the end day; no red alert for a plan by the month.
       const created = await subscription(planId, {
         endDate: '2026-12-31',
         autoRenew: false,
@@ -212,7 +213,7 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
 
       expect(created.status).toBe('ACTIVE');
       expect(created.noticeDeadline).toEqual({ value: null, source: 'BY_END_DATE' });
-      expect(created.alerts).toEqual({ baseDate: '2026-12-31', dates: ['2026-12-24'] });
+      expect(created.alerts).toEqual({ baseDate: '2026-09-30', dates: ['2026-09-23'] });
       expect(created.warnings).toEqual([]);
     });
 

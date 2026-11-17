@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { addDays } from '../../../src/core/business-date';
+import { addMonths } from '../../../src/core/fiscal-year';
 import { FinanceApi } from '../../../src/modules/finance/public/finance.api';
 import { PgRelay } from '../../support/pg-relay';
 import { QueryCounter, dataStatements, tablesOf } from '../../support/query-count';
@@ -203,12 +204,14 @@ describe('catalog subscription read model (integration, real PostgreSQL)', () =>
       const day = await today();
       await setSince('SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY', 14, addDays(day, -5));
       try {
-        // Both started long ago. A's month began about 10 days ago (before the change), B's begins in about 20 days (after it).
+        // Both started long ago. A's month began 8 to 11 days ago (before the change), B's about 2 days ago (after it): the next payment day is
+        // always within a month of today (R-1), so B's is a month from today less 2 days.
         const older = await h.subscription(5, 'K2');
         const later = await h.subscription(5, 'K2');
+        const laterPayment = addDays(addMonths(day, 1), -2);
         for (const [id, payment] of [
           [older, addDays(day, 20)],
-          [later, addDays(day, 50)],
+          [later, laterPayment],
         ]) {
           await sql().query(
             `UPDATE subscriptions SET start_date = $2, renewal_date = $3, end_date = NULL, notice_deadline = NULL, auto_renew = true WHERE id = $1`,
@@ -217,7 +220,7 @@ describe('catalog subscription read model (integration, real PostgreSQL)', () =>
         }
 
         expect((await rowOf(older)).alerts).toEqual({ baseDate: addDays(day, 20), dates: [addDays(day, 13)] });
-        expect((await rowOf(later)).alerts).toEqual({ baseDate: addDays(day, 50), dates: [addDays(day, 36)] });
+        expect((await rowOf(later)).alerts).toEqual({ baseDate: laterPayment, dates: [addDays(laterPayment, -14)] });
       } finally {
         await unset('SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY');
       }

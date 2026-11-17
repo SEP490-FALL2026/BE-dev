@@ -1,5 +1,5 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
-import { addMonths } from '../../../core/fiscal-year';
+import { addMonths, firstGridOffsetFrom } from '../../../core/fiscal-year';
 import { nthWorkingDayFrom, type NonWorkingDates } from '../../../core/working-days';
 
 /**
@@ -105,9 +105,7 @@ export function subscriptionPaymentPeriods(input: {
   const anchor = input.renewalDate ?? input.endDate ?? input.startDate;
   const from = input.notBefore > input.startDate ? input.notBefore : input.startDate;
   const stopsAt = !input.autoRenew ? input.endDate : null;
-  let at = 0;
-  while (addMonths(anchor, (at - 1) * months) >= from) at -= 1;
-  while (addMonths(anchor, at * months) < from) at += 1;
+  let at = firstGridOffsetFrom(anchor, months, from);
 
   const periods: PaymentPeriod[] = [];
   for (; ; at += 1) {
