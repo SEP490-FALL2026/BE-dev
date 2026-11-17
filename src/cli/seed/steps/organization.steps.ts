@@ -2,7 +2,7 @@ import type { DemoAccountSpec } from '../../../modules/installation/public/demo-
 import { dayOffset } from '../demo-dates';
 import { emailOf, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
-import type { DemoDepartment, DemoPerson } from '../fixture/demo-fixture.types';
+import type { DemoDepartment, DemoPerson, DemoPersonnelEvent } from '../fixture/demo-fixture.types';
 
 type Result = { status: StepOutcome['status']; label: string };
 
@@ -112,6 +112,8 @@ async function placedAsWanted(
   cache: Map<string, Map<string, { fullName: string }>>,
 ): Promise<Result> {
   if (person.department === null) return stillUnplaced(ctx, person);
+  const event = personnelEvent(ctx, person.code);
+  if (event) return afterPersonnelEvent(ctx, person, event);
   const departmentId = ctx.ids.departments.get(person.department);
   if (!departmentId) return { status: 'conflict', label: `${person.code}: phòng ${person.department} không có` };
   if (!cache.has(departmentId)) {
@@ -128,6 +130,58 @@ async function placedAsWanted(
   return same(member.fullName, person.fullName)
     ? { status: 'present', label: person.code }
     : { status: 'conflict', label: `${person.code} đã có với họ tên khác` };
+}
+
+function personnelEvent(ctx: DemoRunContext, code: string): DemoPersonnelEvent | undefined {
+  if (code === 'NV-DEV7') return { kind: 'OFFBOARDING', employee: code };
+  return ctx.fixture.personnel.find((event) => event.employee === code);
+}
+
+interface EmployeeProfile {
+  fullName: string;
+  department: { code: string } | null;
+  status: string;
+  workState: string;
+}
+
+/** Compare with the event's stored date, never a fresh relative date that would move forward on each rerun. */
+async function departmentAfterTransfer(
+  ctx: DemoRunContext,
+  person: DemoPerson,
+  event: Extract<DemoPersonnelEvent, { kind: 'TRANSFER' }>,
+): Promise<string | null> {
+  const rows = await listAll<{ effectiveOn: string; status: string; to: { department: { code: string } } }>(
+    ctx,
+    ctx.superAdminEmail,
+    `/department-transfers?employeeId=${ctx.ids.employees.get(person.code)}`,
+  );
+  const transfer = rows.find((row) => row.status !== 'CANCELLED' && row.to.department.code === event.toDepartment);
+  return transfer && transfer.effectiveOn <= ctx.today ? event.toDepartment : person.department;
+}
+
+/** Only the changes declared by this dataset can explain a different current placement. Names must still match. */
+async function afterPersonnelEvent(
+  ctx: DemoRunContext,
+  person: DemoPerson,
+  event: DemoPersonnelEvent,
+): Promise<Result> {
+  const profile = await ctx.api.call<EmployeeProfile>(
+    ctx.superAdminEmail,
+    'GET',
+    `/employees/${ctx.ids.employees.get(person.code)}`,
+  );
+  if (!same(profile.fullName, person.fullName))
+    return { status: 'conflict', label: `${person.code}: họ tên đã thay đổi` };
+  if (
+    event.kind === 'OFFBOARDING' &&
+    (profile.status === 'TERMINATED' || ['HANDING_OVER', 'LEFT'].includes(profile.workState))
+  ) {
+    return { status: 'present', label: person.code };
+  }
+  const expected = event.kind === 'TRANSFER' ? await departmentAfterTransfer(ctx, person, event) : person.department;
+  return profile.department?.code === expected
+    ? { status: 'present', label: person.code }
+    : { status: 'conflict', label: `${person.code}: phòng hiện tại không khớp sự kiện của fixture` };
 }
 
 /** The unplaced employee is the demo one while the profile has no department and the fixture's name (a placement is somebody's change). */
