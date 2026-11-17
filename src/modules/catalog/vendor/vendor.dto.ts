@@ -1,21 +1,39 @@
 import { z } from 'zod';
+import { normalizeDisplayName } from '../../../core/display-name';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 /**
- * The shape and the sizes the profile policy keeps (at most twenty lines, a name of at most 100 characters) are checked
- * here, so a body over them is a `VALIDATION_ERROR`. Whether a tax name is empty or repeated, or a rate is a percentage
+ * The shape and the sizes the profile policy keeps (at most twenty lines, a name of at most 100 characters, counted as the
+ * policy keeps it) are checked here, so a body over them is a `VALIDATION_ERROR`. Whether a tax name is empty or repeated, or a rate is a percentage
  * of at most two decimals between 0 and 100, is judged by the profile policy and answers with its own
  * `VENDOR_TAX_PROFILE.*` code. Money is text, never a JSON number (ADR-0007).
  */
 const group = z.enum(['T1', 'T2', 'T3']);
 const payer = z.enum(['VENDOR_COLLECTS', 'BUYER_REMITS']);
 
+const MAX_TAX_TYPE_LENGTH = 100;
+/** A tax name is counted as the profile policy keeps it (accents composed, ends trimmed, blanks collapsed), not as it is typed. */
+const taxType = z
+  .string()
+  .superRefine((value, context) => {
+    if (normalizeDisplayName(value).length > MAX_TAX_TYPE_LENGTH) {
+      context.addIssue({
+        code: 'too_big',
+        origin: 'string',
+        maximum: MAX_TAX_TYPE_LENGTH,
+        inclusive: true,
+        input: value,
+      });
+    }
+  })
+  .meta({
+    description: `At most ${MAX_TAX_TYPE_LENGTH} characters once the ends are trimmed, runs of blanks are collapsed to one and accents are composed (NFC); it is kept that way.`,
+  });
+
 export const declareTaxProfileBodySchema = z.strictObject({
   group: group.optional(),
-  lines: z
-    .array(z.strictObject({ taxType: z.string().max(100), ratePercent: z.string().max(20), deductible: z.boolean() }))
-    .max(20),
+  lines: z.array(z.strictObject({ taxType, ratePercent: z.string().max(20), deductible: z.boolean() })).max(20),
 });
 
 const pageQuery = {

@@ -405,6 +405,17 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
         lines: [line('T'.repeat(100)), ...Array.from({ length: 19 }, (_, index) => line(`Tax ${index}`))],
       });
       expect(atLimit.lines).toHaveLength(20);
+
+      // FIX-E-O2: the length is counted as the policy keeps the name, so spaces around it and a decomposed accent do not count twice.
+      const typed = `  ${'T'.repeat(48)}     ${'U'.repeat(51)}  `;
+      const decomposed = 'Thuế'.normalize('NFD').repeat(25);
+      const kept = await profileOf(id, { lines: [line(typed), line(decomposed)] });
+      expect(kept.lines.map((entry) => entry.taxType)).toEqual([
+        `${'T'.repeat(48)} ${'U'.repeat(51)}`,
+        'Thuế'.repeat(25),
+      ]);
+      const overOnceKept = await declare(id, { lines: [line(`${typed}x`)] }).expect(422);
+      expect(detailsOf(overOnceKept)).toMatchObject({ issues: [{ path: 'lines.0.taxType' }] });
     });
 
     it('answers 404 VENDOR.NOT_FOUND on every route for a vendor that does not exist, writing nothing', async () => {
