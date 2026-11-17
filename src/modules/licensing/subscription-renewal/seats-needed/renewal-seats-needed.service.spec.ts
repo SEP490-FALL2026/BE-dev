@@ -7,23 +7,23 @@ import { RenewalSeatsNeededService } from './renewal-seats-needed.service';
 
 const waiting: PendingRenewal = { requestId: 'req', state: 'PENDING', approved: false };
 
-function build(facts: Partial<SeatsNeededFacts>, pendingIds: string[] = [], openRequests = 0) {
+function build(facts: Partial<SeatsNeededFacts>, pendingIds: string[] = [], openRequests = 0, awaitingGrant = 0) {
   const seatsNeededFacts = jest.fn().mockResolvedValue({
     heldPastRenewal: 0,
     endingAssignmentIds: [],
     activeSeatsToday: 0,
-    approvedAwaitingGrant: 0,
     ...facts,
   });
   const pendingRenewalsOf = jest.fn((ids: readonly string[]) =>
     Promise.resolve(new Map(ids.filter((id) => pendingIds.includes(id)).map((id) => [id, waiting]))),
   );
   const openRequestsOfPlan = jest.fn().mockResolvedValue(openRequests);
+  const approvedAwaitingGrantOfPlan = jest.fn().mockResolvedValue(awaitingGrant);
   const hook = new RenewalHoldHook();
-  hook.bind({ pendingRenewalsOf, openRequestsOfPlan } as unknown as RenewalHold);
+  hook.bind({ pendingRenewalsOf, openRequestsOfPlan, approvedAwaitingGrantOfPlan } as unknown as RenewalHold);
   const service = new RenewalSeatsNeededService({ seatsNeededFacts } as unknown as SubscriptionRenewalSeatRepo, hook);
 
-  return { service, seatsNeededFacts, pendingRenewalsOf, openRequestsOfPlan };
+  return { service, seatsNeededFacts, pendingRenewalsOf, openRequestsOfPlan, approvedAwaitingGrantOfPlan };
 }
 
 const period = (extra: Partial<Parameters<RenewalSeatsNeededService['countFor']>[0]> = {}) => ({
@@ -39,9 +39,10 @@ const period = (extra: Partial<Parameters<RenewalSeatsNeededService['countFor']>
 describe('RenewalSeatsNeededService', () => {
   it('counts the seats held past the renewal, the continuations waiting and the grants approved and waiting', async () => {
     const { service } = build(
-      { heldPastRenewal: 4, endingAssignmentIds: ['a-1', 'a-2', 'a-3'], activeSeatsToday: 7, approvedAwaitingGrant: 2 },
+      { heldPastRenewal: 4, endingAssignmentIds: ['a-1', 'a-2', 'a-3'], activeSeatsToday: 7 },
       ['a-1', 'a-3'],
       1,
+      2,
     );
 
     expect(await service.countFor(period({ vendorMinimumSeats: 5 }))).toEqual({
@@ -61,19 +62,24 @@ describe('RenewalSeatsNeededService', () => {
     expect((await build({}).service.countFor(period({ vendorMinimumSeats: 5 }))).target).toBe(0);
   });
 
-  it('asks the repo for the facts of the subscription on the renewal day, counting the grants waiting only for the primary subscription of the plan', async () => {
+  it('asks the repo for the facts of the subscription on the renewal day', async () => {
     const tx = {} as DbTx;
     const { service, seatsNeededFacts } = build({});
 
-    await service.countFor(period({ isPrimaryForPlan: false }), tx);
+    await service.countFor(period(), tx);
 
-    expect(seatsNeededFacts).toHaveBeenCalledWith(
-      'sub-1',
-      'plan-1',
-      { today: '2026-12-01', renewalOn: '2027-01-01' },
-      false,
-      tx,
-    );
+    expect(seatsNeededFacts).toHaveBeenCalledWith('sub-1', { today: '2026-12-01', renewalOn: '2027-01-01' }, tx);
+  });
+
+  it('asks the requests for the people waiting for their grant only for the primary subscription of the plan, so a second subscription does not count them again', async () => {
+    const tx = {} as DbTx;
+    const primary = build({}, [], 0, 3);
+    expect((await primary.service.countFor(period(), tx)).approvedAwaitingGrant).toBe(3);
+    expect(primary.approvedAwaitingGrantOfPlan).toHaveBeenCalledWith('plan-1', tx);
+
+    const other = build({}, [], 0, 3);
+    expect((await other.service.countFor(period({ isPrimaryForPlan: false }))).approvedAwaitingGrant).toBe(0);
+    expect(other.approvedAwaitingGrantOfPlan).not.toHaveBeenCalled();
   });
 
   it('asks the requests for the seats that end by the renewal only, and not at all when none does', async () => {

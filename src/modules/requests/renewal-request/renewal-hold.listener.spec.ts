@@ -9,10 +9,14 @@ type CountArgs = [{ where: { planId: string; state: { notIn: string[] } } }];
 
 describe('RenewalHoldReader', () => {
   const count = jest.fn();
+  const countLines = jest.fn();
   const hook = new RenewalHoldHook();
   const reader = new RenewalHoldReader(
     {} as RenewalRequestRepo,
-    new AccessRequestRepo({ accessRequest: { count } } as unknown as PrismaService),
+    new AccessRequestRepo({
+      accessRequest: { count },
+      accessRequestLine: { count: countLines },
+    } as unknown as PrismaService),
     hook,
   );
 
@@ -43,6 +47,39 @@ describe('RenewalHoldReader', () => {
 
       expect(await reader.openRequestsOfPlan('plan-1', { accessRequest: { count: inTx } } as unknown as DbTx)).toBe(1);
       expect(count).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('approvedAwaitingGrantOfPlan', () => {
+    type RequestArgs = [{ where: { planId: string; type: { in: string[] }; state: string } }];
+    type LineArgs = [{ where: { state: string; request: { planId: string; type: string; state: { in: string[] } } } }];
+
+    it('counts the requests of a person and of a service account that wait for the IT Admin, and the approved lines of a group, never a renewal', async () => {
+      count.mockResolvedValue(2);
+      countLines.mockResolvedValue(3);
+
+      expect(await reader.approvedAwaitingGrantOfPlan('plan-1')).toBe(5);
+
+      const single = (count.mock.calls[0] as RequestArgs)[0].where;
+      expect(single).toEqual({
+        planId: 'plan-1',
+        type: { in: ['GRANT', 'SERVICE_ACCOUNT'] },
+        state: 'AWAITING_EXECUTION',
+      });
+      const grouped = (countLines.mock.calls[0] as LineArgs)[0].where;
+      expect(grouped.state).toBe('APPROVED');
+      expect(grouped.request).toMatchObject({ planId: 'plan-1', type: 'GROUP_GRANT' });
+      expect([...grouped.request.state.in].sort()).toEqual(['AWAITING_EXECUTION', 'EXECUTING']);
+    });
+
+    it('reads inside the transaction it is given', async () => {
+      const inTx = jest.fn().mockResolvedValue(1);
+      const inTxLines = jest.fn().mockResolvedValue(1);
+
+      const tx = { accessRequest: { count: inTx }, accessRequestLine: { count: inTxLines } } as unknown as DbTx;
+      expect(await reader.approvedAwaitingGrantOfPlan('plan-1', tx)).toBe(2);
+      expect(count).not.toHaveBeenCalled();
+      expect(countLines).not.toHaveBeenCalled();
     });
   });
 

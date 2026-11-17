@@ -372,6 +372,28 @@ export class AccessRequestRepo {
   }
 
   /**
+   * The people the requests for the plan approved in full are still to be granted for (`QĐ-103e`, `QĐ-103v`(2)): a request of one person
+   * (or of a service account) that waits for the IT Admin (`AWAITING_EXECUTION`) is one; a request for a group is one for each person
+   * whose line is approved and not taken yet. They are the people the queue of grants shows as waiting. A request to go on using is no
+   * grant (its seat is held and read as a renewal waiting), and a request whose task was made is read by the seat it holds.
+   */
+  async countApprovedAwaitingGrantOfPlan(planId: string, tx?: DbTx): Promise<number> {
+    const db = tx ?? this.prisma;
+    // One query at a time: the client of a transaction runs one statement at once.
+    const single = await db.accessRequest.count({
+      where: { planId, type: { in: ['GRANT', 'SERVICE_ACCOUNT'] }, state: 'AWAITING_EXECUTION' },
+    });
+    const grouped = await db.accessRequestLine.count({
+      where: {
+        state: 'APPROVED',
+        request: { planId, type: 'GROUP_GRANT', state: { in: ['AWAITING_EXECUTION', 'EXECUTING'] } },
+      },
+    });
+
+    return single + grouped;
+  }
+
+  /**
    * A request that is being drafted (`DRAFT`, spec L.1) is written by the release after this one and is not read here: it is
    * answered as a request that does not exist, so no service of this release can see, list, decide or move it.
    */

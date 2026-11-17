@@ -9,7 +9,8 @@ import { RenewalRequestRepo } from '../renewal-apply/renewal-request.repo';
  * What licensing asks of the module of requests about a seat whose right is reaching its end (`RenewalHold`, bound to licensing's
  * `RenewalHoldHook` when the module starts): does it have a renewal waiting for its decision. A request sent up to the end of the
  * right leaves the right as it is until a decision comes; refused or withdrawn, it is no longer waiting (`US-05-14` AC-4). And how
- * many requests for a plan are still open, which keeps the renewal of its subscription from being cancelled (`QĐ-103e`).
+ * many requests for a plan are still open, which keeps the renewal of its subscription from being cancelled (`QĐ-103e`), and for how many
+ * people the approved ones still wait for their grant, which the seats the next period needs add (`QĐ-103v`(2)).
  */
 @Injectable()
 export class RenewalHoldReader implements RenewalHold, OnModuleInit {
@@ -36,5 +37,9 @@ export class RenewalHoldReader implements RenewalHold, OnModuleInit {
 
   openRequestsOfPlan(planId: string, tx?: DbTx): Promise<number> {
     return this.requests.countOpenOfPlan(planId, tx);
+  }
+
+  approvedAwaitingGrantOfPlan(planId: string, tx?: DbTx): Promise<number> {
+    return this.requests.countApprovedAwaitingGrantOfPlan(planId, tx);
   }
 }

@@ -154,6 +154,12 @@ export interface RenewalHold {
    * one is open the renewal of a subscription of the plan is not cancelled (`QĐ-103e`).
    */
   openRequestsOfPlan(planId: string, tx?: DbTx): Promise<number>;
+  /**
+   * How many people the requests for the plan, approved in full, are still to be granted for: the request waits for the IT Admin to
+   * make the task of its grant, so no seat of a subscription holds it yet (`QĐ-103e`, `QĐ-103v`(2)). A request to go on using is not
+   * one (it is read through `pendingRenewalsOf`) and a grant whose task was made is read by the seat it holds.
+   */
+  approvedAwaitingGrantOfPlan(planId: string, tx?: DbTx): Promise<number>;
 }
 
 /** The renewals of requests that hold a seat (bound by requests). */

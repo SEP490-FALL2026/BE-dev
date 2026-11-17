@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { OPEN_GRANT_TASK_STATUSES } from '../public/licensing-open-grants.types';
 import type { HeldSeat, SeatsNeededFacts } from './subscription-renewal.types';
 
 interface RawSeat {
@@ -82,18 +81,17 @@ export class SubscriptionRenewalSeatRepo {
    * The seats of the subscription as the count of the seats its next period needs reads them (`SBF-20` §4.3), in one statement: the
    * ones held past `renewalOn`, the ones in effect today that end by it, and the ones not ended today. The last day of a seat is the
    * earlier of the day before `valid_until` and `expected_end_date` (none: it does not end); a seat with a revocation under way is
-   * counted only among the seats not ended today. `countPlanWaiting` adds, in a second statement, the grants of the plan approved and
-   * not carried out, which no subscription holds yet.
+   * counted only among the seats not ended today. The requests approved and waiting for their grant hold no seat yet: the module of
+   * requests counts them (`RenewalHold.approvedAwaitingGrantOfPlan`).
    */
   async seatsNeededFacts(
     subscriptionId: string,
-    planId: string,
     days: { today: BusinessDate; renewalOn: BusinessDate },
-    countPlanWaiting: boolean,
     tx?: DbTx,
   ): Promise<SeatsNeededFacts> {
-    const db = tx ?? this.prisma;
-    const [row] = await db.$queryRaw<{ held_past_renewal: number; ending_ids: string[]; active_today: number }[]>`
+    const [row] = await (tx ?? this.prisma).$queryRaw<
+      { held_past_renewal: number; ending_ids: string[]; active_today: number }[]
+    >`
       WITH seats AS (
         SELECT a.id, a.valid_from, a.valid_until, LEAST(a.valid_until - 1, a.expected_end_date) AS last_day,
                EXISTS (SELECT 1 FROM provisioning_tasks t JOIN provisioning_task_reasons r ON r.task_id = t.id
@@ -113,20 +111,6 @@ export class SubscriptionRenewalSeatRepo {
       heldPastRenewal: row.held_past_renewal,
       endingAssignmentIds: row.ending_ids,
       activeSeatsToday: row.active_today,
-      approvedAwaitingGrant: countPlanWaiting ? await this.awaitingGrant(planId, db) : 0,
     };
-  }
-
-  /** The seats of the plan approved and waiting for the IT Admin to grant them: no subscription holds them, a grant task is open. */
-  private async awaitingGrant(planId: string, db: PrismaService | DbTx): Promise<number> {
-    const [row] = await db.$queryRaw<{ waiting: number }[]>`
-      SELECT count(*)::int AS waiting
-        FROM license_assignments a
-       WHERE a.plan_id = ${planId}::uuid AND a.subscription_id IS NULL AND a.failed_at IS NULL AND a.cancelled_at IS NULL
-         AND EXISTS (SELECT 1 FROM provisioning_tasks t
-                      WHERE t.assignment_id = a.id AND t.kind = 'GRANT'
-                        AND t.status::text = ANY(${[...OPEN_GRANT_TASK_STATUSES]}::text[]))`;
-
-    return row.waiting;
   }
 }

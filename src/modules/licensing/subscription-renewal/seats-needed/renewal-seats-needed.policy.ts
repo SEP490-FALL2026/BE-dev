@@ -6,7 +6,7 @@ export interface SeatsNeededParts {
   heldPastRenewal: number;
   /** Seats ending by the renewal day, not being taken back, that a request to go on using is waiting for. */
   pendingContinuations: number;
-  /** Grants of the plan approved and not carried out yet, which no subscription holds. */
+  /** People the requests for the plan, approved in full, are still to be granted for (no task yet, so no seat holds them): the module of requests counts them. */
   approvedAwaitingGrant: number;
 }
 

@@ -2,16 +2,20 @@ import { randomUUID } from 'node:crypto';
 import { AccessRequestRepo } from '../../../src/modules/requests/access-request/access-request.repo';
 import { SubscriptionRenewalSeatRepo } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal-seat.repo';
 import { RenewalSeatsNeededService } from '../../../src/modules/licensing/subscription-renewal/seats-needed/renewal-seats-needed.service';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { RenewalHarness } from '../../support/renewal-harness';
+import type { Unit } from '../../support/spend-harness';
 
 const h = new RenewalHarness();
 const TODAY = '2026-11-20';
 const RENEWAL_ON = '2027-01-01';
+const M = 1_000_000;
 
 /**
  * The statements behind the seats a subscription needs for its next period (SBF-20, S20-T3), on real PostgreSQL: the seats held past
- * the renewal day, the ones that end by it, the ones not ended today and the grants of the plan that wait; and the count of the open
- * requests of a plan that licensing reads through the module of requests.
+ * the renewal day, the ones that end by it and the ones not ended today; and what licensing reads through the module of requests: the
+ * renewals waiting for a seat, the requests approved and waiting for their grant (a request taken through the real routes, never a
+ * seat written by hand) and the open requests of a plan.
  */
 describe('the seats the next period needs (integration, real PostgreSQL)', () => {
   let seats: SubscriptionRenewalSeatRepo;
@@ -19,6 +23,7 @@ describe('the seats the next period needs (integration, real PostgreSQL)', () =>
 
   beforeAll(async () => {
     await h.start();
+    await h.withApprover();
     seats = h.ctx.app.get(SubscriptionRenewalSeatRepo, { strict: false });
   }, 300000);
 
@@ -120,8 +125,8 @@ describe('the seats the next period needs (integration, real PostgreSQL)', () =>
 
     return { subscriptionId, planId };
   };
-  const factsOf = (subscriptionId: string, planId: string, countPlanWaiting = false) =>
-    seats.seatsNeededFacts(subscriptionId, planId, { today: TODAY, renewalOn: RENEWAL_ON }, countPlanWaiting);
+  const factsOf = (subscriptionId: string) =>
+    seats.seatsNeededFacts(subscriptionId, { today: TODAY, renewalOn: RENEWAL_ON });
 
   describe('seatsNeededFacts', () => {
     it('counts the seats held past the renewal day, those that end by it and those not ended today', async () => {
@@ -135,7 +140,7 @@ describe('the seats the next period needs (integration, real PostgreSQL)', () =>
       await seat(planId, subscriptionId, { validFrom: '2026-10-01', validUntil: '2026-11-10' });
       await seat(planId, subscriptionId, { cancelled: true });
 
-      const facts = await factsOf(subscriptionId, planId);
+      const facts = await factsOf(subscriptionId);
 
       // The seat that ends exactly on the renewal day is not held past it (QĐ-106i(2)); one that starts later is.
       expect(facts.heldPastRenewal).toBe(3);
@@ -144,7 +149,6 @@ describe('the seats the next period needs (integration, real PostgreSQL)', () =>
       );
       // Every seat not ended today, a later start included; one ended before today and a cancelled one are not (R2-4).
       expect(facts.activeSeatsToday).toBe(6);
-      expect(facts.approvedAwaitingGrant).toBe(0);
     });
 
     it('leaves a seat being taken back out of the seats held and the seats ending, and keeps it among the seats in effect today', async () => {
@@ -157,38 +161,17 @@ describe('the seats the next period needs (integration, real PostgreSQL)', () =>
       await task(revokedEnding, 'REVOKE', 'QUEUED');
       await task(done, 'REVOKE', 'QUEUED', true);
 
-      const facts = await factsOf(subscriptionId, planId);
+      const facts = await factsOf(subscriptionId);
 
       expect(facts.heldPastRenewal).toBe(1);
       expect(facts.endingAssignmentIds).toEqual([done]);
       expect(facts.activeSeatsToday).toBe(4);
-    });
-
-    it('counts the grants of the plan approved and waiting only when asked, and only the ones no subscription holds', async () => {
-      const { subscriptionId, planId } = await subscription();
-      const waiting = await seat(planId, null);
-      await task(waiting, 'GRANT', 'QUEUED');
-      const retrying = await seat(planId, null);
-      await task(retrying, 'GRANT', 'RETRY_SCHEDULED');
-      const granted = await seat(planId, null);
-      await task(granted, 'GRANT', 'COMPLETED');
-      await seat(planId, null);
-      const held = await seat(planId, subscriptionId);
-      await task(held, 'GRANT', 'QUEUED');
-      const { planId: otherPlan } = await subscription();
-      await task(await seat(otherPlan, null), 'GRANT', 'QUEUED');
-
-      expect((await factsOf(subscriptionId, planId, true)).approvedAwaitingGrant).toBe(2);
-      expect((await factsOf(subscriptionId, planId, false)).approvedAwaitingGrant).toBe(0);
-      // The grant waiting is not a seat of the subscription: it is neither held nor in effect on it.
-      expect(await factsOf(subscriptionId, planId, true)).toMatchObject({ heldPastRenewal: 1, activeSeatsToday: 1 });
     });
   });
 
   describe('the open requests of a plan, read through the module of requests', () => {
     it('counts a request until it reaches a final state', async () => {
       const unit = await h.unit(1);
-      await h.withApprover();
       const subscriptionId = await h.term({ ownerDepartmentId: unit.department.id });
       const planId = await h.planOf(subscriptionId);
       const requests = h.ctx.app.get(AccessRequestRepo, { strict: false });
@@ -219,25 +202,128 @@ describe('the seats the next period needs (integration, real PostgreSQL)', () =>
   });
 
   describe('RenewalSeatsNeededService, with the real hook of the module of requests', () => {
-    it('adds the seats held past the renewal day to the grants waiting and reads the open requests of the plan', async () => {
-      const { subscriptionId, planId } = await subscription();
+    const service = () => h.ctx.app.get(RenewalSeatsNeededService, { strict: false });
+    const countFor = (
+      subscriptionId: string,
+      planId: string,
+      days: { today: string; renewalOn: string } = { today: TODAY, renewalOn: RENEWAL_ON },
+      isPrimaryForPlan = true,
+    ) => service().countFor({ subscriptionId, planId, vendorMinimumSeats: null, isPrimaryForPlan, ...days });
+
+    let unitSeq = 0;
+    /** A department with a head, a member, its IT Admin in charge and a budget; a K2 plan with a subscription of ten seats. */
+    const setting = async () => {
+      unitSeq += 1;
+      const unit = await h.departmentWithHead(`P-SN${unitSeq}`);
+      await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
+      await h.budgetFor(unit, { total: 100 * M });
+      const subscriptionId = await h.subscription(10, 'K2');
+
+      return { unit, subscriptionId, planId: await h.planOf(subscriptionId) };
+    };
+    /** A request of the member for the plan taken through the real routes to the IT Admin: the head, the sending on, the spending approver. */
+    const approvedRequest = async (unit: Unit, planId: string): Promise<string> => {
+      const requestId = await h.paidRequest(unit, planId);
+      await h.sendOn([requestId], unit.head.account).expect(201);
+      await h.decideSpend(requestId, { decision: 'APPROVE' }, h.boss.account).expect(200);
+
+      return requestId;
+    };
+
+    it('adds the seats held past the renewal day to the open requests of the plan, and the grants waiting only for the primary subscription', async () => {
+      const { unit, subscriptionId, planId } = await setting();
       await seat(planId, subscriptionId);
       await seat(planId, subscriptionId, { expectedEndDate: RENEWAL_ON });
-      await task(await seat(planId, null), 'GRANT', 'QUEUED');
-      const service = h.ctx.app.get(RenewalSeatsNeededService, { strict: false });
-      const period = { subscriptionId, planId, vendorMinimumSeats: 5, renewalOn: RENEWAL_ON, today: TODAY };
+      const requestId = await approvedRequest(unit, planId);
+      expect(await h.state(requestId)).toBe('AWAITING_EXECUTION');
 
-      expect(await service.countFor({ ...period, isPrimaryForPlan: true })).toEqual({
+      expect(await countFor(subscriptionId, planId)).toEqual({
         heldPastRenewal: 1,
         pendingContinuations: 0,
         approvedAwaitingGrant: 1,
         seatsNeeded: 2,
-        vendorMinimumSeats: 5,
-        target: 5,
+        vendorMinimumSeats: null,
+        target: 2,
         activeSeatsToday: 2,
-        openRequests: 0,
+        openRequests: 1,
       });
-      expect((await service.countFor({ ...period, isPrimaryForPlan: false })).seatsNeeded).toBe(1);
+      expect(
+        (await countFor(subscriptionId, planId, { today: TODAY, renewalOn: RENEWAL_ON }, false)).approvedAwaitingGrant,
+      ).toBe(0);
+    });
+
+    it('counts a request approved and not yet granted, and once the IT Admin grants it the seat is held by the subscription and not counted twice', async () => {
+      const { unit, subscriptionId, planId } = await setting();
+      const requestId = await approvedRequest(unit, planId);
+      // A renewal day before the one month of the right: the seat of the grant ends after it, so it is held past it.
+      const days = { today: TODAY, renewalOn: '2026-01-02' };
+
+      expect(await countFor(subscriptionId, planId, days)).toMatchObject({
+        heldPastRenewal: 0,
+        approvedAwaitingGrant: 1,
+        seatsNeeded: 1,
+      });
+
+      // The grant makes the task and the seat of the subscription at once (K2): the seat is held, the request is no longer waiting.
+      await h.grant({ requestId, subscriptionId }).expect(201);
+
+      expect(await h.state(requestId)).toBe('EXECUTING');
+      expect(await countFor(subscriptionId, planId, days)).toMatchObject({
+        heldPastRenewal: 1,
+        approvedAwaitingGrant: 0,
+        seatsNeeded: 1,
+      });
+    });
+
+    it('counts a request that is not approved yet in the open requests only, and a request refused in no part', async () => {
+      const { unit, subscriptionId, planId } = await setting();
+      const sent = await h.sent(unit.member, planId, { termMonths: 1 });
+
+      expect(await countFor(subscriptionId, planId)).toMatchObject({ approvedAwaitingGrant: 0, openRequests: 1 });
+
+      await h.decide(sent.id, { decision: 'REJECT', reason: 'Not needed' }, unit.head.account).expect(200);
+      expect(await countFor(subscriptionId, planId)).toMatchObject({ approvedAwaitingGrant: 0, openRequests: 0 });
+    });
+
+    it('counts an approved request to go on using only among the continuations waiting, never among the grants waiting', async () => {
+      const { unit, subscriptionId, planId } = await setting();
+      const people = [unit.member.employeeId, unit.head.employeeId];
+      await h.ctx.sql.query(`UPDATE employees SET hire_date = '2020-01-01' WHERE id = ANY($1::uuid[])`, [people]);
+      await h.ctx.sql.query(
+        `UPDATE employee_placements SET valid_from = '2020-01-01' WHERE employee_id = ANY($1::uuid[])`,
+        [people],
+      );
+      await h.ctx.sql.query(`UPDATE department_head_periods SET valid_from = '2020-01-01' WHERE department_id = $1`, [
+        unit.department.id,
+      ]);
+      try {
+        pretendBusinessToday(h.ctx.app, '2026-08-10');
+        const assignmentId = await h.seatOf(
+          unit.member,
+          { subscriptionId, planId },
+          { grantedOn: '2026-08-05', expectedEndDate: '2026-11-04' },
+        );
+        pretendBusinessToday(h.ctx.app, '2026-10-05');
+        const { request } = await h.renewed(unit.member.account, {
+          assignmentId,
+          longTerm: true,
+          businessReason: 'The work goes on',
+        });
+        pretendBusinessToday(h.ctx.app, '2026-10-20');
+        await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
+        await h.sendOn([request.id], unit.head.account).expect(201);
+        await h.decideSpend(request.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
+        expect(await h.state(request.id)).toBe('AWAITING_EXECUTION');
+
+        expect(await countFor(subscriptionId, planId, { today: '2026-10-20', renewalOn: '2026-11-05' })).toMatchObject({
+          heldPastRenewal: 0,
+          pendingContinuations: 1,
+          approvedAwaitingGrant: 0,
+          seatsNeeded: 1,
+        });
+      } finally {
+        jest.restoreAllMocks();
+      }
     });
   });
 });

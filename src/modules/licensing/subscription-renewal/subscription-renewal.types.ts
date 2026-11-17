@@ -104,8 +104,6 @@ export interface SeatsNeededFacts {
   endingAssignmentIds: string[];
   /** The seats not ended today (a seat that starts later and one being taken back included), as the renewal outcome counts them. */
   activeSeatsToday: number;
-  /** The grants of the plan approved and not carried out, held by no subscription; zero when not asked for. */
-  approvedAwaitingGrant: number;
 }
 
 /** A seat held on a subscription on a day, with what the ranking of a reduction reads of it. */
