@@ -557,12 +557,18 @@ describe('shared dataset v4: the eighteen requests of S10b (T12)', () => {
     'NV-NEW3',
   ]);
   const OLD_SENDERS = new Set(['NV-FINH', 'NV-DEP', 'NV-ITOH']);
-  const extra = F.requests.filter((r) => /^R(4\d|5[0-7])$/.test(r.key));
+  const extra = F.requests.filter((r) => /^R(4\d|5[0-8])$/.test(r.key));
   const request = (key: string) => F.requests.find((r) => r.key === key)!;
 
-  it('adds R40 to R57, eighteen of them, after the requests of MF-1', () => {
-    expect(extra.map((r) => r.key).sort()).toEqual(Array.from({ length: 18 }, (_, i) => `R${40 + i}`));
-    expect(F.requests.slice(-18)).toEqual(extra);
+  it('adds R40 to R57 and the additional pending Board request needed before the group budget check', () => {
+    expect(extra.map((r) => r.key).sort()).toEqual(Array.from({ length: 19 }, (_, i) => `R${40 + i}`));
+    expect(F.requests.slice(-19)).toEqual(extra);
+    expect(request('R58')).toMatchObject({
+      requester: 'NV-BOD1',
+      plan: 'adobe-cc-teams',
+      target: 'AWAITING_SPEND_DECISION',
+    });
+    expect(F.requests.indexOf(request('R58'))).toBeLessThan(F.requests.indexOf(request('R49')));
   });
 
   it('puts nobody of Marketing, Design or Sales in a new request, as sender or as beneficiary (SPEC 4.2: R10, R21, R11 keep their budgets)', () => {

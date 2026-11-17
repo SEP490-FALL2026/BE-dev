@@ -55,6 +55,14 @@ export const REQUESTS_EXTRA: DemoRequestScenario[] = [
       'Gói K1 không kiểm soát được (GitHub Copilot): IT mua thêm một ghế khi cấp và ghi chú các bước của danh sách.',
   }),
   r({
+    key: 'R58',
+    requester: 'NV-BOD1',
+    plan: 'adobe-cc-teams',
+    termMonths: null,
+    target: 'AWAITING_SPEND_DECISION',
+    summary: 'Biên tập bộ tài liệu điều hành bằng Adobe Creative Cloud: trưởng phòng đã trình lô, chờ Người duyệt chi.',
+  }),
+  r({
     key: 'R47',
     requester: 'NV-BOD1',
     plan: 'adobe-photoshop',

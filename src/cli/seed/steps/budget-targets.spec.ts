@@ -22,6 +22,20 @@ const lightOf = (input: { month: number; base: bigint; reserve: bigint; forecast
   return 'GREEN';
 };
 
+it('covers both provisional group lines before the spending approver rejects one, with the default Board reserve', () => {
+  for (const today of ['2026-10-01', '2026-11-18', '2026-12-31']) {
+    const group = F.requests.find((request) => request.key === 'R49')!;
+    const subscription = F.subscriptions.find((subscription) => subscription.plan === group.plan)!;
+    const months = 12 - Number(today.slice(5, 7)) + 1;
+    const provisional = Math.ceil(Number(subscription.unitPrice.amount) / 12) * months * group.beneficiaries!.length;
+    const choice = baseFor(F, 'BOD', today)!;
+    const { pending } = expectedOf(F, 'BOD', today);
+    expect(choice.reservePercent).toBe(10);
+    expect(choice.base * 1.1).toBeGreaterThanOrEqual(pending + provisional);
+    expect(choice.light).toBe('GREEN');
+  }
+});
+
 const DAYS = ['2026-11-17', '2026-10-01', '2026-12-31'];
 
 describe('the month the latest review closes (T9b)', () => {
