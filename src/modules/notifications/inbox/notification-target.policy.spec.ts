@@ -191,13 +191,25 @@ describe('notificationTarget', () => {
       'SUBSCRIPTION_RENEWAL_ALERT',
       'SUBSCRIPTION_RENEWAL_RED_ALERT',
       'SUBSCRIPTION_RENEWAL_KEPT',
-      'SUBSCRIPTION_AUTO_RENEWAL_INCIDENT',
       'SUBSCRIPTION_EXPIRY_MARKED',
       'SUBSCRIPTION_RENEWAL_DATA_QUALITY',
     ]) {
       expect(notificationTarget(code, subject, { subscriptionId: ID, renewalId: null })).toEqual({
         operationId: 'subscriptionGet',
         pathParams: { id: ID },
+      });
+    }
+  });
+
+  it('opens the list of deadline events for the incident of a renewal that nobody recorded, whatever the notice carries', () => {
+    const subject = { type: 'SUBSCRIPTION', id: ID };
+    for (const params of [
+      { subscriptionId: ID, baseDate: '2026-11-01', renewalId: null },
+      { subscriptionId: ID, renewalId: OTHER },
+    ]) {
+      expect(notificationTarget('SUBSCRIPTION_AUTO_RENEWAL_INCIDENT', subject, params)).toEqual({
+        operationId: 'subscriptionDeadlineEventList',
+        pathParams: {},
       });
     }
   });

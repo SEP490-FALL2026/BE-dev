@@ -92,6 +92,8 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
   IT_ADMIN_HANDOVER_RECEIVED: null, // the catalogue names two lists (subscriptions, applications)
   // SBF-20: the result of an adjustment is read as the renewal case; the other notices of a subscription open the subscription (its subject).
   SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED: route('subscriptionRenewalGet', { id: 'renewalId' }),
+  // The incident is also told to the person who decides spending, who may not read a subscription: the list of deadline events is open to all three recipients.
+  SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: route('subscriptionDeadlineEventList'),
   // Operations round: a list for the notices whose subject is not one record the recipient can read.
   OUT_OF_PROCESS_CASE_REPORTED: null, // the person and their head have no route that reads the case (`outOfProcessCaseList` is for the IT Admin)
   VENDOR_ACCOUNT_DISCREPANCY_OPENED: route('vendorAccountDiscrepancyList'),
