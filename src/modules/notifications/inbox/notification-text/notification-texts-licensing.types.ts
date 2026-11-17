@@ -2,8 +2,8 @@ import type { InAppNotificationCode } from '../../public/notifications.types';
 import type { NotificationTexts } from './notification-text.types';
 
 /**
- * The sentences of MF-5 (ghost seats and usage), SBF-03 (a right that ends), SBF-20 (a subscription and its renewal), SBF-19 (a
- * purchase invoice) and the software list of a department. Copied from `catalog/notifications.md` of the FE docs: one entry per
+ * The sentences of MF-5 (ghost seats and usage), SBF-03 (a right that ends), SBF-19 (a purchase invoice) and the software list of
+ * a department; the subscription and its renewal (SBF-20) are in `notification-texts-subscription.types.ts`. Copied from `catalog/notifications.md` of the FE docs: one entry per
  * code, `vi` and `en`.
  */
 export const LICENSING_TEXTS = {
@@ -243,119 +243,6 @@ export const LICENSING_TEXTS = {
       title: 'Service account still has no new owner',
       message:
         'As of {dueOn:date}, the service account of {employeeId:name} still has no new owner. (Old notice; this feature has been retired.)',
-    },
-  },
-  // Until the renewal of a subscription is redesigned (N3d) the old keys stay in the sentence. The state of the case (a decision, its
-  // outcome) and of the usage data is carried by labels of `CODE_LABELS` that complete the sentence, so no case of the variant needs
-  // a second `by`: `outcomeRecorded` is `true` or `false`, `usageData` is `AVAILABLE` or `NOT_AVAILABLE`.
-  SUBSCRIPTION_RENEWAL_ALERT: {
-    vi: {
-      title: 'Thuê bao sắp đến hạn gia hạn',
-      message: {
-        by: 'decisionRecorded',
-        cases: {
-          false:
-            'Còn {milestoneDays} ngày đến {baseDate:date} ({noticeBasis:enum}) của thuê bao {subscriptionId:name}. Chưa có quyết định gia hạn. {usageData:enum}',
-          true: 'Còn {milestoneDays} ngày đến {baseDate:date} ({noticeBasis:enum}) của thuê bao {subscriptionId:name}. Đã có quyết định{outcomeRecorded:enum} {usageData:enum}',
-        },
-        otherwise:
-          'Còn {milestoneDays} ngày đến {baseDate:date} ({noticeBasis:enum}) của thuê bao {subscriptionId:name}. {usageData:enum}',
-      },
-    },
-    en: {
-      title: 'Subscription renewal approaching',
-      message: {
-        by: 'decisionRecorded',
-        cases: {
-          false:
-            '{milestoneDays} days left until {baseDate:date} ({noticeBasis:enum}) for subscription {subscriptionId:name}. No renewal decision yet. {usageData:enum}',
-          true: '{milestoneDays} days left until {baseDate:date} ({noticeBasis:enum}) for subscription {subscriptionId:name}. A decision {outcomeRecorded:enum} {usageData:enum}',
-        },
-        otherwise:
-          '{milestoneDays} days left until {baseDate:date} ({noticeBasis:enum}) for subscription {subscriptionId:name}. {usageData:enum}',
-      },
-    },
-  },
-  SUBSCRIPTION_RENEWAL_DATA_QUALITY: {
-    vi: {
-      title: 'Thuê bao thiếu thông tin hợp đồng',
-      message:
-        'Thuê bao {subscriptionId:name} chưa có hạn báo hủy hoặc ngày hết hạn nên hệ thống chưa thể nhắc gia hạn. Vui lòng bổ sung thông tin hợp đồng.',
-    },
-    en: {
-      title: 'Subscription is missing contract data',
-      message:
-        'Subscription {subscriptionId:name} has no cancellation deadline or end date, so renewal reminders cannot be sent. Please complete the contract details.',
-    },
-  },
-  SUBSCRIPTION_RENEWAL_PROPOSED: {
-    vi: {
-      title: 'Có đề xuất gia hạn thuê bao chờ bạn xác nhận',
-      message: 'IT Admin đề xuất {choice:enum} cho thuê bao {subscriptionId:name}. Vui lòng xem xét và xác nhận.',
-    },
-    en: {
-      title: 'Subscription renewal proposal awaits your confirmation',
-      message: 'IT Admin proposed to {choice:enum} subscription {subscriptionId:name}. Please review and confirm.',
-    },
-  },
-  SUBSCRIPTION_RENEWAL_DECIDED: {
-    vi: {
-      title: 'Đã có quyết định gia hạn thuê bao',
-      message:
-        'Phương án {choice:enum} cho thuê bao {subscriptionId:name} đã được xác nhận và sẽ thực hiện {executionPoint:enum}.',
-    },
-    en: {
-      title: 'Subscription renewal decided',
-      message:
-        'The option to {choice:enum} subscription {subscriptionId:name} was confirmed and will be carried out {executionPoint:enum}.',
-    },
-  },
-  SUBSCRIPTION_RENEWAL_LATE: {
-    vi: {
-      title: 'Gia hạn thuê bao chưa được thực hiện đúng hạn',
-      message:
-        'Đã đến {baseDate:date} nhưng quyết định gia hạn thuê bao {subscriptionId:name} vẫn chưa ghi nhận kết quả với nhà cung cấp. Vui lòng thực hiện và cập nhật kết quả.',
-    },
-    en: {
-      title: 'Subscription renewal not carried out on time',
-      message:
-        '{baseDate:date} has arrived but the renewal decision for subscription {subscriptionId:name} still has no outcome recorded with the vendor. Please carry it out and record the result.',
-    },
-  },
-  SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: {
-    vi: {
-      title: 'Thuê bao có thể đã tự động gia hạn ngoài ý muốn',
-      message:
-        'Đã qua {baseDate:date} mà thuê bao {subscriptionId:name}, vốn tự động gia hạn, chưa có quyết định nào. Thuê bao có thể đã tự gia hạn. Vui lòng kiểm tra với nhà cung cấp.',
-    },
-    en: {
-      title: 'Subscription may have auto-renewed unintentionally',
-      message:
-        '{baseDate:date} has passed and subscription {subscriptionId:name}, which renews automatically, has no decision. It may have renewed on its own. Please check with the vendor.',
-    },
-  },
-  SUBSCRIPTION_EXPIRY_MARKED: {
-    vi: {
-      title: 'Thuê bao được đánh dấu sẽ kết thúc',
-      message:
-        'Đã qua {baseDate:date} mà thuê bao {subscriptionId:name} chưa có quyết định gia hạn, nên thuê bao được đánh dấu sẽ kết thúc[ vào {endDate:date}].',
-    },
-    en: {
-      title: 'Subscription marked to end',
-      message:
-        '{baseDate:date} has passed with no renewal decision for subscription {subscriptionId:name}, so it is marked to end[ on {endDate:date}].',
-    },
-  },
-  SUBSCRIPTION_SEATS_INCREASED: {
-    vi: {
-      title: 'Thuê bao được mua thêm chỗ',
-      message:
-        '{changedByEmployeeId:name} đã tăng số chỗ của thuê bao {subscriptionId:name} từ {fromQuantity} lên {toQuantity}.',
-    },
-    en: {
-      title: 'Seats added to a subscription',
-      message:
-        '{changedByEmployeeId:name} increased the seats of subscription {subscriptionId:name} from {fromQuantity} to {toQuantity}.',
     },
   },
   PURCHASE_INVOICE_SUBMITTED: {

@@ -57,9 +57,14 @@ const MAY_BE_ABSENT: Readonly<Partial<Record<InAppNotificationCode, readonly str
   STEP_ASSIGNED: ['stepKind'],
   STEP_SLA_ESCALATION: ['holderEmployeeId'],
   STEP_SLA_NO_SUPERIOR: ['holderEmployeeId'],
+  OUT_OF_PROCESS_CASE_REPORTED: ['applicationId', 'vendorId'],
+  SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['renewalId'],
   SUBSCRIPTION_EXPIRY_MARKED: ['endDate'],
-  SUBSCRIPTION_RENEWAL_ALERT: ['renewalId'],
+  // A row of before `SBF-20` v3.1 has no `commitment`; one of after has no `milestoneDays`, and `renewalId` is null.
+  SUBSCRIPTION_RENEWAL_ALERT: ['renewalId', 'commitment', 'milestoneDays'],
+  SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED: ['quantity', 'nextSubscriptionId'],
   SUBSCRIPTION_SEATS_INCREASED: ['requestId'],
+  VENDOR_ACCOUNT_DISCREPANCY_OPENED: ['applicationId', 'vendorId'],
   WITHDRAWAL_AWAITING_IT_CLOSE: ['taskId'],
 };
 

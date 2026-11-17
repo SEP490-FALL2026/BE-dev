@@ -90,12 +90,19 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
   DEPARTMENT_SOFTWARE_PROPOSED: route('departmentSoftwareProposalList'),
   DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED: route('meDepartmentSoftwareList'),
   IT_ADMIN_HANDOVER_RECEIVED: null, // the catalogue names two lists (subscriptions, applications)
+  // SBF-20: the result of an adjustment is read as the renewal case; the other notices of a subscription open the subscription (its subject).
+  SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED: route('subscriptionRenewalGet', { id: 'renewalId' }),
+  // Operations round: a list for the notices whose subject is not one record the recipient can read.
+  OUT_OF_PROCESS_CASE_REPORTED: null, // the person and their head have no route that reads the case (`outOfProcessCaseList` is for the IT Admin)
+  VENDOR_ACCOUNT_DISCREPANCY_OPENED: route('vendorAccountDiscrepancyList'),
+  DEVICE_STOP_REQUESTED: route('deviceStopRequestList'),
+  DEVICE_STOP_REQUEST_OVERDUE: route('deviceStopRequestList'),
 };
 
 /**
  * By `subject.type` (canonical), tried when the code has no route of its own: one line for each type of the catalogue that has a route
  * to read one record. Not here, for want of such a route: `APPLICATION`, `BUDGET_ADJUSTMENT`, `COST_CENTER`,
- * `DEPARTMENT_SOFTWARE_PROPOSAL`, `HANDOVER_DUTY`, `LICENSE_ASSIGNMENT`, `TRANSFER_REVIEW`.
+ * `DEPARTMENT_SOFTWARE_PROPOSAL`, `DEVICE_STOP_REQUEST`, `HANDOVER_DUTY`, `LICENSE_ASSIGNMENT`, `OUT_OF_PROCESS_CASE`, `TRANSFER_REVIEW`.
  */
 export const TARGET_BY_SUBJECT_TYPE: Readonly<Record<string, RouteRef>> = {
   ACCESS_REQUEST: route('accessRequestGet', { id: 'subject' }),
@@ -115,6 +122,7 @@ export const TARGET_BY_SUBJECT_TYPE: Readonly<Record<string, RouteRef>> = {
   PROVISIONING_TASK: route('provisioningTaskGet', { id: 'subject' }),
   PURCHASE_INVOICE: route('purchaseInvoiceGet', { id: 'subject' }),
   RETURN_REQUEST: route('returnRequestGet', { id: 'subject' }),
+  SAAS_ISSUE: route('saasIssueGet', { id: 'subject' }),
   SPEND_BATCH: route('spendBatchGet', { id: 'subject' }),
   SUBSCRIPTION: route('subscriptionGet', { id: 'subject' }),
   SUBSCRIPTION_RENEWAL: route('subscriptionRenewalGet', { id: 'subject' }),

@@ -57,7 +57,20 @@ const VARIANT_DOMAINS: Readonly<Record<string, Domain>> = {
   'SPEND_QUEUE_REMINDER.cause': { values: ['NO_HOLDER'] },
   // A row written before the key existed is the holder's.
   'STEP_SLA_REMINDER.recipientRole': { values: ['REQUESTER', 'HOLDER'], viaOtherwise: ['HOLDER'] },
-  'SUBSCRIPTION_RENEWAL_ALERT.decisionRecorded': { values: ['true', 'false'] },
+  // A row of before `SBF-20` v3.1 has no `commitment`: it takes the `otherwise`, the sentence of the old milestone.
+  'SUBSCRIPTION_RENEWAL_ALERT.commitment': { values: ['MONTHLY', 'ANNUAL'] },
+  // `NO_ALERT_ANCHOR` (no date at all) is the sentence that existed before the second problem: the `otherwise`.
+  'SUBSCRIPTION_RENEWAL_DATA_QUALITY.problem': {
+    values: ['NO_ALERT_ANCHOR', 'NO_NOTICE_DEADLINE'],
+    viaOtherwise: ['NO_ALERT_ANCHOR'],
+  },
+  // `false` (the vendor was told by the IT Admin of the subscription) is the plain sentence: the `otherwise`.
+  'SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED.substitute': { values: ['true', 'false'], viaOtherwise: ['false'] },
+  // An IT Admin who moved the report (`IT_ACTION`) is the plain sentence: the `otherwise`.
+  'SAAS_ISSUE_STATE_CHANGED.trigger': {
+    values: ['IT_ACTION', 'REPORTER_REPLY', 'REPORTER_REOPEN', 'REOPEN_WINDOW_LAPSED'],
+    viaOtherwise: ['IT_ACTION'],
+  },
   'TRANSFER_GRACE_STARTED.audience': { values: ['MOVER', 'HEAD', 'IT_ADMIN'] },
 };
 

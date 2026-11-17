@@ -20,8 +20,10 @@ const TYPES_WITHOUT_DETAIL_ROUTE = [
   'BUDGET_ADJUSTMENT',
   'COST_CENTER',
   'DEPARTMENT_SOFTWARE_PROPOSAL',
+  'DEVICE_STOP_REQUEST',
   'HANDOVER_DUTY',
   'LICENSE_ASSIGNMENT',
+  'OUT_OF_PROCESS_CASE',
   'TRANSFER_REVIEW',
 ] as const;
 
@@ -38,18 +40,21 @@ const CATALOGUE_SUBJECT_TYPES = [
   'DEPARTMENT',
   'DEPARTMENT_SOFTWARE_PROPOSAL',
   'DEPARTMENT_TRANSFER',
+  'DEVICE_STOP_REQUEST',
   'EMPLOYEE',
   'EMPLOYEE_LEAVE',
   'GHOST_SEAT_RECOMMENDATION',
   'HANDOVER_DUTY',
   'LICENSE_ASSIGNMENT',
   'OFFBOARDING_CASE',
+  'OUT_OF_PROCESS_CASE',
   'PERSONNEL_NOTICE',
   'PLAN',
   'POLICY_VERSION',
   'PROVISIONING_TASK',
   'PURCHASE_INVOICE',
   'RETURN_REQUEST',
+  'SAAS_ISSUE',
   'SPEND_BATCH',
   'SUBSCRIPTION',
   'SUBSCRIPTION_RENEWAL',
@@ -170,6 +175,51 @@ describe('notificationTarget', () => {
         { batchId: ID, departmentId: OTHER, sentCount: 3 },
       ),
     ).toEqual({ operationId: 'spendBatchGet', pathParams: { id: ID } });
+  });
+
+  it('opens the renewal case of a recorded adjustment, and the subscription for the other notices of SBF-20', () => {
+    const subject = { type: 'SUBSCRIPTION', id: ID };
+    expect(
+      notificationTarget('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', subject, { renewalId: OTHER, subscriptionId: ID }),
+    ).toEqual({ operationId: 'subscriptionRenewalGet', pathParams: { id: OTHER } });
+    // A renewal case that is not on the notice falls back to the subscription it is about.
+    expect(notificationTarget('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', subject, { renewalId: null })).toEqual({
+      operationId: 'subscriptionGet',
+      pathParams: { id: ID },
+    });
+    for (const code of [
+      'SUBSCRIPTION_RENEWAL_ALERT',
+      'SUBSCRIPTION_RENEWAL_RED_ALERT',
+      'SUBSCRIPTION_RENEWAL_KEPT',
+      'SUBSCRIPTION_AUTO_RENEWAL_INCIDENT',
+      'SUBSCRIPTION_EXPIRY_MARKED',
+      'SUBSCRIPTION_RENEWAL_DATA_QUALITY',
+    ]) {
+      expect(notificationTarget(code, subject, { subscriptionId: ID, renewalId: null })).toEqual({
+        operationId: 'subscriptionGet',
+        pathParams: { id: ID },
+      });
+    }
+  });
+
+  it('opens the issue report of the three notices about one, the lists of the operations notices, and nothing for a case outside the process', () => {
+    for (const code of ['SAAS_ISSUE_SUBMITTED', 'SAAS_ISSUE_RESPONSE_OVERDUE', 'SAAS_ISSUE_STATE_CHANGED']) {
+      expect(notificationTarget(code, { type: 'SAAS_ISSUE', id: ID }, { issueId: ID })).toEqual({
+        operationId: 'saasIssueGet',
+        pathParams: { id: ID },
+      });
+    }
+    expect(notificationTarget('VENDOR_ACCOUNT_DISCREPANCY_OPENED', null, { newCount: 2 })).toEqual({
+      operationId: 'vendorAccountDiscrepancyList',
+      pathParams: {},
+    });
+    for (const code of ['DEVICE_STOP_REQUESTED', 'DEVICE_STOP_REQUEST_OVERDUE']) {
+      expect(notificationTarget(code, { type: 'DEVICE_STOP_REQUEST', id: ID }, { stopRequestId: ID })).toEqual({
+        operationId: 'deviceStopRequestList',
+        pathParams: {},
+      });
+    }
+    expect(notificationTarget('OUT_OF_PROCESS_CASE_REPORTED', { type: 'OUT_OF_PROCESS_CASE', id: ID }, {})).toBeNull();
   });
 
   it('gives a screen without a subject when the catalogue names one', () => {

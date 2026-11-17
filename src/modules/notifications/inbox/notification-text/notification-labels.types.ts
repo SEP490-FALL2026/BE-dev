@@ -47,9 +47,21 @@ export const SHARED_LABELS = {
   choice: {
     RENEW: { vi: 'gia hạn', en: 'renew' },
     REDUCE: { vi: 'giảm số chỗ', en: 'reduce seats' },
+    INCREASE: { vi: 'tăng số chỗ', en: 'increase seats' },
     CANCEL: { vi: 'hủy', en: 'cancel' },
   },
 } satisfies LabelsByKey;
+
+/** The states of a report of an error in a SaaS right (`SAAS_ISSUE_STATE_CHANGED`), the same for where it comes from and where it goes. */
+const SAAS_ISSUE_STATE: LabelTable = {
+  NEW: { vi: 'mới gửi', en: 'new' },
+  IN_PROGRESS: { vi: 'đang xử lý', en: 'in progress' },
+  WAITING_REPORTER: { vi: 'chờ người báo trả lời', en: 'waiting for the reporter' },
+  WAITING_PROVIDER: { vi: 'chờ nhà cung cấp', en: 'waiting for the vendor' },
+  RESOLVED: { vi: 'đã giải quyết', en: 'resolved' },
+  CLOSED: { vi: 'đã đóng', en: 'closed' },
+  DUPLICATE: { vi: 'trùng phiếu khác', en: 'duplicate' },
+};
 
 /** `BUDGET_ADJUSTMENT_REQUESTED` and `BUDGET_ADJUSTMENT_DECIDED` name the kind of adjustment the same way. */
 const ADJUSTMENT_KIND: LabelTable = {
@@ -64,10 +76,7 @@ const REVOCATION_SOURCE: LabelTable = {
   GHOST_SEAT: { vi: 'chỗ ít được sử dụng', en: 'rarely used seat' },
 };
 
-/**
- * The labels of a value that belong to one code, which win over `SHARED_LABELS`. `SUBSCRIPTION_RENEWAL_ALERT` uses a label as a
- * whole clause of its sentence (`outcomeRecorded` is `true` or `false`, `usageData` completes it): a variant has one `by` only.
- */
+/** The labels of a value that belong to one code, which win over `SHARED_LABELS`. */
 export const CODE_LABELS = {
   REQUEST_NEED_APPROVED: {
     next: {
@@ -272,29 +281,30 @@ export const CODE_LABELS = {
   REVOCATION_UPCOMING: { source: REVOCATION_SOURCE },
   REVOCATION_CANCELLED: { source: REVOCATION_SOURCE },
   SUBSCRIPTION_RENEWAL_ALERT: {
-    noticeBasis: {
-      DECLARED: { vi: 'hạn báo hủy', en: 'cancellation deadline' },
-      INFERRED_UNCONFIRMED: {
-        vi: 'hạn báo hủy suy ra, chưa xác nhận',
-        en: 'inferred cancellation deadline, unconfirmed',
-      },
-      BY_END_DATE: { vi: 'ngày hết hạn thuê bao', en: 'subscription end date' },
-    },
-    outcomeRecorded: {
-      false: {
-        vi: ', chưa ghi kết quả với nhà cung cấp.',
-        en: 'was made; the outcome with the vendor is not recorded yet.',
-      },
-      true: { vi: ' và kết quả.', en: 'and its outcome are recorded.' },
-    },
-    usageData: {
-      AVAILABLE: { vi: 'Đã có dữ liệu sử dụng để tham khảo.', en: 'Usage data is available for reference.' },
-      NOT_AVAILABLE: { vi: 'Chưa có dữ liệu sử dụng.', en: 'No usage data yet.' },
+    commitment: {
+      MONTHLY: { vi: 'gói tháng', en: 'monthly' },
+      ANNUAL: { vi: 'gói năm', en: 'annual' },
     },
   },
   SUBSCRIPTION_RENEWAL_DATA_QUALITY: {
     problem: {
       NO_ALERT_ANCHOR: { vi: 'không có ngày làm mốc cảnh báo', en: 'no date to anchor the alerts' },
+      NO_NOTICE_DEADLINE: { vi: 'thiếu hạn chót báo hủy', en: 'no cancellation deadline' },
+    },
+  },
+  // What the IT Admin chose, and what the vendor did with it.
+  SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED: {
+    choice: {
+      RENEW: { vi: 'gia hạn đúng số', en: 'renew as is' },
+      REDUCE: { vi: 'giảm', en: 'reduce' },
+      INCREASE: { vi: 'tăng', en: 'increase' },
+      CANCEL: { vi: 'hủy', en: 'cancel' },
+    },
+    outcome: {
+      AS_DECIDED: { vi: 'đồng ý', en: 'agreed' },
+      VENDOR_REFUSED: { vi: 'từ chối', en: 'refused' },
+      DIFFERENT: { vi: 'làm khác', en: 'did otherwise' },
+      UNCONFIRMED: { vi: 'chưa xác nhận', en: 'not confirmed' },
     },
   },
   SUBSCRIPTION_RENEWAL_DECIDED: {
@@ -302,6 +312,33 @@ export const CODE_LABELS = {
       AS_PLANNED: { vi: 'theo kế hoạch của kỳ gia hạn', en: 'as planned for the renewal' },
       MID_TERM: { vi: 'ngay trong kỳ hiện tại', en: 'mid-term' },
       NEXT_RENEWAL: { vi: 'ở kỳ gia hạn kế tiếp', en: 'at the next renewal' },
+    },
+  },
+  // The words of the kind and the effect of a report are the ones the form of `saasIssueSubmit` shows the reporter, shortened to fit a sentence.
+  SAAS_ISSUE_SUBMITTED: {
+    category: {
+      NO_ACCESS: { vi: 'không vào được phần mềm', en: 'no access to the software' },
+      INVITATION_OR_ACTIVATION: {
+        vi: 'lời mời hoặc kích hoạt tài khoản không dùng được',
+        en: 'invitation or account activation failed',
+      },
+      MISSING_PLAN_FEATURE: { vi: 'thiếu tính năng của gói', en: 'a feature of the plan is missing' },
+      PROVIDER_OUTAGE: { vi: 'nhà cung cấp có vẻ đang lỗi', en: 'the vendor seems to be down' },
+      OTHER: { vi: 'lỗi khác', en: 'other error' },
+    },
+    impact: {
+      UNUSABLE: { vi: 'không dùng được phần mềm', en: 'the software cannot be used' },
+      PARTIAL: { vi: 'dùng được một phần', en: 'the software works in part' },
+      QUESTION_OR_OTHER: { vi: 'câu hỏi hoặc ảnh hưởng khác', en: 'a question or another effect' },
+    },
+  },
+  SAAS_ISSUE_STATE_CHANGED: { fromState: SAAS_ISSUE_STATE, toState: SAAS_ISSUE_STATE },
+  // The kind of batch that opened the differences, not the `source` filter of `vendorAccountDiscrepancyList` (D-17).
+  VENDOR_ACCOUNT_DISCREPANCY_OPENED: {
+    source: {
+      USAGE_IMPORT: { vi: 'báo cáo sử dụng của nhà cung cấp', en: 'vendor usage report' },
+      INVOICE_DIFFERENCE: { vi: 'chênh lệch hóa đơn', en: 'invoice difference' },
+      COLLECTOR_UNLISTED: { vi: 'công cụ lạ do collector báo', en: 'unlisted tool reported by the collector' },
     },
   },
   DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED: {

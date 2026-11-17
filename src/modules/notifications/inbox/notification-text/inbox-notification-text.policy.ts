@@ -14,6 +14,7 @@ import { MF1_SLA_TEXTS } from './notification-texts-mf1-sla.types';
 import { MF1_TEXTS } from './notification-texts-mf1.types';
 import { OPS_TEXTS } from './notification-texts-ops.types';
 import { ORG_TEXTS } from './notification-texts-org.types';
+import { SUBSCRIPTION_TEXTS } from './notification-texts-subscription.types';
 
 /**
  * Pure renderer of the sentence templates (entry of the `notification-text` group). Syntax, from the catalogue:
@@ -278,6 +279,7 @@ export const NOTIFICATION_TEXTS = {
   ...ORG_TEXTS,
   ...BUDGET_TEXTS,
   ...LICENSING_TEXTS,
+  ...SUBSCRIPTION_TEXTS,
   ...OPS_TEXTS,
 } satisfies Record<InAppNotificationCode, NotificationTexts>;
 
