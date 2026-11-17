@@ -418,8 +418,10 @@ export class AssignmentService {
       startDate ?? seat.effectiveFrom,
     );
     if (startDate === null || next === undefined || carried.length === 0) return;
-    // The pool buys exactly the seats the adjustment counted, and the count leaves out a seat that ends on the renewal day (R2-2, A1C-06).
-    if (next.ownerDepartmentId === null && carriedPast(carried, startDate).length === 0) return;
+    // The pool buys exactly the seats the adjustment counted, and the count leaves out a seat that ends on the renewal day of the period that
+    // runs (R2-2, A1C-06, V-6): not the first day of the next, which a plan by the year may begin the day after it.
+    const renewalOn = period.adjustment?.end ?? startDate;
+    if (next.ownerDepartmentId === null && carriedPast(carried, renewalOn).length === 0) return;
 
     const carrying = {
       assignmentIds: [seat.id],

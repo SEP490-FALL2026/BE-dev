@@ -310,16 +310,23 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
   });
 
   /** The pool of ten seats, four held, a next period of the pool recorded ahead and full (the adjustment bought the four needed). */
-  const fullNextPool = async () => {
+  const fullNextPool = async (period?: { renewalOn: string; startsOn: string }) => {
     const running = await h.subscription(10, 'K2');
     await takeOwnerOff(h, running);
+    // A plan by the year renewing itself on `renewalOn`: the day its adjustment counts the seats against (`adjustment.end`).
+    if (period) {
+      await h.ctx.sql.query(
+        `UPDATE subscriptions SET billing_cycle = 'ANNUAL', commitment_term_months = 12, auto_renew = true, renewal_date = $2::date WHERE id = $1`,
+        [running, period.renewalOn],
+      );
+    }
     await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
       running,
       answering.employeeId,
     ]);
     const planId = await h.planOf(running);
     for (let index = 0; index < 4; index += 1) await h.seat({ subscriptionId: running }, code());
-    const startsOn = h.inDays(30);
+    const startsOn = period?.startsOn ?? h.inDays(30);
     const next = await nextPeriod(h, running, 'ACTIVE', startsOn);
     await carry(h, running, next, startsOn);
     await sizeNext(next, 4);
@@ -362,6 +369,30 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
     expect(await purchasedOf(next)).toBe(5);
     expect(await risesOf(next)).toHaveLength(1);
     expect(await heldOn(next, startsOn)).toBe(5);
+  });
+
+  it('V-6 a seat granted to end on the day after the renewal day of a plan by the year, the next period beginning that day, is carried and buys its seat: its last day is judged against the renewal day', async () => {
+    const renewalOn = h.inDays(30);
+    const { next, planId, startsOn } = await fullNextPool({ renewalOn, startsOn: h.inDays(31) });
+
+    const { assignmentId } = taskOf(await grantEndingOn(planId, startsOn));
+
+    expect((await successorsOf(assignmentId)).map((row) => row.subscription_id)).toEqual([next]);
+    expect(await purchasedOf(next)).toBe(5);
+    expect(await risesOf(next)).toHaveLength(1);
+    expect(await heldOn(next, startsOn)).toBe(5);
+  });
+
+  it('V-6 a seat granted to end on the renewal day itself, the next period beginning that day, is still not carried and buys nothing (A1C-06)', async () => {
+    const renewalOn = h.inDays(30);
+    const { next, planId, startsOn } = await fullNextPool({ renewalOn, startsOn: renewalOn });
+
+    const { assignmentId } = taskOf(await grantEndingOn(planId, renewalOn));
+
+    expect(await successorsOf(assignmentId)).toEqual([]);
+    expect(await purchasedOf(next)).toBe(4);
+    expect(await risesOf(next)).toEqual([]);
+    expect(await heldOn(next, startsOn)).toBe(4);
   });
 
   it('S20-T4c a next period of the pool with room buys nothing: the seat carried takes the free one', async () => {
