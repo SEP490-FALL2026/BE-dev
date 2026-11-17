@@ -1,4 +1,4 @@
-import type { DemoApplication, DemoPlan } from '../demo-fixture.types';
+import type { DemoApplication, DemoPlan, DemoSubscription } from '../demo-fixture.types';
 
 export const k2 = (key: string, name: string, extra: Partial<DemoPlan> = {}): DemoPlan => ({
   key,
@@ -68,3 +68,21 @@ export function groupOf(key: string): string {
 
   return group;
 }
+
+export const monthly = (
+  key: string,
+  plan: string,
+  amount: string,
+  responsible: string,
+  freeAfterBaseline: number,
+): DemoSubscription => ({
+  key,
+  plan,
+  kind: 'TERM',
+  unitPrice: { amount, currency: 'VND' },
+  billingCycle: 'MONTHLY',
+  termMonths: 1,
+  noticePeriodDays: 30,
+  responsible,
+  freeAfterBaseline,
+});

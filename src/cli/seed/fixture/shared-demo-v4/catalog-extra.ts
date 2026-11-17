@@ -1,5 +1,5 @@
-import type { DemoApplication, DemoPlan } from '../demo-fixture.types';
-import { app, groupOf, k2, k4 } from './catalog-kit';
+import type { DemoApplication, DemoPlan, DemoSubscription } from '../demo-fixture.types';
+import { app, groupOf, k2, k4, monthly } from './catalog-kit';
 
 /** A per-seat plan bought one by one (K1): the control the company has over the seat is the one the vendor allows. */
 const k1 = (key: string, name: string, controlLevel: NonNullable<DemoPlan['controlLevel']>): DemoPlan => ({
@@ -78,4 +78,83 @@ export const EXTRA_APPLICATIONS: DemoApplication[] = [
     plans: [{ key: 'attendance-access', name: 'Truy cập Chấm công', provisioningType: 'K5', dataLossOnRemoval: false }],
   },
   app('skype', 'Skype for Business', 'Microsoft', [k2('skype-online', 'Skype Online Plan 2')], 'SAAS', 'LOW'),
+];
+
+/** An annual subscription: 12 months of commitment, a seat paid once a year, renewing `renewalInDays` from today. */
+const annual = (
+  key: string,
+  amount: string,
+  responsible: string,
+  freeAfterBaseline: number,
+  extra: Partial<DemoSubscription> = {},
+): DemoSubscription => ({
+  key,
+  plan: key,
+  kind: 'TERM',
+  unitPrice: { amount, currency: 'VND' },
+  billingCycle: 'ANNUAL',
+  termMonths: 12,
+  noticePeriodDays: 30,
+  responsible,
+  freeAfterBaseline,
+  ...extra,
+});
+
+/** One subscription of a monthly plan, named by the key of its plan, with its payment day counted from the day of the seed. */
+const byMonth = (
+  key: string,
+  amount: string,
+  responsible: string,
+  free: number,
+  renewalInDays: number,
+): DemoSubscription => ({
+  ...monthly(key, key, amount, responsible, free),
+  renewalInDays,
+});
+
+/** A K1 plan is bought seat by seat on each grant, so it starts with none; the vendor's dollar quote stays beside the price in dong (FX-1). */
+const k1Subscription = (key: string, amount: string, dollars: string): DemoSubscription => ({
+  ...monthly(key, key, amount, 'NV-ITA1', 0),
+  quantity: 0,
+  ownerDepartment: 'ENG',
+  originalPrice: { amount: dollars, currency: 'USD' },
+});
+
+/** A key bought once, on a day in the past: its keys come from the key store. */
+const perpetual = (key: string, amount: string, quantity: number): DemoSubscription => ({
+  key,
+  plan: key,
+  kind: 'PERPETUAL',
+  unitPrice: { amount, currency: 'VND' },
+  billingCycle: 'MONTHLY',
+  termMonths: 1,
+  responsible: 'NV-ITA1',
+  freeAfterBaseline: 0,
+  quantity,
+});
+
+/*
+ * Sixteen subscriptions, one per plan but Skype (retired in S21) and the internal attendance plan. Their payment and renewal days are counted
+ * from the day of the seed (SPEC 4.5) so that on that day and the next, some stand inside the window of SBF-20 and some outside it:
+ * Zoom Pro, Confluence Standard and HubSpot are inside (monthly); Notion Plus, Confluence Premium (a declared deadline) and Adobe (red: its
+ * deadline is in 5 days) are inside (annual); Microsoft 365, Notion Business and Photoshop are outside. Zoom Business's renewal day has passed
+ * with the automatic renewal on, which the daily job records as an incident (§8). Claude Team has no date at all.
+ */
+export const EXTRA_SUBSCRIPTIONS: DemoSubscription[] = [
+  byMonth('m365-basic', '150000', 'NV-ITA1', 5, 20),
+  annual('m365-standard', '3800000', 'NV-ITA1', 2, { renewalInDays: 120 }),
+  byMonth('zoom-pro', '360000', 'NV-ITA1', 3, 3),
+  annual('zoom-business', '5200000', 'NV-ITA1', 2, { renewalInDays: -3 }),
+  byMonth('notion-business', '500000', 'NV-ITA2', 4, 10),
+  annual('notion-plus', '2900000', 'NV-ITA2', 2, { renewalInDays: 45 }),
+  byMonth('confluence-standard', '160000', 'NV-ITA1', 4, 5),
+  annual('confluence-premium', '3700000', 'NV-ITA1', 2, { renewalInDays: 70, noticeDeadlineInDays: 25 }),
+  annual('adobe-cc-teams', '22000000', 'NV-ITA2', 3, { renewalInDays: 35 }),
+  byMonth('adobe-photoshop', '560000', 'NV-ITA2', 2, 25),
+  k1Subscription('claude-pro', '508000', '20'),
+  annual('claude-team', '7500000', 'NV-ITA1', 3, { withoutDates: true }),
+  k1Subscription('copilot-pro', '254000', '10'),
+  perpetual('visio-pro', '13000000', 3),
+  perpetual('sublime-license', '2500000', 2),
+  byMonth('hubspot-starter', '450000', 'NV-ITA1', 2, 1),
 ];

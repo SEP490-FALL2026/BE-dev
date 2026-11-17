@@ -1,6 +1,6 @@
 import type { DemoApplication, DemoFixture, DemoSeat, DemoSubscription } from '../demo-fixture.types';
-import { EXTRA_APPLICATIONS } from './catalog-extra';
-import { app, groupOf, k2, k4 } from './catalog-kit';
+import { EXTRA_APPLICATIONS, EXTRA_SUBSCRIPTIONS } from './catalog-extra';
+import { app, groupOf, k2, k4, monthly } from './catalog-kit';
 
 /*
  * The thirteen applications of the first dataset (twelve more are in `catalog-extra.ts`). Each (application, plan) has exactly one subscription, the stock of the shared pool (`QĐ-103d`): K2 plans have
@@ -99,24 +99,6 @@ const APPLICATIONS: DemoApplication[] = [
     ],
   },
 ];
-
-const monthly = (
-  key: string,
-  plan: string,
-  amount: string,
-  responsible: string,
-  freeAfterBaseline: number,
-): DemoSubscription => ({
-  key,
-  plan,
-  kind: 'TERM',
-  unitPrice: { amount, currency: 'VND' },
-  billingCycle: 'MONTHLY',
-  termMonths: 1,
-  noticePeriodDays: 30,
-  responsible,
-  freeAfterBaseline,
-});
 
 const SUBSCRIPTIONS: DemoSubscription[] = [
   { ...monthly('jira', 'jira-standard', '200000', 'NV-ITA1', 4), renewalInDays: 20 },
@@ -218,6 +200,6 @@ const SEATS: DemoSeat[] = [
 
 export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats'> = {
   applications: [...APPLICATIONS, ...EXTRA_APPLICATIONS],
-  subscriptions: SUBSCRIPTIONS,
+  subscriptions: [...SUBSCRIPTIONS, ...EXTRA_SUBSCRIPTIONS],
   seats: SEATS,
 };

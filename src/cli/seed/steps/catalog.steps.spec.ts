@@ -204,3 +204,47 @@ describe('the days of a subscription counted from the day of the seed (T5)', () 
     for (const key of ['chatgpt', 'cursor', 'grammarly']) expect(declared(key).renewalInDays).toBeUndefined();
   });
 });
+
+/** SPEC S05: thirteen more workspace profiles (the twelve K2 plans with a subscription and Visio); Notion Business names no company account. */
+describe('the workspace profiles of the plans of T4 and T6', () => {
+  const employees = new Map(SHARED_DEMO_V4.people.map((person) => [person.code, `id-${person.code}`]));
+  const ctx = { fixture: SHARED_DEMO_V4, today: '2026-11-17', ids: { employees } } as unknown as DemoRunContext;
+  const plans = SHARED_DEMO_V4.applications.flatMap((app) => app.plans);
+
+  it('records a profile for each K2 plan with a subscription and for Visio, and none for Skype or the K1, K5 plans', () => {
+    const withProfile = plans.filter((plan) => workspaceProfileBody(ctx, plan) !== null).map((plan) => plan.key);
+    const added = withProfile.filter(
+      (key) =>
+        ![
+          'jira-standard',
+          'figma-professional',
+          'slack-pro',
+          'github-team',
+          'onepassword-business',
+          'postman-professional',
+          'mailchimp-standard',
+          'canva-teams',
+          'jetbrains-all',
+        ].includes(key),
+    );
+
+    expect(added).toHaveLength(13);
+    expect(added).toContain('visio-pro');
+    expect(withProfile).not.toContain('skype-online');
+    expect(withProfile).not.toContain('claude-pro');
+    expect(withProfile).not.toContain('sublime-license');
+  });
+
+  it('names the third IT Admin as the vendor admin of Microsoft 365 and Visio, and leaves Notion Business without a company account', () => {
+    const body = (key: string) =>
+      workspaceProfileBody(
+        ctx,
+        plans.find((plan) => plan.key === key)!,
+      )!;
+
+    expect(body('m365-basic').members).toContainEqual({ employeeId: 'id-NV-ITA3', role: 'ADMIN' });
+    expect(body('visio-pro').members).toContainEqual({ employeeId: 'id-NV-ITA3', role: 'ADMIN' });
+    expect(body('notion-business')).not.toHaveProperty('ownerAccountEmail');
+    expect(body('notion-plus').ownerAccountEmail).toBe('it-notion-plus@saoviet.example');
+  });
+});
