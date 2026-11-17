@@ -168,6 +168,20 @@ describe('Finance asks for an adjustment of the budget and the spending approver
     expect(code(await supplementOf('-1').expect(422))).toBe('MONEY_OUT_OF_RANGE');
   });
 
+  it('F2: a money error points at the money object (`amount`) and a malformed text at the text inside it (`amount.amount`), as on every route that takes a money object', async () => {
+    const supplementOf = (amount: string) =>
+      ask({ kind: 'SUPPLEMENT', toCostCenterId: sales.department.unitId, amount: h.money(amount) });
+    const errorOf = (res: { body: unknown }) =>
+      (res.body as { error: { code: string; details: { path?: string; issues?: { path: string }[] } } }).error;
+
+    expect(errorOf(await supplementOf('-1').expect(422)).details.path).toBe('amount');
+    expect(errorOf(await supplementOf('1.5').expect(422))).toMatchObject({
+      code: 'MONEY_SCALE_EXCEEDED',
+      details: { path: 'amount' },
+    });
+    expect(errorOf(await supplementOf('abc').expect(422)).details.issues?.[0]?.path).toBe('amount.amount');
+  });
+
   it('refuses the shapes a kind does not have, and a Cost Center that is not one', async () => {
     expect(
       code(
