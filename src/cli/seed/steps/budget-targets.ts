@@ -102,7 +102,10 @@ function requestCost(fixture: Basis, today: Day, request: DemoRequestScenario): 
   const subscription = fixture.subscriptions.find((candidate) => candidate.plan === request.plan);
   const plan = request.plan ? planOf(fixture, request.plan) : undefined;
   if (!subscription || !plan) return 0;
-  const people = (request.beneficiaries ?? [request.requester]).length;
+  // The people the spending approver refuses hold nothing: they are never granted (R49).
+  const people = (request.beneficiaries ?? [request.requester]).filter(
+    (code) => !request.rejectedLines?.includes(code),
+  ).length;
   if (plan.provisioningType === 'K4')
     return request.grant === 'KEY' ? 0 : Number(subscription.unitPrice.amount) * people;
   if (plan.provisioningType === 'K5') return 0;

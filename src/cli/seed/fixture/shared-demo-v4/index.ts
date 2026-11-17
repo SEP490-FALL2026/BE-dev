@@ -3,6 +3,7 @@ import { CATALOG } from './catalog';
 import { FINANCE } from './finance';
 import { ORGANIZATION } from './organization';
 import { REQUESTS } from './requests';
+import { REQUESTS_EXTRA } from './requests-extra';
 import { SOFTWARE_LIST } from './software-list';
 import { USAGE } from './usage';
 
@@ -15,6 +16,7 @@ export const SHARED_DEMO_V4: DemoFixture = {
   ...CATALOG,
   ...FINANCE,
   ...REQUESTS,
+  requests: [...REQUESTS.requests, ...REQUESTS_EXTRA],
   ...USAGE,
   ...SOFTWARE_LIST,
 };

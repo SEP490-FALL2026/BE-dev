@@ -72,10 +72,16 @@ const request = (key: string, requester: string, target: 'COMPLETED' | 'AWAITING
   target,
   summary: 'x',
 });
+const headedBy = (code: string) => F.people.find((person) => person.code === code)?.department;
+/** The fixture as it was before T12: no request of the Board or of Finance, so those two have nothing counted yet. */
+const WITHOUT_BOARD_AND_FINANCE = {
+  ...F,
+  requests: F.requests.filter((candidate) => !['BOD', 'FIN'].includes(headedBy(candidate.requester) ?? '')),
+};
 const WITH_BOARD_AND_FINANCE = {
   ...F,
   requests: [
-    ...F.requests,
+    ...WITHOUT_BOARD_AND_FINANCE.requests,
     request('RB1', 'NV-BOD1', 'COMPLETED'),
     request('RB2', 'NV-BOD2', 'COMPLETED'),
     request('RB3', 'NV-BOD1', 'AWAITING_SPEND_DECISION'),
@@ -113,12 +119,56 @@ describe('the base counted for the light a department must show (baseFor, SPEC S
     },
   );
 
-  it('gives IT the light under with the amount of the fixture while nothing is counted for it, and says when a light cannot be reached', () => {
+  it('keeps the amount of the fixture while nothing is counted for a department, and says that its light cannot be reached', () => {
     for (const today of DAYS) {
-      expect(baseFor(F, 'ITO', today)).toMatchObject({ base: 50_000_000, light: 'UNDER', reachable: true });
-      expect(baseFor(F, 'BOD', today)).toMatchObject({ base: 50_000_000, light: 'UNDER', reachable: false });
-      expect(baseFor(F, 'FIN', today)).toMatchObject({ base: 50_000_000, light: 'UNDER', reachable: false });
+      expect(baseFor(WITHOUT_BOARD_AND_FINANCE, 'BOD', today)).toMatchObject({
+        base: 50_000_000,
+        light: 'UNDER',
+        reachable: false,
+      });
+      expect(baseFor(WITHOUT_BOARD_AND_FINANCE, 'FIN', today)).toMatchObject({
+        base: 50_000_000,
+        light: 'UNDER',
+        reachable: false,
+      });
     }
+  });
+
+  it.each(DAYS)(
+    'gives the four departments their four lights with the requests of the fixture itself on %s (T12, CP2: D-9)',
+    (today) => {
+      for (const [department, light] of [
+        ['ENG', 'UNDER'],
+        ['ITO', 'UNDER'],
+        ['BOD', 'GREEN'],
+        ['FIN', 'YELLOW'],
+      ] as const) {
+        expect(lightAt(F, department, today)).toBe(light);
+        expect(baseFor(F, department, today)).toMatchObject({ reachable: true, wanted: light });
+      }
+    },
+  );
+
+  it('counts the people the spending approver refuses out of what a group request holds (R49: only NV-BOD1 is granted)', () => {
+    const group = (rejectedLines?: string[]) => ({
+      ...F,
+      requests: [
+        {
+          key: 'RG',
+          requester: 'NV-DEP',
+          beneficiaries: ['NV-BOD1', 'NV-BOD2'],
+          plan: 'm365-standard',
+          termMonths: 1,
+          target: 'AWAITING_EXECUTION' as const,
+          ...(rejectedLines ? { rejectedLines } : {}),
+          summary: 'x',
+        },
+      ],
+    });
+    const price = Math.ceil(3_800_000 / 12);
+
+    expect(expectedOf(group(), 'BOD', '2026-11-17').committed).toBe(price * 2);
+    expect(expectedOf(group(['NV-BOD2']), 'BOD', '2026-11-17').committed).toBe(price);
   });
 
   it('asks the reserve of Finance at 60 % and the others at the default, and asks nothing of a department it does not count', () => {

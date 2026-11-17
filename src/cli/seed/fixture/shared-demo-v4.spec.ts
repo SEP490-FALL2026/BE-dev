@@ -344,10 +344,11 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
 
   it('leaves the pool enough free seats for what is granted from it', () => {
     const drawn = new Map<string, number>();
+    const draws = ['COMPLETED', 'AWAITING_EXECUTION', 'EXECUTING', 'FAILED', 'AWAITING_IT_CLOSE'];
     for (const request of F.requests) {
       const subscription = request.plan ? subscriptionOf(request.plan) : undefined;
       if (!subscription || subscription.quantity !== undefined) continue;
-      if (request.grant === 'PURCHASE' || !['COMPLETED', 'AWAITING_EXECUTION'].includes(request.target)) continue;
+      if (request.grant === 'PURCHASE' || !draws.includes(request.target)) continue;
       drawn.set(subscription.key, (drawn.get(subscription.key) ?? 0) + (request.beneficiaries?.length ?? 1));
     }
     for (const [key, used] of drawn) {
@@ -446,6 +447,10 @@ describe('shared dataset v4: the requests of MF-1', () => {
     'AWAITING_EXECUTION',
     'AWAITING_IT_ASSESSMENT',
     'RESERVE_UNCONFIRMED',
+    'AWAITING_REQUESTER_REVISION',
+    'EXECUTING',
+    'AWAITING_IT_CLOSE',
+    'PENDING_OR_CANCELLED',
   ];
 
   it('has unique keys and requesters with an account, none of them the spending approver', () => {
@@ -528,6 +533,112 @@ describe('shared dataset v4: the requests of MF-1', () => {
   it('counts its dates from today only', () => {
     expect(dayOffset('2026-11-10', 20)).toBe('2026-11-30');
     expect(endOfMonth('2026-02-10')).toBe('2026-02-28');
+  });
+});
+
+describe('shared dataset v4: the eighteen requests of S10b (T12)', () => {
+  const NEW_PEOPLE = new Set([
+    'NV-DEV5',
+    'NV-DEV6',
+    'NV-DEV7',
+    'NV-ITO1',
+    'NV-ITO2',
+    'NV-FIN2',
+    'NV-BOD1',
+    'NV-BOD2',
+    'NV-BOD3',
+    'NV-BOD4',
+    'NV-BOD5',
+    'NV-BOD6',
+    'NV-SAL3',
+    'NV-SAL4',
+    'NV-OPS2',
+    'NV-NEW2',
+    'NV-NEW3',
+  ]);
+  const OLD_SENDERS = new Set(['NV-FINH', 'NV-DEP', 'NV-ITOH']);
+  const extra = F.requests.filter((r) => /^R(4\d|5[0-7])$/.test(r.key));
+  const request = (key: string) => F.requests.find((r) => r.key === key)!;
+
+  it('adds R40 to R57, eighteen of them, after the requests of MF-1', () => {
+    expect(extra.map((r) => r.key).sort()).toEqual(Array.from({ length: 18 }, (_, i) => `R${40 + i}`));
+    expect(F.requests.slice(-18)).toEqual(extra);
+  });
+
+  it('puts nobody of Marketing, Design or Sales in a new request, as sender or as beneficiary (SPEC 4.2: R10, R21, R11 keep their budgets)', () => {
+    for (const r of extra) {
+      for (const code of [r.requester, ...(r.beneficiaries ?? [])]) {
+        expect(['MKT', 'DES', 'SAL']).not.toContain(person(code).department);
+      }
+    }
+  });
+
+  it('is sent by the people of T1, or by the heads of Finance, the Board and IT only (SPEC 4.2)', () => {
+    for (const r of extra) expect(NEW_PEOPLE.has(r.requester) || OLD_SENDERS.has(r.requester)).toBe(true);
+    for (const r of extra) for (const code of r.beneficiaries ?? []) expect(NEW_PEOPLE.has(code)).toBe(true);
+  });
+
+  it('has the head of Finance send R42 in one step, and the Board group R49 refuse a person who is one of its beneficiaries', () => {
+    expect(department('FIN').head).toBe(request('R42').requester);
+    expect(department('BOD').head).toBe(request('R49').requester);
+    expect(request('R49').rejectedLines).toEqual(['NV-BOD2']);
+    for (const code of request('R49').rejectedLines ?? []) expect(request('R49').beneficiaries).toContain(code);
+    expect(request('R49').target).toBe('AWAITING_EXECUTION');
+  });
+
+  it('reaches every state the demo lacked, each by the step that sends it there', () => {
+    const at = (target: string, fields: Record<string, unknown> = {}) =>
+      extra.some((r) => r.target === target && Object.entries(fields).every(([k, v]) => (r as never)[k] === v));
+    for (const target of ['IT_REJECTED', 'EXECUTING', 'FAILED', 'AWAITING_IT_CLOSE', 'PENDING_OR_CANCELLED'])
+      expect(at(target)).toBe(true);
+    expect(at('REJECTED', { rejectAt: 'SPEND' })).toBe(true);
+    for (const returnAt of ['NEED', 'ASSESSMENT', 'SPEND'])
+      expect(at('AWAITING_REQUESTER_REVISION', { returnAt })).toBe(true);
+  });
+
+  it('sends back at the spending approver only a request of one step: a head sends it (R42)', () => {
+    for (const r of extra.filter((candidate) => candidate.returnAt === 'SPEND')) {
+      expect(F.departments.map((d) => d.head)).toContain(r.requester);
+    }
+  });
+
+  it('lets Finance confirm the reserve of the two requests its budget cannot hold without it (R42, R55)', () => {
+    expect(request('R42').confirmReserve).toBe(true);
+    expect(request('R55').confirmReserve).toBe(true);
+    expect(extra.filter((r) => r.confirmReserve).every((r) => person(r.requester).department === 'FIN')).toBe(true);
+  });
+
+  it('reads R57 as the head of the department of its sender, who is blocked and cannot sign in (C-2)', () => {
+    const r57 = request('R57');
+    expect(r57.target).toBe('PENDING_OR_CANCELLED');
+    expect(r57.readAs).toBe(department(person(r57.requester).department!).head);
+    expect(extra.filter((r) => r.readAs).map((r) => r.key)).toEqual(['R57']);
+  });
+
+  it('sends the completed requests first, and the Board request that fails before the group it decides line by line', () => {
+    const order = F.requests.map((r) => r.key);
+    expect(order.indexOf('R50')).toBeLessThan(order.indexOf('R47'));
+    expect(order.indexOf('R56')).toBeLessThan(order.indexOf('R47'));
+    expect(order.indexOf('R47')).toBeLessThan(order.indexOf('R49'));
+    expect(order.indexOf('R48')).toBeLessThan(order.indexOf('R54'));
+  });
+
+  it('proposes Linear and Loom with the real address of their site, and points the refused proposal at a plan of the catalog', () => {
+    expect(request('R43').proposal).toMatchObject({ softwareName: 'Linear', homepageUrl: 'https://linear.app' });
+    expect(request('R44').proposal).toMatchObject({ softwareName: 'Loom', homepageUrl: 'https://www.loom.com' });
+    expect(plan(request('R43').alternativePlan!)).toBeDefined();
+  });
+
+  it('asks for a K5 plan of the internal attendance system without months, and a K1 plan for the months a K1 plan allows', () => {
+    expect(plan(request('R50').plan!).provisioningType).toBe('K5');
+    expect(request('R50').termMonths).toBeNull();
+    expect(request('R56').termMonths).toBe(2);
+    expect(request('R56').grant).toBe('PURCHASE');
+  });
+
+  it('leaves requests waiting for the need in the queues of the heads of the Board, Finance and Operations', () => {
+    const queues = new Set(extra.filter((r) => r.target === 'PENDING').map((r) => person(r.requester).department));
+    expect([...queues].sort()).toEqual(['BOD', 'FIN', 'OPS']);
   });
 });
 
