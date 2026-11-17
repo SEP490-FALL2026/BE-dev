@@ -15,7 +15,7 @@ const ANSWERS: Readonly<Record<RenewalProblem, { status: HttpStatus; message: st
   NOT_RENEWABLE: {
     status: HttpStatus.CONFLICT,
     message:
-      'Only a live term of a shared-pool workspace has a point of adjustment (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED).',
+      'Only a live shared-pool term has an adjustment point (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED, CANCELLED).',
   },
   CONTRACT_DATA_INCOMPLETE: {
     status: HttpStatus.CONFLICT,
