@@ -20,8 +20,8 @@ organization, personnel, requests ([module-graph](../../../docs/generated/module
 - `EmailDeliveryApi` ([public/email-delivery.api.ts](public/email-delivery.api.ts)): `dispatchDue(isUsable)` — gửi
   một lô outbox đến hạn; chỉ vòng mail của worker gọi.
 - `public/notifications.types.ts` — `EmailTemplate`, `IN_APP_NOTIFICATION_CODES` (bảng mã đóng; hai nhóm cuối là cảnh báo license
-  của `a03-license-inbox-alerts` và tám mã `SUBSCRIPTION_*` của gia hạn thuê bao ở `a06-*`: `SUBSCRIPTION_RENEWAL_ALERT`,
-  `_RENEWAL_DATA_QUALITY`, `_RENEWAL_PROPOSED`, `_RENEWAL_DECIDED`, `_RENEWAL_LATE`,
+  của `a03-license-inbox-alerts` và mười mã `SUBSCRIPTION_*` của gia hạn thuê bao ở `a06-*`: `SUBSCRIPTION_RENEWAL_ALERT`,
+  `_RENEWAL_RED_ALERT`, `_RENEWAL_KEPT`, `_RENEWAL_DATA_QUALITY`, `_RENEWAL_PROPOSED`, `_RENEWAL_DECIDED`, `_RENEWAL_LATE`,
   `_RENEWAL_OUTCOME_RECORDED`, `_AUTO_RENEWAL_INCIDENT`, `_EXPIRY_MARKED`; chỉ id, mã và ngày, khóa nằm trong `PARAM_KEYS_BY_CODE`; mã cũ
   `SUBSCRIPTION_BUSINESS_OWNER_LEFT` không ghi mới nhưng dòng đã lưu vẫn đọc được — `QĐ-111g`), `TokenUsability`.
 - `public/notifications.errors.ts` — `InvalidInAppNotificationError`.

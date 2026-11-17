@@ -154,17 +154,25 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   REVOCATION_CANCELLED: ['planId', 'applicationId', 'source'],
   // The renewal of a subscription: ids, the milestone and where it comes from, the choice and when it is carried out. The
   // usage of the seats is only said to be available or not; no figure of money, no person but the recipient.
+  // The point of adjustment (`SBF-20` §4.5): `baseDate` is the deadline of the period, `renewalOn` the day the next one begins, `commitment` MONTHLY or ANNUAL;
+  // `renewalId` is null. The keys from `milestoneDays` on belong to the old milestones, kept so a notice already stored is still read.
   SUBSCRIPTION_RENEWAL_ALERT: [
     'subscriptionId',
     'renewalId',
-    'milestoneDays',
     'baseDate',
+    'renewalOn',
+    'seatsNeeded',
+    'commitment',
+    'milestoneDays',
     'noticeBasis',
     'audience',
     'decisionRecorded',
     'outcomeRecorded',
     'usageData',
   ],
+  // The red alert of a plan by the year with no outcome near its deadline, and the seats a plan by the month keeps when nothing was recorded before its payment day (`QĐ-103e`).
+  SUBSCRIPTION_RENEWAL_RED_ALERT: ['subscriptionId', 'baseDate', 'renewalOn', 'seatsNeeded'],
+  SUBSCRIPTION_RENEWAL_KEPT: ['subscriptionId', 'renewalOn', 'purchasedQuantity', 'seatsNeeded'],
   SUBSCRIPTION_RENEWAL_DATA_QUALITY: ['subscriptionId', 'problem'],
   SUBSCRIPTION_RENEWAL_PROPOSED: ['renewalId', 'subscriptionId', 'choice'],
   SUBSCRIPTION_RENEWAL_DECIDED: ['renewalId', 'subscriptionId', 'choice', 'executionPoint'],

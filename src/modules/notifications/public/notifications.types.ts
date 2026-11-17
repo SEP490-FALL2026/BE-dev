@@ -166,8 +166,10 @@ export const IN_APP_NOTIFICATION_CODES = [
   // The revocation of a seat that is coming, told to the person who holds it, and one that no longer applies (`BR-MF5-04`, `US-10-06` AC-2).
   'REVOCATION_UPCOMING',
   'REVOCATION_CANCELLED',
-  // The renewal of a subscription (EP-11): the milestones, the quality of the contract data, the case and its deadline.
+  // The renewal of a subscription (EP-11): the point of adjustment and its red alert, the quality of the contract data, the case and its deadline.
   'SUBSCRIPTION_RENEWAL_ALERT',
+  'SUBSCRIPTION_RENEWAL_RED_ALERT',
+  'SUBSCRIPTION_RENEWAL_KEPT',
   'SUBSCRIPTION_RENEWAL_DATA_QUALITY',
   'SUBSCRIPTION_RENEWAL_PROPOSED',
   'SUBSCRIPTION_RENEWAL_DECIDED',
