@@ -121,10 +121,10 @@ export class BudgetVersionsController {
       status: HttpStatus.CONFLICT,
       description:
         'The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the department is not in the cycle of the year (DEPARTMENT_NOT_IN_CYCLE), the deadline has not passed, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).',
-      // CURRENT_EXISTS is not shown: a current budget keeps the proposal behind it REVIEWED, so none can wait beside it.
       examples: [
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
         EXAMPLES.PROPOSAL_NOT_SUBMITTED,
+        EXAMPLES.CURRENT_EXISTS,
         EXAMPLES.VERSION_IN_FLIGHT,
         EXAMPLES.BASELINE_VERSION_NOT_ALLOWED,
       ],

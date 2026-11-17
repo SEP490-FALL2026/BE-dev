@@ -61414,6 +61414,18 @@
                       }
                     }
                   },
+                  "BUDGET.CURRENT_EXISTS": {
+                    "summary": "The Cost Center already has a current budget for this year.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.CURRENT_EXISTS",
+                        "message": "The Cost Center already has a current budget for this year.",
+                        "details": { "versionId": "<version-id>" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "BUDGET.VERSION_IN_FLIGHT": {
                     "summary": "The Cost Center already has a version for this year that is not decided.",
                     "value": {
@@ -64301,7 +64313,7 @@
         },
         "responses": {
           "200": {
-            "description": "Finance lets what is left of a commitment go back to the budget, with a reason, once the request it is held for has ended and no invoice is still to come. Money that became an expense and a commitment that was already released are not touched.",
+            "description": "Finance lets what is left of a commitment go back to the budget, with a reason, once the request it is held for has ended and no invoice is still to come. Money that became an expense and a commitment that was already released are not touched. The other refusals of a commitment (BUDGET.COMMITMENT_AMOUNT_NOT_POSITIVE, COMMITMENT_EXCEEDS_HELD, COMMITMENT_NO_COMMITMENT, COMMITMENT_YEAR_REPEATED) belong to the releases the system makes when a request ends and are never answered by this route.",
             "content": {
               "application/json": {
                 "schema": {
@@ -69744,7 +69756,7 @@
             }
           },
           "403": {
-            "description": "The caller is not the head of the department of this Cost Center (BUDGET.NOT_YOUR_COST_CENTER); only the head explains.",
+            "description": "The caller does not hold the manager role (AUTHORIZATION.FORBIDDEN) or is not the head of the department of this Cost Center (BUDGET.NOT_YOUR_COST_CENTER); only the head explains.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -69756,6 +69768,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.NOT_YOUR_COST_CENTER": {
+                    "summary": "Only the head of the department proposes a budget for its Cost Center.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.NOT_YOUR_COST_CENTER",
+                        "message": "Only the head of the department proposes a budget for its Cost Center.",
                         "requestId": "req_example"
                       }
                     }
@@ -69861,7 +69884,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), or the line was not asked for an explanation because it is green (BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED).",
+            "description": "The body is invalid (VALIDATION_ERROR; also the amount known to be needed that is not a plain number), the amount has more decimals than the reporting currency allows (MONEY_SCALE_EXCEEDED) or is below nothing or too large (MONEY_OUT_OF_RANGE), or the line was not asked for an explanation because it is green (BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -69874,6 +69897,30 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_SCALE_EXCEEDED": {
+                    "summary": "This currency allows at most 0 decimal digit(s).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_SCALE_EXCEEDED",
+                        "message": "This currency allows at most 0 decimal digit(s).",
+                        "details": { "allowedDecimals": 0, "path": "knownNeedsToYearEnd.amount" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_OUT_OF_RANGE": {
+                    "summary": "The amount is outside the range a money value may hold.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_OUT_OF_RANGE",
+                        "message": "The amount is outside the range a money value may hold.",
+                        "details": { "path": "knownNeedsToYearEnd.amount" },
                         "requestId": "req_example"
                       }
                     }
@@ -70049,6 +70096,27 @@
               }
             }
           },
+          "404": {
+            "description": "A Cost Center the adjustment names does not exist (BUDGET.COST_CENTER_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "BUDGET.COST_CENTER_NOT_FOUND": {
+                    "summary": "The Cost Center does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.COST_CENTER_NOT_FOUND",
+                        "message": "The Cost Center does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "409": {
             "description": "The budget cycle of the year is not open yet (BUDGET_CYCLE.NOT_OPEN) or still takes proposals, so no budget of the year is made to adjust (BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED: asked once the cycle is locked, the day after its submission deadline); the Cost Center that receives was retired (FINANCE.SETUP_INCOMPLETE), has a version of the year still being decided (BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT) or a proposal that waits for its version (BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION).",
             "content": {
@@ -70162,7 +70230,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), a transfer for COST_CENTER_CHANGE is more than what is left after what the Cost Center used (BUDGET_ADJUSTMENT.OVER_REMAINING), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).",
+            "description": "The body is invalid (VALIDATION_ERROR; also an amount that is not a plain number), the amount has more decimals than the reporting currency allows (MONEY_SCALE_EXCEEDED) or is not above nothing or is too large (MONEY_OUT_OF_RANGE), the year has ended (BUDGET.YEAR_ENDED), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), a transfer for COST_CENTER_CHANGE is more than what is left after what the Cost Center used (BUDGET_ADJUSTMENT.OVER_REMAINING), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -70175,6 +70243,30 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_SCALE_EXCEEDED": {
+                    "summary": "This currency allows at most 0 decimal digit(s).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_SCALE_EXCEEDED",
+                        "message": "This currency allows at most 0 decimal digit(s).",
+                        "details": { "allowedDecimals": 0, "path": "amount" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_OUT_OF_RANGE": {
+                    "summary": "The amount is outside the range a money value may hold.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_OUT_OF_RANGE",
+                        "message": "The amount is outside the range a money value may hold.",
+                        "details": { "path": "amount" },
                         "requestId": "req_example"
                       }
                     }
@@ -70600,7 +70692,7 @@
             }
           },
           "403": {
-            "description": "Only the spending approver decides.",
+            "description": "Only the spending approver decides: a caller without the role is refused first (AUTHORIZATION.FORBIDDEN), then one who is not the spending approver in use (BUDGET.NOT_SPENDING_APPROVER) or who asked for the adjustment (BUDGET.CONFLICT_OF_INTEREST).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -70612,6 +70704,28 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.NOT_SPENDING_APPROVER": {
+                    "summary": "The version cannot be decided: NOT_SPENDING_APPROVER.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.NOT_SPENDING_APPROVER",
+                        "message": "The version cannot be decided: NOT_SPENDING_APPROVER.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.CONFLICT_OF_INTEREST": {
+                    "summary": "The version cannot be decided: CONFLICT_OF_INTEREST.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.CONFLICT_OF_INTEREST",
+                        "message": "The version cannot be decided: CONFLICT_OF_INTEREST.",
                         "requestId": "req_example"
                       }
                     }
@@ -70778,6 +70892,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.ADJUSTMENT_REASON_REQUIRED": {
+                    "summary": "A reason is required for the adjustment.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.ADJUSTMENT_REASON_REQUIRED",
+                        "message": "A reason is required for the adjustment.",
                         "requestId": "req_example"
                       }
                     }

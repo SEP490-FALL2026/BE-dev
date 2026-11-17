@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import { MoneyOutOfRangeError, MoneyScaleExceededError } from '../../../core/money/money.errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { BudgetCycleNotOpenError } from '../budget/budget.errors';
@@ -104,6 +105,12 @@ export const BUDGET_ADJUSTMENT_ERROR_EXAMPLES = {
   ALREADY_DECIDED: example(new BudgetAdjustmentDecidedError()),
   VERSION_IN_FLIGHT: example(new BudgetAdjustmentVersionInFlightError(COST_CENTER)),
   FINANCE_SETUP_INCOMPLETE: BUDGET_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+  COST_CENTER_NOT_FOUND: BUDGET_ERROR_EXAMPLES.COST_CENTER_NOT_FOUND,
+  NOT_SPENDING_APPROVER: BUDGET_ERROR_EXAMPLES.NOT_SPENDING_APPROVER,
+  CONFLICT_OF_INTEREST: BUDGET_ERROR_EXAMPLES.CONFLICT_OF_INTEREST,
+  ADJUSTMENT_REASON_REQUIRED: BUDGET_ERROR_EXAMPLES.ADJUSTMENT_REASON_REQUIRED,
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(0, 'amount')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('amount')),
   YEAR_ENDED: BUDGET_ERROR_EXAMPLES.YEAR_ENDED,
   CYCLE_NOT_LOCKED: example(new BudgetAdjustmentCycleNotLockedError(2026, '2026-11-30')),
   BUDGET_IN_PREPARATION: example(new BudgetAdjustmentBudgetInPreparationError(COST_CENTER)),

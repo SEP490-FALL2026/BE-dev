@@ -41,8 +41,8 @@ export class BudgetReviewExplanationController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'The caller is not the head of the department of this Cost Center (BUDGET.NOT_YOUR_COST_CENTER); only the head explains.',
-      examples: [FORBIDDEN_EXAMPLE],
+        'The caller does not hold the manager role (AUTHORIZATION.FORBIDDEN) or is not the head of the department of this Cost Center (BUDGET.NOT_YOUR_COST_CENTER); only the head explains.',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_YOUR_COST_CENTER],
     },
     {
       status: HttpStatus.NOT_FOUND,
@@ -59,8 +59,13 @@ export class BudgetReviewExplanationController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), or the line was not asked for an explanation because it is green (BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.EXPLANATION_NOT_REQUIRED],
+        'The body is invalid (VALIDATION_ERROR; also the amount known to be needed that is not a plain number), the amount has more decimals than the reporting currency allows (MONEY_SCALE_EXCEEDED) or is below nothing or too large (MONEY_OUT_OF_RANGE), or the line was not asked for an explanation because it is green (BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.MONEY_SCALE_EXCEEDED,
+        EXAMPLES.MONEY_OUT_OF_RANGE,
+        EXAMPLES.EXPLANATION_NOT_REQUIRED,
+      ],
     },
   )
   async explain(

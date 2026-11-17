@@ -93,7 +93,7 @@ export class BudgetCommitmentsController {
   @ApiSuccessResponse(CommitmentResponseDto, {
     message: 'BUDGET_COMMITMENT.RELEASED',
     description:
-      'Finance lets what is left of a commitment go back to the budget, with a reason, once the request it is held for has ended and no invoice is still to come. Money that became an expense and a commitment that was already released are not touched.',
+      'Finance lets what is left of a commitment go back to the budget, with a reason, once the request it is held for has ended and no invoice is still to come. Money that became an expense and a commitment that was already released are not touched. The other refusals of a commitment (BUDGET.COMMITMENT_AMOUNT_NOT_POSITIVE, COMMITMENT_EXCEEDS_HELD, COMMITMENT_NO_COMMITMENT, COMMITMENT_YEAR_REPEATED) belong to the releases the system makes when a request ends and are never answered by this route.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,

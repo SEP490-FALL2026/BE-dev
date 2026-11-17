@@ -1,7 +1,8 @@
 import { HttpStatus } from '@nestjs/common';
+import { MoneyOutOfRangeError, MoneyScaleExceededError } from '../../../core/money/money.errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
-import { toBudgetApiException } from '../budget/budget.http-errors';
+import { BUDGET_ERROR_EXAMPLES, toBudgetApiException } from '../budget/budget.http-errors';
 import {
   BudgetReviewExistsError,
   BudgetReviewLineNotFoundError,
@@ -84,4 +85,7 @@ export const BUDGET_REVIEW_ERROR_EXAMPLES = {
   NOT_AWAITING_EXPLANATIONS: example(new BudgetReviewNotAwaitingError('SIGNED')),
   LINE_NOT_FOUND: example(new BudgetReviewLineNotFoundError()),
   EXPLANATION_NOT_REQUIRED: example(new BudgetReviewNotAskedError('NOT_REQUIRED')),
+  NOT_YOUR_COST_CENTER: BUDGET_ERROR_EXAMPLES.NOT_YOUR_COST_CENTER,
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(0, 'knownNeedsToYearEnd.amount')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('knownNeedsToYearEnd.amount')),
 } as const;
