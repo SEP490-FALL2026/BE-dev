@@ -181,6 +181,16 @@ export function existingCaseOf(cases: readonly RenewalRecord[], deadline: Busine
   );
 }
 
+/**
+ * The case of a cancellation decided before the one-write renewal that still waits for its outcome (`V-3`, `SBF-20` §4.4 step 7, R2-1). The company
+ * still ends that subscription (`ending`), but the IT Admin must close the case first, on the route of the outcome, so a write or a read of the
+ * adjustment answers it as `ALREADY_PROPOSED` with the case, before it answers `NOT_RENEWABLE` / `CANCELLED`, which is for a cancellation already
+ * recorded as decided. Null when there is none.
+ */
+export function decidedCancelOf(cases: readonly RenewalRecord[]): RenewalRecord | null {
+  return cases.find((record) => record.state === 'DECIDED' && record.decision?.choice === 'CANCEL') ?? null;
+}
+
 /** Where the day the case counts from comes from (R2-6): the kind of the point, and for a deadline whether the contract declared it. */
 export function noticeBasisOf(kind: PeriodAdjustment['kind'], noticeSource: PeriodNoticeSource): NoticeBasis {
   if (kind === 'PAYMENT_DATE') return 'BY_PAYMENT_DATE';

@@ -39963,7 +39963,7 @@
             }
           },
           "409": {
-            "description": "The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool, a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE); the point has not come (SUBSCRIPTION_RENEWAL.BEFORE_ADJUSTMENT_POINT, details.adjustmentPointOn, details.deadline); the quantity is not the seats the next period needs (SUBSCRIPTION_RENEWAL.QUANTITY_NOT_SEATS_NEEDED, details.seatsNeeded, vendorMinimumSeats, target, quantity); a cancellation while seats are needed, in effect or a request of the plan is open (SUBSCRIPTION_RENEWAL.CANCEL_NOT_ALLOWED, details.seatsNeeded, heldPastRenewal, pendingContinuations, approvedAwaitingGrant, activeSeatsToday, openRequests); the period already has its result, or a case of before still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId); more seats are held than the new period buys (SUBSCRIPTION_RENEWAL.EXCESS_NOT_REVOKED); a seat to carry has an open task (SUBSCRIPTION_RENEWAL.SEATS_HAVE_OPEN_TASKS); the new period cannot be recorded as the continuation (SUBSCRIPTION_RENEWAL.PERIOD_REFUSED, details.reason NOT_ON_RENEWAL_DAY with details.renewalOn when nextPeriod.startDate is not the renewal day: renewalOn or the day after it for a plan by the year, the payment day for a plan by the month; or another reason such as ALREADY_RENEWED, PRICE_NOT_VND). Nothing is written.",
+            "description": "The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool, a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE); the point has not come (SUBSCRIPTION_RENEWAL.BEFORE_ADJUSTMENT_POINT, details.adjustmentPointOn, details.deadline); the quantity is not the seats the next period needs (SUBSCRIPTION_RENEWAL.QUANTITY_NOT_SEATS_NEEDED, details.seatsNeeded, vendorMinimumSeats, target, quantity); a cancellation while seats are needed, in effect or a request of the plan is open (SUBSCRIPTION_RENEWAL.CANCEL_NOT_ALLOWED, details.seatsNeeded, heldPastRenewal, pendingContinuations, approvedAwaitingGrant, activeSeatsToday, openRequests); the period already has its result, or a case of before (a cancellation decided before the rule too) still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId); more seats are held than the new period buys (SUBSCRIPTION_RENEWAL.EXCESS_NOT_REVOKED); a seat to carry has an open task (SUBSCRIPTION_RENEWAL.SEATS_HAVE_OPEN_TASKS); the new period cannot be recorded as the continuation (SUBSCRIPTION_RENEWAL.PERIOD_REFUSED, details.reason NOT_ON_RENEWAL_DAY with details.renewalOn when nextPeriod.startDate is not the renewal day: renewalOn or the day after it for a plan by the year, the payment day for a plan by the month; or another reason such as ALREADY_RENEWED, PRICE_NOT_VND). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40378,7 +40378,7 @@
             }
           },
           "409": {
-            "description": "The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool (a department owns it, or it is a key or a one-time license), a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE).",
+            "description": "The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool (a department owns it, or it is a key or a one-time license), a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); a cancellation decided before the one-write rule still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId: the IT Admin records its outcome first); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40391,6 +40391,18 @@
                         "code": "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE",
                         "message": "Only a live term of a shared-pool workspace has a point of adjustment (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED).",
                         "details": { "reason": "ALREADY_CONTINUED" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED": {
+                    "summary": "The result of this period is already recorded, or a renewal of before still waits for its outcome (details.renewalId, when it is known).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED",
+                        "message": "The result of this period is already recorded, or a renewal of before still waits for its outcome (details.renewalId, when it is known).",
+                        "details": { "renewalId": "<renewal-id>" },
                         "requestId": "req_example"
                       }
                     }

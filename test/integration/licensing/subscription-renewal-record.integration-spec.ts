@@ -1,3 +1,4 @@
+import { SubscriptionRenewalRepo } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal.repo';
 import { RenewalHarness } from '../../support/renewal-harness';
 import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
 import { takeOwnerOff } from '../../support/shared-pool-subscription';
@@ -548,5 +549,34 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     expect(response.status).toBe(409);
     expect(h.codeOf(response)).toBe('SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED');
     expect(detailsOf(response)).toEqual({ renewalId: legacy });
+  });
+
+  it('answers a cancellation decided before this rule with the case that still waits for its outcome, to the write and to the read alike, and still ends the subscription (V-3, R2-1)', async () => {
+    const unit = await h.unit(0);
+    const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
+    const legacy = await h.legacyDecidedRenewal(subscriptionId, { choice: 'CANCEL', decidedBy: unit.head });
+    const cases = () =>
+      h.ctx.sql.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM subscription_renewals WHERE subscription_id = $1`,
+        [subscriptionId],
+      );
+
+    const written = await record({
+      subscriptionId,
+      choice: 'CANCEL',
+      outcome: 'AS_DECIDED',
+      closure: { dataExported: true, adminsTransferred: true },
+    });
+    const read = await h.adjustment(subscriptionId);
+
+    for (const answer of [written, read]) {
+      expect(answer.status).toBe(409);
+      expect(h.codeOf(answer)).toBe('SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED');
+      expect(detailsOf(answer)).toEqual({ renewalId: legacy });
+    }
+    expect((await cases()).rows[0].n).toBe(1);
+    // The company still ends it: the sweep and the pool read the same set as before, and the IT Admin closes the case on its own route.
+    const repo = h.ctx.app.get(SubscriptionRenewalRepo, { strict: false });
+    expect((await repo.endingAmong([subscriptionId])).has(subscriptionId)).toBe(true);
   });
 });

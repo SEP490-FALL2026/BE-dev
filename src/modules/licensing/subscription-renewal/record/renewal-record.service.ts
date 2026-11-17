@@ -19,6 +19,7 @@ import type { RenewalChoice, RenewalOutcomeKind, RenewalRecord } from '../subscr
 import { RenewalRecordTrail, type RecordedBy } from './renewal-record-trail.service';
 import {
   countsRefusal,
+  decidedCancelOf,
   existingCaseOf,
   nextPeriodProblem,
   nextStartProblem,
@@ -122,7 +123,11 @@ export class RenewalRecordService {
   ): Promise<Checked> {
     const quantity = input.proposedQuantity ?? null;
     const note = textOf(input.note);
-    const ending = (await this.repo.endingAmong([period.subscriptionId], tx)).has(period.subscriptionId);
+    const cases = (await this.repo.ofSubscriptions([period.subscriptionId], tx)).get(period.subscriptionId) ?? [];
+    // A cancellation decided before this rule is answered by its case (ALREADY_PROPOSED, below); CANCELLED is for one recorded as decided.
+    const ending =
+      (await this.repo.endingAmong([period.subscriptionId], tx)).has(period.subscriptionId) &&
+      decidedCancelOf(cases) === null;
     const ready = preflightOf({ period, ending, today, choice: input.choice, quantity });
     if ('refusal' in ready) throw errorOf(ready.refusal);
     const { adjustment } = ready;
@@ -139,7 +144,6 @@ export class RenewalRecordService {
     );
     const refusal = countsRefusal(counts, { choice: input.choice, quantity, note });
     if (refusal) throw errorOf(refusal);
-    const cases = (await this.repo.ofSubscriptions([period.subscriptionId], tx)).get(period.subscriptionId) ?? [];
     const standing = existingCaseOf(cases, adjustment.deadline);
     if (standing) throw new RenewalError('ALREADY_PROPOSED', { renewalId: standing.id });
     const nextPeriod = nextPeriodProblem({

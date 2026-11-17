@@ -3,6 +3,7 @@ import type { SeatsNeededCounts } from '../seats-needed/renewal-seats-needed.pol
 import type { RenewalChoice, RenewalRecord } from '../subscription-renewal.types';
 import {
   countsRefusal,
+  decidedCancelOf,
   existingCaseOf,
   lateRenewalOf,
   noticeBasisOf,
@@ -260,6 +261,28 @@ describe('the case that already stands for the period (SBF-20 §4.4 step 7, R2-1
     expect(
       existingCaseOf([stored({ state: 'OUTCOME_RECORDED', noticeBaseDate: '2026-01-15' })], '2026-12-01'),
     ).toBeNull();
+  });
+});
+
+describe('the cancellation decided before the one-write renewal (V-3)', () => {
+  const stored = (extra: Partial<RenewalRecord>): RenewalRecord =>
+    ({
+      id: 'case',
+      subscriptionId: 'sub',
+      state: 'DECIDED',
+      decision: { choice: 'CANCEL' },
+      ...extra,
+    }) as RenewalRecord;
+
+  it('is the case of choice cancel that still waits for its outcome, the one the answer names before CANCELLED', () => {
+    expect(decidedCancelOf([stored({})])?.id).toBe('case');
+  });
+
+  it('is none for a cancellation already recorded as decided, another choice, or no case', () => {
+    expect(decidedCancelOf([stored({ state: 'OUTCOME_RECORDED' })])).toBeNull();
+    expect(decidedCancelOf([stored({ decision: { choice: 'REDUCE' } as RenewalRecord['decision'] })])).toBeNull();
+    expect(decidedCancelOf([stored({ state: 'PROPOSED', decision: null })])).toBeNull();
+    expect(decidedCancelOf([])).toBeNull();
   });
 });
 

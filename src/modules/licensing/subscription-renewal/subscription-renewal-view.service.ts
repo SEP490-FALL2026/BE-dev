@@ -16,7 +16,7 @@ import type {
   RenewalSummaryWire,
 } from './subscription-renewal.dto';
 import { RenewalError } from './subscription-renewal.errors';
-import { existingCaseOf, lateRenewalOf, pointOf } from './record/renewal-record.policy';
+import { decidedCancelOf, existingCaseOf, lateRenewalOf, pointOf } from './record/renewal-record.policy';
 import { RenewalSeatsNeededService } from './seats-needed/renewal-seats-needed.service';
 import { toAdjustmentWire, toDeadlineEvent, toRenewalDetail, toRenewalSummary } from './subscription-renewal.mapper';
 import { RenewalPartiesService, type RenewalReadScope } from './subscription-renewal-parties.service';
@@ -98,9 +98,13 @@ export class RenewalViewService {
   async adjustmentOf(actor: AuthenticatedPrincipal, subscriptionId: string): Promise<RenewalAdjustmentWire> {
     const period = (await this.periodsOf([subscriptionId])).get(subscriptionId);
     if (!period) throw new RenewalError('NOT_FOUND');
-    const ending = (await this.repo.endingAmong([subscriptionId])).has(subscriptionId);
+    const cases = (await this.repo.ofSubscriptions([subscriptionId])).get(subscriptionId) ?? [];
+    const decidedCancel = decidedCancelOf(cases);
+    // A cancellation decided before the one-write rule is answered by its case; CANCELLED is for one recorded as decided (V-3).
+    const ending = (await this.repo.endingAmong([subscriptionId])).has(subscriptionId) && decidedCancel === null;
     const found = pointOf(period, ending);
     if ('refusal' in found) throw new RenewalError(found.refusal.problem, found.refusal.details);
+    if (decidedCancel) throw new RenewalError('ALREADY_PROPOSED', { renewalId: decidedCancel.id });
     const { adjustment } = found;
     const counts = await this.seatsNeeded.countFor({
       subscriptionId,
@@ -110,7 +114,6 @@ export class RenewalViewService {
       renewalOn: adjustment.end,
       today: await this.organizationReads.businessToday(),
     });
-    const cases = (await this.repo.ofSubscriptions([subscriptionId])).get(subscriptionId) ?? [];
 
     return toAdjustmentWire(period, adjustment, counts, {
       ...(await this.parties.substituteOf(actor, period)),
