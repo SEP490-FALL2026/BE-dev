@@ -11,6 +11,7 @@ import { toUnavailableApiException } from '../../../infrastructure/http/errors/s
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { BudgetCommitmentExistsError, BudgetCommitmentNotHoldableError } from '../public/budgets.errors';
 import {
   BudgetCycleDeadlinesInvalidError,
   BudgetCycleExistsError,
@@ -22,8 +23,6 @@ import {
   BudgetCycleNotOpenError,
   BudgetCycleReasonRequiredError,
   BudgetCycleYearPastError,
-  BudgetCommitmentExistsError,
-  BudgetCommitmentNotHoldableError,
   BudgetCommitmentNotFoundError,
   BudgetCommitmentRefusedError,
   BudgetCostCenterNotFoundError,

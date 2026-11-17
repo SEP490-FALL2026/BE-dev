@@ -87,6 +87,7 @@ export class RequestResubmissionService {
     const waiting = await this.stepsStillWaiting(tx, request);
     if (waiting.length === 0) throw new AccessRequestNotAwaitingRevisionError();
     const reopened: string[] = [];
+    const holders: string[] = [];
     for (const { step, employeeIds } of waiting) {
       const stepId = await this.requests.addNeedStep(tx, {
         requestId: request.id,
@@ -101,6 +102,8 @@ export class RequestResubmissionService {
       });
       if (employeeIds.length > 0) await this.lines.repointNeed(tx, request.id, employeeIds, stepId);
       reopened.push(stepId);
+      // A step that waits for somebody to hold it has nobody to tell.
+      if (step.assigneeEmployeeId !== null) holders.push(step.assigneeEmployeeId);
     }
     await this.requests.setState(tx, request.id, 'PENDING');
     await this.audit.record(
@@ -111,7 +114,12 @@ export class RequestResubmissionService {
         'ACCESS_REQUEST.RESUBMITTED',
         'ACCESS_REQUEST',
         request.id,
-        { requestId: request.id, reopenedStepIds: reopened.join(','), requestState: 'PENDING' },
+        {
+          requestId: request.id,
+          reopenedStepIds: reopened.join(','),
+          assigneeEmployeeIds: holders.join(','),
+          requestState: 'PENDING',
+        },
       ),
     );
   }

@@ -1,3 +1,4 @@
+import request from 'supertest';
 import { StatusHarness, type NoticeRow } from '../../support/status-harness';
 import type { Unit } from '../../support/spend-harness';
 
@@ -361,6 +362,83 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
       expect((await h.noticesOf(successor.employeeId, 'STEP_ASSIGNED')).map((row) => row.params)).toEqual([
         { requestId: sent.id, stepKind: 'NEED', cause: 'WAIT_ENDED' },
       ]);
+    });
+  });
+
+  describe('a request sent again after it was returned, and a proposal of a head (B1, B4)', () => {
+    const resubmit = (id: string, account: Unit['member']['account']) =>
+      request(h.server()).post(`/api/v1/access-requests/${id}/resubmission`).set(h.as(account));
+    const assigned = async (employeeId: string, id: string, cause: string) =>
+      (await h.noticesOf(employeeId, 'STEP_ASSIGNED'))
+        .filter((row) => row.subject_id === id && row.params.cause === cause)
+        .map((row) => row.params);
+
+    it('tells the head the need step is theirs again when the requester sends it again, and not the requester', async () => {
+      const u = await example();
+      const sent = await h.sent(u.member, plan, { termMonths: 1 });
+      await h.decide(sent.id, { decision: 'RETURN', reason: 'Say how many seats' }, u.head.account).expect(200);
+      await h.project();
+      expect(await assigned(u.head.employeeId, sent.id, 'RESUBMITTED')).toEqual([]);
+
+      await resubmit(sent.id, u.member.account).expect(200);
+      await h.project();
+
+      expect(await assigned(u.head.employeeId, sent.id, 'RESUBMITTED')).toEqual([
+        { requestId: sent.id, stepKind: 'NEED', cause: 'RESUBMITTED' },
+      ]);
+      expect(await assigned(u.member.employeeId, sent.id, 'RESUBMITTED')).toEqual([]);
+    });
+
+    it('tells the IT Admin who holds the assessment that it is theirs again when the sender sends the proposal again', async () => {
+      const u = await example();
+      const proposed = await h.proposed(u.member);
+      await h.decide(proposed.id, { decision: 'APPROVE' }, u.head.account).expect(200);
+      // The holder of the step is read when the event is projected, so the approval is told before the step is closed by the return.
+      await h.project();
+      await h.saveAssessment(proposed.id, h.assessmentBody(), h.it1).expect(200);
+      await request(h.server())
+        .post(`/api/v1/access-requests/${proposed.id}/assessment/rejection`)
+        .set(h.as(h.it1))
+        .send({ decision: 'RETURN', reason: 'Name the vendor', checklist: h.checklists.yes('1.3') })
+        .expect(200);
+      await h.project();
+      expect(await assigned(h.it1.employeeId, proposed.id, 'RESUBMITTED')).toEqual([]);
+
+      await resubmit(proposed.id, u.member.account).expect(200);
+      await h.project();
+
+      expect(await assigned(h.it1.employeeId, proposed.id, 'RESUBMITTED')).toEqual([
+        { requestId: proposed.id, stepKind: 'IT_ASSESSMENT', cause: 'RESUBMITTED' },
+      ]);
+      expect(await assigned(h.it1.employeeId, proposed.id, 'ASSESSMENT')).toHaveLength(1);
+      expect(await assigned(u.head.employeeId, proposed.id, 'RESUBMITTED')).toEqual([]);
+    });
+
+    it('tells the IT Admin once that a head proposed new software for themselves, and the head nothing', async () => {
+      const u = await example();
+
+      const proposed = await h.proposed(u.head);
+      await h.project();
+      await h.project();
+
+      expect(await h.codesFor(h.it1.employeeId, proposed.id)).toEqual(['STEP_ASSIGNED']);
+      expect(await assigned(h.it1.employeeId, proposed.id, 'SUBMITTED')).toEqual([
+        { requestId: proposed.id, stepKind: 'IT_ASSESSMENT', cause: 'SUBMITTED' },
+      ]);
+      expect(await h.codesFor(u.head.employeeId, proposed.id)).not.toContain('STEP_ASSIGNED');
+    });
+
+    it('tells the IT Admin once, by the approval of the need and not by the proposal, when a member proposed it', async () => {
+      const u = await example();
+      const proposed = await h.proposed(u.member);
+      await h.project();
+      expect(await h.codesFor(h.it1.employeeId, proposed.id)).toEqual([]);
+
+      await h.decide(proposed.id, { decision: 'APPROVE' }, u.head.account).expect(200);
+      await h.project();
+
+      expect(await assigned(h.it1.employeeId, proposed.id, 'SUBMITTED')).toEqual([]);
+      expect(await h.codesFor(h.it1.employeeId, proposed.id)).toEqual(['STEP_ASSIGNED']);
     });
   });
 

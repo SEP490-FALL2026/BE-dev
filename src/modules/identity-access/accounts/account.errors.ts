@@ -47,8 +47,15 @@ export class LoginEmailTakenError extends Error {
 
 export class LoginEmailRequiredError extends Error {
   constructor() {
-    super('The employee has no work email and none was supplied.');
+    super('The employee has no work email.');
     this.name = 'LoginEmailRequiredError';
+  }
+}
+
+export class LoginEmailNotWorkEmailError extends Error {
+  constructor() {
+    super('The login email must be the work email of the employee.');
+    this.name = 'LoginEmailNotWorkEmailError';
   }
 }
 

@@ -208,6 +208,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'DEPARTURE_REVOCATION_IT_CLOSE',
   // A new version of a policy is in force (`QĐ-111bi`): told once to each account of a role it applies to, with the code, the number and whether it asks to be acknowledged again.
   'POLICY_PUBLISHED',
+  // A batch of spend requests that opened at least one step for the spending approver: one notice for each batch and each approver (`FR-3.21`, `Q-5A-1`).
+  'SPEND_BATCH_SUBMITTED',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

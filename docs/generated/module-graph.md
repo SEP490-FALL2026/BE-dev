@@ -76,10 +76,11 @@ flowchart BT
   data_import -->|2| notifications
   data_import -->|11| organization
   data_import -->|5| policies
-  devices -->|10| audit
+  devices -->|12| audit
   devices -->|3| catalog
   devices -->|2| identity_access
-  devices -->|12| organization
+  devices -->|2| operating_parameters
+  devices -->|14| organization
   finance -->|3| audit
   finance -->|3| organization
   identity_access -->|18| audit
@@ -108,7 +109,7 @@ flowchart BT
   operating_parameters -->|6| organization
   optimization -->|7| audit
   optimization -->|8| catalog
-  optimization -->|5| identity_access
+  optimization -->|6| identity_access
   optimization -->|25| licensing
   optimization -->|7| notifications
   optimization -->|6| operating_parameters
@@ -132,12 +133,12 @@ flowchart BT
   policies -->|2| notifications
   policies -->|7| organization
   requests -->|64| audit
-  requests -->|30| budgets
+  requests -->|32| budgets
   requests -->|43| catalog
   requests -->|11| finance
   requests -->|38| identity_access
   requests -->|60| licensing
-  requests -->|13| notifications
+  requests -->|14| notifications
   requests -->|12| operating_parameters
   requests -->|97| organization
   requests -->|34| policies
@@ -155,4 +156,4 @@ flowchart BT
   usage -->|4| requests
 ```
 
-112 module edges.
+113 module edges.

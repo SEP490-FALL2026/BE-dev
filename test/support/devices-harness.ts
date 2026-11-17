@@ -49,6 +49,22 @@ export interface MyDeviceWire {
   signatureRecorded: boolean;
   canAcknowledge: boolean;
   blockedReason: string | null;
+  stopRequestPending: boolean;
+}
+
+export interface StopRequestWire {
+  id: string;
+  registrationId: string;
+  deviceId: string;
+  holderEmployeeId: string;
+  state: 'OPEN' | 'COMPLETED' | 'INVALID';
+  invalidReason: 'DUPLICATE' | 'ALREADY_STOPPED' | 'REGISTRATION_ENDED' | null;
+  requestedAt: string;
+  dueAt: string;
+  handledAt: string | null;
+  handledByAppUserId: string | null;
+  selfHandled: boolean;
+  overdue: boolean;
 }
 
 export interface CredentialWire {
@@ -123,6 +139,16 @@ export class DevicesHarness extends DocumentHarness {
       .post(`/api/v1/me/device-registrations/${registrationId}/acknowledgements`)
       .set(this.as(account))
       .send({ noticeVersionId });
+
+  requestStop = (account: ApiAccount, registrationId: string, body: object = {}) =>
+    request(this.server())
+      .post(`/api/v1/me/device-registrations/${registrationId}/stop-requests`)
+      .set(this.as(account))
+      .send(body);
+  listStopRequests = (query = '', account: ApiAccount = this.it1) =>
+    request(this.server()).get(`/api/v1/device-stop-requests${query}`).set(this.as(account));
+  completeStop = (id: string, account: ApiAccount = this.it1, body: object = {}) =>
+    request(this.server()).post(`/api/v1/device-stop-requests/${id}/completion`).set(this.as(account)).send(body);
 
   createCode = (registrationId: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server())

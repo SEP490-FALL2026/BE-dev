@@ -210,6 +210,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   DEPARTURE_REVOCATION_IT_CLOSE: ['caseId', 'employeeId', 'taskCount'],
   // A new version of a policy: which policy, which version, and whether the reader is asked to acknowledge it (`QĐ-111bi`).
   POLICY_PUBLISHED: ['policyCode', 'versionNumber', 'requiresReacknowledgement'],
+  // A batch of spend requests sent to the spending approver: which batch, from which department, and how many steps it opened for them (`FR-3.21`).
+  SPEND_BATCH_SUBMITTED: ['batchId', 'departmentId', 'sentCount'],
 };
 
 /** Whether the code is one of the closed table. */

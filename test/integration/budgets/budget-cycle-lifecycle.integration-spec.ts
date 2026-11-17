@@ -455,12 +455,7 @@ describe('the budget cycle: draft, open, locked (integration, real PostgreSQL)',
           )
           .items.map((item) => item.key);
 
-      // The two thresholds of the zero-based-budget explanation of BM-10 belong to Finance too (QĐ-94l, L1-19).
-      expect(await keysOf(h.as(h.finance))).toEqual([
-        'BUDGET_RESERVE_DEFAULT_PERCENT',
-        'BUDGET_ZBB_KPI3_BELOW_PERCENT',
-        'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
-      ]);
+      expect(await keysOf(h.as(h.finance))).toEqual(['BUDGET_RESERVE_DEFAULT_PERCENT']);
       expect(await keysOf(asToken(h.admin))).toEqual(
         expect.arrayContaining(['BUDGET_RESERVE_DEFAULT_PERCENT', 'FORECAST_ERROR_THRESHOLD_PERCENT']),
       );

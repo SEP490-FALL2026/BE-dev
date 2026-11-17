@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { hasSpendStep } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -12,6 +10,7 @@ import { PolicyChecklistIncompleteError } from '../../policies/public/policy-che
 import type { ChecklistBody } from '../../policies/public/policy-checklist.types';
 import { ReserveConfirmationService } from '../reserve-confirmation/reserve-confirmation.service';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
+import { SpendBatchRecorder } from './spend-batch-recorder.service';
 import { SpendHeadService } from './spend-head.service';
 import { SpendConfirmationNotInBatchError, SpendNotInQueueError } from '../spend/spend.errors';
 import { SpendRoutingService } from '../spend/spend-routing.service';
@@ -25,6 +24,12 @@ export interface SubmitResult {
   outcome: 'SENT_TO_APPROVER' | 'AWAITING_RESERVE_CONFIRMATION' | 'STOPPED';
   stopReason: StopReason | null;
   reserveConfirmation: ConfirmationResult;
+}
+
+/** What `sendOn` made of a request, and who holds the spend step it opened (null: no step, or one that waits); the answer carries the first only. */
+interface Sent {
+  result: SubmitResult;
+  openedFor: string | null;
 }
 
 export interface ReserveConfirmationInput {
@@ -56,8 +61,8 @@ export class SpendBatchService {
     private readonly head: SpendHeadService,
     private readonly routing: SpendRoutingService,
     private readonly reserve: ReserveConfirmationService,
-    private readonly audit: AuditApi,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly recorder: SpendBatchRecorder,
   ) {}
 
   /**
@@ -92,12 +97,14 @@ export class SpendBatchService {
           ? await this.reserve.judgeBatchChecklist(tx, organizationId, checklist)
           : null;
       const now = new Date();
-      const results: SubmitResult[] = [];
+      const sent: Sent[] = [];
       for (const id of requestIds) {
-        results.push(
+        sent.push(
           await this.sendOn(tx, actor, locked.get(id) as AccessRequestRecord, { reason: reasons.get(id), now }),
         );
       }
+      // The answer is the results as they were: `SubmitResult` goes into a strict response, so who holds the steps stays here.
+      const results = sent.map((item) => item.result);
 
       const confirmed = results.filter((result) => result.reserveConfirmation === 'APPLIED').map((r) => r.requestId);
       if (verdict && confirmed.length > 0) {
@@ -120,7 +127,14 @@ export class SpendBatchService {
           leftReason: null,
         })),
       });
-      await this.recordSubmitted(tx, actor, { organizationId, departmentId, batchId, requestIds, results });
+      await this.recorder.submitted(tx, actor, {
+        organizationId,
+        departmentId,
+        batchId,
+        requestIds,
+        outcomes: results.map((item) => item.outcome),
+        openedFor: sent.map((item) => item.openedFor),
+      });
 
       return { batchId, results };
     });
@@ -149,62 +163,49 @@ export class SpendBatchService {
     return locked;
   }
 
-  private async recordSubmitted(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    batch: {
-      organizationId: string;
-      departmentId: string;
-      batchId: string;
-      requestIds: readonly string[];
-      results: readonly SubmitResult[];
-    },
-  ): Promise<void> {
-    const count = (outcome: SubmitResult['outcome']) => batch.results.filter((item) => item.outcome === outcome).length;
-    await this.audit.record(
-      tx,
-      accessRequestAuditEvent(actor, batch.organizationId, 'SPEND_BATCH.SUBMITTED', 'SPEND_BATCH', batch.batchId, {
-        departmentId: batch.departmentId,
-        requestIds: batch.requestIds.join(','),
-        sentToApprover: count('SENT_TO_APPROVER'),
-        awaitingReserveConfirmation: count('AWAITING_RESERVE_CONFIRMATION'),
-        stopped: count('STOPPED'),
-      }),
-    );
-  }
-
   /** One request of the batch: the check, where the check sent it, and what became of the confirmation of the reserve, if one was given. */
   private async sendOn(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     request: AccessRequestRecord,
     given: { reason: string | undefined; now: Date },
-  ): Promise<SubmitResult> {
+  ): Promise<Sent> {
     const ignored: ConfirmationResult = given.reason === undefined ? 'NOT_GIVEN' : 'IGNORED';
     const routed = await this.routing.route(tx, actor, request, 'SUBMISSION', given.now);
-    if (routed.status === 'NOT_CHECKABLE') {
-      return { requestId: request.id, outcome: 'STOPPED', stopReason: routed.reason, reserveConfirmation: ignored };
-    }
-    if (routed.outcome === 'BLOCKED') {
-      const [first] = routed.check.blockReasons;
-
-      return { requestId: request.id, outcome: 'STOPPED', stopReason: first ?? null, reserveConfirmation: ignored };
-    }
+    const stopped = (stopReason: StopReason | null): Sent => ({
+      result: { requestId: request.id, outcome: 'STOPPED', stopReason, reserveConfirmation: ignored },
+      openedFor: null,
+    });
+    if (routed.status === 'NOT_CHECKABLE') return stopped(routed.reason);
+    if (routed.outcome === 'BLOCKED') return stopped(routed.check.blockReasons[0] ?? null);
     if (routed.outcome === 'WITHIN_BASE') {
-      return { requestId: request.id, outcome: 'SENT_TO_APPROVER', stopReason: null, reserveConfirmation: ignored };
+      return {
+        result: { requestId: request.id, outcome: 'SENT_TO_APPROVER', stopReason: null, reserveConfirmation: ignored },
+        openedFor: routed.step?.assigneeEmployeeId ?? null,
+      };
     }
     // The head never confirms the reserve of a request they are one of the people for (`BR-MF1-06h`): it waits, as without a reason.
     const selfConfirm = request.beneficiaryEmployeeIds.includes(actor.employeeId);
     if (given.reason === undefined || selfConfirm) {
       return {
-        requestId: request.id,
-        outcome: 'AWAITING_RESERVE_CONFIRMATION',
-        stopReason: null,
-        reserveConfirmation: given.reason === undefined ? 'NOT_GIVEN' : 'IGNORED',
+        result: {
+          requestId: request.id,
+          outcome: 'AWAITING_RESERVE_CONFIRMATION',
+          stopReason: null,
+          reserveConfirmation: given.reason === undefined ? 'NOT_GIVEN' : 'IGNORED',
+        },
+        openedFor: null,
       };
     }
-    await this.reserve.confirmOnCheck(tx, actor, request, routed.check, { reason: given.reason, now: given.now });
+    const step = await this.reserve.confirmOnCheck(tx, actor, request, routed.check, {
+      reason: given.reason,
+      now: given.now,
+      via: 'BATCH',
+    });
 
-    return { requestId: request.id, outcome: 'SENT_TO_APPROVER', stopReason: null, reserveConfirmation: 'APPLIED' };
+    return {
+      result: { requestId: request.id, outcome: 'SENT_TO_APPROVER', stopReason: null, reserveConfirmation: 'APPLIED' },
+      openedFor: step.assigneeEmployeeId,
+    };
   }
 }

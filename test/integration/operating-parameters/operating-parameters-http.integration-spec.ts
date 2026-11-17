@@ -141,8 +141,6 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'RENEWAL_WINDOW_DAYS',
         'FORECAST_ERROR_THRESHOLD_PERCENT',
         'BUDGET_RESERVE_DEFAULT_PERCENT',
-        'BUDGET_ZBB_KPI3_BELOW_PERCENT',
-        'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
         'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
         'DEPARTURE_REVOCATION_WORKING_DAYS',
         'TRANSFER_GRACE_WORKING_DAYS',
@@ -411,6 +409,42 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect(rows[0].valid_to).not.toBeNull();
     });
 
+    it('does not return the two thresholds of the zero-based-budget explanation, and the migration closes a stored value without deleting it (QĐ-111ab)', async () => {
+      await ctx.sql.query(
+        `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
+         VALUES (gen_random_uuid(), $1, 'BUDGET_ZBB_KPI3_BELOW_PERCENT', '60'::jsonb, now() - interval '1 day'),
+                (gen_random_uuid(), $1, 'BUDGET_ZBB_PRICE_INCREASE_PERCENT', '10'::jsonb, now() - interval '1 day')`,
+        [seed.organizationId],
+      );
+      const migration = readFileSync(
+        join(
+          __dirname,
+          '..',
+          '..',
+          '..',
+          'prisma',
+          'migrations',
+          '20261117100000_drop_zbb_parameters',
+          'migration.sql',
+        ),
+        'utf8',
+      );
+
+      await ctx.sql.query(migration);
+      await ctx.sql.query(migration);
+
+      const parameters = await list();
+      expect(parameters.has('BUDGET_ZBB_KPI3_BELOW_PERCENT')).toBe(false);
+      expect(parameters.has('BUDGET_ZBB_PRICE_INCREASE_PERCENT')).toBe(false);
+      const rows = (
+        await ctx.sql.query<{ valid_to: Date | null }>(
+          `SELECT valid_to FROM parameter_values WHERE key LIKE 'BUDGET_ZBB_%'`,
+        )
+      ).rows;
+      expect(rows).toHaveLength(2);
+      expect(rows.every((row) => row.valid_to !== null)).toBe(true);
+    });
+
     it('does not return, and does not fail on, a budget period kind stored before it was removed (AC-8)', async () => {
       await ctx.sql.query(
         `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
@@ -424,8 +458,9 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       // 27 before GH-1/2/3 and the renewal window (REQUEST_OPEN_NEW_LIMIT, PAID_SOFTWARE_FLAG_THRESHOLD, RENEWAL_WINDOW_DAYS), less the
       // threshold of GH-3 that went with it (PAID_SOFTWARE_FLAG_THRESHOLD, QĐ-111h), then the three of MF-2 and MF-3 (DEPARTURE_REVOCATION_WORKING_DAYS, TRANSFER_GRACE_WORKING_DAYS, TRANSFER_GRACE_REMINDER_WORKING_DAYS), less the
       // two of the handover that went (ABRUPT_DEPARTURE_HOLD_WORKING_DAYS, HANDOVER_SHORT_DEADLINE_WORKING_DAYS, QĐ-110g) and the deadline of the
-      // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p).
-      expect(parameters.size).toBe(29);
+      // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p), then the two ZBB thresholds that went
+      // with the zero-based-budget explanation of a line (BUDGET_ZBB_KPI3_BELOW_PERCENT, BUDGET_ZBB_PRICE_INCREASE_PERCENT, QĐ-111ab).
+      expect(parameters.size).toBe(27);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {
