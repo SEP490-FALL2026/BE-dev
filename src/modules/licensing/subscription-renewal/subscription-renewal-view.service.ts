@@ -98,7 +98,8 @@ export class RenewalViewService {
   async adjustmentOf(actor: AuthenticatedPrincipal, subscriptionId: string): Promise<RenewalAdjustmentWire> {
     const period = (await this.periodsOf([subscriptionId])).get(subscriptionId);
     if (!period) throw new RenewalError('NOT_FOUND');
-    const found = pointOf(period);
+    const ending = (await this.repo.endingAmong([subscriptionId])).has(subscriptionId);
+    const found = pointOf(period, ending);
     if ('refusal' in found) throw new RenewalError(found.refusal.problem, found.refusal.details);
     const { adjustment } = found;
     const counts = await this.seatsNeeded.countFor({

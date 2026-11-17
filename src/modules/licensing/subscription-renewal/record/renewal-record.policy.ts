@@ -15,19 +15,24 @@ export interface RecordRefusal {
 }
 
 /** Why a subscription has no renewal (`details.reason` of `NOT_RENEWABLE`). */
-export type NotRenewableReason = 'PERPETUAL' | 'INTERNAL' | 'NOT_POOL_TERM' | 'NOT_ACTIVE' | 'ALREADY_CONTINUED';
+export type NotRenewableReason =
+  'PERPETUAL' | 'INTERNAL' | 'NOT_POOL_TERM' | 'NOT_ACTIVE' | 'ALREADY_CONTINUED' | 'CANCELLED';
 
 /**
  * The reason a subscription has no point of adjustment (`SBF-20` §4.1), the first of the list: a perpetual purchase, internal software, a
- * term that is not a workspace of the shared pool (`K1` has no point, `FR-1.12`(9)), a draft, a period a later one continues. Null when it has.
+ * term that is not a workspace of the shared pool (`K1` has no point, `FR-1.12`(9)), a draft, a period a later one continues, a subscription the
+ * company recorded as cancelled (`ending`: the catalog still shows it until it is closed, whatever period its payment day rolls into, `A1C-02`).
+ * Null when it has.
  */
-function notRenewableReason(period: RenewalPeriodFacts): NotRenewableReason | null {
+function notRenewableReason(period: RenewalPeriodFacts, ending: boolean): NotRenewableReason | null {
   if (period.kind === 'PERPETUAL') return 'PERPETUAL';
   if (period.applicationKind === 'INTERNAL') return 'INTERNAL';
   if (period.provisioningType !== 'K2') return 'NOT_POOL_TERM';
   if (period.status !== 'ACTIVE') return 'NOT_ACTIVE';
 
-  return period.renewedById === null ? null : 'ALREADY_CONTINUED';
+  if (period.renewedById !== null) return 'ALREADY_CONTINUED';
+
+  return ending ? 'CANCELLED' : null;
 }
 
 /**
@@ -48,8 +53,11 @@ function quantityFits(choice: RenewalChoice, quantity: number | null, purchasedQ
  * the subscription has a point (`NOT_RENEWABLE` with its reason), then a date gives one (`CONTRACT_DATA_INCOMPLETE`). Whether the point has come
  * is not asked here: the IT Admin reads the count before it.
  */
-export function pointOf(period: RenewalPeriodFacts): { adjustment: PeriodAdjustment } | { refusal: RecordRefusal } {
-  const reason = notRenewableReason(period);
+export function pointOf(
+  period: RenewalPeriodFacts,
+  ending: boolean,
+): { adjustment: PeriodAdjustment } | { refusal: RecordRefusal } {
+  const reason = notRenewableReason(period, ending);
   if (reason !== null) return { refusal: { problem: 'NOT_RENEWABLE', details: { reason } } };
   const adjustment = period.adjustment;
 
@@ -64,12 +72,14 @@ export function pointOf(period: RenewalPeriodFacts): { adjustment: PeriodAdjustm
  */
 export function preflightOf(input: {
   period: RenewalPeriodFacts;
+  /** The company recorded the subscription as cancelled (`A1C-02`). */
+  ending: boolean;
   today: BusinessDate;
   choice: RenewalChoice;
   quantity: number | null;
 }): { adjustment: PeriodAdjustment } | { refusal: RecordRefusal } {
   const { period, today } = input;
-  const found = pointOf(period);
+  const found = pointOf(period, input.ending);
   if ('refusal' in found) return found;
   const { adjustment } = found;
   if (today < adjustment.point) {

@@ -336,6 +336,14 @@ describe('subscription renewal routes (e2e, no database)', () => {
         ['IT_ADMIN'],
       ],
       [
+        'a subscription already recorded as cancelled, with the reason CANCELLED (A1C-02)',
+        new RenewalError('NOT_RENEWABLE', { reason: 'CANCELLED' }),
+        409,
+        'SUBSCRIPTION_RENEWAL.NOT_RENEWABLE',
+        (s) => request(s).post('/api/v1/subscription-renewals').send(RECORD),
+        ['IT_ADMIN'],
+      ],
+      [
         'a period that already has its result, with the case',
         new RenewalError('ALREADY_PROPOSED', { renewalId: ID }),
         409,

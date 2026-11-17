@@ -3,6 +3,7 @@ import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/b
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { endingAmongOf } from '../shared-pool/shared-pool-capacity.repo';
 import { renewalDecisionSnapshotJson } from './subscription-renewal-decision-snapshot.json';
 import type {
   DeadlineEventRecord,
@@ -166,21 +167,10 @@ export class SubscriptionRenewalRepo {
 
   /**
    * Which of these periods the company has decided to end and whose decision still stands (`Q-162`): a case decided `CANCEL` that waits for
-   * its outcome, or whose outcome is the one decided. A cancellation the vendor refused, or that ended another way, ends nothing. One
-   * statement, only the ids.
+   * its outcome, or whose outcome is the one decided. The reading is the one the pool grants by (`endingAmongOf`). One statement, only the ids.
    */
-  async endingAmong(subscriptionIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
-    if (subscriptionIds.length === 0) return new Set();
-    const rows = await (tx ?? this.prisma).subscriptionRenewal.findMany({
-      where: {
-        subscriptionId: { in: [...subscriptionIds] },
-        decidedChoice: 'CANCEL',
-        OR: [{ state: 'DECIDED' }, { state: 'OUTCOME_RECORDED', outcome: 'AS_DECIDED' }],
-      },
-      select: { subscriptionId: true },
-    });
-
-    return new Set(rows.map((row) => row.subscriptionId));
+  endingAmong(subscriptionIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return endingAmongOf(tx ?? this.prisma, subscriptionIds);
   }
 
   /** Closes a proposal that waits as out of date: the period is free for a new one. False when it no longer waits. */

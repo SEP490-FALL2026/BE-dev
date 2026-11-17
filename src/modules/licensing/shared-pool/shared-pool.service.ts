@@ -10,6 +10,8 @@ import { SharedPoolAvoidedCostRepo } from './shared-pool-avoided-cost.repo';
 import { SharedPoolCapacityRepo } from './shared-pool-capacity.repo';
 import { avoidedCostOf, judgePurchase, type PoolStock, type PurchaseDecision } from './shared-pool.policy';
 
+const idOf = (subscription: PoolSubscription): string => subscription.subscriptionId;
+
 type ProvisioningType = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
 
 /**
@@ -53,6 +55,20 @@ export class SharedPoolService {
   ) {}
 
   /**
+   * The subscriptions of the plan a seat can be taken from today: the grantable ones of the catalog (`getGrantableSubscriptions`) less those
+   * the company recorded as cancelled, which the catalog still shows until the closing of the subscription is written (`A1C-02`, `QĐ-99i`).
+   */
+  async grantableOf(tx: DbTx, planId: string, today: BusinessDate): Promise<PoolSubscription[]> {
+    const subscriptions = await this.catalog.getGrantableSubscriptions(planId, today, tx);
+
+    return this.withoutEnding(subscriptions, await this.capacityRepo.endingAmong(subscriptions.map(idOf), tx));
+  }
+
+  private withoutEnding(subscriptions: readonly PoolSubscription[], ending: ReadonlySet<string>): PoolSubscription[] {
+    return subscriptions.filter((subscription) => !ending.has(subscription.subscriptionId));
+  }
+
+  /**
    * What the subscriptions of the plan hold from today on: free seats are the seats bought less the most assignments held on any day from
    * today on. The period that runs and the next one recorded ahead of its start are one pool: the next is not among the subscriptions
    * (`getGrantableSubscriptions`), its seats being those of the one that runs (`QĐ-111n`).
@@ -63,7 +79,7 @@ export class SharedPoolService {
     today: BusinessDate,
     provisioningType?: ProvisioningType,
   ): Promise<PoolStock> {
-    const subscriptions = await this.catalog.getGrantableSubscriptions(planId, today, tx);
+    const subscriptions = await this.grantableOf(tx, planId, today);
 
     return this.stockOfSubscriptions(tx, subscriptions, today, provisioningType === 'K4');
   }
@@ -98,9 +114,15 @@ export class SharedPoolService {
     const stocks = new Map<string, PlanStock>();
     const targets = await this.catalog.findPlanSeatTargets(planIds);
     const pooled = targets.filter((target) => target.provisioningType === 'K2' || target.provisioningType === 'K4');
-    const grantable = await this.catalog.getGrantableSubscriptionsOfPlans(
+    const grantableOfPlans = await this.catalog.getGrantableSubscriptionsOfPlans(
       pooled.map((target) => target.planId),
       today,
+    );
+    const ending = await this.capacityRepo.endingAmong(
+      [...grantableOfPlans.values()].flat().map((subscription) => subscription.subscriptionId),
+    );
+    const grantable = new Map(
+      [...grantableOfPlans].map(([planId, subscriptions]) => [planId, this.withoutEnding(subscriptions, ending)]),
     );
     const occupancy = await this.capacityRepo.occupancyOfMany(
       [...grantable.values()].flat().map((subscription) => subscription.subscriptionId),
@@ -139,7 +161,7 @@ export class SharedPoolService {
     tx: DbTx,
     input: { planId: string; provisioningType: ProvisioningType; today: BusinessDate },
   ): Promise<string | null> {
-    const subscriptions = await this.catalog.getGrantableSubscriptions(input.planId, input.today, tx);
+    const subscriptions = await this.grantableOf(tx, input.planId, input.today);
     if (input.provisioningType !== 'K2' && input.provisioningType !== 'K4')
       return subscriptions[0]?.subscriptionId ?? null;
     const stock = await this.stockOfSubscriptions(tx, subscriptions, input.today, input.provisioningType === 'K4');

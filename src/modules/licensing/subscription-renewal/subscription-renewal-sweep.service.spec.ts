@@ -39,10 +39,12 @@ function build(
   options: {
     cases?: Map<string, Partial<RenewalRecord>[]>;
     events?: string[];
+    ending?: string[];
     counts?: Partial<typeof counts>;
   } = {},
 ) {
   const ofSubscriptions = jest.fn().mockResolvedValue(options.cases ?? new Map());
+  const endingAmong = jest.fn().mockResolvedValue(new Set(options.ending ?? []));
   const deadlineEventsOf = jest.fn().mockResolvedValue(new Map((options.events ?? []).map((id) => [id, {}])));
   const sharedPeople = jest.fn().mockResolvedValue({ finance: 'fin', approver: 'boss', superAdmin: 'root' });
   const peopleOf = jest.fn((_period: unknown, shared: object) => Promise.resolve({ ...shared, itAdmin: 'it' }));
@@ -54,7 +56,7 @@ function build(
   const recordPassedRenewalDay = jest.fn<Promise<boolean>, [subject: Written]>().mockResolvedValue(true);
   const service = new SubscriptionRenewalSweepService(
     { listAdjustmentSubjects: jest.fn().mockResolvedValue(subjects) } as unknown as SubscriptionPeriodApi,
-    { ofSubscriptions, deadlineEventsOf } as unknown as SubscriptionRenewalRepo,
+    { ofSubscriptions, endingAmong, deadlineEventsOf } as unknown as SubscriptionRenewalRepo,
     { sharedPeople, peopleOf } as unknown as RenewalPartiesService,
     {
       getOrganization: jest.fn().mockResolvedValue({ id: 'org' }),
@@ -184,5 +186,28 @@ describe('the pass over the points of adjustment (SBF-20 §4.5)', () => {
     await sweep(service);
 
     expect(sendDue.mock.calls[0][0]).toMatchObject({ kinds: ['ADJUSTMENT_POINT', 'KEPT'] });
+  });
+
+  it('passes over a subscription recorded as cancelled whole: no alert, no warning, no event, the seats not even counted (A1C-02)', async () => {
+    TODAY.value = '2026-12-01';
+    const monthly: PeriodAdjustment = {
+      kind: 'PAYMENT_DATE',
+      deadline: '2026-12-01',
+      point: '2026-11-24',
+      end: '2026-12-01',
+      redAlertOn: null,
+      commitment: 'MONTHLY',
+    };
+    const { service, sendDue, countFor, dataQualityWarning, recordPassedRenewalDay } = build(
+      [periodOf('a', monthly), periodOf('b', null)],
+      { ending: ['a', 'b'] },
+    );
+
+    expect(await sweep(service)).toEqual({ told: 0, deadlineEvents: 0 });
+
+    expect(countFor).not.toHaveBeenCalled();
+    expect(sendDue).not.toHaveBeenCalled();
+    expect(dataQualityWarning).not.toHaveBeenCalled();
+    expect(recordPassedRenewalDay).not.toHaveBeenCalled();
   });
 });

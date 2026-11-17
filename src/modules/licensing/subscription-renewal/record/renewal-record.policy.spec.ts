@@ -65,7 +65,13 @@ const counts = (extra: Partial<SeatsNeededCounts> = {}): SeatsNeededCounts => ({
 });
 
 const reason = (extra: Partial<RenewalPeriodFacts>) => {
-  const result = preflightOf({ period: period(extra), today: '2026-11-10', choice: 'REDUCE', quantity: 8 });
+  const result = preflightOf({
+    period: period(extra),
+    ending: false,
+    today: '2026-11-10',
+    choice: 'REDUCE',
+    quantity: 8,
+  });
 
   return 'refusal' in result ? result.refusal : null;
 };
@@ -76,7 +82,8 @@ describe('the order of the refusals of a recorded renewal (SBF-20 §4.4 steps 2,
     today = '2026-11-10',
     choice: RenewalChoice = 'REDUCE',
     quantity = 8,
-  ) => preflightOf({ period: period(extra), today, choice, quantity });
+    ending = false,
+  ) => preflightOf({ period: period(extra), ending, today, choice, quantity });
 
   it('gives the adjustment of a subscription of the shared pool that is a live term the day the point has come', () => {
     expect(run({})).toEqual({ adjustment: adjustment() });
@@ -101,6 +108,13 @@ describe('the order of the refusals of a recorded renewal (SBF-20 §4.4 steps 2,
     expect(reason({ renewedById: 'next' })).toEqual({
       problem: 'NOT_RENEWABLE',
       details: { reason: 'ALREADY_CONTINUED' },
+    });
+    // A subscription the company recorded as cancelled has no point either, after the others of the list (`A1C-02`).
+    expect(run({}, '2026-11-10', 'REDUCE', 8, true)).toEqual({
+      refusal: { problem: 'NOT_RENEWABLE', details: { reason: 'CANCELLED' } },
+    });
+    expect(run({ renewedById: 'next' }, '2026-11-10', 'REDUCE', 8, true)).toMatchObject({
+      refusal: { details: { reason: 'ALREADY_CONTINUED' } },
     });
     // Several at once: the first of the list answers.
     expect(reason({ kind: 'PERPETUAL', status: 'DRAFT', renewedById: 'next', provisioningType: 'K4' })).toMatchObject({
@@ -134,7 +148,9 @@ describe('the order of the refusals of a recorded renewal (SBF-20 §4.4 steps 2,
 
   it('fits the quantity to the choice: none to cancel, as bought to renew, fewer to reduce, more to increase (step 5)', () => {
     const shape = (choice: 'RENEW' | 'REDUCE' | 'INCREASE' | 'CANCEL', quantity: number | null) =>
-      'refusal' in preflightOf({ period: period(), today: '2026-11-10', choice, quantity }) ? 'QUANTITY_INVALID' : null;
+      'refusal' in preflightOf({ period: period(), ending: false, today: '2026-11-10', choice, quantity })
+        ? 'QUANTITY_INVALID'
+        : null;
 
     expect(shape('CANCEL', null)).toBeNull();
     expect(shape('CANCEL', 0)).toBe('QUANTITY_INVALID');
@@ -298,22 +314,28 @@ describe('whether a result was recorded after the renewal day (lateRenewal, QĐ-
 
 describe('the point of adjustment read before a result is recorded (SBF-20 §5, S20-T5)', () => {
   it('gives the adjustment of a live term of the shared pool even before its point has come', () => {
-    expect(pointOf(period({}))).toEqual({ adjustment: adjustment() });
+    expect(pointOf(period({}), false)).toEqual({ adjustment: adjustment() });
   });
 
   it('names why a subscription has no point, with the same reasons as the write (K1, K4, K5 and the others)', () => {
-    expect(pointOf(period({ provisioningType: 'K1', ownerDepartmentId: 'dep' }))).toEqual({
+    expect(pointOf(period({ provisioningType: 'K1', ownerDepartmentId: 'dep' }), false)).toEqual({
       refusal: { problem: 'NOT_RENEWABLE', details: { reason: 'NOT_POOL_TERM' } },
     });
-    expect(pointOf(period({ kind: 'PERPETUAL', provisioningType: 'K4' }))).toEqual({
+    expect(pointOf(period({ kind: 'PERPETUAL', provisioningType: 'K4' }), false)).toEqual({
       refusal: { problem: 'NOT_RENEWABLE', details: { reason: 'PERPETUAL' } },
     });
-    expect(pointOf(period({ applicationKind: 'INTERNAL', provisioningType: 'K5' }))).toEqual({
+    expect(pointOf(period({ applicationKind: 'INTERNAL', provisioningType: 'K5' }), false)).toEqual({
       refusal: { problem: 'NOT_RENEWABLE', details: { reason: 'INTERNAL' } },
     });
   });
 
+  it('names a subscription recorded as cancelled, which has no point to adjust any more (A1C-02)', () => {
+    expect(pointOf(period({}), true)).toEqual({
+      refusal: { problem: 'NOT_RENEWABLE', details: { reason: 'CANCELLED' } },
+    });
+  });
+
   it('asks for the contract data when no date gives a point', () => {
-    expect(pointOf(period({ adjustment: null }))).toEqual({ refusal: { problem: 'CONTRACT_DATA_INCOMPLETE' } });
+    expect(pointOf(period({ adjustment: null }), false)).toEqual({ refusal: { problem: 'CONTRACT_DATA_INCOMPLETE' } });
   });
 });

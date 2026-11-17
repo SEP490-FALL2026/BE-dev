@@ -114,7 +114,8 @@ export class RenewalRecordService {
   ): Promise<Checked> {
     const quantity = input.proposedQuantity ?? null;
     const note = textOf(input.note);
-    const ready = preflightOf({ period, today, choice: input.choice, quantity });
+    const ending = (await this.repo.endingAmong([period.subscriptionId], tx)).has(period.subscriptionId);
+    const ready = preflightOf({ period, ending, today, choice: input.choice, quantity });
     if ('refusal' in ready) throw errorOf(ready.refusal);
     const { adjustment } = ready;
     const counts = await this.seatsNeeded.countFor(

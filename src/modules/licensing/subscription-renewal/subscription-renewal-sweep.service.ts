@@ -22,6 +22,8 @@ interface PassWorld {
   organizationId: string;
   today: BusinessDate;
   cases: Map<string, RenewalRecord[]>;
+  /** The subscriptions the company recorded as cancelled: no alert, warning or event is made for them (`A1C-02`). */
+  ending: ReadonlySet<string>;
   events: Map<string, DeadlineEventRecord>;
   shared: Awaited<ReturnType<RenewalPartiesService['sharedPeople']>> | undefined;
 }
@@ -38,7 +40,8 @@ const isAlert = (kind: DueNoticeKind): kind is AlertKind =>
  * One pass over the subscriptions that have a point of adjustment (`SBF-20` §4.5, `US-11-01`, `US-11-04`): the IT Admin told the point came,
  * the red alert of a plan by the year, the seats a plan by the month keeps, the incident or the end of a period whose renewal day passed with
  * no outcome recorded, and the warning of contract data that gives no point. Every step is idempotent (a person told once, one event per
- * period), so the pass may run again, on several instances, or after a failure.
+ * period), so the pass may run again, on several instances, or after a failure. A subscription the company recorded as cancelled is passed
+ * over whole (`A1C-02`).
  *
  * Known risk (R2-12): the catalog gives at most 500 subscriptions with no order, so past 500 pool subscriptions the later ones are never
  * seen; the shared pool holds few. The seats a period needs are counted only for a period with something due today.
@@ -67,6 +70,7 @@ export class SubscriptionRenewalSweepService {
       organizationId: organization.id,
       today,
       cases: await this.repo.ofSubscriptions(ids),
+      ending: await this.repo.endingAmong(ids),
       events: await this.repo.deadlineEventsOf(ids),
       shared: undefined,
     };
@@ -82,6 +86,7 @@ export class SubscriptionRenewalSweepService {
   /** What the pass does for one period: the warnings of its data, then, when something is due today, its alerts and its event. */
   private async sweepPeriod(period: RenewalPeriodFacts, world: PassWorld): Promise<SweepResult> {
     const done: SweepResult = { told: 0, deadlineEvents: 0 };
+    if (world.ending.has(period.subscriptionId)) return done;
     const { adjustment } = period;
     const problems = dataQualityProblemsOf(adjustment);
     const eventRecorded = world.events.has(period.subscriptionId);
