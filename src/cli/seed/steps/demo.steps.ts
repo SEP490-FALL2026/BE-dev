@@ -1,6 +1,7 @@
 import { as, listAll, summarize, tag, yearOf } from '../demo-step-kit';
 import { dayOffset } from '../demo-dates';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
+import { contractPdf, invoicePdf, receiptPdf } from './pdf-builders';
 import { uploadDocument } from './file-kit';
 import { financePerson, money } from './finance-kit';
 
@@ -19,6 +20,13 @@ const subscriptionOf = (ctx: DemoRunContext, key: string) => {
 
   return found;
 };
+
+const vendorNameOf = (ctx: DemoRunContext, applicationKey: string): string =>
+  ctx.fixture.applications.find((application) => application.key === applicationKey)?.vendorName ?? applicationKey;
+
+const vendorOfPlan = (ctx: DemoRunContext, planKey: string): string =>
+  ctx.fixture.applications.find((application) => application.plans.some((plan) => plan.key === planKey))?.vendorName ??
+  planKey;
 
 const headOfCostCenter = (ctx: DemoRunContext, costCenterCode: string): string | null =>
   ctx.fixture.departments.find((department) => department.costCenter?.code === costCenterCode)?.head ?? null;
@@ -47,12 +55,13 @@ async function contracts(ctx: DemoRunContext): Promise<StepOutcome> {
       results.push({ status: 'planned', label: spec.number });
       continue;
     }
+    const effective = { from: dayOffset(ctx.today, -200), to: dayOffset(ctx.today, 165) };
     const created = await ctx.api.call<{ contract: { id: string } }>(admin, 'POST', '/contracts', {
       name: spec.name,
       number: spec.number,
       vendorId: ctx.ids.vendors.get(spec.application),
-      effectiveFrom: dayOffset(ctx.today, -200),
-      effectiveTo: dayOffset(ctx.today, 165),
+      effectiveFrom: effective.from,
+      effectiveTo: effective.to,
       note: `${tag(ctx, 'CONTRACT')} Hợp đồng khung một năm, gia hạn theo thuê bao.`,
     });
     const contractId = created.contract.id;
@@ -61,7 +70,14 @@ async function contracts(ctx: DemoRunContext): Promise<StepOutcome> {
         subscriptionId: ctx.ids.subscriptions.get(key),
       });
     }
-    const file = await uploadDocument(ctx, admin, 'CONTRACT_ATTACHMENT', `${spec.number}.pdf`);
+    const pdf = await contractPdf({
+      number: spec.number,
+      name: spec.name,
+      vendor: vendorNameOf(ctx, spec.application),
+      effectiveFrom: effective.from,
+      effectiveTo: effective.to,
+    });
+    const file = await uploadDocument(ctx, admin, 'CONTRACT_ATTACHMENT', pdf);
     await ctx.api.call(admin, 'POST', `/documents/${file}/attach`, { contractId });
     results.push({ status: 'done', label: spec.number });
   }
@@ -105,8 +121,18 @@ async function invoices(ctx: DemoRunContext): Promise<StepOutcome> {
     if (!row) {
       const subscription = subscriptionOf(ctx, spec.subscription);
       const admin = await as(ctx, subscription.responsible);
-      const document = await uploadDocument(ctx, admin, 'PURCHASE_DOCUMENT', `${spec.number}.pdf`);
       const price = BigInt(subscription.unitPrice.amount);
+      const netAmount = (price * BigInt(spec.quantity)).toString();
+      const pdf = await invoicePdf({
+        vendorInvoiceNumber: spec.number,
+        vendorName: vendorOfPlan(ctx, subscription.plan),
+        issuedOn: ctx.today,
+        servicePeriodMonth: ctx.today.slice(0, 7),
+        quantity: spec.quantity,
+        unitPrice: price.toString(),
+        netAmount,
+      });
+      const document = await uploadDocument(ctx, admin, 'PURCHASE_DOCUMENT', pdf);
       row = await ctx.api.call<InvoiceRow>(admin, 'POST', '/purchase-invoices', {
         link: { subscriptionId: ctx.ids.subscriptions.get(spec.subscription) },
         vendorInvoiceNumber: spec.number,
@@ -114,7 +140,7 @@ async function invoices(ctx: DemoRunContext): Promise<StepOutcome> {
         servicePeriodMonth: ctx.today.slice(0, 7),
         quantity: spec.quantity,
         unitPriceOriginal: { amount: price.toString(), currency: 'VND' },
-        netAmount: money((price * BigInt(spec.quantity)).toString()),
+        netAmount: money(netAmount),
         paymentSource: 'COMPANY_CARD',
         documentIds: [document],
       });
@@ -295,7 +321,14 @@ async function outOfProcess(ctx: DemoRunContext): Promise<StepOutcome> {
     caseId = decided.outOfProcessCaseId;
   }
   if (!caseId) return { status: 'conflict', detail: 'quyết định không mở ca ngoài quy trình' };
-  const receipt = await uploadDocument(ctx, finance, 'PURCHASE_DOCUMENT', 'bien-nhan-jira-ca-nhan.pdf');
+  const pdf = await receiptPdf({
+    number: 'bien-nhan-jira-ca-nhan',
+    vendor: vendorNameOf(ctx, 'jira'),
+    amount: '200000',
+    issuedOn: ctx.today,
+    note: 'Nhân viên Kinh doanh tự mua Jira bằng thẻ cá nhân, Finance ghi phần đã chi theo biên nhận.',
+  });
+  const receipt = await uploadDocument(ctx, finance, 'PURCHASE_DOCUMENT', pdf);
   await ctx.api.call(finance, 'POST', `/out-of-process-cases/${caseId}/closure`, {
     outcome: 'RECORD_SPENT',
     note: `${tag(ctx, 'SBF07')} Ghi phần đã chi theo biên nhận, tính cho phòng Kinh doanh.`,

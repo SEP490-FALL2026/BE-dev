@@ -3,22 +3,21 @@ import { as, emailOf, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoSeat } from '../fixture/demo-fixture.types';
 import { catalogAdmin } from './catalog.steps';
+import { SEAT_BASELINE_COLUMNS, csvCell } from './file-builders';
 
 type Result = { status: StepOutcome['status']; label: string };
 
 /** Seats are granted this many days ago unless the fixture says otherwise: past the 90-day tier of the optimization rules. */
 const DEFAULT_GRANTED_DAYS_AGO = 130;
 /** The columns of the seat template: a column it does not know (the old `reason`) would come back as `ignoredColumns` on every preview. */
-const HEADER = 'employee_code,account_identifier,kind,granted_on,expected_end_date';
-
-const cell = (value: string): string => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+const HEADER = SEAT_BASELINE_COLUMNS.join(',');
 
 /** One line of the seat file for a seat of the fixture: the import takes personal seats only (`QĐ-110m`). */
 export function lineOf(ctx: DemoRunContext, seat: DemoSeat): string {
   const grantedOn = dayOffset(ctx.today, -(seat.grantedDaysAgo ?? DEFAULT_GRANTED_DAYS_AGO));
   const end = seat.endInDays === undefined ? '' : dayOffset(ctx.today, seat.endInDays);
 
-  return [seat.holder, emailOf(ctx, seat.holder), 'personal', grantedOn, end].map(cell).join(',');
+  return [seat.holder, emailOf(ctx, seat.holder), 'personal', grantedOn, end].map(csvCell).join(',');
 }
 
 interface ImportPreview {

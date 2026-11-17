@@ -197,6 +197,22 @@ export class DemoApiClient {
   }
 
   /**
+   * The bytes of a file the API answers as itself, not in an envelope (a template: `GET /import-templates/{kind}`), as the account of `email`.
+   * A refusal is a DemoApiError (method, path, status and code, no body).
+   */
+  async download(email: string, path: string): Promise<Uint8Array> {
+    const session = this.sessions.get(email);
+    if (!session) throw new Error(`No session for the account of this step (GET ${path})`);
+    try {
+      return await this.fetchBytes(path, session.accessToken);
+    } catch (error) {
+      if (!(error instanceof DemoApiError) || error.status !== 401) throw error;
+      await this.login(session.email, session.password);
+      return this.fetchBytes(path, this.sessions.get(email)?.accessToken ?? '');
+    }
+  }
+
+  /**
    * Puts the bytes of a file at the upload link the API gave (object storage, outside the API): the headers are the ones the API
    * named. A refusal is a DemoApiError of the storage (method PUT, the link without its signature).
    */
@@ -235,6 +251,19 @@ export class DemoApiClient {
         continue;
       }
       return this.read<T>(method, path, response);
+    }
+  }
+
+  private async fetchBytes(path: string, token: string): Promise<Uint8Array> {
+    for (let attempt = 0; ; attempt++) {
+      const response = await this.fetchOnce('GET', path, undefined, token, { accept: '*/*' });
+      if (retryable('GET', response.status) && attempt < this.retries) {
+        await this.sleep(waitOf(response, attempt));
+        continue;
+      }
+      if (!response.ok) return this.read<Uint8Array>('GET', path, response);
+
+      return new Uint8Array(await response.arrayBuffer());
     }
   }
 

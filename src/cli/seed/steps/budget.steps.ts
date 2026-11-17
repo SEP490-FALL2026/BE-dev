@@ -2,6 +2,7 @@ import { as, listAll, summarize, yearOf } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoNextYear } from '../fixture/demo-fixture.types';
 import { yesChecklist } from './checklist-kit';
+import { proposalFile, versionFile } from './budget-files';
 import { uploadBudgetFile } from './file-kit';
 import { financePerson, money } from './finance-kit';
 
@@ -54,7 +55,7 @@ async function propose(
     ctx,
     to.headEmail,
     '/budget-proposals/attachments',
-    `BM-10-${plan.department}-${to.year}.pdf`,
+    await proposalFile(ctx, to.headEmail, plan, to.year),
   );
 
   return ctx.api.call(to.headEmail, 'POST', '/budget-proposals', {
@@ -69,7 +70,8 @@ async function propose(
 async function sendVersion(ctx: DemoRunContext, finance: string, versionId: string, label: string): Promise<unknown> {
   const files = await listAll<{ id: string }>(ctx, finance, `/budget-versions/${versionId}/attachments`);
   if (files.length === 0) {
-    await uploadBudgetFile(ctx, finance, `/budget-versions/${versionId}/attachments`, `phien-ban-${label}.pdf`);
+    const file = await versionFile(ctx, finance, versionId, `phien-ban-${label}.xlsx`);
+    await uploadBudgetFile(ctx, finance, `/budget-versions/${versionId}/attachments`, file);
   }
 
   return ctx.api.call(finance, 'POST', `/budget-versions/${versionId}/submission`);

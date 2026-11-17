@@ -121,6 +121,17 @@ export interface DemoBudget {
   note?: string;
 }
 
+/** A line of `BM-10`: software a department expects to need in the year, for how many people, at what price and for how many months. */
+export interface DemoBudgetLine {
+  software: string;
+  plan: string;
+  seats: number;
+  /** VND a seat a month, before tax. */
+  monthlyPrice: number;
+  months: number;
+  reason: string;
+}
+
 /** Where the budget of the next year of a department is left for the demo to carry on from. */
 export interface DemoNextYear {
   department: string;
@@ -277,6 +288,8 @@ export interface DemoFixture {
   budgets: DemoBudget[];
   /** The budgets of the next year, each left at the stage a demo carries on from. */
   nextYear: DemoNextYear[];
+  /** The lines of the `BM-10` file of each department (by code), this year and next; what they leave short of the amount asked is one balancing line. */
+  budgetLines: Record<string, DemoBudgetLine[]>;
   requests: DemoRequestScenario[];
   keys: DemoKeys[];
   usageSources: DemoUsageSource[];

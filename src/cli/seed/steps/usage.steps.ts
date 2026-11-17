@@ -1,5 +1,6 @@
 import { DemoApiError } from '../demo-api-client';
 import { yesChecklist } from './checklist-kit';
+import { USAGE_REPORT_COLUMNS } from './file-builders';
 import { dayOffset } from '../demo-dates';
 import { as, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
@@ -7,8 +8,8 @@ import type { DemoGhostDecision, DemoUsageSource } from '../fixture/demo-fixture
 
 type Result = { status: StepOutcome['status']; label: string };
 
-const IDENTIFIER_COLUMN = 'email';
-const ACTIVITY_COLUMN = 'last_activity_date';
+const IDENTIFIER_COLUMN = USAGE_REPORT_COLUMNS.identifier;
+const ACTIVITY_COLUMN = USAGE_REPORT_COLUMNS.lastActivityDate;
 
 /** The IT Admin who declares the source of an application and imports its reports. */
 const importerOf = (ctx: DemoRunContext, spec: DemoUsageSource) => as(ctx, spec.importer);
