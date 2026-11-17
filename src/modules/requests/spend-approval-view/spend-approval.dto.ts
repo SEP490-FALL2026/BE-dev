@@ -166,7 +166,6 @@ const approvalSummarySchema = z.strictObject({
   outcome: budgetOutcomeSchema.nullable(),
   /** The part of the year after of the request against the approved budget of that year; null when it keeps nothing of it. */
   nextYearBudget: nextYearBudgetSchema,
-  /** The same person holds the need step and this one. */
   /** The batch it was last sent in, when it was sent in one. */
   batchId: z.uuid().nullable(),
 });

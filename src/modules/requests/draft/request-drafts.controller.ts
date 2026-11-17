@@ -85,7 +85,7 @@ export class RequestDraftsController {
     status: HttpStatus.CREATED,
     message: 'ACCESS_REQUEST.DRAFT_SAVED',
     description:
-      'Keeps what the sender filled for an individual request, a request for a group or a request for a service account (the body is the one of the operation that sends it, with its kind), without any gate: no Cost Center, no check of the budget, no step, no commitment, and it counts for nothing. It is listed, sent and deleted only by the sender; to change it, delete it and save it again.',
+      'Keeps what the sender filled for an individual request or a request for a group (the body is the one of the operation that sends it, with its kind), without any gate: no Cost Center, no check of the budget, no step, no commitment, and it counts for nothing. It is listed, sent and deleted only by the sender; to change it, delete it and save it again.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

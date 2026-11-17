@@ -41645,7 +41645,7 @@
         },
         "responses": {
           "201": {
-            "description": "Keeps what the sender filled for an individual request, a request for a group or a request for a service account (the body is the one of the operation that sends it, with its kind), without any gate: no Cost Center, no check of the budget, no step, no commitment, and it counts for nothing. It is listed, sent and deleted only by the sender; to change it, delete it and save it again.",
+            "description": "Keeps what the sender filled for an individual request or a request for a group (the body is the one of the operation that sends it, with its kind), without any gate: no Cost Center, no check of the budget, no step, no commitment, and it counts for nothing. It is listed, sent and deleted only by the sender; to change it, delete it and save it again.",
             "content": {
               "application/json": {
                 "schema": {
@@ -43966,7 +43966,7 @@
         },
         "responses": {
           "200": {
-            "description": "The person who holds the need step answers the checklist of the policy in force and approves, refuses or sends the request back to its sender. A refusal or a return gives its reason, or takes it from the answers No; an approval is locked while an answer is No. A return leaves the request with its sender, who adds what is missing and sends it again. A refusal gives its reason; a term over twelve months is approved only with a confirmation. The decision becomes an electronic approval record that is never changed. An approval sends the request on (the IT Admin for internal software, the spend submission for paid software); a refusal ends it with no spend step and no commitment.",
+            "description": "The person who holds the need step answers the checklist of the policy in force and approves, refuses or sends the request back to its sender. A refusal or a return gives its reason, or takes it from the answers No; an approval is locked while an answer is No. A return leaves the request with its sender, who adds what is missing and sends it again. The decision becomes an electronic approval record that is never changed. An approval sends the request on (the IT Admin for internal software, the spend submission for paid software); a refusal ends it with no spend step and no commitment.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44302,7 +44302,7 @@
         },
         "responses": {
           "200": {
-            "description": "The requester withdraws the request while it waits or while the grant has not been carried out; the head of the department does too, with a reason, once Finance gave it back, it waits for a budget or the data stopped it. The open steps and the questions to Finance close, the request leaves the batch it was sent in, what was held for it goes back to the budget and a task nobody has worked is cancelled with its assignment (never failed). When the grant had failed the request waits (AWAITING_IT_CLOSE) until the IT Admin cancels the task, and it then ends as withdrawn.",
+            "description": "The requester withdraws the request while it waits or while the grant has not been carried out; the head of the department does too, with a reason, only while the budget or the data stopped the request or it waits for the head to confirm the reserve. The open steps close, the request leaves the batch it was sent in, what was held for it goes back to the budget and a task nobody has worked is cancelled with its assignment (never failed). When the grant had failed the request waits (AWAITING_IT_CLOSE) until the IT Admin cancels the task, and it then ends as withdrawn.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44815,7 +44815,7 @@
         },
         "responses": {
           "200": {
-            "description": "The request ends as cancelled, neither refused nor failed nor withdrawn, with who closed it, when and why (the person it was for left, or was transferred to another department while it was still open: a paid request keeps the department it was sent from, and the IT Admin closes the part not yet granted with a reason). The open steps and the questions to Finance close, the request leaves the batch it was sent in, what was held for it and is not spent goes back to the budget and the task of its grant is cancelled with its assignment so the seat is free (a task being worked, or any open task when the person was transferred, only with the evidence that the work was undone, or that the vendor was checked and the invitation collected). A grant that is done is not closed here: the right goes to the held rights. The people it concerns and Finance are told from the audit event.",
+            "description": "The request ends as cancelled, neither refused nor failed nor withdrawn, with who closed it, when and why (the person it was for left, or was transferred to another department while it was still open: a paid request keeps the department it was sent from, and the IT Admin closes the part not yet granted with a reason). The open steps close, the request leaves the batch it was sent in, what was held for it and is not spent goes back to the budget and the task of its grant is cancelled with its assignment so the seat is free (a task being worked, or any open task when the person was transferred, only with the evidence that the work was undone, or that the vendor was checked and the invitation collected). A grant that is done is not closed here: the right goes to the held rights. The requester and the people it was for are told from the audit event; Finance is told only when the system closes the request itself.",
             "content": {
               "application/json": {
                 "schema": {
@@ -49028,7 +49028,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The requests of the batch in the order they were sent, each with how it fared (sent to the approver, sent to Finance, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head who sent the batch and Finance see all of them; the person who holds a spend step sees the requests they hold.",
+            "description": "The requests of the batch in the order they were sent, each with how it fared (sent to the approver, waiting for the head to confirm the reserve, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head who sent the batch and Finance see all of them; the person who holds a spend step sees the requests they hold.",
             "content": {
               "application/json": {
                 "schema": {
@@ -49743,7 +49743,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The spend steps given to the caller that are open, the oldest first: what each request is, what it costs, the first code of its check, whether the same person holds the need step and this one, whether the head confirmed the reserve for it, and the batch it was sent in.",
+            "description": "The spend steps given to the caller that are open, the oldest first: what each request is, what it costs, the first code of its check and what that check said (within the base, or uses the reserve the head confirmed), and the batch it was sent in.",
             "content": {
               "application/json": {
                 "schema": {
@@ -50734,13 +50734,13 @@
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "Only the requests of this kind: GRANT (one person), GROUP_GRANT (several people, decided line by line), RENEWAL (a right that is renewed) or SERVICE_ACCOUNT.",
+            "description": "Only the requests of this kind: GRANT (one person), GROUP_GRANT (several people, decided line by line), RENEWAL (a right that is renewed) or SERVICE_ACCOUNT (only on records of the earlier releases; no new request has it).",
             "schema": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] }
           }
         ],
         "responses": {
           "200": {
-            "description": "The need steps given to the caller that are pending, the oldest first: what each request is, who asked and who it is for, when the step is due, whether approving needs a confirmed term or a line of the plan of the budget, and what the request costs as the request itself says. A step that waits for somebody to hold it, a request the caller asked for or is given, and a request that was decided, withdrawn or ended are not here; neither is any figure of a budget. A request for a group is decided line by line.",
+            "description": "The need steps given to the caller that are pending, the oldest first: what each request is, who asked and who it is for, when the step is due, and what the request costs as the request itself says. A step that waits for somebody to hold it, a request the caller asked for or is given, and a request that was decided, withdrawn or ended are not here; neither is any figure of a budget. A request for a group is decided line by line.",
             "content": {
               "application/json": {
                 "schema": {
@@ -52248,7 +52248,7 @@
         },
         "responses": {
           "201": {
-            "description": "The holder of a right that has an end date asks to go on using it, for a number of months or with no end (a plan of seats or internal software, not for a person with a term). The end the right has is never edited: a request of its own is made for the same tool and the person, decided like any request (the need step and, for paid software, the spend step), and approval ends the old record at its end and begins a new one that follows it, so the seats taken on any day do not change. Sent up to the end of the right, today included, the right stays as it is until the request is decided, and a refusal or a withdrawal leaves it for the revocation that follows its end. A stay over twelve months in all, counting the records that followed one another, needs the confirmation of whoever confirms the need. Sent after the end, what is made is a request for the tool like any other (outcome NEW_REQUEST), sent by the person it is for.",
+            "description": "The holder of a right that has an end date asks to go on using it, for a number of months or with no end (a plan of seats or internal software, not for a person with a term). The end the right has is never edited: a request of its own is made for the same tool and the person, decided like any request (the need step and, for paid software, the spend step), and approval ends the old record at its end and begins a new one that follows it, so the seats taken on any day do not change. Sent up to the end of the right, today included, the right stays as it is until the request is decided, and a refusal or a withdrawal leaves it for the revocation that follows its end. Sent after the end, what is made is a request for the tool like any other (outcome NEW_REQUEST), sent by the person it is for.",
             "content": {
               "application/json": {
                 "schema": {
@@ -55604,7 +55604,7 @@
         ],
         "responses": {
           "200": {
-            "description": "When the request was sent, when the last approval was given and when the grant was completed, the seconds to approve it, to grant it and in all, and where it waited for each step (the need, the assessment of the IT Admin, the queue of the head, the review of Finance, the decision of the spend and the grant, each a property that is empty when the request had no such step, and open while the step is not over). The time to approve includes the wait of the head to send it on as spend. Only a request whose grant was completed counts in the indicator of the time to grant. The time Finance spends after the approval is not part of it. The people who may see the request read it.",
+            "description": "When the request was sent, when the last approval was given and when the grant was completed, the seconds to approve it, to grant it and in all, and where it waited for each step (the need, the assessment of the IT Admin, the queue of the head, the decision of the spend and the grant, each a property that is empty when the request had no such step, and open while the step is not over). The time to approve includes the wait of the head to send it on as spend. Only a request whose grant was completed counts in the indicator of the time to grant. The time Finance spends after the approval is not part of it. The people who may see the request read it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -56796,7 +56796,7 @@
         },
         "responses": {
           "201": {
-            "description": "One request for the people named, each a line with a state of its own, charged to the Unit Cost Center of the department of the sender on the day with one amount for all of them. A head who sends confirms the need of the others by sending, and the head named among them is decided by the person who decides a head’s own request; an Employee who sends has the people decided by the head of the department. Everything is written or nothing is.",
+            "description": "One request for the people named, each a line with a state of its own, charged to the Unit Cost Center of the department of the sender on the day with one amount for all of them. A head who sends confirms the need of the others by sending; an Employee who sends has the people decided by the head of the department. The head of a department cannot be one of the people: that line is refused with the reason HEAD_IN_GROUP. Everything is written or nothing is.",
             "content": {
               "application/json": {
                 "schema": {
@@ -56990,7 +56990,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE, with details.reason KIND_NOT_MULTI_SEAT for a plan that gives no account of its own to each person, NOT_PAID_SOFTWARE for internal software); too many people are named (GROUP_REQUEST.TOO_MANY_LINES), fewer than two different people (GROUP_REQUEST.TOO_FEW_LINES, with min), a time of use the plan refuses (ACCESS_REQUEST.TERM_REQUIRED, TERM_MONTHS_OUT_OF_RANGE or TERM_NOT_ASKED) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER. Nothing is written.",
+            "description": "The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE, with details.reason KIND_NOT_MULTI_SEAT for a plan that gives no account of its own to each person, NOT_PAID_SOFTWARE for internal software); too many people are named (GROUP_REQUEST.TOO_MANY_LINES), fewer than two different people (GROUP_REQUEST.TOO_FEW_LINES, with min), a time of use the plan refuses (ACCESS_REQUEST.TERM_REQUIRED, TERM_MONTHS_OUT_OF_RANGE or TERM_NOT_ASKED) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER, one that is a head of a department with the reason HEAD_IN_GROUP. Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -57906,7 +57906,7 @@
         },
         "responses": {
           "200": {
-            "description": "The person the spend step is given to answers one checklist for the group and decides all the people whose need is confirmed at once (or sends the whole group back to its head, RETURN), approving some and refusing others, each refusal with its reason. The request is checked again on the people approved and the decision is made on that check, which is kept with it; a request that has less money than it costs in a year of the budget, or none, cannot be approved. One commitment is held for each year, the sum of the part of the people approved, and each person stands for a share of it. A request that turned out to be an exception since it was sent goes back to Finance, and one whose data is at fault goes back to its head; nobody is decided then.",
+            "description": "The person the spend step is given to answers one checklist for the group and decides all the people whose need is confirmed at once (or sends the whole group back to its head, RETURN), approving some and refusing others, each refusal with its reason. The request is checked again on the people approved and the decision is made on that check, which is kept with it; a request that has less money than it costs in a year of the budget, or none, cannot be approved. One commitment is held for each year, the sum of the part of the people approved, and each person stands for a share of it. A request that does not pass the check again, or whose data is at fault, goes back to its head; nobody is decided then.",
             "content": {
               "application/json": {
                 "schema": {
@@ -103990,7 +103990,11 @@
                   "type": "object",
                   "properties": {
                     "requestId": { "type": "string", "format": "uuid" },
-                    "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                    "type": {
+                      "type": "string",
+                      "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"],
+                      "description": "SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more."
+                    },
                     "state": { "type": "string" },
                     "plan": {
                       "type": "object",
@@ -112436,7 +112440,11 @@
                 "type": "object",
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
-                  "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                  "type": {
+                    "type": "string",
+                    "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"],
+                    "description": "SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more."
+                  },
                   "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG", "NEW_SOFTWARE"] },
                   "state": {
                     "type": "string",
@@ -113018,7 +113026,11 @@
                 "type": "object",
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
-                  "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                  "type": {
+                    "type": "string",
+                    "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"],
+                    "description": "SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more."
+                  },
                   "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG", "NEW_SOFTWARE"] },
                   "state": {
                     "type": "string",
@@ -114004,7 +114016,11 @@
                     "type": "object",
                     "properties": {
                       "id": { "type": "string", "format": "uuid" },
-                      "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                      "type": {
+                        "type": "string",
+                        "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"],
+                        "description": "SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more."
+                      },
                       "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG", "NEW_SOFTWARE"] },
                       "state": {
                         "type": "string",
@@ -115363,7 +115379,11 @@
                 "type": "object",
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
-                  "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                  "type": {
+                    "type": "string",
+                    "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"],
+                    "description": "SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more."
+                  },
                   "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG", "NEW_SOFTWARE"] },
                   "state": {
                     "type": "string",
@@ -115946,7 +115966,8 @@
                       "PLAN_LINE_MOVED",
                       "BUDGET_VERSION_APPROVED",
                       "FINANCE_OUTCOME_WHILE_WAITING"
-                    ]
+                    ],
+                    "description": "PLAN_LINE_MOVED, BUDGET_VERSION_APPROVED and FINANCE_OUTCOME_WHILE_WAITING are on checks of the earlier releases only; they are not given any more."
                   },
                   "route": { "type": "string", "enum": ["BLOCKED", "SPEND_APPROVAL"] },
                   "outcome": { "type": "string", "enum": ["WITHIN_BASE", "USES_RESERVE", "BLOCKED"] },
@@ -116695,7 +116716,8 @@
                     },
                     "outcome": {
                       "type": "string",
-                      "enum": ["SENT_TO_APPROVER", "AWAITING_RESERVE_CONFIRMATION", "STOPPED", "SENT_TO_FINANCE"]
+                      "enum": ["SENT_TO_APPROVER", "AWAITING_RESERVE_CONFIRMATION", "STOPPED", "SENT_TO_FINANCE"],
+                      "description": "SENT_TO_FINANCE is on batches of the earlier releases only; it is not given any more."
                     },
                     "stopReason": {
                       "type": "string",
@@ -116719,6 +116741,7 @@
                         "REQUEST_CANCELLED",
                         null
                       ],
+                      "description": "RETURNED_BY_FINANCE and CONFLICT_OF_INTEREST are on batches of the earlier releases only; they are not given any more.",
                       "nullable": true
                     },
                     "leftAt": { "type": "string", "format": "date-time", "nullable": true },
@@ -117832,7 +117855,11 @@
                     "stepId": { "type": "string", "format": "uuid" },
                     "stepKind": { "type": "string", "enum": ["NEED"] },
                     "deciderRole": { "type": "string", "enum": ["MANAGER", "SPENDING_APPROVER"] },
-                    "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                    "type": {
+                      "type": "string",
+                      "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"],
+                      "description": "SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more."
+                    },
                     "openedAt": { "type": "string", "format": "date-time" },
                     "assignedAt": { "type": "string", "format": "date-time", "nullable": true },
                     "slaWorkingDays": {
@@ -117974,7 +118001,11 @@
                   "type": "object",
                   "properties": {
                     "requestId": { "type": "string", "format": "uuid" },
-                    "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "GROUP_GRANT"] },
+                    "type": {
+                      "type": "string",
+                      "enum": ["GRANT", "SERVICE_ACCOUNT", "GROUP_GRANT"],
+                      "description": "SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more."
+                    },
                     "lineCount": {
                       "type": "integer",
                       "exclusiveMinimum": true,
@@ -118677,7 +118708,11 @@
                 "type": "object",
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
-                  "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                  "type": {
+                    "type": "string",
+                    "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"],
+                    "description": "SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more."
+                  },
                   "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG", "NEW_SOFTWARE"] },
                   "state": {
                     "type": "string",
@@ -120882,7 +120917,11 @@
                 "type": "object",
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
-                  "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                  "type": {
+                    "type": "string",
+                    "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"],
+                    "description": "SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more."
+                  },
                   "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG", "NEW_SOFTWARE"] },
                   "state": {
                     "type": "string",
@@ -121810,7 +121849,11 @@
                   "type": "object",
                   "properties": {
                     "id": { "type": "string", "format": "uuid" },
-                    "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                    "type": {
+                      "type": "string",
+                      "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"],
+                      "description": "SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more."
+                    },
                     "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG", "NEW_SOFTWARE"] },
                     "state": {
                       "type": "string",
@@ -122038,7 +122081,11 @@
                   "type": "object",
                   "properties": {
                     "id": { "type": "string", "format": "uuid" },
-                    "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                    "type": {
+                      "type": "string",
+                      "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"],
+                      "description": "SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more."
+                    },
                     "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG", "NEW_SOFTWARE"] },
                     "state": {
                       "type": "string",
@@ -122261,7 +122308,11 @@
                   "type": "object",
                   "properties": {
                     "id": { "type": "string", "format": "uuid" },
-                    "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                    "type": {
+                      "type": "string",
+                      "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"],
+                      "description": "SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more."
+                    },
                     "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG", "NEW_SOFTWARE"] },
                     "state": {
                       "type": "string",

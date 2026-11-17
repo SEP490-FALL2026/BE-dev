@@ -52,7 +52,7 @@ export class NeedDecisionController {
   @ApiSuccessResponse(AccessRequestResponseDto, {
     message: 'ACCESS_REQUEST.NEED_DECIDED',
     description:
-      'The person who holds the need step answers the checklist of the policy in force and approves, refuses or sends the request back to its sender. A refusal or a return gives its reason, or takes it from the answers No; an approval is locked while an answer is No. A return leaves the request with its sender, who adds what is missing and sends it again. A refusal gives its reason; a term over twelve months is approved only with a confirmation. The decision becomes an electronic approval record that is never changed. An approval sends the request on (the IT Admin for internal software, the spend submission for paid software); a refusal ends it with no spend step and no commitment.',
+      'The person who holds the need step answers the checklist of the policy in force and approves, refuses or sends the request back to its sender. A refusal or a return gives its reason, or takes it from the answers No; an approval is locked while an answer is No. A return leaves the request with its sender, who adds what is missing and sends it again. The decision becomes an electronic approval record that is never changed. An approval sends the request on (the IT Admin for internal software, the spend submission for paid software); a refusal ends it with no spend step and no commitment.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

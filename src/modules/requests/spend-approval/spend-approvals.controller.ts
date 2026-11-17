@@ -60,7 +60,7 @@ export class SpendApprovalsController {
   @ApiSuccessResponse(ApprovalListResponseDto, {
     message: 'SPEND_APPROVAL.LISTED',
     description:
-      'The spend steps given to the caller that are open, the oldest first: what each request is, what it costs, the first code of its check, whether the same person holds the need step and this one, whether the head confirmed the reserve for it, and the batch it was sent in.',
+      'The spend steps given to the caller that are open, the oldest first: what each request is, what it costs, the first code of its check and what that check said (within the base, or uses the reserve the head confirmed), and the batch it was sent in.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ApprovalQueryDto) {

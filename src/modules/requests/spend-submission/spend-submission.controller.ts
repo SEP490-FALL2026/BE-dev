@@ -245,7 +245,7 @@ export class SpendSubmissionController {
   @ApiSuccessResponse(BatchItemListResponseDto, {
     message: 'SPEND_BATCH.ITEMS_LISTED',
     description:
-      'The requests of the batch in the order they were sent, each with how it fared (sent to the approver, sent to Finance, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head who sent the batch and Finance see all of them; the person who holds a spend step sees the requests they hold.',
+      'The requests of the batch in the order they were sent, each with how it fared (sent to the approver, waiting for the head to confirm the reserve, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head who sent the batch and Finance see all of them; the person who holds a spend step sees the requests they hold.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, BATCH_NOT_FOUND, INVALID)
   async items(

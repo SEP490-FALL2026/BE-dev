@@ -162,8 +162,9 @@ const reserveConfirmationResultSchema = z.strictObject({
 const batchItemSchema = z.strictObject({
   requestId: z.uuid(),
   position: z.number().int().positive(),
-  /** `SENT_TO_FINANCE` is read from batches made before; it is not given any more. */
-  outcome: z.enum(['SENT_TO_APPROVER', 'AWAITING_RESERVE_CONFIRMATION', 'STOPPED', 'SENT_TO_FINANCE']),
+  outcome: z
+    .enum(['SENT_TO_APPROVER', 'AWAITING_RESERVE_CONFIRMATION', 'STOPPED', 'SENT_TO_FINANCE'])
+    .describe('SENT_TO_FINANCE is on batches of the earlier releases only; it is not given any more.'),
   stopReason: z
     .enum([
       'PRICE_EXPIRED',
@@ -176,6 +177,9 @@ const batchItemSchema = z.strictObject({
     .nullable(),
   leftReason: z
     .enum(['RETURNED_BY_FINANCE', 'CONFLICT_OF_INTEREST', 'REQUEST_WITHDRAWN', 'REQUEST_CANCELLED'])
+    .describe(
+      'RETURNED_BY_FINANCE and CONFLICT_OF_INTEREST are on batches of the earlier releases only; they are not given any more.',
+    )
     .nullable(),
   leftAt: z.iso.datetime().nullable(),
   /** Where the request is now; it is the request that holds the state, never the batch. */
