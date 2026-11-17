@@ -142,3 +142,26 @@ B không thêm/bớt định nghĩa tham số vận hành (số khóa không đ�
 - `catalog/errors.md`: 15 mã B3 (cột `details`), lỗi tiền `details.path`/`issues`, bỏ nhãn "(không khai trong OpenAPI)" ở mã đã khai (E8a), không đổi cột HTTP.
 - `catalog/README.md`: thêm formatter `:quarter`; quy ước lỗi 17/11; cụm chung `(không rõ tên)`.
 - Sinh lại `reference/*`, `enums.md`, `api-index.md`.
+
+## FIX smoke (P5-FIX-SMOKE, 17/11/2026) — XONG, CI xanh trên `fe91beb4`
+
+Làm trực tiếp trên `feat/p5` (đã push, chưa merge `dev`/`main`). Code do subagent Sonnet viết từng gói; điều phối chat B kiểm lại độc lập từng gói (typecheck, `test:gates` 337, jest, `graph/routes --check`, `openapi:export` không drift, integration chính).
+
+| Mục | Commit | Kết quả |
+| --- | --- | --- |
+| F1 target theo vai người đọc | `d19bbbdd` | trưởng phòng không còn 403 ở `budgetCycleGet`/`budgetVersionGet`/`departmentTransferGet`/`offboardingCaseGet`; test lượng tử hóa mọi mã × subject × vai; integration `in-app-notifications` 29/29 |
+| F2 path lỗi tiền `budgetAdjustmentCreate` | `22aa9322` | **không đổi path** (xem D-1); test ghim hành vi, integration `budget-adjustment` 18/18 |
+| F3 chữ EN + dấu chấm đôi | `9e4ce969` | spec `notification-text.wording.spec.ts` (đỏ 7 câu → xanh); jest `notifications` 773 |
+| F4 `NOT_RENEWABLE` đủ 6 reason | `5f952160`, `fe91beb4` | commit đầu làm message 165 ký tự > 160 ⟹ `http-contract` đỏ (run 44085641450); `fe91beb4` rút còn 148 ký tự |
+| F5 `alerts` rỗng khi không có điểm điều chỉnh | `65375780` | `hasAdjustmentPoint` (chỉ K2, không INTERNAL); jest `catalog` 576 |
+| T1 replay lô chỉ báo 1 lần | `0f086c61` | mutation `randomUUID()` trong `eventKey` ⟹ test đỏ (3 dòng thay vì 1), đã khôi phục; integration 8/8 |
+
+CI: run 44085641450 (`0f086c61`) đỏ ở `http-contract` (`openapi-response-examples`: message `NOT_RENEWABLE` quá 160 ký tự); **run 44088867187 (`fe91beb4`) xanh toàn bộ job**: https://github.com/SEP490-FALL2026/BE-dev/actions/runs/44088867187
+
+### D-n
+- D-1 (F2, cần Owner/điều phối xác nhận): BE nhất quán — `MONEY_OUT_OF_RANGE`/`MONEY_SCALE_EXCEEDED` trả `details.path` là đường dẫn tới OBJECT tiền (`amount`), còn `VALIDATION_ERROR` chuỗi hỏng trả `<path>.amount`. Mọi route khác (`unitPrice`, `requestedAmount`, `annualCeiling`, `base`, `reserve`) cùng quy ước. Smoke F2 coi là lỗi nhưng đó là cách đọc nhầm; đổi riêng một route sẽ lệch, đổi chung phải sửa helper `facts.money`, nhiều test và ví dụ OpenAPI. **Docs**: `catalog/errors.md` và `changes/2026-11-17-prompt5.md` ghi rõ: `MONEY_*` có `details.path` trỏ tới object tiền, `VALIDATION_ERROR` có `issues[].path = <object>.amount`; FE gắn cùng một ô bằng cách bỏ hậu tố `.amount`. Nếu vẫn muốn `amount.amount` cho `MONEY_*` ⟹ đợt đổi riêng.
+- D-2 (F5): chỉ đổi `alerts` của list; badge/filter hết hạn vẫn dùng `runsAPeriod`, `subscription-notice.service.ts` không đổi. Muốn K1 mất badge/nhắc hạn ⟹ việc riêng.
+- D-3 (F1, Docs): cột "Bấm vào mở" của `catalog/notifications.md` phải theo vai; trưởng phòng nhận `BUDGET_CYCLE_OPENED` → `budgetMine`, `BUDGET_VERSION_DECIDED` → `budgetMineVersionList`, `BUDGET_NEXT_YEAR_MISSING`/`BUDGET_THRESHOLD_REACHED`/`BUDGET_SHARED_POOL_OVER_RESERVE` → `budgetMine`; `PERSONNEL_EVENT_RECORDED` người liên quan → `meDepartmentTransferGet`/`meDepartureNoticeGet`, trưởng phòng `null`; `EMPLOYEE_PROFILE_UPDATED` nhân viên → `meGet`, vai khác `null`; `target = null` có thể xảy ra với bất kỳ mã nào khi vai người đọc không đọc được route đích. `budgetMine`/`budgetMineVersionList` không có path param (FE tự thêm `year`/`costCenterId`).
+- D-4 (F1, kỹ thuật): vai route đọc bằng quét `@RequireRoles`/`@RequireRolesOrGrants`/decorator class trong controller + bảng tay cho 3 route service giới hạn (`budgetVersionGet`, `budgetProposalGet`, `subscriptionRenewalGet`) — phải sửa khi vai route đổi.
+- D-5 (F3): dấu chấm đôi xử lý ở renderer (cắt đúng một dấu chấm cuối của biến raw đứng ngay trước dấu chấm của mẫu), không đổi dữ liệu lưu.
+- D-6 (F4): subagent không chạy `test:http`; lỗi 160 ký tự chỉ lộ ở CI, điều phối chạy đúng một http-spec để xác nhận sửa.
