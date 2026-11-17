@@ -129,12 +129,12 @@ describe('the result of an adjustment (SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED)', 
     }
   });
 
-  it('tells the IT Admin in charge that another one recorded it for them', () => {
+  it('tells, for every recipient alike (Finance too), that another IT Admin recorded it for the one in charge', () => {
     expect(render('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', { ...recorded, substitute: true }, 'vi').message).toBe(
-      'Kết quả điều chỉnh thuê bao Figma Pro: giảm 8 seat, nhà cung cấp đồng ý. Một IT Admin khác đã ghi thay.',
+      'Kết quả điều chỉnh thuê bao Figma Pro: giảm 8 seat, nhà cung cấp đồng ý. Kết quả được một IT Admin khác ghi thay IT Admin phụ trách.',
     );
     expect(render('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', { ...recorded, substitute: true }, 'en').message).toBe(
-      'Adjustment of subscription Figma Pro: reduce 8 seats, vendor agreed. Another IT Admin recorded it on your behalf.',
+      'Adjustment of subscription Figma Pro: reduce 8 seats, vendor agreed. Recorded by another IT Admin on behalf of the IT Admin in charge.',
     );
   });
 });

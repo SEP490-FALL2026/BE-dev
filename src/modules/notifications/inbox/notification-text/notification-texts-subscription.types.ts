@@ -68,7 +68,7 @@ export const SUBSCRIPTION_TEXTS = {
       message: {
         by: 'substitute',
         cases: {
-          true: 'Kết quả điều chỉnh thuê bao {subscriptionId:name}: {choice:enum}[ {quantity} seat], nhà cung cấp {outcome:enum}. Một IT Admin khác đã ghi thay.',
+          true: 'Kết quả điều chỉnh thuê bao {subscriptionId:name}: {choice:enum}[ {quantity} seat], nhà cung cấp {outcome:enum}. Kết quả được một IT Admin khác ghi thay IT Admin phụ trách.',
         },
         otherwise:
           'Kết quả điều chỉnh thuê bao {subscriptionId:name}: {choice:enum}[ {quantity} seat], nhà cung cấp {outcome:enum}.',
@@ -79,7 +79,7 @@ export const SUBSCRIPTION_TEXTS = {
       message: {
         by: 'substitute',
         cases: {
-          true: 'Adjustment of subscription {subscriptionId:name}: {choice:enum}[ {quantity} seats], vendor {outcome:enum}. Another IT Admin recorded it on your behalf.',
+          true: 'Adjustment of subscription {subscriptionId:name}: {choice:enum}[ {quantity} seats], vendor {outcome:enum}. Recorded by another IT Admin on behalf of the IT Admin in charge.',
         },
         otherwise:
           'Adjustment of subscription {subscriptionId:name}: {choice:enum}[ {quantity} seats], vendor {outcome:enum}.',
