@@ -1,229 +1,266 @@
+import { randomUUID } from 'node:crypto';
+import { addDays } from '../../src/core/business-date';
 import { FlowWorld } from '../support/flows/flow-world';
-import { k1Checklist } from '../support/k1-checklist';
+
+interface Adjustment {
+  adjustmentPointOn: string;
+  deadline: string;
+  renewalOn: string;
+  purchasedQuantity: number;
+  seatsNeeded: { total: number; heldPastRenewal: number };
+  target: number;
+  activeSeatsToday: number;
+  canCancel: boolean;
+  recordedRenewalId: string | null;
+}
 
 /**
- * MF-5, the edges of F5-02 (review D-M4): what the IT Admin may propose and what the head may confirm. The reduction names exactly the
- * seats above the new number, the fields of one choice are refused on another, a cancellation of a subscription in use is confirmed
- * after the warning, the head of another department finds no case, and a proposal that went out of date is closed so the IT Admin can
- * propose again (A-H2); the department with no head has its own file (`mf5-rightsizing-no-head`). Real sign-in, the seats granted through the whole Request flow, nothing mocked.
+ * MF-5, the edges of F5-02 (SBF-20 §4.4, §8): what the IT Admin may record at the point of adjustment. The fields of one choice are refused on
+ * another and `releasedAssignmentIds` is no longer taken (422, nothing written), the number must be the count of the system (409 with the
+ * number to send again), a subscription in use cannot be cancelled, nobody records before the point, only the IT Admin records, and a seat granted
+ * after the IT Admin read the number changes it — the write is refused with the new count, the IT Admin reads again and records once (`ALREADY_PROPOSED`
+ * after that). Real sign-in, the seeded dataset, nothing mocked.
  *
- * Whose subscription it is: only a subscription that a department owns has a head who decides it. The subscriptions of the shared pool
- * (`QĐ-103d`) have no owner department and are not proposed or decided here yet, so the scenarios run on the two the dataset gives
- * Engineering: Cursor Pro (K1, no seat yet) for the reduction and the cancellation, ChatGPT Plus (K1, the seat of NV-DEV1 from R18) for
- * the proposal that goes out of date. Each K1 grant buys one more seat, so the seats bought follow the seats held.
+ * Whose subscription it is: the shared pool (`QĐ-103d`). Figma Professional is the annual one (point opened, 18 bought, 14 in effect); Jira Standard is
+ * by the month, whose point opens a week before its payment day. The clock of the flows starts on the real day and the payment day of a plan by the month
+ * is the nearest of the grid of its stored day, so where Jira stands against its point changes with the calendar: the case that needs it before its point
+ * puts the payment day of Jira 20 days from today first (R-2).
  */
-describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-02 @MF5 @D1', () => {
+describe('MF-5 ghi kết quả điều chỉnh: các biên của F5-02 @MF5 @D1', () => {
   let world: FlowWorld;
+  let figma: string;
+  let jira: string;
 
   const call = () => world.calls;
-  const stateOf = async (id: string) =>
-    (await world.facts.one<{ state: string }>(`SELECT state::text FROM subscription_renewals WHERE id = $1`, [id]))
-      .state;
-  /** The revocation tasks this file made: the dataset already holds one (the Thu hồi of NV-DES11, R-MF5), which is not ours. */
-  let revokeBaseline = 0;
-  const revokeTasks = async () => (await world.facts.count('provisioning_tasks', "kind = 'REVOKE'")) - revokeBaseline;
-
-  /** One seat through the whole flow: need, batch, spend decision, the grant task of the IT Admin. Returns the assignment id. */
-  const grantSeat = async (employeeCode: string, planName: string, subscriptionName: string): Promise<string> => {
-    const plan = await call().planId(planName);
-    // The plans of this file are bought by the month (K1): a request for one takes 1 to 9 months and never none (QĐ-111i); the most, so the seat outlasts the file.
-    const requestId = await call().submitRequest(employeeCode, plan, { termMonths: 9 });
-    expect((await call().approveNeed('NV-ENGH', requestId)).status).toBe(200);
-    expect((await call().submitBatch('NV-ENGH', [requestId])).status).toBe(201);
-    const approved = await call().post('NV-CEO', `/access-requests/${requestId}/spend-approval`, {
-      decision: 'APPROVE',
-    });
-    expect(approved.status).toBe(200);
-    const subscriptionId = await call().subscriptionOf(subscriptionName);
-    const task = await call().post('NV-ITA1', '/provisioning-tasks', { requestId, subscriptionId });
-    expect(task.status).toBe(201);
-    const taskId = call().data<{ task: { id: string } }>(task).task.id;
-    expect((await call().post('NV-ITA1', `/provisioning-tasks/${taskId}/claim`)).status).toBe(200);
-    // Every plan of this file is K1: the grant is completed with the checklist of the grant as well as the evidence (QĐ-111az).
-    const completed = await call().post('NV-ITA1', `/provisioning-tasks/${taskId}/complete`, {
-      evidence: 'Đã cấp',
-      k1Checklist: k1Checklist('GRANT'),
-    });
-    expect(completed.status).toBe(200);
-
-    return (
-      await world.facts.one<{ id: string }>(
-        `SELECT id FROM license_assignments WHERE employee_id = $1 AND plan_id = $2 AND kind = 'PERSONAL' AND valid_until IS NULL`,
-        [await world.facts.employeeId(employeeCode), plan],
-      )
-    ).id;
-  };
-
-  const propose = (subscriptionId: string, body: Record<string, unknown>) =>
-    call().post('NV-ITA1', '/subscription-renewals', { subscriptionId, ...body });
-  const confirm = (code: string, id: string, body: Record<string, unknown> = {}) =>
-    call().post(code, `/subscription-renewals/${id}/decision`, { decision: 'CONFIRM', ...body });
-
-  let cursor: string[];
-  let chatgpt: string[];
+  const adjustmentOf = async (subscriptionId: string, code = 'NV-ITA1'): Promise<Adjustment> =>
+    call().data<{ adjustment: Adjustment }>(
+      await call().get(code, `/subscription-renewals/adjustment?subscriptionId=${subscriptionId}`),
+    ).adjustment;
+  const record = (body: Record<string, unknown>, code = 'NV-ITA1') =>
+    call().post(code, '/subscription-renewals', { subscriptionId: figma, outcome: 'AS_DECIDED', ...body });
+  /** The year the vendor confirmed, starting on the renewal day (A1C-03, A1C-04). */
+  const nextYear = (renewalOn: string, quantity: number) => ({
+    purchasedQuantity: quantity,
+    unitPrice: { amount: '4500000', currency: 'VND' },
+    billingCycle: 'ANNUAL',
+    startDate: renewalOn,
+    endDate: addDays(renewalOn, 364),
+    renewalDate: addDays(renewalOn, 365),
+    noticePeriodDays: 30,
+    autoRenew: true,
+    allowsMidTermReduction: false,
+  });
+  const cases = () => world.facts.count('subscription_renewals');
 
   beforeAll(async () => {
     world = await FlowWorld.open();
-    // Nobody holds Cursor Pro in the dataset: two people of Engineering get a seat. DEV1 holds a ChatGPT Plus seat (R18) and DEV2 gets one.
-    const dev1ChatgptSeat = (
-      await world.facts.one<{ id: string }>(
-        `SELECT id FROM license_assignments WHERE employee_id = $1 AND plan_id = $2 AND kind = 'PERSONAL'`,
-        [await world.facts.employeeId('NV-DEV1'), await call().planId('ChatGPT Plus')],
-      )
-    ).id;
-    cursor = [
-      await grantSeat('NV-DEV1', 'Cursor Pro', 'Cursor Pro'),
-      await grantSeat('NV-DEV2', 'Cursor Pro', 'Cursor Pro'),
-    ];
-    chatgpt = [dev1ChatgptSeat, await grantSeat('NV-DEV2', 'ChatGPT Plus', 'ChatGPT Plus')];
-    revokeBaseline = await world.facts.count('provisioning_tasks', "kind = 'REVOKE'");
-  }, 400000);
+    figma = await call().subscriptionOf('Figma Professional');
+    jira = await call().subscriptionOf('Jira Standard');
+  }, 300000);
 
   afterAll(async () => {
     await world?.close();
   });
 
-  describe('đề xuất: danh sách ghế thu hồi và trường theo lựa chọn @B5', () => {
-    it('giảm phải nêu đúng số ghế vượt; thiếu, thừa hoặc ghế không phải của thuê bao ⟹ 422 và không ghi gì #9', async () => {
-      const subscriptionId = await call().subscriptionOf('Cursor Pro');
-      const cases = await world.facts.count('subscription_renewals');
-      const unknown = '5b1b4f7e-0a52-4b0e-9f5b-9f3c1a2d7e10';
+  describe('hình dạng lựa chọn @B5', () => {
+    it('trường của lựa chọn khác bị từ chối: số lượng với hủy, thiếu số với giảm/tăng, vượt mức mua, giữ nguyên khác số đã mua ⟹ 422 và không ghi gì #9', async () => {
+      const bought = (await adjustmentOf(figma)).purchasedQuantity;
+      const written = await cases();
 
-      const none = await propose(subscriptionId, { choice: 'REDUCE', proposedQuantity: 0, releasedAssignmentIds: [] });
-      const short = await propose(subscriptionId, {
-        choice: 'REDUCE',
-        proposedQuantity: 0,
-        releasedAssignmentIds: [cursor[0]],
-      });
-      const foreign = await propose(subscriptionId, {
-        choice: 'REDUCE',
-        proposedQuantity: 0,
-        releasedAssignmentIds: [cursor[0], unknown],
-      });
-      const extra = await propose(subscriptionId, {
-        choice: 'REDUCE',
-        proposedQuantity: 1,
-        releasedAssignmentIds: [cursor[0], cursor[1]],
-      });
-
-      for (const response of [none, short, foreign, extra]) {
-        expect(response.status).toBe(422);
-        expect(call().codeOf(response)).toBe('SUBSCRIPTION_RENEWAL.EXCESS_SELECTION_INVALID');
-      }
-      expect(call().detailsOf(short)).toEqual({ required: 2, selected: 1 });
-      expect(await world.facts.count('subscription_renewals')).toBe(cases);
-    });
-
-    it('trường của lựa chọn khác bị từ chối: số lượng với giữ nguyên hoặc hủy, danh sách ghế với giữ nguyên hoặc hủy #9', async () => {
-      const subscriptionId = await call().subscriptionOf('Cursor Pro');
-      const cases = await world.facts.count('subscription_renewals');
-
-      const renewWithQuantity = await propose(subscriptionId, { choice: 'RENEW', proposedQuantity: 1 });
-      const cancelWithQuantity = await propose(subscriptionId, { choice: 'CANCEL', proposedQuantity: 0 });
-      const renewWithSeats = await propose(subscriptionId, { choice: 'RENEW', releasedAssignmentIds: [cursor[0]] });
-      const cancelWithSeats = await propose(subscriptionId, { choice: 'CANCEL', releasedAssignmentIds: [cursor[0]] });
-      const reduceAboveBought = await propose(subscriptionId, { choice: 'REDUCE', proposedQuantity: 999 });
-
-      expect(call().codeOf(renewWithQuantity)).toBe('SUBSCRIPTION_RENEWAL.QUANTITY_INVALID');
-      expect(call().codeOf(cancelWithQuantity)).toBe('SUBSCRIPTION_RENEWAL.QUANTITY_INVALID');
-      expect(call().codeOf(renewWithSeats)).toBe('SUBSCRIPTION_RENEWAL.EXCESS_SELECTION_INVALID');
-      expect(call().codeOf(cancelWithSeats)).toBe('SUBSCRIPTION_RENEWAL.EXCESS_SELECTION_INVALID');
-      expect(call().codeOf(reduceAboveBought)).toBe('SUBSCRIPTION_RENEWAL.QUANTITY_INVALID');
-      for (const response of [
-        renewWithQuantity,
-        cancelWithQuantity,
-        renewWithSeats,
-        cancelWithSeats,
-        reduceAboveBought,
-      ]) {
-        expect([422]).toContain(response.status);
-      }
-      expect(await world.facts.count('subscription_renewals')).toBe(cases);
-    });
-  });
-
-  describe('xác nhận: phạm vi và cảnh báo @B5', () => {
-    let cancelId: string;
-
-    it('trưởng phòng khác không thấy hồ sơ (404), IT Admin và Finance bị 403, trưởng phòng sở hữu đọc được #9', async () => {
-      const subscriptionId = await call().subscriptionOf('Cursor Pro');
-      const proposed = await propose(subscriptionId, {
+      const cancelWithQuantity = await record({
         choice: 'CANCEL',
-        note: 'Chuyển sang công cụ khác',
+        proposedQuantity: 0,
+        outcome: 'AS_DECIDED',
+        closure: { dataExported: true, adminsTransferred: true },
       });
-      expect(proposed.status).toBe(201);
-      cancelId = call().data<{ renewal: { id: string } }>(proposed).renewal.id;
+      const reduceWithoutQuantity = await record({ choice: 'REDUCE' });
+      const reduceAboveBought = await record({ choice: 'REDUCE', proposedQuantity: bought });
+      const increaseBelowBought = await record({ choice: 'INCREASE', proposedQuantity: bought });
+      const renewWithOther = await record({ choice: 'RENEW', proposedQuantity: bought - 1 });
 
-      const otherHeadRead = await call().get('NV-SALH', `/subscription-renewals/${cancelId}`);
-      const otherHeadDecide = await confirm('NV-SALH', cancelId);
-      const itDecide = await confirm('NV-ITA1', cancelId);
-      const financeDecide = await confirm('NV-FIN1', cancelId);
-
-      expect([otherHeadRead.status, call().codeOf(otherHeadRead)]).toEqual([404, 'SUBSCRIPTION_RENEWAL.NOT_FOUND']);
-      expect([otherHeadDecide.status, call().codeOf(otherHeadDecide)]).toEqual([404, 'SUBSCRIPTION_RENEWAL.NOT_FOUND']);
-      expect([itDecide.status, call().codeOf(itDecide)]).toEqual([403, 'SUBSCRIPTION_RENEWAL.NOT_DECIDER']);
-      expect([financeDecide.status, call().codeOf(financeDecide)]).toEqual([403, 'SUBSCRIPTION_RENEWAL.NOT_DECIDER']);
-      expect((await call().get('NV-ENGH', `/subscription-renewals/${cancelId}`)).status).toBe(200);
-      expect(await stateOf(cancelId)).toBe('PROPOSED');
+      for (const response of [cancelWithQuantity, increaseBelowBought, reduceAboveBought, renewWithOther]) {
+        expect([response.status, call().codeOf(response)]).toEqual([422, 'SUBSCRIPTION_RENEWAL.QUANTITY_INVALID']);
+      }
+      expect([reduceWithoutQuantity.status, call().codeOf(reduceWithoutQuantity)]).toEqual([
+        422,
+        'SUBSCRIPTION_RENEWAL.QUANTITY_INVALID',
+      ]);
+      expect(await cases()).toBe(written);
     });
 
-    it('hủy thuê bao còn người dùng: phải xác nhận sau cảnh báo; xác nhận mở thu hồi mọi ghế cá nhân #9', async () => {
-      const warned = await confirm('NV-ENGH', cancelId);
+    it('body cũ bị 422: danh sách ghế thu hồi không còn được nhận; thiếu ghi chú khi NCC từ chối; closure kèm lựa chọn khác hủy #9', async () => {
+      const written = await cases();
 
-      expect([warned.status, call().codeOf(warned)]).toEqual([
-        409,
-        'SUBSCRIPTION_RENEWAL.ACTIVE_USERS_NOT_ACKNOWLEDGED',
-      ]);
-      expect(call().detailsOf(warned)).toEqual({ seatsInUse: cursor.length });
-      expect(await stateOf(cancelId)).toBe('PROPOSED');
-      expect(await revokeTasks()).toBe(0);
-
-      const confirmed = await confirm('NV-ENGH', cancelId, {
-        acknowledgeActiveUsers: true,
-        reason: 'Nhóm đã đổi công cụ',
-      });
-
-      expect(confirmed.status).toBe(200);
-      expect(await stateOf(cancelId)).toBe('DECIDED');
-      expect(await revokeTasks()).toBe(cursor.length);
+      for (const body of [
+        { choice: 'REDUCE', proposedQuantity: 1, releasedAssignmentIds: [randomUUID()] },
+        { choice: 'REDUCE', proposedQuantity: 1, outcome: 'VENDOR_REFUSED' },
+        { choice: 'RENEW', closure: { dataExported: true, adminsTransferred: true } },
+        { choice: 'CANCEL', outcome: 'AS_DECIDED' },
+        { choice: 'CANCEL', outcome: 'AS_DECIDED', closure: { dataExported: true, adminsTransferred: false } },
+      ]) {
+        const response = await record(body);
+        expect([JSON.stringify(body), response.status, call().codeOf(response)]).toEqual([
+          JSON.stringify(body),
+          422,
+          'VALIDATION_ERROR',
+        ]);
+      }
+      expect(await cases()).toBe(written);
     });
   });
 
-  describe('đề xuất lỗi thời: đóng lại để đề xuất lại (A-H2) @B5', () => {
-    it('một ghế nữa được cấp sau đề xuất: xác nhận ⟹ 409 PROPOSAL_STALE, hồ sơ đóng STALE, IT đề xuất lại và xác nhận được', async () => {
-      const subscriptionId = await call().subscriptionOf('ChatGPT Plus');
-      const first = await propose(subscriptionId, {
-        choice: 'REDUCE',
-        proposedQuantity: 1,
-        releasedAssignmentIds: [chatgpt[1]],
+  describe('số seat do hệ thống tính và hủy thuê bao còn người dùng @B5', () => {
+    it('số ghi khác số hệ thống tính ⟹ 409 kèm số đúng để gửi lại, không ghi gì #9', async () => {
+      const seen = await adjustmentOf(figma);
+      const written = await cases();
+
+      const wrong = await record({ choice: 'REDUCE', proposedQuantity: seen.target + 3 });
+
+      expect([wrong.status, call().codeOf(wrong)]).toEqual([409, 'SUBSCRIPTION_RENEWAL.QUANTITY_NOT_SEATS_NEEDED']);
+      expect(call().detailsOf(wrong)).toMatchObject({
+        seatsNeeded: seen.seatsNeeded.total,
+        target: seen.target,
+        quantity: seen.target + 3,
       });
-      expect(first.status).toBe(201);
-      const staleId = call().data<{ renewal: { id: string } }>(first).renewal.id;
-      // A third person gets a seat before the head confirms: the excess is now two seats, the proposal names one.
-      const third = await grantSeat('NV-DEV3', 'ChatGPT Plus', 'ChatGPT Plus');
+      expect(await cases()).toBe(written);
+    });
 
-      const stale = await confirm('NV-ENGH', staleId);
+    it('hủy thuê bao còn người dùng ⟹ 409 CANCEL_NOT_ALLOWED kèm số ghế còn hiệu lực; Finance chỉ đọc số, không ghi #9', async () => {
+      const seen = await adjustmentOf(figma);
+      expect(seen).toMatchObject({ canCancel: false, recordedRenewalId: null });
+      const written = await cases();
 
-      expect([stale.status, call().codeOf(stale)]).toEqual([409, 'SUBSCRIPTION_RENEWAL.PROPOSAL_STALE']);
-      expect(call().detailsOf(stale)).toEqual({ required: 2, stillHeld: 1 });
-      expect(await stateOf(staleId)).toBe('STALE');
-      expect(await revokeTasks()).toBe(cursor.length);
-      const again = await confirm('NV-ENGH', staleId);
-      expect(call().codeOf(again)).toBe('SUBSCRIPTION_RENEWAL.NOT_AWAITING_DECISION');
-
-      const second = await propose(subscriptionId, {
-        choice: 'REDUCE',
-        proposedQuantity: 1,
-        releasedAssignmentIds: [chatgpt[1], third],
+      const cancel = await record({
+        choice: 'CANCEL',
+        outcome: 'AS_DECIDED',
+        closure: { dataExported: true, adminsTransferred: true },
       });
-      expect(second.status).toBe(201);
-      const secondId = call().data<{ renewal: { id: string } }>(second).renewal.id;
-      expect(secondId).not.toBe(staleId);
-      expect(call().codeOf(await propose(subscriptionId, { choice: 'RENEW' }))).toBe(
-        'SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED',
+
+      expect([cancel.status, call().codeOf(cancel)]).toEqual([409, 'SUBSCRIPTION_RENEWAL.CANCEL_NOT_ALLOWED']);
+      expect(call().detailsOf(cancel)).toMatchObject({
+        seatsNeeded: seen.seatsNeeded.total,
+        heldPastRenewal: seen.seatsNeeded.heldPastRenewal,
+        activeSeatsToday: seen.activeSeatsToday,
+        openRequests: 0,
+      });
+      expect(await cases()).toBe(written);
+      expect((await adjustmentOf(figma, 'NV-FIN1')).canCancel).toBe(false);
+    });
+  });
+
+  describe('ai ghi và khi nào @B5', () => {
+    it('chỉ IT Admin ghi: trưởng phòng, Người duyệt chi, Finance, nhân viên bị 403; thuê bao không tồn tại 404 #9', async () => {
+      const written = await cases();
+
+      for (const code of ['NV-DESH', 'NV-CEO', 'NV-FIN1', 'NV-DES1', 'NV-SA']) {
+        const refused = await record({ choice: 'RENEW' }, code);
+        expect([code, refused.status]).toEqual([code, 403]);
+      }
+      const unknown = await call().post('NV-ITA1', '/subscription-renewals', {
+        subscriptionId: randomUUID(),
+        choice: 'RENEW',
+        outcome: 'AS_DECIDED',
+      });
+      expect([unknown.status, call().codeOf(unknown)]).toEqual([404, 'SUBSCRIPTION_RENEWAL.NOT_FOUND']);
+      expect(await cases()).toBe(written);
+    });
+
+    it('trước điểm điều chỉnh ⟹ 409 BEFORE_ADJUSTMENT_POINT kèm ngày mở; số vẫn đọc được từ mọi ngày #9', async () => {
+      // The payment day of Jira follows today, not the calendar of the dataset: 20 days from today, so its point (7 days before) is 13 days away.
+      const paymentDay = call().inDays(20);
+      await world.ctx.sql.query(`UPDATE subscriptions SET renewal_date = $2::date, end_date = NULL WHERE id = $1`, [
+        jira,
+        paymentDay,
+      ]);
+      const seen = await adjustmentOf(jira);
+      expect(seen.deadline).toBe(paymentDay);
+      expect(seen.adjustmentPointOn).toBe(addDays(paymentDay, -7));
+      expect(seen.adjustmentPointOn > call().today()).toBe(true);
+      const written = await cases();
+
+      const early = await call().post('NV-ITA1', '/subscription-renewals', {
+        subscriptionId: jira,
+        choice: 'REDUCE',
+        proposedQuantity: seen.target,
+        outcome: 'AS_DECIDED',
+      });
+
+      expect([early.status, call().codeOf(early)]).toEqual([409, 'SUBSCRIPTION_RENEWAL.BEFORE_ADJUSTMENT_POINT']);
+      expect(call().detailsOf(early)).toEqual({
+        adjustmentPointOn: seen.adjustmentPointOn,
+        deadline: seen.deadline,
+      });
+      expect(await cases()).toBe(written);
+    });
+  });
+
+  describe('số cần đổi giữa lúc xem và lúc ghi (QĐ-104d) @B5', () => {
+    it('một ghế nữa được cấp sau khi IT đọc số: ghi số cũ ⟹ 409 kèm số mới, IT đọc lại và ghi được một lần, ghi lần hai ⟹ NOT_RENEWABLE (kỳ đã nối tiếp) #9', async () => {
+      const first = await adjustmentOf(figma);
+      // A person of the department gets a seat with no end after the IT Admin read the number: the seat is needed after the renewal.
+      await world.ctx.sql.query(
+        `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
+           normalized_account_identifier, valid_from, valid_from_basis, owning_department_id, created_by_app_user_id)
+         SELECT gen_random_uuid(), s.organization_id, 'PERSONAL', 'REQUEST', s.plan_id, s.id, e.id, e.work_email, e.normalized_work_email,
+                $3::date, 'RECORDED', (SELECT id FROM departments WHERE code = 'ENG'), $4::uuid
+           FROM subscriptions s JOIN employees e ON e.employee_code = $2 WHERE s.id = $1`,
+        [figma, 'NV-DEV3', call().today(), randomUUID()],
       );
-      expect((await confirm('NV-ENGH', secondId)).status).toBe(200);
-      expect(await revokeTasks()).toBe(cursor.length + 2);
+
+      const stale = await record({ choice: 'REDUCE', proposedQuantity: first.target });
+
+      expect([stale.status, call().codeOf(stale)]).toEqual([409, 'SUBSCRIPTION_RENEWAL.QUANTITY_NOT_SEATS_NEEDED']);
+      expect(call().detailsOf(stale)).toMatchObject({
+        seatsNeeded: first.seatsNeeded.total + 1,
+        target: first.target + 1,
+        quantity: first.target,
+      });
+      const second = await adjustmentOf(figma);
+      expect(second.target).toBe(first.target + 1);
+
+      // The seats the dataset already decided to take back stay held until their revocation completes (not before the day the task names), and the
+      // new period buys the seats the system counts: the IT Admin completes them first, as the flow of the adjustment does.
+      const tasks = await world.facts.rows<{ id: string }>(
+        `SELECT t.id FROM provisioning_tasks t JOIN license_assignments a ON a.id = t.assignment_id
+          WHERE t.kind = 'REVOKE' AND a.subscription_id = $1 AND t.status = 'QUEUED'`,
+        [figma],
+      );
+      world.clock.jumpDays(7);
+      await world.actors.signIn('NV-ITA1');
+      for (const task of tasks) {
+        expect((await call().post('NV-ITA1', `/provisioning-tasks/${task.id}/claim`)).status).toBe(200);
+        const done = await call().post('NV-ITA1', `/provisioning-tasks/${task.id}/revocation-completion`, {
+          completion: 'ACCOUNT_REMOVED',
+          evidence: 'đã gỡ tài khoản Figma',
+        });
+        expect(done.status).toBe(200);
+      }
+      const third = await adjustmentOf(figma);
+      expect(third.target).toBe(second.target);
+
+      const written = await cases();
+      const recorded = await record({
+        choice: 'REDUCE',
+        proposedQuantity: third.target,
+        nextPeriod: nextYear(third.renewalOn, third.target),
+      });
+      expect(recorded.status).toBe(201);
+      expect(await cases()).toBe(written + 1);
+      // The period has its successor: no number is read for it any more and a second write is refused.
+      const read = await call().get('NV-ITA1', `/subscription-renewals/adjustment?subscriptionId=${figma}`);
+      expect([read.status, call().codeOf(read)]).toEqual([409, 'SUBSCRIPTION_RENEWAL.NOT_RENEWABLE']);
+
+      const twice = await record({
+        choice: 'REDUCE',
+        proposedQuantity: third.target,
+        nextPeriod: nextYear(third.renewalOn, third.target),
+      });
+      expect([twice.status, call().codeOf(twice), call().detailsOf(twice)]).toEqual([
+        409,
+        'SUBSCRIPTION_RENEWAL.NOT_RENEWABLE',
+        { reason: 'ALREADY_CONTINUED' },
+      ]);
+      expect(await cases()).toBe(written + 1);
     });
   });
 });

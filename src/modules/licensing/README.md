@@ -164,15 +164,16 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   `SAAS_ISSUE_STATE_CHANGED` cho bên còn lại — người báo khi IT Admin đổi trạng thái, IT Admin được giao khi người báo trả lời hoặc mở
   lại, người báo khi lượt quét tự đóng phiếu hết hạn mở lại (`REOPEN_WINDOW_LAPSED`) — không báo người tự làm. Tham số chỉ gồm id, mã phiếu
   và từ trạng thái; không có nội dung người báo hay IT Admin viết, trưởng phòng không được báo.
-- `subscription-renewal/` — gia hạn subscription theo kỳ (EP-11): `subscription-renewals.controller.ts`
-  (`/subscription-renewals*`, `/subscription-deadline-events`); nhóm `proposal/` (IT Admin đề xuất, kèm danh sách ghế thu hồi),
-  `decision/` (trưởng phòng sở hữu xác nhận `CONFIRM` đề xuất đúng như đã lập, mở thu hồi; Finance chỉ đọc; đọc theo vai ở
-  `subscription-renewal-view.service.ts` + `readScopeOf`), `outcome/` (IT Admin ghi kết quả, kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
-  `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`), `alerts/` (mốc T−15/T−7, chất lượng dữ liệu), `deadline/` (cờ thực hiện trễ, sự cố tự gia
-  hạn/đánh dấu hết hạn); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; xếp ghế ở
-  `subscription-renewal-ranking.policy.ts`. Quyết định không tạo khoản cam kết ngân sách (`QĐ-62s`). Cột JSON
-  `subscription_renewals.decision_snapshot` đi qua codec `subscription-renewal-decision-snapshot.json.ts` (spec cạnh file); audit và thông báo
-  của một quyết định ghi ở `decision/renewal-decision-trail.service.ts`.
+- `subscription-renewal/` — điều chỉnh/gia hạn thuê bao kho `K2` theo kỳ (EP-11, `SBF-20`): `subscription-renewals.controller.ts`
+  (`/subscription-renewals*`, `/subscription-deadline-events`); nhóm `record/` (IT Admin ghi kết quả **một lần** tại điểm điều chỉnh: ca,
+  quyết định `IT_ADMIN_IN_CHARGE` và kết quả trong một transaction; ghi audit `substitute` và báo Finance ở `renewal-record-trail.service.ts`),
+  `seats-needed/` (số seat cần của kỳ sau, `QĐ-103e`), `outcome/` (lõi ghi kết quả: kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
+  `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`; route `/{id}/outcome` chỉ còn cho ca `DECIDED` cũ), `alerts/` (điểm điều chỉnh, cảnh báo đỏ gói năm, gói tháng giữ nguyên, chất lượng dữ liệu — `renewal-adjustment-alerts.policy.ts`), `deadline/`
+  (sự cố tự gia hạn/đánh dấu hết hạn theo ngày gia hạn `end`); không còn bước trưởng phòng xác nhận (route `decision` đã gỡ). Đọc theo vai ở
+  `subscription-renewal-view.service.ts` + `readScopeOf` (IT Admin, Finance đọc mọi ca kể cả thuê bao kho không phòng sở hữu; trưởng phòng chỉ
+  ca của phòng mình); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; `subscription-renewal-ranking.policy.ts`
+  còn cho route `seat-ranking` (deprecated). Ghi kết quả không tạo khoản cam kết ngân sách (`QĐ-62s`). Cột JSON
+  `subscription_renewals.decision_snapshot` đi qua codec `subscription-renewal-decision-snapshot.json.ts` (spec cạnh file).
 - Gốc module (dùng chung nhiều capability): `licensing-audit-event.mapper.ts`, `licensing.http-errors.ts`;
   `licensing-alerts.policy.ts` + `licensing-alerts.service.ts` (`LicensingAlerts`) — cảnh báo license `FR-5.14` vào hộp thông báo
   (dòng 3 T−7 ở `expiry/`, dòng 12 bàn giao đã bỏ theo `QĐ-110g`, dòng 13 tài khoản dịch vụ đã bỏ theo `QĐ-110m`, dòng 38 `K1` của
@@ -189,8 +190,8 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 - `provisioningTaskGrant`: `subscriptionId` tùy chọn (không có ⟹ `chooseSubscription`: thuê bao chính, ưu tiên cái còn chỗ Trống; K5 không được có);
   có mà không thuộc `getGrantableSubscriptions` của gói hôm nay (kỳ đã hết, hoặc kỳ kế tiếp đã chạy) ⟹ 422 `PROVISIONING.SUBSCRIPTION_NOT_GRANTABLE`.
   Seat vừa cấp trên thuê bao có kỳ kế tiếp `ACTIVE` ghi trước ngày bắt đầu được mang sang kỳ đó ngay trong transaction của lệnh cấp (`RENEWAL_CARRY`, luật `seatsToCarry` và
-  SQL `AssignmentCarryRepo.carry` của `assignment/renewal/`, cùng đường với `outcome/` lúc ghi gia hạn; seat hết hạn trước ngày đó thì không mang); kỳ kế tiếp không đủ ghế ⟹ 422
-  `PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS`, không ghi gì (sửa số ghế kỳ kế tiếp trước); lệnh cấp thất bại hoặc bị hủy thu lại cả bản ghi sang kỳ sau (`takeBackCarry`).
+  SQL `AssignmentCarryRepo.carry` của `assignment/renewal/`, cùng đường với `outcome/` lúc ghi gia hạn; seat hết hạn trước ngày đó thì không mang); kỳ kế tiếp là kho (không phòng sở hữu) mà không đủ ghế ⟹ `CatalogApi.addPoolSeat` mua thêm 1 seat cho kỳ đó rồi mang lại (S20-T4c, báo IT phụ trách như seat mua theo lệnh cấp); kỳ kế tiếp
+  do một phòng sở hữu mà không đủ ghế ⟹ 422 `PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS`, không ghi gì (sửa số ghế kỳ kế tiếp trước); lệnh cấp thất bại hoặc bị hủy thu lại cả bản ghi sang kỳ sau (`takeBackCarry`).
   `purchase?: { reason? }` chỉ K2/K4 (K khác ⟹ 422 `PURCHASE_NOT_APPLICABLE`): còn Trống ⟹ 409 `PURCHASE_NOT_ALLOWED` (audit
   `PROVISIONING_TASK.PURCHASE_REFUSED` ghi ở transaction riêng sau rollback); hết kho + còn seat đang thu hồi + thiếu lý do ⟹ 422
   `PURCHASE_REASON_REQUIRED`; ngược lại `CatalogApi.addPoolSeat` (+1 seat/lần) rồi ghi Assignment, task có `purchase_kind` (`POOL_TOP_UP`/`KEY_PURCHASE`).

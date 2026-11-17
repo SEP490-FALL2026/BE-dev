@@ -137,11 +137,11 @@ import { StockSummaryController } from './stock-summary/stock-summary.controller
 import { StockSummaryQueryService } from './stock-summary/stock-summary-query.service';
 import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
 import { RenewalDeadlineService } from './subscription-renewal/deadline/renewal-deadline.service';
-import { RenewalDecisionTrail } from './subscription-renewal/decision/renewal-decision-trail.service';
-import { RenewalDecisionService } from './subscription-renewal/decision/renewal-decision.service';
 import { RenewalOutcomeService } from './subscription-renewal/outcome/renewal-outcome.service';
-import { RenewalProposalService } from './subscription-renewal/proposal/renewal-proposal.service';
+import { RenewalRecordService } from './subscription-renewal/record/renewal-record.service';
+import { RenewalRecordTrail } from './subscription-renewal/record/renewal-record-trail.service';
 import { RenewalNotifier } from './subscription-renewal/subscription-renewal-notifier.service';
+import { RenewalSeatsNeededService } from './subscription-renewal/seats-needed/renewal-seats-needed.service';
 import { RenewalPartiesService } from './subscription-renewal/subscription-renewal-parties.service';
 import { RenewalRankingService } from './subscription-renewal/subscription-renewal-ranking.service';
 import { SubscriptionRenewalSeatRepo } from './subscription-renewal/subscription-renewal-seat.repo';
@@ -280,10 +280,10 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     SubscriptionRenewalSeatRepo,
     RenewalPartiesService,
     RenewalRankingService,
+    RenewalSeatsNeededService,
     RenewalNotifier,
-    RenewalProposalService,
-    RenewalDecisionTrail,
-    RenewalDecisionService,
+    RenewalRecordTrail,
+    RenewalRecordService,
     RenewalOutcomeService,
     RenewalAlertsService,
     RenewalDeadlineService,

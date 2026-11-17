@@ -28,7 +28,13 @@ import type {
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { toAssignmentFailure } from './assignment-conflicts.repo';
 import { AssignmentDepartmentRepo } from './assignment-department.repo';
-import { assignmentCreatedSnapshot, nextPeriodStart, replacedByGrant, seatsToCarry } from './assignment.policy';
+import {
+  assignmentCreatedSnapshot,
+  carriedPast,
+  nextPeriodStart,
+  replacedByGrant,
+  seatsToCarry,
+} from './assignment.policy';
 import { assertBaselineTarget, assertSeatTargetUsable, toSeatTargetRef } from './baseline-target.policy';
 import { AssignmentRepo } from './assignment.repo';
 import { AssignmentCarryRepo } from './assignment-carry.repo';
@@ -261,7 +267,7 @@ export class AssignmentService {
         },
       ),
     );
-    await this.carryToNextPeriod(tx, actor, { seat: record, today: input.effectiveFrom });
+    await this.carryToNextPeriod(tx, actor, { seat: record, today: input.effectiveFrom, requestId: input.requestId });
 
     return record;
   }
@@ -391,13 +397,15 @@ export class AssignmentService {
    * A seat granted on a subscription that a next period, recorded ahead of its start, continues goes on into that period at once, in the
    * transaction of the grant (`QĐ-35c`): otherwise the seats the next period buys, sized to the rights held and the requests waiting to be
    * granted (`QĐ-103e`), would show it free on its first day with the person holding it (a second grant of it). The same carrying and the
-   * same rule as when the renewal was recorded; a seat that ends before the next period begins stays where it is. Throws
-   * ProvisioningSubscriptionError (`NEXT_PERIOD_SEATS`) when the next period buys no seat for it, nothing written.
+   * same rule as when the renewal was recorded; a seat that ends before the next period begins stays where it is, and in the shared pool so does one that ends on its first day (R2-2). When
+   * the next period is the shared pool and holds no free seat for it, one seat is bought on it for the request and the carrying is tried again
+   * (S20-T4c, R2-8: the adjustment bought exactly the seats needed, a request granted after it comes in after). Throws ProvisioningSubscriptionError
+   * (`NEXT_PERIOD_SEATS`) when the next period is one a department owns and buys no seat for it, nothing written.
    */
   private async carryToNextPeriod(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    input: { seat: AssignmentRecord; today: BusinessDate },
+    input: { seat: AssignmentRecord; today: BusinessDate; requestId: string },
   ): Promise<void> {
     const { seat } = input;
     if (seat.subscriptionId === null) return;
@@ -410,21 +418,55 @@ export class AssignmentService {
       startDate ?? seat.effectiveFrom,
     );
     if (startDate === null || next === undefined || carried.length === 0) return;
+    // The pool buys exactly the seats the adjustment counted, and the count leaves out a seat that ends on the renewal day of the period that
+    // runs (R2-2, A1C-06, V-6): not the first day of the next, which a plan by the year may begin the day after it.
+    const renewalOn = period.adjustment?.end ?? startDate;
+    if (next.ownerDepartmentId === null && carriedPast(carried, renewalOn).length === 0) return;
 
+    const carrying = {
+      assignmentIds: [seat.id],
+      nextSubscriptionId: next.subscriptionId,
+      startDate,
+      actorAppUserId: actor.appUserId,
+    };
+    await this.carryOrBuy(tx, actor, { carrying, next, requestId: input.requestId });
+  }
+
+  /**
+   * Carries the seat; when the next period holds no free seat for it and is the shared pool (no department owns it), buys one seat on it for the
+   * request and carries again: the person who comes in after the adjustment was recorded is a seat the IT Admin buys for the period (`QĐ-103q`),
+   * told like any seat a grant buys (`QĐ-110v`). A next period a department owns buys nothing here. Throws ProvisioningSubscriptionError
+   * (`NEXT_PERIOD_SEATS`).
+   */
+  private async carryOrBuy(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: {
+      carrying: Parameters<AssignmentCarryRepo['carry']>[1];
+      next: { subscriptionId: string; ownerDepartmentId: string | null };
+      requestId: string;
+    },
+  ): Promise<void> {
+    const refused = await this.carrying.carryBehindSavepoint(tx, input.carrying);
+    if (refused === null) return;
+    this.requireNoRoom(refused);
+    const { subscriptionId, ownerDepartmentId } = input.next;
+    if (ownerDepartmentId !== null) throw new ProvisioningSubscriptionError('NEXT_PERIOD_SEATS');
+    await this.catalog.lockSeatTarget(tx, { subscriptionId });
+    await this.catalog.addPoolSeat(tx, actor, subscriptionId, input.requestId);
     try {
-      await this.carrying.carry(tx, {
-        assignmentIds: [seat.id],
-        nextSubscriptionId: next.subscriptionId,
-        startDate,
-        actorAppUserId: actor.appUserId,
-      });
+      await this.carrying.carry(tx, input.carrying);
     } catch (error) {
-      const failure = toAssignmentFailure(error, 0);
-      if (failure instanceof AssignmentConflictError && failure.conflict === 'SEAT_CAPACITY') {
-        throw new ProvisioningSubscriptionError('NEXT_PERIOD_SEATS');
-      }
-      throw failure ?? error;
+      this.requireNoRoom(error as Error);
+      throw new ProvisioningSubscriptionError('NEXT_PERIOD_SEATS');
     }
+  }
+
+  /** Returns when the database refused the carrying for want of a free seat on the next period; throws any other refusal as the failure it is. */
+  private requireNoRoom(error: Error): void {
+    const failure = toAssignmentFailure(error, 0);
+    if (failure instanceof AssignmentConflictError && failure.conflict === 'SEAT_CAPACITY') return;
+    throw failure ?? error;
   }
 
   /**

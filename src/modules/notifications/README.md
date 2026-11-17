@@ -20,9 +20,9 @@ organization, personnel, requests ([module-graph](../../../docs/generated/module
 - `EmailDeliveryApi` ([public/email-delivery.api.ts](public/email-delivery.api.ts)): `dispatchDue(isUsable)` — gửi
   một lô outbox đến hạn; chỉ vòng mail của worker gọi.
 - `public/notifications.types.ts` — `EmailTemplate`, `IN_APP_NOTIFICATION_CODES` (bảng mã đóng; hai nhóm cuối là cảnh báo license
-  của `a03-license-inbox-alerts` và bảy mã `SUBSCRIPTION_*` của gia hạn thuê bao ở `a06-*`: `SUBSCRIPTION_RENEWAL_ALERT`,
-  `_RENEWAL_DATA_QUALITY`, `_RENEWAL_PROPOSED`, `_RENEWAL_DECIDED`, `_RENEWAL_LATE`,
-  `_AUTO_RENEWAL_INCIDENT`, `_EXPIRY_MARKED`; chỉ id, mã và ngày, khóa nằm trong `PARAM_KEYS_BY_CODE`; mã cũ
+  của `a03-license-inbox-alerts` và mười mã `SUBSCRIPTION_*` của gia hạn thuê bao ở `a06-*`: `SUBSCRIPTION_RENEWAL_ALERT`,
+  `_RENEWAL_RED_ALERT`, `_RENEWAL_KEPT`, `_RENEWAL_DATA_QUALITY`, `_RENEWAL_PROPOSED`, `_RENEWAL_DECIDED`, `_RENEWAL_LATE`,
+  `_RENEWAL_OUTCOME_RECORDED`, `_AUTO_RENEWAL_INCIDENT`, `_EXPIRY_MARKED`; chỉ id, mã và ngày, khóa nằm trong `PARAM_KEYS_BY_CODE`; mã cũ
   `SUBSCRIPTION_BUSINESS_OWNER_LEFT` không ghi mới nhưng dòng đã lưu vẫn đọc được — `QĐ-111g`), `TokenUsability`.
   - Tám mã của `FR-3.21`/`FR-2.15`/`SBF-07a`/`SBF-08`/`US-09-04` (khóa ở `PARAM_KEYS_BY_CODE`, chỉ id, mã, ngày, nguồn và số đếm; không nội dung người viết, định danh tài
     khoản hay số tiền), mỗi mã một người nhận cố định và `eventKey` riêng:

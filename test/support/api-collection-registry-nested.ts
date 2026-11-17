@@ -90,13 +90,13 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     findings: [],
     owner: 'g3-subscription-purchase',
     businessMaximum: {
-      maxItems: 5,
+      maxItems: 2,
       source:
-        'alertDates over RENEWAL_ALERT_DAYS_BEFORE_DEADLINE, an int-list of length 1–5 in parameter-definitions.ts',
+        'alertDates in subscription.policy.ts: the point of adjustment and, for a plan by the year, the red alert',
     },
     rationale:
-      'One date per configured alert offset; whether alerts stay on list rows is LD-13 decision 3 (subscriptionList#owner-decision).',
-    removeWhen: 'Review when the parameter length limit or alertDates changes.',
+      'The point of adjustment, and the red alert of a plan by the year; whether alerts stay on list rows is LD-13 decision 3 (subscriptionList#owner-decision).',
+    removeWhen: 'Review when alertDates changes.',
   },
   {
     key: 'subscriptionList#warnings',
@@ -128,12 +128,12 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     findings: [],
     owner: 'g3-subscription-purchase',
     businessMaximum: {
-      maxItems: 5,
+      maxItems: 2,
       source:
-        'alertDates over RENEWAL_ALERT_DAYS_BEFORE_DEADLINE, an int-list of length 1–5 in parameter-definitions.ts',
+        'alertDates in subscription.policy.ts: the point of adjustment and, for a plan by the year, the red alert',
     },
-    rationale: 'One date per configured alert offset.',
-    removeWhen: 'Review when the parameter length limit or alertDates changes.',
+    rationale: 'The point of adjustment, and the red alert of a plan by the year.',
+    removeWhen: 'Review when alertDates changes.',
   },
   {
     key: 'subscriptionGet#warnings',

@@ -572,6 +572,8 @@ enum RenewalChoice {
   RENEW
   REDUCE
   CANCEL
+  // The IT Admin raises the seats to the number the system counted (SBF-20).
+  INCREASE
 }
 
 enum RenewalState {
@@ -599,6 +601,9 @@ enum RenewalNoticeBasis {
   DECLARED
   INFERRED_UNCONFIRMED
   BY_END_DATE
+  // The milestone of a period with no declared deadline: the renewal date, or the next payment date of a monthly pack (SBF-20).
+  BY_RENEWAL_DATE
+  BY_PAYMENT_DATE
 }
 
 enum RenewalDeadlineOutcome {
@@ -609,7 +614,7 @@ enum RenewalDeadlineOutcome {
 model SubscriptionRenewal {
   id                          String                 @id @default(uuid()) @db.Uuid
   organizationId              String                 @map("organization_id") @db.Uuid
-  // At most one live (not STALE) case per period: a partial unique index in the migration 20261108300100.
+  // At most one live (not STALE) case per (subscription, notice_base_date): a partial unique index in the migration 20261117110100.
   subscriptionId              String                 @map("subscription_id") @db.Uuid
   state                       RenewalState           @default(PROPOSED)
   // The milestone the period was proposed against, as the catalog derived it then.
@@ -618,6 +623,9 @@ model SubscriptionRenewal {
   proposedChoice              RenewalChoice          @map("proposed_choice")
   proposedQuantity            Int?                   @map("proposed_quantity")
   proposalNote                String?                @map("proposal_note")
+  // The seats the system counted for the next period when the result was recorded; null on a case written before (SBF-20).
+  // Written at insert only: the trigger that freezes the proposal does not cover this column.
+  seatsNeeded                 Int?                   @map("seats_needed")
   // What the Business Owner said, as the IT Admin who proposes recorded it: an input, never a step.
   businessOwnerOpinion        String?                @map("business_owner_opinion")
   proposedByEmployeeId        String                 @map("proposed_by_employee_id") @db.Uuid

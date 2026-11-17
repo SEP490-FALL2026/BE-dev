@@ -87,9 +87,9 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     findings: [],
     owner: 'g2-operating-parameters',
     businessMaximum: {
-      maxItems: 5,
+      maxItems: 3,
       source:
-        'the longest int-list in parameter-definitions.ts (RENEWAL_ALERT_DAYS_BEFORE_DEADLINE, length 1–5), enforced by validateParameterValue',
+        'the longest int-list in parameter-definitions.ts (DETECTION_THRESHOLD_DAYS, length 3–3), enforced by validateParameterValue',
     },
     rationale: 'A value is a list only for an int-list definition.',
     removeWhen: 'Review when an int-list definition, its length or the value validation changes.',
@@ -100,8 +100,9 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     findings: [],
     owner: 'g2-operating-parameters',
     businessMaximum: {
-      maxItems: 5,
-      source: 'the int-list defaults in parameter-definitions.ts (3 and 2 values, within the same length limits)',
+      maxItems: 3,
+      source:
+        'the int-list default in parameter-definitions.ts (DETECTION_THRESHOLD_DAYS, 3 values, within the same length limit)',
     },
     rationale: 'A default is a list only for an int-list definition.',
     removeWhen: 'Review when an int-list definition or its default changes.',
@@ -125,9 +126,9 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     findings: [],
     owner: 'g2-operating-parameters',
     businessMaximum: {
-      maxItems: 5,
+      maxItems: 3,
       source:
-        'the longest int-list in parameter-definitions.ts (RENEWAL_ALERT_DAYS_BEFORE_DEADLINE, length 1–5), enforced by validateParameterValue',
+        'the longest int-list in parameter-definitions.ts (DETECTION_THRESHOLD_DAYS, length 3–3), enforced by validateParameterValue',
     },
     rationale: 'A past value is a list only for an int-list definition.',
     removeWhen: 'Review when an int-list definition, its length or the value validation changes.',

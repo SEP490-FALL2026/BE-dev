@@ -1,45 +1,72 @@
 import { Injectable } from '@nestjs/common';
-import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
-import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { catalogAuditEvent } from '../catalog-audit-event.mapper';
-import { PlanFactsService } from '../plan/plan-facts.service';
-import { SubscriptionPeriodRefusedError } from '../public/subscription-period.errors';
+import { fromDateColumn, type BusinessDate } from '../../../../core/business-date';
+import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AuditApi } from '../../../audit/public/audit.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import { catalogAuditEvent } from '../../catalog-audit-event.mapper';
+import { PlanFactsService } from '../../plan/plan-facts.service';
+import { SubscriptionPeriodRefusedError } from '../../public/subscription-period.errors';
 import type {
   NextPeriodInput,
   PaymentScheduleFacts,
+  PeriodAdjustment,
   RenewalPeriodFacts,
   SubscriptionPurchaseFacts,
-} from '../public/subscription-period.types';
-import { assertPoolTerms } from './pool/subscription-pool.policy';
-import { SubscriptionPoolService } from './pool/subscription-pool.service';
-import { snapshotOf } from './subscription.mapper';
-import { monthlyCostOf } from './price/subscription-price.policy';
+} from '../../public/subscription-period.types';
+import {
+  adjustmentCommitmentOf,
+  adjustmentPointOf,
+  redAlertOf,
+  type AdjustmentWindows,
+} from '../obligation/subscription-obligation.policy';
+import { assertPoolTerms } from '../pool/subscription-pool.policy';
+import { SubscriptionPoolService } from '../pool/subscription-pool.service';
+import { snapshotOf } from '../subscription.mapper';
+import { monthlyCostOf } from '../price/subscription-price.policy';
 import {
   assertSubscriptionShape,
   declaredStateOf,
   deriveNotice,
   noticeInputOf,
   subscriptionStatusOf,
-} from './subscription.policy';
-import { SubscriptionPriceNotVndError } from './subscription.errors';
-import { SubscriptionRepo, type PaidTermRow } from './subscription.repo';
-import { SubscriptionPricingService } from './subscription-pricing.service';
-import type { ApplicationKind, BillingCycle, ProvisioningType, SubscriptionRecord } from './subscription.types';
+} from '../subscription.policy';
+import { SubscriptionPriceNotVndError } from '../subscription.errors';
+import { SubscriptionPeriodRepo } from './subscription-period.repo';
+import { SubscriptionRepo, type PaidTermRow } from '../subscription.repo';
+import { SubscriptionPricingService } from '../subscription-pricing.service';
+import { SubscriptionWindowsService } from '../subscription-windows.service';
+import type { ApplicationKind, BillingCycle, ProvisioningType, SubscriptionRecord } from '../subscription.types';
 
 /** How many periods one pass of the renewal sweep reads at most; the next pass takes the rest. */
 const SWEEP_LIMIT = 500;
 
-/** A period that a department head decides on: the subscriptions of the shared pool (K2, K4) have no owner department and are not decided here. */
-type OwnedRecord = SubscriptionRecord & { ownerDepartmentId: string };
+/** The point of adjustment of a period on `today`, with the red alert of a plan by the year; null when no date gives a point. */
+function adjustmentOf(
+  record: SubscriptionRecord,
+  today: BusinessDate,
+  windows: AdjustmentWindows,
+): PeriodAdjustment | null {
+  const point = adjustmentPointOf(record, today, windows);
+  if (point === null) return null;
+  const commitment = adjustmentCommitmentOf(record);
 
-function isOwned(record: SubscriptionRecord): record is OwnedRecord {
-  return record.ownerDepartmentId !== null;
+  return {
+    kind: point.kind,
+    deadline: point.deadline,
+    point: point.point,
+    end: point.end,
+    redAlertOn: redAlertOf(point.deadline, commitment, windows.redAlertDaysAnnual),
+    commitment,
+  };
 }
 
-function factsOf(record: OwnedRecord, renewedById: string | null): RenewalPeriodFacts {
+function factsOf(
+  record: SubscriptionRecord,
+  renewedById: string | null,
+  today: BusinessDate,
+  windows: AdjustmentWindows,
+): RenewalPeriodFacts {
   const notice = deriveNotice(noticeInputOf(record));
 
   return {
@@ -52,6 +79,10 @@ function factsOf(record: OwnedRecord, renewedById: string | null): RenewalPeriod
     applicationKind: record.applicationKind,
     ownerDepartmentId: record.ownerDepartmentId,
     responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
+    provisioningType: record.planProvisioningType,
+    commitmentTermMonths: record.commitmentTermMonths,
+    vendorMinimumSeats: record.vendorMinimumSeats,
+    isPrimaryForPlan: record.isPrimaryForPlan,
     kind: record.kind,
     status: record.status,
     purchasedQuantity: record.purchasedQuantity,
@@ -63,6 +94,7 @@ function factsOf(record: OwnedRecord, renewedById: string | null): RenewalPeriod
     autoRenew: record.autoRenew,
     allowsMidTermReduction: record.allowsMidTermReduction,
     notice: { source: notice.source, deadline: notice.deadline, baseDate: notice.baseDate },
+    adjustment: adjustmentOf(record, today, windows),
     renewedFromId: record.renewedFromId,
     renewedById,
   };
@@ -95,11 +127,13 @@ function scheduleOf(row: PaidTermRow): PaymentScheduleFacts | null {
 export class SubscriptionPeriodService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
+    private readonly periods: SubscriptionPeriodRepo,
     private readonly plans: PlanFactsService,
     private readonly pricing: SubscriptionPricingService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly pool: SubscriptionPoolService,
+    private readonly windows: SubscriptionWindowsService,
   ) {}
 
   /** The periods with these ids, by id; an id that does not exist is absent. */
@@ -131,20 +165,12 @@ export class SubscriptionPeriodService {
   }
 
   /**
-   * The active terms the renewal sweep looks at, none of them continued yet: those whose milestone falls between two days, and
-   * those that have no milestone at all (the warning of the quality of the contract data). A perpetual purchase and a draft are
-   * never among them (`QĐ-49c`).
+   * The active K2 terms (the shared pool's workspaces, those of a department too) that no later period continues, at most `SWEEP_LIMIT`:
+   * the periods that have a point of adjustment (`SBF-20`). A perpetual purchase, a draft and the other kinds of plan are never among them.
    */
-  async subjects(window: { from: BusinessDate; to: BusinessDate }): Promise<RenewalPeriodFacts[]> {
-    const dated = await this.subscriptions.listTermsWithMilestoneBetween(window.from, window.to);
-    const { items: undated } = await this.subscriptions.list({
-      status: 'ACTIVE',
-      kind: 'TERM',
-      withoutAlertAnchor: true,
-      skip: 0,
-      take: SWEEP_LIMIT,
-    });
-    const facts = await this.withSuccessors([...dated.slice(0, SWEEP_LIMIT), ...undated]);
+  async adjustmentSubjects(): Promise<RenewalPeriodFacts[]> {
+    const records = await this.subscriptions.findMany(await this.periods.listAdjustmentSubjectIds(SWEEP_LIMIT));
+    const facts = await this.withSuccessors(records);
 
     return facts.filter((period) => period.renewedById === null);
   }
@@ -167,7 +193,6 @@ export class SubscriptionPeriodService {
     const previous = await this.subscriptions.find(input.previousSubscriptionId, tx);
     if (!previous) throw new SubscriptionPeriodRefusedError('NOT_FOUND');
     if (previous.kind !== 'TERM') throw new SubscriptionPeriodRefusedError('NOT_TERM');
-    if (!isOwned(previous)) throw new SubscriptionPeriodRefusedError('NO_OWNER_DEPARTMENT');
     if ((await this.subscriptions.successorsOf([previous.id], tx)).has(previous.id)) {
       throw new SubscriptionPeriodRefusedError('ALREADY_RENEWED');
     }
@@ -220,7 +245,14 @@ export class SubscriptionPeriodService {
       }),
     );
 
-    return factsOf({ ...created, ownerDepartmentId: previous.ownerDepartmentId }, null);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+
+    return factsOf(
+      created,
+      null,
+      today,
+      (await this.windows.of([created], today, tx)).get(created.id) as AdjustmentWindows,
+    );
   }
 
   /**
@@ -263,6 +295,11 @@ export class SubscriptionPeriodService {
       tx,
     );
 
-    return records.filter(isOwned).map((record) => factsOf(record, successors.get(record.id) ?? null));
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+    const windows = await this.windows.of(records, today, tx);
+
+    return records.map((record) =>
+      factsOf(record, successors.get(record.id) ?? null, today, windows.get(record.id) as AdjustmentWindows),
+    );
   }
 }

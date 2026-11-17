@@ -87,11 +87,12 @@ export class AiSummaryHarness extends GroupHarness {
   }
 
   /**
-   * A renewal of a term subscription of the department, proposed by the IT Admin, that waits for the decision of the spending
-   * approver (`US-11-02`, state `PROPOSED`): what `RenewalHarness.proposedRenewal` makes, on this branch of the harnesses. The notice
-   * deadline is 20 days from today. Returns the case and its subscription.
+   * The cancellation of a term subscription of the department, recorded by the IT Admin in the one write of the point of adjustment
+   * (`SBF-20` §4.4: no step waits for the head or the spending approver any more), the vendor having refused it with `opinion` as its
+   * note: what `RenewalHarness.recordedRenewal` makes, on this branch of the harnesses. The notice deadline is 20 days from today, so its
+   * point of adjustment has come. Returns the case and its subscription.
    */
-  async proposedRenewal(
+  async recordedRenewal(
     ownerDepartmentId: string,
     opinion: string,
   ): Promise<{ renewalId: string; subscriptionId: string }> {
@@ -113,15 +114,31 @@ export class AiSummaryHarness extends GroupHarness {
     const response = await request(this.server())
       .post('/api/v1/subscription-renewals')
       .set(this.as(this.it1))
-      .send({ subscriptionId, choice: 'RENEW', note: opinion });
-    if (response.status !== 201) throw new Error(`propose: ${response.status} ${JSON.stringify(response.body)}`);
+      .send({
+        subscriptionId,
+        choice: 'CANCEL',
+        outcome: 'VENDOR_REFUSED',
+        outcomeNote: opinion,
+        // The vendor kept the period anyway (V-2): the period it made, starting on the renewal day.
+        nextPeriod: {
+          purchasedQuantity: 10,
+          unitPrice: { amount: '1000000', currency: 'VND' },
+          billingCycle: 'ANNUAL',
+          startDate: inDays(50),
+          endDate: inDays(414),
+          noticeDeadline: inDays(385),
+          autoRenew: true,
+          allowsMidTermReduction: false,
+        },
+      });
+    if (response.status !== 201) throw new Error(`record: ${response.status} ${JSON.stringify(response.body)}`);
 
     return { renewalId: this.dataOf<{ renewal: { id: string } }>(response).renewal.id, subscriptionId };
   }
 
-  /** The renewals waiting for a decision that `account` reads in its own queue. */
+  /** The renewals `account` reads in its own list. */
   renewalQueue = (account: ApiAccount) =>
-    request(this.server()).get('/api/v1/subscription-renewals?state=PROPOSED').set(this.as(account));
+    request(this.server()).get('/api/v1/subscription-renewals').set(this.as(account));
 
   /** The Super Admin sets one AI switch. */
   setSwitch = (key: (typeof AI_SWITCHES)[number], value: 'ON' | 'OFF') =>

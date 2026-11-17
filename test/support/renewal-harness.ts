@@ -1,4 +1,8 @@
 import request from 'supertest';
+import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
+import { LicensingApi } from '../../src/modules/licensing/public/licensing.api';
+import { SubscriptionRenewalRepo } from '../../src/modules/licensing/subscription-renewal/subscription-renewal.repo';
+import type { DeciderRole } from '../../src/modules/licensing/subscription-renewal/subscription-renewal.types';
 import { SubscriptionRenewalSweepService } from '../../src/modules/licensing/subscription-renewal/subscription-renewal-sweep.service';
 import type { ApiAccount } from './api-accounts';
 import { declareApplication, declarePlan, declareSubscription } from './builders/catalog.builder';
@@ -51,13 +55,15 @@ export class RenewalHarness extends ExpiryHarness {
     request(this.server()).get(`/api/v1/subscription-renewals/${id}`).set(this.as(account));
   ranking = (id: string, account: ApiAccount = this.it1, query = '') =>
     request(this.server()).get(`/api/v1/subscription-renewals/${id}/seat-ranking${query}`).set(this.as(account));
+  /** The one write of the result at the point of adjustment (`SBF-20` §4.4): the case, its decision and its outcome in one transaction. */
   propose = (body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post('/api/v1/subscription-renewals').set(this.as(account)).send(body);
-  decideRenewal = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/subscription-renewals/${id}/decision`).set(this.as(account)).send(body);
-  /** The head of the department that owns the subscription confirms the proposal as it is (`QĐ-94d`(2)). */
-  confirmRenewal = (id: string, account: ApiAccount, body: object = {}) =>
-    this.decideRenewal(id, { decision: 'CONFIRM', ...body }, account);
+  /** The adjustment of a subscription as the IT Admin or Finance reads it before recording (`GET /subscription-renewals/adjustment`). */
+  adjustment = (subscriptionId: string, account: ApiAccount = this.it1) =>
+    request(this.server())
+      .get(`/api/v1/subscription-renewals/adjustment?subscriptionId=${subscriptionId}`)
+      .set(this.as(account));
+  /** The outcome of a case DECIDED before the one-write rule (legacy route): nothing else is recorded this way. */
   outcome = (id: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/subscription-renewals/${id}/outcome`).set(this.as(account)).send(body);
   deadlineEvents = (query = '', account: ApiAccount = this.it1) =>
@@ -147,12 +153,72 @@ export class RenewalHarness extends ExpiryHarness {
     return { subscriptionId, seats };
   }
 
-  /** Proposes as the IT Admin and returns the id of the case, failing on anything but 201. */
-  async proposedRenewal(body: object): Promise<string> {
-    const response = await this.propose(body);
-    if (response.status !== 201) throw new Error(`propose: ${response.status} ${JSON.stringify(response.body)}`);
+  /** Records the result as the IT Admin (or `account`), failing on anything but 201; returns the id of the case and of the new period, if any. */
+  async recordedRenewal(
+    body: object,
+    account: ApiAccount = this.it1,
+  ): Promise<{ id: string; nextSubscriptionId: string | null }> {
+    const response = await this.propose(body, account);
+    if (response.status !== 201) throw new Error(`record: ${response.status} ${JSON.stringify(response.body)}`);
+    const renewal = this.dataOf<{
+      renewal: { id: string; outcomeDetail: { nextSubscriptionId: string | null } | null };
+    }>(response).renewal;
 
-    return this.dataOf<{ renewal: { id: string } }>(response).renewal.id;
+    return { id: renewal.id, nextSubscriptionId: renewal.outcomeDetail?.nextSubscriptionId ?? null };
+  }
+
+  /**
+   * A case as it stood before the one-write rule: proposed by the IT Admin and decided by `decidedBy` (a head), waiting for its outcome
+   * (state `DECIDED`). Written through the repository, as the old routes did; only `POST /{id}/outcome` still records it.
+   */
+  async legacyDecidedRenewal(
+    subscriptionId: string,
+    options: { choice: 'RENEW' | 'REDUCE' | 'CANCEL'; quantity?: number; decidedBy: Person; role?: DeciderRole },
+  ): Promise<string> {
+    const repo = this.ctx.app.get(SubscriptionRenewalRepo, { strict: false });
+
+    return this.ctx.app.get(TransactionRunner).run(async (tx) => {
+      const proposed = await repo.insert(tx, {
+        organizationId: this.seed.organizationId,
+        subscriptionId,
+        noticeBasis: 'DECLARED',
+        noticeBaseDate: this.inDays(60),
+        proposedChoice: options.choice,
+        proposedQuantity: options.quantity ?? null,
+        proposalNote: null,
+        seatsNeeded: null,
+        proposedByEmployeeId: this.it1.employeeId,
+        proposedByAppUserId: this.it1.appUserId,
+      });
+      if (!proposed) throw new Error('the legacy case was not written');
+      await repo.recordDecision(tx, proposed.id, {
+        choice: options.choice,
+        quantity: options.quantity ?? null,
+        reason: null,
+        decidedByEmployeeId: options.decidedBy.employeeId,
+        decidedByAppUserId: options.decidedBy.account.appUserId,
+        deciderRole: options.role ?? 'OWNER_DEPARTMENT_HEAD',
+        decidedAt: new Date(),
+        decidedOn: this.inDays(0),
+        decidedAfterDeadline: false,
+        executionPoint: 'AS_PLANNED',
+        activeSeatsAtDecision: 0,
+        snapshot: { source: 'NOT_CONNECTED', takenAt: new Date().toISOString() },
+      });
+
+      return proposed.id;
+    });
+  }
+
+  /** What a source module does: opens the revocation of a seat (the seat stays held until the task completes). */
+  openRevocation(assignmentId: string) {
+    return this.ctx.app.get(TransactionRunner).run((tx) =>
+      this.ctx.app.get(LicensingApi).openRevocation(tx, this.principal(this.it1, ['IT_ADMIN']), {
+        assignmentId,
+        source: 'RETURN',
+        decision: { decidedRole: 'MANAGER' },
+      }),
+    );
   }
 
   /** The notices of a code about a subject (a subscription or a case), oldest first. */
