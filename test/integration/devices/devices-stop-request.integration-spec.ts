@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
+import { StopRequestSweepService } from '../../../src/modules/devices/stop-request/stop-request-sweep.service';
 import { ApiAccount } from '../../support/api-accounts';
 import {
   DevicesHarness,
@@ -335,5 +336,152 @@ describe('stopping collection on the holder request (integration, real PostgreSQ
     expect(await pending()).toEqual([true]);
     await h.completeStop(created.id).expect(200);
     expect(await pending()).toEqual([false]);
+  });
+
+  describe('the notices of a request (FX-T9c)', () => {
+    interface Notice {
+      recipient_employee_id: string;
+      subject_type: string | null;
+      subject_id: string | null;
+      event_key: string;
+      params: Record<string, unknown>;
+    }
+    const noticesOf = async (code: string, requestId: string): Promise<Notice[]> =>
+      (
+        await sql().query<Notice>(
+          `SELECT recipient_employee_id, subject_type, subject_id, event_key, params
+             FROM in_app_notifications WHERE code = $1 AND event_key = $2 ORDER BY recipient_employee_id`,
+          [code, `${code}:${requestId}`],
+        )
+      ).rows;
+    const recipients = (notices: Notice[]): string[] => notices.map((notice) => notice.recipient_employee_id).sort();
+    const inCharge = (employeeId: string | null) =>
+      sql().query(`UPDATE departments SET it_admin_employee_id = $1 WHERE status = 'ACTIVE'`, [employeeId]);
+    const dayOf = async (instant: string): Promise<string> => {
+      const zone = (await sql().query<{ time_zone: string }>(`SELECT time_zone FROM organizations LIMIT 1`)).rows[0]
+        .time_zone;
+
+      return new Intl.DateTimeFormat('en-CA', { timeZone: zone }).format(new Date(instant));
+    };
+    const sweep = (now: Date) => h.ctx.app.get(StopRequestSweepService, { strict: false }).run(now);
+    const pastDue = (id: string) =>
+      sql().query(`UPDATE device_stop_requests SET due_at = now() - interval '1 hour' WHERE id = $1`, [id]);
+
+    afterEach(async () => {
+      await inCharge(null);
+    });
+
+    it('FX-T9c: a request tells the IT Admin in charge of the department of the holder, once, with the deadline day', async () => {
+      await inCharge(h.it1.employeeId);
+      const person = await holder();
+      const device = await h.active(person, notice);
+
+      const created = stopOf(await h.requestStop(person, device.registrationId as string).expect(201));
+
+      const notices = await noticesOf('DEVICE_STOP_REQUESTED', created.id);
+      expect(recipients(notices)).toEqual([h.it1.employeeId]);
+      expect(notices[0]).toMatchObject({
+        subject_type: 'DEVICE_STOP_REQUEST',
+        subject_id: created.id,
+        params: {
+          stopRequestId: created.id,
+          registrationId: device.registrationId,
+          deviceId: device.id,
+          holderEmployeeId: person.employeeId,
+          dueAt: created.dueAt,
+          dueOn: await dayOf(created.dueAt),
+        },
+      });
+      expect(Object.keys(notices[0].params).sort()).toEqual([
+        'deviceId',
+        'dueAt',
+        'dueOn',
+        'holderEmployeeId',
+        'registrationId',
+        'stopRequestId',
+      ]);
+    });
+
+    it('FX-T9c: when nobody is in charge, every IT Admin who can act is told, and not the holder', async () => {
+      await inCharge(null);
+      const person = await holder();
+      const device = await h.active(person, notice);
+
+      const created = stopOf(await h.requestStop(person, device.registrationId as string).expect(201));
+
+      const told = recipients(await noticesOf('DEVICE_STOP_REQUESTED', created.id));
+      expect(told).toEqual(expect.arrayContaining([h.it1.employeeId, it2.employeeId]));
+      expect(told).not.toContain(person.employeeId);
+    });
+
+    it('FX-T9c Review 2: an IT Admin who asks for their own machine is not told; the other IT Admins who can act are', async () => {
+      await inCharge(it2.employeeId);
+      const device = await h.active(it2, notice);
+
+      const created = stopOf(await h.requestStop(it2, device.registrationId as string).expect(201));
+
+      const told = recipients(await noticesOf('DEVICE_STOP_REQUESTED', created.id));
+      expect(told).not.toContain(it2.employeeId);
+      expect(told).toContain(h.it1.employeeId);
+    });
+
+    it('FX-T9c: a request closed as a duplicate tells nobody', async () => {
+      await inCharge(h.it1.employeeId);
+      const person = await holder();
+      const device = await h.active(person, notice);
+      await h.requestStop(person, device.registrationId as string).expect(201);
+
+      const duplicate = stopOf(await h.requestStop(person, device.registrationId as string).expect(201));
+
+      expect(duplicate.state).toBe('INVALID');
+      expect(await noticesOf('DEVICE_STOP_REQUESTED', duplicate.id)).toEqual([]);
+    });
+
+    it('FX-T9c AC-5: an open request past its deadline tells the same people once; a second pass says nothing', async () => {
+      await inCharge(h.it1.employeeId);
+      const person = await holder();
+      const device = await h.active(person, notice);
+      const created = stopOf(await h.requestStop(person, device.registrationId as string).expect(201));
+      await pastDue(created.id);
+
+      await sweep(new Date());
+      await sweep(new Date());
+
+      const notices = await noticesOf('DEVICE_STOP_REQUEST_OVERDUE', created.id);
+      expect(recipients(notices)).toEqual([h.it1.employeeId]);
+      expect(notices[0]).toMatchObject({
+        subject_type: 'DEVICE_STOP_REQUEST',
+        subject_id: created.id,
+        params: { stopRequestId: created.id, holderEmployeeId: person.employeeId, deviceId: device.id },
+      });
+      const marked = await sql().query<{ overdue_noticed_at: Date | null }>(
+        `SELECT overdue_noticed_at FROM device_stop_requests WHERE id = $1`,
+        [created.id],
+      );
+      expect(marked.rows[0].overdue_noticed_at).not.toBeNull();
+    });
+
+    it('FX-T9c AC-5: a request before its deadline, a completed one and an invalid one past it are not told', async () => {
+      await inCharge(h.it1.employeeId);
+      const [waiting, done, closed] = [await holder(), await holder(), await holder()];
+      const [waitingDevice, doneDevice, closedDevice] = [
+        await h.active(waiting, notice),
+        await h.active(done, notice),
+        await h.active(closed, notice),
+      ];
+      const early = stopOf(await h.requestStop(waiting, waitingDevice.registrationId as string).expect(201));
+      const completed = stopOf(await h.requestStop(done, doneDevice.registrationId as string).expect(201));
+      await h.completeStop(completed.id).expect(200);
+      await h.requestStop(closed, closedDevice.registrationId as string).expect(201);
+      const duplicate = stopOf(await h.requestStop(closed, closedDevice.registrationId as string).expect(201));
+      await pastDue(completed.id);
+      await pastDue(duplicate.id);
+
+      await sweep(new Date());
+
+      for (const id of [early.id, completed.id, duplicate.id]) {
+        expect(await noticesOf('DEVICE_STOP_REQUEST_OVERDUE', id)).toEqual([]);
+      }
+    });
   });
 });

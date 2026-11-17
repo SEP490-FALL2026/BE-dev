@@ -174,6 +174,10 @@
   passed it sets `response_overdue_noticed_at` and writes the audit event `SAAS_ISSUE.RESPONSE_OVERDUE` in one transaction, so a report is
   told once however many instances run; a failed pass only logs. The reminder only tells: the report keeps its IT Admin and its state and
   is never closed by the calendar while it is not resolved. Run one by hand with `SaasIssueSweepService.run(now)`.
+  The API also runs `StopRequestSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each request of a holder
+  to stop the collection of a machine that is still `OPEN` after its `due_at` it sets `overdue_noticed_at` and writes the inbox notice
+  `DEVICE_STOP_REQUEST_OVERDUE` in one transaction, so a request is told once however many instances run; a failed pass only logs. The reminder
+  only tells: the request stays open and collection goes on until an IT Admin completes it. Run one by hand with `StopRequestSweepService.run(now)`.
   The API also runs `SubscriptionRenewalSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each term
   subscription period whose notice deadline falls from sixty days back to the largest `RENEWAL_ALERT_DAYS_BEFORE_DEADLINE` ahead it tells
   the milestones due (inbox notices `SUBSCRIPTION_RENEWAL_ALERT`, with the audit event `SUBSCRIPTION_RENEWAL.ALERT_SENT`, and

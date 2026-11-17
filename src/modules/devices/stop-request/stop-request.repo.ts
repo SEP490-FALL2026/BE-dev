@@ -140,6 +140,28 @@ export class StopRequestRepo {
     return toRecord(row);
   }
 
+  /** The open requests past their deadline that nobody was told about yet, oldest deadline first. */
+  async listOverdueUnnoticed(now: Date, take: number): Promise<StopRequestRecord[]> {
+    const rows = await this.prisma.deviceStopRequest.findMany({
+      where: { state: 'OPEN', dueAt: { lt: now }, overdueNoticedAt: null },
+      select: SELECT,
+      orderBy: [{ dueAt: 'asc' }, { id: 'asc' }],
+      take,
+    });
+
+    return rows.map(toRecord);
+  }
+
+  /** Marks the request as told about its deadline; false when it was handled or told meanwhile (the update waits for a concurrent one). */
+  async markOverdueNoticed(tx: DbTx, id: string, at: Date): Promise<boolean> {
+    const { count } = await tx.deviceStopRequest.updateMany({
+      where: { id, state: 'OPEN', overdueNoticedAt: null },
+      data: { overdueNoticedAt: at },
+    });
+
+    return count === 1;
+  }
+
   /** A page of the requests in one state, those due first. */
   async page(
     state: StopRequestState,

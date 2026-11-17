@@ -78,9 +78,10 @@ flowchart BT
   data_import -->|5| policies
   devices -->|12| audit
   devices -->|3| catalog
-  devices -->|2| identity_access
+  devices -->|3| identity_access
+  devices -->|2| notifications
   devices -->|2| operating_parameters
-  devices -->|14| organization
+  devices -->|16| organization
   finance -->|3| audit
   finance -->|3| organization
   identity_access -->|18| audit
@@ -156,4 +157,4 @@ flowchart BT
   usage -->|4| requests
 ```
 
-113 module edges.
+114 module edges.

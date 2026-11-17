@@ -92,6 +92,29 @@ describe('the notices of MF-2 and MF-3 and of what goes with them (QĐ-110, QĐ-
       'VENDOR_ACCOUNT_DISCREPANCY_OPENED',
       { applicationId: null, vendorId: OTHER, source: 'INVOICE_DIFFERENCE', newCount: 1 },
     ],
+    // A holder asked to stop the collection of a machine (`US-09-04`): ids, the deadline and its day.
+    [
+      'DEVICE_STOP_REQUESTED',
+      {
+        stopRequestId: ID,
+        registrationId: OTHER,
+        deviceId: ID,
+        holderEmployeeId: OTHER,
+        dueAt: '2026-11-19T10:00:00.000Z',
+        dueOn: '2026-11-19',
+      },
+    ],
+    [
+      'DEVICE_STOP_REQUEST_OVERDUE',
+      {
+        stopRequestId: ID,
+        registrationId: OTHER,
+        deviceId: ID,
+        holderEmployeeId: OTHER,
+        dueAt: '2026-11-19T10:00:00.000Z',
+        dueOn: '2026-11-19',
+      },
+    ],
   ];
 
   it.each(cases)('accepts %s with the keys of its code', (code, params) => {

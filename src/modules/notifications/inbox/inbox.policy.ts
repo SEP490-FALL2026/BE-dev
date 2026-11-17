@@ -219,6 +219,9 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   // A case outside the process closed as a report only, and a difference with a vendor opened (`SBF-07a`, `SBF-08`): ids and the source, never the account's identifier or what it did.
   OUT_OF_PROCESS_CASE_REPORTED: ['caseId', 'applicationId', 'vendorId', 'employeeId'],
   VENDOR_ACCOUNT_DISCREPANCY_OPENED: ['applicationId', 'vendorId', 'source', 'newCount'],
+  // A holder asked to stop the collection of a machine (`US-09-04`, E1): ids, the deadline and its day in the time of the company; never what the machine collected.
+  DEVICE_STOP_REQUESTED: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
+  DEVICE_STOP_REQUEST_OVERDUE: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
 };
 
 /** Whether the code is one of the closed table. */
