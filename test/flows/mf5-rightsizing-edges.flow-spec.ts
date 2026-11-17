@@ -22,7 +22,9 @@ interface Adjustment {
  * after that). Real sign-in, the seeded dataset, nothing mocked.
  *
  * Whose subscription it is: the shared pool (`QĐ-103d`). Figma Professional is the annual one (point opened, 18 bought, 14 in effect); Jira Standard is
- * by the month, whose point opens a week before its payment day, so it is before its point today.
+ * by the month, whose point opens a week before its payment day. The clock of the flows starts on the real day and the payment day of a plan by the month
+ * is the nearest of the grid of its stored day, so where Jira stands against its point changes with the calendar: the case that needs it before its point
+ * puts the payment day of Jira 20 days from today first (R-2).
  */
 describe('MF-5 ghi kết quả điều chỉnh: các biên của F5-02 @MF5 @D1', () => {
   let world: FlowWorld;
@@ -164,7 +166,15 @@ describe('MF-5 ghi kết quả điều chỉnh: các biên của F5-02 @MF5 @D1'
     });
 
     it('trước điểm điều chỉnh ⟹ 409 BEFORE_ADJUSTMENT_POINT kèm ngày mở; số vẫn đọc được từ mọi ngày #9', async () => {
+      // The payment day of Jira follows today, not the calendar of the dataset: 20 days from today, so its point (7 days before) is 13 days away.
+      const paymentDay = call().inDays(20);
+      await world.ctx.sql.query(`UPDATE subscriptions SET renewal_date = $2::date, end_date = NULL WHERE id = $1`, [
+        jira,
+        paymentDay,
+      ]);
       const seen = await adjustmentOf(jira);
+      expect(seen.deadline).toBe(paymentDay);
+      expect(seen.adjustmentPointOn).toBe(addDays(paymentDay, -7));
       expect(seen.adjustmentPointOn > call().today()).toBe(true);
       const written = await cases();
 
