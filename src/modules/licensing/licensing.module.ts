@@ -119,6 +119,7 @@ import { ProvisioningTaskReasonRepo } from './provisioning/provisioning-task-rea
 import { SaasIssueCalendar } from './saas-issue/saas-issue-calendar.service';
 import { SaasIssueFactsRepo } from './saas-issue/saas-issue-facts.repo';
 import { SaasIssueHandlingService } from './saas-issue/saas-issue-handling.service';
+import { SaasIssueNotifier } from './saas-issue/saas-issue-notifier.service';
 import { SaasIssueRepo } from './saas-issue/saas-issue.repo';
 import { SaasIssueService } from './saas-issue/saas-issue.service';
 import { SaasIssueSweepService } from './saas-issue/saas-issue-sweep.service';
@@ -267,6 +268,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     SaasIssueRepo,
     SaasIssueFactsRepo,
     SaasIssueCalendar,
+    SaasIssueNotifier,
     SaasIssueService,
     SaasIssueHandlingService,
     SaasIssueViewService,

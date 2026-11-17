@@ -3,6 +3,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { isReopenLapsed } from './saas-issue.policy';
+import { SaasIssueNotifier } from './saas-issue-notifier.service';
 import { SaasIssueRepo, type SaasIssueRecord } from './saas-issue.repo';
 
 /** How many reports one pass looks at in each of its two parts; the next pass takes the rest. */
@@ -21,6 +22,7 @@ export class SaasIssueSweepService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly issues: SaasIssueRepo,
     private readonly audit: AuditApi,
+    private readonly notifier: SaasIssueNotifier,
   ) {}
 
   /** Runs both parts as of `now`; returns how many reports were closed and how many were told about. */
@@ -90,6 +92,7 @@ export class SaasIssueSweepService {
         },
         correlationId: issue.id,
       });
+      await this.notifier.responseOverdue(tx, issue);
 
       return true;
     });

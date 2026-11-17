@@ -70,6 +70,22 @@ describe('the notices of MF-2 and MF-3 and of what goes with them (QĐ-110, QĐ-
       { sourceKind: 'DEPARTMENT_TRANSFER', sourceId: ID, fromEmployeeId: OTHER, subscriptions: 3, applications: 2 },
     ],
     ['DEPARTURE_REVOCATION_IT_CLOSE', { caseId: ID, employeeId: OTHER, taskCount: 2 }],
+    // The reports of errors in SaaS rights (`FR-2.15`): ids and the words of the report's kind and states, never what was written in it.
+    [
+      'SAAS_ISSUE_SUBMITTED',
+      { issueId: ID, issueCode: 'BM11-2026-000001', category: 'NO_ACCESS', impact: 'UNUSABLE', applicationId: OTHER },
+    ],
+    ['SAAS_ISSUE_RESPONSE_OVERDUE', { issueId: ID, issueCode: 'BM11-2026-000001', responseDueOn: '2026-12-08' }],
+    [
+      'SAAS_ISSUE_STATE_CHANGED',
+      {
+        issueId: ID,
+        issueCode: 'BM11-2026-000001',
+        fromState: 'IN_PROGRESS',
+        toState: 'WAITING_REPORTER',
+        trigger: 'IT_ACTION',
+      },
+    ],
   ];
 
   it.each(cases)('accepts %s with the keys of its code', (code, params) => {

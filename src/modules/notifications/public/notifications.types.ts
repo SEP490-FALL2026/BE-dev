@@ -210,6 +210,10 @@ export const IN_APP_NOTIFICATION_CODES = [
   'POLICY_PUBLISHED',
   // A batch of spend requests that opened at least one step for the spending approver: one notice for each batch and each approver (`FR-3.21`, `Q-5A-1`).
   'SPEND_BATCH_SUBMITTED',
+  // The reports of errors in SaaS rights (`FR-2.15`): the IT Admin it is given to is told when it is sent and, once, when its day to be taken up passed; the report is told of when its state changes.
+  'SAAS_ISSUE_SUBMITTED',
+  'SAAS_ISSUE_RESPONSE_OVERDUE',
+  'SAAS_ISSUE_STATE_CHANGED',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

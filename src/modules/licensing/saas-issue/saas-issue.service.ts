@@ -18,6 +18,7 @@ import {
 import { SaasIssueFactsRepo } from './saas-issue-facts.repo';
 import { SaasIssueRepo, type AuthorRole, type SaasIssueRecord } from './saas-issue.repo';
 import { SaasIssueCalendar } from './saas-issue-calendar.service';
+import { SaasIssueNotifier } from './saas-issue-notifier.service';
 
 export interface SubmitIssueInput {
   assignmentId: string;
@@ -43,6 +44,7 @@ export class SaasIssueService {
     private readonly issues: SaasIssueRepo,
     private readonly facts: SaasIssueFactsRepo,
     private readonly audit: AuditApi,
+    private readonly notifier: SaasIssueNotifier,
   ) {}
 
   async submit(actor: AuthenticatedPrincipal, input: SubmitIssueInput): Promise<SaasIssueRecord> {
@@ -94,6 +96,7 @@ export class SaasIssueService {
           responseDueOn: issue.responseDueOn,
         }),
       );
+      await this.notifier.submitted(tx, issue, facts.planId);
 
       return issue;
     });
