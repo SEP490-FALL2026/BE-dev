@@ -43,6 +43,23 @@ describe('the next payment day of a plan by the month: the grid of its stored da
     expect(pointOn(notBegun, '2026-12-21')?.deadline).toBe('2027-01-20');
   });
 
+  it('counts the first payment day strictly after the day the plan starts: the day of a purchase is not the day of a renewal (V-1)', () => {
+    // The shape the IT Admin records when it carries a plan on: it starts on the payment day P and pays again one month later.
+    const startsOnTheGrid = monthly({ startDate: '2026-12-15', renewalDate: '2027-01-15', endDate: null });
+
+    // Before the start and on the start day alike, the first payment day is the one a month after the start, never the start day itself.
+    expect(pointOn(startsOnTheGrid, '2026-12-10')).toMatchObject({ deadline: '2027-01-15', point: '2027-01-08' });
+    expect(pointOn(startsOnTheGrid, '2026-12-15')).toMatchObject({ deadline: '2027-01-15', point: '2027-01-08' });
+    // The day after the start the grid is read from today, as before.
+    expect(pointOn(startsOnTheGrid, '2026-12-16')?.deadline).toBe('2027-01-15');
+  });
+
+  it('does not count the day a plan by the month is declared to start today as its first payment day', () => {
+    const startsToday = monthly({ startDate: '2026-11-17', renewalDate: '2026-12-17', endDate: null });
+
+    expect(pointOn(startsToday, '2026-11-17')).toMatchObject({ deadline: '2026-12-17', point: '2026-12-10' });
+  });
+
   it('has no point with only a start day: it bounds the payment days and anchors none, nothing is guessed', () => {
     expect(pointOn(monthly({ endDate: null, startDate: '2026-03-10' }), '2026-11-15')).toBeNull();
   });

@@ -417,6 +417,50 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     expect(carried.map((row) => row.predecessor_id).sort()).toEqual([...seats].sort());
   });
 
+  it('does not open the point of the period it has just recorded: the new line of a plan by the month pays one month after its start day (V-1)', async () => {
+    const unit = await h.unit(2);
+    const subscriptionId = await h.term({
+      quantity: 10,
+      billingCycle: 'MONTHLY',
+      startDate: h.inDays(-25),
+      renewalDate: h.inDays(5),
+      endDate: h.inDays(5),
+      autoRenew: true,
+      ownerDepartmentId: unit.department.id,
+    });
+    for (const member of unit.members) await h.seatOf(member, { subscriptionId });
+    await takeOwnerOff(h, subscriptionId);
+
+    const response = await record({
+      subscriptionId,
+      choice: 'REDUCE',
+      proposedQuantity: 2,
+      outcome: 'AS_DECIDED',
+      nextPeriod: {
+        purchasedQuantity: 2,
+        unitPrice: { amount: '1000000', currency: 'VND' },
+        billingCycle: 'MONTHLY',
+        startDate: h.inDays(5),
+        endDate: h.inDays(35),
+        renewalDate: h.inDays(35),
+        autoRenew: true,
+        allowsMidTermReduction: false,
+      },
+    });
+    expect(response.status).toBe(201);
+    const next = h.dataOf<{ renewal: CaseWire }>(response).renewal.outcomeDetail?.nextSubscriptionId as string;
+
+    // The day of the purchase is the start day of the new line, not a payment day: today it asks and alerts nothing of it.
+    await h.sweepOn(h.today());
+    await h.sweepOn(h.inDays(1));
+    expect(await h.notices('SUBSCRIPTION_RENEWAL_ALERT', next)).toEqual([]);
+    const read = await h.adjustment(next);
+    expect(read.status).toBe(200);
+    const adjustment = h.dataOf<{ adjustment: { adjustmentPointOn: string; deadline: string } }>(read).adjustment;
+    expect(adjustment.deadline).toBe(h.inDays(35));
+    expect(adjustment.adjustmentPointOn > h.today()).toBe(true);
+  });
+
   it('records an increase to the vendor minimum with its evidence, and the outcome as decided matches it (R2-3, QĐ-103q)', async () => {
     const unit = await h.unit(2);
     const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 3, ...year() });

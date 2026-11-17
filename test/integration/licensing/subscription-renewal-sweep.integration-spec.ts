@@ -316,6 +316,28 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
     });
   });
 
+  describe('the first payment day of a plan by the month comes after its start day (V-1)', () => {
+    it('tells nothing on the day a plan is declared to start today, the day it began is not a day of renewal', async () => {
+      // Paid on the same day of the month as it starts: the grid of its renewal day holds the start day itself one month back.
+      const subscriptionId = await h.term({
+        ownerDepartmentId: unit.department.id,
+        quantity: 10,
+        billingCycle: 'MONTHLY',
+        startDate: h.today(),
+        renewalDate: addMonths(h.today(), 1),
+        autoRenew: true,
+      });
+      await h.seatOf(unit.members[0], { subscriptionId });
+
+      await h.sweepOn(h.today());
+      await h.sweepOn(h.today());
+      await h.sweepOn(h.inDays(1));
+
+      expect(await h.notices('SUBSCRIPTION_RENEWAL_ALERT', subscriptionId)).toEqual([]);
+      expect(await h.notices('SUBSCRIPTION_RENEWAL_KEPT', subscriptionId)).toEqual([]);
+    });
+  });
+
   describe('the data a period lacks', () => {
     it('warns the IT Admin once that a period with no date gives no point to alert from', async () => {
       const undated = await h.term({ ownerDepartmentId: unit.department.id, autoRenew: true });
