@@ -153,6 +153,9 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     `spend-approval-view/` (thẻ của approver: `spend-approval-queue.service.ts` hàng đợi, `spend-approval-view.service.ts` chi tiết,
     `spend-approval.mapper.ts` dựng wire, `spend-approval.dto.ts`, dùng cả cho request nhóm; `next-year-budget.service.ts` + `.policy.ts` + `.repo.ts`: `nextYearBudget`
     của chi tiết và hàng đợi — ngân sách năm sau đã duyệt trừ số năm sau đã lưu của Request đã duyệt chi, cảnh báo mềm `QĐ-111al`, chỉ người giữ bước duyệt chi đọc, S-3).
+    Các route duyệt chi (`spendApprovalDecide`, `spendApprovalLineDecide`) trả 409 `BUDGET.COMMITMENT_NOT_HOLDABLE` hoặc `BUDGET.COMMITMENT_EXISTS` khi không giữ được khoản
+    cam kết của quyết định (lưới an toàn sau lần kiểm ngân sách; chưa quyết gì, `spend/spend.http-errors.ts`); `spendBatchDecide` không ném mà bỏ qua mục đó với lý
+    do `COMMITMENT_NOT_HOLDABLE` và đi tiếp các mục khác.
 - **Request cá nhân**
   - `request-submission/` — controller `access-requests.controller.ts` (gửi, xem, đọc: US-05-01 → US-05-03) và xem trước
     (`RequestPreviewService`). Hai route của bước nhu cầu nằm ở `need-decision/` (`need-decision.controller.ts`,
@@ -214,7 +217,17 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   - `invoice-discrepancy/` (L0, không controller) — `invoice_discrepancy_cases`: `invoice-discrepancy.repo.ts` (writer duy nhất), `invoice-discrepancy-opening.service.ts` (mở một lần cho một hóa đơn, gọi từ chữ ký), `invoice-discrepancy-closure.service.ts` + `.policy.ts` (đóng một lần với lý do và số chênh VND; `OUT_OF_PROCESS_SUSPECTED` cần chênh > 0 và phát `InvoiceDiscrepancyReferralListeners` trong cùng transaction để chuyển `SBF-08`). Không có controller vì `purchase-invoice` (có controller) gọi nó và gate không cho capability có controller bị import.
   - `invoice-discrepancy-queue/` — `GET /invoice-discrepancies`, `GET /invoice-discrepancies/{id}` (Finance, IT Admin theo `getItAdminScope`, D8), `POST /invoice-discrepancies/{id}/closure` (Finance): controller, dto, mapper, `-query.service`.
 - **Trạng thái, SLA, chuyển bước**
-  - `status/` — chiếu audit event của request thành thông báo inbox (US-05-15); nhóm `rules/` là bảng luật sự kiện → thông báo.
+  - `status/` — chiếu audit event của request thành thông báo inbox (US-05-15); nhóm `rules/` là bảng luật sự kiện → thông báo. Luật `STEP_ASSIGNED`
+    (người gây ra sự kiện không được báo): gửi lại sau _Trả về_ (`ACCESS_REQUEST.RESUBMITTED`, `status-rules-progress.policy.ts`) báo người giữ bước vừa mở lại —
+    IT Admin của bước đánh giá hoặc người giữ từng bước nhu cầu — với `cause = RESUBMITTED`; Request một bước gửi lại thì bước chi mở lại do
+    `BUDGET_CHECKED` báo (`cause = SUBMITTED`). Bước chi mở trong lô (`VIA_HEAD`) báo Người duyệt chi bằng **một** `SPEND_BATCH_SUBMITTED` cho mỗi lô và người
+    (`sentCount` = số bước mở cho họ, trừ chính trưởng phòng trình; `spend-submission/spend-batch-recorder.service.ts`, trong transaction gửi lô), không
+    phải một `STEP_ASSIGNED` cho mỗi Request; bước chi mở khi trưởng phòng xác nhận dự phòng **riêng** (không nằm trong lô) báo `STEP_ASSIGNED` `cause = SPEND_SENT`
+    (`ACCESS_REQUEST.RESERVE_CONFIRMED` có `via = CONFIRMATION`, hoặc `BUDGET_CHECKED` kiểm lại mà đủ số cơ sở). Mục của lô không định giá được
+    (`ACCESS_REQUEST.SPEND_NOT_CHECKABLE`, `reason` như `PRICE_MISSING`) dừng tại lô và báo người yêu cầu + IT Admin phụ trách bằng `REQUEST_BUDGET_BLOCKED`; trưởng
+    phòng trình đọc kết quả ở `results[]` nên không được báo. Request một bước: trưởng phòng gửi đề xuất phần mềm mới (`ACCESS_REQUEST.ASSESSMENT_REQUESTED`,
+    `routingMode = ONE_STEP`) báo IT Admin giữ bước đánh giá `STEP_ASSIGNED` `IT_ASSESSMENT`/`SUBMITTED`; `ACCESS_REQUEST.ONE_STEP_PRICE_MISSING` báo
+    người yêu cầu + IT Admin phụ trách.
   - `timing/` (thời gian từng bước, KPI-2), `sla/` (nhắc bước trễ, tồn đọng, nghẽn; US-05-09, US-05-10),
     `reassignment/` (chuyển bước khi tổ chức hoặc vai trò đổi, chờ có kiểm soát; US-05-11, US-05-12).
 

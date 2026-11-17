@@ -41,7 +41,11 @@ Tầng: T5 (`scripts/arch/tiers.cjs`). Phụ thuộc: audit, organization, ident
   `GET /device-stop-requests` và hoàn tất `POST /device-stop-requests/{id}/completion` — một `UPDATE` đặt `collection_stopped_at` và xóa
   `acknowledged_from` (CHECK `device_registrations_one_projection`), không thu hồi credential. Đăng ký kết thúc thì
   `registry.repo.ts` đóng mọi yêu cầu `OPEN` thành `INVALID REGISTRATION_ENDED` (nên `registry` không import `stop-request`). Xác nhận lại
-  dùng route xác nhận có sẵn. Thông báo cho IT và sweep quá hạn: chưa làm (FX-T9c).
+  dùng route xác nhận có sẵn. `stop-request-notifier.service.ts` báo `DEVICE_STOP_REQUESTED` khi yêu cầu `OPEN` được ghi (dòng `INVALID`
+  không báo ai) và `DEVICE_STOP_REQUEST_OVERDUE` khi quá `dueAt`, trong transaction của thay đổi, một thông báo cho mỗi người nhận và yêu
+  cầu; người nhận là IT Admin phụ trách phòng của người giữ nếu còn dùng được, không thì mọi IT Admin dùng được, không bao giờ chính người giữ.
+  `StopRequestSweeper` (`stop-request.job.ts`, mỗi giờ, lượt đầu sau 5 phút) gọi `stop-request-sweep.service.ts`: mỗi yêu cầu `OPEN` quá hạn
+  báo đúng một lần (đặt `overdue_noticed_at` cùng transaction với thông báo), không hoàn tất hay đóng yêu cầu nào.
 - `my-devices/` — `GET /me/devices` (kèm `stopRequestPending`).
 - `devices-collection-state.policy.ts` — hàm trạng thái thu thập (`RETIRED`, `UNREGISTERED`, `COLLECTION_STOPPED`, `ACTIVE`,
   `AWAITING_ACKNOWLEDGEMENT`) mà danh sách đọc bằng cùng `CASE` SQL và lát credential/intake đọc lại.
@@ -59,4 +63,4 @@ phiên bản → khóa mọi đăng ký mở theo id.
 
 ## Chưa làm (mức B, sau demo)
 
-Thông báo yêu cầu dừng và sweep quá hạn (FX-T9c), lịch sử `/me`, `PATCH /devices`, kết thúc đăng ký theo ngày làm việc cuối, cổng đọc sổ thiết bị cho licensing K4 (contract `licensing/device-binding` đã gỡ ở MF2-A, `QĐ-110`: thiết kế lại từ sổ thiết bị thật khi làm K4 theo thiết bị).
+Lịch sử `/me`, `PATCH /devices`, kết thúc đăng ký theo ngày làm việc cuối, cổng đọc sổ thiết bị cho licensing K4 (contract `licensing/device-binding` đã gỡ ở MF2-A, `QĐ-110`: thiết kế lại từ sổ thiết bị thật khi làm K4 theo thiết bị).

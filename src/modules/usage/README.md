@@ -68,6 +68,10 @@ Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, licensin
   `vendor-account-decision.service.ts` (quyết định một lần: `FALSE_ALARM|OUT_OF_PROCESS` kèm `companyAsset` — không còn `LEGALIZE_VIA_REQUEST`/`REVOKE`, `QĐ-103m`; hóa đơn lệch `INVOICE_DIFFERENCE` không đi `OUT_OF_PROCESS`; `OUT_OF_PROCESS` mở ca cùng
   transaction hoặc gắn vào ca đang mở của cùng tài khoản, `QĐ-98h`), `out-of-process-case-closure.service.ts` (`FALSE_ALARM|RECORD_SPENT|REPORT_ONLY|REVOKED`; `RECORD_SPENT` chỉ FINANCE, `REVOKED` chỉ IT_ADMIN, chỉ ca trên tài sản công ty, kèm `renewalCancelled` + chứng từ hủy gia hạn; ghi tiền chỉ khi có chứng từ + số VND + Cost Center đang hiệu lực hoặc
   chưa phân bổ: đính tệp qua `CatalogApi.attachOutOfProcessCaseDocuments`, rồi `BudgetsApi.recordOutOfProcessSpend` ghi MỘT khoản thực chi không cam kết),
+  `vendor-account-review-notifier.service.ts` (thông báo trong transaction của thay đổi): `VENDOR_ACCOUNT_DISCREPANCY_OPENED` khi một lần
+  (báo cáo xác nhận, hồ sơ hóa đơn, ngày của collector — mỗi ngày một thông báo) mở **thêm** sai lệch mới (`newCount > 0`, không có thì không báo ai) cho IT Admin
+  phụ trách ứng dụng nếu còn dùng được, không thì mọi IT Admin dùng được; không có `subject`, chỉ id, nguồn và số lượng (không có định danh tài khoản). Khi
+  ca ngoài quy trình đóng bằng `REPORT_ONLY`, `OUT_OF_PROCESS_CASE_REPORTED` báo người dùng và trưởng phòng hôm nay của phòng họ làm việc gần nhất (người đã nghỉ vẫn được báo; ca không gắn người nào thì không báo ai).
   `vendor-account-evidence-retention.service.ts` + `.job.ts` (`VendorAccountEvidenceSweeper` xóa bằng chứng quá 24 tháng, `US-14-04` AC-2). Policy thuần:
   `out-of-process-revocation.service.ts` + `.policy.ts` (việc thu hồi một ca trên tài sản công ty đòi ở IT Admin, tính LÚC ĐỌC: `RequestsApi.openGrantRequestsOf` một lần cho cả trang, lịch ngày nghỉ một lần; `required`/`waitingRequestId`/`waitUntil` = ngày làm việc thứ 10 kể từ ngày kết luận/`due`, `US-13-05` AC-20, AC-23, AC-24; không lưu gì, không tác vụ `SBF-18`).
   Policy thuần: `vendor-account-discrepancy.policy.ts` (hai giá trị, mốc 24 tháng), `out-of-process-case.policy.ts` (đóng ca), `out-of-process-revocation.policy.ts` (thu hồi).
@@ -93,7 +97,11 @@ người được cấp sau nhận ở lần xác nhận kế — luôn **trư�
 
 ## Quyền riêng tư và gắn lúc đọc
 
-Mọi route nhà cung cấp chỉ `IT_ADMIN` (trưởng phòng không thấy dữ liệu thô — `QĐ-101i`). Ngày hoạt động không mang `employee_id`: ai là ai được nối
+Mọi route nhà cung cấp chỉ `IT_ADMIN` (trưởng phòng không thấy dữ liệu thô — `QĐ-101i`). Phạm vi IT (`QĐ-111ax`, cùng
+`UsageOverviewScopeService` của `usage-overview/`): ngoài `usage-overview` và `employees/{id}/usage-software`, `usageIdentityMappingList` và
+`usageNoAssignmentFindingList` chỉ trả ánh xạ và phát hiện của người thuộc phòng IT đó phụ trách (phòng không có IT Admin dùng được thì mọi IT Admin thấy);
+`deviceUsageList` và `deviceToolStatusList` chỉ đọc theo các đăng ký do người trong phạm vi giữ (`DevicesApi.registrationsOfDevice`): máy có mà không
+đăng ký nào trong phạm vi ⟹ trang rỗng 200, máy không có ⟹ 404. `usageUnmatchedIdentityList` giữ nguyên (không lọc theo phòng). Ngày hoạt động không mang `employee_id`: ai là ai được nối
 qua ánh xạ còn hiệu lực lúc đọc, nên sửa ánh xạ sai là đủ (`DA6-11`); định danh chưa khớp không dùng để kết luận (`INV-12`). Dòng thô
 `usage_import_rows.cells` chưa có hạn giữ (ghi sổ lệch).
 
