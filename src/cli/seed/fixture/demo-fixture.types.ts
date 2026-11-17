@@ -36,6 +36,29 @@ export interface DemoPerson {
   contractEndInDays?: number;
 }
 
+/** A line of a people file the Super Admin imports (`SBF-01a`): the department is a code that may be wrong on purpose. */
+export interface DemoImportRow {
+  code: string;
+  fullName: string;
+  /** The local part of the work email, or the person of the fixture whose email the line repeats (a refusal on purpose). */
+  email: string | { sameAsPerson: string };
+  employmentType: DemoPerson['employmentType'];
+  department: string;
+  jobTitle?: string;
+}
+
+/** One people file: confirmed (the people exist after it) or only previewed (kept as the screen with lines to fix). */
+export interface DemoEmployeeImport {
+  key: string;
+  fileName: string;
+  confirm: boolean;
+  /** For a confirmed import, the key of its confirmation (the API answers a second one with the first). */
+  idempotencyKey: string;
+  rows: DemoImportRow[];
+  /** The codes the preview must give the lines it refuses, in the order of the lines. */
+  expectedErrors: string[];
+}
+
 export interface DemoPlan {
   key: string;
   name: string;
@@ -269,6 +292,8 @@ export interface DemoFixture {
   currency: string;
   departments: DemoDepartment[];
   people: DemoPerson[];
+  /** The people files of the Super Admin: one is confirmed, one is left as a preview with lines to fix (`SBF-01a`). */
+  employeeImports: DemoEmployeeImport[];
   /** The one approval role left, the spending approver (a role grant, `QĐ-93b`). */
   approvalRoles: { SPENDING_APPROVER: string };
   applications: DemoApplication[];

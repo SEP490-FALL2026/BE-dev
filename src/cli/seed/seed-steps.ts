@@ -9,6 +9,7 @@ import { DEMO_STEPS } from './steps/demo.steps';
 import { extraSteps } from './steps/extras.steps';
 import { FINANCE_STEPS } from './steps/finance.steps';
 import { ORGANIZATION_STEPS } from './steps/organization.steps';
+import { PEOPLE_ADMIN_STEPS } from './steps/people-admin.steps';
 import { PERSONNEL_STEPS } from './steps/personnel.steps';
 import { requestSteps } from './steps/request.steps';
 import { SOFTWARE_LIST_STEPS } from './steps/software-list.steps';
@@ -28,6 +29,7 @@ const pick = (key: string): DemoStep => {
 export function demoSteps(fixture: DemoFixture): DemoStep[] {
   return [
     ...ORGANIZATION_STEPS,
+    ...PEOPLE_ADMIN_STEPS,
     pick('finance.cost-centers'),
     ...CATALOG_STEPS,
     pick('finance.tax-profile'),

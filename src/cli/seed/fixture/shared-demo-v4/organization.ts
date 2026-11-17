@@ -1,4 +1,4 @@
-import type { DemoDepartment, DemoFixture, DemoPerson } from '../demo-fixture.types';
+import type { DemoDepartment, DemoEmployeeImport, DemoFixture, DemoPerson } from '../demo-fixture.types';
 
 const unit = (code: string, name: string) => ({ code: `CC-${code}`, name });
 
@@ -164,8 +164,46 @@ const PEOPLE: DemoPerson[] = [
   person('NV-NEW2', 'Âu Thị Xuyến', 'xuyen.au', null, 'EMPLOYEE'),
 ];
 
-export const ORGANIZATION: Pick<DemoFixture, 'departments' | 'people' | 'approvalRoles'> = {
+/*
+ * Two people files (`SBF-01a`). The first is confirmed: three people with no account. The second is only previewed and never confirmed, so the
+ * screen shows a file with one good line and two the API refuses: a department code that does not exist and the work email of NV-DEV5.
+ */
+const EMPLOYEE_IMPORTS: DemoEmployeeImport[] = [
+  {
+    key: 'confirmed',
+    fileName: 'SV-employees-confirmed.csv',
+    confirm: true,
+    idempotencyKey: 'SV-EMPLOYEE-IMPORT-1',
+    expectedErrors: [],
+    rows: [
+      { code: 'NV-IMP1', fullName: 'Nguyễn Hữu Đạt', email: 'dat.nguyen', employmentType: 'STAFF', department: 'ENG' },
+      { code: 'NV-IMP2', fullName: 'Trần Mỹ Linh', email: 'linh.tran', employmentType: 'STAFF', department: 'OPS' },
+      { code: 'NV-IMP3', fullName: 'Lê Hoài Nam', email: 'nam.le', employmentType: 'STAFF', department: 'FIN' },
+    ],
+  },
+  {
+    key: 'preview',
+    fileName: 'SV-employees-preview.csv',
+    confirm: false,
+    idempotencyKey: 'SV-EMPLOYEE-IMPORT-2',
+    expectedErrors: ['DEPARTMENT_CODE_INVALID', 'WORK_EMAIL_TAKEN'],
+    rows: [
+      { code: 'NV-IMP4', fullName: 'Phạm Gia Hân', email: 'han.pham', employmentType: 'STAFF', department: 'MKT' },
+      { code: 'NV-IMP5', fullName: 'Võ Thanh Tùng', email: 'tung.vo', employmentType: 'STAFF', department: 'XYZ' },
+      {
+        code: 'NV-IMP6',
+        fullName: 'Đỗ Khánh Vy',
+        email: { sameAsPerson: 'NV-DEV5' },
+        employmentType: 'STAFF',
+        department: 'ENG',
+      },
+    ],
+  },
+];
+
+export const ORGANIZATION: Pick<DemoFixture, 'departments' | 'people' | 'employeeImports' | 'approvalRoles'> = {
   departments: DEPARTMENTS,
   people: PEOPLE,
+  employeeImports: EMPLOYEE_IMPORTS,
   approvalRoles: { SPENDING_APPROVER: 'NV-CEO' },
 };
