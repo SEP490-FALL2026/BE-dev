@@ -11,6 +11,7 @@ import { extraSteps } from './steps/extras.steps';
 import { FINANCE_STEPS } from './steps/finance.steps';
 import { ORGANIZATION_STEPS } from './steps/organization.steps';
 import { PEOPLE_ADMIN_STEPS } from './steps/people-admin.steps';
+import { NOTICE_STEPS } from './steps/notices.steps';
 import { PERSONNEL_STEPS } from './steps/personnel.steps';
 import { requestSteps } from './steps/request.steps';
 import { SAAS_ISSUE_STEPS } from './steps/saas-issues.steps';
@@ -47,6 +48,7 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     ...SAAS_ISSUE_STEPS,
     ...extraSteps(),
     ...PERSONNEL_STEPS,
+    ...NOTICE_STEPS,
     ...USAGE_STEPS,
     // Last: the invoices, the closes of the months and the adjustments read what the requests and seats above hold; the policy published
     // again changes the version every checklist answers, so it comes after every decision of the dataset.

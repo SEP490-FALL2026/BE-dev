@@ -285,6 +285,17 @@ export interface DemoSaasIssue {
   duplicateOf?: string;
 }
 
+export interface DemoNotice {
+  key: string;
+  sender: string;
+  employee: string;
+  kind: 'LONG_LEAVE' | 'DEPARTURE';
+  proposedInDays: number;
+  note: string;
+  handling?: 'LINK' | 'REJECT' | 'RECORD';
+  returnInDays?: number;
+}
+
 /** A baseline seat returned by its holder, either revoked by IT or waiting for IT. */
 export interface DemoReturn {
   key: string;
@@ -410,5 +421,5 @@ export interface DemoFixture {
   /** A report of an error in the seat the request of this key granted. */
   saasIssues: DemoSaasIssue[];
   /** A notice (BM-09) a head sends; it changes nothing until the Super Admin handles it. */
-  notice: { sender: string; employee: string; kind: 'LONG_LEAVE'; proposedInDays: number; note: string };
+  notices: DemoNotice[];
 }

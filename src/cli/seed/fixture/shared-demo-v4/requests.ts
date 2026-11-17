@@ -10,7 +10,7 @@ const r = (scenario: DemoRequestScenario): DemoRequestScenario => scenario;
  * software (K2, K5) takes 1 to 12 or none (a right with no end, never for a person with a term), a plan bought once (K4) takes none. The dates
  * of the budget scenarios do not depend on the day the seed runs: R10, R21 and R11 ask for one month, which costs one month of the price.
  */
-export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIssues' | 'notice'> = {
+export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIssues' | 'notices'> = {
   requests: [
     r({
       key: 'R01',
@@ -336,11 +336,42 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       description: 'Gửi lại lỗi giấy phép Adobe của cùng tài khoản.',
     },
   ],
-  notice: {
-    sender: 'NV-ENGH',
-    employee: 'NV-DEV3',
-    kind: 'LONG_LEAVE',
-    proposedInDays: 14,
-    note: '[SV-NOTICE] Dự kiến nghỉ dài hạn, chờ căn cứ của phòng Nhân sự.',
-  },
+  notices: [
+    {
+      key: 'NOTICE',
+      sender: 'NV-ENGH',
+      employee: 'NV-DEV3',
+      kind: 'LONG_LEAVE',
+      proposedInDays: 14,
+      note: 'Dự kiến nghỉ dài hạn, chờ căn cứ của phòng Nhân sự.',
+    },
+    {
+      key: 'NOTICE2',
+      sender: 'NV-DESH',
+      employee: 'NV-DES7',
+      kind: 'LONG_LEAVE',
+      proposedInDays: 0,
+      handling: 'LINK',
+      note: 'Nghỉ dài hạn đã được phòng Nhân sự ghi nhận.',
+    },
+    {
+      key: 'NOTICE3',
+      sender: 'NV-DEP',
+      employee: 'NV-BOD5',
+      kind: 'DEPARTURE',
+      proposedInDays: 30,
+      handling: 'REJECT',
+      note: 'Dự kiến nghỉ việc, chưa có căn cứ xác nhận.',
+    },
+    {
+      key: 'NOTICE4',
+      sender: 'NV-ITOH',
+      employee: 'NV-ITO2',
+      kind: 'LONG_LEAVE',
+      proposedInDays: 0,
+      handling: 'RECORD',
+      returnInDays: 5,
+      note: 'Nghỉ dài hạn có quyết định và ngày trở lại sau năm ngày.',
+    },
+  ],
 };
