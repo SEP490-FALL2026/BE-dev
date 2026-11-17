@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import type { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import type { PeriodAdjustment, RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -80,7 +81,7 @@ describe('the pass over the points of adjustment (SBF-20 §4.5)', () => {
   it('counts the seats and tells the IT Admin of a period at its point, reading the cases of all in ONE read', async () => {
     const { service, ofSubscriptions, countFor, sendDue } = build([periodOf('a', annual)]);
 
-    expect(await sweep(service)).toEqual({ told: 1, deadlineEvents: 0 });
+    expect(await sweep(service)).toEqual({ told: 1, deadlineEvents: 0, failed: 0 });
 
     expect(ofSubscriptions).toHaveBeenCalledWith(['a']);
     expect(countFor).toHaveBeenCalledWith({
@@ -98,7 +99,7 @@ describe('the pass over the points of adjustment (SBF-20 §4.5)', () => {
     TODAY.value = '2026-10-20';
     const { service, countFor, sendDue, sharedPeople } = build([periodOf('a', annual), periodOf('b', annual)]);
 
-    expect(await sweep(service)).toEqual({ told: 0, deadlineEvents: 0 });
+    expect(await sweep(service)).toEqual({ told: 0, deadlineEvents: 0, failed: 0 });
 
     expect(countFor).not.toHaveBeenCalled();
     expect(sendDue).not.toHaveBeenCalled();
@@ -121,7 +122,7 @@ describe('the pass over the points of adjustment (SBF-20 §4.5)', () => {
     TODAY.value = '2026-12-07';
     const { service, recordPassedRenewalDay, sendDue } = build([periodOf('a', annual)]);
 
-    expect(await sweep(service)).toEqual({ told: 0, deadlineEvents: 1 });
+    expect(await sweep(service)).toEqual({ told: 0, deadlineEvents: 1, failed: 0 });
 
     expect(recordPassedRenewalDay.mock.calls[0][0]).toMatchObject({
       kind: 'AUTO_RENEWAL_INCIDENT',
@@ -138,7 +139,7 @@ describe('the pass over the points of adjustment (SBF-20 §4.5)', () => {
     expect(marked.recordPassedRenewalDay.mock.calls[0][0]).toMatchObject({ kind: 'EXPIRY_MARKED' });
 
     const empty = build([ends], { counts: { activeSeatsToday: 0 } });
-    expect(await sweep(empty.service)).toEqual({ told: 0, deadlineEvents: 0 });
+    expect(await sweep(empty.service)).toEqual({ told: 0, deadlineEvents: 0, failed: 0 });
     expect(empty.recordPassedRenewalDay).not.toHaveBeenCalled();
 
     const already = build([ends], { events: ['a'] });
@@ -149,7 +150,7 @@ describe('the pass over the points of adjustment (SBF-20 §4.5)', () => {
   it('warns of the quality of the data of a period with no point of adjustment, and counts nothing for it', async () => {
     const { service, dataQualityWarning, countFor } = build([periodOf('a', null)]);
 
-    expect(await sweep(service)).toEqual({ told: 1, deadlineEvents: 0 });
+    expect(await sweep(service)).toEqual({ told: 1, deadlineEvents: 0, failed: 0 });
 
     expect(dataQualityWarning).toHaveBeenCalledTimes(1);
     expect(dataQualityWarning.mock.calls[0][0]).toMatchObject({
@@ -203,11 +204,31 @@ describe('the pass over the points of adjustment (SBF-20 §4.5)', () => {
       { ending: ['a', 'b'] },
     );
 
-    expect(await sweep(service)).toEqual({ told: 0, deadlineEvents: 0 });
+    expect(await sweep(service)).toEqual({ told: 0, deadlineEvents: 0, failed: 0 });
 
     expect(countFor).not.toHaveBeenCalled();
     expect(sendDue).not.toHaveBeenCalled();
     expect(dataQualityWarning).not.toHaveBeenCalled();
     expect(recordPassedRenewalDay).not.toHaveBeenCalled();
+  });
+
+  it('a subscription that fails does not stop the others: the next one is told, the failure is counted and logged without its data (O-2)', async () => {
+    const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    try {
+      const { service, countFor, sendDue } = build([periodOf('a', annual), periodOf('b', annual)]);
+      countFor.mockRejectedValueOnce(new Error('alice@example.com holds 12 seats'));
+
+      expect(await sweep(service)).toEqual({ told: 1, deadlineEvents: 0, failed: 1 });
+
+      expect(sendDue).toHaveBeenCalledTimes(1);
+      expect(sendDue.mock.calls[0][0]).toMatchObject({ period: { subscriptionId: 'b' } });
+      expect(error).toHaveBeenCalledTimes(1);
+      const logged = String(error.mock.calls[0][0]);
+      expect(logged).toContain('a');
+      expect(logged).toContain('Error');
+      expect(logged).not.toContain('alice@example.com');
+    } finally {
+      error.mockRestore();
+    }
   });
 });

@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import type { PeriodAdjustment, RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
+import { describeForOperator } from '../../../infrastructure/observability/operator-error';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
   candidateNotices,
@@ -31,6 +32,8 @@ interface PassWorld {
 export interface SweepResult {
   told: number;
   deadlineEvents: number;
+  /** The subscriptions whose period failed and were left for the next pass; the others were swept. */
+  failed: number;
 }
 
 const isAlert = (kind: DueNoticeKind): kind is AlertKind =>
@@ -43,11 +46,16 @@ const isAlert = (kind: DueNoticeKind): kind is AlertKind =>
  * period), so the pass may run again, on several instances, or after a failure. A subscription the company recorded as cancelled is passed
  * over whole (`A1C-02`).
  *
+ * A subscription whose period fails (a hook, a write) is logged by its id and the kind of the failure and counted in `failed`; the ones after it are
+ * still swept, and the next pass tries it again (as `SeatMonthSweeper` does, `O-2`).
+ *
  * Known risk (R2-12): the catalog gives at most 500 subscriptions with no order, so past 500 pool subscriptions the later ones are never
  * seen; the shared pool holds few. The seats a period needs are counted only for a period with something due today.
  */
 @Injectable()
 export class SubscriptionRenewalSweepService {
+  private readonly logger = new Logger(SubscriptionRenewalSweepService.name);
+
   constructor(
     private readonly periods: SubscriptionPeriodApi,
     private readonly repo: SubscriptionRenewalRepo,
@@ -59,7 +67,7 @@ export class SubscriptionRenewalSweepService {
   ) {}
 
   async sweep(now: Date = new Date()): Promise<SweepResult> {
-    const result: SweepResult = { told: 0, deadlineEvents: 0 };
+    const result: SweepResult = { told: 0, deadlineEvents: 0, failed: 0 };
     const organization = await this.organizationReads.getOrganization();
     if (!organization) return result;
     const today = await this.organizationReads.businessToday(now);
@@ -75,9 +83,17 @@ export class SubscriptionRenewalSweepService {
       shared: undefined,
     };
     for (const period of subjects) {
-      const done = await this.sweepPeriod(period, world);
-      result.told += done.told;
-      result.deadlineEvents += done.deadlineEvents;
+      try {
+        const done = await this.sweepPeriod(period, world);
+        result.told += done.told;
+        result.deadlineEvents += done.deadlineEvents;
+      } catch (error) {
+        // Only the id and the kind of the failure are logged, never what the failing step held.
+        result.failed += 1;
+        this.logger.error(
+          `Renewal sweep of subscription ${period.subscriptionId} failed: ${describeForOperator(error)}`,
+        );
+      }
     }
 
     return result;
@@ -85,7 +101,7 @@ export class SubscriptionRenewalSweepService {
 
   /** What the pass does for one period: the warnings of its data, then, when something is due today, its alerts and its event. */
   private async sweepPeriod(period: RenewalPeriodFacts, world: PassWorld): Promise<SweepResult> {
-    const done: SweepResult = { told: 0, deadlineEvents: 0 };
+    const done: SweepResult = { told: 0, deadlineEvents: 0, failed: 0 };
     if (world.ending.has(period.subscriptionId)) return done;
     const { adjustment } = period;
     const problems = dataQualityProblemsOf(adjustment);
@@ -147,7 +163,7 @@ export class SubscriptionRenewalSweepService {
     },
   ): Promise<SweepResult> {
     const { world, period, adjustment, people } = at;
-    const done: SweepResult = { told: 0, deadlineEvents: 0 };
+    const done: SweepResult = { told: 0, deadlineEvents: 0, failed: 0 };
     const kinds = due.filter(isAlert);
     if (kinds.length > 0) {
       done.told = await this.alerts.sendDue({

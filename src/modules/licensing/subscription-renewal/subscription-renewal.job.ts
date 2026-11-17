@@ -46,6 +46,11 @@ export class SubscriptionRenewalSweeper implements OnApplicationBootstrap, OnMod
       if (written > 0) {
         this.logger.log(`Renewal pass: ${result.told} notice(s), ${result.deadlineEvents} renewal-day event(s)`);
       }
+      if (result.failed > 0) {
+        this.logger.warn(
+          `${result.failed} subscription(s) could not be swept for renewal; the next pass tries them again`,
+        );
+      }
     } catch (error) {
       this.logger.error(`Subscription renewal sweep failed: ${describeForOperator(error)}`, traceForOperator(error));
     } finally {
