@@ -116,7 +116,7 @@ export class VendorsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR, among others more than 20 lines or a tax name over 100 characters once its ends are trimmed, its blanks collapsed and its accents composed) or a tax line is refused: VENDOR_TAX_PROFILE.TAX_TYPE_INVALID (an empty name), TAX_TYPE_DUPLICATE or RATE_INVALID.',
+        'The request is invalid (VALIDATION_ERROR, among others more than 20 lines or a tax name over 100 characters counted after the blanks at its ends are dropped, its blanks collapsed and its accents composed) or a tax line is refused: VENDOR_TAX_PROFILE.TAX_TYPE_INVALID (an empty name), TAX_TYPE_DUPLICATE or RATE_INVALID.',
       examples: [
         VALIDATION_EXAMPLE,
         VENDOR_ERROR_EXAMPLES.TAX_TYPE_INVALID,

@@ -13,7 +13,7 @@ const group = z.enum(['T1', 'T2', 'T3']);
 const payer = z.enum(['VENDOR_COLLECTS', 'BUYER_REMITS']);
 
 const MAX_TAX_TYPE_LENGTH = 100;
-/** A tax name is counted as the profile policy keeps it (accents composed, ends trimmed, blanks collapsed), not as it is typed. */
+/** A tax name is counted as the profile policy keeps it (accents composed, the blanks at its ends dropped, runs of blanks collapsed), not as it is typed. */
 const taxType = z
   .string()
   .superRefine((value, context) => {
@@ -28,7 +28,7 @@ const taxType = z
     }
   })
   .meta({
-    description: `At most ${MAX_TAX_TYPE_LENGTH} characters once the ends are trimmed, runs of blanks are collapsed to one and accents are composed (NFC); it is kept that way.`,
+    description: `At most ${MAX_TAX_TYPE_LENGTH} characters counted after the blanks at its ends are dropped, runs of blanks are collapsed to one and accents are composed (NFC); it is kept that way.`,
   });
 
 export const declareTaxProfileBodySchema = z.strictObject({
