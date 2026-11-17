@@ -261,6 +261,8 @@ export interface DemoRequestScenario {
   returnAt?: DemoRequestStep;
   /** For a group request: the people the spending approver refuses (the others are approved) and who get no task of grant. */
   rejectedLines?: string[];
+  /** For `IT_REJECTED`: the plan of the catalog IT points the requester at instead (a key of the fixture). */
+  alternativePlan?: string;
   /** The person who reads the request instead of its requester, when the requester cannot sign in any more (R57, C-2). */
   readAs?: string;
   /** The head confirms the use of the reserve with the batch, so the request goes on to the spending approver. */
