@@ -167,7 +167,7 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   K1_MONTHLY_ONLY: example(new SubscriptionK1MonthlyOnlyError()),
   K4_PERPETUAL_ONLY: example(new SubscriptionK4PerpetualOnlyError()),
   BILLING_LONGER_THAN_COMMITMENT: example(new SubscriptionBillingLongerThanCommitmentError()),
-  BILLING_CYCLE_UNSUPPORTED: example(new SubscriptionBillingCycleUnsupportedError('QUARTERLY')),
+  BILLING_CYCLE_UNSUPPORTED: example(new SubscriptionBillingCycleUnsupportedError('OTHER')),
   RESPONSIBLE_REQUIRED: example(new SubscriptionResponsibleRequiredError()),
   VENDOR_ADMINS_REQUIRED: example(new SubscriptionVendorAdminsRequiredError('<plan-id>', 1, 2)),
   RESPONSIBLE_NOT_IT_ADMIN: example(new SubscriptionResponsibleNotItAdminError()),

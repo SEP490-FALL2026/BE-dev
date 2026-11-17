@@ -3062,7 +3062,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR, among them a name or a function over its limit or a field the route does not take) or a rule of the department refuses it; details name the reason.",
+            "description": "The request is invalid (VALIDATION_ERROR, among them a name or a function over its limit or a field the route does not take) or a rule of the department refuses it; details name the reason. The code is not of the form 2 to 20 capital letters or digits in groups joined by one hyphen (DEPARTMENT.CODE_INVALID).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -3075,6 +3075,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.CODE_INVALID": {
+                    "summary": "Department code must be 2 to 20 uppercase letters or digits in groups separated by single hyphens (e.g. P-ENG).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.CODE_INVALID",
+                        "message": "Department code must be 2 to 20 uppercase letters or digits in groups separated by single hyphens (e.g. P-ENG).",
                         "requestId": "req_example"
                       }
                     }
@@ -7539,7 +7550,7 @@
             }
           },
           "409": {
-            "description": "The employee is on long leave already (LONG_LEAVE.ALREADY_ON_LEAVE), or is handing over or has left (EMPLOYEE_NOT_WORKING).",
+            "description": "The employee is on long leave already (LONG_LEAVE.ALREADY_ON_LEAVE), or is not working (LONG_LEAVE.EMPLOYEE_NOT_WORKING, details.workState HANDING_OVER or LEFT).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -7562,7 +7573,7 @@
                       "error": {
                         "code": "LONG_LEAVE.EMPLOYEE_NOT_WORKING",
                         "message": "The employee is not working: they are handing over before leaving, or have left.",
-                        "details": { "workState": "HANDING_OVER" },
+                        "details": { "workState": "LEFT" },
                         "requestId": "req_example"
                       }
                     }
@@ -7614,7 +7625,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid or names a field the route does not know (VALIDATION_ERROR), the start is in the future or before the employee joined (LONG_LEAVE.START_DATE_INVALID), the day of return is not after the start (RETURN_DATE_INVALID), or the basis (groundsNote) is empty (LONG_LEAVE.GROUNDS_REQUIRED), longer than 500 characters (GROUNDS_TOO_LONG) or is only the code of a notice and not a document (GROUNDS_IS_NOTICE): nothing is saved.",
+            "description": "The body is invalid or names a field the route does not know (VALIDATION_ERROR), the start is in the future or before the employee joined (LONG_LEAVE.START_DATE_INVALID), the day of return is not after the start (LONG_LEAVE.RETURN_DATE_INVALID, with details.reason NOT_AFTER_START), or the basis (groundsNote) is empty (LONG_LEAVE.GROUNDS_REQUIRED), longer than 500 characters (GROUNDS_TOO_LONG) or is only the code of a notice and not a document (GROUNDS_IS_NOTICE): nothing is saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -12308,7 +12319,7 @@
             }
           },
           "409": {
-            "description": "The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED), there is nothing left to take away (NOTHING_TO_REVOKE), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
+            "description": "The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED, with details.problem SOURCE_REQUIRED, ASSIGNMENT_IS_SERVICE_ACCOUNT or TYPE_NOT_SUPPORTED, and details.provisioningType when it is the kind of the seat), there is nothing left to take away (NOTHING_TO_REVOKE), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -12364,7 +12375,11 @@
                       "error": {
                         "code": "OFFBOARDING_CASE.REVOCATION_NOT_SUPPORTED",
                         "message": "The kind of provisioning of the seat has no revocation yet.",
-                        "details": { "assignmentId": "<assignment-id>", "provisioningType": "K3" },
+                        "details": {
+                          "assignmentId": "<assignment-id>",
+                          "problem": "TYPE_NOT_SUPPORTED",
+                          "provisioningType": "K3"
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -19791,7 +19806,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH, UPDATE_EMPTY or INTERNAL_HAS_NO_VENDOR (a dictionary line is sent for internal software, which has no vendor).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -19882,6 +19897,17 @@
                       "error": {
                         "code": "APPLICATION.UPDATE_EMPTY",
                         "message": "The update names no field to change.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APPLICATION.INTERNAL_HAS_NO_VENDOR": {
+                    "summary": "An internal application has no vendor and no dictionary line.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APPLICATION.INTERNAL_HAS_NO_VENDOR",
+                        "message": "An internal application has no vendor and no dictionary line.",
                         "requestId": "req_example"
                       }
                     }
@@ -22006,7 +22032,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED, WORKSPACE_TEXT_INVALID or VENDOR_ADMINS_INVALID (fewer than two different IT Admins).",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED (details.role is OWNER when there are more owners than ownerLimit, ADMIN when more admins than adminLimit), WORKSPACE_TEXT_INVALID or VENDOR_ADMINS_INVALID (fewer than two different IT Admins).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -24384,7 +24410,7 @@
                       "error": {
                         "code": "SUBSCRIPTION.BILLING_CYCLE_UNSUPPORTED",
                         "message": "A subscription is paid by the month (MONTHLY) or by the year (ANNUAL).",
-                        "details": { "billingCycle": "QUARTERLY" },
+                        "details": { "billingCycle": "OTHER" },
                         "requestId": "req_example"
                       }
                     }
@@ -25040,7 +25066,7 @@
                       "error": {
                         "code": "SUBSCRIPTION.BILLING_CYCLE_UNSUPPORTED",
                         "message": "A subscription is paid by the month (MONTHLY) or by the year (ANNUAL).",
-                        "details": { "billingCycle": "QUARTERLY" },
+                        "details": { "billingCycle": "OTHER" },
                         "requestId": "req_example"
                       }
                     }
@@ -28237,7 +28263,7 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin and Finance keep and open files: the department head, an employee, the spending approver and the Super Admin are refused.",
+            "description": "Only the IT Admin and Finance keep and open files: the department head, an employee, the spending approver and the Super Admin are refused. The uploader who no longer holds a role that may choose the purpose of the file is refused too (DOCUMENT.PURPOSE_FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -28249,6 +28275,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DOCUMENT.PURPOSE_FORBIDDEN": {
+                    "summary": "This role may not choose this purpose for a file.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DOCUMENT.PURPOSE_FORBIDDEN",
+                        "message": "This role may not choose this purpose for a file.",
                         "requestId": "req_example"
                       }
                     }
@@ -32392,6 +32429,17 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "EMPLOYEE.NOT_FOUND": {
+                    "summary": "Employee not found: <employee-id>",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_FOUND",
+                        "message": "Employee not found: <employee-id>",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
@@ -33339,6 +33387,17 @@
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "PROVISIONING_TASK.NOT_MANUAL": {
+                    "summary": "The task is for the connector, not for a person.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING_TASK.NOT_MANUAL",
+                        "message": "The task is for the connector, not for a person.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "PROVISIONING_TASK.NOT_CLAIMABLE": {
                     "summary": "The task is not in a state that allows this: NOT_CLAIMABLE.",
                     "value": {
@@ -33606,6 +33665,17 @@
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "PROVISIONING_TASK.NOT_MANUAL": {
+                    "summary": "The task is for the connector, not for a person.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING_TASK.NOT_MANUAL",
+                        "message": "The task is for the connector, not for a person.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "PROVISIONING_TASK.NOT_IN_PROGRESS": {
                     "summary": "The task is not in a state that allows this: NOT_IN_PROGRESS.",
                     "value": {
@@ -33998,6 +34068,17 @@
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "PROVISIONING_TASK.NOT_MANUAL": {
+                    "summary": "The task is for the connector, not for a person.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING_TASK.NOT_MANUAL",
+                        "message": "The task is for the connector, not for a person.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "PROVISIONING_TASK.NOT_IN_PROGRESS": {
                     "summary": "The task is not in a state that allows this: NOT_IN_PROGRESS.",
                     "value": {
@@ -84132,7 +84213,7 @@
             }
           },
           "422": {
-            "description": "The request or the Idempotency-Key is invalid (VALIDATION_ERROR), the report has types of event nobody sorted (USAGE_IMPORT.EVENT_TYPE_UNMAPPED), the holders of the first report were not told (TRACKING_NOTICE_REQUIRED), or the application became a communication service (USAGE_SOURCE.COMMUNICATION_APP).",
+            "description": "The request or the Idempotency-Key is invalid (VALIDATION_ERROR), the report has types of event nobody sorted (USAGE_IMPORT.EVENT_TYPE_UNMAPPED), the holders of the first report were not told (TRACKING_NOTICE_REQUIRED), or the application of the source no longer allows an import: it does not exist (USAGE_SOURCE.APPLICATION_NOT_FOUND), is internal software (APPLICATION_INTERNAL), was retired (APPLICATION_RETIRED) or became a communication service (COMMUNICATION_APP).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -84145,6 +84226,39 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.APPLICATION_NOT_FOUND": {
+                    "summary": "The usage source cannot be used: APPLICATION_NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.APPLICATION_NOT_FOUND",
+                        "message": "The usage source cannot be used: APPLICATION_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.APPLICATION_INTERNAL": {
+                    "summary": "The usage source cannot be used: APPLICATION_INTERNAL.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.APPLICATION_INTERNAL",
+                        "message": "The usage source cannot be used: APPLICATION_INTERNAL.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.APPLICATION_RETIRED": {
+                    "summary": "The usage source cannot be used: APPLICATION_RETIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.APPLICATION_RETIRED",
+                        "message": "The usage source cannot be used: APPLICATION_RETIRED.",
                         "requestId": "req_example"
                       }
                     }
@@ -89119,7 +89233,7 @@
             }
           },
           "404": {
-            "description": "No such policy (POLICY.NOT_FOUND).",
+            "description": "No such policy (POLICY.NOT_FOUND), or it has no published version of the number asked for (POLICY.VERSION_NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -89131,6 +89245,17 @@
                       "error": {
                         "code": "POLICY.NOT_FOUND",
                         "message": "No policy has this code.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.VERSION_NOT_FOUND": {
+                    "summary": "The policy has no published version with this number.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.VERSION_NOT_FOUND",
+                        "message": "The policy has no published version with this number.",
                         "requestId": "req_example"
                       }
                     }
@@ -89986,7 +90111,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR): a step or an item code that repeats, an empty checklist; or the draft changes what the company may not change: the set of steps (POLICY.STEP_SET_FIXED, details.added and details.removed) or the code of an item the system checks by itself (POLICY.SYSTEM_ITEM_UNKNOWN, details.codes).",
+            "description": "The request is invalid (VALIDATION_ERROR): a step or an item code that repeats, an empty checklist; or the draft changes what the company may not change: the set of steps (POLICY.STEP_SET_FIXED, details.added and details.removed) or the code of an item the system checks by itself (POLICY.SYSTEM_ITEM_UNKNOWN, details.items).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -95320,7 +95445,7 @@
             }
           },
           "409": {
-            "description": "Self change, a Manager still heading a department, an occupied Finance or spending approver role, or open work blocking the spending approver.",
+            "description": "Self change, a Manager still heading a department, an occupied Finance or spending approver role, an employee who heads a department or is named to take one over becoming the spending approver (APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT, details.headPeriods), or open work blocking the spending approver.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -95376,6 +95501,28 @@
                       "error": {
                         "code": "APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED",
                         "message": "Another account already holds the SPENDING_APPROVER role.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT": {
+                    "summary": "The employee heads a department, will head one from a later day, or is named as a successor, so cannot be the spending approver.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT",
+                        "message": "The employee heads a department, will head one from a later day, or is named as a successor, so cannot be the spending approver.",
+                        "details": {
+                          "headPeriods": [
+                            {
+                              "departmentId": "<department-id>",
+                              "departmentCode": "<department-code>",
+                              "validFrom": "2026-01-01",
+                              "validTo": null,
+                              "timing": "CURRENT"
+                            }
+                          ]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -97896,7 +98043,7 @@
             }
           },
           "403": {
-            "description": "Only the head of the department that was asked may do this.",
+            "description": "Only the head of the department that was asked may do this: a caller who does not head it is refused (GHOST_SEAT.NOT_DECIDER, with details.items naming each recommendation).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -97908,6 +98055,18 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.NOT_DECIDER": {
+                    "summary": "Only the head of the department that was asked can decide on this recommendation.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.NOT_DECIDER",
+                        "message": "Only the head of the department that was asked can decide on this recommendation.",
+                        "details": { "items": [{ "recommendationId": "recommendation-id", "code": "NOT_DECIDER" }] },
                         "requestId": "req_example"
                       }
                     }
@@ -97938,7 +98097,7 @@
             }
           },
           "409": {
-            "description": "A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (NOT_DECIDABLE) or its seat cannot be revoked (SEAT_NOT_REVOCABLE), `details.items` names each; or the policy of the checklist was changed since the head was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE). Nothing was saved.",
+            "description": "A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (GHOST_SEAT.NOT_DECIDABLE) or its seat cannot be revoked (GHOST_SEAT.SEAT_NOT_REVOCABLE), `details.items` names each; or the policy of the checklist was changed since the head was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE). Nothing was saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -97951,6 +98110,32 @@
                         "code": "GHOST_SEAT.PAUSED",
                         "message": "The recommendation is paused while its holder is in a transfer.",
                         "details": { "items": [{ "recommendationId": "recommendation-id", "code": "PAUSED" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.NOT_DECIDABLE": {
+                    "summary": "The recommendation is not waiting for a decision.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.NOT_DECIDABLE",
+                        "message": "The recommendation is not waiting for a decision.",
+                        "details": { "items": [{ "recommendationId": "recommendation-id", "code": "NOT_DECIDABLE" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.SEAT_NOT_REVOCABLE": {
+                    "summary": "The seat cannot be revoked.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.SEAT_NOT_REVOCABLE",
+                        "message": "The seat cannot be revoked.",
+                        "details": {
+                          "items": [{ "recommendationId": "recommendation-id", "code": "SEAT_NOT_REVOCABLE" }]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -98039,6 +98224,20 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.EXEMPTION_REQUIRED": {
+                    "summary": "An exemption needs the day it lasts to.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.EXEMPTION_REQUIRED",
+                        "message": "An exemption needs the day it lasts to.",
+                        "details": {
+                          "items": [{ "recommendationId": "recommendation-id", "code": "EXEMPTION_REQUIRED" }]
+                        },
                         "requestId": "req_example"
                       }
                     }

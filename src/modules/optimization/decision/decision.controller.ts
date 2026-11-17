@@ -36,6 +36,24 @@ const INVALID = {
   description: 'The body, the query or the id is invalid (VALIDATION_ERROR).',
   examples: [VALIDATION_EXAMPLE],
 } as const;
+const DECIDER_ONLY = {
+  status: HttpStatus.FORBIDDEN,
+  description:
+    'Only the head of the department that was asked may do this: a caller who does not head it is refused (GHOST_SEAT.NOT_DECIDER, with details.items naming each recommendation).',
+  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_DECIDER],
+} as const;
+const DECISION_CONFLICT = {
+  status: HttpStatus.CONFLICT,
+  description:
+    'A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (GHOST_SEAT.NOT_DECIDABLE) or its seat cannot be revoked (GHOST_SEAT.SEAT_NOT_REVOCABLE), `details.items` names each; or the policy of the checklist was changed since the head was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE). Nothing was saved.',
+  examples: [
+    EXAMPLES.PAUSED,
+    EXAMPLES.NOT_DECIDABLE,
+    EXAMPLES.SEAT_NOT_REVOCABLE,
+    CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+    CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
+  ],
+} as const;
 const forbidden = (who: string): ErrorResponseDeclaration => ({
   status: HttpStatus.FORBIDDEN,
   description: `Only ${who} may do this.`,
@@ -129,24 +147,20 @@ export class DecisionController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    forbidden('the head of the department that was asked'),
+    DECIDER_ONLY,
     {
       status: HttpStatus.NOT_FOUND,
       description: 'A recommendation does not exist (GHOST_SEAT.NOT_FOUND).',
       examples: [EXAMPLES.NOT_FOUND],
     },
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (NOT_DECIDABLE) or its seat cannot be revoked (SEAT_NOT_REVOCABLE), `details.items` names each; or the policy of the checklist was changed since the head was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE). Nothing was saved.',
-      examples: [EXAMPLES.PAUSED, CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED, CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE],
-    },
+    DECISION_CONFLICT,
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
         'The body is invalid (VALIDATION_ERROR), an exemption has no end day (EXEMPTION_REQUIRED) or lasts beyond 12 months or into the past (EXEMPTION_TOO_LONG), the checklist lacks an answer (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the choice is to keep or exempt (POLICY.CHECKLIST_HAS_NO, with the questions answered No in details.items): the head can only reclaim.',
       examples: [
         VALIDATION_EXAMPLE,
+        EXAMPLES.EXEMPTION_REQUIRED,
         EXAMPLES.EXEMPTION_TOO_LONG,
         CHECKLIST_ERROR_EXAMPLES.INCOMPLETE,
         CHECKLIST_ERROR_EXAMPLES.HAS_NO,

@@ -151,6 +151,7 @@ export const OFFBOARDING_ERROR_EXAMPLES = {
   REVOCATION_NOT_SUPPORTED: example(
     new OffboardingRefusedError('REVOCATION_NOT_SUPPORTED', {
       assignmentId: '<assignment-id>',
+      problem: 'TYPE_NOT_SUPPORTED',
       provisioningType: 'K3',
     }),
   ),

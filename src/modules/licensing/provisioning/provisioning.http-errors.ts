@@ -235,6 +235,7 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   ANOTHER_IT_ADMIN_NEEDED: example(new ProvisioningAnotherItAdminNeededError()),
   NOT_CLAIMABLE: example(new ProvisioningTaskStateError('NOT_CLAIMABLE')),
   NOT_IN_PROGRESS: example(new ProvisioningTaskStateError('NOT_IN_PROGRESS')),
+  NOT_MANUAL: example(new ProvisioningTaskNotManualError()),
   IS_REVOCATION: example(new ProvisioningTaskStateError('IS_REVOCATION')),
   NOT_REVOCATION: example(new ProvisioningTaskStateError('NOT_REVOCATION')),
   NOT_FAILED: example(new ProvisioningTaskStateError('NOT_FAILED')),
@@ -270,7 +271,11 @@ export const PROVISIONING_ERROR_EXAMPLES = {
 
 /** The refusals of the grant of a seat, by status, after the request gate of G5 (`US-07-01`). */
 export const PROVISIONING_GRANT_EXAMPLES = {
-  NOT_FOUND: [PROVISIONING_ERROR_EXAMPLES.REQUEST_NOT_FOUND, example(new SeatTargetNotFoundError('SUBSCRIPTION'))],
+  NOT_FOUND: [
+    PROVISIONING_ERROR_EXAMPLES.REQUEST_NOT_FOUND,
+    example(new SeatTargetNotFoundError('SUBSCRIPTION')),
+    example(new EmployeeNotFoundError('<employee-id>')),
+  ],
   CONFLICT: [
     example(new GrantRequestRefusedError('NOT_APPROVED')),
     example(new GrantRequestRefusedError('ENDED')),

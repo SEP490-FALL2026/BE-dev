@@ -173,6 +173,7 @@ export class ProvisioningTasksController {
       description:
         'PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken) or PROVISIONING.BENEFICIARY_DEPARTED (the person has left or is blocked by a departure, details.cause says which: close the request as cancelled; a task already being worked is not refused).',
       examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_MANUAL,
         PROVISIONING_ERROR_EXAMPLES.NOT_CLAIMABLE,
         PROVISIONING_ERROR_EXAMPLES.NOT_BEFORE,
         PROVISIONING_ERROR_EXAMPLES.BENEFICIARY_DEPARTED,
@@ -214,6 +215,7 @@ export class ProvisioningTasksController {
       description:
         'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, or IS_REVOCATION (a revocation is completed by its own route); the key named is not free in the store (LICENSE_KEY.NOT_IN_STORE: another grant took it), was withdrawn from it (LICENSE_KEY.WITHDRAWN) or belongs to another purchase than the seat (LICENSE_KEY.SUBSCRIPTION_MISMATCH). Nothing is written.',
       examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_MANUAL,
         PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS,
         PROVISIONING_ERROR_EXAMPLES.IS_REVOCATION,
         PROVISIONING_ERROR_EXAMPLES.KEY_NOT_IN_STORE,
@@ -263,7 +265,7 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description: 'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS],
+      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_MANUAL, PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
