@@ -1,12 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { dayOffset, endOfMonth } from '../demo-dates';
+import { EXTRA_APPLICATIONS } from './shared-demo-v4/catalog-extra';
 import { INSTALLATION } from './shared-demo-v4/installation';
 import { SHARED_DEMO_V4 as F } from './shared-demo-v4';
 
 const person = (code: string) => F.people.find((candidate) => candidate.code === code)!;
 const plan = (key: string) => F.applications.flatMap((app) => app.plans).find((candidate) => candidate.key === key)!;
 const subscriptionOf = (planKey: string) => F.subscriptions.find((candidate) => candidate.plan === planKey)!;
+/** The plans of the twelve applications of T4, which have no subscription until T6. */
+const EXTRA_PLAN_KEYS = new Set(EXTRA_APPLICATIONS.flatMap((application) => application.plans.map((p) => p.key)));
 const department = (code: string) => F.departments.find((candidate) => candidate.code === code)!;
 
 describe('shared dataset v4: the organization', () => {
@@ -94,9 +97,49 @@ describe('shared dataset v4: the organization', () => {
 });
 
 describe('shared dataset v4: the catalog and the shared pool', () => {
-  it('has one subscription per plan of the catalog except the internal one', () => {
-    const plans = F.applications.flatMap((app) => app.plans).filter((p) => p.provisioningType !== 'K5');
+  it('has one subscription per plan of the catalog except the internal ones (the plans of T4 wait for T6)', () => {
+    const plans = F.applications
+      .flatMap((app) => app.plans)
+      .filter((p) => p.provisioningType !== 'K5')
+      .filter((p) => !EXTRA_PLAN_KEYS.has(p.key));
     expect(F.subscriptions.map((s) => s.plan).sort()).toEqual(plans.map((p) => p.key).sort());
+  });
+
+  it('holds 25 applications of 32 plans, named as they are sold, with none of the three the budget scenarios refuse (T4, S04)', () => {
+    expect(F.applications).toHaveLength(25);
+    expect(F.applications.flatMap((app) => app.plans)).toHaveLength(32);
+    expect(F.applications.filter((app) => app.kind === 'SAAS')).toHaveLength(23);
+    expect(F.applications.filter((app) => app.kind === 'INTERNAL')).toHaveLength(2);
+    const names = F.applications.map((app) => app.name.toLowerCase());
+    for (const refused of ['miro', 'whimsical', 'canva enterprise']) expect(names).not.toContain(refused);
+    expect(new Set(F.applications.map((app) => app.key)).size).toBe(25);
+    expect(new Set(F.applications.map((app) => app.name)).size).toBe(25);
+    const planNames = F.applications.flatMap((app) => app.plans.map((p) => p.name));
+    expect(new Set(planNames).size).toBe(32);
+    expect(new Set(F.applications.flatMap((app) => app.plans.map((p) => p.key))).size).toBe(32);
+  });
+
+  it('gives each plan the kind of control and sharing its application needs, and a note to a plan that loses data (T4)', () => {
+    expect(plan('copilot-pro')).toMatchObject({ provisioningType: 'K1', controlLevel: 'UNCONTROLLABLE' });
+    expect(plan('visio-pro')).toMatchObject({
+      provisioningType: 'K4',
+      hasAdminConsole: true,
+      sharingPolicy: 'ALLOWED',
+    });
+    expect(plan('sublime-license')).toMatchObject({ provisioningType: 'K4' });
+    expect(plan('sublime-license').hasAdminConsole).toBeUndefined();
+    expect(plan('adobe-cc-teams').dataLossOnRemoval).toBe(true);
+    expect(plan('adobe-cc-teams').revocationNote).toBeTruthy();
+    expect(plan('attendance-access').provisioningType).toBe('K5');
+    for (const declared of F.applications.flatMap((app) => app.plans).filter((p) => p.dataLossOnRemoval)) {
+      expect(declared.revocationNote).toBeTruthy();
+    }
+  });
+
+  it('keeps Zoom and Skype in the group the usage rules never collect (T4)', () => {
+    const group = (key: string) => F.applications.find((app) => app.key === key)!.functionalGroup;
+    expect(group('zoom')).toBe('Liên lạc (email, chat, họp)');
+    expect(group('skype')).toBe('Liên lạc (email, chat, họp)');
   });
 
   it('covers K1, K2 with free seats and a sold-out plan, K4 with and without keys, and K5', () => {
@@ -442,7 +485,10 @@ describe('shared dataset v4: MF-2, MF-3 and the IT Admins (QĐ-110, QĐ-111)', (
     expect(plan('jetbrains-all')).toMatchObject({ provisioningType: 'K4', hasAdminConsole: true });
     expect(plan('jetbrains-datagrip').hasAdminConsole).toBeUndefined();
     const flagged = F.applications.flatMap((a) => a.plans).filter((p) => p.withoutOwnerAccountEmail);
-    expect(flagged.map((p) => [p.key, p.provisioningType])).toEqual([['canva-teams', 'K2']]);
+    expect(flagged.map((p) => [p.key, p.provisioningType]).sort()).toEqual([
+      ['canva-teams', 'K2'],
+      ['notion-business', 'K2'],
+    ]);
   });
 
   it('lists software for departments with an IT Admin, from the catalog, and proposes only what their list does not hold (P16–P18)', () => {

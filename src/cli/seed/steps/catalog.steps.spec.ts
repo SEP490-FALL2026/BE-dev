@@ -78,9 +78,15 @@ describe('the workspace profile the dataset records for the plans that need admi
   it('names the IT Admin who answers for the subscription as the owner and another IT Admin as the admin, for every plan that needs them', () => {
     const needing = SHARED_DEMO_V4.applications
       .flatMap((app) => app.plans)
-      .filter((p) => p.provisioningType === 'K2' || p.hasAdminConsole === true);
+      .filter((p) => p.provisioningType === 'K2' || p.hasAdminConsole === true)
+      // A plan with no subscription (Skype, retired in S21) has no IT Admin who answers for it and so no profile.
+      .filter((p) => SHARED_DEMO_V4.subscriptions.some((s) => s.plan === p.key) || p.key === 'skype-online');
     expect(needing.map((p) => p.key)).toContain('jetbrains-all');
     for (const needed of needing) {
+      if (needed.key === 'skype-online') {
+        expect(workspaceProfileBody(ctx, needed)).toBeNull();
+        continue;
+      }
       const body = workspaceProfileBody(ctx, needed)!;
       const responsible = SHARED_DEMO_V4.subscriptions.find((s) => s.plan === needed.key)!.responsible;
 

@@ -65,10 +65,10 @@ export interface DemoPlan {
   key: string;
   name: string;
   provisioningType: 'K1' | 'K2' | 'K4' | 'K5';
-  controlLevel?: 'FULL' | 'PARTIAL';
+  controlLevel?: 'FULL' | 'PARTIAL' | 'UNCONTROLLABLE';
   dataLossOnRemoval: boolean;
   revocationNote?: string;
-  sharingPolicy?: 'NOT_ALLOWED';
+  sharingPolicy?: 'NOT_ALLOWED' | 'ALLOWED';
   /** K4 only: the plan has an admin console at the vendor, so like a K2 plan it needs a workspace profile of two IT Admins (`QĐ-110k`, R-53). */
   hasAdminConsole?: boolean;
   /** The IT Admin who administers the plan at the vendor beside the one responsible for its subscription (default: the first other IT Admin). */
