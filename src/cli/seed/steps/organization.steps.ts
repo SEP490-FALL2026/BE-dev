@@ -66,7 +66,7 @@ export function employeeBodyOf(ctx: DemoRunContext, person: DemoPerson): Record<
     workEmail: emailOf(ctx, person.code),
     employmentType: person.employmentType,
     hireDate: dayOffset(ctx.today, -HIRE_DAYS_AGO),
-    departmentCode: person.department,
+    ...(person.department === null ? {} : { departmentCode: person.department }),
     ...(person.contractEndInDays === undefined
       ? {}
       : { contractEndDate: dayOffset(ctx.today, person.contractEndInDays) }),
@@ -103,13 +103,15 @@ async function employees(ctx: DemoRunContext): Promise<StepOutcome> {
 
 /**
  * An employee of a demo code is the demo one only while they are a member of the department the fixture places them in,
- * under the fixture's name: anything else is somebody's change, reported and never overwritten.
+ * under the fixture's name: anything else is somebody's change, reported and never overwritten. One the fixture leaves
+ * unplaced is read from the profile instead (no department yet).
  */
 async function placedAsWanted(
   ctx: DemoRunContext,
   person: DemoPerson,
   cache: Map<string, Map<string, { fullName: string }>>,
 ): Promise<Result> {
+  if (person.department === null) return stillUnplaced(ctx, person);
   const departmentId = ctx.ids.departments.get(person.department);
   if (!departmentId) return { status: 'conflict', label: `${person.code}: phòng ${person.department} không có` };
   if (!cache.has(departmentId)) {
@@ -124,6 +126,23 @@ async function placedAsWanted(
   if (!member) return { status: 'conflict', label: `${person.code} đã có nhưng không thuộc ${person.department}` };
 
   return same(member.fullName, person.fullName)
+    ? { status: 'present', label: person.code }
+    : { status: 'conflict', label: `${person.code} đã có với họ tên khác` };
+}
+
+/** The unplaced employee is the demo one while the profile has no department and the fixture's name (a placement is somebody's change). */
+async function stillUnplaced(ctx: DemoRunContext, person: DemoPerson): Promise<Result> {
+  const id = ctx.ids.employees.get(person.code);
+  const profile = await ctx.api.call<{ fullName: string; department: { code: string } | null }>(
+    ctx.superAdminEmail,
+    'GET',
+    `/employees/${id}`,
+  );
+  if (profile.department !== null) {
+    return { status: 'conflict', label: `${person.code} đã được xếp vào phòng ${profile.department.code}` };
+  }
+
+  return same(profile.fullName, person.fullName)
     ? { status: 'present', label: person.code }
     : { status: 'conflict', label: `${person.code} đã có với họ tên khác` };
 }

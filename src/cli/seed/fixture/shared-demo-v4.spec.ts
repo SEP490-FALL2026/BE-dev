@@ -47,6 +47,47 @@ describe('shared dataset v4: the organization', () => {
     expect(F.departments.filter((d) => d.costCenter === null).map((d) => d.code)).toEqual(['OPS']);
   });
 
+  it('adds seventeen people of SPEC S01, one of them left unplaced, with the accounts the scenarios need (T1)', () => {
+    const added = [
+      'NV-DEV5',
+      'NV-DEV6',
+      'NV-DEV7',
+      'NV-ITO1',
+      'NV-ITO2',
+      'NV-FIN2',
+      'NV-BOD1',
+      'NV-BOD2',
+      'NV-BOD3',
+      'NV-BOD4',
+      'NV-BOD5',
+      'NV-BOD6',
+      'NV-SAL3',
+      'NV-SAL4',
+      'NV-OPS2',
+      'NV-NEW2',
+      'NV-NEW3',
+    ];
+    expect(F.people).toHaveLength(41 + 17);
+    expect(added.map((code) => person(code).code)).toEqual(added);
+    expect(F.people.filter((p) => p.department === null).map((p) => p.code)).toEqual(['NV-NEW2']);
+    expect(F.people.filter((p) => p.account !== null)).toHaveLength(30 + 12);
+    const withoutAccount = added.filter((code) => person(code).account === null);
+    expect(withoutAccount).toEqual(['NV-BOD5', 'NV-BOD6', 'NV-SAL3', 'NV-SAL4', 'NV-NEW3']);
+    expect(person('NV-NEW2').account).toBe('EMPLOYEE');
+    expect(person('NV-BOD3').account).toBe('EMPLOYEE');
+    for (const [code, dept] of [
+      ['NV-DEV7', 'ENG'],
+      ['NV-ITO2', 'ITO'],
+      ['NV-FIN2', 'FIN'],
+      ['NV-BOD6', 'BOD'],
+      ['NV-SAL4', 'SAL'],
+      ['NV-OPS2', 'OPS'],
+      ['NV-NEW3', 'BOD'],
+    ]) {
+      expect(person(code).department).toBe(dept);
+    }
+  });
+
   it('has enough people in one department for a group', () => {
     expect(F.people.filter((p) => p.department === 'ENG').length).toBeGreaterThanOrEqual(5);
   });
@@ -294,7 +335,7 @@ describe('shared dataset v4: the requests of MF-1', () => {
   });
 
   it('saves a draft in a department with no Cost Center, which can only stay a draft', () => {
-    expect(department(person(F.draft.requester).department).costCenter).toBeNull();
+    expect(department(person(F.draft.requester).department!).costCenter).toBeNull();
   });
 
   it('counts its dates from today only', () => {
@@ -445,7 +486,7 @@ describe('shared dataset v4: the documentation', () => {
       const role = p.code === F.approvalRoles.SPENDING_APPROVER ? 'SPENDING_APPROVER' : (p.account ?? '-');
       const email = p.account ? `${p.email}@${F.emailDomain}` : 'no account';
       const head = F.departments.find((d) => d.head === p.code)?.code ?? '-';
-      expect(readme).toContain(`| ${p.code} | ${p.fullName} | ${email} | ${role} | ${p.department} | ${head} |`);
+      expect(readme).toContain(`| ${p.code} | ${p.fullName} | ${email} | ${role} | ${p.department ?? '-'} | ${head} |`);
     }
   });
 });

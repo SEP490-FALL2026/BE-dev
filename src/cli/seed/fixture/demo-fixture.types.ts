@@ -24,7 +24,8 @@ export interface DemoPerson {
   fullName: string;
   /** The local part of the work email; the domain is the fixture's. */
   email: string;
-  department: string;
+  /** The department code the person is placed in; null: the dataset leaves them unplaced (`QĐ-93g`), the Super Admin places them later. */
+  department: string | null;
   employmentType: 'STAFF' | 'CONTRACTOR' | 'FREELANCER' | 'INTERN';
   /** The one direct role of the person's sign-in account; null: no account (the Super Admin can create one to test). */
   account: DemoRole | null;
