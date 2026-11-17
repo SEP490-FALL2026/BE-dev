@@ -8,7 +8,7 @@ import { SubscriptionPeriodRefusedError } from '../../../catalog/public/subscrip
 import type { NextPeriodInput, RenewalPeriodFacts } from '../../../catalog/public/subscription-period.types';
 import type { AuditValue } from '../../../audit/public/audit.types';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
-import { seatsToCarry } from '../../assignment/assignment.policy';
+import { carriedPast, seatsToCarry } from '../../assignment/assignment.policy';
 import { AssignmentService } from '../../assignment/assignment.service';
 import { licensingAuditEvent } from '../../licensing-audit-event.mapper';
 import { RenewalError } from '../subscription-renewal.errors';
@@ -20,7 +20,7 @@ import type {
   RenewalOutcomeKind,
   RenewalRecord,
 } from '../subscription-renewal.types';
-import { carriedPast, checkOutcome, realisedSavingsOf } from './renewal-outcome.policy';
+import { checkOutcome, realisedSavingsOf } from './renewal-outcome.policy';
 
 export interface RecordOutcomeInput {
   outcome: RenewalOutcomeKind;

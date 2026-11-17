@@ -28,7 +28,13 @@ import type {
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { toAssignmentFailure } from './assignment-conflicts.repo';
 import { AssignmentDepartmentRepo } from './assignment-department.repo';
-import { assignmentCreatedSnapshot, nextPeriodStart, replacedByGrant, seatsToCarry } from './assignment.policy';
+import {
+  assignmentCreatedSnapshot,
+  carriedPast,
+  nextPeriodStart,
+  replacedByGrant,
+  seatsToCarry,
+} from './assignment.policy';
 import { assertBaselineTarget, assertSeatTargetUsable, toSeatTargetRef } from './baseline-target.policy';
 import { AssignmentRepo } from './assignment.repo';
 import { AssignmentCarryRepo } from './assignment-carry.repo';
@@ -391,9 +397,9 @@ export class AssignmentService {
    * A seat granted on a subscription that a next period, recorded ahead of its start, continues goes on into that period at once, in the
    * transaction of the grant (`QĐ-35c`): otherwise the seats the next period buys, sized to the rights held and the requests waiting to be
    * granted (`QĐ-103e`), would show it free on its first day with the person holding it (a second grant of it). The same carrying and the
-   * same rule as when the renewal was recorded; a seat that ends before the next period begins stays where it is. When the next period is
-   * the shared pool and holds no free seat for it, one seat is bought on it for the request and the carrying is tried again (S20-T4c, R2-8: the
-   * adjustment bought exactly the seats needed, a request granted after it comes in after). Throws ProvisioningSubscriptionError
+   * same rule as when the renewal was recorded; a seat that ends before the next period begins stays where it is, and in the shared pool so does one that ends on its first day (R2-2). When
+   * the next period is the shared pool and holds no free seat for it, one seat is bought on it for the request and the carrying is tried again
+   * (S20-T4c, R2-8: the adjustment bought exactly the seats needed, a request granted after it comes in after). Throws ProvisioningSubscriptionError
    * (`NEXT_PERIOD_SEATS`) when the next period is one a department owns and buys no seat for it, nothing written.
    */
   private async carryToNextPeriod(
@@ -412,6 +418,8 @@ export class AssignmentService {
       startDate ?? seat.effectiveFrom,
     );
     if (startDate === null || next === undefined || carried.length === 0) return;
+    // The pool buys exactly the seats the adjustment counted, and the count leaves out a seat that ends on the renewal day (R2-2, A1C-06).
+    if (next.ownerDepartmentId === null && carriedPast(carried, startDate).length === 0) return;
 
     const carrying = {
       assignmentIds: [seat.id],

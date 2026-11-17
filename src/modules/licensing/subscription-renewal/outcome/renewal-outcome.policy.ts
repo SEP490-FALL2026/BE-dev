@@ -64,30 +64,3 @@ export function realisedSavingsOf(input: {
 
   return saved > 0n && input.old.unitPrice ? { amountMinor: saved, currency: input.old.unitPrice.currency } : null;
 }
-
-/** The days a seat holds, as the rule of its last day reads them. */
-export interface SeatDays {
-  validUntil: BusinessDate | null;
-  expectedEndDate: BusinessDate | null;
-}
-
-/** The last day of a seat: the earlier of the day before its right ends and its expected end; null when it does not end. */
-export function lastDayOf(seat: SeatDays): BusinessDate | null {
-  const days = [seat.validUntil === null ? null : addDays(seat.validUntil, -1), seat.expectedEndDate].filter(
-    (day) => day !== null,
-  );
-
-  return days.length === 0 ? null : days.reduce((first, day) => (day < first ? day : first));
-}
-
-/**
- * The seats that go on into the new period of a renewal recorded at the point of adjustment (`QĐ-106i`(2), R2-2): the seat whose last day
- * is the renewal day or before stays on the old period to its last day, since the count of the seats needed (`SBF-20` §4.3) leaves it out.
- */
-export function carriedPast<T extends SeatDays>(seats: readonly T[], endingBy: BusinessDate): T[] {
-  return seats.filter((seat) => {
-    const last = lastDayOf(seat);
-
-    return last === null || last > endingBy;
-  });
-}

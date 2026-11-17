@@ -1,4 +1,4 @@
-import { carriedPast, checkOutcome, realisedSavingsOf } from './renewal-outcome.policy';
+import { checkOutcome, realisedSavingsOf } from './renewal-outcome.policy';
 
 describe('an outcome against the decision (US-11-03 AC-15, AC-18, US-11-05 AC-11, AC-12)', () => {
   const base = { decidedQuantity: null, purchasedQuantity: 100 };
@@ -101,33 +101,5 @@ describe('the savings at renewal (FR-4.15, QĐ-66w, US-11-03 AC-3, AC-21)', () =
     ).toBeNull();
     expect(realisedSavingsOf({ outcome: 'AS_DECIDED', old, next: { ...cheaper, billingCycle: 'MONTHLY' } })).toBeNull();
     expect(realisedSavingsOf({ outcome: 'AS_DECIDED', old, next: { ...cheaper, endDate: '2027-06-30' } })).toBeNull();
-  });
-});
-
-describe('the seats that go on into the new period when the renewal day ends some (R2-2, QĐ-106i(2))', () => {
-  const seat = (id: string, validUntil: string | null, expectedEndDate: string | null) => ({
-    id,
-    validFrom: '2026-01-05',
-    validUntil,
-    expectedEndDate,
-  });
-
-  it('leaves on the old period a seat whose last day is the renewal day or before, and carries the others', () => {
-    const seats = [
-      seat('open', null, null),
-      seat('ends-on-renewal-expected', null, '2026-12-31'),
-      seat('ends-on-renewal-until', '2027-01-01', null),
-      seat('ends-after', null, '2027-01-01'),
-      seat('until-after', '2027-01-03', null),
-      seat('expected-before', null, '2026-12-30'),
-    ];
-
-    expect(carriedPast(seats, '2026-12-31').map((s) => s.id)).toEqual(['open', 'ends-after', 'until-after']);
-  });
-
-  it('counts the earlier of the day before the end of the right and the expected end', () => {
-    expect(carriedPast([seat('both', '2027-01-10', '2026-12-31')], '2026-12-31')).toEqual([]);
-    expect(carriedPast([seat('both', '2027-01-01', '2027-02-01')], '2026-12-31')).toEqual([]);
-    expect(carriedPast([seat('both', '2027-01-02', '2027-02-01')], '2026-12-31')).toHaveLength(1);
   });
 });
