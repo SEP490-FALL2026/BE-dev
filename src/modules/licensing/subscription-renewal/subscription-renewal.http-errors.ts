@@ -69,7 +69,7 @@ const ANSWERS: Readonly<Record<RenewalProblem, { status: HttpStatus; message: st
   NEXT_PERIOD_REQUIRED: {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     message:
-      'A renewal, a reduction or an increase is recorded with the new period the vendor confirmed; only a vendor that refused a plan by the month leaves it out. A cancellation the vendor refused or did otherwise is recorded with the period the vendor made.',
+      'Record the new period the vendor made, unless the cancellation was carried out or a monthly plan was refused.',
   },
 };
 
