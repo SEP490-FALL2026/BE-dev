@@ -55,7 +55,7 @@ export class BudgetsController {
   @ApiSuccessResponse(MineResponseDto, {
     message: 'BUDGET.FETCHED',
     description:
-      'The Cost Center of the department the caller heads, the year, whether it has a current budget (ACTIVE) or not (NO_ACTIVE_BUDGET), its base, reserve, commitments, spend, pending spend, both remaining amounts, the published department ceiling and cycle deadlines, and the proposal behind it.',
+      'The Cost Center of the department the caller heads, the year, whether it has a current budget (ACTIVE) or not (NO_ACTIVE_BUDGET), its base, reserve, commitments, spend, pending spend, both remaining amounts, the state and the deadlines of the cycle of the year, the version in force, the refusal of the latest version when it was refused, and the proposal behind it.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, MINE_INVALID)
   async mine(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineQueryDto) {

@@ -32446,7 +32446,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED (the request was refused, withdrawn, cancelled or closed as failed; a request that was granted answers with its task instead, 201), REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
+            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED (the request was refused, withdrawn, cancelled or closed as failed; a request that was granted answers with its task instead, 201), REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED and RESPONSIBLE_NOT_IN_DEPARTMENT (only for a request for a service account kept from the earlier releases: its boundary was not accepted, or the person who answers for it left its department or the company), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -35259,7 +35259,7 @@
         },
         "responses": {
           "200": {
-            "description": "The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K4 as KEY_DEACTIVATED with evidence, and the IT Admin must say where its key goes (keyDisposition, required for K4): back to the store (RETURN_TO_STORE) or back and withdrawn from it at once (WITHDRAW, with a withdrawalReason: a key that may not move to another device), with LICENSE_KEY.RETURNED_TO_STORE (and LICENSE_KEY.WITHDRAWN) in the audit trail; K1 as RENEWAL_CANCELLED with the day the paid period ends (paidThroughOn), what is known of the access (UNTIL_PAID_END, or CUT with the day accessCutOn and its accessEvidence) and the checklist of the card (k1Checklist, required: the steps of the variant the card tells, DEPARTURE or STILL_EMPLOYED, each { code, done: true, doneAt } with doneAt not falling as the steps go and not before the task was made, and the evidence in k1Checklist.evidence, or in evidence when the checklist has none; k1Checklist is refused for any other kind of grant). The assignment ends the same day for K2, K4 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.",
+            "description": "The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K4 as KEY_DEACTIVATED with evidence, and the IT Admin must say where its key goes (keyDisposition, required for K4): back to the store (RETURN_TO_STORE) or back and withdrawn from it at once (WITHDRAW, with a withdrawalReason: a key that may not move to another device), with LICENSE_KEY.RETURNED_TO_STORE (and LICENSE_KEY.WITHDRAWN) in the audit trail; K1 as RENEWAL_CANCELLED with the day the paid period ends (paidThroughOn), what is known of the access (UNTIL_PAID_END, or CUT with the day accessCutOn and its accessEvidence) and the checklist of the card (k1Checklist, required: the steps of the variant the card tells, DEPARTURE or STILL_EMPLOYED, each { code, done: true, doneAt } with doneAt not falling as the steps go (the same instant is in order; a step may be timed before the task was made), and the evidence in k1Checklist.evidence, or in evidence when the checklist has none; k1Checklist is refused for any other kind of grant). The assignment ends the same day for K2, K4 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35464,7 +35464,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), or a K1 checklist that is not valid: a step missing, not ticked or ticked with no time, or no evidence (K1_CHECKLIST_INCOMPLETE), steps ticked out of their order, such as the lock of the mailbox before the sign-out of the sessions, or a step timed before the task was made (K1_CHECKLIST_OUT_OF_ORDER), or a step the variant does not have, sent twice or sent for a kind that has no checklist (COMPLETION_NOT_ALLOWED). A refusal of the checklist of a K1 task carries details { variant, codes }: the variant the server worked out and the steps it expects of this task, in order; MAILBOX_LOCKED is among them only when no other K1 revocation of the person is still to do.",
+            "description": "The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), or a K1 checklist that is not valid: a step missing, not ticked or ticked with no time, or no evidence (K1_CHECKLIST_INCOMPLETE), steps ticked out of their order, a step timed earlier than the one that comes before it in the list, such as the lock of the mailbox before the sign-out of the sessions (K1_CHECKLIST_OUT_OF_ORDER), or a step the variant does not have, sent twice or sent for a kind that has no checklist (COMPLETION_NOT_ALLOWED). A refusal of the checklist of a K1 task carries details { variant, codes }: the variant the server worked out and the steps it expects of this task, in order; MAILBOX_LOCKED is among them only when no other K1 revocation of the person is still to do.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -37168,7 +37168,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin starts the revocation.",
+            "description": "Only an IT Admin starts the revocation, and an IT Admin who is the person revoked waits for another usable IT Admin (PROVISIONING.ANOTHER_IT_ADMIN_NEEDED); with none left they may.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -37221,7 +37221,7 @@
             }
           },
           "409": {
-            "description": "The right was ended already (ASSIGNMENT_EXPIRY.NOT_OPEN), its end day has not passed (ASSIGNMENT_EXPIRY.NOT_EXPIRED), a renewal sent in time waits for its decision (ASSIGNMENT_EXPIRY.RENEWAL_PENDING), or the revocation gate refuses it (for example PROVISIONING.ANOTHER_IT_ADMIN_NEEDED when the IT Admin is the holder). Nothing is written.",
+            "description": "The right was ended already (ASSIGNMENT_EXPIRY.NOT_OPEN), its end day has not passed (ASSIGNMENT_EXPIRY.NOT_EXPIRED), a renewal sent in time waits for its decision (ASSIGNMENT_EXPIRY.RENEWAL_PENDING), or the revocation gate refuses the kind of grant (REVOCATION.TYPE_NOT_SUPPORTED). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -60272,7 +60272,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The proposal without its lines, which are a paged list of their own.",
+            "description": "The proposal: its state, the amount asked for the whole year, the note, who sent it and when, how it ended and which proposal follows it. It has no lines.",
             "content": {
               "application/json": {
                 "schema": {
@@ -61466,7 +61466,7 @@
             }
           },
           "409": {
-            "description": "The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the department is not in the cycle of the year (DEPARTMENT_NOT_IN_CYCLE), the deadline has not passed, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).",
+            "description": "The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle of the year is not open (CYCLE_NOT_OPEN), the department is not in it (DEPARTMENT_NOT_IN_CYCLE), the submission deadline has not passed (BEFORE_DEADLINE) or a proposal waits (HAS_PROPOSAL) (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -61928,7 +61928,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The edits of the figures, of a line and of the lines added or imported, newest first, each with the fields it changed before and after, and who and when. Finance reads it, and so does the person who decides the version.",
+            "description": "The edits of a version, newest first: of the figures, and of the files added or removed (the edits of a line, of lines added or imported and of a moved window are on versions of the earlier releases only), each with the fields it changed before and after, and who and when. Finance reads it, and so does the person who decides the version.",
             "content": {
               "application/json": {
                 "schema": {
@@ -63274,7 +63274,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The Cost Center of the department the caller heads, the year, whether it has a current budget (ACTIVE) or not (NO_ACTIVE_BUDGET), its base, reserve, commitments, spend, pending spend, both remaining amounts, the published department ceiling and cycle deadlines, and the proposal behind it.",
+            "description": "The Cost Center of the department the caller heads, the year, whether it has a current budget (ACTIVE) or not (NO_ACTIVE_BUDGET), its base, reserve, commitments, spend, pending spend, both remaining amounts, the state and the deadlines of the cycle of the year, the version in force, the refusal of the latest version when it was refused, and the proposal behind it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -64043,7 +64043,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The commitments, the newest first, each with its request (the software and plan, who sent it, how many people it is for, when the spend was approved), Cost Center, year and amount, what is still held, what invoices have turned into an expense, and whether it is attached to the budget of its year or waits for one (no budget yet). Narrowed by `state`, `attached`, the year, the Cost Center or the request.",
+            "description": "The commitments, the newest first, each with its request (the software and plan, who sent it, how many people it is for, when the spend was approved), Cost Center, year and amount, what is still held, what invoices have turned into an expense, and whether it is attached to the budget of its year or waits for one (no budget yet). Narrowed by `state`, `attached`, the year, the Cost Center or the request. Finance reads every commitment; the head of a department reads those of the Cost Centers they head.",
             "content": {
               "application/json": {
                 "schema": {
@@ -64215,7 +64215,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Each time money went back to the budget from the commitment, the oldest first: how much, why (the request ended, a grant failed, a share was withdrawn, or Finance let the remainder go), and who, when a person did it.",
+            "description": "Each time money went back to the budget from the commitment, the oldest first: how much, why (the request was cancelled or withdrawn, a grant failed, the share of a person was withdrawn, Finance let the remainder go, a seat was revoked or granted late, a key was given from the pool, or a transfer took effect), and who, when a person did it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -81137,7 +81137,7 @@
             }
           },
           "403": {
-            "description": "The credential is not an AI collector’s (DEVICE.WRONG_COLLECTOR_KIND), the holder has not acknowledged the notice (DEVICE.NOT_ACKNOWLEDGED), collection was stopped (DEVICE.COLLECTION_STOPPED), or the notice in force that names the status of tools is not acknowledged (DEVICE.TOOL_STATUS_NOT_ACKNOWLEDGED).",
+            "description": "The credential is not an AI collector’s (DEVICE.WRONG_COLLECTOR_KIND), the holder has not acknowledged the notice (DEVICE.NOT_ACKNOWLEDGED), collection was stopped (DEVICE.COLLECTION_STOPPED), or the holder acknowledged the notice but the version in force does not cover the status of tools (DEVICE.TOOL_STATUS_NOT_ACKNOWLEDGED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -99824,7 +99824,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "The sections of the overview of the head for the department they head on the business day (asOf), and no other department. The seats the department is granted or manages and the open reviews after a transfer are counted; the queue ready for spending submission, the budget proposals and the lines of the approved version name the operation that lists them; the need decisions waiting are counted as needDecisionList counts them; the ghost seats and the actual cost and commitments say they are not available yet and are never shown as zero. No remaining budget, budget check result, company total or usage measure is answered.",
+            "description": "The sections of the overview of the head for the department they head on the business day (asOf), and no other department. The seats the department is granted or manages and the ghost-seat recommendations that wait for the head are counted; the need decisions waiting are counted as needDecisionList counts them; the queue ready for spending submission, the budget proposals and the approved budget name the operation that lists them; the actual cost and commitments say they are not available yet and are never shown as zero. No remaining budget, budget check result, company total or usage measure is answered.",
             "content": {
               "application/json": {
                 "schema": {
@@ -124864,7 +124864,7 @@
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "The invoices recorded this year against every Cost Center the department ever had (the seat-months of K2 are not in it yet)."
+                      "description": "The invoices recorded this year, with the seat-months charged to them, against every Cost Center the department ever had."
                     },
                     "carriedOverNextYear": {
                       "type": "object",
@@ -124920,7 +124920,7 @@
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "The seats the people of the department hold, counted the way the warehouse counts them: a future start and a service account they answer for included."
+                            "description": "The seats the people of the department hold, counted the way the warehouse counts them: a seat that starts later is included."
                           },
                           "monthlyUnitPrice": {
                             "type": "object",
@@ -124984,7 +124984,7 @@
                   ],
                   "additionalProperties": false
                 },
-                "description": "The departments of the year, by id: at most 500 are listed (the most a division of the ceiling names); departmentsTotal says how many there are."
+                "description": "The departments of the year, by id: at most 500 are listed; departmentsTotal says how many there are."
               },
               "sharedPoolUnallocated": {
                 "type": "object",
@@ -125247,7 +125247,7 @@
                   ],
                   "additionalProperties": false
                 },
-                "description": "The departments of the year, by id: at most 500 are listed (the most a division of the ceiling names); departmentsTotal says how many there are."
+                "description": "The departments of the year, by id: at most 500 are listed; departmentsTotal says how many there are."
               }
             },
             "required": [
@@ -126370,7 +126370,7 @@
                     "explanationStatus": {
                       "type": "string",
                       "enum": ["NOT_REQUIRED", "PENDING", "EXPLAINED", "UNEXPLAINED", "NO_HEAD"],
-                      "description": "NOT_REQUIRED: a month, or a Cost Center that is green, is not asked. PENDING: asked and waiting for the head of the department. EXPLAINED: the head explained. UNEXPLAINED: Finance signed the quarter before the head explained. NO_HEAD: Finance signed and the department had no head to ask (not held against it)."
+                      "description": "NOT_REQUIRED: a month, or a Cost Center that is green, is not asked. PENDING: asked and waiting for the head of the department. EXPLAINED: the head explained. UNEXPLAINED: Finance signed the quarter before the head explained. NO_HEAD: the department had no head the day the quarter opened, so nobody is asked and the quarter does not wait for it (not held against it)."
                     },
                     "explanation": {
                       "type": "object",
@@ -126542,7 +126542,7 @@
               "explanationStatus": {
                 "type": "string",
                 "enum": ["NOT_REQUIRED", "PENDING", "EXPLAINED", "UNEXPLAINED", "NO_HEAD"],
-                "description": "NOT_REQUIRED: a month, or a Cost Center that is green, is not asked. PENDING: asked and waiting for the head of the department. EXPLAINED: the head explained. UNEXPLAINED: Finance signed the quarter before the head explained. NO_HEAD: Finance signed and the department had no head to ask (not held against it)."
+                "description": "NOT_REQUIRED: a month, or a Cost Center that is green, is not asked. PENDING: asked and waiting for the head of the department. EXPLAINED: the head explained. UNEXPLAINED: Finance signed the quarter before the head explained. NO_HEAD: the department had no head the day the quarter opened, so nobody is asked and the quarter does not wait for it (not held against it)."
               },
               "explanation": {
                 "type": "object",

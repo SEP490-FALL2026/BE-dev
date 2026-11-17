@@ -55,7 +55,7 @@ export class BudgetCommitmentsController {
   @ApiSuccessResponse(CommitmentListResponseDto, {
     message: 'BUDGET_COMMITMENT.LISTED',
     description:
-      'The commitments, the newest first, each with its request (the software and plan, who sent it, how many people it is for, when the spend was approved), Cost Center, year and amount, what is still held, what invoices have turned into an expense, and whether it is attached to the budget of its year or waits for one (no budget yet). Narrowed by `state`, `attached`, the year, the Cost Center or the request.',
+      'The commitments, the newest first, each with its request (the software and plan, who sent it, how many people it is for, when the spend was approved), Cost Center, year and amount, what is still held, what invoices have turned into an expense, and whether it is attached to the budget of its year or waits for one (no budget yet). Narrowed by `state`, `attached`, the year, the Cost Center or the request. Finance reads every commitment; the head of a department reads those of the Cost Centers they head.',
   })
   @ApiErrorResponses(UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE, READERS, INVALID_QUERY)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: CommitmentListQueryDto) {
@@ -75,7 +75,7 @@ export class BudgetCommitmentsController {
   @ApiSuccessResponse(ReleaseListResponseDto, {
     message: 'BUDGET_COMMITMENT.RELEASES_LISTED',
     description:
-      'Each time money went back to the budget from the commitment, the oldest first: how much, why (the request ended, a grant failed, a share was withdrawn, or Finance let the remainder go), and who, when a person did it.',
+      'Each time money went back to the budget from the commitment, the oldest first: how much, why (the request was cancelled or withdrawn, a grant failed, the share of a person was withdrawn, Finance let the remainder go, a seat was revoked or granted late, a key was given from the pool, or a transfer took effect), and who, when a person did it.',
   })
   @ApiErrorResponses(UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE, READERS, NOT_FOUND, INVALID_QUERY)
   async releases(@Param() params: CommitmentIdParamDto, @Query() query: ReleaseListQueryDto) {

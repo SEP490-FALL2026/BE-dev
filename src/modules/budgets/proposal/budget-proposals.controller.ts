@@ -156,7 +156,8 @@ export class BudgetProposalsController {
   @ApiOperation({ operationId: 'budgetProposalGet', summary: 'Get a budget proposal' })
   @ApiSuccessResponse(ProposalResponseDto, {
     message: 'BUDGET_PROPOSAL.FETCHED',
-    description: 'The proposal without its lines, which are a paged list of their own.',
+    description:
+      'The proposal: its state, the amount asked for the whole year, the note, who sent it and when, how it ended and which proposal follows it. It has no lines.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, INVALID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {
