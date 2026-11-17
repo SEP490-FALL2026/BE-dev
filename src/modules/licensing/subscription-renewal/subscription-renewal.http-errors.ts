@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { CurrencyNotSupportedError, MoneyScaleExceededError } from '../../../core/money/money.errors';
+import { MoneyOutOfRangeError, MoneyScaleExceededError } from '../../../core/money/money.errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toMoneyApiException } from '../../../infrastructure/http/errors/money-errors';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
@@ -133,6 +133,7 @@ export const RENEWAL_ERROR_EXAMPLES = {
   SEATS_HAVE_OPEN_TASKS: renewal('SEATS_HAVE_OPEN_TASKS', { seats: 1 }),
   PERIOD_REFUSED: renewal('PERIOD_REFUSED', { reason: 'ALREADY_RENEWED' }),
   NEXT_PERIOD_REQUIRED: renewal('NEXT_PERIOD_REQUIRED'),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'nextPeriod.unitPrice')),
-  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'nextPeriod.unitPrice')),
+  // The price of a period is in dong, which has no decimals: a price in another currency is PERIOD_REFUSED (PRICE_NOT_VND) before the amount is read.
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(0, 'nextPeriod.unitPrice')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('nextPeriod.unitPrice')),
 } as const;

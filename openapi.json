@@ -40204,7 +40204,7 @@
             }
           },
           "422": {
-            "description": "A field is invalid or one the route does not know (VALIDATION_ERROR), among them a note missing when the vendor refused or did otherwise and a closure not confirmed for a cancellation; the quantity does not fit the choice: a renewal names the seats bought, a reduction fewer, an increase more, a cancellation none (SUBSCRIPTION_RENEWAL.QUANTITY_INVALID); the seats are the vendor minimum above the need and note gives no evidence (SUBSCRIPTION_RENEWAL.VENDOR_MINIMUM_EVIDENCE_REQUIRED, details.seatsNeeded, vendorMinimumSeats); a renewal, a reduction or an increase with no nextPeriod, except a vendor that refused a plan by the month, and a cancellation the vendor refused or did otherwise with no nextPeriod (SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED); an outcome as decided whose new period does not have the seats recorded (SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH); the price of the new period has too many decimals or an unknown currency (MONEY_SCALE_EXCEEDED, CURRENCY_NOT_SUPPORTED).",
+            "description": "A field is invalid or one the route does not know (VALIDATION_ERROR), among them a note missing when the vendor refused or did otherwise and a closure not confirmed for a cancellation; the quantity does not fit the choice: a renewal names the seats bought, a reduction fewer, an increase more, a cancellation none (SUBSCRIPTION_RENEWAL.QUANTITY_INVALID); the seats are the vendor minimum above the need and note gives no evidence (SUBSCRIPTION_RENEWAL.VENDOR_MINIMUM_EVIDENCE_REQUIRED, details.seatsNeeded, vendorMinimumSeats); a renewal, a reduction or an increase with no nextPeriod, except a vendor that refused a plan by the month, and a cancellation the vendor refused or did otherwise with no nextPeriod (SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED); an outcome as decided whose new period does not have the seats recorded (SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH); the price of the new period has decimals, which dong does not have (MONEY_SCALE_EXCEEDED, details.allowedDecimals 0), or is below nothing or too large (MONEY_OUT_OF_RANGE), both with details.path nextPeriod.unitPrice.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40267,25 +40267,25 @@
                     }
                   },
                   "MONEY_SCALE_EXCEEDED": {
-                    "summary": "This currency allows at most 2 decimal digit(s).",
+                    "summary": "This currency allows at most 0 decimal digit(s).",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "MONEY_SCALE_EXCEEDED",
-                        "message": "This currency allows at most 2 decimal digit(s).",
-                        "details": { "allowedDecimals": 2, "path": "nextPeriod.unitPrice" },
+                        "message": "This currency allows at most 0 decimal digit(s).",
+                        "details": { "allowedDecimals": 0, "path": "nextPeriod.unitPrice" },
                         "requestId": "req_example"
                       }
                     }
                   },
-                  "CURRENCY_NOT_SUPPORTED": {
-                    "summary": "The currency XYZ is not supported.",
+                  "MONEY_OUT_OF_RANGE": {
+                    "summary": "The amount is outside the range a money value may hold.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "CURRENCY_NOT_SUPPORTED",
-                        "message": "The currency XYZ is not supported.",
-                        "details": { "currency": "XYZ", "path": "nextPeriod.unitPrice" },
+                        "code": "MONEY_OUT_OF_RANGE",
+                        "message": "The amount is outside the range a money value may hold.",
+                        "details": { "path": "nextPeriod.unitPrice" },
                         "requestId": "req_example"
                       }
                     }
@@ -41173,7 +41173,7 @@
             }
           },
           "422": {
-            "description": "A field is invalid (VALIDATION_ERROR); an outcome as decided that is not the decision (SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH); the price of the new period has too many decimals or an unknown currency (MONEY_SCALE_EXCEEDED, CURRENCY_NOT_SUPPORTED).",
+            "description": "A field is invalid (VALIDATION_ERROR); an outcome as decided that is not the decision (SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH); the price of the new period has decimals, which dong does not have (MONEY_SCALE_EXCEEDED, details.allowedDecimals 0), or is below nothing or too large (MONEY_OUT_OF_RANGE), both with details.path nextPeriod.unitPrice.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -41202,25 +41202,25 @@
                     }
                   },
                   "MONEY_SCALE_EXCEEDED": {
-                    "summary": "This currency allows at most 2 decimal digit(s).",
+                    "summary": "This currency allows at most 0 decimal digit(s).",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "MONEY_SCALE_EXCEEDED",
-                        "message": "This currency allows at most 2 decimal digit(s).",
-                        "details": { "allowedDecimals": 2, "path": "nextPeriod.unitPrice" },
+                        "message": "This currency allows at most 0 decimal digit(s).",
+                        "details": { "allowedDecimals": 0, "path": "nextPeriod.unitPrice" },
                         "requestId": "req_example"
                       }
                     }
                   },
-                  "CURRENCY_NOT_SUPPORTED": {
-                    "summary": "The currency XYZ is not supported.",
+                  "MONEY_OUT_OF_RANGE": {
+                    "summary": "The amount is outside the range a money value may hold.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "CURRENCY_NOT_SUPPORTED",
-                        "message": "The currency XYZ is not supported.",
-                        "details": { "currency": "XYZ", "path": "nextPeriod.unitPrice" },
+                        "code": "MONEY_OUT_OF_RANGE",
+                        "message": "The amount is outside the range a money value may hold.",
+                        "details": { "path": "nextPeriod.unitPrice" },
                         "requestId": "req_example"
                       }
                     }

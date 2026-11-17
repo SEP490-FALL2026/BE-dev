@@ -205,7 +205,7 @@ export class SubscriptionRenewalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'A field is invalid or one the route does not know (VALIDATION_ERROR), among them a note missing when the vendor refused or did otherwise and a closure not confirmed for a cancellation; the quantity does not fit the choice: a renewal names the seats bought, a reduction fewer, an increase more, a cancellation none (SUBSCRIPTION_RENEWAL.QUANTITY_INVALID); the seats are the vendor minimum above the need and note gives no evidence (SUBSCRIPTION_RENEWAL.VENDOR_MINIMUM_EVIDENCE_REQUIRED, details.seatsNeeded, vendorMinimumSeats); a renewal, a reduction or an increase with no nextPeriod, except a vendor that refused a plan by the month, and a cancellation the vendor refused or did otherwise with no nextPeriod (SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED); an outcome as decided whose new period does not have the seats recorded (SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH); the price of the new period has too many decimals or an unknown currency (MONEY_SCALE_EXCEEDED, CURRENCY_NOT_SUPPORTED).',
+        'A field is invalid or one the route does not know (VALIDATION_ERROR), among them a note missing when the vendor refused or did otherwise and a closure not confirmed for a cancellation; the quantity does not fit the choice: a renewal names the seats bought, a reduction fewer, an increase more, a cancellation none (SUBSCRIPTION_RENEWAL.QUANTITY_INVALID); the seats are the vendor minimum above the need and note gives no evidence (SUBSCRIPTION_RENEWAL.VENDOR_MINIMUM_EVIDENCE_REQUIRED, details.seatsNeeded, vendorMinimumSeats); a renewal, a reduction or an increase with no nextPeriod, except a vendor that refused a plan by the month, and a cancellation the vendor refused or did otherwise with no nextPeriod (SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED); an outcome as decided whose new period does not have the seats recorded (SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH); the price of the new period has decimals, which dong does not have (MONEY_SCALE_EXCEEDED, details.allowedDecimals 0), or is below nothing or too large (MONEY_OUT_OF_RANGE), both with details.path nextPeriod.unitPrice.',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.QUANTITY_INVALID,
@@ -213,7 +213,7 @@ export class SubscriptionRenewalsController {
         EXAMPLES.NEXT_PERIOD_REQUIRED,
         EXAMPLES.OUTCOME_MISMATCH,
         EXAMPLES.MONEY_SCALE_EXCEEDED,
-        EXAMPLES.CURRENCY_NOT_SUPPORTED,
+        EXAMPLES.MONEY_OUT_OF_RANGE,
       ],
     },
   )
@@ -261,12 +261,12 @@ export class SubscriptionRenewalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'A field is invalid (VALIDATION_ERROR); an outcome as decided that is not the decision (SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH); the price of the new period has too many decimals or an unknown currency (MONEY_SCALE_EXCEEDED, CURRENCY_NOT_SUPPORTED).',
+        'A field is invalid (VALIDATION_ERROR); an outcome as decided that is not the decision (SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH); the price of the new period has decimals, which dong does not have (MONEY_SCALE_EXCEEDED, details.allowedDecimals 0), or is below nothing or too large (MONEY_OUT_OF_RANGE), both with details.path nextPeriod.unitPrice.',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.OUTCOME_MISMATCH,
         EXAMPLES.MONEY_SCALE_EXCEEDED,
-        EXAMPLES.CURRENCY_NOT_SUPPORTED,
+        EXAMPLES.MONEY_OUT_OF_RANGE,
       ],
     },
   )
