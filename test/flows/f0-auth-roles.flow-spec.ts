@@ -74,11 +74,18 @@ describe('F0-01 every role signs in and refreshes for real @MF0 @D1', () => {
       ['NV-DEV3', 'NV-ENGH', 'NV-ITA1', 'NV-CEO', SUPER_ADMIN],
     ],
     [
-      'only the IT Admin proposes a renewal',
+      'only the IT Admin records the result of a renewal (one write, no head to confirm)',
       'post',
       '/subscription-renewals',
       ['NV-ITA1'],
       ['NV-DEV3', 'NV-ENGH', 'NV-FIN1', 'NV-CEO', SUPER_ADMIN],
+    ],
+    [
+      'the IT Admin and Finance read the seats a subscription needs for its next period',
+      'get',
+      '/subscription-renewals/adjustment',
+      ['NV-ITA1', 'NV-FIN1'],
+      ['NV-DEV3', 'NV-ENGH', 'NV-CEO', SUPER_ADMIN],
     ],
   ];
 
