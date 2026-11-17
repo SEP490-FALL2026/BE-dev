@@ -101,8 +101,17 @@ export interface DemoSubscription {
   billingCycle: 'MONTHLY' | 'ANNUAL';
   /** The commitment of the period: 1 month for a monthly plan, 12 for an annual one. */
   termMonths: 1 | 12;
-  /** An annual subscription renews this many days from today; none: the term of the current year. */
+  /**
+   * The payment day of a monthly subscription, or the renewal day of an annual one, this many days from today (negative: already past); none: a
+   * monthly one runs the calendar year with no payment day, and an annual one has the year of its start.
+   */
   renewalInDays?: number;
+  /** An annual subscription declares the deadline to cancel this many days from today (otherwise it follows from the renewal and the notice period). */
+  noticeDeadlineInDays?: number;
+  /** The subscription carries no end, renewal or notice date at all (`NO_ALERT_ANCHOR`, `CONTRACT_DATA_INCOMPLETE`): only a start and the cycle. */
+  withoutDates?: true;
+  /** Whether the subscription renews by itself (default true). */
+  autoRenew?: boolean;
   noticePeriodDays?: number;
   /** The IT Admin who answers for it (a person code). */
   responsible: string;

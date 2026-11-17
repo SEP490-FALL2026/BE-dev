@@ -119,7 +119,7 @@ const monthly = (
 });
 
 const SUBSCRIPTIONS: DemoSubscription[] = [
-  monthly('jira', 'jira-standard', '200000', 'NV-ITA1', 4),
+  { ...monthly('jira', 'jira-standard', '200000', 'NV-ITA1', 4), renewalInDays: 20 },
   // The annual one: 12 months of commitment, renewing in 50 days; a seat costs 4.500.000 a year, 375.000 a month.
   {
     key: 'figma',
@@ -133,13 +133,13 @@ const SUBSCRIPTIONS: DemoSubscription[] = [
     responsible: 'NV-ITA2',
     freeAfterBaseline: 4,
   },
-  monthly('slack', 'slack-pro', '180000', 'NV-ITA1', 6),
-  monthly('github', 'github-team', '100000', 'NV-ITA1', 5),
-  monthly('onepassword', 'onepassword-business', '200000', 'NV-ITA1', 0),
-  monthly('postman', 'postman-professional', '300000', 'NV-ITA1', 5),
+  { ...monthly('slack', 'slack-pro', '180000', 'NV-ITA1', 6), renewalInDays: 20 },
+  { ...monthly('github', 'github-team', '100000', 'NV-ITA1', 5), renewalInDays: 20 },
+  { ...monthly('onepassword', 'onepassword-business', '200000', 'NV-ITA1', 0), renewalInDays: 20 },
+  { ...monthly('postman', 'postman-professional', '300000', 'NV-ITA1', 5), renewalInDays: 20 },
   // The IT Admin who leaves answers for it: his departure hands it over (P5).
-  monthly('mailchimp', 'mailchimp-standard', '400000', 'NV-ITA4', 4),
-  monthly('canva', 'canva-teams', '250000', 'NV-ITA2', 4),
+  { ...monthly('mailchimp', 'mailchimp-standard', '400000', 'NV-ITA4', 4), renewalInDays: 20 },
+  { ...monthly('canva', 'canva-teams', '250000', 'NV-ITA2', 4), renewalInDays: 20 },
   // K1: bought one by one when a seat is granted, so ChatGPT and Cursor start with none (the MF-5 reduction flows count their seats).
   { ...monthly('chatgpt', 'chatgpt-plus', '500000', 'NV-ITA1', 0), quantity: 0, ownerDepartment: 'ENG' },
   // The vendor quotes 20 USD; a price is written in dong (`QĐ-111an`), so it is 508.000 (at the 25.400 the dataset used to record) and the
