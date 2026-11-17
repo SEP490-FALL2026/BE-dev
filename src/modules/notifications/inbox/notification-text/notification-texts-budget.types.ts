@@ -279,7 +279,7 @@ export const BUDGET_TEXTS = {
     en: {
       title: 'Budget explanation requested',
       message:
-        '{costCenterId:name} has a {light:enum} light in the quarterly review ending {month}/{year}. Please provide an explanation by {dueOn:date}.',
+        '{costCenterId:name} is marked {light:enum} in the quarterly review ending {month}/{year}. Please provide an explanation by {dueOn:date}.',
     },
   },
   BUDGET_ADJUSTMENT_REQUESTED: {

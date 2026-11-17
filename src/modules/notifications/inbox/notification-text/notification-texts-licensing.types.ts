@@ -253,7 +253,7 @@ export const LICENSING_TEXTS = {
     en: {
       title: 'An invoice awaits your confirmation',
       message:
-        'A purchase invoice for {linkKind:enum}, service month {servicePeriodMonth}, is waiting for you to confirm the payment.',
+        'A purchase invoice {linkKind:enum}, service month {servicePeriodMonth}, is waiting for you to confirm the payment.',
     },
   },
   PURCHASE_INVOICE_CONFIRMED: {
@@ -264,7 +264,7 @@ export const LICENSING_TEXTS = {
     en: {
       title: 'Invoice confirmed',
       message:
-        'Finance confirmed the payment for your purchase invoice for {linkKind:enum}, service month {servicePeriodMonth}.',
+        'Finance confirmed the payment for your purchase invoice {linkKind:enum}, service month {servicePeriodMonth}.',
     },
   },
   PURCHASE_INVOICE_RETURNED: {
@@ -276,7 +276,7 @@ export const LICENSING_TEXTS = {
     en: {
       title: 'Invoice returned',
       message:
-        'Finance returned your purchase invoice for {linkKind:enum}, service month {servicePeriodMonth}. Open it to read the reason, fix it and submit it again.',
+        'Finance returned your purchase invoice {linkKind:enum}, service month {servicePeriodMonth}. Open it to read the reason, fix it and submit it again.',
     },
   },
   DEPARTMENT_SOFTWARE_PROPOSED: {

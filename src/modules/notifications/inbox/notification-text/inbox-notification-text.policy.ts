@@ -238,10 +238,26 @@ const hasGroupValue = (value: unknown): boolean => value !== 0 && hasValue(value
 const groupShows = (group: GroupNode, params: Readonly<Record<string, unknown>>): boolean =>
   group.nodes.every((n) => n.t !== 'var' || hasGroupValue(params[n.key]));
 
+/**
+ * The text a person typed (`{reason}`, printed raw) may end with the full stop the template prints after it
+ * ("Lý do: {reason}."): that one is dropped, so the sentence does not end with "..". An ellipsis stays an ellipsis.
+ */
+const SENTENCE_END = /[.。]$/;
+
+function printNode(n: VarNode | TextNode, next: Node | undefined, ctx: RenderContext): string {
+  if (n.t === 'text') return n.text;
+  const value = formatValue(n, ctx);
+  return n.format === undefined && next?.t === 'text' && /^[.。]/.test(next.text)
+    ? value.replace(SENTENCE_END, '')
+    : value;
+}
+
 export function renderTemplate(template: TextTemplate, ctx: RenderContext): string {
-  const part = (n: VarNode | TextNode): string => (n.t === 'text' ? n.text : formatValue(n, ctx));
   const out = parse(branchOf(template, ctx.params))
-    .nodes.map((n) => (n.t === 'group' ? (groupShows(n, ctx.params) ? n.nodes.map(part).join('') : '') : part(n)))
+    .nodes.map((n, i, all) => {
+      if (n.t !== 'group') return printNode(n, all[i + 1], ctx);
+      return groupShows(n, ctx.params) ? n.nodes.map((m, j) => printNode(m, n.nodes[j + 1], ctx)).join('') : '';
+    })
     .join('');
   return out.replace(/ {2,}/g, ' ').trim();
 }
