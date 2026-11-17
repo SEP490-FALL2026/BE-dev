@@ -245,6 +245,14 @@ function annualDates(ctx: DemoRunContext, subscription: DemoSubscription): Dates
   };
 }
 
+/** The day a subscription starts: the first day the seats of the pool exist, so no seat of it is granted before. */
+export function subscriptionStartDate(ctx: DemoRunContext, subscription: DemoSubscription): string {
+  if (subscription.kind === 'PERPETUAL' || subscription.withoutDates) return dayOffset(ctx.today, -200);
+
+  return (subscription.billingCycle === 'ANNUAL' ? annualDates(ctx, subscription) : monthlyDates(ctx, subscription))
+    .startDate;
+}
+
 /** The terms of a subscription (everything but which plan and for whom), as the API takes them on creation and on update of a draft. */
 export function subscriptionTerms(ctx: DemoRunContext, subscription: DemoSubscription): Record<string, unknown> {
   const base = {

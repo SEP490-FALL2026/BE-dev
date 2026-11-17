@@ -246,6 +246,92 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
     }
   });
 
+  it('gives the new subscriptions seats of the people of T1 and of four heads only: the people the flows count are never touched (T8, SPEC 4.2)', () => {
+    const newPeople = new Set([
+      'NV-DEV5',
+      'NV-DEV6',
+      'NV-DEV7',
+      'NV-ITO1',
+      'NV-ITO2',
+      'NV-FIN2',
+      'NV-BOD1',
+      'NV-BOD2',
+      'NV-BOD3',
+      'NV-BOD4',
+      'NV-BOD5',
+      'NV-BOD6',
+      'NV-SAL3',
+      'NV-SAL4',
+      'NV-OPS2',
+      'NV-NEW2',
+      'NV-NEW3',
+    ]);
+    const oldKeys = new Set([
+      'jira',
+      'figma',
+      'slack',
+      'github',
+      'onepassword',
+      'postman',
+      'mailchimp',
+      'canva',
+      'chatgpt',
+      'cursor',
+      'grammarly',
+      'jetbrains',
+      'datagrip',
+    ]);
+    const added = F.seats.filter((seat) => !oldKeys.has(seat.subscription));
+
+    expect(added.length).toBeGreaterThan(0);
+    for (const seat of F.seats.filter((candidate) => oldKeys.has(candidate.subscription))) {
+      expect(newPeople.has(seat.holder)).toBe(false);
+    }
+    const oldHolders = new Set(added.map((seat) => seat.holder).filter((code) => !newPeople.has(code)));
+    expect([...oldHolders].sort()).toEqual(['NV-DEP', 'NV-FINH', 'NV-ITOH', 'NV-SALH']);
+    for (const seat of added) expect(person(seat.holder).department).not.toBe('MKT');
+    expect(added.some((seat) => person(seat.holder).department === 'DES')).toBe(false);
+    for (const key of ['figma', 'onepassword', 'datagrip', 'github']) {
+      expect(F.seats.filter((seat) => seat.subscription === key).every((seat) => !newPeople.has(seat.holder))).toBe(
+        true,
+      );
+    }
+  });
+
+  it('puts the seats of Adobe and Zoom Pro on the Board, not on Marketing, so R10 keeps its budget (T8, Q-B)', () => {
+    const holders = (key: string) => F.seats.filter((seat) => seat.subscription === key).map((seat) => seat.holder);
+
+    expect(holders('adobe-cc-teams').sort()).toEqual(['NV-BOD4', 'NV-BOD5', 'NV-BOD6', 'NV-DEP']);
+    expect(holders('zoom-pro').sort()).toEqual(['NV-BOD1', 'NV-BOD4', 'NV-SAL3', 'NV-SAL4']);
+    expect(holders('zoom-business')).toEqual(['NV-DEP']);
+    expect(holders('hubspot-starter').sort()).toEqual(['NV-SAL3', 'NV-SAL4', 'NV-SALH']);
+    expect(holders('m365-basic')).toHaveLength(13);
+    expect(
+      F.seats.filter(
+        (seat) =>
+          person(seat.holder).department === 'MKT' &&
+          !['jira', 'figma', 'slack', 'github', 'onepassword', 'postman', 'mailchimp', 'canva', 'grammarly'].includes(
+            seat.subscription,
+          ),
+      ),
+    ).toEqual([]);
+  });
+
+  it('has two seats that ended before today, the ones the queue of expiring rights shows (T8)', () => {
+    const ended = F.seats.filter((seat) => seat.endInDays !== undefined && seat.endInDays < 0);
+
+    expect(ended.map((seat) => `${seat.subscription}:${seat.holder}`).sort()).toEqual([
+      'confluence-standard:NV-ITO2',
+      'zoom-pro:NV-SAL4',
+    ]);
+  });
+
+  it('puts the keys of the two new K4 plans in the store: three for Visio, two for Sublime (T8)', () => {
+    expect(F.keys).toContainEqual({ subscription: 'visio-pro', count: 3 });
+    expect(F.keys).toContainEqual({ subscription: 'sublime-license', count: 2 });
+    expect(F.keys.some((k) => k.subscription === 'datagrip')).toBe(false);
+  });
+
   it('never makes a person ask for a plan they already hold', () => {
     for (const request of F.requests) {
       const subscription = request.plan ? subscriptionOf(request.plan) : undefined;

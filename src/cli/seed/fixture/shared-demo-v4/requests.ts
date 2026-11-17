@@ -284,7 +284,11 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       summary: 'K1 9 tháng qua năm: năm nay giữ phần còn lại của năm, số năm sau đã lưu khi duyệt chi (DEMO-4).',
     }),
   ],
-  keys: [{ subscription: 'jetbrains', count: 3 }],
+  keys: [
+    { subscription: 'jetbrains', count: 3 },
+    { subscription: 'visio-pro', count: 3 },
+    { subscription: 'sublime-license', count: 2 },
+  ],
   draft: { requester: 'NV-OPS1', plan: 'jira-standard', termMonths: null },
   saasIssue: {
     request: 'R01',

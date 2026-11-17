@@ -1,4 +1,4 @@
-import type { DemoApplication, DemoPlan, DemoPlanTerms, DemoSubscription } from '../demo-fixture.types';
+import type { DemoApplication, DemoPlan, DemoPlanTerms, DemoSeat, DemoSubscription } from '../demo-fixture.types';
 import { app, groupOf, k2, k4, monthly } from './catalog-kit';
 
 /** A per-seat plan bought one by one (K1): the control the company has over the seat is the one the vendor allows. */
@@ -193,4 +193,46 @@ export const PLAN_TERMS: DemoPlanTerms[] = [
     lastReviewedDaysAgo: 20,
     aiTraining: 'Không dùng dữ liệu khách hàng để huấn luyện (văn bản mô phỏng).',
   },
+];
+
+const seatsOf = (subscription: string, holders: string[], extra: Partial<DemoSeat> = {}): DemoSeat[] =>
+  holders.map((holder) => ({ subscription, holder, ...extra }));
+
+/*
+ * The seats the baseline files put in the new subscriptions (SPEC S08). Only the people of T1 and the heads of Finance, the Board, IT and Sales
+ * hold them (the invariants of 4.2): nobody of Marketing, whose budget R10 depends on, and nobody of Design, whose traps the MF-5 flows count. The
+ * seats of the people of T1 were granted 60 to 300 days ago, so the spending of a department grows month by month (Q-C, S24); the heads' seats keep
+ * the 130 days of every other seat of the old dataset. The ones the usage files of T17 make ghosts (BOD3 in Notion, BOD5, BOD6 in Adobe, SAL4 in
+ * HubSpot) are old enough to be judged. Two seats ended already and are still held: the queue of rights that ended shows them.
+ */
+export const EXTRA_SEATS: DemoSeat[] = [
+  ...seatsOf('m365-basic', ['NV-FINH', 'NV-DEP', 'NV-ITOH']),
+  ...seatsOf('m365-basic', ['NV-DEV5', 'NV-ITO1', 'NV-BOD1'], { grantedDaysAgo: 300 }),
+  ...seatsOf('m365-basic', ['NV-DEV6', 'NV-ITO2', 'NV-BOD2'], { grantedDaysAgo: 240 }),
+  ...seatsOf('m365-basic', ['NV-FIN2', 'NV-BOD3'], { grantedDaysAgo: 180 }),
+  ...seatsOf('m365-basic', ['NV-OPS2'], { grantedDaysAgo: 120 }),
+  ...seatsOf('m365-basic', ['NV-DEV7'], { grantedDaysAgo: 60 }),
+  ...seatsOf('m365-standard', ['NV-FINH', 'NV-DEP']),
+  ...seatsOf('zoom-pro', ['NV-SAL3'], { grantedDaysAgo: 180 }),
+  ...seatsOf('zoom-pro', ['NV-BOD4'], { grantedDaysAgo: 120 }),
+  ...seatsOf('zoom-pro', ['NV-BOD1'], { grantedDaysAgo: 60 }),
+  ...seatsOf('zoom-pro', ['NV-SAL4'], { grantedDaysAgo: 180, endInDays: -5 }),
+  ...seatsOf('zoom-business', ['NV-DEP']),
+  ...seatsOf('notion-business', ['NV-DEV5', 'NV-BOD3'], { grantedDaysAgo: 240 }),
+  ...seatsOf('notion-business', ['NV-DEV6'], { grantedDaysAgo: 180 }),
+  ...seatsOf('notion-business', ['NV-BOD1'], { grantedDaysAgo: 120 }),
+  ...seatsOf('notion-plus', ['NV-ITOH']),
+  ...seatsOf('notion-plus', ['NV-ITO1'], { grantedDaysAgo: 120 }),
+  ...seatsOf('confluence-standard', ['NV-DEV5'], { grantedDaysAgo: 180 }),
+  ...seatsOf('confluence-standard', ['NV-ITO1'], { grantedDaysAgo: 120 }),
+  ...seatsOf('confluence-standard', ['NV-ITO2'], { grantedDaysAgo: 240, endInDays: -10 }),
+  ...seatsOf('confluence-premium', ['NV-ITOH']),
+  ...seatsOf('adobe-cc-teams', ['NV-DEP']),
+  ...seatsOf('adobe-cc-teams', ['NV-BOD5'], { grantedDaysAgo: 300 }),
+  ...seatsOf('adobe-cc-teams', ['NV-BOD4', 'NV-BOD6'], { grantedDaysAgo: 240 }),
+  ...seatsOf('adobe-photoshop', ['NV-BOD2'], { grantedDaysAgo: 120 }),
+  ...seatsOf('claude-team', ['NV-DEV5'], { grantedDaysAgo: 180 }),
+  ...seatsOf('claude-team', ['NV-DEV6', 'NV-ITO1'], { grantedDaysAgo: 120 }),
+  ...seatsOf('hubspot-starter', ['NV-SALH']),
+  ...seatsOf('hubspot-starter', ['NV-SAL3', 'NV-SAL4'], { grantedDaysAgo: 120 }),
 ];

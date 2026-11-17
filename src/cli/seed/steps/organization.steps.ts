@@ -19,7 +19,7 @@ interface DepartmentProfile extends DepartmentRow {
 }
 
 /** Everybody started 400 days before today: a seat granted in the past never precedes the person it is for. */
-const HIRE_DAYS_AGO = 400;
+export const HIRE_DAYS_AGO = 400;
 const same = (a: string, b: string) => a.normalize('NFC').trim() === b.normalize('NFC').trim();
 
 async function departments(ctx: DemoRunContext): Promise<StepOutcome> {

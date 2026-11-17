@@ -2,8 +2,9 @@ import { dayOffset } from '../demo-dates';
 import { as, emailOf, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoSeat } from '../fixture/demo-fixture.types';
-import { catalogAdmin } from './catalog.steps';
+import { catalogAdmin, subscriptionStartDate } from './catalog.steps';
 import { SEAT_BASELINE_COLUMNS, csvCell } from './file-builders';
+import { HIRE_DAYS_AGO } from './organization.steps';
 
 type Result = { status: StepOutcome['status']; label: string };
 
@@ -12,12 +13,26 @@ const DEFAULT_GRANTED_DAYS_AGO = 130;
 /** The columns of the seat template: a column it does not know (the old `reason`) would come back as `ignoredColumns` on every preview. */
 const HEADER = SEAT_BASELINE_COLUMNS.join(',');
 
+/**
+ * The day a seat of the baseline was granted: the days of the seat before today, but never before the subscription starts (the annual ones of the
+ * dataset start late in the year) nor before the person was hired.
+ */
+export function grantedOnOf(ctx: DemoRunContext, seat: DemoSeat): string {
+  const wanted = dayOffset(ctx.today, -(seat.grantedDaysAgo ?? DEFAULT_GRANTED_DAYS_AGO));
+  const subscription = ctx.fixture.subscriptions.find((candidate) => candidate.key === seat.subscription);
+  const floors = [
+    dayOffset(ctx.today, -HIRE_DAYS_AGO),
+    ...(subscription ? [subscriptionStartDate(ctx, subscription)] : []),
+  ];
+
+  return [wanted, ...floors].reduce((latest, day) => (day > latest ? day : latest));
+}
+
 /** One line of the seat file for a seat of the fixture: the import takes personal seats only (`QĐ-110m`). */
 export function lineOf(ctx: DemoRunContext, seat: DemoSeat): string {
-  const grantedOn = dayOffset(ctx.today, -(seat.grantedDaysAgo ?? DEFAULT_GRANTED_DAYS_AGO));
   const end = seat.endInDays === undefined ? '' : dayOffset(ctx.today, seat.endInDays);
 
-  return [seat.holder, emailOf(ctx, seat.holder), 'personal', grantedOn, end].map(csvCell).join(',');
+  return [seat.holder, emailOf(ctx, seat.holder), 'personal', grantedOnOf(ctx, seat), end].map(csvCell).join(',');
 }
 
 interface ImportPreview {
