@@ -12,6 +12,7 @@ import {
   valuesOfUnlistedTool,
   valuesOfUnmatchedIdentity,
 } from './vendor-account-discrepancy.policy';
+import { VendorAccountReviewNotifier } from './vendor-account-review-notifier.service';
 import { VendorAccountReviewRepo } from './vendor-account-review.repo';
 import type { NewDiscrepancy } from './vendor-account-review.types';
 
@@ -27,6 +28,7 @@ export class VendorAccountIntakeService {
     private readonly repo: VendorAccountReviewRepo,
     private readonly catalog: CatalogApi,
     private readonly finance: FinanceApi,
+    private readonly notifier: VendorAccountReviewNotifier,
   ) {}
 
   /** The open findings and open identifiers the confirmed report contains; returns how many differences are new. */
@@ -69,12 +71,22 @@ export class VendorAccountIntakeService {
       })),
     ];
 
-    return this.repo.upsertMany(tx, rows);
+    const added = await this.repo.upsertMany(tx, rows);
+    await this.notifier.opened(tx, {
+      organizationId: rows[0].organizationId,
+      applicationId: event.applicationId,
+      vendorId,
+      source: 'USAGE_IMPORT',
+      newCount: added,
+      occasion: event.importId,
+    });
+
+    return added;
   }
 
   /** The invoice Finance closed as a suspicion: what the invoice says against what was approved or bought, side by side. */
   async fromInvoiceReferral(tx: DbTx, referral: InvoiceDiscrepancyReferral, now: Date = new Date()): Promise<void> {
-    await this.repo.upsertMany(tx, [
+    const added = await this.repo.upsertMany(tx, [
       {
         organizationId: referral.organizationId,
         source: 'INVOICE_DIFFERENCE',
@@ -94,6 +106,14 @@ export class VendorAccountIntakeService {
         }),
       },
     ]);
+    await this.notifier.opened(tx, {
+      organizationId: referral.organizationId,
+      applicationId: null,
+      vendorId: referral.vendorId,
+      source: 'INVOICE_DIFFERENCE',
+      newCount: added,
+      occasion: referral.caseId,
+    });
   }
 
   /** The tools the collector reported that are not on the allowlist: one row for each tool, the day of the evidence the last day it was seen. */
@@ -107,7 +127,7 @@ export class VendorAccountIntakeService {
       const seen = lastDay.get(sighting.tool);
       if (seen === undefined || sighting.date > seen) lastDay.set(sighting.tool, sighting.date);
     }
-    await this.repo.upsertMany(
+    const added = await this.repo.upsertMany(
       tx,
       [...lastDay].map(([tool, date]) => ({
         organizationId: input.organizationId,
@@ -122,6 +142,14 @@ export class VendorAccountIntakeService {
         ...valuesOfUnlistedTool(tool),
       })),
     );
+    await this.notifier.opened(tx, {
+      organizationId: input.organizationId,
+      applicationId: null,
+      vendorId: null,
+      source: 'COLLECTOR_UNLISTED',
+      newCount: added,
+      occasion: await this.notifier.businessDay(tx, now),
+    });
   }
 
   private async priceText(tx: DbTx, price: { amountMinor: bigint; currency: string }): Promise<string> {

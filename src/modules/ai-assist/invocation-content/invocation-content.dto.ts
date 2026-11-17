@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { AI_PROVIDER_MODES } from '../ai-service/ai-service.types';
 
 export const invocationContentParamSchema = z.strictObject({ invocationId: z.uuid() });
 
@@ -11,6 +12,10 @@ export const invocationContentParamSchema = z.strictObject({ invocationId: z.uui
  */
 const contentSchema = z.strictObject({
   invocationId: z.uuid(),
+  providerMode: z.enum(AI_PROVIDER_MODES).meta({
+    description:
+      "Where the answer came from: MODEL, the AI service; SIMULATED, the simulation that calls no model (show the label 'Giả lập — không phải AI').",
+  }),
   context: z.record(z.string(), z.unknown()).meta({
     description:
       'The allow-listed context sent to the AI service, with opaque references (R001, C001) in place of ids. A JSON object.',

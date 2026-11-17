@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
-import { SubscriptionPeriodService } from '../subscription/subscription-period.service';
+import { SubscriptionPeriodService } from '../subscription/period/subscription-period.service';
 import type {
   NextPeriodInput,
   PaymentScheduleFacts,
@@ -41,9 +40,12 @@ export class SubscriptionPeriodApi {
     return this.periods.lock(tx, subscriptionId);
   }
 
-  /** The active terms not yet continued whose milestone falls between two days, and those that have no milestone at all. */
-  listRenewalSubjects(window: { from: BusinessDate; to: BusinessDate }): Promise<RenewalPeriodFacts[]> {
-    return this.periods.subjects(window);
+  /**
+   * The active K2 terms (the shared pool's workspaces) not yet continued, at most 500: the periods that have a point of adjustment
+   * (`SBF-20`). Each carries its `adjustment`, null when no date gives one.
+   */
+  listAdjustmentSubjects(): Promise<RenewalPeriodFacts[]> {
+    return this.periods.adjustmentSubjects();
   }
 
   /**

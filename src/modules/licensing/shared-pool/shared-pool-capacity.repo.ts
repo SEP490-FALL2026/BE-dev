@@ -9,6 +9,29 @@ export interface SubscriptionOccupancy {
   inRevocation: number;
 }
 
+/**
+ * Which of these periods the company has decided to end and whose decision still stands (`Q-162`, `A1C-02`): a case decided `CANCEL` that
+ * waits for its outcome, or whose outcome is the one decided. A cancellation the vendor refused, or that ended another way, ends nothing.
+ * It is written here, the lowest capability that asks it (the pool grants nothing from such a subscription; the renewals read it too through
+ * their repo), so that the two never differ. One statement, only the ids.
+ */
+export async function endingAmongOf(
+  client: DbTx | PrismaService,
+  subscriptionIds: readonly string[],
+): Promise<Set<string>> {
+  if (subscriptionIds.length === 0) return new Set();
+  const rows = await client.subscriptionRenewal.findMany({
+    where: {
+      subscriptionId: { in: [...subscriptionIds] },
+      decidedChoice: 'CANCEL',
+      OR: [{ state: 'DECIDED' }, { state: 'OUTCOME_RECORDED', outcome: 'AS_DECIDED' }],
+    },
+    select: { subscriptionId: true },
+  });
+
+  return new Set(rows.map((row) => row.subscriptionId));
+}
+
 /** Reads the assignments and tasks of licensing to tell how much of the pool of a plan is taken. */
 @Injectable()
 export class SharedPoolCapacityRepo {
@@ -34,6 +57,11 @@ export class SharedPoolCapacityRepo {
     today: BusinessDate,
   ): Promise<Map<string, SubscriptionOccupancy>> {
     return this.read(this.prisma, subscriptionIds, today);
+  }
+
+  /** `endingAmong` for the pool: the ones it grants nothing from (`A1C-02`). */
+  endingAmong(subscriptionIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return endingAmongOf(tx ?? this.prisma, subscriptionIds);
   }
 
   private async read(

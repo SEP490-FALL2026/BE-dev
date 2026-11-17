@@ -2,7 +2,7 @@ import type { DbTx, TransactionRunner } from '../../../infrastructure/database/t
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { AuditEventInput } from '../../audit/public/audit.types';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import type { AiInvocationContentRepo } from '../invocation/invocation-content.repo';
+import type { AiInvocationHistoryStore } from '../invocation/invocation-history-store.types';
 import { AiPurgeApi } from './ai-purge.api';
 import { AiPurgeRefusedError } from './ai-purge.errors';
 
@@ -14,8 +14,8 @@ function world(options: { count?: number; organization?: boolean } = {}) {
   const order: string[] = [];
   const events: AuditEventInput[] = [];
   const repo = {
-    countCreatedBefore: jest.fn<Promise<number>, [Date, DbTx?]>(() => Promise.resolve(count)),
-    deleteCreatedBefore: jest.fn<Promise<number>, [DbTx, Date]>(() => {
+    countPurgeable: jest.fn<Promise<number>, [Date]>(() => Promise.resolve(count)),
+    purge: jest.fn<Promise<number>, [DbTx, Date]>(() => {
       order.push('delete');
       return Promise.resolve(count);
     }),
@@ -33,7 +33,7 @@ function world(options: { count?: number; organization?: boolean } = {}) {
   const run = jest.fn(<T>(work: (tx: DbTx) => Promise<T>) => work(TX));
   const api = new AiPurgeApi(
     { run } as unknown as TransactionRunner,
-    repo as unknown as AiInvocationContentRepo,
+    repo as unknown as AiInvocationHistoryStore,
     organizations as unknown as OrganizationReadApi,
     audit as unknown as AuditApi,
   );
@@ -51,7 +51,7 @@ describe('AiPurgeApi.purge', () => {
         through: '2026-12-01',
         contentCount: 7,
       });
-      expect(repo.deleteCreatedBefore).not.toHaveBeenCalled();
+      expect(repo.purge).not.toHaveBeenCalled();
       expect(audit.record).not.toHaveBeenCalled();
       expect(run).not.toHaveBeenCalled();
     });
@@ -61,7 +61,7 @@ describe('AiPurgeApi.purge', () => {
 
       await api.purge({ through: '2026-12-31', apply: false, operator: null });
 
-      expect(repo.countCreatedBefore).toHaveBeenCalledWith(new Date('2027-01-01T00:00:00.000Z'));
+      expect(repo.countPurgeable).toHaveBeenCalledWith(new Date('2027-01-01T00:00:00.000Z'));
     });
   });
 
@@ -74,7 +74,7 @@ describe('AiPurgeApi.purge', () => {
       await expect(api.purge(command)).resolves.toEqual({ mode: 'APPLIED', through: '2026-12-01', contentCount: 4 });
 
       expect(run).toHaveBeenCalledTimes(1);
-      expect(repo.deleteCreatedBefore).toHaveBeenCalledWith(TX, new Date('2026-12-02T00:00:00.000Z'));
+      expect(repo.purge).toHaveBeenCalledWith(TX, new Date('2026-12-02T00:00:00.000Z'));
       expect(audit.record).toHaveBeenCalledWith(TX, expect.anything());
       expect(order).toEqual(['delete', 'audit']);
       expect(events).toEqual([
@@ -119,7 +119,7 @@ describe('AiPurgeApi.purge', () => {
       await expect(api.purge({ through: '2026-12-01', apply: true, operator: null })).rejects.toThrow(
         AiPurgeRefusedError,
       );
-      expect(repo.deleteCreatedBefore).not.toHaveBeenCalled();
+      expect(repo.purge).not.toHaveBeenCalled();
     });
   });
 });

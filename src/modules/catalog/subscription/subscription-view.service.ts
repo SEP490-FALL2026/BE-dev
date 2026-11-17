@@ -2,18 +2,26 @@ import { Injectable } from '@nestjs/common';
 import { formatAmount } from '../../../core/money/money';
 import { FinanceApi } from '../../finance/public/finance.api';
 import type { TaxEstimateResult } from '../../finance/public/finance.types';
-import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import type { BusinessDate } from '../../../core/business-date';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SeatOccupancyHook } from '../public/catalog.extension-points';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { needsVendorAdmins } from '../plan/plan-vendor-admins.policy';
-import { adjustmentPointOf, expiryReading, runsAPeriod } from './obligation/subscription-obligation.policy';
+import {
+  adjustmentCommitmentOf,
+  adjustmentPointOf,
+  expiryReading,
+  redAlertOf,
+  runsAPeriod,
+  type AdjustmentPoint,
+  type AdjustmentWindows,
+} from './obligation/subscription-obligation.policy';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
 import { isPricedInDong } from './price/subscription-price.policy';
 import { liveIdsByPlan, liveSiblingsOf, poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
 import { SubscriptionGrantingRepo } from './subscription-granting.repo';
 import { SubscriptionRepo } from './subscription.repo';
+import { SubscriptionWindowsService } from './subscription-windows.service';
 import type {
   DeadlineKind,
   ExpiryState,
@@ -53,24 +61,41 @@ const seatsOfPool = (record: SubscriptionRecord, counts: SeatCounts): Subscripti
   };
 };
 
+/** The alerts of a subscription: the deadline of its point of adjustment, and the days it counts back to (the point, then the red alert of a plan by the year). */
+const alertsOf = (
+  point: AdjustmentPoint | null,
+  record: SubscriptionRecord,
+  windows: AdjustmentWindows | undefined,
+): SubscriptionView['alerts'] => ({
+  baseDate: point?.deadline ?? null,
+  dates: alertDates(
+    point === null || windows === undefined
+      ? null
+      : {
+          point: point.point,
+          redAlertOn: redAlertOf(point.deadline, adjustmentCommitmentOf(record), windows.redAlertDaysAnnual),
+        },
+  ),
+});
+
 const mergeWarnings = (mergeCandidateIds: readonly string[]): 'SHOULD_MERGE'[] =>
   mergeCandidateIds.length > 0 ? ['SHOULD_MERGE'] : [];
 
 /**
  * A subscription as it is answered: the stored data with everything derived when it is read — the notice deadline and
- * its source, the alert dates the operating parameter sets now, the data-quality warning, the tax profile of the vendor
+ * its source, the alert dates from its point of adjustment, the data-quality warning, the tax profile of the vendor
  * and the tax estimate on the unit price. Nothing here is stored, so none of it can disagree with the data.
  */
 @Injectable()
 export class SubscriptionViewService {
   constructor(
     private readonly finance: FinanceApi,
-    private readonly parameters: OperatingParametersApi,
     private readonly subscriptions: SubscriptionRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly planFacts: PlanFactsService,
     private readonly occupancy: SeatOccupancyHook,
     private readonly periods: SubscriptionGrantingRepo,
+    private readonly windows: SubscriptionWindowsService,
   ) {}
 
   /**
@@ -80,8 +105,9 @@ export class SubscriptionViewService {
   async expiryReadings(records: readonly SubscriptionRecord[]): Promise<Map<string, ExpiryReadingView>> {
     const today = await this.organizationReads.businessToday();
     const [seats, continued] = await Promise.all([this.seatsOf(records, today), this.continuedAmong(records)]);
+    const points = await this.pointsOf(records, today, continued);
 
-    return this.readingsOf(records, today, seats, continued);
+    return this.readingsAt(records, points.points, today, seats);
   }
 
   /** Which of these subscriptions a later period continues: one read for all of them. */
@@ -89,21 +115,42 @@ export class SubscriptionViewService {
     return this.periods.idsWithSuccessor(records.map((record) => record.id));
   }
 
-  private readingsOf(
+  /**
+   * The point of adjustment of each of these subscriptions today, null where there is none, with the windows each was counted with. Only a
+   * subscription that runs a period has a point: the rule of the filter by expiry, so a badge, the alert dates and the filter never disagree. The
+   * windows are those of the period of each (`QĐ-106h`), read once for all of them by the one rule of the instant (`adjustmentPeriodInstantOf`).
+   */
+  private async pointsOf(
     records: readonly SubscriptionRecord[],
     today: BusinessDate,
-    seats: SeatCounts,
     continued: ReadonlySet<string>,
+  ): Promise<{ points: Map<string, AdjustmentPoint | null>; windows: Map<string, AdjustmentWindows> }> {
+    const running = records.filter((record) => runsAPeriod({ ...record, hasSuccessor: continued.has(record.id) }));
+    const windows = await this.windows.of(running, today);
+
+    return {
+      windows,
+      points: new Map(
+        records.map((record) => {
+          const own = windows.get(record.id);
+
+          return [record.id, own === undefined ? null : adjustmentPointOf(record, today, own)];
+        }),
+      ),
+    };
+  }
+
+  private readingsAt(
+    records: readonly SubscriptionRecord[],
+    points: ReadonlyMap<string, AdjustmentPoint | null>,
+    today: BusinessDate,
+    seats: SeatCounts,
   ): Map<string, ExpiryReadingView> {
     return new Map(
-      records.map((record) => {
-        // Only a subscription that runs a period has a point: the rule of the filter by expiry, so a badge and the filter never disagree.
-        const point = runsAPeriod({ ...record, hasSuccessor: continued.has(record.id) })
-          ? adjustmentPointOf(record, today)
-          : null;
-
-        return [record.id, expiryReading(point, today, (seats.get(record.id)?.occupied ?? 0) > 0)];
-      }),
+      records.map((record) => [
+        record.id,
+        expiryReading(points.get(record.id) ?? null, today, (seats.get(record.id)?.occupied ?? 0) > 0),
+      ]),
     );
   }
 
@@ -138,7 +185,6 @@ export class SubscriptionViewService {
   /** The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. */
   async viewAll(records: SubscriptionRecord[]): Promise<SubscriptionView[]> {
     if (records.length === 0) return [];
-    const daysBefore = await this.alertDays();
     // A priced subscription answers its tax profile from the read its estimate came from, so the two are one version
     //; only the vendors of the subscriptions without a price are read for their profile alone.
     const unpricedVendors = records.filter((record) => record.unitPrice === null).map((record) => record.vendor.id);
@@ -173,7 +219,8 @@ export class SubscriptionViewService {
     const vendorAdmins = await this.vendorAdminsOf(records);
     const today = await this.organizationReads.businessToday();
     const seatCounts = await this.seatsOf(records, today);
-    const readings = this.readingsOf(records, today, seatCounts, await this.continuedAmong(records));
+    const { points, windows } = await this.pointsOf(records, today, await this.continuedAmong(records));
+    const readings = this.readingsAt(records, points, today, seatCounts);
     const answerer = await this.answerersOf(records);
     const adjustment = (record: SubscriptionRecord) => ({
       logoUrl: record.applicationLogoUrl,
@@ -251,7 +298,7 @@ export class SubscriptionViewService {
         isPrimaryForPlan: record.isPrimaryForPlan,
         ...adjustment(record),
         noticeDeadline: { value: notice.deadline, source: notice.source },
-        alerts: { baseDate: notice.baseDate, dates: alertDates(notice.baseDate, daysBefore) },
+        alerts: alertsOf(points.get(record.id) ?? null, record, windows.get(record.id)),
         warnings: [...noticeWarnings(notice.source), ...poolWarnings(record), ...mergeWarnings(mergeCandidateIds)],
         mergeCandidateIds,
         ...vendorAdmins(record),
@@ -311,12 +358,5 @@ export class SubscriptionViewService {
         ...vendorAdminFlags({ needs, admins, ownerAccountEmail }),
       };
     };
-  }
-
-  /** The days before the deadline an alert falls, as the parameter says now. */
-  private async alertDays(): Promise<number[]> {
-    const value = await this.parameters.getValue('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE');
-
-    return Array.isArray(value) ? value : [];
   }
 }

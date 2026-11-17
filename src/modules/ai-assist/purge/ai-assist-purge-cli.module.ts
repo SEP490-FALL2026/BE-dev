@@ -3,6 +3,7 @@ import { DatabaseModule } from '../../../infrastructure/database/database.module
 import { AuditModule } from '../../audit/audit.module';
 import { OrganizationModule } from '../../organization/organization.module';
 import { AiInvocationContentRepo } from '../invocation/invocation-content.repo';
+import { AiInvocationHistoryStore } from '../invocation/invocation-history-store.types';
 import { AiPurgeApi } from '../public/ai-purge.api';
 
 /**
@@ -11,7 +12,11 @@ import { AiPurgeApi } from '../public/ai-purge.api';
  */
 @Module({
   imports: [DatabaseModule, OrganizationModule, AuditModule],
-  providers: [AiInvocationContentRepo, AiPurgeApi],
+  providers: [
+    AiInvocationContentRepo,
+    { provide: AiInvocationHistoryStore, useExisting: AiInvocationContentRepo },
+    AiPurgeApi,
+  ],
   exports: [AiPurgeApi],
 })
 export class AiAssistPurgeCliModule {}

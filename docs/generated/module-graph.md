@@ -58,7 +58,7 @@ flowchart BT
   catalog -->|10| finance
   catalog -->|8| identity_access
   catalog -->|3| notifications
-  catalog -->|4| operating_parameters
+  catalog -->|3| operating_parameters
   catalog -->|33| organization
   dashboards -->|2| catalog
   dashboards -->|2| devices
@@ -78,9 +78,10 @@ flowchart BT
   data_import -->|5| policies
   devices -->|12| audit
   devices -->|3| catalog
-  devices -->|2| identity_access
+  devices -->|3| identity_access
+  devices -->|2| notifications
   devices -->|2| operating_parameters
-  devices -->|14| organization
+  devices -->|16| organization
   finance -->|3| audit
   finance -->|3| organization
   identity_access -->|18| audit
@@ -93,12 +94,12 @@ flowchart BT
   installation -->|8| organization
   installation -->|2| policies
   licensing -->|30| audit
-  licensing -->|55| catalog
+  licensing -->|57| catalog
   licensing -->|2| finance
   licensing -->|12| identity_access
-  licensing -->|8| notifications
-  licensing -->|7| operating_parameters
-  licensing -->|56| organization
+  licensing -->|10| notifications
+  licensing -->|6| operating_parameters
+  licensing -->|55| organization
   licensing -->|4| policies
   onboarding -->|2| catalog
   onboarding -->|2| data_import
@@ -144,16 +145,16 @@ flowchart BT
   requests -->|34| policies
   usage -->|10| audit
   usage -->|3| budgets
-  usage -->|15| catalog
-  usage -->|16| devices
+  usage -->|16| catalog
+  usage -->|17| devices
   usage -->|3| finance
-  usage -->|2| identity_access
+  usage -->|3| identity_access
   usage -->|8| licensing
-  usage -->|2| notifications
+  usage -->|3| notifications
   usage -->|2| operating_parameters
-  usage -->|18| organization
+  usage -->|19| organization
   usage -->|4| policies
   usage -->|4| requests
 ```
 
-113 module edges.
+114 module edges.

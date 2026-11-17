@@ -44,8 +44,8 @@ describe('the content of a call of the AI over HTTP (integration, real PostgreSQ
     const id = randomUUID();
     const complete = options.complete ?? true;
     await ctx.sql.query(
-      `INSERT INTO ai_invocations (id, organization_id, feature, actor_app_user_id, actor_employee_id, status, source_revision, finished_at)
-       VALUES ($1, $2, 'ACCESS_REQUEST_QUEUE_SUMMARY', $3, $4, $5::"AiInvocationStatus", $6, now())`,
+      `INSERT INTO ai_invocations (id, organization_id, feature, actor_app_user_id, actor_employee_id, status, source_revision, finished_at, provider_mode)
+       VALUES ($1, $2, 'ACCESS_REQUEST_QUEUE_SUMMARY', $3, $4, $5::"AiInvocationStatus", $6, now(), 'MODEL')`,
       [id, seed.organizationId, owner.appUserId, owner.employeeId, complete ? 'COMPLETED' : 'FAILED', `rev-${id}`],
     );
     await ctx.sql.query(
@@ -91,6 +91,7 @@ describe('the content of a call of the AI over HTTP (integration, real PostgreSQ
       message: 'AI.CONTENT_READ',
       data: {
         invocationId: id,
+        providerMode: 'MODEL',
         context: CONTEXT,
         promptText: 'the prompt',
         rawResponse: '{"items":[]}',
@@ -131,6 +132,7 @@ describe('the content of a call of the AI over HTTP (integration, real PostgreSQ
 
     expect(bodyOf(response).data).toEqual({
       invocationId: id,
+      providerMode: 'MODEL',
       context: CONTEXT,
       promptText: null,
       rawResponse: null,

@@ -15,6 +15,7 @@ import {
 import { SaasIssueFactsRepo } from './saas-issue-facts.repo';
 import { SaasIssueRepo, type IssuePatch, type SaasIssueRecord } from './saas-issue.repo';
 import { SaasIssueCalendar } from './saas-issue-calendar.service';
+import { SaasIssueNotifier } from './saas-issue-notifier.service';
 
 export interface TransitionInput {
   to: SaasIssueState;
@@ -41,6 +42,7 @@ export class SaasIssueHandlingService {
     private readonly issues: SaasIssueRepo,
     private readonly facts: SaasIssueFactsRepo,
     private readonly audit: AuditApi,
+    private readonly notifier: SaasIssueNotifier,
   ) {}
 
   async transition(actor: AuthenticatedPrincipal, id: string, input: TransitionInput): Promise<SaasIssueRecord> {
@@ -70,7 +72,7 @@ export class SaasIssueHandlingService {
       };
       const updated = await this.issues.update(tx, id, patch);
       const onBehalfOf = actor.employeeId === issue.assignedItAdminEmployeeId ? null : issue.assignedItAdminEmployeeId;
-      await this.issues.insertEntry(tx, {
+      const entry = await this.issues.insertEntry(tx, {
         issueId: id,
         kind: 'TRANSITION',
         authorEmployeeId: actor.employeeId,
@@ -120,6 +122,8 @@ export class SaasIssueHandlingService {
         );
       }
 
+      await this.notifier.stateChanged(tx, issue, entry, 'IT_ACTION', actor.employeeId);
+
       return updated;
     });
   }
@@ -155,7 +159,7 @@ export class SaasIssueHandlingService {
         duplicateReason: reason,
       });
       const onBehalfOf = actor.employeeId === issue.assignedItAdminEmployeeId ? null : issue.assignedItAdminEmployeeId;
-      await this.issues.insertEntry(tx, {
+      const entry = await this.issues.insertEntry(tx, {
         issueId: id,
         kind: 'TRANSITION',
         authorEmployeeId: actor.employeeId,
@@ -183,6 +187,8 @@ export class SaasIssueHandlingService {
           },
         ),
       );
+
+      await this.notifier.stateChanged(tx, issue, entry, 'IT_ACTION', actor.employeeId);
 
       return updated;
     });

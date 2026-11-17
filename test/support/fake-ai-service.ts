@@ -53,7 +53,13 @@ export interface RecordedCall {
 
 /** What the stand-in does with an authorised call. */
 export type FakeReply =
-  | { kind: 'answer'; items: ScriptedItem[] | null; parseStatus?: 'OK' | 'INVALID_JSON' | 'SCHEMA_MISMATCH' }
+  | {
+      kind: 'answer';
+      items: ScriptedItem[] | null;
+      parseStatus?: 'OK' | 'INVALID_JSON' | 'SCHEMA_MISMATCH';
+      /** The model id the answer names; `fake-model` when absent. */
+      modelId?: string;
+    }
   | { kind: 'status'; status: number; code: string }
   | { kind: 'body'; status: number; body: string }
   | { kind: 'hang' }
@@ -220,7 +226,7 @@ export class FakeAiService {
           JSON.stringify({
             contractVersion: '1',
             invocationId: call.body.invocationId,
-            modelId: 'fake-model',
+            modelId: reply.modelId ?? 'fake-model',
             modelRevision: 'fake-rev-1',
             promptVersion: 'access-request-queue-summary-v1',
             schemaVersion: 'access-request-queue-summary.v1',

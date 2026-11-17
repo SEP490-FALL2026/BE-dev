@@ -4,8 +4,22 @@ import type { BusinessDate } from '../../../core/business-date';
 export type PeriodNoticeSource = 'DECLARED' | 'INFERRED_UNCONFIRMED' | 'BY_END_DATE' | 'MISSING' | 'NOT_APPLICABLE';
 
 /**
+ * The point of adjustment of a period as the catalog derives it (`FR-1.4`, `QĐ-103e`): the day the IT Admin has to act by (`deadline`, of
+ * the kind `kind`), the day the point opens (`point`), the last day of the period (`end`) and, for a plan by the year, the day the red alert opens.
+ */
+export interface PeriodAdjustment {
+  kind: 'PAYMENT_DATE' | 'NOTICE_DEADLINE' | 'RENEWAL_DATE' | 'END_DATE';
+  deadline: BusinessDate;
+  point: BusinessDate;
+  end: BusinessDate;
+  /** The day the red alert opens, for a plan by the year; null for a plan by the month. */
+  redAlertOn: BusinessDate | null;
+  commitment: 'MONTHLY' | 'ANNUAL';
+}
+
+/**
  * What the renewal of a subscription period needs to know of it (EP-11): the term, the milestone as the catalog derives it,
- * the price and the seats bought, the department that owns it, and whether a later period already continues it. Nothing of
+ * the price and the seats bought, the department that owns it (none for the shared pool), and whether a later period already continues it. Nothing of
  * how the catalog keeps it.
  */
 export interface RenewalPeriodFacts {
@@ -16,9 +30,17 @@ export interface RenewalPeriodFacts {
   applicationId: string;
   applicationName: string;
   applicationKind: 'SAAS' | 'LICENSED' | 'INTERNAL';
-  ownerDepartmentId: string;
+  /** The department that owns it; null for a subscription of the shared pool (K2 workspaces, K4 keys), which every IT Admin works. */
+  ownerDepartmentId: string | null;
   /** The IT Admin who answers for the subscription; null when it names none (`QĐ-103v`(4)). */
   responsibleItAdminEmployeeId: string | null;
+  provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  /** The months the purchase commits to (`QĐ-103e`); null when none is declared. */
+  commitmentTermMonths: 1 | 12 | null;
+  /** The least number of seats the vendor sells, when it says one (`QĐ-103e`). */
+  vendorMinimumSeats: number | null;
+  /** The subscription that prices its plan when there are several of it. */
+  isPrimaryForPlan: boolean;
   kind: 'TERM' | 'PERPETUAL';
   status: 'DRAFT' | 'ACTIVE';
   purchasedQuantity: number | null;
@@ -30,6 +52,8 @@ export interface RenewalPeriodFacts {
   autoRenew: boolean;
   allowsMidTermReduction: boolean;
   notice: { source: PeriodNoticeSource; deadline: BusinessDate | null; baseDate: BusinessDate | null };
+  /** The point of adjustment of the period on the business day it was read; null when no date gives one or the purchase was made once. */
+  adjustment: PeriodAdjustment | null;
   renewedFromId: string | null;
   /** The period that continues this one, once a renewal recorded it; null while none does. */
   renewedById: string | null;

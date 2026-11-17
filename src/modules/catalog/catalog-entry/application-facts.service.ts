@@ -66,6 +66,11 @@ export class ApplicationFactsService {
     return this.applications.count();
   }
 
+  /** The IT Admin responsible for the application now (`QĐ-111g`), a person the organization may since have lost; null when it does not exist. */
+  async responsibleItAdminIdOf(applicationId: string, tx?: DbTx): Promise<string | null> {
+    return (await this.applications.find(applicationId, tx))?.responsibleItAdminEmployeeId ?? null;
+  }
+
   /** The kind, whether it is a communication service and whether it is retired, of these applications (those that exist). */
   collectorApplications(ids: readonly string[], tx?: DbTx) {
     return this.applications.collectorApplications(ids, tx);

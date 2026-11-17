@@ -32625,7 +32625,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, ACCOUNT_IDENTIFIER_REQUIRED (a service account without the identifier the IT Admin enters), RESPONSIBLE_INVALID (the person named is not active in the owning department, or the request is not for a service account), REQUEST_PARTY.INELIGIBLE (the person named is the spending approver, who answers for no account of a request), SUBSCRIPTION_NOT_ALLOWED (a K5 plan names none), SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_NOT_GRANTABLE (the subscription named is of the plan but no seat can be taken from it today: its period ended, or a next period that runs took it over), SUBSCRIPTION_NEXT_PERIOD_SEATS (a next period recorded ahead of its start continues the subscription and buys no seat for this one, which goes on into it: raise the seats of that period first; nothing was written), SUBSCRIPTION_QUANTITY_UNKNOWN, PURCHASE_NOT_APPLICABLE (a `purchase` for a plan that is not K2 or K4), PURCHASE_REASON_REQUIRED (the pool is empty but a seat is still being taken back: say why buying cannot wait), SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP or IDENTIFIER_IN_USE. The IT Admin gives no end day: a body with `expectedEndDate` is a VALIDATION_ERROR, and the seat ends on the day of the request or, when it names none, when its term ends.",
+            "description": "The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, ACCOUNT_IDENTIFIER_REQUIRED (a service account without the identifier the IT Admin enters), RESPONSIBLE_INVALID (the person named is not active in the owning department, or the request is not for a service account), REQUEST_PARTY.INELIGIBLE (the person named is the spending approver, who answers for no account of a request), SUBSCRIPTION_NOT_ALLOWED (a K5 plan names none), SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_NOT_GRANTABLE (the subscription named is of the plan but no seat can be taken from it today: its period ended, a next period that runs took it over, or it was recorded as cancelled), SUBSCRIPTION_NEXT_PERIOD_SEATS (a next period a department owns, recorded ahead of its start, continues the subscription and buys no seat for this one, which goes on into it: raise the seats of that period first; nothing was written. A next period of the shared pool buys that seat itself and the IT Admin who answers for it is told), SUBSCRIPTION_QUANTITY_UNKNOWN, PURCHASE_NOT_APPLICABLE (a `purchase` for a plan that is not K2 or K4), PURCHASE_REASON_REQUIRED (the pool is empty but a seat is still being taken back: say why buying cannot wait), SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP or IDENTIFIER_IN_USE. The IT Admin gives no end day: a body with `expectedEndDate` is a VALIDATION_ERROR, and the seat ends on the day of the request or, when it names none, when its term ends.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -39774,7 +39774,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of the renewal cases, the earliest milestone first: the period, the milestone it was proposed against (a declared or an inferred cancellation deadline, or the end date), the choice proposed, the decision and when it is carried out, the outcome and the late flag. With state PROPOSED it is the queue of the head who confirms: a period with no proposal of the IT Admin has nothing to confirm. The IT Admin and Finance (who only reads) see every case; the head of a department sees those of the subscriptions the department owns. Filter by state, by subscription or by the late flag.",
+            "description": "A page of the renewal cases: the period (subscription.ownerDepartmentId is null for a subscription of the shared pool), the day the case counts from and where it comes from (a declared or an inferred cancellation deadline, the renewal day, the payment day or the end date), the choice recorded, the decision and the outcome. The IT Admin and Finance (who only reads) see every case; the head of a department sees those of the subscriptions the department owns, and none of the shared pool. A case that waited for a head before the one-write renewal is closed (state STALE); waitingReason is always null. Filter by state, by subscription or by the late flag.",
             "content": {
               "application/json": {
                 "schema": {
@@ -39930,13 +39930,13 @@
         },
         "responses": {
           "201": {
-            "description": "The IT Admin proposes to renew the period as it is, to reduce it to a number of seats (naming exactly the seats in use above that number to take back), or to cancel it. The point where the decision is carried out is worked out by the system, not sent. One proposal per period. It puts the case in the queue of the head of the department that owns the subscription, who is told; when the department has no head the case waits (waitingReason NO_HEAD) and the Super Admin is told. The IT Admin does not decide it.",
+            "description": "Any IT Admin records, once per period and from its point of adjustment, what was done with the vendor: the choice (renew as it is, reduce, increase or cancel) with the seats the system counts for the next period (read them first; a number that is not that count is refused, and one above it is accepted only as the vendor minimum with the evidence in note), what the vendor did (as decided, refused, did otherwise; a result the vendor has not confirmed is recorded once it has) and the new period it confirmed, which starts on the renewal day and which a renewal, a reduction or an increase must carry (only a vendor that refused a plan by the month may leave it out) and so must a cancellation the vendor refused or did otherwise (it made a period anyway: an incident is raised for it). A cancellation is accepted only when no seat is needed, none is in effect and no request for the plan is open, and needs closure.dataExported and closure.adminsTransferred. The case is written complete in one transaction (state OUTCOME_RECORDED, deciderRole IT_ADMIN_IN_CHARGE): the new period continues the old one with the seats held on its first day, a seat ending on the renewal day stays on the old period. Writing after the renewal day is allowed (a late renewal). Finance is told; the IT Admin responsible is told too when another IT Admin recorded in their place (the audit trail says so). It opens no revocation, asks no head and creates no budget commitment. releasedAssignmentIds is no longer taken.",
             "content": {
               "application/json": {
                 "schema": {
                   "allOf": [
                     { "$ref": "#/components/schemas/SubscriptionRenewalResponseDto" },
-                    { "properties": { "message": { "example": "SUBSCRIPTION_RENEWAL.PROPOSED" } } }
+                    { "properties": { "message": { "example": "SUBSCRIPTION_RENEWAL.OUTCOME_RECORDED" } } }
                   ]
                 }
               }
@@ -39996,7 +39996,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin proposes.",
+            "description": "Only an IT Admin records.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40038,51 +40038,121 @@
             }
           },
           "409": {
-            "description": "A perpetual purchase, internal software, a draft or a period already continued has no renewal (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE); the period has no milestone to count from and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE); the period already has a live proposal (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED; one closed as out of date does not count); the IT Admin who proposes heads the department that owns the subscription and would confirm their own proposal (SUBSCRIPTION_RENEWAL.PROPOSER_IS_OWNER_HEAD: another IT Admin proposes).",
+            "description": "The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool, a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE); the point has not come (SUBSCRIPTION_RENEWAL.BEFORE_ADJUSTMENT_POINT, details.adjustmentPointOn, details.deadline); the quantity is not the seats the next period needs (SUBSCRIPTION_RENEWAL.QUANTITY_NOT_SEATS_NEEDED, details.seatsNeeded, vendorMinimumSeats, target, quantity); a cancellation while seats are needed, in effect or a request of the plan is open (SUBSCRIPTION_RENEWAL.CANCEL_NOT_ALLOWED, details.seatsNeeded, heldPastRenewal, pendingContinuations, approvedAwaitingGrant, activeSeatsToday, openRequests); the period already has its result, or a case of before (a cancellation decided before the rule too) still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId); more seats are held than the new period buys (SUBSCRIPTION_RENEWAL.EXCESS_NOT_REVOKED); a seat to carry has an open task (SUBSCRIPTION_RENEWAL.SEATS_HAVE_OPEN_TASKS); the new period cannot be recorded as the continuation (SUBSCRIPTION_RENEWAL.PERIOD_REFUSED, details.reason NOT_ON_RENEWAL_DAY with details.renewalOn when nextPeriod.startDate is not the renewal day: renewalOn or the day after it for a plan by the year, the payment day for a plan by the month; or another reason such as ALREADY_RENEWED, PRICE_NOT_VND). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE": {
-                    "summary": "A perpetual purchase, internal software, a draft or a period already continued has no renewal.",
+                    "summary": "Only a live term of a shared-pool workspace has a point of adjustment (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED).",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE",
-                        "message": "A perpetual purchase, internal software, a draft or a period already continued has no renewal.",
+                        "message": "Only a live term of a shared-pool workspace has a point of adjustment (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED).",
+                        "details": { "reason": "ALREADY_CONTINUED" },
                         "requestId": "req_example"
                       }
                     }
                   },
                   "SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE": {
-                    "summary": "The subscription has no cancellation deadline or end date to count from: complete its contract data first.",
+                    "summary": "The subscription has no cancellation deadline, renewal day or end date to count from: complete its contract data first.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE",
-                        "message": "The subscription has no cancellation deadline or end date to count from: complete its contract data first.",
+                        "message": "The subscription has no cancellation deadline, renewal day or end date to count from: complete its contract data first.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.BEFORE_ADJUSTMENT_POINT": {
+                    "summary": "The point of adjustment of this period has not come: the result is recorded from that day.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.BEFORE_ADJUSTMENT_POINT",
+                        "message": "The point of adjustment of this period has not come: the result is recorded from that day.",
+                        "details": { "adjustmentPointOn": "2026-11-24", "deadline": "2026-12-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.QUANTITY_NOT_SEATS_NEEDED": {
+                    "summary": "The quantity is not the seats the next period needs: read the count again and record that number.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.QUANTITY_NOT_SEATS_NEEDED",
+                        "message": "The quantity is not the seats the next period needs: read the count again and record that number.",
+                        "details": { "seatsNeeded": 8, "vendorMinimumSeats": 5, "target": 8, "quantity": 7 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.CANCEL_NOT_ALLOWED": {
+                    "summary": "The subscription cannot be cancelled while seats are needed, seats are still in effect or a request for the plan is open.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.CANCEL_NOT_ALLOWED",
+                        "message": "The subscription cannot be cancelled while seats are needed, seats are still in effect or a request for the plan is open.",
+                        "details": {
+                          "seatsNeeded": 8,
+                          "heldPastRenewal": 6,
+                          "pendingContinuations": 1,
+                          "approvedAwaitingGrant": 1,
+                          "activeSeatsToday": 7,
+                          "openRequests": 1
+                        },
                         "requestId": "req_example"
                       }
                     }
                   },
                   "SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED": {
-                    "summary": "This period already has a renewal proposal.",
+                    "summary": "The result of this period is already recorded, or a renewal of before still waits for its outcome (details.renewalId, when it is known).",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED",
-                        "message": "This period already has a renewal proposal.",
+                        "message": "The result of this period is already recorded, or a renewal of before still waits for its outcome (details.renewalId, when it is known).",
+                        "details": { "renewalId": "<renewal-id>" },
                         "requestId": "req_example"
                       }
                     }
                   },
-                  "SUBSCRIPTION_RENEWAL.PROPOSER_IS_OWNER_HEAD": {
-                    "summary": "The IT Admin who proposes heads the department that owns the subscription and would confirm their own proposal: another IT Admin proposes.",
+                  "SUBSCRIPTION_RENEWAL.EXCESS_NOT_REVOKED": {
+                    "summary": "More seats are still in use than the new period buys: take the excess back first.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "SUBSCRIPTION_RENEWAL.PROPOSER_IS_OWNER_HEAD",
-                        "message": "The IT Admin who proposes heads the department that owns the subscription and would confirm their own proposal: another IT Admin proposes.",
+                        "code": "SUBSCRIPTION_RENEWAL.EXCESS_NOT_REVOKED",
+                        "message": "More seats are still in use than the new period buys: take the excess back first.",
+                        "details": { "seatsInUse": 89, "quantity": 88 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.SEATS_HAVE_OPEN_TASKS": {
+                    "summary": "A seat to carry to the new period still has an open task of the provisioning queue.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.SEATS_HAVE_OPEN_TASKS",
+                        "message": "A seat to carry to the new period still has an open task of the provisioning queue.",
+                        "details": { "seats": 1 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.PERIOD_REFUSED": {
+                    "summary": "The new period cannot be recorded as the continuation of this one.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.PERIOD_REFUSED",
+                        "message": "The new period cannot be recorded as the continuation of this one.",
+                        "details": { "reason": "ALREADY_RENEWED" },
                         "requestId": "req_example"
                       }
                     }
@@ -40134,7 +40204,7 @@
             }
           },
           "422": {
-            "description": "A field is invalid or one the route does not know (VALIDATION_ERROR); the quantity does not fit the choice: a reduction names fewer seats than bought, the others none (SUBSCRIPTION_RENEWAL.QUANTITY_INVALID); the seats chosen are not exactly the seats in use above the new number (SUBSCRIPTION_RENEWAL.EXCESS_SELECTION_INVALID, details.required, details.selected).",
+            "description": "A field is invalid or one the route does not know (VALIDATION_ERROR), among them a note missing when the vendor refused or did otherwise and a closure not confirmed for a cancellation; the quantity does not fit the choice: a renewal names the seats bought, a reduction fewer, an increase more, a cancellation none (SUBSCRIPTION_RENEWAL.QUANTITY_INVALID); the seats are the vendor minimum above the need and note gives no evidence (SUBSCRIPTION_RENEWAL.VENDOR_MINIMUM_EVIDENCE_REQUIRED, details.seatsNeeded, vendorMinimumSeats); a renewal, a reduction or an increase with no nextPeriod, except a vendor that refused a plan by the month, and a cancellation the vendor refused or did otherwise with no nextPeriod (SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED); an outcome as decided whose new period does not have the seats recorded (SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH); the price of the new period has too many decimals or an unknown currency (MONEY_SCALE_EXCEEDED, CURRENCY_NOT_SUPPORTED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40152,24 +40222,70 @@
                     }
                   },
                   "SUBSCRIPTION_RENEWAL.QUANTITY_INVALID": {
-                    "summary": "A reduction names fewer seats than are bought; renewing as it is and cancelling name none.",
+                    "summary": "The quantity does not fit the choice: a renewal names the seats bought, a reduction fewer, an increase more, and a cancellation none.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.QUANTITY_INVALID",
-                        "message": "A reduction names fewer seats than are bought; renewing as it is and cancelling name none.",
+                        "message": "The quantity does not fit the choice: a renewal names the seats bought, a reduction fewer, an increase more, and a cancellation none.",
                         "requestId": "req_example"
                       }
                     }
                   },
-                  "SUBSCRIPTION_RENEWAL.EXCESS_SELECTION_INVALID": {
-                    "summary": "Choose exactly the seats above the new number, each a seat in use of this subscription.",
+                  "SUBSCRIPTION_RENEWAL.VENDOR_MINIMUM_EVIDENCE_REQUIRED": {
+                    "summary": "The seats are the vendor minimum above the need: the note must give the evidence for it.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "SUBSCRIPTION_RENEWAL.EXCESS_SELECTION_INVALID",
-                        "message": "Choose exactly the seats above the new number, each a seat in use of this subscription.",
-                        "details": { "required": 4, "selected": 3 },
+                        "code": "SUBSCRIPTION_RENEWAL.VENDOR_MINIMUM_EVIDENCE_REQUIRED",
+                        "message": "The seats are the vendor minimum above the need: the note must give the evidence for it.",
+                        "details": { "seatsNeeded": 3, "vendorMinimumSeats": 5 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED": {
+                    "summary": "Record the new period the vendor made, unless the cancellation was carried out or a monthly plan was refused.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.NEXT_PERIOD_REQUIRED",
+                        "message": "Record the new period the vendor made, unless the cancellation was carried out or a monthly plan was refused.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH": {
+                    "summary": "This outcome is not the decision: record what the vendor did as a different outcome.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.OUTCOME_MISMATCH",
+                        "message": "This outcome is not the decision: record what the vendor did as a different outcome.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_SCALE_EXCEEDED": {
+                    "summary": "This currency allows at most 2 decimal digit(s).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_SCALE_EXCEEDED",
+                        "message": "This currency allows at most 2 decimal digit(s).",
+                        "details": { "allowedDecimals": 2 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CURRENCY_NOT_SUPPORTED": {
+                    "summary": "The currency XYZ is not supported.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CURRENCY_NOT_SUPPORTED",
+                        "message": "The currency XYZ is not supported.",
+                        "details": { "currency": "XYZ" },
                         "requestId": "req_example"
                       }
                     }
@@ -40233,7 +40349,232 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Propose the renewal of a subscription period",
+        "summary": "Record the result of the adjustment of a subscription period",
+        "tags": ["subscription-renewals"]
+      }
+    },
+    "/api/v1/subscription-renewals/adjustment": {
+      "get": {
+        "operationId": "subscriptionRenewalAdjustmentGet",
+        "parameters": [
+          {
+            "name": "subscriptionId",
+            "required": true,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read before the result is recorded, from any day (also before the point of adjustment): the point (commitment, the kind and day of the deadline, the day the point opens, the renewal day and, for a plan by the year, the red alert day), the seats the next period needs (seatsNeeded.total, the sum of the seats held past the renewal day, the continuations waiting and the grants approved and waiting; no buffer seat is added), target (the need raised to the vendor minimum, zero when nothing is needed), suggestedChoice (the choice the count points to; null when the seats bought are not known), canCancel (target 0, no seat in effect today and no request of the plan open), the IT Admin responsible, whether the caller is that person (false means the caller records in their place; it blocks nothing) and recordedRenewalId when the period already has its result. Read by the IT Admin and Finance. The write counts again under a lock: a number recorded that is not the target is refused there.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SubscriptionRenewalAdjustmentResponseDto" },
+                    { "properties": { "message": { "example": "SUBSCRIPTION_RENEWAL.ADJUSTMENT_FOUND" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin and Finance read the seats a subscription needs.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The subscription does not exist (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "SUBSCRIPTION_RENEWAL.NOT_FOUND": {
+                    "summary": "There is no renewal or subscription with this id.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.NOT_FOUND",
+                        "message": "There is no renewal or subscription with this id.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool (a department owns it, or it is a key or a one-time license), a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); a cancellation decided before the one-write rule still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId: the IT Admin records its outcome first); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE": {
+                    "summary": "Only a live term of a shared-pool workspace has a point of adjustment (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.NOT_RENEWABLE",
+                        "message": "Only a live term of a shared-pool workspace has a point of adjustment (details.reason: PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED).",
+                        "details": { "reason": "ALREADY_CONTINUED" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED": {
+                    "summary": "The result of this period is already recorded, or a renewal of before still waits for its outcome (details.renewalId, when it is known).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED",
+                        "message": "The result of this period is already recorded, or a renewal of before still waits for its outcome (details.renewalId, when it is known).",
+                        "details": { "renewalId": "<renewal-id>" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE": {
+                    "summary": "The subscription has no cancellation deadline, renewal day or end date to count from: complete its contract data first.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE",
+                        "message": "The subscription has no cancellation deadline, renewal day or end date to count from: complete its contract data first.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field or a filter is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read the seats a subscription needs for its next period",
         "tags": ["subscription-renewals"]
       }
     },
@@ -40245,7 +40586,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The case with its period (seats bought and in use, dates, automatic renewal, reduction mid-term), whether evidence of use is available (without it the usage cannot be judged, never 0), the proposal the IT Admin recorded and how many seats it proposes to take back, the decision with the seats chosen to take back and the snapshot frozen when it was taken (null for the IT Admin), the late flag, and the outcome with the new period and the savings at renewal when the new period costs less. A decision never holds a budget commitment.",
+            "description": "The case with its period (seats bought and in use, dates, automatic renewal, reduction mid-term), whether evidence of use is available (without it the usage cannot be judged, never 0), the choice the IT Admin recorded with proposal.seatsNeeded, the seats the system counted for the next period (null on a case of before), the decision (deciderRole IT_ADMIN_IN_CHARGE for a case recorded in one write; the money snapshot is null for the IT Admin), and the outcome with the new period, outcomeDetail.lateRenewal (recorded after the renewal day) and the savings at renewal when the new period costs less. A decision never holds a budget commitment.",
             "content": {
               "application/json": {
                 "schema": {
@@ -40311,7 +40652,7 @@
             }
           },
           "404": {
-            "description": "There is no renewal with this id, or it belongs to a subscription another department owns and the caller is a head (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
+            "description": "There is no renewal with this id, or it belongs to a subscription another department owns, or to the shared pool, and the caller is a head (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40444,7 +40785,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The personal seats in use of the period, in the order a reduction below them is chosen from: the seats whose revocation is already decided, then those whose holder left, then those a waste rule flagged and the rest by the oldest last activity. While no evidence of use is connected (usage NOT_AVAILABLE) no seat is flagged, lastActivityOn is null and the rest come oldest seat first: an order, not a judgement of use. Each seat shows whether the IT Admin proposed to take it back (inProposal; proposedOnly=true lists only those). Read by the IT Admin and by the head of the owner department; the head sees the code and name of the holder and nothing else of them.",
+            "description": "Deprecated: no seat is chosen for a reduction any more, the system counts them (`SBF-20`). The personal seats in use of the period, in the order a reduction below them was chosen from: the seats whose revocation is already decided, then those whose holder left, then those a waste rule flagged and the rest by the oldest last activity. While no evidence of use is connected (usage NOT_AVAILABLE) no seat is flagged, lastActivityOn is null and the rest come oldest seat first: an order, not a judgement of use. Each seat shows whether the IT Admin proposed to take it back (inProposal; proposedOnly=true lists only those). Read by the IT Admin and by the head of the owner department; the head sees the code and name of the holder and nothing else of them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -40510,7 +40851,7 @@
             }
           },
           "404": {
-            "description": "There is no renewal with this id, or it belongs to a subscription another department owns and the caller is a head (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
+            "description": "There is no renewal with this id, or it belongs to a subscription another department owns, or to the shared pool, and the caller is a head (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40611,307 +40952,6 @@
         "tags": ["subscription-renewals"]
       }
     },
-    "/api/v1/subscription-renewals/{id}/decision": {
-      "post": {
-        "operationId": "subscriptionRenewalDecide",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/SubscriptionRenewalDecideBodyDto" } }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The head of the department that owns the subscription on the day of the decision, and nobody in their place, confirms the proposal of the IT Admin as it is (renew, reduce or cancel); nothing of it is chosen again. A cancellation while seats are in use is confirmed after seeing how many; a reduction opens the revocation of the seats the IT Admin proposed, which must still be exactly the excess of that day. The decision after the milestone is never voided: it is carried out mid-term when the subscription allows a reduction mid-term, else at the next renewal. It is written with the snapshot the head saw; it holds no budget commitment, creates no new period and records no savings, and it does not wait for a Cost Center. The IT Admin who carries it out and Finance are told.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/SubscriptionRenewalResponseDto" },
-                    { "properties": { "message": { "example": "SUBSCRIPTION_RENEWAL.DECIDED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller is not the head of the department that owns the subscription on this day, or proposed it (SUBSCRIPTION_RENEWAL.NOT_DECIDER).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "SUBSCRIPTION_RENEWAL.NOT_DECIDER": {
-                    "summary": "Only the head of the department that owns the subscription may confirm this renewal.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUBSCRIPTION_RENEWAL.NOT_DECIDER",
-                        "message": "Only the head of the department that owns the subscription may confirm this renewal.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "There is no renewal with this id, or it belongs to a subscription another department owns and the caller is a head (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "SUBSCRIPTION_RENEWAL.NOT_FOUND": {
-                    "summary": "There is no renewal or subscription with this id.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUBSCRIPTION_RENEWAL.NOT_FOUND",
-                        "message": "There is no renewal or subscription with this id.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The case is not waiting for a decision (SUBSCRIPTION_RENEWAL.NOT_AWAITING_DECISION); people still use the subscription and the cancellation was not confirmed (SUBSCRIPTION_RENEWAL.ACTIVE_USERS_NOT_ACKNOWLEDGED, details.seatsInUse); the seats the IT Admin proposed to take back are no longer exactly the excess (SUBSCRIPTION_RENEWAL.PROPOSAL_STALE, details.required, details.stillHeld): this proposal is then closed as out of date (state STALE) and the IT Admin proposes again; a seat to take back cannot be revoked through the queue (REVOCATION.TYPE_NOT_SUPPORTED). Nothing is written.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "SUBSCRIPTION_RENEWAL.NOT_AWAITING_DECISION": {
-                    "summary": "The renewal is not waiting for a decision.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUBSCRIPTION_RENEWAL.NOT_AWAITING_DECISION",
-                        "message": "The renewal is not waiting for a decision.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SUBSCRIPTION_RENEWAL.ACTIVE_USERS_NOT_ACKNOWLEDGED": {
-                    "summary": "People still use the subscription: confirm the cancellation after seeing how many.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUBSCRIPTION_RENEWAL.ACTIVE_USERS_NOT_ACKNOWLEDGED",
-                        "message": "People still use the subscription: confirm the cancellation after seeing how many.",
-                        "details": { "seatsInUse": 5 },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SUBSCRIPTION_RENEWAL.PROPOSAL_STALE": {
-                    "summary": "The seats proposed to take back no longer match the seats in use: this proposal is closed as out of date and the IT Admin proposes again.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUBSCRIPTION_RENEWAL.PROPOSAL_STALE",
-                        "message": "The seats proposed to take back no longer match the seats in use: this proposal is closed as out of date and the IT Admin proposes again.",
-                        "details": { "required": 2, "stillHeld": 1 },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "REVOCATION.TYPE_NOT_SUPPORTED": {
-                    "summary": "The seat cannot be revoked: TYPE_NOT_SUPPORTED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "REVOCATION.TYPE_NOT_SUPPORTED",
-                        "message": "The seat cannot be revoked: TYPE_NOT_SUPPORTED.",
-                        "details": { "provisioningType": "K3" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "A field is invalid or one the route does not know: only decision CONFIRM, reason and acknowledgeActiveUsers are taken (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Confirm a renewal of a subscription period",
-        "tags": ["subscription-renewals"]
-      }
-    },
     "/api/v1/subscription-renewals/{id}/outcome": {
       "post": {
         "operationId": "subscriptionRenewalRecordOutcome",
@@ -40926,7 +40966,7 @@
         },
         "responses": {
           "200": {
-            "description": "The IT Admin records what was done with the vendor outside the system: as decided, or what really happened (the vendor refused, did something else, has not confirmed), which leaves a follow-up with the vendor open; the note (the reason and the evidence) is required when the vendor refused or did something else. A new period the vendor confirmed is recorded as the continuation of the old one, once, with the seats held on its first day carried to it; it is refused while more seats are held than it buys. A cancellation as decided needs every seat taken back first. The savings at renewal are written only for an outcome as decided whose new period, of the same length, costs less in total. Nothing creates a budget commitment.",
+            "description": "Legacy: only for a case a head decided before the one-write renewal (state DECIDED); a new result is recorded with POST /subscription-renewals. The IT Admin records what was done with the vendor outside the system: as decided, or what really happened (the vendor refused, did something else, has not confirmed), which leaves a follow-up with the vendor open; the note (the reason and the evidence) is required when the vendor refused or did something else. A new period the vendor confirmed is recorded as the continuation of the old one, once, with the seats held on its first day carried to it; it is refused while more seats are held than it buys. A cancellation as decided needs every seat taken back first. The savings at renewal are written only for an outcome as decided whose new period, of the same length, costs less in total. Nothing creates a budget commitment.",
             "content": {
               "application/json": {
                 "schema": {
@@ -41013,7 +41053,7 @@
             }
           },
           "404": {
-            "description": "There is no renewal with this id, or it belongs to a subscription another department owns and the caller is a head (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
+            "description": "There is no renewal with this id, or it belongs to a subscription another department owns, or to the shared pool, and the caller is a head (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -41244,7 +41284,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Record the outcome of a renewal",
+        "summary": "Record the outcome of a renewal decided before (legacy)",
         "tags": ["subscription-renewals"]
       }
     },
@@ -41293,7 +41333,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of what the system recorded when the milestone of a period passed with no decision taken by it, the newest first: an incident for a subscription that renews itself (what the measure of unwanted renewals counts, one per period) or a mark that a subscription that does not renew itself will end. A decision taken later never removes an event, and a step past its SLA is never one. Filter by kind and by the day recorded.",
+            "description": "A page of what the system recorded when the renewal day of a period passed with no result recorded, the newest first: an incident for a subscription that renews itself (what the measure of unwanted renewals counts, one per period) or a mark that a subscription that does not renew itself expired without renewal. A result recorded later never removes an event, and a step past its SLA is never one. subscription.ownerDepartmentId is null for a subscription of the shared pool. Filter by kind and by the day recorded.",
             "content": {
               "application/json": {
                 "schema": {
@@ -41338,7 +41378,7 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin, the person who decides spending and the Super Admin read them.",
+            "description": "Only the IT Admin, Finance, the person who decides spending and the Super Admin read them.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -41435,7 +41475,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "List the milestones that passed with no renewal decision",
+        "summary": "List the renewal days that passed with no result recorded",
         "tags": ["subscription-renewals"]
       }
     },
@@ -80692,7 +80732,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The counted days of the machine, newest first, with the registration each belongs to.",
+            "description": "The counted days of the machine, newest first, with the registration each belongs to; only the registrations held by people of the departments the IT Admin works (and of a department with no IT Admin), an empty page when there are none.",
             "content": {
               "application/json": {
                 "schema": {
@@ -81322,7 +81362,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The latest login and quota of each tool, a row for each window.",
+            "description": "The latest login and quota of each tool, a row for each window; only the registrations held by people of the departments the IT Admin works (and of a department with no IT Admin), an empty page when there are none.",
             "content": {
               "application/json": {
                 "schema": {
@@ -88302,7 +88342,7 @@
         },
         "responses": {
           "202": {
-            "description": "The call is recorded and runs in the background; read it with GET until it is no longer PENDING or RUNNING. Asking again for the same revision gives the call already kept for it. When the steps of the caller cannot be read the answer is still 202, with status FAILED: nothing was sent to the model and the queue read by hand is unchanged. The model is never called when no step waits for the caller. With no AI service configured the answer is 503 AI.PROVIDER_UNAVAILABLE and nothing is written.",
+            "description": "The call is recorded and runs in the background; read it with GET until it is no longer PENDING or RUNNING. Asking again for the same revision gives the call already kept for it. When the steps of the caller cannot be read the answer is still 202, with status FAILED: nothing was sent to the model and the queue read by hand is unchanged. The model is never called when no step waits for the caller. In the MODEL mode with no AI service configured the answer is 503 AI.PROVIDER_UNAVAILABLE and nothing is written; the SIMULATED mode needs no AI service.",
             "content": {
               "application/json": {
                 "schema": {
@@ -111536,7 +111576,7 @@
                         "planName": { "type": "string" },
                         "applicationId": { "type": "string", "format": "uuid" },
                         "applicationName": { "type": "string" },
-                        "ownerDepartmentId": { "type": "string", "format": "uuid" }
+                        "ownerDepartmentId": { "type": "string", "format": "uuid", "nullable": true }
                       },
                       "required": ["id", "planId", "planName", "applicationId", "applicationName", "ownerDepartmentId"],
                       "additionalProperties": false
@@ -111544,13 +111584,22 @@
                     "milestone": {
                       "type": "object",
                       "properties": {
-                        "basis": { "type": "string", "enum": ["DECLARED", "INFERRED_UNCONFIRMED", "BY_END_DATE"] },
+                        "basis": {
+                          "type": "string",
+                          "enum": [
+                            "DECLARED",
+                            "INFERRED_UNCONFIRMED",
+                            "BY_END_DATE",
+                            "BY_RENEWAL_DATE",
+                            "BY_PAYMENT_DATE"
+                          ]
+                        },
                         "baseDate": { "type": "string" }
                       },
                       "required": ["basis", "baseDate"],
                       "additionalProperties": false
                     },
-                    "proposedChoice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL"] },
+                    "proposedChoice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL", "INCREASE"] },
                     "proposedQuantity": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -111559,7 +111608,7 @@
                     },
                     "decidedChoice": {
                       "type": "string",
-                      "enum": ["RENEW", "REDUCE", "CANCEL", null],
+                      "enum": ["RENEW", "REDUCE", "CANCEL", "INCREASE", null],
                       "nullable": true
                     },
                     "executionPoint": {
@@ -111618,6 +111667,94 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "SubscriptionRenewalAdjustmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "adjustment": {
+                "type": "object",
+                "properties": {
+                  "subscriptionId": { "type": "string", "format": "uuid" },
+                  "commitment": { "type": "string", "enum": ["MONTHLY", "ANNUAL"] },
+                  "deadlineKind": {
+                    "type": "string",
+                    "enum": ["PAYMENT_DATE", "NOTICE_DEADLINE", "RENEWAL_DATE", "END_DATE"]
+                  },
+                  "deadline": { "type": "string" },
+                  "adjustmentPointOn": { "type": "string" },
+                  "renewalOn": { "type": "string" },
+                  "redAlertOn": { "type": "string", "nullable": true },
+                  "purchasedQuantity": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "nullable": true
+                  },
+                  "vendorMinimumSeats": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "nullable": true
+                  },
+                  "seatsNeeded": {
+                    "type": "object",
+                    "properties": {
+                      "total": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "heldPastRenewal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "pendingContinuations": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "approvedAwaitingGrant": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    },
+                    "required": ["total", "heldPastRenewal", "pendingContinuations", "approvedAwaitingGrant"],
+                    "additionalProperties": false
+                  },
+                  "target": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "suggestedChoice": {
+                    "type": "string",
+                    "enum": ["RENEW", "REDUCE", "CANCEL", "INCREASE", null],
+                    "nullable": true
+                  },
+                  "canCancel": { "type": "boolean" },
+                  "activeSeatsToday": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "openRequests": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
+                  "callerIsResponsible": { "type": "boolean" },
+                  "recordedRenewalId": { "type": "string", "format": "uuid", "nullable": true }
+                },
+                "required": [
+                  "subscriptionId",
+                  "commitment",
+                  "deadlineKind",
+                  "deadline",
+                  "adjustmentPointOn",
+                  "renewalOn",
+                  "redAlertOn",
+                  "purchasedQuantity",
+                  "vendorMinimumSeats",
+                  "seatsNeeded",
+                  "target",
+                  "suggestedChoice",
+                  "canCancel",
+                  "activeSeatsToday",
+                  "openRequests",
+                  "responsibleItAdminEmployeeId",
+                  "callerIsResponsible",
+                  "recordedRenewalId"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": ["adjustment"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "SubscriptionRenewalResponseDto": {
         "type": "object",
         "properties": {
@@ -111639,7 +111776,7 @@
                       "planName": { "type": "string" },
                       "applicationId": { "type": "string", "format": "uuid" },
                       "applicationName": { "type": "string" },
-                      "ownerDepartmentId": { "type": "string", "format": "uuid" }
+                      "ownerDepartmentId": { "type": "string", "format": "uuid", "nullable": true }
                     },
                     "required": ["id", "planId", "planName", "applicationId", "applicationName", "ownerDepartmentId"],
                     "additionalProperties": false
@@ -111647,20 +111784,33 @@
                   "milestone": {
                     "type": "object",
                     "properties": {
-                      "basis": { "type": "string", "enum": ["DECLARED", "INFERRED_UNCONFIRMED", "BY_END_DATE"] },
+                      "basis": {
+                        "type": "string",
+                        "enum": [
+                          "DECLARED",
+                          "INFERRED_UNCONFIRMED",
+                          "BY_END_DATE",
+                          "BY_RENEWAL_DATE",
+                          "BY_PAYMENT_DATE"
+                        ]
+                      },
                       "baseDate": { "type": "string" }
                     },
                     "required": ["basis", "baseDate"],
                     "additionalProperties": false
                   },
-                  "proposedChoice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL"] },
+                  "proposedChoice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL", "INCREASE"] },
                   "proposedQuantity": {
                     "type": "integer",
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991,
                     "nullable": true
                   },
-                  "decidedChoice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL", null], "nullable": true },
+                  "decidedChoice": {
+                    "type": "string",
+                    "enum": ["RENEW", "REDUCE", "CANCEL", "INCREASE", null],
+                    "nullable": true
+                  },
                   "executionPoint": {
                     "type": "string",
                     "enum": ["AS_PLANNED", "MID_TERM", "NEXT_RENEWAL", null],
@@ -111712,7 +111862,7 @@
                   "proposal": {
                     "type": "object",
                     "properties": {
-                      "choice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL"] },
+                      "choice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL", "INCREASE"] },
                       "quantity": {
                         "type": "integer",
                         "minimum": -9007199254740991,
@@ -111722,6 +111872,7 @@
                       "note": { "type": "string", "nullable": true },
                       "proposedByEmployeeId": { "type": "string", "format": "uuid" },
                       "proposedAt": { "type": "string", "format": "date-time" },
+                      "seatsNeeded": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "nullable": true },
                       "releasedSeatCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                     },
                     "required": [
@@ -111730,6 +111881,7 @@
                       "note",
                       "proposedByEmployeeId",
                       "proposedAt",
+                      "seatsNeeded",
                       "releasedSeatCount"
                     ],
                     "additionalProperties": false
@@ -111737,7 +111889,7 @@
                   "decision": {
                     "type": "object",
                     "properties": {
-                      "choice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL"] },
+                      "choice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL", "INCREASE"] },
                       "quantity": {
                         "type": "integer",
                         "minimum": -9007199254740991,
@@ -111748,7 +111900,12 @@
                       "decidedByEmployeeId": { "type": "string", "format": "uuid" },
                       "deciderRole": {
                         "type": "string",
-                        "enum": ["OWNER_DEPARTMENT_HEAD", "SPENDING_APPROVER", "CONFLICT_SUBSTITUTE"]
+                        "enum": [
+                          "OWNER_DEPARTMENT_HEAD",
+                          "SPENDING_APPROVER",
+                          "CONFLICT_SUBSTITUTE",
+                          "IT_ADMIN_IN_CHARGE"
+                        ]
                       },
                       "decidedAt": { "type": "string", "format": "date-time" },
                       "decidedOn": { "type": "string" },
@@ -111855,7 +112012,8 @@
                         "required": ["amount", "currency"],
                         "additionalProperties": false,
                         "nullable": true
-                      }
+                      },
+                      "lateRenewal": { "type": "boolean" }
                     },
                     "required": [
                       "kind",
@@ -111864,7 +112022,8 @@
                       "recordedAt",
                       "vendorFollowUpOpen",
                       "nextSubscriptionId",
-                      "realisedSavings"
+                      "realisedSavings",
+                      "lateRenewal"
                     ],
                     "additionalProperties": false,
                     "nullable": true
@@ -111987,26 +112146,67 @@
         "type": "object",
         "properties": {
           "subscriptionId": { "type": "string", "format": "uuid" },
-          "choice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL"] },
+          "choice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL", "INCREASE"] },
           "proposedQuantity": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
           "note": { "type": "string", "minLength": 1, "maxLength": 2000 },
-          "releasedAssignmentIds": {
-            "maxItems": 10000,
-            "type": "array",
-            "items": { "type": "string", "format": "uuid" }
+          "outcome": { "type": "string", "enum": ["AS_DECIDED", "VENDOR_REFUSED", "DIFFERENT"] },
+          "outcomeNote": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "nextPeriod": {
+            "type": "object",
+            "properties": {
+              "purchasedQuantity": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
+              "unitPrice": {
+                "type": "object",
+                "properties": {
+                  "amount": { "type": "string", "maxLength": 40 },
+                  "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+                },
+                "required": ["amount", "currency"],
+                "additionalProperties": false
+              },
+              "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER"] },
+              "startDate": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
+              "endDate": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
+              "renewalDate": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
+              "noticeDeadline": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
+              "noticePeriodDays": { "type": "integer", "minimum": 0, "maximum": 3650 },
+              "autoRenew": { "type": "boolean" },
+              "allowsMidTermReduction": { "type": "boolean" }
+            },
+            "required": [
+              "purchasedQuantity",
+              "unitPrice",
+              "billingCycle",
+              "startDate",
+              "autoRenew",
+              "allowsMidTermReduction"
+            ],
+            "additionalProperties": false
+          },
+          "closure": {
+            "type": "object",
+            "properties": { "dataExported": { "type": "boolean" }, "adminsTransferred": { "type": "boolean" } },
+            "required": ["dataExported", "adminsTransferred"],
+            "additionalProperties": false
           }
         },
-        "required": ["subscriptionId", "choice"],
-        "additionalProperties": false
-      },
-      "SubscriptionRenewalDecideBodyDto": {
-        "type": "object",
-        "properties": {
-          "decision": { "type": "string", "enum": ["CONFIRM"] },
-          "reason": { "type": "string", "minLength": 1, "maxLength": 2000 },
-          "acknowledgeActiveUsers": { "type": "boolean" }
-        },
-        "required": ["decision"],
+        "required": ["subscriptionId", "choice", "outcome"],
         "additionalProperties": false
       },
       "SubscriptionRenewalOutcomeBodyDto": {
@@ -112088,7 +112288,7 @@
                         "planName": { "type": "string" },
                         "applicationId": { "type": "string", "format": "uuid" },
                         "applicationName": { "type": "string" },
-                        "ownerDepartmentId": { "type": "string", "format": "uuid" }
+                        "ownerDepartmentId": { "type": "string", "format": "uuid", "nullable": true }
                       },
                       "required": ["id", "planId", "planName", "applicationId", "applicationName", "ownerDepartmentId"],
                       "additionalProperties": false
@@ -131864,6 +132064,10 @@
                 "type": "boolean",
                 "description": "True when the queue of the person changed since the summary was composed."
               },
+              "simulated": {
+                "type": "boolean",
+                "description": "True khi bản tóm tắt do chế độ giả lập dựng, không phải model AI; FE luôn hiển thị nhãn 'Giả lập — không phải AI'."
+              },
               "omittedCount": {
                 "type": "integer",
                 "minimum": 0,
@@ -131895,7 +132099,16 @@
                 "nullable": true
               }
             },
-            "required": ["invocationId", "status", "createdAt", "sourceStale", "omittedCount", "lines", "errorCode"],
+            "required": [
+              "invocationId",
+              "status",
+              "createdAt",
+              "sourceStale",
+              "simulated",
+              "omittedCount",
+              "lines",
+              "errorCode"
+            ],
             "additionalProperties": false,
             "nullable": true
           }
@@ -131912,6 +132125,11 @@
             "type": "object",
             "properties": {
               "invocationId": { "type": "string", "format": "uuid" },
+              "providerMode": {
+                "type": "string",
+                "enum": ["MODEL", "SIMULATED"],
+                "description": "Where the answer came from: MODEL, the AI service; SIMULATED, the simulation that calls no model (show the label 'Giả lập — không phải AI')."
+              },
               "context": {
                 "type": "object",
                 "additionalProperties": {},
@@ -131940,7 +132158,7 @@
                 "nullable": true
               }
             },
-            "required": ["invocationId", "context", "promptText", "rawResponse", "parsed", "result"],
+            "required": ["invocationId", "providerMode", "context", "promptText", "rawResponse", "parsed", "result"],
             "additionalProperties": false,
             "nullable": true
           }

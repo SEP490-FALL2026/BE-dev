@@ -6,7 +6,7 @@ import {
   validateQueueSummary,
 } from './queue-summary-output.policy';
 
-// The cases of the queue in AI-dev/tests/test_validators.py (the reference validator that scores the models), ported one by one.
+// The cases of the queue in AI-SERVICE/tests/test_validators.py (the reference validator that scores the models), ported one by one.
 
 type Request = QueueContext['requests'][number];
 
@@ -260,7 +260,7 @@ describe('validateQueueSummary', () => {
     expect(accepted(validateQueueSummary(context(), parsed(['R003', 'NEED_APPROVAL', text])))).toEqual(['R003']);
   });
 
-  // Final review I-1, the same cases as AI-dev/tests/test_validators.py: the probes of the review on line R001 and the
+  // Final review I-1, the same cases as AI-SERVICE/tests/test_validators.py: the probes of the review on line R001 and the
   // same shapes in other words.
   it.each([
     'Figma cho Nguyễn An, yêu cầu này nên được duyệt.',

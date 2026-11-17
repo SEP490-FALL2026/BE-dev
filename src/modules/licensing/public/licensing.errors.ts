@@ -145,7 +145,7 @@ export type ProvisioningSubscriptionProblem =
 
 /**
  * A grant names a subscription when it needs none (K5), none when it needs one (K1, K2), one of another plan, or one of the plan a seat
- * cannot be taken from today (its period ended, or a next period that runs took it over); or a seat the next period recorded ahead of
+ * cannot be taken from today (its period ended, a next period that runs took it over, or it was recorded as cancelled); or a seat the next period recorded ahead of
  * its start buys no seat for (`NEXT_PERIOD_SEATS`: the seat goes on into it, so it needs one).
  */
 export class ProvisioningSubscriptionError extends Error {

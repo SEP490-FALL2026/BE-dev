@@ -31,7 +31,7 @@ const VALIDATION_ERROR = {
   description: 'The request is invalid (VALIDATION_ERROR).',
   examples: [VALIDATION_EXAMPLE],
 } as const;
-/** The 503 of every guarded route, and AI.PROVIDER_UNAVAILABLE when no AI service is configured. */
+/** The 503 of every guarded route, and AI.PROVIDER_UNAVAILABLE in the MODEL mode when no AI service is configured. */
 const UNAVAILABLE_OR_NO_AI_SERVICE = {
   ...GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   examples: [...GUARDED_SERVICE_UNAVAILABLE_RESPONSE.examples, EXAMPLES.PROVIDER_UNAVAILABLE],
@@ -72,7 +72,7 @@ export class QueueSummaryController {
     status: HttpStatus.ACCEPTED,
     message: 'AI.SUMMARY_ACCEPTED',
     description:
-      'The call is recorded and runs in the background; read it with GET until it is no longer PENDING or RUNNING. Asking again for the same revision gives the call already kept for it. When the steps of the caller cannot be read the answer is still 202, with status FAILED: nothing was sent to the model and the queue read by hand is unchanged. The model is never called when no step waits for the caller. With no AI service configured the answer is 503 AI.PROVIDER_UNAVAILABLE and nothing is written.',
+      'The call is recorded and runs in the background; read it with GET until it is no longer PENDING or RUNNING. Asking again for the same revision gives the call already kept for it. When the steps of the caller cannot be read the answer is still 202, with status FAILED: nothing was sent to the model and the queue read by hand is unchanged. The model is never called when no step waits for the caller. In the MODEL mode with no AI service configured the answer is 503 AI.PROVIDER_UNAVAILABLE and nothing is written; the SIMULATED mode needs no AI service.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,

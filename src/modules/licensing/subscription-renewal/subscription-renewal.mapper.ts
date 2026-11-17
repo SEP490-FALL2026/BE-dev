@@ -1,7 +1,14 @@
-import type { RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
-import type { DeadlineEventWire, RenewalDetailWire, RenewalSummaryWire } from './subscription-renewal.dto';
+import type { PeriodAdjustment, RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
+import { cancelProblem, suggestedChoiceOf, type SeatsNeededCounts } from './seats-needed/renewal-seats-needed.policy';
+import type {
+  DeadlineEventWire,
+  RenewalAdjustmentWire,
+  RenewalDetailWire,
+  RenewalSummaryWire,
+} from './subscription-renewal.dto';
 import type { DeadlineEventRecord, ReleasedSeat, RenewalRecord } from './subscription-renewal.types';
 
+/** The subscription of a case; `ownerDepartmentId` is null for one of the shared pool (a K2 workspace no department owns). */
 const briefOf = (period: RenewalPeriodFacts) => ({
   id: period.subscriptionId,
   planId: period.planId,
@@ -12,11 +19,7 @@ const briefOf = (period: RenewalPeriodFacts) => ({
 });
 
 /** A case as a list shows it: the period it is about, the milestone, the choice proposed and where the case stands. */
-export function toRenewalSummary(
-  record: RenewalRecord,
-  period: RenewalPeriodFacts,
-  waitingReason: RenewalSummaryWire['waitingReason'],
-): RenewalSummaryWire {
+export function toRenewalSummary(record: RenewalRecord, period: RenewalPeriodFacts): RenewalSummaryWire {
   return {
     id: record.id,
     state: record.state,
@@ -28,7 +31,8 @@ export function toRenewalSummary(
     executionPoint: record.decision?.executionPoint ?? null,
     outcome: record.outcome?.kind ?? null,
     lateFlagged: record.lateFlaggedAt !== null,
-    waitingReason,
+    // No case waits for a head any more (QĐ-103e): the field stays null for the readers that still have it.
+    waitingReason: null,
     proposedAt: record.proposedAt.toISOString(),
   };
 }
@@ -64,7 +68,8 @@ export function toRenewalDetail(
     usageAvailable: boolean;
     released: readonly ReleasedSeat[];
     savings: { amount: string; currency: string } | null;
-    waitingReason: RenewalSummaryWire['waitingReason'];
+    /** Whether the outcome was recorded after the renewal day of the period (a late renewal, `QĐ-98e`). */
+    lateRenewal: boolean;
     /** False for the IT Admin: the money the head saw is not theirs to read (`L-617`). */
     showSnapshot: boolean;
   },
@@ -73,7 +78,7 @@ export function toRenewalDetail(
   const { decision, outcome } = record;
 
   return {
-    ...toRenewalSummary(record, period, context.waitingReason),
+    ...toRenewalSummary(record, period),
     period: {
       purchasedQuantity: period.purchasedQuantity,
       billingCycle: period.billingCycle,
@@ -91,6 +96,7 @@ export function toRenewalDetail(
       note: record.proposalNote,
       proposedByEmployeeId: record.proposedByEmployeeId,
       proposedAt: record.proposedAt.toISOString(),
+      seatsNeeded: record.seatsNeeded,
       releasedSeatCount: released.length,
     },
     decision: decision && decisionWire(decision, released.length, context.showSnapshot),
@@ -103,6 +109,7 @@ export function toRenewalDetail(
       vendorFollowUpOpen: outcome.vendorFollowUpOpen,
       nextSubscriptionId: outcome.nextSubscriptionId,
       realisedSavings: context.savings,
+      lateRenewal: context.lateRenewal,
     },
   };
 }
@@ -116,5 +123,43 @@ export function toDeadlineEvent(event: DeadlineEventRecord, period: RenewalPerio
     autoRenewAtTime: event.autoRenewAtTime,
     recordedOn: event.recordedOn,
     recordedAt: event.recordedAt.toISOString(),
+  };
+}
+
+/**
+ * The seats a subscription needs as the route reads them before a result is recorded: the point, the count in its three parts, the target and
+ * whether a cancellation is allowed (the same rule the write applies). `callerIsResponsible` is true only for the IT Admin responsible; it is
+ * false for a reader who is not, and when nobody is responsible.
+ */
+export function toAdjustmentWire(
+  period: Pick<RenewalPeriodFacts, 'subscriptionId' | 'purchasedQuantity' | 'vendorMinimumSeats'>,
+  adjustment: PeriodAdjustment,
+  counts: SeatsNeededCounts,
+  who: { responsibleItAdminEmployeeId: string | null; callerEmployeeId: string; recordedRenewalId: string | null },
+): RenewalAdjustmentWire {
+  return {
+    subscriptionId: period.subscriptionId,
+    commitment: adjustment.commitment,
+    deadlineKind: adjustment.kind,
+    deadline: adjustment.deadline,
+    adjustmentPointOn: adjustment.point,
+    renewalOn: adjustment.end,
+    redAlertOn: adjustment.redAlertOn,
+    purchasedQuantity: period.purchasedQuantity,
+    vendorMinimumSeats: period.vendorMinimumSeats,
+    seatsNeeded: {
+      total: counts.seatsNeeded,
+      heldPastRenewal: counts.heldPastRenewal,
+      pendingContinuations: counts.pendingContinuations,
+      approvedAwaitingGrant: counts.approvedAwaitingGrant,
+    },
+    target: counts.target,
+    suggestedChoice: suggestedChoiceOf(counts.target, period.purchasedQuantity),
+    canCancel: cancelProblem(counts) === null,
+    activeSeatsToday: counts.activeSeatsToday,
+    openRequests: counts.openRequests,
+    responsibleItAdminEmployeeId: who.responsibleItAdminEmployeeId,
+    callerIsResponsible: who.responsibleItAdminEmployeeId === who.callerEmployeeId,
+    recordedRenewalId: who.recordedRenewalId,
   };
 }

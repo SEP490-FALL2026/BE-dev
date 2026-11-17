@@ -274,15 +274,40 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'US-04-04 AC-10',
   },
   {
-    key: 'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
-    label: 'Cảnh báo trước hạn báo hủy thuê bao',
+    key: 'SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY',
+    label: 'Mở điểm điều chỉnh gói tháng trước ngày thanh toán',
     group: 'SUBSCRIPTION',
-    shape: { kind: 'int-list', min: 1, max: 180, length: { min: 1, max: 5 }, order: 'descending' },
-    default: [15, 7],
+    shape: { kind: 'int', min: 1, max: 28 },
+    default: 7,
     unit: 'days',
     unitLabel: 'ngày',
-    description: 'How many days before the cancellation deadline of a subscription an alert is sent.',
-    source: 'FR-1.4',
+    description:
+      'How many days before the next payment day of a subscription by the month the IT Admin is asked to adjust it; a period already running keeps the value it began with.',
+    source: 'FR-1.4, FR-8.2',
+  },
+  {
+    key: 'SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL',
+    label: 'Mở điểm điều chỉnh gói năm trước hạn báo hủy',
+    group: 'SUBSCRIPTION',
+    shape: { kind: 'int', min: 1, max: 180 },
+    default: 30,
+    unit: 'days',
+    unitLabel: 'ngày',
+    description:
+      'How many days before the cancellation deadline of a subscription by the year the IT Admin is asked to adjust it; a period already running keeps the value it began with.',
+    source: 'FR-1.4, FR-8.2',
+  },
+  {
+    key: 'SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL',
+    label: 'Cảnh báo đỏ gói năm trước hạn báo hủy',
+    group: 'SUBSCRIPTION',
+    shape: { kind: 'int', min: 1, max: 90 },
+    default: 7,
+    unit: 'days',
+    unitLabel: 'ngày',
+    description:
+      'How many days before the cancellation deadline of a subscription by the year the alert turns red; a period already running keeps the value it began with.',
+    source: 'FR-1.4, FR-8.2',
   },
   {
     key: 'ACTIVITY_WINDOW_MINUTES',
@@ -395,6 +420,22 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     description:
       'Cho phép người được giao bước duyệt bấm "Tóm tắt bằng AI" trên hàng chờ của mình; chỉ có hiệu lực khi công tắc tổng của AI đang bật.',
     source: 'OQ-G-08, US-15-05',
+  },
+  {
+    key: 'AI_PROVIDER_MODE',
+    label: 'Nguồn trả lời của AI',
+    group: 'AI',
+    shape: {
+      kind: 'enum',
+      options: ['SIMULATED', 'MODEL'],
+      optionLabels: { SIMULATED: 'Giả lập (không gọi model)', MODEL: 'Model AI' },
+    },
+    default: 'SIMULATED',
+    unit: 'mode',
+    unitLabel: 'chế độ',
+    description:
+      'Giả lập: hệ thống tự dựng câu mẫu từ dữ liệu nguồn, không gọi model, kết quả mang nhãn "giả lập — không phải AI". Model AI: gọi dịch vụ AI của nhóm. Chỉ có hiệu lực khi công tắc AI đang bật.',
+    source: 'QĐ-102f, US-15-05 AC-16',
   },
 ];
 

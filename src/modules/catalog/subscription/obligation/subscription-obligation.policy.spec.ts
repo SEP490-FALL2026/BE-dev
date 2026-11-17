@@ -3,8 +3,10 @@ import {
   adjustmentPointOf,
   expiryReading,
   increasesObligation,
+  redAlertOf,
   runsAPeriod,
   type AdjustmentInput,
+  type AdjustmentWindows,
   type ObligationState,
 } from './subscription-obligation.policy';
 
@@ -92,6 +94,7 @@ const annual = (extra: Partial<AdjustmentInput> = {}): AdjustmentInput => ({
   billingCycle: 'ANNUAL',
   noticeDeadline: null,
   noticePeriodDays: null,
+  startDate: null,
   renewalDate: '2026-12-31',
   endDate: null,
   autoRenew: true,
@@ -103,14 +106,17 @@ const monthly = (extra: Partial<AdjustmentInput> = {}): AdjustmentInput => ({
   billingCycle: 'MONTHLY',
   noticeDeadline: null,
   noticePeriodDays: null,
+  startDate: null,
   renewalDate: '2026-12-15',
   endDate: null,
   autoRenew: true,
   ...extra,
 });
 
-/** The point of a subscription on `today` (a day before the payment and the deadline of every fixture unless a case says otherwise). */
-const pointOf = (input: AdjustmentInput, today: BusinessDate = '2026-11-15') => adjustmentPointOf(input, today);
+/** The point of a subscription on `today` (15/11 unless a case says otherwise: a day before the payment day and the deadline of the fixtures, except a plan by the month, whose payment day falls on the 15th each month). */
+const STANDARD: AdjustmentWindows = { monthlyDays: 7, annualDays: 30, redAlertDaysAnnual: 7 };
+const pointOf = (input: AdjustmentInput, today: BusinessDate = '2026-11-15', windows: AdjustmentWindows = STANDARD) =>
+  adjustmentPointOf(input, today, windows);
 
 describe('adjustmentPointOf: where the IT Admin adjusts a subscription before its next period (`FR-1.4`, `QĐ-111o`)', () => {
   describe('a plan bought by the year', () => {
@@ -173,7 +179,7 @@ describe('adjustmentPointOf: where the IT Admin adjusts a subscription before it
 
   describe('a plan bought by the month', () => {
     it('opens 7 days before the payment day and ends on it, whatever the deadline to cancel says', () => {
-      expect(pointOf(monthly({ noticeDeadline: '2026-12-01' }))).toEqual({
+      expect(pointOf(monthly({ noticeDeadline: '2026-12-01' }), '2026-11-16')).toEqual({
         kind: 'PAYMENT_DATE',
         deadline: '2026-12-15',
         point: '2026-12-08',
@@ -182,8 +188,9 @@ describe('adjustmentPointOf: where the IT Admin adjusts a subscription before it
       });
     });
 
-    it('takes the end date when no renewal date is known, and has no point with neither', () => {
-      expect(pointOf(monthly({ renewalDate: null, endDate: '2026-12-20' }))?.deadline).toBe('2026-12-20');
+    it('counts from the end date when no renewal date is known, rolled to the payment day that is not before today, and has no point with no date at all', () => {
+      // Today is 15/11: the 20th of the month that runs, not the end day a month on (R-1).
+      expect(pointOf(monthly({ renewalDate: null, endDate: '2026-12-20' }))?.deadline).toBe('2026-11-20');
       expect(pointOf(monthly({ renewalDate: null, endDate: null }))).toBeNull();
     });
 
@@ -229,8 +236,46 @@ describe('adjustmentPointOf: where the IT Admin adjusts a subscription before it
     });
 
     it('is a plan by the month when it names no commitment but is paid by the month (a personal plan, K1)', () => {
-      expect(pointOf(monthly({ commitmentTermMonths: null }))?.point).toBe('2026-12-08');
+      expect(pointOf(monthly({ commitmentTermMonths: null }), '2026-11-16')?.point).toBe('2026-12-08');
       expect(pointOf(annual({ commitmentTermMonths: null, noticeDeadline: '2026-12-20' }))?.point).toBe('2026-11-20');
+    });
+  });
+
+  describe('with windows other than the standard ones (S20-T9b: the three parameters of FR-1.4 and FR-8.2)', () => {
+    it('opens a plan by the year as many days before its deadline as its window says, and leaves the deadline and the end alone', () => {
+      const windows = { ...STANDARD, annualDays: 45 };
+
+      expect(pointOf(annual({ noticeDeadline: '2026-12-20' }), '2026-11-15', windows)).toEqual({
+        kind: 'NOTICE_DEADLINE',
+        deadline: '2026-12-20',
+        point: '2026-11-05',
+        end: '2026-12-31',
+        endKind: 'RENEWAL_DATE',
+      });
+      expect(
+        pointOf(annual({ noticeDeadline: '2026-12-20' }), '2026-11-15', { ...STANDARD, annualDays: 1 })?.point,
+      ).toBe('2026-12-19');
+    });
+
+    it('opens a plan by the month as many days before its payment day as its window says', () => {
+      expect(pointOf(monthly(), '2026-11-16', { ...STANDARD, monthlyDays: 14 })).toMatchObject({
+        deadline: '2026-12-15',
+        point: '2026-12-01',
+      });
+      expect(pointOf(monthly(), '2026-11-16', { ...STANDARD, monthlyDays: 28 })?.point).toBe('2026-11-17');
+    });
+
+    it('reads the window of the commitment of the plan only: the window of a month never moves a plan by the year, nor the reverse', () => {
+      const windows = { ...STANDARD, monthlyDays: 2, annualDays: 90 };
+
+      expect(pointOf(annual({ noticeDeadline: '2026-12-20' }), '2026-11-15', windows)?.point).toBe('2026-09-21');
+      expect(pointOf(monthly(), '2026-11-16', windows)?.point).toBe('2026-12-13');
+    });
+
+    it('counts the red alert of a plan by the year back from its deadline by its own days, and gives a plan by the month none', () => {
+      expect(redAlertOf('2026-12-20', 'ANNUAL', 7)).toBe('2026-12-13');
+      expect(redAlertOf('2026-12-20', 'ANNUAL', 90)).toBe('2026-09-21');
+      expect(redAlertOf('2026-12-20', 'MONTHLY', 7)).toBeNull();
     });
   });
 

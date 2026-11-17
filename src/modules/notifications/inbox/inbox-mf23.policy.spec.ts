@@ -70,6 +70,51 @@ describe('the notices of MF-2 and MF-3 and of what goes with them (QĐ-110, QĐ-
       { sourceKind: 'DEPARTMENT_TRANSFER', sourceId: ID, fromEmployeeId: OTHER, subscriptions: 3, applications: 2 },
     ],
     ['DEPARTURE_REVOCATION_IT_CLOSE', { caseId: ID, employeeId: OTHER, taskCount: 2 }],
+    // The reports of errors in SaaS rights (`FR-2.15`): ids and the words of the report's kind and states, never what was written in it.
+    [
+      'SAAS_ISSUE_SUBMITTED',
+      { issueId: ID, issueCode: 'BM11-2026-000001', category: 'NO_ACCESS', impact: 'UNUSABLE', applicationId: OTHER },
+    ],
+    ['SAAS_ISSUE_RESPONSE_OVERDUE', { issueId: ID, issueCode: 'BM11-2026-000001', responseDueOn: '2026-12-08' }],
+    [
+      'SAAS_ISSUE_STATE_CHANGED',
+      {
+        issueId: ID,
+        issueCode: 'BM11-2026-000001',
+        fromState: 'IN_PROGRESS',
+        toState: 'WAITING_REPORTER',
+        trigger: 'IT_ACTION',
+      },
+    ],
+    // The accounts at the vendors (`SBF-07a`, `SBF-08`): ids and the source of the difference; applicationId and vendorId may be null.
+    ['OUT_OF_PROCESS_CASE_REPORTED', { caseId: ID, applicationId: OTHER, vendorId: ID, employeeId: OTHER }],
+    [
+      'VENDOR_ACCOUNT_DISCREPANCY_OPENED',
+      { applicationId: null, vendorId: OTHER, source: 'INVOICE_DIFFERENCE', newCount: 1 },
+    ],
+    // A holder asked to stop the collection of a machine (`US-09-04`): ids, the deadline and its day.
+    [
+      'DEVICE_STOP_REQUESTED',
+      {
+        stopRequestId: ID,
+        registrationId: OTHER,
+        deviceId: ID,
+        holderEmployeeId: OTHER,
+        dueAt: '2026-11-19T10:00:00.000Z',
+        dueOn: '2026-11-19',
+      },
+    ],
+    [
+      'DEVICE_STOP_REQUEST_OVERDUE',
+      {
+        stopRequestId: ID,
+        registrationId: OTHER,
+        deviceId: ID,
+        holderEmployeeId: OTHER,
+        dueAt: '2026-11-19T10:00:00.000Z',
+        dueOn: '2026-11-19',
+      },
+    ],
   ];
 
   it.each(cases)('accepts %s with the keys of its code', (code, params) => {
