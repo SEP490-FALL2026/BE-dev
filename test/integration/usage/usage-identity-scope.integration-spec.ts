@@ -125,4 +125,17 @@ describe('the identity mappings and findings by department of the IT Admin (inte
       expect(queue.items.map((item) => item.identifier)).toEqual(['stranger-scope@vendor.example']);
     }
   });
+
+  // Last on purpose: it ends the placement of `SC-P1` for the rest of the file.
+  it('O-01: reads the mappings of a person who has left by the last department, for the IT Admin in charge of it and nobody else', async () => {
+    await h.ctx.sql.query(
+      `UPDATE employee_placements SET valid_to = DATE '2026-06-01' WHERE employee_id = $1 AND valid_to IS NULL`,
+      [p1],
+    );
+
+    expect(await mappingCodes(h.it1, { employeeId: p1 })).toEqual(['SC-P1']);
+    expect(await mappingCodes(h.it2, { employeeId: p1 })).toEqual([]);
+    // The list nobody was asked for in particular stays that of the people placed today.
+    expect(await mappingCodes(h.it1)).toEqual(['SC-P3']);
+  });
 });

@@ -153,6 +153,31 @@ describe('the notices of a case outside the process closed as a report over Post
     );
   });
 
+  it('O-05: keeps the notice for the first head of a department that has none, and hands it to them once when they are named', async () => {
+    serial += 1;
+    const department = await h.departmentWithUnit(`P-OR${serial}`);
+    const member = await h.staff(department, `P-OR${serial}-E`);
+    const caseId = await caseOfPerson(member.employeeId);
+
+    await closure(caseId, h.it1).send({ outcome: 'REPORT_ONLY', note: 'Chưa có trưởng phòng' }).expect(201);
+
+    expect((await noticesOf(caseId)).map((notice) => notice.recipient_employee_id)).toEqual([member.employeeId]);
+
+    const head = await h.staff(department, `P-OR${serial}-H`);
+    await h.makeHead(department, head);
+
+    const notices = await noticesOf(caseId);
+    expect(notices.map((notice) => notice.recipient_employee_id).sort()).toEqual(
+      [head.employeeId, member.employeeId].sort(),
+    );
+    expect(notices.find((notice) => notice.recipient_employee_id === head.employeeId)).toMatchObject({
+      subject_type: 'OUT_OF_PROCESS_CASE',
+      subject_id: caseId,
+      event_key: `${CODE}:${caseId}`,
+      params: { caseId, applicationId, vendorId, employeeId: member.employeeId },
+    });
+  });
+
   it('tells nobody when the case is about no person', async () => {
     const caseId = await caseOfNobody();
 

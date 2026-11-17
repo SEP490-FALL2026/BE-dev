@@ -123,12 +123,18 @@ export class IdentityQueryService {
     );
   }
 
-  /** The people whose mappings and findings the IT Admin reads today; the one asked for, only when they are among them. */
+  /**
+   * The people whose mappings and findings the IT Admin reads: those placed today in the departments of their scope, or the one person asked
+   * for when the last department they were placed in (they may have left) is in it, so a mapping of a person who has left can still be found and ended.
+   */
   private async readableEmployeeIds(actor: AuthenticatedPrincipal, employeeId: string | undefined): Promise<string[]> {
-    const people = await this.scope.peopleOf(actor, {}, await this.organizationReads.businessToday());
-    const ids = people.map((person) => person.employeeId);
+    const people = await this.scope.peopleOf(
+      actor,
+      employeeId === undefined ? {} : { employeeId },
+      await this.organizationReads.businessToday(),
+    );
 
-    return employeeId === undefined ? ids : ids.filter((id) => id === employeeId);
+    return people.map((person) => person.employeeId);
   }
 
   private async peopleOf(
