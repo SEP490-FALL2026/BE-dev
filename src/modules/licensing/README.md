@@ -163,8 +163,8 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   (`/subscription-renewals*`, `/subscription-deadline-events`); nhóm `record/` (IT Admin ghi kết quả **một lần** tại điểm điều chỉnh: ca,
   quyết định `IT_ADMIN_IN_CHARGE` và kết quả trong một transaction; ghi audit `substitute` và báo Finance ở `renewal-record-trail.service.ts`),
   `seats-needed/` (số seat cần của kỳ sau, `QĐ-103e`), `outcome/` (lõi ghi kết quả: kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
-  `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`; route `/{id}/outcome` chỉ còn cho ca `DECIDED` cũ), `alerts/` (mốc, chất lượng dữ liệu), `deadline/`
-  (sự cố tự gia hạn/đánh dấu hết hạn); không còn bước trưởng phòng xác nhận (route `decision` đã gỡ). Đọc theo vai ở
+  `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`; route `/{id}/outcome` chỉ còn cho ca `DECIDED` cũ), `alerts/` (điểm điều chỉnh, cảnh báo đỏ gói năm, gói tháng giữ nguyên, chất lượng dữ liệu — `renewal-adjustment-alerts.policy.ts`), `deadline/`
+  (sự cố tự gia hạn/đánh dấu hết hạn theo ngày gia hạn `end`); không còn bước trưởng phòng xác nhận (route `decision` đã gỡ). Đọc theo vai ở
   `subscription-renewal-view.service.ts` + `readScopeOf` (IT Admin, Finance đọc mọi ca kể cả thuê bao kho không phòng sở hữu; trưởng phòng chỉ
   ca của phòng mình); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; `subscription-renewal-ranking.policy.ts`
   còn cho route `seat-ranking` (deprecated). Ghi kết quả không tạo khoản cam kết ngân sách (`QĐ-62s`). Cột JSON

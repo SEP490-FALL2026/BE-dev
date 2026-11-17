@@ -92,10 +92,10 @@ flowchart BT
   installation -->|8| organization
   installation -->|2| policies
   licensing -->|30| audit
-  licensing -->|54| catalog
+  licensing -->|56| catalog
   licensing -->|2| finance
   licensing -->|12| identity_access
-  licensing -->|8| notifications
+  licensing -->|9| notifications
   licensing -->|6| operating_parameters
   licensing -->|55| organization
   licensing -->|4| policies

@@ -7,8 +7,8 @@ const FIRST_SWEEP_AFTER_MS = 5 * 60 * 1000;
 const SWEEP_EVERY_MS = 60 * 60 * 1000;
 
 /**
- * Once an hour looks at the milestones of the subscription periods (`US-11-01`, `US-11-03`, `US-11-04`): the alerts due, the late
- * flag and the event of a milestone passed with no decision. It renews, cancels and decides nothing. Each instance runs it; every
+ * Once an hour looks at the points of adjustment of the subscription periods (`SBF-20`, `US-11-01`, `US-11-04`): the notices due (the point, the
+ * red alert, the seats a monthly plan keeps) and the event of a renewal day passed with no outcome. It renews, cancels and decides nothing. Each instance runs it; every
  * step is written once, so that is safe, and a failed pass only logs. The timer never keeps the process alive.
  */
 @Injectable()
@@ -42,11 +42,9 @@ export class SubscriptionRenewalSweeper implements OnApplicationBootstrap, OnMod
   private async sweep(): Promise<void> {
     try {
       const result = await this.sweeps.sweep();
-      const written = result.told + result.flaggedLate + result.deadlineEvents;
+      const written = result.told + result.deadlineEvents;
       if (written > 0) {
-        this.logger.log(
-          `Renewal pass: ${result.told} alert(s), ${result.flaggedLate} late flag(s), ${result.deadlineEvents} milestone event(s)`,
-        );
+        this.logger.log(`Renewal pass: ${result.told} notice(s), ${result.deadlineEvents} renewal-day event(s)`);
       }
     } catch (error) {
       this.logger.error(`Subscription renewal sweep failed: ${describeForOperator(error)}`, traceForOperator(error));

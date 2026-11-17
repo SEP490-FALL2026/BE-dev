@@ -174,17 +174,24 @@
   passed it sets `response_overdue_noticed_at` and writes the audit event `SAAS_ISSUE.RESPONSE_OVERDUE` in one transaction, so a report is
   told once however many instances run; a failed pass only logs. The reminder only tells: the report keeps its IT Admin and its state and
   is never closed by the calendar while it is not resolved. Run one by hand with `SaasIssueSweepService.run(now)`.
-  The API also runs `SubscriptionRenewalSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each term
-  subscription period whose notice deadline falls from sixty days back to the largest `RENEWAL_ALERT_DAYS_BEFORE_DEADLINE` ahead it tells
-  the milestones due (inbox notices `SUBSCRIPTION_RENEWAL_ALERT`, with the audit event `SUBSCRIPTION_RENEWAL.ALERT_SENT`, and
-  `SUBSCRIPTION_RENEWAL_DATA_QUALITY` with `SUBSCRIPTION_RENEWAL.DATA_QUALITY_WARNED` when the contract has no date to count from), flags a
-  decision not carried out by its deadline late (`late_flagged_at`, the audit event `SUBSCRIPTION_RENEWAL.FLAGGED_LATE`, the notice
-  `SUBSCRIPTION_RENEWAL_LATE`) and records the event of a deadline passed with no decision (`subscription_deadline_events`, unique per
-  subscription and immutable, the audit event `SUBSCRIPTION.AUTO_RENEWAL_INCIDENT` or `SUBSCRIPTION.EXPIRY_MARKED` and its notice). It is
-  idempotent however many instances run: each notice carries an event key (`subscription-renewal-alert:{subscription}:{base date}:{days}`,
-  one per recipient), the late flag is a conditional update written once, and the deadline event has `ON CONFLICT DO NOTHING`; a failed
-  pass only logs. It only tells and flags late: it never renews, cancels, decides or records an outcome, never changes a subscription or
-  a seat, and a decision taken after the deadline is never voided. Run one by hand with `SubscriptionRenewalSweepService.sweep(now)`.
+  The API also runs `SubscriptionRenewalSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each active
+  K2 term subscription not yet continued (the catalog gives at most 500, no order) it reads the point of adjustment of the period (`SBF-20`: a
+  plan by the month opens `SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY` days before its payment day, a plan by the year `SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL`
+  days before its deadline to cancel, the red alert `SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL` days before it; each value is the one the subscription
+  had when its period began) and, for a period for which no case stands, tells the IT Admin in charge `SUBSCRIPTION_RENEWAL_ALERT` from the point to
+  the renewal day, the IT Admin and Finance `SUBSCRIPTION_RENEWAL_RED_ALERT` once a plan by the year is at its red alert, the IT Admin
+  `SUBSCRIPTION_RENEWAL_KEPT` on the payment day of a plan by the month that has more seats bought than it needs (audit event
+  `SUBSCRIPTION_RENEWAL.ALERT_SENT`), and warns the IT Admin of the quality of the contract data (`SUBSCRIPTION_RENEWAL_DATA_QUALITY`, problem
+  `NO_ALERT_ANCHOR` when no date gives a point, `NO_NOTICE_DEADLINE` for a plan by the year counted from its renewal date; audit event
+  `SUBSCRIPTION_RENEWAL.DATA_QUALITY_WARNED`). Past the renewal day (up to sixty days), with no case and seats still held, it records the event
+  of the period (`subscription_deadline_events`, unique per subscription and immutable, `notice_base_date` = the renewal day): an incident for a
+  period that renews itself (audit `SUBSCRIPTION.AUTO_RENEWAL_INCIDENT`, told to the IT Admin, Finance and the person who decides spending —
+  they hear of an incident only) or _expired without renewal_ for one that does not (audit `SUBSCRIPTION.EXPIRY_MARKED`, told to the IT Admin
+  and Finance). The seats a period needs are counted only for a period with something due that day. It is idempotent however many instances
+  run: each notice carries an event key (`subscription-adjustment-point:{subscription}:{deadline}`, `subscription-renewal-red:…`,
+  `subscription-renewal-kept:…`, `subscription-incident:{subscription}:{renewal day}`, `subscription-expiry:…`, one per recipient) and the
+  deadline event has `ON CONFLICT DO NOTHING`; a failed pass only logs. It only tells and records the event: it never renews, cancels,
+  decides or records an outcome, never changes a subscription or a seat. Run one by hand with `SubscriptionRenewalSweepService.sweep(now)`.
   The API also runs `VendorAccountEvidenceSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it deletes the evidence of the review of the accounts at the vendors (`SBF-08`, `vendor_account_discrepancies`) whose day is older than 24 months (`US-14-04` AC-2), open or decided, at most 500 rows per transaction (`DELETE … FOR UPDATE SKIP LOCKED`, the oldest first, passes repeat until none is left), and writes one audit event `VENDOR_ACCOUNT_EVIDENCE.EXPIRED` with actor `SYSTEM` for each organization and batch with the number deleted and the cutoff, never what was deleted. A case outside the process (`out_of_process_cases`) and the expense it recorded are kept; a failed pass only logs. Run one by hand with `VendorAccountEvidenceRetentionService.sweep(now)`.
   The API also runs `BudgetAttachmentExpirySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each unattached document upload whose deadline has passed (`AWAITING_UPLOAD` older than 24 hours, `UPLOADED` older than 7 days) it marks the attachment `EXPIRED`, writes the audit event `BUDGET_ATTACHMENT.EXPIRED` with actor `SYSTEM`, and deletes the abandoned storage object(s) after commit; each file is picked and locked `FOR UPDATE SKIP LOCKED` inside its own transaction (a file a proposal send holds is skipped, never waited for; at most 100 per pass), attached, removed and discarded records are left untouched, and a failed pass only logs. Run one by hand with `BudgetAttachmentExpiryService.expire(now)`.
   The API also runs `YearStartCommitmentsSweeper` once an hour (the first pass five minutes after start, unreferenced timer): the first pass after

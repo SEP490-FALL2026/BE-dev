@@ -242,16 +242,6 @@ export class SubscriptionRenewalRepo {
     }));
   }
 
-  /** Sets the late flag of a decided case once; false when it was set already or the case is no longer waiting for its outcome. */
-  async flagLate(tx: DbTx, id: string, at: Date): Promise<boolean> {
-    const { count } = await tx.subscriptionRenewal.updateMany({
-      where: { id, state: 'DECIDED', lateFlaggedAt: null },
-      data: { lateFlaggedAt: at },
-    });
-
-    return count === 1;
-  }
-
   async recordOutcome(tx: DbTx, id: string, outcome: OutcomeWrite): Promise<RenewalRecord> {
     const row = await tx.subscriptionRenewal.update({
       where: { id },
