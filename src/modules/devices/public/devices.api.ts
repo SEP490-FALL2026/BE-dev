@@ -57,6 +57,14 @@ export class DevicesApi {
   }
 
   /**
+   * Every registration of the machine, the ended ones too, with the person who held it, oldest first; empty when the machine has none or does
+   * not exist (ask `deviceExists` to tell them apart). The IT Admin reads the days of the registrations of the people of their departments only.
+   */
+  registrationsOfDevice(deviceId: string, tx?: DbTx): Promise<ReadonlyArray<{ id: string; holderEmployeeId: string }>> {
+    return this.repo.registrationsOfDevice(deviceId, tx);
+  }
+
+  /**
    * Who held each of these registrations and from which day to which (the end day is exclusive; null while open): the days of usage a collector
    * sent are tied to the person who held the machine on that day. A registration that does not exist is absent.
    */

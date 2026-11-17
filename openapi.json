@@ -80405,7 +80405,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The counted days of the machine, newest first, with the registration each belongs to.",
+            "description": "The counted days of the machine, newest first, with the registration each belongs to; only the registrations held by people of the departments the IT Admin works (and of a department with no IT Admin), an empty page when there are none.",
             "content": {
               "application/json": {
                 "schema": {
@@ -81035,7 +81035,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The latest login and quota of each tool, a row for each window.",
+            "description": "The latest login and quota of each tool, a row for each window; only the registrations held by people of the departments the IT Admin works (and of a department with no IT Admin), an empty page when there are none.",
             "content": {
               "application/json": {
                 "schema": {

@@ -261,6 +261,15 @@ export class RegistryRepo {
     return rows.map((row) => row.id);
   }
 
+  /** Every registration of the machine, ended or not, with who held it, oldest first. */
+  async registrationsOfDevice(deviceId: string, tx?: DbTx): Promise<Array<{ id: string; holderEmployeeId: string }>> {
+    return (tx ?? this.prisma).deviceRegistration.findMany({
+      where: { deviceId },
+      select: { id: true, holderEmployeeId: true },
+      orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
+    });
+  }
+
   /** Who holds each of these registrations and over which days: a registration has one holder for its whole life. */
   async holdersOf(
     registrationIds: readonly string[],

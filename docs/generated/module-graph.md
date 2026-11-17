@@ -145,7 +145,7 @@ flowchart BT
   usage -->|10| audit
   usage -->|3| budgets
   usage -->|15| catalog
-  usage -->|16| devices
+  usage -->|17| devices
   usage -->|3| finance
   usage -->|2| identity_access
   usage -->|8| licensing
