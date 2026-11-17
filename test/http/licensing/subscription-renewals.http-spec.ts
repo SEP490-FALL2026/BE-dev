@@ -35,6 +35,10 @@ const CLOSURE = { dataExported: true, adminsTransferred: true };
 
 const ROUTES: Array<[string, Call]> = [
   ['GET /subscription-renewals', (s) => request(s).get('/api/v1/subscription-renewals')],
+  [
+    'GET /subscription-renewals/adjustment',
+    (s) => request(s).get(`/api/v1/subscription-renewals/adjustment?subscriptionId=${SUB}`),
+  ],
   ['GET /subscription-renewals/{id}', (s) => request(s).get(`/api/v1/subscription-renewals/${ID}`)],
   [
     'GET /subscription-renewals/{id}/seat-ranking',
@@ -48,12 +52,37 @@ const ROUTES: Array<[string, Call]> = [
   ['GET /subscription-deadline-events', (s) => request(s).get('/api/v1/subscription-deadline-events')],
 ];
 
+/** What the route of the seats needed answers (`SBF-20` §5): the point, the count of the seats, the target and whether a cancellation is allowed. */
+const ADJUSTMENT = {
+  subscriptionId: SUB,
+  commitment: 'MONTHLY',
+  deadlineKind: 'PAYMENT_DATE',
+  deadline: '2026-12-01',
+  adjustmentPointOn: '2026-11-24',
+  renewalOn: '2026-12-01',
+  redAlertOn: null,
+  purchasedQuantity: 10,
+  vendorMinimumSeats: null,
+  seatsNeeded: { total: 8, heldPastRenewal: 6, pendingContinuations: 1, approvedAwaitingGrant: 1 },
+  target: 8,
+  suggestedChoice: 'REDUCE',
+  canCancel: false,
+  activeSeatsToday: 7,
+  openRequests: 1,
+  responsibleItAdminEmployeeId: null,
+  callerIsResponsible: false,
+  recordedRenewalId: null,
+};
+
 /** What a stand-in service throws for each test; the HTTP mapping is what is proven here. */
 let next: Error | null = null;
 const throwing = async () => {
   if (next) throw next;
   return Promise.reject(new Error('the stand-in was reached without an answer'));
 };
+const adjustmentOf = jest.fn<Promise<unknown>, [unknown, string]>();
+/** The reader of one case by id: the route of the seats needed must never reach it (R2-5). */
+const caseGet = jest.fn(throwing);
 const EMPTY_PAGE = { items: [], pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 } };
 /** The page of events: empty unless the test asked for a refusal. */
 const emptyPage = () => (next ? Promise.reject(next) : Promise.resolve(EMPTY_PAGE));
@@ -69,7 +98,8 @@ describe('subscription renewal routes (e2e, no database)', () => {
           token: RenewalViewService,
           useValue: {
             list: throwing,
-            get: throwing,
+            get: caseGet,
+            adjustmentOf,
             seatRanking: throwing,
             deadlineEvents: emptyPage,
             detailOf: throwing,
@@ -85,8 +115,13 @@ describe('subscription renewal routes (e2e, no database)', () => {
     await app?.close();
   });
 
+  beforeEach(() => {
+    adjustmentOf.mockImplementation(async () => (next ? Promise.reject(next) : ADJUSTMENT));
+  });
+
   afterEach(() => {
     next = null;
+    jest.clearAllMocks();
   });
 
   it.each(ROUTES)('%s without a token is 401', async (_name, call) => {
@@ -113,6 +148,19 @@ describe('subscription renewal routes (e2e, no database)', () => {
 
       expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
     });
+
+    it.each([['EMPLOYEE'], ['MANAGER'], ['SPENDING_APPROVER'], ['SUPER_ADMIN']])(
+      '%s does not read the seats a subscription needs (SBF-20 §7: the IT Admin and Finance only)',
+      async (role) => {
+        const response = await request(app.getHttpServer())
+          .get(`/api/v1/subscription-renewals/adjustment?subscriptionId=${SUB}`)
+          .set('Authorization', as([role]))
+          .expect(403);
+
+        expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+        expect(adjustmentOf).not.toHaveBeenCalled();
+      },
+    );
 
     it.each([['EMPLOYEE'], ['MANAGER']])('%s does not read the events of the renewal days', async (role) => {
       const response = await request(app.getHttpServer())
@@ -147,6 +195,79 @@ describe('subscription renewal routes (e2e, no database)', () => {
         expect(bodyOf(response).error.code).toBe('HTTP_NOT_FOUND');
       },
     );
+  });
+
+  describe('the seats a subscription needs, read before the result is recorded (S20-T5, R2-5)', () => {
+    const URL = `/api/v1/subscription-renewals/adjustment?subscriptionId=${SUB}`;
+
+    it.each([['IT_ADMIN'], ['FINANCE']])(
+      '%s reads it with 200: declared before the route of a case by id, it never falls to it',
+      async (role) => {
+        const response = await request(app.getHttpServer())
+          .get(URL)
+          .set('Authorization', as([role]))
+          .expect(200);
+
+        const body = bodyOf(response);
+        expect(body.message).toBe('SUBSCRIPTION_RENEWAL.ADJUSTMENT_FOUND');
+        expect(body.data).toEqual({ adjustment: ADJUSTMENT });
+        expect(adjustmentOf).toHaveBeenCalledWith(expect.objectContaining({ roles: [role] }), SUB);
+        expect(caseGet).not.toHaveBeenCalled();
+      },
+    );
+
+    it('still answers a case by id on its own route', async () => {
+      next = new RenewalError('NOT_FOUND');
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/subscription-renewals/${ID}`)
+        .set('Authorization', as(['IT_ADMIN']))
+        .expect(404);
+
+      expect(bodyOf(response).error.code).toBe('SUBSCRIPTION_RENEWAL.NOT_FOUND');
+      expect(caseGet).toHaveBeenCalledTimes(1);
+      expect(adjustmentOf).not.toHaveBeenCalled();
+    });
+
+    it.each<[string, Error, number, string]>([
+      [
+        'a subscription of a department (K1), which has no point',
+        new RenewalError('NOT_RENEWABLE', { reason: 'NOT_POOL_TERM' }),
+        409,
+        'SUBSCRIPTION_RENEWAL.NOT_RENEWABLE',
+      ],
+      [
+        'a subscription with no date to count from',
+        new RenewalError('CONTRACT_DATA_INCOMPLETE'),
+        409,
+        'SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE',
+      ],
+      ['a subscription that does not exist', new RenewalError('NOT_FOUND'), 404, 'SUBSCRIPTION_RENEWAL.NOT_FOUND'],
+    ])('answers %s', async (_name, error, status, code) => {
+      next = error;
+      const response = await request(app.getHttpServer())
+        .get(URL)
+        .set('Authorization', as(['FINANCE']))
+        .expect(status);
+
+      expect(bodyOf(response).error.code).toBe(code);
+      if (error instanceof RenewalError && Object.keys(error.details).length > 0) {
+        expect(bodyOf(response).error.details).toEqual(error.details);
+      }
+    });
+
+    it.each([
+      ['no subscription', '/api/v1/subscription-renewals/adjustment'],
+      ['a subscription that is not an id', '/api/v1/subscription-renewals/adjustment?subscriptionId=x'],
+      ['a filter the route does not know', `/api/v1/subscription-renewals/adjustment?subscriptionId=${SUB}&page=1`],
+    ])('refuses %s with 422', async (_name, url) => {
+      const response = await request(app.getHttpServer())
+        .get(url)
+        .set('Authorization', as(['IT_ADMIN']))
+        .expect(422);
+
+      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+      expect(adjustmentOf).not.toHaveBeenCalled();
+    });
   });
 
   describe('the refusals of the services, as their codes (SoD-2, SoD-3, US-11-02 AC-2, AC-20, US-11-05 AC-9)', () => {

@@ -263,6 +263,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/assignment-expiry-reminders',
   'GET /api/v1/subscription-renewals',
   'POST /api/v1/subscription-renewals',
+  'GET /api/v1/subscription-renewals/adjustment',
   'GET /api/v1/subscription-renewals/{id}',
   'GET /api/v1/subscription-renewals/{id}/seat-ranking',
   'POST /api/v1/subscription-renewals/{id}/outcome',

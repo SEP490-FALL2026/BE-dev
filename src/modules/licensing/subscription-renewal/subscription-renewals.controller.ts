@@ -17,6 +17,8 @@ import { RenewalRecordService } from './record/renewal-record.service';
 import {
   SubscriptionDeadlineEventPageResponseDto,
   SubscriptionDeadlineEventListQueryDto,
+  SubscriptionRenewalAdjustmentQueryDto,
+  SubscriptionRenewalAdjustmentResponseDto,
   SubscriptionRenewalListQueryDto,
   SubscriptionRenewalProposeBodyDto,
   SubscriptionRenewalOutcomeBodyDto,
@@ -75,6 +77,49 @@ export class SubscriptionRenewalsController {
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: SubscriptionRenewalListQueryDto) {
     try {
       return await this.views.list(actor, query);
+    } catch (error) {
+      throw toRenewalApiException(error);
+    }
+  }
+
+  /** Declared before `:id`: Nest matches in the order of declaration, so after it `adjustment` would be read as an id (422). */
+  @Get('subscription-renewals/adjustment')
+  @RequireRoles('IT_ADMIN', 'FINANCE')
+  @ApiOperation({
+    operationId: 'subscriptionRenewalAdjustmentGet',
+    summary: 'Read the seats a subscription needs for its next period',
+  })
+  @ApiSuccessResponse(SubscriptionRenewalAdjustmentResponseDto, {
+    message: 'SUBSCRIPTION_RENEWAL.ADJUSTMENT_FOUND',
+    description:
+      'Read before the result is recorded, from any day (also before the point of adjustment): the point (commitment, the kind and day of the deadline, the day the point opens, the renewal day and, for a plan by the year, the red alert day), the seats the next period needs (seatsNeeded.total, the sum of the seats held past the renewal day, the continuations waiting and the grants approved and waiting; no buffer seat is added), target (the need raised to the vendor minimum, zero when nothing is needed), suggestedChoice (the choice the count points to; null when the seats bought are not known), canCancel (target 0, no seat in effect today and no request of the plan open), the IT Admin responsible, whether the caller is that person (false means the caller records in their place; it blocks nothing) and recordedRenewalId when the period already has its result. Read by the IT Admin and Finance. The write counts again under a lock: a number recorded that is not the target is refused there.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only the IT Admin and Finance read the seats a subscription needs.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The subscription does not exist (SUBSCRIPTION_RENEWAL.NOT_FOUND).',
+      examples: [EXAMPLES.NOT_FOUND],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool (a department owns it, or it is a key or a one-time license), a draft or a period already continued (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE or ALREADY_CONTINUED); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE).',
+      examples: [EXAMPLES.NOT_RENEWABLE, EXAMPLES.CONTRACT_DATA_INCOMPLETE],
+    },
+    INVALID,
+  )
+  async adjustment(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Query() query: SubscriptionRenewalAdjustmentQueryDto,
+  ) {
+    try {
+      return { adjustment: await this.views.adjustmentOf(actor, query.subscriptionId) };
     } catch (error) {
       throw toRenewalApiException(error);
     }

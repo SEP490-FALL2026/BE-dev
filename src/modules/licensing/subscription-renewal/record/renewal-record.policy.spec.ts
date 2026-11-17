@@ -6,6 +6,7 @@ import {
   existingCaseOf,
   lateRenewalOf,
   noticeBasisOf,
+  pointOf,
   preflightOf,
   unintendedRenewalOf,
 } from './renewal-record.policy';
@@ -292,5 +293,27 @@ describe('whether a result was recorded after the renewal day (lateRenewal, QĐ-
   it('counts a plan by the month to its payment day, which the date of the subscription does not say', () => {
     expect(late('BY_PAYMENT_DATE', '2026-12-01', '2026-12-01', { renewalDate: '2026-08-01' })).toBe(false);
     expect(late('BY_PAYMENT_DATE', '2026-12-01', '2026-12-02', { renewalDate: '2026-08-01' })).toBe(true);
+  });
+});
+
+describe('the point of adjustment read before a result is recorded (SBF-20 §5, S20-T5)', () => {
+  it('gives the adjustment of a live term of the shared pool even before its point has come', () => {
+    expect(pointOf(period({}))).toEqual({ adjustment: adjustment() });
+  });
+
+  it('names why a subscription has no point, with the same reasons as the write (K1, K4, K5 and the others)', () => {
+    expect(pointOf(period({ provisioningType: 'K1', ownerDepartmentId: 'dep' }))).toEqual({
+      refusal: { problem: 'NOT_RENEWABLE', details: { reason: 'NOT_POOL_TERM' } },
+    });
+    expect(pointOf(period({ kind: 'PERPETUAL', provisioningType: 'K4' }))).toEqual({
+      refusal: { problem: 'NOT_RENEWABLE', details: { reason: 'PERPETUAL' } },
+    });
+    expect(pointOf(period({ applicationKind: 'INTERNAL', provisioningType: 'K5' }))).toEqual({
+      refusal: { problem: 'NOT_RENEWABLE', details: { reason: 'INTERNAL' } },
+    });
+  });
+
+  it('asks for the contract data when no date gives a point', () => {
+    expect(pointOf(period({ adjustment: null }))).toEqual({ refusal: { problem: 'CONTRACT_DATA_INCOMPLETE' } });
   });
 });

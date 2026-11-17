@@ -44,6 +44,19 @@ function quantityFits(choice: RenewalChoice, quantity: number | null, purchasedQ
 }
 
 /**
+ * The point of adjustment of a subscription (`SBF-20` §4.1), the first two refusals of a recorded result and the whole of a read before it:
+ * the subscription has a point (`NOT_RENEWABLE` with its reason), then a date gives one (`CONTRACT_DATA_INCOMPLETE`). Whether the point has come
+ * is not asked here: the IT Admin reads the count before it.
+ */
+export function pointOf(period: RenewalPeriodFacts): { adjustment: PeriodAdjustment } | { refusal: RecordRefusal } {
+  const reason = notRenewableReason(period);
+  if (reason !== null) return { refusal: { problem: 'NOT_RENEWABLE', details: { reason } } };
+  const adjustment = period.adjustment;
+
+  return adjustment === null ? { refusal: { problem: 'CONTRACT_DATA_INCOMPLETE' } } : { adjustment };
+}
+
+/**
  * What the request is judged by before the seats are counted, in the order the route answers (`SBF-20` §4.4 steps 2, 4 and 5): the subscription
  * has a point (`NOT_RENEWABLE` with its reason, then `CONTRACT_DATA_INCOMPLETE` when no date gives one), the point has come (a result is recorded
  * after the renewal day too: a late renewal, `QĐ-98e`), and the quantity fits the choice. Anybody who is an IT Admin records: who answers for the
@@ -56,10 +69,9 @@ export function preflightOf(input: {
   quantity: number | null;
 }): { adjustment: PeriodAdjustment } | { refusal: RecordRefusal } {
   const { period, today } = input;
-  const reason = notRenewableReason(period);
-  if (reason !== null) return { refusal: { problem: 'NOT_RENEWABLE', details: { reason } } };
-  const adjustment = period.adjustment;
-  if (adjustment === null) return { refusal: { problem: 'CONTRACT_DATA_INCOMPLETE' } };
+  const found = pointOf(period);
+  if ('refusal' in found) return found;
+  const { adjustment } = found;
   if (today < adjustment.point) {
     return {
       refusal: {

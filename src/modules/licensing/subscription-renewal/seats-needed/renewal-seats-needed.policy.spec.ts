@@ -2,6 +2,7 @@ import {
   cancelProblem,
   choiceProblem,
   seatsNeededOf,
+  suggestedChoiceOf,
   targetOf,
   type SeatsNeededCounts,
 } from './renewal-seats-needed.policy';
@@ -115,5 +116,22 @@ describe('the seats a subscription needs for its next period (QĐ-103e, QĐ-104d
         ),
       ).toBe('CANCEL_NOT_ALLOWED');
     });
+  });
+});
+
+describe('the choice the count suggests (SBF-20 §5, the route of the seats needed)', () => {
+  it('is a cancellation when nothing is needed, whether or not it is allowed yet', () => {
+    expect(suggestedChoiceOf(0, 10)).toBe('CANCEL');
+    expect(suggestedChoiceOf(0, null)).toBe('CANCEL');
+  });
+
+  it('compares the target with the seats bought: the same renews, fewer reduces, more increases', () => {
+    expect(suggestedChoiceOf(10, 10)).toBe('RENEW');
+    expect(suggestedChoiceOf(8, 10)).toBe('REDUCE');
+    expect(suggestedChoiceOf(12, 10)).toBe('INCREASE');
+  });
+
+  it('suggests nothing when the seats bought are not known and something is needed', () => {
+    expect(suggestedChoiceOf(8, null)).toBeNull();
   });
 });

@@ -1,5 +1,11 @@
-import type { RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
-import type { DeadlineEventWire, RenewalDetailWire, RenewalSummaryWire } from './subscription-renewal.dto';
+import type { PeriodAdjustment, RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
+import { cancelProblem, suggestedChoiceOf, type SeatsNeededCounts } from './seats-needed/renewal-seats-needed.policy';
+import type {
+  DeadlineEventWire,
+  RenewalAdjustmentWire,
+  RenewalDetailWire,
+  RenewalSummaryWire,
+} from './subscription-renewal.dto';
 import type { DeadlineEventRecord, ReleasedSeat, RenewalRecord } from './subscription-renewal.types';
 
 /** The subscription of a case; `ownerDepartmentId` is null for one of the shared pool (a K2 workspace no department owns). */
@@ -117,5 +123,43 @@ export function toDeadlineEvent(event: DeadlineEventRecord, period: RenewalPerio
     autoRenewAtTime: event.autoRenewAtTime,
     recordedOn: event.recordedOn,
     recordedAt: event.recordedAt.toISOString(),
+  };
+}
+
+/**
+ * The seats a subscription needs as the route reads them before a result is recorded: the point, the count in its three parts, the target and
+ * whether a cancellation is allowed (the same rule the write applies). `callerIsResponsible` is true only for the IT Admin responsible; it is
+ * false for a reader who is not, and when nobody is responsible.
+ */
+export function toAdjustmentWire(
+  period: Pick<RenewalPeriodFacts, 'subscriptionId' | 'purchasedQuantity' | 'vendorMinimumSeats'>,
+  adjustment: PeriodAdjustment,
+  counts: SeatsNeededCounts,
+  who: { responsibleItAdminEmployeeId: string | null; callerEmployeeId: string; recordedRenewalId: string | null },
+): RenewalAdjustmentWire {
+  return {
+    subscriptionId: period.subscriptionId,
+    commitment: adjustment.commitment,
+    deadlineKind: adjustment.kind,
+    deadline: adjustment.deadline,
+    adjustmentPointOn: adjustment.point,
+    renewalOn: adjustment.end,
+    redAlertOn: adjustment.redAlertOn,
+    purchasedQuantity: period.purchasedQuantity,
+    vendorMinimumSeats: period.vendorMinimumSeats,
+    seatsNeeded: {
+      total: counts.seatsNeeded,
+      heldPastRenewal: counts.heldPastRenewal,
+      pendingContinuations: counts.pendingContinuations,
+      approvedAwaitingGrant: counts.approvedAwaitingGrant,
+    },
+    target: counts.target,
+    suggestedChoice: suggestedChoiceOf(counts.target, period.purchasedQuantity),
+    canCancel: cancelProblem(counts) === null,
+    activeSeatsToday: counts.activeSeatsToday,
+    openRequests: counts.openRequests,
+    responsibleItAdminEmployeeId: who.responsibleItAdminEmployeeId,
+    callerIsResponsible: who.responsibleItAdminEmployeeId === who.callerEmployeeId,
+    recordedRenewalId: who.recordedRenewalId,
   };
 }

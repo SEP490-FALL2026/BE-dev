@@ -37,6 +37,18 @@ export const targetOf = (seatsNeeded: number, vendorMinimumSeats: number | null)
   seatsNeeded === 0 ? 0 : Math.max(seatsNeeded, vendorMinimumSeats ?? 0);
 
 /**
+ * The choice the count points to, for the IT Admin to start from: nothing needed is a cancellation (whether it is allowed is `cancelProblem`),
+ * the target the seats bought is a renewal, fewer a reduction, more an increase; null when the seats bought are not known.
+ */
+export function suggestedChoiceOf(target: number, purchasedQuantity: number | null): RenewalChoice | null {
+  if (target === 0) return 'CANCEL';
+  if (purchasedQuantity === null) return null;
+  if (target === purchasedQuantity) return 'RENEW';
+
+  return target < purchasedQuantity ? 'REDUCE' : 'INCREASE';
+}
+
+/**
  * A cancellation is allowed only when nothing is needed, no seat is left in effect (the renewal outcome refuses a cancellation with
  * seats not taken back) and no request for the plan is open (`QĐ-103e`, `QĐ-99i`).
  */

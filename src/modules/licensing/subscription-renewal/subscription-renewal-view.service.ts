@@ -11,12 +11,14 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import type {
   DeadlineEventWire,
   RankedSeatWire,
+  RenewalAdjustmentWire,
   RenewalDetailWire,
   RenewalSummaryWire,
 } from './subscription-renewal.dto';
 import { RenewalError } from './subscription-renewal.errors';
-import { lateRenewalOf } from './record/renewal-record.policy';
-import { toDeadlineEvent, toRenewalDetail, toRenewalSummary } from './subscription-renewal.mapper';
+import { existingCaseOf, lateRenewalOf, pointOf } from './record/renewal-record.policy';
+import { RenewalSeatsNeededService } from './seats-needed/renewal-seats-needed.service';
+import { toAdjustmentWire, toDeadlineEvent, toRenewalDetail, toRenewalSummary } from './subscription-renewal.mapper';
 import { RenewalPartiesService, type RenewalReadScope } from './subscription-renewal-parties.service';
 import { RenewalRankingService } from './subscription-renewal-ranking.service';
 import { SubscriptionRenewalRepo } from './subscription-renewal.repo';
@@ -39,6 +41,7 @@ export class RenewalViewService {
     private readonly catalog: CatalogApi,
     private readonly parties: RenewalPartiesService,
     private readonly ranking: RenewalRankingService,
+    private readonly seatsNeeded: RenewalSeatsNeededService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly finance: FinanceApi,
   ) {}
@@ -84,6 +87,35 @@ export class RenewalViewService {
     if (!period || !this.inScope(scope, period)) throw new RenewalError('NOT_FOUND');
 
     return this.detailOf(record, actor);
+  }
+
+  /**
+   * The seats a subscription needs for its next period, read before a result is recorded (`SBF-20` §4.6, §5): the point of adjustment, the count in
+   * its three parts, the target and whether a cancellation is allowed. Read by the IT Admin and Finance (the route checks the role), with no lock:
+   * the write counts again under the lock of the period. It is read from any day, before the point has come too. Throws RenewalError
+   * (`NOT_FOUND`, `NOT_RENEWABLE`, `CONTRACT_DATA_INCOMPLETE`).
+   */
+  async adjustmentOf(actor: AuthenticatedPrincipal, subscriptionId: string): Promise<RenewalAdjustmentWire> {
+    const period = (await this.periodsOf([subscriptionId])).get(subscriptionId);
+    if (!period) throw new RenewalError('NOT_FOUND');
+    const found = pointOf(period);
+    if ('refusal' in found) throw new RenewalError(found.refusal.problem, found.refusal.details);
+    const { adjustment } = found;
+    const counts = await this.seatsNeeded.countFor({
+      subscriptionId,
+      planId: period.planId,
+      vendorMinimumSeats: period.vendorMinimumSeats,
+      isPrimaryForPlan: period.isPrimaryForPlan,
+      renewalOn: adjustment.end,
+      today: await this.organizationReads.businessToday(),
+    });
+    const cases = (await this.repo.ofSubscriptions([subscriptionId])).get(subscriptionId) ?? [];
+
+    return toAdjustmentWire(period, adjustment, counts, {
+      ...(await this.parties.substituteOf(actor, period)),
+      callerEmployeeId: actor.employeeId,
+      recordedRenewalId: existingCaseOf(cases, adjustment.deadline)?.id ?? null,
+    });
   }
 
   /** The page of a case just written, read as its route answers it to the caller; the IT Admin does not read the money snapshot. */

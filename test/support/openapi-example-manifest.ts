@@ -344,6 +344,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   subscriptionCreate: 'SUBSCRIPTION.CREATED',
   subscriptionGet: 'SUBSCRIPTION.FETCHED',
   subscriptionList: 'SUBSCRIPTION.LISTED',
+  subscriptionRenewalAdjustmentGet: 'SUBSCRIPTION_RENEWAL.ADJUSTMENT_FOUND',
   subscriptionRenewalGet: 'SUBSCRIPTION_RENEWAL.FOUND',
   subscriptionRenewalList: 'SUBSCRIPTION_RENEWAL.LISTED',
   subscriptionRenewalPropose: 'SUBSCRIPTION_RENEWAL.OUTCOME_RECORDED',
