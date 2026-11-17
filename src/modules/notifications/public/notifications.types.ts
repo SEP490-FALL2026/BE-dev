@@ -214,6 +214,10 @@ export const IN_APP_NOTIFICATION_CODES = [
   'SAAS_ISSUE_SUBMITTED',
   'SAAS_ISSUE_RESPONSE_OVERDUE',
   'SAAS_ISSUE_STATE_CHANGED',
+  // A case outside the process closed as a report only: the person it is about and the head of their department are told (`SBF-07a`, `QĐ-103m`).
+  'OUT_OF_PROCESS_CASE_REPORTED',
+  // A difference with a vendor was opened (`SBF-08`): the IT Admin in charge of the application, or every IT Admin who can act, is told once for each report, invoice or batch of the collector.
+  'VENDOR_ACCOUNT_DISCREPANCY_OPENED',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

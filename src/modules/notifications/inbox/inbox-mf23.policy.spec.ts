@@ -86,6 +86,12 @@ describe('the notices of MF-2 and MF-3 and of what goes with them (QĐ-110, QĐ-
         trigger: 'IT_ACTION',
       },
     ],
+    // The accounts at the vendors (`SBF-07a`, `SBF-08`): ids and the source of the difference; applicationId and vendorId may be null.
+    ['OUT_OF_PROCESS_CASE_REPORTED', { caseId: ID, applicationId: OTHER, vendorId: ID, employeeId: OTHER }],
+    [
+      'VENDOR_ACCOUNT_DISCREPANCY_OPENED',
+      { applicationId: null, vendorId: OTHER, source: 'INVOICE_DIFFERENCE', newCount: 1 },
+    ],
   ];
 
   it.each(cases)('accepts %s with the keys of its code', (code, params) => {
