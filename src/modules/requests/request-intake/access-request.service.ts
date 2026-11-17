@@ -103,7 +103,11 @@ export class AccessRequestService {
     });
     this.requireNotHeld(assessed, options.toleratedSeatId);
     if (assessed.termRefusal !== null) {
-      throw new AccessRequestTermRefusedError(assessed.termRefusal, assessed.contractEndDate);
+      throw new AccessRequestTermRefusedError(
+        assessed.termRefusal,
+        assessed.contractEndDate,
+        assessed.target.provisioningType,
+      );
     }
     await this.limits.requireForOne(tx, {
       employeeId: actor.employeeId,

@@ -23,11 +23,11 @@ export interface NewTransferFacts {
   /** The department the person is to join: whether it exists and takes people. Its Cost Center is not asked (`QĐ-87d`(3)). */
   destinationDepartment: { active: boolean; effectiveFrom: BusinessDate } | null;
   groundsNote: string | undefined;
-  pending: { effectiveOn: BusinessDate } | null;
+  pending: { id: string; effectiveOn: BusinessDate } | null;
   /** The transfer before took effect and is not closed: its grace still runs, or rights of the old department wait to be taken back (`QĐ-110r`, `US-03-01` AC-28). */
-  unclosed: { effectiveOn: BusinessDate } | null;
-  /** Another waiting transfer names this person to follow the head of its department: they stay until it is settled. */
-  namedAsSuccessor: boolean;
+  unclosed: { id: string; effectiveOn: BusinessDate } | null;
+  /** The id of another waiting transfer that names this person to follow the head of its department: they stay until it is settled; null when none does. */
+  namedAsSuccessor: string | null;
   successor: SuccessorFacts;
 }
 
@@ -108,14 +108,21 @@ export function newTransferRefusal(facts: NewTransferFacts): TransferRefusal | n
   const grounds = groundsNoteRefusal(facts.groundsNote);
   if (grounds) return { code: grounds.reason };
 
-  if (facts.pending)
-    return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'TRANSFER', effectiveOn: facts.pending.effectiveOn } };
-  if (facts.unclosed)
+  if (facts.pending) {
     return {
       code: 'PENDING_EVENT_EXISTS',
-      details: { kind: 'TRANSFER_SETTLING', effectiveOn: facts.unclosed.effectiveOn },
+      details: { kind: 'TRANSFER', effectiveOn: facts.pending.effectiveOn, eventId: facts.pending.id },
     };
-  if (facts.namedAsSuccessor) return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'HEAD_HANDOVER' } };
+  }
+  if (facts.unclosed) {
+    return {
+      code: 'PENDING_EVENT_EXISTS',
+      details: { kind: 'TRANSFER_SETTLING', effectiveOn: facts.unclosed.effectiveOn, eventId: facts.unclosed.id },
+    };
+  }
+  if (facts.namedAsSuccessor !== null) {
+    return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'HEAD_HANDOVER', eventId: facts.namedAsSuccessor } };
+  }
   if (employee.workState === 'HANDING_OVER') return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'OFFBOARDING' } };
 
   return successorRefusal(facts.successor);

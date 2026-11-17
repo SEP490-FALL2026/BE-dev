@@ -49,22 +49,25 @@ const LINK_NOT_FOUND = {
 const REFUSED_STATE =
   'The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE)';
 const TAKEN_NUMBER = 'the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN)';
-const NOT_PURCHASABLE = {
+const NO_PLACE =
+  'the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE)';
+const NOT_PURCHASABLE_OR_NO_PLACE = {
   status: HttpStatus.CONFLICT,
-  description: `${REFUSED_STATE}.`,
-  examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE],
+  description: `${REFUSED_STATE}, or ${NO_PLACE}.`,
+  examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE, EXAMPLES.NO_PLACE],
 } as const;
-const NOT_PURCHASABLE_OR_TAKEN = {
+const NOT_PURCHASABLE_TAKEN_OR_NO_PLACE = {
   status: HttpStatus.CONFLICT,
-  description: `${REFUSED_STATE}, or ${TAKEN_NUMBER}.`,
-  examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE, EXAMPLES.NUMBER_TAKEN],
+  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, or ${NO_PLACE}.`,
+  examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE, EXAMPLES.NUMBER_TAKEN, EXAMPLES.NO_PLACE],
 } as const;
 const NOT_PURCHASABLE_TAKEN_OR_NOT_RETURNED = {
   status: HttpStatus.CONFLICT,
-  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).`,
+  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, ${NO_PLACE}, the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).`,
   examples: [
     EXAMPLES.REQUEST_NOT_PURCHASABLE,
     EXAMPLES.NUMBER_TAKEN,
+    EXAMPLES.NO_PLACE,
     EXAMPLES.NOT_RETURNED,
     EXAMPLES.ALREADY_RESUBMITTED,
   ],
@@ -85,12 +88,18 @@ const INVALID_SUBMISSION = {
   examples: [VALIDATION_EXAMPLE, ...MONEY_EXAMPLES, EXAMPLES.NO_VENDOR, EXAMPLES.DOCUMENT_INVALID],
 } as const;
 
-const PREVIEW_ERRORS = [...AUTH_ERRORS, FORBIDDEN, LINK_NOT_FOUND, NOT_PURCHASABLE, INVALID_PREVIEW] as const;
+const PREVIEW_ERRORS = [
+  ...AUTH_ERRORS,
+  FORBIDDEN,
+  LINK_NOT_FOUND,
+  NOT_PURCHASABLE_OR_NO_PLACE,
+  INVALID_PREVIEW,
+] as const;
 const SUBMIT_ERRORS = [
   ...AUTH_ERRORS,
   FORBIDDEN,
   LINK_NOT_FOUND,
-  NOT_PURCHASABLE_OR_TAKEN,
+  NOT_PURCHASABLE_TAKEN_OR_NO_PLACE,
   INVALID_SUBMISSION,
 ] as const;
 const RESUBMIT_ERRORS = [

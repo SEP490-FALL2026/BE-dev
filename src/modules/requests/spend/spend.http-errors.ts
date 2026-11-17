@@ -29,7 +29,13 @@ export function toSpendApiException(error: unknown): unknown {
     return refuse(HttpStatus.NOT_FOUND, 'SPEND.REVIEW_NOT_FOUND', error.message);
   }
   if (error instanceof SpendNotHeadError) return refuse(HttpStatus.FORBIDDEN, 'SPEND.NOT_HEAD', error.message);
-  if (error instanceof SpendNotInQueueError) return refuse(HttpStatus.CONFLICT, 'SPEND.NOT_IN_QUEUE', error.message);
+  if (error instanceof SpendNotInQueueError) {
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'SPEND.NOT_IN_QUEUE',
+      message: error.message,
+      details: { requestId: error.requestId },
+    });
+  }
   if (error instanceof SpendBatchNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'SPEND.BATCH_NOT_FOUND', error.message);
   }
@@ -111,6 +117,7 @@ export const SPEND_ERROR_EXAMPLES = {
   NOT_THE_ASSIGNEE: example(new SpendDecisionRefusedError('NOT_THE_ASSIGNEE')),
   OWN_REQUEST: example(new SpendDecisionRefusedError('OWN_REQUEST')),
   NO_SPEND_STEP: example(new SpendDecisionRefusedError('NO_SPEND_STEP')),
+  STEP_NOT_PENDING: example(new SpendDecisionRefusedError('STEP_NOT_PENDING')),
   NOT_CHECKABLE: example(new SpendDecisionRefusedError('NOT_CHECKABLE')),
   COMMITMENT_NOT_HOLDABLE: example(new BudgetCommitmentNotHoldableError('NO_APPROVED_BUDGET', 2026)),
   COMMITMENT_EXISTS: example(new BudgetCommitmentExistsError(2026)),

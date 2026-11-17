@@ -153,13 +153,13 @@ export class OffboardingRepo {
     return row && toRecord(row);
   }
 
-  /** Whether another waiting transfer names the person to follow the head of its department: they cannot leave before it is settled. */
-  async isNamedSuccessorOfPendingTransfer(tx: DbTx, employeeId: string): Promise<boolean> {
+  /** The id of another waiting transfer that names the person to follow the head of its department (they cannot leave before it is settled), or null. */
+  async pendingTransferNaming(tx: DbTx, employeeId: string): Promise<string | null> {
     const rows = await tx.$queryRaw<{ id: string }[]>`
       SELECT id FROM department_transfers
        WHERE status = 'PENDING' AND head_handover ->> 'successorEmployeeId' = ${employeeId} LIMIT 1`;
 
-    return rows.length > 0;
+    return rows[0]?.id ?? null;
   }
 
   /** Moves the last working day of a handover under way with the periods that follow it. */

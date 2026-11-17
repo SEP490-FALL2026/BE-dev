@@ -200,6 +200,7 @@ import { RequestReadAccessService } from './request-view/request-read-access.ser
 import { RequestReadRepo } from './request-view/request-read.repo';
 import { MyRequestsFactsRepo } from './my-requests/my-requests-facts.repo';
 import { MyRequestsRepo } from './my-requests/my-requests.repo';
+import { RequestNotificationNamesListener } from './my-requests/request-notification-names.listener';
 import { MyRequestsService } from './my-requests/my-requests.service';
 import { InvoiceDiscrepanciesController } from './invoice-discrepancy-queue/invoice-discrepancies.controller';
 import { InvoiceDiscrepancyQueryService } from './invoice-discrepancy-queue/invoice-discrepancy-query.service';
@@ -439,6 +440,8 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     GroupLineClosureService,
     GroupSupplementService,
     MyRequestsRepo,
+    // Names a Request in a notification sentence: added to the name sources of `notifications` when the module starts.
+    RequestNotificationNamesListener,
     MyRequestsFactsRepo,
     MyRequestsService,
     RequestHistoryRepo,

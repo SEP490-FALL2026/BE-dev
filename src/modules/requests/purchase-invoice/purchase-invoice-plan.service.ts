@@ -249,20 +249,24 @@ export class PurchaseInvoicePlanService {
    * field below zero. Throws the money errors of `core/money`.
    */
   async moneyOf(form: PurchaseInvoiceFormInput, tx?: DbTx): Promise<PurchaseInvoiceMoney> {
-    const dong = async (input: { amount: string } | undefined, floor: 'POSITIVE' | 'NON_NEGATIVE'): Promise<bigint> => {
+    const dong = async (
+      input: { amount: string } | undefined,
+      path: string,
+      floor: 'POSITIVE' | 'NON_NEGATIVE',
+    ): Promise<bigint> => {
       if (!input) return 0n;
-      const { amountMinor } = await this.finance.parseMoney({ amount: input.amount, currency: 'VND' }, tx);
-      if (floor === 'POSITIVE' ? amountMinor <= 0n : amountMinor < 0n) throw new MoneyOutOfRangeError();
+      const { amountMinor } = await this.finance.parseMoney({ amount: input.amount, currency: 'VND' }, path, tx);
+      if (floor === 'POSITIVE' ? amountMinor <= 0n : amountMinor < 0n) throw new MoneyOutOfRangeError(path);
 
       return amountMinor;
     };
-    const original = await this.finance.parseMoney(form.unitPriceOriginal, tx);
-    if (original.amountMinor <= 0n) throw new MoneyOutOfRangeError();
+    const original = await this.finance.parseMoney(form.unitPriceOriginal, 'unitPriceOriginal', tx);
+    if (original.amountMinor <= 0n) throw new MoneyOutOfRangeError('unitPriceOriginal');
 
     return {
-      netMinor: await dong(form.netAmount, 'POSITIVE'),
-      deductibleTaxMinor: await dong(form.deductibleTax, 'NON_NEGATIVE'),
-      nonDeductibleTaxMinor: await dong(form.nonDeductibleTax, 'NON_NEGATIVE'),
+      netMinor: await dong(form.netAmount, 'netAmount', 'POSITIVE'),
+      deductibleTaxMinor: await dong(form.deductibleTax, 'deductibleTax', 'NON_NEGATIVE'),
+      nonDeductibleTaxMinor: await dong(form.nonDeductibleTax, 'nonDeductibleTax', 'NON_NEGATIVE'),
       unitPriceOriginal: original,
     };
   }

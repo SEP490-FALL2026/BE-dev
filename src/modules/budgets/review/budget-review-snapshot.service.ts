@@ -3,6 +3,7 @@ import { addDays } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { SeatMonthService } from '../seat-month/seat-month.service';
+import { SeatMonthChargeError } from '../seat-month/seat-month.errors';
 import { explanationDueOn } from './budget-review-explanation.policy';
 import { BudgetReviewFiguresService } from './budget-review-figures.service';
 import { BudgetReviewPoolWatchService } from './budget-review-pool-watch.service';
@@ -80,7 +81,7 @@ export class BudgetReviewSnapshotService {
     try {
       await this.seatMonths.chargeMonth(`${body.year}-${String(body.month).padStart(2, '0')}-01`, now);
     } catch (error) {
-      throw new BudgetReviewSeatMonthsError(error);
+      throw new BudgetReviewSeatMonthsError(error, error instanceof SeatMonthChargeError ? error.subscriptionIds : []);
     }
   }
 }

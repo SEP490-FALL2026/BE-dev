@@ -111,6 +111,7 @@ describe('the head of a department that starts next year does the budget work (i
     const refused = await h.submitProposal({ year: h.next, ...h.bm10() }, head.account).expect(409);
 
     expect(h.codeOf(refused)).toBe('FINANCE.SETUP_INCOMPLETE');
+    expect(h.detailsOf(refused)).toEqual({ departmentId: department.id });
   });
 
   it('asks which Cost Center when the person answers for two that year, and takes the one they name (COST_CENTER_REQUIRED)', async () => {
@@ -154,6 +155,7 @@ describe('the head of a department that starts next year does the budget work (i
       .expect(200);
 
     expect(h.codeOf(unnamed)).toBe('BUDGET.COST_CENTER_REQUIRED');
+    expect((h.detailsOf(unnamed).costCenterIds as string[]).sort()).toEqual([department.unitId, old.unitId].sort());
     expect(h.codeOf(stranger)).toBe('BUDGET.NOT_YOUR_COST_CENTER');
     expect(h.dataOf<{ proposal: ProposalWire }>(named).proposal.costCenter.id).toBe(department.unitId);
     expect(h.dataOf<{ proposal: ProposalWire }>(oldOne).proposal.costCenter.id).toBe(old.unitId);

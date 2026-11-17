@@ -82,7 +82,8 @@ export class ExpiryController {
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'Only an IT Admin starts the revocation.',
+      description:
+        'Only an IT Admin starts the revocation, and an IT Admin who is the person revoked waits for another usable IT Admin (PROVISIONING.ANOTHER_IT_ADMIN_NEEDED); with none left they may.',
       examples: [FORBIDDEN_EXAMPLE, EXAMPLES.ANOTHER_IT_ADMIN_NEEDED],
     },
     {
@@ -93,7 +94,7 @@ export class ExpiryController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The right was ended already (ASSIGNMENT_EXPIRY.NOT_OPEN), its end day has not passed (ASSIGNMENT_EXPIRY.NOT_EXPIRED), a renewal sent in time waits for its decision (ASSIGNMENT_EXPIRY.RENEWAL_PENDING), or the revocation gate refuses it (for example PROVISIONING.ANOTHER_IT_ADMIN_NEEDED when the IT Admin is the holder). Nothing is written.',
+        'The right was ended already (ASSIGNMENT_EXPIRY.NOT_OPEN), its end day has not passed (ASSIGNMENT_EXPIRY.NOT_EXPIRED), a renewal sent in time waits for its decision (ASSIGNMENT_EXPIRY.RENEWAL_PENDING), or the revocation gate refuses the kind of grant (REVOCATION.TYPE_NOT_SUPPORTED). Nothing is written.',
       examples: [
         EXAMPLES.NOT_OPEN,
         EXAMPLES.NOT_EXPIRED,

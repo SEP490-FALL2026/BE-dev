@@ -247,6 +247,8 @@ export class RenewalOutcomeService {
       next = await this.periods.recordNextPeriod(tx, actor, {
         ...nextPeriod,
         previousSubscriptionId: period.subscriptionId,
+        // `nextPeriod` of both routes that record a result: a money error points at the field of their body.
+        unitPricePath: 'nextPeriod.unitPrice',
       });
     } catch (error) {
       if (error instanceof SubscriptionPeriodRefusedError)

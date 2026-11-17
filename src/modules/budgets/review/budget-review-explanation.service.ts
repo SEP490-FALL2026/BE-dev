@@ -43,7 +43,11 @@ export class BudgetReviewExplanationService {
     }
     const currency = await this.facts.reportingCurrency();
     // The need to the end of the year is one of the four things the head says (US-12-21 AC-5): an amount, and nothing (0) is an answer.
-    const needsAmountMinor = await this.facts.money(body.knownNeedsToYearEnd.amount, currency);
+    const needsAmountMinor = await this.facts.money(
+      body.knownNeedsToYearEnd.amount,
+      currency,
+      'knownNeedsToYearEnd.amount',
+    );
     const written = await this.runner.run(async (tx) => {
       const period = await this.repo.findSharedLocked(tx, periodId);
       if (!period) throw new BudgetReviewNotFoundError();

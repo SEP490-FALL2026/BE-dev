@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { TermRefusal } from '../../../core/term-limit';
+import type { TermKind, TermRefusal } from '../../../core/term-limit';
 import type { WithdrawalRefusal } from './withdrawal.policy';
 import type { CancellationRefusal, HeldAccess } from './access-request.types';
 
@@ -106,6 +106,8 @@ export class AccessRequestTermRefusedError extends Error {
     readonly reason: TermRefusal,
     /** The last day of the contract, for `TERM_CONTRACT_ENDED`. */
     readonly contractEndDate: BusinessDate | null = null,
+    /** The kind of the plan the time of use is judged for; null for a proposal, whose plan is not known (the rule that takes the most judges it). */
+    readonly kind: TermKind | null = null,
   ) {
     super(TERM_MESSAGES[reason]);
     this.name = 'AccessRequestTermRefusedError';

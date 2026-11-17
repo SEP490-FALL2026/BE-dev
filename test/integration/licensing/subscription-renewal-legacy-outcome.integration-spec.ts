@@ -117,6 +117,19 @@ describe('the outcome of a case decided before the one-write rule (integration, 
     expect(renewal.outcomeDetail).toMatchObject({ kind: 'DIFFERENT', vendorFollowUpOpen: true, realisedSavings: null });
   });
 
+  it('points the money errors of the new period at nextPeriod.unitPrice, the field of this body too (FIX-E-R2)', async () => {
+    const { id } = await legacy('RENEW');
+
+    const scale = await h.outcome(id, {
+      outcome: 'AS_DECIDED',
+      nextPeriod: { ...nextYear(10), unitPrice: { amount: '1000000.5', currency: 'VND' } },
+    });
+    expect(scale.status).toBe(422);
+    expect(h.codeOf(scale)).toBe('MONEY_SCALE_EXCEEDED');
+    expect(h.detailsOf(scale)).toEqual({ allowedDecimals: 0, path: 'nextPeriod.unitPrice' });
+    expect((await h.caseRow(id)).state).toBe('DECIDED');
+  });
+
   it('asks the note of an outcome that is not the decision, the reason and the evidence, and not of the others (QĐ-96i)', async () => {
     const refused = await legacy('RENEW', undefined, 0);
     const different = await legacy('RENEW', undefined, 0);

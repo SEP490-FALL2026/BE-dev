@@ -112,7 +112,7 @@ export class GroupLinesController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, a person twice, a group sent back in part); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO). Nothing is saved.',
+        'The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from (issues[0].path = reason), a person twice, a group sent back in part); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO). Nothing is saved.',
       examples: [
         VALIDATION_EXAMPLE,
         GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH,
@@ -144,7 +144,7 @@ export class GroupLinesController {
   @ApiSuccessResponse(ApprovalDetailResponseDto, {
     message: 'SPEND_APPROVAL.LINES_DECIDED',
     description:
-      'The person the spend step is given to answers one checklist for the group and decides all the people whose need is confirmed at once (or sends the whole group back to its head, RETURN), approving some and refusing others, each refusal with its reason. The request is checked again on the people approved and the decision is made on that check, which is kept with it; a request that has less money than it costs in a year of the budget, or none, cannot be approved. One commitment is held for each year, the sum of the part of the people approved, and each person stands for a share of it. A request that turned out to be an exception since it was sent goes back to Finance, and one whose data is at fault goes back to its head; nobody is decided then.',
+      'The person the spend step is given to answers one checklist for the group and decides all the people whose need is confirmed at once (or sends the whole group back to its head, RETURN), approving some and refusing others, each refusal with its reason. The request is checked again on the people approved and the decision is made on that check, which is kept with it; a request that has less money than it costs in a year of the budget, or none, cannot be approved. One commitment is held for each year, the sum of the part of the people approved, and each person stands for a share of it. A request that does not pass the check again, or whose data is at fault, goes back to its head; nobody is decided then.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -173,7 +173,7 @@ export class GroupLinesController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, a group sent back in part); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO).',
+        'The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from (issues[0].path = reason), a group sent back in part); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO).',
       examples: [
         VALIDATION_EXAMPLE,
         GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH,

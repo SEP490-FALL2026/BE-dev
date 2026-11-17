@@ -90,12 +90,12 @@ export class LongLeavesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The employee is on long leave already (LONG_LEAVE.ALREADY_ON_LEAVE), or is handing over or has left (EMPLOYEE_NOT_WORKING).',
+        'The employee is on long leave already (LONG_LEAVE.ALREADY_ON_LEAVE), or is not working (LONG_LEAVE.EMPLOYEE_NOT_WORKING, details.workState HANDING_OVER or LEFT).',
       examples: [EXAMPLES.ALREADY_ON_LEAVE, EXAMPLES.EMPLOYEE_NOT_WORKING],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid or names a field the route does not know (VALIDATION_ERROR), the start is in the future or before the employee joined (LONG_LEAVE.START_DATE_INVALID), the day of return is not after the start (RETURN_DATE_INVALID), or ${GROUNDS_REFUSALS}: nothing is saved.`,
+      description: `The body is invalid or names a field the route does not know (VALIDATION_ERROR), the start is in the future or before the employee joined (LONG_LEAVE.START_DATE_INVALID), the day of return is not after the start (LONG_LEAVE.RETURN_DATE_INVALID, with details.reason NOT_AFTER_START), or ${GROUNDS_REFUSALS}: nothing is saved.`,
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.START_DATE_INVALID,

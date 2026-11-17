@@ -144,7 +144,9 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
       await h.budgetFor(other, { total: 100 * M });
       const theirs = await waiting(10 * M, other);
 
-      expect(h.codeOf(await h.sendOn([waitingId, done], design.head.account).expect(409))).toBe('SPEND.NOT_IN_QUEUE');
+      const notInQueue = await h.sendOn([waitingId, done], design.head.account).expect(409);
+      expect(h.codeOf(notInQueue)).toBe('SPEND.NOT_IN_QUEUE');
+      expect(h.detailsOf(notInQueue)).toEqual({ requestId: done });
       expect(h.codeOf(await h.sendOn([waitingId, theirs], design.head.account).expect(404))).toBe(
         'ACCESS_REQUEST.NOT_FOUND',
       );

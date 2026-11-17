@@ -64,7 +64,7 @@ export class ToolStatusController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'The credential is not an AI collector’s (DEVICE.WRONG_COLLECTOR_KIND), the holder has not acknowledged the notice (DEVICE.NOT_ACKNOWLEDGED), collection was stopped (DEVICE.COLLECTION_STOPPED), or the notice in force that names the status of tools is not acknowledged (DEVICE.TOOL_STATUS_NOT_ACKNOWLEDGED).',
+        'The credential is not an AI collector’s (DEVICE.WRONG_COLLECTOR_KIND), the holder has not acknowledged the notice (DEVICE.NOT_ACKNOWLEDGED), collection was stopped (DEVICE.COLLECTION_STOPPED), or the holder acknowledged the notice but the version in force does not cover the status of tools (DEVICE.TOOL_STATUS_NOT_ACKNOWLEDGED).',
       examples: [
         EXAMPLES.WRONG_COLLECTOR_KIND,
         EXAMPLES.NOT_ACKNOWLEDGED,

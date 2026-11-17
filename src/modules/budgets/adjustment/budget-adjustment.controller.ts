@@ -28,6 +28,12 @@ import { BudgetAdjustmentDecisionService } from './budget-adjustment-decision.se
 import { BudgetAdjustmentQueryService } from './budget-adjustment-query.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
+const DECIDER_ONLY = {
+  status: HttpStatus.FORBIDDEN,
+  description:
+    'Only the spending approver decides: a caller without the role is refused first (AUTHORIZATION.FORBIDDEN), then one who is not the spending approver in use (BUDGET.NOT_SPENDING_APPROVER) or who asked for the adjustment (BUDGET.CONFLICT_OF_INTEREST).',
+  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_SPENDING_APPROVER, EXAMPLES.CONFLICT_OF_INTEREST],
+} as const;
 
 /**
  * The adjustments of the budget in the year: Finance makes one on any day with the reason, the spending approver approves or refuses it, and what the budget of a Cost Center
@@ -60,6 +66,11 @@ export class BudgetAdjustmentController {
       examples: [FORBIDDEN_EXAMPLE],
     },
     {
+      status: HttpStatus.NOT_FOUND,
+      description: 'A Cost Center the adjustment names does not exist (BUDGET.COST_CENTER_NOT_FOUND).',
+      examples: [EXAMPLES.COST_CENTER_NOT_FOUND],
+    },
+    {
       status: HttpStatus.CONFLICT,
       description:
         'The budget cycle of the year is not open yet (BUDGET_CYCLE.NOT_OPEN) or still takes proposals, so no budget of the year is made to adjust (BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED: asked once the cycle is locked, the day after its submission deadline); the Cost Center that receives was retired (FINANCE.SETUP_INCOMPLETE), has a version of the year still being decided (BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT) or a proposal that waits for its version (BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION).',
@@ -74,9 +85,11 @@ export class BudgetAdjustmentController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), a transfer for COST_CENTER_CHANGE is more than what is left after what the Cost Center used (BUDGET_ADJUSTMENT.OVER_REMAINING), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).',
+        'The body is invalid (VALIDATION_ERROR; also an amount that is not a plain number), the amount has more decimals than the reporting currency allows (MONEY_SCALE_EXCEEDED) or is below nothing or too large (MONEY_OUT_OF_RANGE), the year has ended (BUDGET.YEAR_ENDED), the adjustment is not made as its kind is meant, which includes an amount of nothing (BUDGET_ADJUSTMENT.INVALID_SHAPE, refusal AMOUNT_NOT_POSITIVE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), a transfer for COST_CENTER_CHANGE is more than what is left after what the Cost Center used (BUDGET_ADJUSTMENT.OVER_REMAINING), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).',
       examples: [
         VALIDATION_EXAMPLE,
+        EXAMPLES.MONEY_SCALE_EXCEEDED,
+        EXAMPLES.MONEY_OUT_OF_RANGE,
         EXAMPLES.YEAR_ENDED,
         EXAMPLES.INVALID_SHAPE,
         EXAMPLES.OVER_UNALLOCATED,
@@ -134,11 +147,7 @@ export class BudgetAdjustmentController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    {
-      status: HttpStatus.FORBIDDEN,
-      description: 'Only the spending approver decides.',
-      examples: [FORBIDDEN_EXAMPLE],
-    },
+    DECIDER_ONLY,
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The adjustment does not exist (BUDGET_ADJUSTMENT.NOT_FOUND).',
@@ -163,6 +172,7 @@ export class BudgetAdjustmentController {
         "The body or the id is invalid (VALIDATION_ERROR), a refusal has no reason (BUDGET.ADJUSTMENT_REASON_REQUIRED), the year has ended so that an approval is no longer possible (BUDGET.YEAR_ENDED; a refusal still is), or a condition no longer holds on today's figures (BUDGET_ADJUSTMENT.OVER_UNALLOCATED, BELOW_FORECAST_FLOOR, OVER_BASE, OVER_REMAINING, NO_BUDGET).",
       examples: [
         VALIDATION_EXAMPLE,
+        EXAMPLES.ADJUSTMENT_REASON_REQUIRED,
         EXAMPLES.YEAR_ENDED,
         EXAMPLES.OVER_UNALLOCATED,
         EXAMPLES.BELOW_FORECAST_FLOOR,

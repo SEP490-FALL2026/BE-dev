@@ -46,8 +46,8 @@ export class VersionFigures {
     },
   ) {
     const figures = versionFiguresOf({
-      ...(input.base ? { baseMinor: await this.facts.money(input.base, currency, tx) } : {}),
-      ...(input.reserve ? { reserveMinor: await this.facts.money(input.reserve, currency, tx) } : {}),
+      ...(input.base ? { baseMinor: await this.facts.money(input.base, currency, 'base', tx) } : {}),
+      ...(input.reserve ? { reserveMinor: await this.facts.money(input.reserve, currency, 'reserve', tx) } : {}),
       ...(input.reservePercent !== undefined ? { reservePercent: input.reservePercent } : {}),
       carriedOverMinor: input.carriedOverMinor,
       defaultPercent: input.defaultPercent,
@@ -73,14 +73,14 @@ export class VersionFigures {
     next: VersionPatch,
   ): Promise<void> {
     const reporting = version.currency;
-    if (patch.base) next.baseMinor = await this.facts.money(patch.base, reporting, tx);
+    if (patch.base) next.baseMinor = await this.facts.money(patch.base, reporting, 'base', tx);
     // The base moves only with the reason why (`QĐ-100v`): a base the draft already has needs none.
     if (next.baseMinor !== undefined && next.baseMinor !== version.baseMinor) {
       const reason = patch.baseReason?.trim();
       if (!reason) throw new BudgetBaseReasonRequiredError();
       next.baseReason = reason;
     }
-    if (patch.reserve) next.reserveMinor = await this.facts.money(patch.reserve, reporting, tx);
+    if (patch.reserve) next.reserveMinor = await this.facts.money(patch.reserve, reporting, 'reserve', tx);
     shareOf(version, patch, next);
     // A reserve that is still the default share of the base follows the base when only the base changes: it stays the default (B-M3).
     if (next.baseMinor !== undefined && next.reserveMinor === undefined && version.reservePercent !== null) {

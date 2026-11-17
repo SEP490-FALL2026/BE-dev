@@ -4,6 +4,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
 import type { SeatOfMonth } from '../../licensing/public/licensing-seat-month.types';
 import { SeatMonthSubscriptionService } from './seat-month-subscription.service';
+import { SeatMonthChargeError } from './seat-month.errors';
 import { endedMonthsOf } from './seat-month.policy';
 import { SeatMonthRepo } from './seat-month.repo';
 
@@ -48,11 +49,12 @@ export class SeatMonthService {
 
   /**
    * Charges one month (the first day of it) for every subscription, each in a transaction of its own; a subscription that fails does not stop the others,
-   * and the first failure is thrown after they were all tried. A month already signed is left as it is.
+   * and a SeatMonthChargeError (the first failure, with the subscriptions that failed) is thrown after they were all tried. A month already
+   * signed is left as it is.
    */
   async chargeMonth(month: BusinessDate, now: Date = new Date()): Promise<SeatMonthResult> {
     const done = await this.charge(month, now, false);
-    if (done.firstFailure !== undefined) throw done.firstFailure;
+    if (done.firstFailure !== undefined) throw new SeatMonthChargeError(done.failedIds, done.firstFailure);
 
     return done;
   }
@@ -61,7 +63,7 @@ export class SeatMonthService {
     month: BusinessDate,
     now: Date,
     onlyMissing: boolean,
-  ): Promise<SeatMonthResult & { firstFailure?: Error }> {
+  ): Promise<SeatMonthResult & { firstFailure?: Error; failedIds: string[] }> {
     const seatsBySubscription = new Map<string, SeatOfMonth[]>();
     for (const seat of await this.licensing.getSeatsOfMonth(month)) {
       seatsBySubscription.set(seat.subscriptionId, [...(seatsBySubscription.get(seat.subscriptionId) ?? []), seat]);
@@ -72,10 +74,11 @@ export class SeatMonthService {
     ]
       .filter((subscriptionId) => !marked.has(subscriptionId))
       .sort(byId);
-    const result: SeatMonthResult & { firstFailure?: Error } = {
+    const result: SeatMonthResult & { firstFailure?: Error; failedIds: string[] } = {
       subscriptions: 0,
       rows: 0,
       failed: 0,
+      failedIds: [],
     };
     for (const subscriptionId of subscriptionIds) {
       try {
@@ -85,6 +88,7 @@ export class SeatMonthService {
         result.subscriptions += 1;
       } catch (error) {
         result.failed += 1;
+        result.failedIds.push(subscriptionId);
         result.firstFailure ??= error instanceof Error ? error : new Error(String(error));
       }
     }

@@ -250,6 +250,23 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
       expect(next).toMatchObject({ subscriptionId: 'sub-2', ownerDepartmentId: null, renewedFromId: 'sub-1' });
     });
 
+    it('reads the price where the caller says it sits in its body, so a money error points at that field of the renewal (FIX-E-R2)', async () => {
+      const previous = record();
+      subscriptions.find.mockResolvedValue(previous);
+      plans.lockShared.mockResolvedValue({
+        applicationKind: 'SAAS',
+        provisioningType: 'K2',
+        applicationStatus: 'ACTIVE',
+      });
+      pricing.read.mockRejectedValue(new Error('stop after the price'));
+
+      await expect(service.recordNext(tx, actor, { ...input, unitPricePath: 'nextPeriod.unitPrice' })).rejects.toThrow(
+        'stop after the price',
+      );
+
+      expect(pricing.read).toHaveBeenCalledWith(input.unitPrice, 'nextPeriod.unitPrice');
+    });
+
     it('still refuses a period that is already continued', async () => {
       subscriptions.find.mockResolvedValue(record());
       subscriptions.successorsOf.mockResolvedValue(new Map([['sub-1', 'sub-2']]));

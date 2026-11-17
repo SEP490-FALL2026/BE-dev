@@ -27,8 +27,11 @@ const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: z.strin
 /** One request that waits for the IT Admin to carry it out. */
 const grantQueueItemSchema = z.strictObject({
   requestId: z.uuid(),
-  /** A request for a service account needs the boundary accepted before it is granted. */
-  type: z.enum(['GRANT', 'SERVICE_ACCOUNT', 'GROUP_GRANT']),
+  type: z
+    .enum(['GRANT', 'SERVICE_ACCOUNT', 'GROUP_GRANT'])
+    .describe(
+      'SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more.',
+    ),
   /** How many people the request is for: 1 but for a request for a group, whose approved people are a row each. */
   lineCount: z.number().int().positive(),
   /** The verdict of the IT Admin on a service account; null for any other request. */

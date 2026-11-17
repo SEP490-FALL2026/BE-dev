@@ -16,6 +16,7 @@ import type {
   ProvisioningType,
   WorkspaceProfileRecord,
 } from './plan.types';
+import { applicationPlanName } from './plan.policy';
 
 const WITH_APPLICATION = { application: { select: { name: true, kind: true, logoUrl: true } } } as const;
 type PlanRow = Prisma.PlanGetPayload<{ include: typeof WITH_APPLICATION }>;
@@ -495,5 +496,16 @@ export class PlanRepo {
     const stored = await this.findProfile(profile.planId, tx);
 
     return stored as WorkspaceProfileRecord;
+  }
+
+  /** The name of each of these plans as a sentence names it ("application – plan"), by id, in one read; an id that does not exist is absent. */
+  async namesOf(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).plan.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, name: true, application: { select: { name: true } } },
+    });
+
+    return new Map(rows.map((row) => [row.id, applicationPlanName(row.application.name, row.name)]));
   }
 }

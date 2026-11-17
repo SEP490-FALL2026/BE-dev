@@ -17,7 +17,7 @@ const NOTE = 'Quyết định điều chuyển số QD-12/2026 của HR';
 const NO_SUCCESSOR: SuccessorFacts = { required: false, chosen: undefined, candidate: null };
 
 const facts = (patch: Partial<NewTransferFacts> = {}): NewTransferFacts => ({
-  namedAsSuccessor: false,
+  namedAsSuccessor: null,
   today: '2026-10-15',
   effectiveOn: '2026-11-01',
   employee: { status: 'ACTIVE', workState: 'WORKING' },
@@ -65,11 +65,11 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
     ['the grounds are empty (AC-18)', { groundsNote: undefined }, 'GROUNDS_REQUIRED'],
     ['the grounds are a notice', { groundsNote: 'BM09-2026-000001' }, 'GROUNDS_IS_NOTICE'],
     ['the grounds are over 500 characters', { groundsNote: 'a'.repeat(501) }, 'GROUNDS_TOO_LONG'],
-    ['another transfer waits (AC-21)', { pending: { effectiveOn: '2026-12-01' } }, 'PENDING_EVENT_EXISTS'],
-    ['another transfer names the person to follow its head', { namedAsSuccessor: true }, 'PENDING_EVENT_EXISTS'],
+    ['another transfer waits (AC-21)', { pending: { id: 't-1', effectiveOn: '2026-12-01' } }, 'PENDING_EVENT_EXISTS'],
+    ['another transfer names the person to follow its head', { namedAsSuccessor: 't-2' }, 'PENDING_EVENT_EXISTS'],
     [
       'the transfer before took effect and is not closed (AC-28, QĐ-110r)',
-      { unclosed: { effectiveOn: '2026-10-05' } },
+      { unclosed: { id: 't-0', effectiveOn: '2026-10-05' } },
       'PENDING_EVENT_EXISTS',
     ],
     [
@@ -82,13 +82,22 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
   });
 
   it('says that the transfer before is still settling, with the day it took effect, and not that another one waits', () => {
-    expect(newTransferRefusal(facts({ unclosed: { effectiveOn: '2026-10-05' } }))).toEqual({
+    expect(newTransferRefusal(facts({ unclosed: { id: 't-0', effectiveOn: '2026-10-05' } }))).toEqual({
       code: 'PENDING_EVENT_EXISTS',
-      details: { kind: 'TRANSFER_SETTLING', effectiveOn: '2026-10-05' },
+      details: { kind: 'TRANSFER_SETTLING', effectiveOn: '2026-10-05', eventId: 't-0' },
     });
-    expect(newTransferRefusal(facts({ pending: { effectiveOn: '2026-12-01' } }))?.details).toEqual({
+    expect(newTransferRefusal(facts({ pending: { id: 't-1', effectiveOn: '2026-12-01' } }))?.details).toEqual({
       kind: 'TRANSFER',
       effectiveOn: '2026-12-01',
+      eventId: 't-1',
+    });
+    expect(newTransferRefusal(facts({ namedAsSuccessor: 't-2' }))?.details).toEqual({
+      kind: 'HEAD_HANDOVER',
+      eventId: 't-2',
+    });
+    // The case of the departure is not read by the transfer: nothing to name.
+    expect(newTransferRefusal(facts({ employee: { status: 'ACTIVE', workState: 'HANDING_OVER' } }))?.details).toEqual({
+      kind: 'OFFBOARDING',
     });
   });
 

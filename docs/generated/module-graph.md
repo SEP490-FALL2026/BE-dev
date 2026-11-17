@@ -57,7 +57,7 @@ flowchart BT
   catalog -->|23| audit
   catalog -->|10| finance
   catalog -->|8| identity_access
-  catalog -->|2| notifications
+  catalog -->|3| notifications
   catalog -->|3| operating_parameters
   catalog -->|33| organization
   dashboards -->|2| catalog
@@ -119,7 +119,7 @@ flowchart BT
   optimization -->|9| policies
   optimization -->|9| usage
   organization -->|10| audit
-  organization -->|5| notifications
+  organization -->|8| notifications
   personnel -->|24| audit
   personnel -->|11| catalog
   personnel -->|3| devices
@@ -135,11 +135,11 @@ flowchart BT
   policies -->|7| organization
   requests -->|64| audit
   requests -->|32| budgets
-  requests -->|42| catalog
+  requests -->|43| catalog
   requests -->|11| finance
   requests -->|38| identity_access
   requests -->|60| licensing
-  requests -->|13| notifications
+  requests -->|14| notifications
   requests -->|12| operating_parameters
   requests -->|97| organization
   requests -->|34| policies

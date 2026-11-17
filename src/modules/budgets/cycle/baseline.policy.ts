@@ -170,8 +170,7 @@ export function baselineVersionRefusal(input: {
 }
 
 /**
- * The most departments a baseline or a package lists: a division of the ceiling names at most this many (`budgetDepartmentCeilingsSet`),
- * and the answer says how many there are in all (`departmentsTotal`) when it lists fewer.
+ * The most departments a baseline or a package lists; the answer says how many there are in all (`departmentsTotal`) when it lists fewer.
  */
 export const DEPARTMENTS_LISTED_MAX = 500;
 /** The most subscriptions the baseline lists for one department; `softwareTotal` says how many it owns. */

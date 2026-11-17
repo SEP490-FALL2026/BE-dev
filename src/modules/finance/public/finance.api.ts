@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { isBusinessDate, type BusinessDate } from '../../../core/business-date';
 import { parseDecimalAmount, type Money } from '../../../core/money/money';
+import { withMoneyPath } from '../../../core/money/money-path';
 import { CurrencyNotSupportedError } from '../../../core/money/money.errors';
 import { RATE_DECIMALS, type ScaledRate } from '../../../core/money/rate';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -30,14 +31,17 @@ export class FinanceApi {
 
   /**
    * Reads `{ amount: "1200.50", currency: "USD" }` into minor units with the minor digits of that currency. Throws
-   * CurrencyNotSupportedError, and the money errors of `core/money` for a malformed, over-precise or too large amount.
+   * CurrencyNotSupportedError, and the money errors of `core/money` for a malformed, over-precise or too large amount;
+   * each carries `path`, where the money object sits in the request body (`unitPrice`, `lines.2.amount`), for the answer to point at.
    * A negative amount is read as such: a caller whose field is `>= 0` (unit price, ADR-0007) checks the sign itself.
    */
-  async parseMoney(input: { amount: string; currency: string }, tx?: DbTx): Promise<Money> {
-    const currency = await this.currencies.find(input.currency, tx);
-    if (!currency) throw new CurrencyNotSupportedError(input.currency);
+  parseMoney(input: { amount: string; currency: string }, path: string, tx?: DbTx): Promise<Money> {
+    return withMoneyPath(path, async () => {
+      const currency = await this.currencies.find(input.currency, tx);
+      if (!currency) throw new CurrencyNotSupportedError(input.currency);
 
-    return { amountMinor: parseDecimalAmount(input.amount, currency.minorUnit), currency: currency.code };
+      return { amountMinor: parseDecimalAmount(input.amount, currency.minorUnit), currency: currency.code };
+    });
   }
 
   /**

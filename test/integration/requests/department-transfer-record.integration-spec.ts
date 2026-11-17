@@ -265,7 +265,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
       expect([refused.status, codeOf(refused), h.detailsOf(refused)]).toEqual([
         409,
         'DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS',
-        { kind: 'TRANSFER_SETTLING', effectiveOn: h.today() },
+        { kind: 'TRANSFER_SETTLING', effectiveOn: h.today(), eventId: first.id },
       ]);
       expect(await state(person)).toEqual(before);
 
@@ -282,9 +282,12 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
 
     it('does not mix it up with a transfer that waits, and a cancelled one does not hold the person', async () => {
       const waiting = await h.veteran(des, code('E'));
-      await h.recorded(body(waiting.employeeId));
+      const first = await h.recorded(body(waiting.employeeId));
       const second = await h.recordTransfer(body(waiting.employeeId, { effectiveOn: h.day(40) }));
-      expect([second.status, h.detailsOf(second)]).toEqual([409, { kind: 'TRANSFER', effectiveOn: h.day(30) }]);
+      expect([second.status, h.detailsOf(second)]).toEqual([
+        409,
+        { kind: 'TRANSFER', effectiveOn: h.day(30), eventId: first.id },
+      ]);
 
       const cancelled = await h.veteran(des, code('E'));
       const wire = await h.recorded(body(cancelled.employeeId));
@@ -483,7 +486,7 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
     const second = await h.recordTransfer(body(person.employeeId, { effectiveOn: h.day(60) }));
 
     expect([second.status, codeOf(second)]).toEqual([409, 'DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS']);
-    expect(h.detailsOf(second)).toEqual({ kind: 'TRANSFER', effectiveOn: first.effectiveOn });
+    expect(h.detailsOf(second)).toEqual({ kind: 'TRANSFER', effectiveOn: first.effectiveOn, eventId: first.id });
     const fault = await h.ctx.sql
       .query(
         `INSERT INTO department_transfers (id, organization_id, employee_id, from_department_id, to_department_id,

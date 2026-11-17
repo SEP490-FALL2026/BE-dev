@@ -50,12 +50,15 @@ const auditValue = (cycle: CycleRecord) => ({
 });
 
 /** What the call asks, the amounts read in the currency of the cycle. */
-const updateOf = (body: UpdateCycleBodyDto, parse: (money: { amount: string }) => bigint): CycleUpdate => ({
+const updateOf = (
+  body: UpdateCycleBodyDto,
+  parse: (money: { amount: string }, path: string) => bigint,
+): CycleUpdate => ({
   submissionDeadline: body.submissionDeadline,
   decisionDeadline: body.decisionDeadline,
   priorities: body.priorities,
-  annualCeilingMinor: body.annualCeiling ? parse(body.annualCeiling) : undefined,
-  sharedPoolReserveMinor: body.sharedPoolReserve ? parse(body.sharedPoolReserve) : undefined,
+  annualCeilingMinor: body.annualCeiling ? parse(body.annualCeiling, 'annualCeiling') : undefined,
+  sharedPoolReserveMinor: body.sharedPoolReserve ? parse(body.sharedPoolReserve, 'sharedPoolReserve') : undefined,
   reason: body.reason,
 });
 
@@ -96,8 +99,8 @@ export class CycleService {
     if (isPastYear(body.year, Number(today.slice(0, 4)))) throw new BudgetCycleYearPastError(body.year);
     if (body.decisionDeadline < body.submissionDeadline) throw new BudgetCycleDeadlinesInvalidError();
     const reporting = await this.facts.reportingCurrency();
-    const annualCeilingMinor = await this.facts.money(body.annualCeiling, reporting);
-    const sharedPoolReserveMinor = await this.facts.money(body.sharedPoolReserve, reporting);
+    const annualCeilingMinor = await this.facts.money(body.annualCeiling, reporting, 'annualCeiling');
+    const sharedPoolReserveMinor = await this.facts.money(body.sharedPoolReserve, reporting, 'sharedPoolReserve');
     const organizationId = await this.facts.organizationId();
 
     const created = await this.runner.run(async (tx) => {

@@ -63,8 +63,8 @@ export class RenewalRequestService {
       // A late request is a request like any other: its end is worked out when the IT Admin grants it (`QĐ-98`, R-M4).
       if (!renewing) return this.redirect(tx, actor, { body, facts, settings });
       await this.requireWindowOpen(tx, facts.assignmentId, today, previousEnd);
-      if (await this.renewals.hasOpenFor(facts.assignmentId, tx))
-        throw new RenewalRequestRefusedError('ALREADY_REQUESTED');
+      const waiting = (await this.renewals.pendingOf([facts.assignmentId], tx)).get(facts.assignmentId);
+      if (waiting) throw new RenewalRequestRefusedError('ALREADY_REQUESTED', null, waiting.requestId);
 
       // The new period runs from the day after the right ends, never cut at the end of a year (`QĐ-98`, R-15); its months and its end are judged
       // by the rule of the time of use when the request is written (`QĐ-111l`).

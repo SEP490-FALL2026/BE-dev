@@ -194,7 +194,9 @@ export class GroupRequestService {
   private refuse(judged: GroupJudgement): void {
     if (judged.planRefusal !== null) throw new GroupRequestPlanNotEligibleError(judged.planRefusal);
     if (judged.count.tooMany !== null) throw new GroupRequestTooManyLinesError(judged.count.tooMany.max);
-    if (judged.termRefusal !== null) throw new AccessRequestTermRefusedError(judged.termRefusal);
+    if (judged.termRefusal !== null) {
+      throw new AccessRequestTermRefusedError(judged.termRefusal, null, judged.assessed.target.provisioningType);
+    }
     if (judged.count.tooFew !== null) throw new GroupRequestTooFewLinesError(judged.count.tooFew.min);
     if (judged.count.duplicates.length > 0) throw new GroupRequestDuplicateLineError(judged.count.duplicates);
     if (judged.refused.length > 0) throw new GroupRequestLinesRefusedError(judged.refused);

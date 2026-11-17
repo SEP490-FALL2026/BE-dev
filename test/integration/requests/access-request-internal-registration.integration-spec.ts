@@ -287,6 +287,29 @@ describe('requests over HTTP: registering internal software (integration, real P
       ...over,
     });
 
+    it('FIX-E-R1: names quote.unitPrice, the field of the body, in the money errors of the assessment quote it saves', async () => {
+      const proposed = await classified();
+      const saved = (amount: string) =>
+        h.saveAssessment(proposed.id, { quote: quote({ unitPrice: { amount, currency: 'VND' } }) }, itAdmin.account);
+
+      expect(h.detailsOf(await saved('1.5').expect(422))).toEqual({ allowedDecimals: 0, path: 'quote.unitPrice' });
+      expect(h.detailsOf(await saved('-1').expect(422))).toEqual({ path: 'quote.unitPrice' });
+      expect(h.detailsOf(await saved('abc').expect(422))).toEqual({
+        issues: [{ code: 'invalid_format', path: 'quote.unitPrice.amount' }],
+      });
+    });
+
+    it('FIX-E-R1: names spend.quote.unitPrice, the field of the body, in the money errors of the quote', async () => {
+      const proposed = await classified();
+
+      const refused = await register(
+        proposed.id,
+        asOwner({ spend: { quote: quote({ unitPrice: { amount: '1.5', currency: 'VND' } }) } }),
+      ).expect(422);
+
+      expect(h.detailsOf(refused)).toEqual({ allowedDecimals: 0, path: 'spend.quote.unitPrice' });
+    });
+
     it('registers the software without a spending approver, and keeps the spend step with the amount of the quote', async () => {
       const proposed = await classified();
 

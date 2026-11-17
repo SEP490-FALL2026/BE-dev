@@ -9,7 +9,7 @@ import type { RouteErrorStatus } from './openapi-example-manifest';
 export const ROUTE_ERROR_CODES_POLICIES: Readonly<
   Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
 > = {
-  policyGet: { '404': ['POLICY.NOT_FOUND'], '409': ['POLICY.NOT_PUBLISHED'] },
+  policyGet: { '404': ['POLICY.NOT_FOUND', 'POLICY.VERSION_NOT_FOUND'], '409': ['POLICY.NOT_PUBLISHED'] },
   policyVersionList: { '404': ['POLICY.NOT_FOUND'] },
   policyStepGet: {
     '404': ['POLICY.NOT_FOUND', 'POLICY.STEP_NOT_FOUND'],

@@ -87,7 +87,7 @@ export class LibraryDraftController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR): a step or an item code that repeats, an empty checklist; or the draft changes what the company may not change: the set of steps (POLICY.STEP_SET_FIXED, details.added and details.removed) or the code of an item the system checks by itself (POLICY.SYSTEM_ITEM_UNKNOWN, details.codes).',
+        'The request is invalid (VALIDATION_ERROR): a step or an item code that repeats, an empty checklist; or the draft changes what the company may not change: the set of steps (POLICY.STEP_SET_FIXED, details.added and details.removed) or the code of an item the system checks by itself (POLICY.SYSTEM_ITEM_UNKNOWN, details.items).',
       examples: [VALIDATION_EXAMPLE, EXAMPLES.STEP_SET_FIXED, EXAMPLES.SYSTEM_ITEM_UNKNOWN],
     },
   )

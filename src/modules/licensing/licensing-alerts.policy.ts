@@ -38,7 +38,7 @@ export function expiryReminderAlert(input: {
 }): LicensingAlert {
   return {
     code: 'LICENSE_EXPIRY_REMINDER',
-    subject: { type: 'LicenseAssignment', id: input.assignmentId },
+    subject: { type: 'LICENSE_ASSIGNMENT', id: input.assignmentId },
     params: {
       assignmentId: input.assignmentId,
       holderEmployeeId: input.holderEmployeeId,
@@ -61,7 +61,7 @@ export function renewalWindowOpenedAlert(input: {
 }): LicensingAlert {
   return {
     code: 'RENEWAL_WINDOW_OPENED',
-    subject: { type: 'LicenseAssignment', id: input.assignmentId },
+    subject: { type: 'LICENSE_ASSIGNMENT', id: input.assignmentId },
     params: {
       assignmentId: input.assignmentId,
       holderEmployeeId: input.holderEmployeeId,
@@ -95,7 +95,7 @@ export function leaverAccessAlert(input: {
 }): LicensingAlert {
   return {
     code: 'LEAVER_K1_ACCESS_RUNS_ON',
-    subject: { type: 'ProvisioningTask', id: input.taskId },
+    subject: { type: 'PROVISIONING_TASK', id: input.taskId },
     params: {
       taskId: input.taskId,
       assignmentId: input.assignmentId,

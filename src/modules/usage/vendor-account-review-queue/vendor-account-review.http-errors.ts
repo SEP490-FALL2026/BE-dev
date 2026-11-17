@@ -89,6 +89,6 @@ export const VENDOR_ACCOUNT_ERROR_EXAMPLES = {
   AMOUNT_INVALID: example(new VendorAccountReviewRefusedError('AMOUNT_INVALID')),
   NO_VENDOR: example(new VendorAccountReviewRefusedError('NO_VENDOR')),
   COST_CENTER_NOT_FOUND: example(new VendorAccountReviewRefusedError('COST_CENTER_NOT_FOUND')),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(0)),
-  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(0, 'amount')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('amount')),
 } as const;

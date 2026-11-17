@@ -103,8 +103,17 @@ describe('the reminders of a step that is late, over PostgreSQL (US-05-09, US-05
         subject_type: 'ACCESS_REQUEST',
         subject_id: id,
         event_key: `SLA:${reminder.id}`,
-        params: { requestId: id, stepKind: 'NEED', reminderNumber: 1, ageWorkingDays: 3, overdueWorkingDays: 1 },
+        params: {
+          requestId: id,
+          stepKind: 'NEED',
+          reminderNumber: 1,
+          ageWorkingDays: 3,
+          overdueWorkingDays: 1,
+          recipientRole: 'HOLDER',
+        },
       });
+      const [requesterNotice] = await h.noticesOf(u.member.employeeId, 'STEP_SLA_REMINDER');
+      expect(requesterNotice.params).toMatchObject({ requestId: id, recipientRole: 'REQUESTER' });
       const escalations = (await h.noticesOf(h.boss.employeeId, 'STEP_SLA_ESCALATION')).filter(
         (notice) => notice.subject_id === id,
       );

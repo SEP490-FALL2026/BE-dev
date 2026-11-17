@@ -34,14 +34,18 @@ const checkSchema = z.strictObject({
   id: z.uuid(),
   number: z.number().int().positive(),
   /** What set the check going; the first three are given now, the others are read from checks made before. */
-  trigger: z.enum([
-    'SUBMISSION',
-    'SPEND_DECISION',
-    'RESERVE_CONFIRMATION',
-    'PLAN_LINE_MOVED',
-    'BUDGET_VERSION_APPROVED',
-    'FINANCE_OUTCOME_WHILE_WAITING',
-  ]),
+  trigger: z
+    .enum([
+      'SUBMISSION',
+      'SPEND_DECISION',
+      'RESERVE_CONFIRMATION',
+      'PLAN_LINE_MOVED',
+      'BUDGET_VERSION_APPROVED',
+      'FINANCE_OUTCOME_WHILE_WAITING',
+    ])
+    .describe(
+      'PLAN_LINE_MOVED, BUDGET_VERSION_APPROVED and FINANCE_OUTCOME_WHILE_WAITING are on checks of the earlier releases only; they are not given any more.',
+    ),
   /** \`BLOCKED\` or \`SPEND_APPROVAL\`; a check made before the three outcomes that went to Finance is told as the spend approval it led to. */
   route: z.enum(['BLOCKED', 'SPEND_APPROVAL']),
   /**

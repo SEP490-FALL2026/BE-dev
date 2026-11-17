@@ -123,12 +123,13 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
 
     it('is the only one that waits for a Cost Center and a year', async () => {
       const { head, department } = await fresh('P-A4');
-      await propose(head, department.unitId).expect(201);
+      const first = h.dataOf<{ proposal: ProposalWire }>(await propose(head, department.unitId).expect(201)).proposal;
 
       const second = await propose(head, department.unitId).expect(409);
       const otherYear = await propose(head, department.unitId, { year: h.next + 1 }).expect(201);
 
       expect(h.codeOf(second)).toBe('BUDGET.PROPOSAL_ALREADY_OPEN');
+      expect(h.detailsOf(second)).toEqual({ proposalId: first.id });
       expect(h.dataOf<{ proposal: ProposalWire }>(otherYear).proposal.year).toBe(h.next + 1);
     });
   });

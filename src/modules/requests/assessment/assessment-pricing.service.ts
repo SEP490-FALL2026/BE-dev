@@ -67,7 +67,7 @@ export class AssessmentPricingService {
     when: { now: Date },
   ): Promise<{ quote: Quote | null; pricing: PricingRecord }> {
     const today = await this.organizationReads.businessToday(when.now, tx);
-    const quote = spendQuote ? await this.quotes.read(spendQuote) : null;
+    const quote = spendQuote ? await this.quotes.read(spendQuote, 'spend.quote') : null;
     if (!quote) return { quote, pricing: NOT_APPLICABLE };
     const pricing = this.quotes.price(
       quote,

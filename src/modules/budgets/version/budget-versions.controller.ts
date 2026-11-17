@@ -120,11 +120,11 @@ export class BudgetVersionsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the department is not in the cycle of the year (DEPARTMENT_NOT_IN_CYCLE), the deadline has not passed, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).',
-      // CURRENT_EXISTS is not shown: a current budget keeps the proposal behind it REVIEWED, so none can wait beside it.
+        'The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle of the year is not open (CYCLE_NOT_OPEN), the department is not in it (DEPARTMENT_NOT_IN_CYCLE), the submission deadline has not passed (BEFORE_DEADLINE) or a proposal waits (HAS_PROPOSAL) (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).',
       examples: [
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
         EXAMPLES.PROPOSAL_NOT_SUBMITTED,
+        EXAMPLES.CURRENT_EXISTS,
         EXAMPLES.VERSION_IN_FLIGHT,
         EXAMPLES.BASELINE_VERSION_NOT_ALLOWED,
       ],
@@ -170,7 +170,7 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(BudgetVersionHistoryPageResponseDto, {
     message: 'BUDGET_VERSION.HISTORY_LISTED',
     description:
-      'The edits of the figures, of a line and of the lines added or imported, newest first, each with the fields it changed before and after, and who and when. Finance reads it, and so does the person who decides the version.',
+      'The edits of a version, newest first: of the figures, and of the files added or removed (the edits of a line, of lines added or imported and of a moved window are on versions of the earlier releases only), each with the fields it changed before and after, and who and when. Finance reads it, and so does the person who decides the version.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -313,7 +313,7 @@ export class BudgetVersionsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The decision is invalid (VALIDATION_ERROR): REJECT or REQUEST_CHANGES, which are no longer decisions, a RETURN with no reason and no answer No to take it from, an approval with a reason; the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO); or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
+        'The decision is invalid (VALIDATION_ERROR): REJECT or REQUEST_CHANGES, which are no longer decisions, a RETURN with no reason and no answer No to take it from (issues[0].path = reason), an approval with a reason; the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO); or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.YEAR_ENDED,

@@ -200,12 +200,12 @@ export class TransferRepo {
   }
 
   /** Whether a transfer that waits names this person to follow the head of the department it leaves. */
-  async isNamedSuccessorOfPending(tx: DbTx, employeeId: string): Promise<boolean> {
+  async pendingTransferNaming(tx: DbTx, employeeId: string): Promise<string | null> {
     const rows = await tx.$queryRaw<{ id: string }[]>`
       SELECT id FROM department_transfers
        WHERE status = 'PENDING' AND head_handover ->> 'successorEmployeeId' = ${employeeId} LIMIT 1`;
 
-    return rows.length > 0;
+    return rows[0]?.id ?? null;
   }
 
   /**

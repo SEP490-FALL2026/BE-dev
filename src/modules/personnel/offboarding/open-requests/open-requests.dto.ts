@@ -19,7 +19,11 @@ const planSchema = z.strictObject({
 /** A request the person is the beneficiary of that is not over: where it stands and whether the IT Admin may close it now. */
 const openRequestSchema = z.strictObject({
   requestId: z.uuid(),
-  type: z.enum(['GRANT', 'SERVICE_ACCOUNT', 'RENEWAL', 'GROUP_GRANT']),
+  type: z
+    .enum(['GRANT', 'SERVICE_ACCOUNT', 'RENEWAL', 'GROUP_GRANT'])
+    .describe(
+      'SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more.',
+    ),
   state: z.string(),
   /** The plan asked for; null for software that is not in the catalog yet. */
   plan: planSchema.nullable(),

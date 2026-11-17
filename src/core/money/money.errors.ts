@@ -1,6 +1,13 @@
 /** The amount text is not a plain decimal: exponent, separators, sign `+`, blanks, or too many integer digits. */
 export class MoneyMalformedError extends Error {
-  constructor() {
+  /**
+   * `flat`: the text is a field of its own (a query `netAmount`), not the `amount` of a money object, so `path` already
+   * names the text and the answer does not add `.amount`.
+   */
+  flat = false;
+
+  /** `path`: where the amount sits in the request body (`unitPrice`, `lines.2.amount`) when known; the facade that read it sets it, else null. */
+  constructor(public path: string | null = null) {
     super('An amount is a plain decimal string such as "1200.00".');
     this.name = 'MoneyMalformedError';
   }
@@ -8,7 +15,10 @@ export class MoneyMalformedError extends Error {
 
 /** More decimals than the currency has: never rounded in silence (ADR-0007, M10). */
 export class MoneyScaleExceededError extends Error {
-  constructor(readonly allowedDecimals: number) {
+  constructor(
+    readonly allowedDecimals: number,
+    public path: string | null = null,
+  ) {
     super(`This currency allows at most ${allowedDecimals} decimal digit(s).`);
     this.name = 'MoneyScaleExceededError';
   }
@@ -16,7 +26,8 @@ export class MoneyScaleExceededError extends Error {
 
 /** The amount, or the converted amount, is beyond what a money value may hold (M14). */
 export class MoneyOutOfRangeError extends Error {
-  constructor() {
+  /** `path`: where the amount sits in the request body (`unitPrice`, `lines.2.amount`) when the caller knows it; null for an internal call. */
+  constructor(public path: string | null = null) {
     super('The amount is outside the range a money value may hold.');
     this.name = 'MoneyOutOfRangeError';
   }
@@ -47,7 +58,10 @@ export class RateOutOfRangeError extends Error {
 
 /** The currency code is not one the system prices in (`currencies`). */
 export class CurrencyNotSupportedError extends Error {
-  constructor(readonly currency: string) {
+  constructor(
+    readonly currency: string,
+    public path: string | null = null,
+  ) {
     super(`The currency ${currency} is not supported.`);
     this.name = 'CurrencyNotSupportedError';
   }

@@ -105,7 +105,7 @@ export class OffboardingStepsController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: `The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED), there is nothing left to take away (NOTHING_TO_REVOKE), or ${CONCURRENT}.`,
+      description: `The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED, with details.problem SOURCE_REQUIRED, ASSIGNMENT_IS_SERVICE_ACCOUNT or TYPE_NOT_SUPPORTED, and details.provisioningType when it is the kind of the seat), there is nothing left to take away (NOTHING_TO_REVOKE), or ${CONCURRENT}.`,
       examples: [E.CASE_NOT_BLOCKED, E.CASE_CLOSED, ...LOCK_REFUSALS, E.REVOCATION_NOT_SUPPORTED, E.NOTHING_TO_REVOKE],
     },
     {

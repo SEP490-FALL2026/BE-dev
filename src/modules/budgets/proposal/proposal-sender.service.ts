@@ -71,16 +71,16 @@ export class ProposalSender {
     await this.requireOpenCycle(tx, input.year);
 
     const reporting = await this.facts.reportingCurrency(tx);
-    const total = await this.facts.money(input.requestedAmount, reporting, tx);
+    const total = await this.facts.money(input.requestedAmount, reporting, 'requestedAmount', tx);
 
     const successorOf = input.previous === null ? await this.proposalToFollow(tx, costCenter.id, input.year) : null;
     await this.yearLock.lock(tx, costCenter.id, [input.year]);
-    const open = (await this.proposals.chainOf(costCenter.id, input.year, tx)).some(
+    const open = (await this.proposals.chainOf(costCenter.id, input.year, tx)).find(
       (proposal) =>
         proposal.state === 'SUBMITTED' ||
         (proposal.state === 'REVIEWED' && proposal.succeededAt === null && proposal.id !== successorOf),
     );
-    if (open) throw new BudgetProposalOpenError();
+    if (open) throw new BudgetProposalOpenError(open.id);
 
     const organizationId = await this.facts.organizationId(tx);
     const id = await this.proposals.insert(tx, {

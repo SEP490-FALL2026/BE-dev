@@ -62,7 +62,7 @@ export const LEAVE_ERROR_EXAMPLES = {
   NOT_FOUND: example(new LeaveRefusedError('NOT_FOUND')),
   EMPLOYEE_NOT_FOUND: example(new LeaveRefusedError('EMPLOYEE_NOT_FOUND')),
   ALREADY_ON_LEAVE: example(new LeaveRefusedError('ALREADY_ON_LEAVE')),
-  EMPLOYEE_NOT_WORKING: example(new LeaveRefusedError('EMPLOYEE_NOT_WORKING', { workState: 'HANDING_OVER' })),
+  EMPLOYEE_NOT_WORKING: example(new LeaveRefusedError('EMPLOYEE_NOT_WORKING', { workState: 'LEFT' })),
   NOT_ACTIVE: example(new LeaveRefusedError('NOT_ACTIVE')),
   START_DATE_INVALID: example(new LeaveRefusedError('START_DATE_INVALID', { reason: 'IN_FUTURE' })),
   RETURN_DATE_NOT_AFTER_START: example(new LeaveRefusedError('RETURN_DATE_INVALID', { reason: 'NOT_AFTER_START' })),

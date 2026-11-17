@@ -72,6 +72,9 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
   `reassignment/organization-change.listener.ts`. Vào identity-access: `identity-access.approval-role-change-listeners`
   ← `reassignment/approval-role.listener.ts` (hai listener chuyển bước nằm trong `RequestsWorkFacadeModule`). Chỉ còn
   một vai phê duyệt, `SPENDING_APPROVER` (grant): không approver dự phòng, không người thay thế (QĐ-93c).
+- Đăng ký vào `notifications.name-sources` (`NotificationNameContributions`, tên `requests.names`) ← `my-requests/request-notification-names.listener.ts`, khai ở `requests.module.ts`: REQUEST,
+  tên là `<Ứng dụng> – <Gói>` (gói đọc theo lô qua `CatalogApi.getPlanSummaries`, không đọc bảng catalog) hoặc tên phần mềm đề xuất khi chưa có gói (`MyRequestsRepo.softwareOf`, một truy vấn);
+  Request nhóm không có gói lẫn đề xuất thì vắng ⟹ câu dùng cụm chung.
 - Đăng ký vào budgets: `budgets.pending-spend` (Contributions `PendingSpendContributions`) ← `spend/pending-spend.listener.ts` (định nghĩa duy nhất của _Request đang chờ duyệt chi_, RV-10);
   `budgets.commitment-release-guard` ← `spend/commitment-release.listener.ts`; `budgets.commitment-request-facts` ←
   `spend/commitment-request-facts.listener.ts` (request, plan, người gửi, nhà cung cấp của một trang commitment, đọc theo lô).

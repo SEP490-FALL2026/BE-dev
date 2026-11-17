@@ -154,7 +154,11 @@ export const requestStateSchema = z.enum([
 
 export const requestSchema = z.strictObject({
   id: z.uuid(),
-  type: z.enum(['GRANT', 'SERVICE_ACCOUNT', 'RENEWAL', 'GROUP_GRANT']),
+  type: z
+    .enum(['GRANT', 'SERVICE_ACCOUNT', 'RENEWAL', 'GROUP_GRANT'])
+    .describe(
+      'SERVICE_ACCOUNT is on records of the earlier releases only: no request for a service account is made any more.',
+    ),
   branch: z.enum(['INTERNAL_FREE', 'PAID_IN_CATALOG', 'NEW_SOFTWARE']),
   state: requestStateSchema,
   routing: z.strictObject({

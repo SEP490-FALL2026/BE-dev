@@ -71,7 +71,17 @@ export class PolicyReadingController {
     description:
       'The version in force, or the published version asked for: its sections and the steps with their checklists, the ground of its issue and the roles it applies to.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_422, NOT_FOUND, NOT_PUBLISHED)
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    VALIDATION_422,
+    {
+      status: HttpStatus.NOT_FOUND,
+      description:
+        'No such policy (POLICY.NOT_FOUND), or it has no published version of the number asked for (POLICY.VERSION_NOT_FOUND).',
+      examples: [EXAMPLES.NOT_FOUND, EXAMPLES.VERSION_NOT_FOUND],
+    },
+    NOT_PUBLISHED,
+  )
   async get(
     @CurrentPrincipal() caller: AuthenticatedPrincipal,
     @Param() params: PolicyCodeParamDto,

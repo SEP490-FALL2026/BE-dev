@@ -112,11 +112,11 @@ export interface RecordFacts extends LastDayFacts {
   employee: { status: 'ACTIVE' | 'TERMINATED'; workState: 'WORKING' | 'ON_LONG_LEAVE' | 'HANDING_OVER' | 'LEFT' };
   groundsNote: string | undefined;
   /** The transfer of the person that waits, if any. */
-  pendingTransfer: { effectiveOn: BusinessDate } | null;
+  pendingTransfer: { id: string; effectiveOn: BusinessDate } | null;
   /** The Super Admin confirmed that the transfer that waits is cancelled with the departure. */
   cancelPendingTransfer: boolean;
-  /** Another waiting transfer names this person to follow the head of its department. */
-  namedAsSuccessor: boolean;
+  /** The id of another waiting transfer that names this person to follow the head of its department, or null. */
+  namedAsSuccessor: string | null;
   /** How the head of the department the person leaves is provided for on the day they stop being its head; null when it is fine or not needed. */
   successor: OffboardingRefusal | null;
 }
@@ -144,7 +144,9 @@ export function recordRefusal(facts: RecordFacts): OffboardingRefusal | null {
     facts.cancelPendingTransfer,
   );
   if (transfer) return transfer;
-  if (facts.namedAsSuccessor) return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'HEAD_HANDOVER' } };
+  if (facts.namedAsSuccessor !== null) {
+    return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'HEAD_HANDOVER', eventId: facts.namedAsSuccessor } };
+  }
 
   return facts.successor;
 }
@@ -154,13 +156,17 @@ export function recordRefusal(facts: RecordFacts): OffboardingRefusal | null {
  * caller confirms it is cancelled (the reason is the standard one); on or after that day the transfer wins and the departure is refused.
  */
 export function pendingTransferRefusal(
-  pending: { effectiveOn: BusinessDate } | null,
+  pending: { id: string; effectiveOn: BusinessDate } | null,
   lastWorkingDay: BusinessDate,
   cancelRequested: boolean,
 ): OffboardingRefusal | null {
   if (!pending) return null;
-  if (lastWorkingDay >= pending.effectiveOn)
-    return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'TRANSFER', effectiveOn: pending.effectiveOn } };
+  if (lastWorkingDay >= pending.effectiveOn) {
+    return {
+      code: 'PENDING_EVENT_EXISTS',
+      details: { kind: 'TRANSFER', effectiveOn: pending.effectiveOn, eventId: pending.id },
+    };
+  }
 
   return cancelRequested ? null : { code: 'TRANSFER_CANCELLATION_REQUIRED' };
 }

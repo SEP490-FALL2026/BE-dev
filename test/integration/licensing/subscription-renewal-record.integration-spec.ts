@@ -172,6 +172,29 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     expect(rows[0].n).toBe(0);
   });
 
+  it('points the money errors of the new period at nextPeriod.unitPrice, the field of this body, and writes nothing (FIX-E-R2)', async () => {
+    const unit = await h.unit(2);
+    const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
+    const before = await h.count('subscriptions');
+    const body = (unitPrice: unknown) => ({
+      subscriptionId,
+      choice: 'REDUCE',
+      proposedQuantity: 2,
+      outcome: 'AS_DECIDED',
+      nextPeriod: { ...nextYear(2), unitPrice },
+    });
+
+    // Dong has no minor unit: a price with decimals is out of scale.
+    const scale = await record(body({ amount: '1000000.5', currency: 'VND' }));
+    expect(scale.status).toBe(422);
+    expect(h.codeOf(scale)).toBe('MONEY_SCALE_EXCEEDED');
+    expect(detailsOf(scale)).toEqual({ allowedDecimals: 0, path: 'nextPeriod.unitPrice' });
+    const negative = await record(body({ amount: '-5', currency: 'VND' }));
+    expect(negative.status).toBe(422);
+    expect(detailsOf(negative)).toEqual({ path: 'nextPeriod.unitPrice' });
+    expect(await h.count('subscriptions')).toBe(before);
+  });
+
   it('needs the new period of a cancellation the vendor did not carry out, whatever the plan: nobody is told otherwise (V-2)', async () => {
     const unit = await h.unit(0);
     for (const outcome of [
