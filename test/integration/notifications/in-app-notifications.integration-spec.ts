@@ -366,7 +366,8 @@ describe('the inbox of the application over PostgreSQL (FR-3.11, US-05-15 AC-7, 
       expect(granted?.target).toEqual({ operationId: 'accessRequestGet', pathParams: { id: proposal.id } });
       // The employee reads the sentence written for them, not their own name (R-3).
       expect(profile?.message).toBe('Hồ sơ của bạn vừa được cập nhật thông tin chính thức.');
-      expect(profile?.target).toEqual({ operationId: 'employeeGet', pathParams: { id: grace.employeeId } });
+      // The employee does not read the directory (the Super Admin does): they are sent to their own profile.
+      expect(profile?.target).toEqual({ operationId: 'meGet', pathParams: {} });
       const grantedEn = en.find((item) => item.code === 'REQUEST_GRANTED');
       expect(grantedEn).toMatchObject({ title: 'Access granted' });
       expect(grantedEn?.message).toContain('Miro');
@@ -401,6 +402,49 @@ describe('the inbox of the application over PostgreSQL (FR-3.11, US-05-15 AC-7, 
       expect(ofHeadEn.message).toContain(employeeName);
       // The words change, the stored params do not.
       expect(ofEmployee.params).toEqual(ofHead.params);
+    });
+
+    it('opens a route the reader may read: the head is not sent to the cycle, the version or the case that only Finance or the Super Admin read (F1)', async () => {
+      const department = await h.departmentWithUnit('P-WORDS8');
+      const head = await h.staff(department, 'INB-F1H');
+      await h.makeHead(department, head);
+      const employee = await h.staff(department, 'INB-F1E');
+      const cycle = randomUUID();
+      const version = randomUUID();
+      const departure = randomUUID();
+      const event = (recipient: string, subject: { type: string; id: string }, code: string, params: object) =>
+        notice(recipient, { code: code as InAppNotificationInput['code'], subject, params: params as never });
+      await give(
+        event(head.employeeId, { type: 'BUDGET_CYCLE', id: cycle }, 'BUDGET_CYCLE_OPENED', {
+          cycleId: cycle,
+          year: 2031,
+        }),
+      );
+      await give(
+        event(head.employeeId, { type: 'BUDGET_VERSION', id: version }, 'BUDGET_VERSION_DECIDED', {
+          versionId: version,
+        }),
+      );
+      const left = { employeeId: employee.employeeId, departmentId: department.id, eventKind: 'DEPARTURE_RECORDED' };
+      await give(event(head.employeeId, { type: 'OFFBOARDING_CASE', id: departure }, 'PERSONNEL_EVENT_RECORDED', left));
+      await give(
+        event(employee.employeeId, { type: 'OFFBOARDING_CASE', id: departure }, 'PERSONNEL_EVENT_RECORDED', left),
+      );
+
+      const ofHead = (await list(head.account)).items;
+      const ofEmployee = (await list(employee.account)).items;
+
+      const targetOf = (items: NoticeWire[], code: string) => items.find((item) => item.code === code)?.target;
+      expect(targetOf(ofHead, 'BUDGET_CYCLE_OPENED')).toEqual({ operationId: 'budgetMine', pathParams: {} });
+      expect(targetOf(ofHead, 'BUDGET_VERSION_DECIDED')).toEqual({
+        operationId: 'budgetMineVersionList',
+        pathParams: {},
+      });
+      expect(targetOf(ofHead, 'PERSONNEL_EVENT_RECORDED')).toBeNull();
+      expect(targetOf(ofEmployee, 'PERSONNEL_EVENT_RECORDED')).toEqual({
+        operationId: 'meDepartureNoticeGet',
+        pathParams: {},
+      });
     });
 
     it('uses the generic phrase for an id that does not exist, and still answers 200', async () => {

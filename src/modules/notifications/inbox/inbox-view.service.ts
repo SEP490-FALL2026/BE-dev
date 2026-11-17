@@ -28,6 +28,7 @@ export interface NotificationView {
  * lookup per kind of entity for the whole page, renders each sentence and gives each notice the screen it opens. A name nobody can
  * give (no owner registered, the owner failed, the id is gone) becomes a generic phrase and one line in the log, never a failed route.
  * `recipientEmployeeId` is the employee reading: a notice about that same employee gets the sentence written for them (R-3).
+ * `recipientRoles` are their effective roles: the screen a notice opens is one they may read (F1), or none.
  */
 @Injectable()
 export class InboxViewService {
@@ -39,6 +40,7 @@ export class InboxViewService {
     records: readonly InAppNotificationRecord[],
     locale: RequestLocaleValue,
     recipientEmployeeId: string | null,
+    recipientRoles: readonly string[],
   ): Promise<NotificationView[]> {
     if (records.length === 0) return [];
     const forRender = records.map((record) => withRecipientIsSubject(record.params, recipientEmployeeId));
@@ -55,7 +57,7 @@ export class InboxViewService {
         record: { ...record, subjectType: subject?.type ?? record.subjectType },
         title,
         message,
-        target: notificationTarget(record.code, subject, record.params),
+        target: notificationTarget(record.code, subject, forRender[index], recipientRoles),
       };
     });
   }

@@ -102,6 +102,61 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
 };
 
 /**
+ * The roles that read a route, for the routes that a controller or a service narrows: a route not listed is read by every signed-in
+ * person (the notice is about them or their work). The recipients spec reads the controllers and checks this table says what they say;
+ * the routes marked "service" have no role guard and their service narrows the reader.
+ */
+export const ROUTE_READERS: Readonly<Record<string, readonly string[]>> = {
+  budgetAdjustmentList: ['FINANCE', 'SPENDING_APPROVER', 'MANAGER'],
+  budgetCycleGet: ['FINANCE', 'SPENDING_APPROVER'],
+  budgetMine: ['MANAGER'],
+  budgetMineVersionList: ['MANAGER'],
+  budgetProposalGet: ['FINANCE', 'MANAGER'], // service: Finance reads every proposal, a head those of their Cost Center
+  budgetReviewPeriodGet: ['FINANCE', 'SPENDING_APPROVER', 'MANAGER'],
+  budgetReviewPeriodList: ['FINANCE', 'SPENDING_APPROVER', 'MANAGER'],
+  budgetSummary: ['FINANCE', 'SPENDING_APPROVER'],
+  budgetTable: ['FINANCE', 'SPENDING_APPROVER'],
+  budgetVersionGet: ['FINANCE', 'SPENDING_APPROVER'], // service: only Finance and the spending approver read a version
+  departmentGet: ['SUPER_ADMIN', 'IT_ADMIN', 'MANAGER'],
+  departmentSoftwareProposalList: ['IT_ADMIN', 'MANAGER'],
+  departmentTransferGet: ['SUPER_ADMIN', 'IT_ADMIN'],
+  departmentWarningList: ['SUPER_ADMIN', 'IT_ADMIN'],
+  deviceStopRequestList: ['IT_ADMIN'],
+  employeeGet: ['SUPER_ADMIN'],
+  ghostSeatExemptionList: ['MANAGER', 'IT_ADMIN'],
+  ghostSeatQueueList: ['MANAGER'],
+  ghostSeatRecommendationGet: ['IT_ADMIN', 'MANAGER'],
+  longLeaveGet: ['SUPER_ADMIN', 'IT_ADMIN'],
+  offboardingCaseGet: ['SUPER_ADMIN', 'IT_ADMIN'],
+  personnelNoticeGet: ['SUPER_ADMIN', 'IT_ADMIN', 'MANAGER'],
+  planGet: ['IT_ADMIN', 'FINANCE'],
+  provisioningTaskGet: ['IT_ADMIN'],
+  purchaseInvoiceGet: ['IT_ADMIN', 'FINANCE'],
+  stepCongestionList: ['SUPER_ADMIN'],
+  subscriptionDeadlineEventList: ['IT_ADMIN', 'FINANCE', 'SPENDING_APPROVER', 'SUPER_ADMIN'],
+  subscriptionGet: ['IT_ADMIN', 'FINANCE'],
+  subscriptionRenewalGet: ['IT_ADMIN', 'FINANCE', 'MANAGER'], // service: the IT Admin, Finance and the head of the owning department
+  usageSourceList: ['IT_ADMIN'],
+  vendorAccountDiscrepancyList: ['IT_ADMIN'],
+};
+
+/** Where a reader who may not read a route goes instead, tried in order; `selfOnly` is for a notice about the reader (their own record). */
+export const ALTERNATIVES: Readonly<
+  Record<string, readonly { readonly route: RouteRef; readonly selfOnly?: boolean }[]>
+> = {
+  // The head of a department reads the budget of their department, not the cycle or the table of the company.
+  budgetCycleGet: [{ route: route('budgetMine') }],
+  budgetVersionGet: [{ route: route('budgetMineVersionList') }],
+  budgetTable: [{ route: route('budgetMine') }],
+  budgetSummary: [{ route: route('budgetMine') }],
+  // The person moved or leaving reads their own case; nobody else is given a route they cannot read.
+  departmentTransferGet: [{ route: route('meDepartmentTransferGet'), selfOnly: true }],
+  offboardingCaseGet: [{ route: route('meDepartureNoticeGet'), selfOnly: true }],
+  // The employee reads their own profile through `/me`; the directory is for the Super Admin.
+  employeeGet: [{ route: route('meGet'), selfOnly: true }],
+};
+
+/**
  * By `subject.type` (canonical), tried when the code has no route of its own: one line for each type of the catalogue that has a route
  * to read one record. Not here, for want of such a route: `APPLICATION`, `BUDGET_ADJUSTMENT`, `COST_CENTER`,
  * `DEPARTMENT_SOFTWARE_PROPOSAL`, `DEVICE_STOP_REQUEST`, `HANDOVER_DUTY`, `LICENSE_ASSIGNMENT`, `OUT_OF_PROCESS_CASE`, `TRANSFER_REVIEW`.
@@ -191,22 +246,51 @@ function routeOfCode(
   return (typeof audience === 'string' ? own(entry.cases, audience) : undefined) ?? entry.otherwise;
 }
 
+/** Whether one of the roles of the reader reads the route; a route not in `ROUTE_READERS` is read by every signed-in person. */
+function readsRoute(operationId: string, roles: readonly string[]): boolean {
+  const readers = own(ROUTE_READERS, operationId);
+
+  return readers === undefined || readers.some((role) => roles.includes(role));
+}
+
+/** The target of a route for a reader: the route itself when they may read it, else the first alternative they may read, else null. */
+function targetFor(
+  ref: RouteRef,
+  subject: { type: string; id: string } | null,
+  params: Readonly<Record<string, unknown>>,
+  roles: readonly string[],
+): NotificationTarget | null {
+  if (readsRoute(ref.operationId, roles)) return resolve(ref, subject, params);
+  const isSelf = params.recipientIsSubject === 'true';
+  for (const alternative of own(ALTERNATIVES, ref.operationId) ?? []) {
+    if (alternative.selfOnly === true && !isSelf) continue;
+    if (!readsRoute(alternative.route.operationId, roles)) continue;
+    const target = resolve(alternative.route, subject, params);
+    if (target !== null) return target;
+  }
+
+  return null;
+}
+
 /**
- * The screen a notice opens: the table of its code first, then the table of its subject type; null when neither gives a route with all
- * its path parameters, or when the table of the code says there is none. Accepts any code (a notice may outlive its code) and never throws.
+ * The screen a notice opens for the person who reads it (`roles` are the effective roles of the caller): the table of its code first,
+ * then the table of its subject type; null when neither gives a route with all its path parameters, when the table of the code says there
+ * is none, or when the reader has no role that reads the route and no alternative of it. `params.recipientIsSubject === 'true'` says the
+ * notice is about the reader. Accepts any code (a notice may outlive its code) and never throws.
  */
 export function notificationTarget(
   code: string,
   subject: { type: string; id: string } | null,
   params: Readonly<Record<string, unknown>>,
+  roles: readonly string[],
 ): NotificationTarget | null {
   const entry = own(TARGET_BY_CODE as Readonly<Record<string, RouteRef | AudienceRoutes | null>>, code);
   if (entry === null) return null;
   const byCode = entry === undefined ? undefined : routeOfCode(entry, params);
-  const fromCode = byCode === undefined ? null : resolve(byCode, subject, params);
-  if (fromCode !== null) return fromCode;
+  if (byCode !== undefined && resolve(byCode, subject, params) !== null)
+    return targetFor(byCode, subject, params, roles);
   if (subject === null) return null;
   const bySubject = own(TARGET_BY_SUBJECT_TYPE, canonicalSubjectType(subject.type));
 
-  return bySubject === undefined ? null : resolve(bySubject, subject, params);
+  return bySubject === undefined ? null : targetFor(bySubject, subject, params, roles);
 }

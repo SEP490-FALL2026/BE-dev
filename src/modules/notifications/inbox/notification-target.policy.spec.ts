@@ -4,6 +4,7 @@ import { IN_APP_NOTIFICATION_CODES } from '../public/notifications.types';
 import { PARAM_KEYS_BY_CODE } from './inbox.policy';
 import {
   TARGET_BY_CODE,
+  ALTERNATIVES,
   TARGET_BY_SUBJECT_TYPE,
   canonicalSubjectType,
   isUpperSnakeSubjectType,
@@ -13,6 +14,15 @@ import {
 
 const ID = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
+
+/** A reader who holds every role: the routes below are read by one of them, so the table of the code is what is tested here (the roles are in the recipients spec). */
+const ALL_ROLES = ['SUPER_ADMIN', 'IT_ADMIN', 'FINANCE', 'SPENDING_APPROVER', 'MANAGER', 'EMPLOYEE'];
+const targetOf = (
+  code: string,
+  subject: { type: string; id: string } | null,
+  params: Readonly<Record<string, unknown>>,
+  roles: readonly string[] = ALL_ROLES,
+) => notificationTarget(code, subject, params, roles);
 
 /** `subject.type` of the catalogue that have no route to read one record: a notice of them has no `target` of its own by type. */
 const TYPES_WITHOUT_DETAIL_ROUTE = [
@@ -92,7 +102,7 @@ describe('isUpperSnakeSubjectType', () => {
 
 describe('notificationTarget', () => {
   it('opens the request of a notice about a request, by the type of the subject', () => {
-    expect(notificationTarget('REQUEST_NEED_APPROVED', { type: 'ACCESS_REQUEST', id: ID }, { requestId: ID })).toEqual({
+    expect(targetOf('REQUEST_NEED_APPROVED', { type: 'ACCESS_REQUEST', id: ID }, { requestId: ID })).toEqual({
       operationId: 'accessRequestGet',
       pathParams: { id: ID },
     });
@@ -100,76 +110,69 @@ describe('notificationTarget', () => {
 
   it('prefers the table of the code: the task of a withdrawal waiting for the IT Admin, not the request', () => {
     expect(
-      notificationTarget(
-        'WITHDRAWAL_AWAITING_IT_CLOSE',
-        { type: 'ACCESS_REQUEST', id: ID },
-        { requestId: ID, taskId: OTHER },
-      ),
+      targetOf('WITHDRAWAL_AWAITING_IT_CLOSE', { type: 'ACCESS_REQUEST', id: ID }, { requestId: ID, taskId: OTHER }),
     ).toEqual({ operationId: 'provisioningTaskGet', pathParams: { id: OTHER } });
   });
 
   it('falls back to the subject when the key the code wants is missing from the params', () => {
     expect(
-      notificationTarget('GRANT_TASK_CANCELLED', { type: 'ACCESS_REQUEST', id: ID }, { requestId: ID, taskId: null }),
+      targetOf('GRANT_TASK_CANCELLED', { type: 'ACCESS_REQUEST', id: ID }, { requestId: ID, taskId: null }),
     ).toEqual({ operationId: 'accessRequestGet', pathParams: { id: ID } });
   });
 
   it('opens the return request, the case of a departure and the budget version', () => {
-    expect(notificationTarget('RETURN_COMPLETED', { type: 'RETURN_REQUEST', id: ID }, {})).toEqual({
+    expect(targetOf('RETURN_COMPLETED', { type: 'RETURN_REQUEST', id: ID }, {})).toEqual({
       operationId: 'returnRequestGet',
       pathParams: { id: ID },
     });
     expect(
-      notificationTarget('DEPARTURE_ACCESS_BLOCKED', { type: 'OFFBOARDING_CASE', id: ID }, { audience: 'IT_ADMIN' }),
+      targetOf('DEPARTURE_ACCESS_BLOCKED', { type: 'OFFBOARDING_CASE', id: ID }, { audience: 'IT_ADMIN' }),
     ).toEqual({ operationId: 'offboardingCaseGet', pathParams: { id: ID } });
-    expect(notificationTarget('BUDGET_VERSION_DECIDED', { type: 'BUDGET_VERSION', id: ID }, { versionId: ID })).toEqual(
-      {
-        operationId: 'budgetVersionGet',
-        pathParams: { id: ID },
-      },
-    );
+    expect(targetOf('BUDGET_VERSION_DECIDED', { type: 'BUDGET_VERSION', id: ID }, { versionId: ID })).toEqual({
+      operationId: 'budgetVersionGet',
+      pathParams: { id: ID },
+    });
   });
 
   it('reads a path parameter from the params, with a number written as text', () => {
-    expect(notificationTarget('BUDGET_CYCLE_OPENED', { type: 'BUDGET_CYCLE', id: ID }, { year: 2027 })).toEqual({
+    expect(targetOf('BUDGET_CYCLE_OPENED', { type: 'BUDGET_CYCLE', id: ID }, { year: 2027 })).toEqual({
       operationId: 'budgetCycleGet',
       pathParams: { year: '2027' },
     });
-    expect(
-      notificationTarget('POLICY_PUBLISHED', { type: 'POLICY_VERSION', id: ID }, { policyCode: 'POL-USAGE' }),
-    ).toEqual({
+    expect(targetOf('POLICY_PUBLISHED', { type: 'POLICY_VERSION', id: ID }, { policyCode: 'POL-USAGE' })).toEqual({
       operationId: 'policyGet',
       pathParams: { code: 'POL-USAGE' },
     });
-    expect(notificationTarget('BUDGET_CYCLE_OPENED', { type: 'BUDGET_CYCLE', id: ID }, {})).toBeNull();
+    expect(targetOf('BUDGET_CYCLE_OPENED', { type: 'BUDGET_CYCLE', id: ID }, {})).toBeNull();
   });
 
   it('chooses by audience where the code says so', () => {
     const subject = { type: 'DEPARTMENT_TRANSFER', id: ID };
-    expect(notificationTarget('TRANSFER_GRACE_STARTED', subject, { audience: 'MOVER' })).toEqual({
+    expect(targetOf('TRANSFER_GRACE_STARTED', subject, { audience: 'MOVER' })).toEqual({
       operationId: 'meDepartmentTransferGet',
       pathParams: {},
     });
-    expect(notificationTarget('TRANSFER_GRACE_STARTED', subject, { audience: 'HEAD' })).toEqual({
+    expect(targetOf('TRANSFER_GRACE_STARTED', subject, { audience: 'HEAD' })).toEqual({
       operationId: 'departmentTransferGet',
       pathParams: { id: ID },
     });
-    expect(notificationTarget('TRANSFER_GRACE_STARTED', subject, { audience: 'SOMEONE' })).toEqual({
+    expect(targetOf('TRANSFER_GRACE_STARTED', subject, { audience: 'SOMEONE' })).toEqual({
       operationId: 'departmentTransferGet',
       pathParams: { id: ID },
     });
     expect(
-      notificationTarget('LICENSE_EXPIRY_REMINDER', { type: 'LICENSE_ASSIGNMENT', id: ID }, { audience: 'EMPLOYEE' }),
+      targetOf('LICENSE_EXPIRY_REMINDER', { type: 'LICENSE_ASSIGNMENT', id: ID }, { audience: 'EMPLOYEE' }),
     ).toEqual({ operationId: 'meSoftwareRightList', pathParams: {} });
-    expect(
-      notificationTarget('LICENSE_EXPIRY_REMINDER', { type: 'LicenseAssignment', id: ID }, { audience: 'HEAD' }),
-    ).toEqual({ operationId: 'assignmentExpiryReminderList', pathParams: {} });
-    expect(notificationTarget('LICENSE_EXPIRY_REMINDER', { type: 'LicenseAssignment', id: ID }, {})).toBeNull();
+    expect(targetOf('LICENSE_EXPIRY_REMINDER', { type: 'LicenseAssignment', id: ID }, { audience: 'HEAD' })).toEqual({
+      operationId: 'assignmentExpiryReminderList',
+      pathParams: {},
+    });
+    expect(targetOf('LICENSE_EXPIRY_REMINDER', { type: 'LicenseAssignment', id: ID }, {})).toBeNull();
   });
 
   it('opens the batch of a notice that a batch of spend requests was sent', () => {
     expect(
-      notificationTarget(
+      targetOf(
         'SPEND_BATCH_SUBMITTED',
         { type: 'SPEND_BATCH', id: ID },
         { batchId: ID, departmentId: OTHER, sentCount: 3 },
@@ -180,10 +183,10 @@ describe('notificationTarget', () => {
   it('opens the renewal case of a recorded adjustment, and the subscription for the other notices of SBF-20', () => {
     const subject = { type: 'SUBSCRIPTION', id: ID };
     expect(
-      notificationTarget('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', subject, { renewalId: OTHER, subscriptionId: ID }),
+      targetOf('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', subject, { renewalId: OTHER, subscriptionId: ID }),
     ).toEqual({ operationId: 'subscriptionRenewalGet', pathParams: { id: OTHER } });
     // A renewal case that is not on the notice falls back to the subscription it is about.
-    expect(notificationTarget('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', subject, { renewalId: null })).toEqual({
+    expect(targetOf('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', subject, { renewalId: null })).toEqual({
       operationId: 'subscriptionGet',
       pathParams: { id: ID },
     });
@@ -194,7 +197,7 @@ describe('notificationTarget', () => {
       'SUBSCRIPTION_EXPIRY_MARKED',
       'SUBSCRIPTION_RENEWAL_DATA_QUALITY',
     ]) {
-      expect(notificationTarget(code, subject, { subscriptionId: ID, renewalId: null })).toEqual({
+      expect(targetOf(code, subject, { subscriptionId: ID, renewalId: null })).toEqual({
         operationId: 'subscriptionGet',
         pathParams: { id: ID },
       });
@@ -207,7 +210,7 @@ describe('notificationTarget', () => {
       { subscriptionId: ID, baseDate: '2026-11-01', renewalId: null },
       { subscriptionId: ID, renewalId: OTHER },
     ]) {
-      expect(notificationTarget('SUBSCRIPTION_AUTO_RENEWAL_INCIDENT', subject, params)).toEqual({
+      expect(targetOf('SUBSCRIPTION_AUTO_RENEWAL_INCIDENT', subject, params)).toEqual({
         operationId: 'subscriptionDeadlineEventList',
         pathParams: {},
       });
@@ -216,54 +219,53 @@ describe('notificationTarget', () => {
 
   it('opens the issue report of the three notices about one, the lists of the operations notices, and nothing for a case outside the process', () => {
     for (const code of ['SAAS_ISSUE_SUBMITTED', 'SAAS_ISSUE_RESPONSE_OVERDUE', 'SAAS_ISSUE_STATE_CHANGED']) {
-      expect(notificationTarget(code, { type: 'SAAS_ISSUE', id: ID }, { issueId: ID })).toEqual({
+      expect(targetOf(code, { type: 'SAAS_ISSUE', id: ID }, { issueId: ID })).toEqual({
         operationId: 'saasIssueGet',
         pathParams: { id: ID },
       });
     }
-    expect(notificationTarget('VENDOR_ACCOUNT_DISCREPANCY_OPENED', null, { newCount: 2 })).toEqual({
+    expect(targetOf('VENDOR_ACCOUNT_DISCREPANCY_OPENED', null, { newCount: 2 })).toEqual({
       operationId: 'vendorAccountDiscrepancyList',
       pathParams: {},
     });
     for (const code of ['DEVICE_STOP_REQUESTED', 'DEVICE_STOP_REQUEST_OVERDUE']) {
-      expect(notificationTarget(code, { type: 'DEVICE_STOP_REQUEST', id: ID }, { stopRequestId: ID })).toEqual({
+      expect(targetOf(code, { type: 'DEVICE_STOP_REQUEST', id: ID }, { stopRequestId: ID })).toEqual({
         operationId: 'deviceStopRequestList',
         pathParams: {},
       });
     }
-    expect(notificationTarget('OUT_OF_PROCESS_CASE_REPORTED', { type: 'OUT_OF_PROCESS_CASE', id: ID }, {})).toBeNull();
+    expect(targetOf('OUT_OF_PROCESS_CASE_REPORTED', { type: 'OUT_OF_PROCESS_CASE', id: ID }, {})).toBeNull();
   });
 
   it('gives a screen without a subject when the catalogue names one', () => {
-    expect(notificationTarget('STEP_BACKLOG_ALERT', null, { holderEmployeeId: ID })).toEqual({
+    expect(targetOf('STEP_BACKLOG_ALERT', null, { holderEmployeeId: ID })).toEqual({
       operationId: 'stepCongestionList',
       pathParams: {},
     });
   });
 
   it('opens the employee of a read-only code whose own screen is gone', () => {
-    expect(
-      notificationTarget('HANDOVER_CONFIRMATION_DUE', { type: 'HandoverDuty', id: ID }, { employeeId: OTHER }),
-    ).toEqual({ operationId: 'employeeGet', pathParams: { id: OTHER } });
-    expect(
-      notificationTarget('TRANSFER_REVIEW_DUE', { type: 'TRANSFER_REVIEW', id: ID }, { employeeId: OTHER }),
-    ).toEqual({
+    expect(targetOf('HANDOVER_CONFIRMATION_DUE', { type: 'HandoverDuty', id: ID }, { employeeId: OTHER })).toEqual({
+      operationId: 'employeeGet',
+      pathParams: { id: OTHER },
+    });
+    expect(targetOf('TRANSFER_REVIEW_DUE', { type: 'TRANSFER_REVIEW', id: ID }, { employeeId: OTHER })).toEqual({
       operationId: 'employeeGet',
       pathParams: { id: OTHER },
     });
   });
 
   it('gives null where the catalogue names no single screen', () => {
-    expect(notificationTarget('TRANSFER_RIGHTS_REVOKING', { type: 'DEPARTMENT_TRANSFER', id: ID }, {})).toBeNull();
-    expect(notificationTarget('USAGE_TRACKING_NOTICE', { type: 'APPLICATION', id: ID }, {})).toBeNull();
-    expect(notificationTarget('IT_ADMIN_HANDOVER_RECEIVED', { type: 'OFFBOARDING_CASE', id: ID }, {})).toBeNull();
+    expect(targetOf('TRANSFER_RIGHTS_REVOKING', { type: 'DEPARTMENT_TRANSFER', id: ID }, {})).toBeNull();
+    expect(targetOf('USAGE_TRACKING_NOTICE', { type: 'APPLICATION', id: ID }, {})).toBeNull();
+    expect(targetOf('IT_ADMIN_HANDOVER_RECEIVED', { type: 'OFFBOARDING_CASE', id: ID }, {})).toBeNull();
   });
 
   it('gives null for a subject of a type with no route, for no subject and for a code the table does not know', () => {
-    expect(notificationTarget('SOME_OLD_CODE', { type: 'LICENSE_ASSIGNMENT', id: ID }, {})).toBeNull();
-    expect(notificationTarget('SOME_OLD_CODE', null, {})).toBeNull();
-    expect(notificationTarget('constructor', { type: 'constructor', id: ID }, {})).toBeNull();
-    expect(notificationTarget('SOME_OLD_CODE', { type: 'ACCESS_REQUEST', id: '' }, {})).toBeNull();
+    expect(targetOf('SOME_OLD_CODE', { type: 'LICENSE_ASSIGNMENT', id: ID }, {})).toBeNull();
+    expect(targetOf('SOME_OLD_CODE', null, {})).toBeNull();
+    expect(targetOf('constructor', { type: 'constructor', id: ID }, {})).toBeNull();
+    expect(targetOf('SOME_OLD_CODE', { type: 'ACCESS_REQUEST', id: '' }, {})).toBeNull();
   });
 });
 
@@ -282,6 +284,9 @@ function routesOf(): { owner: string; route: RouteRef; keys?: readonly string[] 
     }
   }
   for (const [type, route] of Object.entries(TARGET_BY_SUBJECT_TYPE)) found.push({ owner: type, route });
+  for (const [operation, alternatives] of Object.entries(ALTERNATIVES)) {
+    for (const { route } of alternatives) found.push({ owner: `alternative of ${operation}`, route });
+  }
 
   return found;
 }

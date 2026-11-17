@@ -72,7 +72,7 @@ export class InboxController {
       const page = await this.inbox.list(actor.employeeId, query);
 
       return {
-        items: (await this.view.view(page.items, locale, actor.employeeId)).map(toNotificationWire),
+        items: (await this.view.view(page.items, locale, actor.employeeId, actor.roles)).map(toNotificationWire),
         pagination: page.pagination,
       };
     } catch (error) {
@@ -145,6 +145,7 @@ export class InboxController {
         [await this.inbox.markRead(actor.employeeId, params.id)],
         locale,
         actor.employeeId,
+        actor.roles,
       );
 
       return { notification: toNotificationWire(view) };
