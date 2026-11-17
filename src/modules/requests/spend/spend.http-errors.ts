@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { BudgetCommitmentExistsError, BudgetCommitmentNotHoldableError } from '../../budgets/public/budgets.errors';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
@@ -54,6 +55,21 @@ export function toSpendApiException(error: unknown): unknown {
   if (error instanceof SpendSupplementRefusedError) {
     return refuse(HttpStatus.CONFLICT, `SPEND.SUPPLEMENT_${error.reason}`, error.message);
   }
+  // The commitment the approval holds is refused (a safety net after the check of the budget): the same answers as the budget's own routes.
+  if (error instanceof BudgetCommitmentNotHoldableError) {
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'BUDGET.COMMITMENT_NOT_HOLDABLE',
+      message: error.message,
+      details: error.year === null ? { reason: error.reason } : { reason: error.reason, year: error.year },
+    });
+  }
+  if (error instanceof BudgetCommitmentExistsError) {
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'BUDGET.COMMITMENT_EXISTS',
+      message: error.message,
+      details: { year: error.year },
+    });
+  }
 
   return toAccessRequestApiException(error);
 }
@@ -96,6 +112,8 @@ export const SPEND_ERROR_EXAMPLES = {
   OWN_REQUEST: example(new SpendDecisionRefusedError('OWN_REQUEST')),
   NO_SPEND_STEP: example(new SpendDecisionRefusedError('NO_SPEND_STEP')),
   NOT_CHECKABLE: example(new SpendDecisionRefusedError('NOT_CHECKABLE')),
+  COMMITMENT_NOT_HOLDABLE: example(new BudgetCommitmentNotHoldableError('NO_APPROVED_BUDGET', 2026)),
+  COMMITMENT_EXISTS: example(new BudgetCommitmentExistsError(2026)),
   RECHECKED_RETURNED_TO_HEAD: example(toRecheckedApiException(['OVER_RESERVE'])),
   RECHECKED_RETURNED_TO_REQUESTER: example(toRecheckedApiException(['OVER_RESERVE'], 'REQUESTER', '1')),
 } as const;

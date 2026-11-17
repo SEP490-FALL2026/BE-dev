@@ -19,6 +19,7 @@ const myDeviceSchema = z.strictObject({
   acknowledgementState: z.enum(['UNACKNOWLEDGED', 'ACKNOWLEDGED', 'STOPPED', 'ENDED']),
   acknowledgedVersionNumber: z.number().int().nullable(),
   signatureRecorded: z.boolean(),
+  stopRequestPending: z.boolean(),
   canAcknowledge: z.boolean(),
   blockedReason: z
     .enum(['SIGNATURE_RECORD_MISSING', 'NOTICE_NOT_PUBLISHED', 'REGISTRATION_ENDED', 'ALREADY_ACKNOWLEDGED'])

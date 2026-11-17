@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { GhostSeatDecisionRepo } from '../ghost-seat/ghost-seat-decision.repo';
 import { GhostSeatRepo } from '../ghost-seat/ghost-seat.repo';
@@ -36,6 +37,7 @@ export class DecisionQueueService {
     private readonly decisions: GhostSeatDecisionRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   async list(actor: AuthenticatedPrincipal, query: { page: number; pageSize: number }) {
@@ -138,7 +140,10 @@ export class DecisionQueueService {
     };
   }
 
-  /** The exemptions: a head reads those of their department, an IT Admin all of them and changes none (`US-10-08` AC-1, AC-7). */
+  /**
+   * The exemptions: a head reads those of their department; an IT Admin reads those about a seat of the departments they answer for, of a
+   * department with no IT Admin and of no department (`QĐ-111ax`), and changes none (`US-10-08` AC-1, AC-7). No department in scope reads an empty page.
+   */
   async listExemptions(actor: AuthenticatedPrincipal, query: { page: number; pageSize: number }) {
     const organization = await this.organizationReads.getOrganization();
     const empty = { items: [], pagination: pageOf(0, query.page, query.pageSize) };
@@ -147,9 +152,15 @@ export class DecisionQueueService {
     const today = await this.organizationReads.businessToday();
     const headed = itAdmin ? null : await this.organizationReads.getHeadedDepartment(actor.employeeId, today);
     if (!itAdmin && !headed) return empty;
+    const scope = itAdmin
+      ? await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
+          this.identity.findUsableItAdminEmployeeIds(ids),
+        )
+      : [];
+    if (itAdmin && scope.length === 0) return empty;
     const { items, total } = await this.decisions.exemptionsPage(
       organization.id,
-      headed ? { departmentId: headed.departmentId } : {},
+      headed ? { departmentId: headed.departmentId } : { departmentIds: scope },
       { skip: (query.page - 1) * query.pageSize, take: query.pageSize },
     );
     const plans = new Map(

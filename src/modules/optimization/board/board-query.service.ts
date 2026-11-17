@@ -93,13 +93,19 @@ export class BoardQueryService {
 
   /**
    * Throws GhostSeatNotFoundError, and GhostSeatNotDeciderError for a head who is not the head of the department that was asked
-   * (`US-10-06` AC-8): an IT Admin reads any recommendation, a head only the ones about a seat of the department they head today.
+   * (`US-10-06` AC-8): an IT Admin reads the recommendations of the departments they answer for, of a department with no IT Admin and of
+   * no department, the same that the table shows, and any other one is not found (`QĐ-111ax`); a head reads only the ones about a seat of
+   * the department they head today.
    */
   async get(actor: AuthenticatedPrincipal, id: string) {
     const record = await this.repo.find(id);
     const organization = await this.organizationReads.getOrganization();
     if (!record || record.organizationId !== organization?.id) throw new GhostSeatNotFoundError();
-    if (!actor.roles.includes('IT_ADMIN')) {
+    const itAdmin = actor.roles.includes('IT_ADMIN');
+    if (itAdmin) {
+      if (record.departmentId !== null && !(await this.scopeOf(actor)).includes(record.departmentId))
+        throw new GhostSeatNotFoundError();
+    } else {
       const headed = await this.organizationReads.getHeadedDepartment(
         actor.employeeId,
         await this.organizationReads.businessToday(),
@@ -107,7 +113,7 @@ export class BoardQueryService {
       if (!headed || record.deciderDepartmentId !== headed.departmentId) throw new GhostSeatNotDeciderError();
     }
 
-    return this.detailOf(record, actor.roles.includes('IT_ADMIN') ? 'IT_ADMIN' : 'HEAD');
+    return this.detailOf(record, itAdmin ? 'IT_ADMIN' : 'HEAD');
   }
 
   /** The detail of a recommendation as the wire has it; a head reads the evidence in short (`SoD-2`). */

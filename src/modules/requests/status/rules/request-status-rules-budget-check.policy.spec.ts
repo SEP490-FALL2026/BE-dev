@@ -187,3 +187,116 @@ describe('BR-MF1-02: one-step result notifications', () => {
   it('keeps the no-need-approver flag audit-only', () =>
     expect(plan(event('ACCESS_REQUEST.NO_NEED_APPROVER'), facts(holders))).toEqual([]));
 });
+
+describe('FX-T3b (B2): the spending approver is told when a request they must decide is sent after a batch', () => {
+  const spend = { stepKind: 'SPEND_APPROVAL' };
+
+  it('a confirmation of the reserve alone (via CONFIRMATION) tells the approver who holds the step: SPEND_SENT', () => {
+    const planned = plan(
+      event(
+        'ACCESS_REQUEST.RESERVE_CONFIRMED',
+        { via: 'CONFIRMATION', spendAssigneeEmployeeId: PEOPLE.approver },
+        { actorEmployeeId: PEOPLE.head },
+      ),
+      facts(holders),
+    );
+
+    expect(told(planned)).toEqual([`${PEOPLE.approver}:STEP_ASSIGNED`]);
+    expect(planned[0].params).toEqual({ requestId: REQUEST_ID, ...spend, cause: 'SPEND_SENT' });
+  });
+
+  it('a confirmation given in the act of sending a batch (via BATCH) tells nobody: the batch has its own notice', () => {
+    const planned = plan(
+      event(
+        'ACCESS_REQUEST.RESERVE_CONFIRMED',
+        { via: 'BATCH', spendAssigneeEmployeeId: PEOPLE.approver },
+        { actorEmployeeId: PEOPLE.head },
+      ),
+      facts(holders),
+    );
+
+    expect(planned).toEqual([]);
+  });
+
+  it('a confirmation whose step waits for an approver (no holder) tells nobody', () => {
+    const planned = plan(
+      event('ACCESS_REQUEST.RESERVE_CONFIRMED', { via: 'CONFIRMATION', spendAssigneeEmployeeId: null }),
+      facts(holders),
+    );
+
+    expect(planned).toEqual([]);
+  });
+
+  it('a confirmation of an approver who is the requester tells nobody (the requester is never told their own step)', () => {
+    const planned = plan(
+      event('ACCESS_REQUEST.RESERVE_CONFIRMED', { via: 'CONFIRMATION', spendAssigneeEmployeeId: PEOPLE.requester }),
+      facts(holders),
+    );
+
+    expect(planned).toEqual([]);
+  });
+
+  it('the head confirms and the check made again finds the request within the base: SPEND_SENT, as a one-step request has SUBMITTED', () => {
+    const planned = plan(
+      event(
+        'ACCESS_REQUEST.BUDGET_CHECKED',
+        {
+          outcome: 'WITHIN_BASE',
+          routingMode: 'VIA_HEAD',
+          trigger: 'RESERVE_CONFIRMATION',
+          opened: 'SPEND_APPROVAL',
+          spendAssigneeEmployeeId: PEOPLE.approver,
+        },
+        { actorEmployeeId: PEOPLE.head },
+      ),
+      facts(holders),
+    );
+
+    expect(told(planned)).toEqual([`${PEOPLE.approver}:STEP_ASSIGNED`]);
+    expect(planned[0].params).toEqual({ requestId: REQUEST_ID, ...spend, cause: 'SPEND_SENT' });
+  });
+
+  it('a batch (trigger SUBMISSION) that opens the step through a head tells nothing about this request: the batch has one notice', () => {
+    const planned = plan(
+      event(
+        'ACCESS_REQUEST.BUDGET_CHECKED',
+        {
+          outcome: 'WITHIN_BASE',
+          routingMode: 'VIA_HEAD',
+          trigger: 'SUBMISSION',
+          opened: 'SPEND_APPROVAL',
+          spendAssigneeEmployeeId: PEOPLE.approver,
+        },
+        { actorEmployeeId: PEOPLE.head },
+      ),
+      facts(holders),
+    );
+
+    expect(planned).toEqual([]);
+  });
+});
+
+describe('FX-T3b (B3): an item of a batch that cannot be checked', () => {
+  it('tells the requester and the IT Admin in charge that the price is missing, and not the head who sent the batch', () => {
+    const planned = plan(
+      event(
+        'ACCESS_REQUEST.SPEND_NOT_CHECKABLE',
+        { reason: 'PRICE_MISSING', routingMode: 'VIA_HEAD' },
+        { actorEmployeeId: PEOPLE.head },
+      ),
+      facts(holders),
+    );
+
+    expect(told(planned)).toEqual([
+      `${PEOPLE.requester}:REQUEST_BUDGET_BLOCKED`,
+      `${PEOPLE.itAdmin}:REQUEST_BUDGET_BLOCKED`,
+    ]);
+    expect(planned[0].params).toEqual({ requestId: REQUEST_ID, reasons: 'PRICE_MISSING' });
+  });
+
+  it('is an action the projection reads', () => {
+    expect(PROJECTED_ACTIONS).toEqual(
+      expect.arrayContaining(['ACCESS_REQUEST.SPEND_NOT_CHECKABLE', 'ACCESS_REQUEST.RESERVE_CONFIRMED']),
+    );
+  });
+});

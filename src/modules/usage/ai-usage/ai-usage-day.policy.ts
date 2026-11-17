@@ -55,7 +55,10 @@ export const contentHashOf = (tool: Pick<UsageToolInput, 'coverage' | 'responses
 /**
  * Judges every day of a batch, in a fixed order (`US-09-05` AC-3, AC-9, AC-14; `US-09-01` AC-10; `US-09-03` AC-3): a clock ahead of the
  * server, a day outside the window of the machine, a tool not on the allowlist that day, a coverage the window cannot support. A
- * day with any problem is refused whole, with one reason; the others go on. Pure: the window and the allowlist come in as facts.
+ * tool not on the allowlist that day is dropped alone (the collector sends every day by the allowlist now in force, so a tool added
+ * later is not on the list of the older days): the coverage is judged and the rows are kept for the tools that remain, and the day is
+ * refused `NOT_IN_ALLOWLIST` only when none remains. Any other problem refuses the day whole, with one reason; the others go on.
+ * Pure: the window and the allowlist come in as facts.
  */
 export function evaluateDays(input: DayEvaluationInput): DayVerdict[] {
   const futureClock = input.generatedAt.getTime() > input.now.getTime() + CLOCK_SKEW_MS;
@@ -68,11 +71,12 @@ export function evaluateDays(input: DayEvaluationInput): DayVerdict[] {
     if (futureClock) return refused('FUTURE_GENERATED_AT');
     if (firstDay === null || day.date < firstDay || day.date > lastDay) return refused('OUTSIDE_WINDOW');
     const allowed = input.allowedOn(day.date);
-    if (day.tools.some((tool) => !allowed.has(tool.tool))) return refused('NOT_IN_ALLOWLIST');
+    const tools = day.tools.filter((tool) => allowed.has(tool.tool));
+    if (day.tools.length > 0 && tools.length === 0) return refused('NOT_IN_ALLOWLIST');
     const dayStart = instantAtWallClock({ date: day.date, msOfDay: 0 }, input.timeZone);
     const dayEnd = instantAtWallClock({ date: addDays(day.date, 1), msOfDay: 0 }, input.timeZone);
     const wholeDayInWindow = input.acceptFromAt !== null && dayStart >= input.acceptFromAt && dayEnd <= upper;
-    const badCoverage = day.tools.some(
+    const badCoverage = tools.some(
       (tool) =>
         (tool.coverage === 'NOT_OBSERVABLE' && (tool.responses !== 0 || tool.totalTokens !== 0)) ||
         (tool.coverage === 'COVERED' && !wholeDayInWindow),
@@ -82,7 +86,7 @@ export function evaluateDays(input: DayEvaluationInput): DayVerdict[] {
     return {
       date: day.date,
       reason: null,
-      rows: day.tools.map((tool) => ({
+      rows: tools.map((tool) => ({
         tool: tool.tool,
         applicationId: allowed.get(tool.tool) as string,
         coverage: tool.coverage,

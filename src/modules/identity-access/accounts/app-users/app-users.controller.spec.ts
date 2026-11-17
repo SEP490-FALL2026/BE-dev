@@ -12,6 +12,7 @@ import {
   FinanceAlreadyAssignedError,
   InvitationInvalidError,
   LoginEmailInvalidError,
+  LoginEmailNotWorkEmailError,
   LoginEmailRequiredError,
   LoginEmailTakenError,
   ManagerStillHeadingError,
@@ -186,12 +187,19 @@ describe('AppUsersController — error answers (status, code, message)', () => {
     [
       'no login email',
       () => new LoginEmailRequiredError(),
-      refused(422, 'APP_USER.LOGIN_EMAIL_REQUIRED', 'The employee has no work email and none was supplied.'),
+      refused(422, 'APP_USER.LOGIN_EMAIL_REQUIRED', 'The employee has no work email.'),
     ],
     [
       'an invalid login email',
       () => new LoginEmailInvalidError(),
       refused(422, 'APP_USER.LOGIN_EMAIL_INVALID', 'The login email is not a valid address.'),
+    ],
+    [
+      'a login email that is not the work email',
+      () => new LoginEmailNotWorkEmailError(),
+      refused(422, 'APP_USER.LOGIN_EMAIL_NOT_WORK_EMAIL', 'The login email must be the work email of the employee.', {
+        field: 'loginEmail',
+      }),
     ],
     [
       'an activated account',

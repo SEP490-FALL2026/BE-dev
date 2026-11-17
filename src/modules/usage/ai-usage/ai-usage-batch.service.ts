@@ -37,7 +37,7 @@ type Outcome = { blocked: GateReason } | { results: DayResult[] };
 
 /**
  * A weekly batch of the days an AI tool was used on a company machine (`US-09-05`). One transaction: the registration is read and
- * locked `FOR SHARE`, the machine's window decides which days are believed, the allowlist of each day decides which tools, and the
+ * locked `FOR SHARE`, the machine's window decides which days are believed, the allowlist of each day decides which tools (a tool off it is dropped alone), and the
  * accepted days are written in one statement — the build made last wins, so a batch sent again, or an older one arriving late, changes
  * nothing. A refusal is written down and committed before the tool is told.
  */
@@ -86,12 +86,15 @@ export class AiUsageBatchService {
           .filter((verdict) => verdict.reason)
           .map((verdict) => this.rejection(context, verdict.reason as GateReasonOrDay, verdict.date)),
       );
-      // A tool the collector reports that is not on the allowlist is software outside what the company manages: the review of the accounts sees it (RC-2.3).
+      // A tool the collector reports that is not on the allowlist in force now is software outside what the company manages: the review of
+      // the accounts sees it (RC-2.3). Not the allowlist of the day: a tool added later is not on the list of the older days. A day refused
+      // before its tools were looked at (clock, window) tells nothing.
+      const current = await this.allowlist.currentTools(context.organizationId, tx);
       const unlisted = input.days.flatMap((day, index) =>
-        verdicts[index].reason === 'NOT_IN_ALLOWLIST'
-          ? day.tools
-              .filter((tool) => !(allowedByDay.get(day.date) ?? new Map()).has(tool.tool))
-              .map((tool) => ({ tool: tool.tool, date: day.date }))
+        verdicts[index].reason === null ||
+        verdicts[index].reason === 'NOT_IN_ALLOWLIST' ||
+        verdicts[index].reason === 'INVALID_COVERAGE'
+          ? day.tools.filter((tool) => !current.has(tool.tool)).map((tool) => ({ tool: tool.tool, date: day.date }))
           : [],
       );
       if (unlisted.length > 0) {

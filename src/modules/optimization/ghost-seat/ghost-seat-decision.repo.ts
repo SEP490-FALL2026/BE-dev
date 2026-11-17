@@ -251,17 +251,27 @@ export class GhostSeatDecisionRepo {
     return { items: rows.map(toDecision), total: await db.ghostSeatDecision.count({ where }) };
   }
 
-  /** One page of the exemptions with the seat they are about, newest first; limited to one department when the reader is its head. */
+  /**
+   * One page of the exemptions with the seat they are about, newest first. A head reads the ones decided for their department; an IT Admin
+   * reads the ones about a seat of their `departmentIds` or of no department, the same condition as the table of the recommendations.
+   */
   async exemptionsPage(
     organizationId: string,
-    filter: { departmentId?: string },
+    filter: { departmentId?: string; departmentIds?: readonly string[] },
     page: { skip: number; take: number },
     tx?: DbTx,
   ): Promise<{ items: ExemptionWithSeat[]; total: number }> {
     const db = tx ?? this.prisma;
-    const where = {
+    const where: Prisma.GhostSeatExemptionWhereInput = {
       organizationId,
       ...(filter.departmentId ? { recommendation: { deciderDepartmentId: filter.departmentId } } : {}),
+      ...(filter.departmentIds
+        ? {
+            recommendation: {
+              OR: [{ departmentId: null }, { departmentId: { in: [...filter.departmentIds] } }],
+            },
+          }
+        : {}),
     };
     const rows = await db.ghostSeatExemption.findMany({
       where,

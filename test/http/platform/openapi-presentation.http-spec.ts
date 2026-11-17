@@ -277,7 +277,8 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       // 414 once lane B (FIX-LB1…LB4) and lane A (RC-1, RC-2: discrepancies of invoices and of vendor accounts, out-of-process cases) are merged again.
       // 418 with RV-1.3 (close a month, list the months closed, read one); 419 with RV-1.4 (sign one).
       // 422 with AD-1.2 (ask for an adjustment, list them, decide one); 423 with RV-3.1 (a head explains a Cost Center of a quarter).
-      expect(operations).toHaveLength(423);
+      // 426 with FX-T9a (stop-collection requests: the holder asks, the IT Admin lists and completes).
+      expect(operations).toHaveLength(426);
       expect(missing).toEqual([]);
     });
 
