@@ -158,7 +158,12 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   (qua `AssignmentDepartmentRepo`), task cấp/thu hồi và báo lỗi IT Admin phụ trách, key trong kho. `DashboardFactsService`,
   `DashboardFactsRepo`; chỉ trả số, không dòng, giá, key hay định danh.
 - `saas-issue/` — báo lỗi quyền SaaS (BM-11, US-07-10, US-07-11); `saas-issues.controller.ts`; `SaasIssueService`,
-  `SaasIssueHandlingService`; `saas-issue.job.ts`.
+  `SaasIssueHandlingService`; `saas-issue.job.ts` → `saas-issue-sweep.service.ts`. `saas-issue-notifier.service.ts` ghi thông báo
+  trong transaction của thay đổi (đúng một lần cho mỗi thay đổi): `SAAS_ISSUE_SUBMITTED` cho IT Admin được giao khi gửi phiếu (không báo
+  nếu chính họ gửi); `SAAS_ISSUE_RESPONSE_OVERDUE` cho IT Admin được giao, một lần, khi lượt quét thấy quá hạn phản hồi đầu tiên;
+  `SAAS_ISSUE_STATE_CHANGED` cho bên còn lại — người báo khi IT Admin đổi trạng thái, IT Admin được giao khi người báo trả lời hoặc mở
+  lại, người báo khi lượt quét tự đóng phiếu hết hạn mở lại (`REOPEN_WINDOW_LAPSED`) — không báo người tự làm. Tham số chỉ gồm id, mã phiếu
+  và từ trạng thái; không có nội dung người báo hay IT Admin viết, trưởng phòng không được báo.
 - `subscription-renewal/` — gia hạn subscription theo kỳ (EP-11): `subscription-renewals.controller.ts`
   (`/subscription-renewals*`, `/subscription-deadline-events`); nhóm `proposal/` (IT Admin đề xuất, kèm danh sách ghế thu hồi),
   `decision/` (trưởng phòng sở hữu xác nhận `CONFIRM` đề xuất đúng như đã lập, mở thu hồi; Finance chỉ đọc; đọc theo vai ở

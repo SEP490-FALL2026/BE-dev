@@ -212,9 +212,9 @@ export class IdentityController {
     description: 'The mappings in force (or all, with inForceOnly=false), each with how it was made.',
   })
   @ApiErrorResponses(...COMMON_ERRORS, INVALID)
-  async mappings(@Query() query: MappingListQueryDto) {
+  async mappings(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MappingListQueryDto) {
     try {
-      const page = await this.queries.mappings(query);
+      const page = await this.queries.mappings(actor, query);
 
       return { items: page.items.map(mappingToWire), pagination: page.pagination };
     } catch (error) {
@@ -267,9 +267,9 @@ export class IdentityController {
       'The findings (open by default), each with the first and the last day of activity no seat covers; no seat is made from them.',
   })
   @ApiErrorResponses(...COMMON_ERRORS, INVALID)
-  async findings(@Query() query: FindingListQueryDto) {
+  async findings(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: FindingListQueryDto) {
     try {
-      const page = await this.queries.noAssignmentFindings(query);
+      const page = await this.queries.noAssignmentFindings(actor, query);
 
       return { items: page.items.map(findingToWire), pagination: page.pagination };
     } catch (error) {

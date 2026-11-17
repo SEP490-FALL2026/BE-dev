@@ -212,6 +212,16 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   POLICY_PUBLISHED: ['policyCode', 'versionNumber', 'requiresReacknowledgement'],
   // A batch of spend requests sent to the spending approver: which batch, from which department, and how many steps it opened for them (`FR-3.21`).
   SPEND_BATCH_SUBMITTED: ['batchId', 'departmentId', 'sentCount'],
+  // The reports of errors in SaaS rights (`FR-2.15`): ids, the code of the report and the words of its kind and states. Never what the reporter or the IT Admin wrote, because the head of the department does not read it.
+  SAAS_ISSUE_SUBMITTED: ['issueId', 'issueCode', 'category', 'impact', 'applicationId'],
+  SAAS_ISSUE_RESPONSE_OVERDUE: ['issueId', 'issueCode', 'responseDueOn'],
+  SAAS_ISSUE_STATE_CHANGED: ['issueId', 'issueCode', 'fromState', 'toState', 'trigger'],
+  // A case outside the process closed as a report only, and a difference with a vendor opened (`SBF-07a`, `SBF-08`): ids and the source, never the account's identifier or what it did.
+  OUT_OF_PROCESS_CASE_REPORTED: ['caseId', 'applicationId', 'vendorId', 'employeeId'],
+  VENDOR_ACCOUNT_DISCREPANCY_OPENED: ['applicationId', 'vendorId', 'source', 'newCount'],
+  // A holder asked to stop the collection of a machine (`US-09-04`, E1): ids, the deadline and its day in the time of the company; never what the machine collected.
+  DEVICE_STOP_REQUESTED: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
+  DEVICE_STOP_REQUEST_OVERDUE: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
 };
 
 /** Whether the code is one of the closed table. */

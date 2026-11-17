@@ -34,6 +34,10 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
   (`POST /ghost-seat-rule-runs`, chạy tay `G1G2`/`G3G4` ngay — `board-rule-run.service.ts`, 409 `GHOST_SEAT.RULE_RUN_BUSY`, audit
   `GHOST_SEAT.RULE_RUN_REQUESTED`), `ghostSeatKpi5Get`
   (SUPER_ADMIN). Quyền: IT_ADMIN cho bảng/chi tiết/tóm tắt/thu hồi; IT_ADMIN và SUPER_ADMIN cho lượt chạy; SUPER_ADMIN cho `KPI-5`.
+  Phạm vi IT (`QĐ-111ax`, `getItAdminScope`: phòng IT đó phụ trách, cộng phòng chưa có IT Admin dùng được và khuyến nghị không thuộc phòng nào): bảng
+  khuyến nghị/trạng thái seat chỉ đọc trong phạm vi (`departmentScope=ALL` giờ đọc như `MINE`); `ghostSeatRecommendationGet` của một khuyến nghị ngoài phạm vi
+  ⟹ 404 `GHOST_SEAT.NOT_FOUND`; `ghostSeatExemptionList` của IT Admin chỉ gồm miễn trừ về ghế trong phạm vi. `ghostSeatOptimizationSummaryGet` và
+  `ghostSeatRuleSkipList` **chưa** lọc theo phạm vi (để lát sau).
 
 - `decision/` (L3, không import `board`; dùng `ghost-seat` L0) — `POST /ghost-seat-decisions` nhận `checklist` của bước `5.4` (`QĐ-111ap`): MỘT bộ cho cả lô, chấm sau khi kiểm quyền và trạng thái từng thẻ, _Không_ khóa `KEEP` và `EXEMPT` (chỉ `RECLAIM`, không có trả về), câu trả lời ghi cho từng thẻ của lô; hàng đợi trưởng phòng cho `G3`/`G4` (`qd103-ghost-seat-manager-decision`):
   `decision-routing.service.ts` (định tuyến `OPEN` REVIEW/ACTION tới trưởng phòng có hiệu lực của phòng người giữ, chờ trưởng phòng, mất/có trưởng phòng),

@@ -12,6 +12,7 @@ import { DocumentExpirySweeper } from '../../../src/modules/catalog/contract/doc
 import { YearStartCommitmentsSweeper } from '../../../src/modules/requests/year-start-commitments/year-start-commitments.job';
 import { ExpiryReminderSweeper } from '../../../src/modules/licensing/expiry/expiry-reminder.job';
 import { ExpiryRevocationSweeper } from '../../../src/modules/licensing/expiry/expiry-revocation.job';
+import { StopRequestSweeper } from '../../../src/modules/devices/stop-request/stop-request.job';
 import { SaasIssueSweeper } from '../../../src/modules/licensing/saas-issue/saas-issue.job';
 import { SubscriptionRenewalSweeper } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal.job';
 import { DecisionFollowUpSweeper } from '../../../src/modules/optimization/decision/decision-follow-up.job';
@@ -59,6 +60,7 @@ export const SWEEPER_OVERRIDES: { token: unknown; useValue: unknown }[] = [
   ExpiryReminderSweeper,
   ExpiryRevocationSweeper,
   SaasIssueSweeper,
+  StopRequestSweeper,
   SubscriptionRenewalSweeper,
   OrganizationChangeSweeper,
   LeaveReturnSweeper,

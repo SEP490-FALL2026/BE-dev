@@ -93,7 +93,8 @@ export class AiUsageController {
   @ApiOperation({ operationId: 'deviceUsageList', summary: 'List the days an AI tool was used on a machine' })
   @ApiSuccessResponse(DeviceUsagePageResponseDto, {
     message: 'DEVICE_USAGE.LISTED',
-    description: 'The counted days of the machine, newest first, with the registration each belongs to.',
+    description:
+      'The counted days of the machine, newest first, with the registration each belongs to; only the registrations held by people of the departments the IT Admin works (and of a department with no IT Admin), an empty page when there are none.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -105,9 +106,13 @@ export class AiUsageController {
     DEVICE_NOT_FOUND,
     QUERY_INVALID,
   )
-  async ofDevice(@Param() params: DeviceIdParamDto, @Query() query: UsageListQueryDto) {
+  async ofDevice(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: DeviceIdParamDto,
+    @Query() query: UsageListQueryDto,
+  ) {
     try {
-      return await this.queries.ofDevice(params.id, query);
+      return await this.queries.ofDevice(actor, params.id, query);
     } catch (error) {
       throw toUsageApiException(error);
     }

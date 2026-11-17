@@ -11,6 +11,7 @@ import { RegistryRepo } from '../registry/registry.repo';
 import { DeviceStopRequestOpenRaceError } from './stop-request.errors';
 import { stopRequestDueAt, stopRequestVerdict } from './stop-request.policy';
 import { StopRequestRepo, type StopRequestRecord } from './stop-request.repo';
+import { StopRequestNotifier, type StopRequestNoticeContext } from './stop-request-notifier.service';
 
 /** How far ahead the days nobody works are read: far more than the working days a deadline can span. */
 const CALENDAR_WINDOW_DAYS = 30;
@@ -28,6 +29,7 @@ export class StopRequestService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly parameters: OperatingParametersApi,
     private readonly audit: AuditApi,
+    private readonly notifier: StopRequestNotifier,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -45,7 +47,8 @@ export class StopRequestService {
       await this.parameters.getNonWorkingDates(today, addDays(today, CALENDAR_WINDOW_DAYS)),
       organization.timeZone,
     );
-    const attempt = () => this.attempt(actor, organization.id, registrationId, now, dueAt);
+    const context = { organizationId: organization.id, timeZone: organization.timeZone };
+    const attempt = () => this.attempt(actor, context, registrationId, now, dueAt);
     try {
       return await attempt();
     } catch (error) {
@@ -58,11 +61,13 @@ export class StopRequestService {
 
   private attempt(
     actor: AuthenticatedPrincipal,
-    organizationId: string,
+    context: StopRequestNoticeContext,
     registrationId: string,
     now: Date,
     dueAt: Date,
   ): Promise<StopRequestRecord> {
+    const { organizationId } = context;
+
     return this.runner.run(async (tx) => {
       const registration = await this.registry.lockRegistrationChain(tx, registrationId);
       if (!registration || registration.holderEmployeeId !== actor.employeeId) {
@@ -100,6 +105,7 @@ export class StopRequestService {
           },
         ),
       );
+      await this.notifier.requested(tx, context, created);
 
       return created;
     });
