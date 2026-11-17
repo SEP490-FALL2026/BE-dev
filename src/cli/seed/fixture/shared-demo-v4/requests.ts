@@ -10,7 +10,7 @@ const r = (scenario: DemoRequestScenario): DemoRequestScenario => scenario;
  * software (K2, K5) takes 1 to 12 or none (a right with no end, never for a person with a term), a plan bought once (K4) takes none. The dates
  * of the budget scenarios do not depend on the day the seed runs: R10, R21 and R11 ask for one month, which costs one month of the price.
  */
-export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIssue' | 'notice'> = {
+export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIssues' | 'notice'> = {
   requests: [
     r({
       key: 'R01',
@@ -290,10 +290,52 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
     { subscription: 'sublime-license', count: 2 },
   ],
   draft: { requester: 'NV-OPS1', plan: 'jira-standard', termMonths: null },
-  saasIssue: {
-    request: 'R01',
-    description: '[SV-ISSUE] Không mở được bộ sưu tập sau khi được thêm vào workspace.',
-  },
+  saasIssues: [
+    {
+      key: 'ISSUE',
+      reporter: 'NV-DEV1',
+      plan: 'postman-professional',
+      end: 'NEW',
+      description: 'Không mở được bộ sưu tập sau khi được thêm vào workspace.',
+    },
+    {
+      key: 'ISSUE2',
+      reporter: 'NV-DEV5',
+      plan: 'confluence-standard',
+      end: 'IN_PROGRESS',
+      description: 'Không vào được trang tài liệu của nhóm.',
+      reporterReply: 'Đã thử lại bằng tài khoản công ty nhưng vẫn gặp lỗi.',
+    },
+    {
+      key: 'ISSUE3',
+      reporter: 'NV-ITO1',
+      plan: 'm365-basic',
+      end: 'RESOLVED',
+      description: 'Không kích hoạt được tài khoản Microsoft 365.',
+    },
+    {
+      key: 'ISSUE4',
+      reporter: 'NV-BOD1',
+      plan: 'zoom-pro',
+      end: 'REOPENED',
+      description: 'Không mở được cuộc họp bằng tài khoản công ty.',
+    },
+    {
+      key: 'ISSUE5',
+      reporter: 'NV-BOD4',
+      plan: 'adobe-cc-teams',
+      end: 'WAITING_PROVIDER',
+      description: 'Ứng dụng không nhận giấy phép của nhóm.',
+    },
+    {
+      key: 'ISSUE5B',
+      reporter: 'NV-BOD4',
+      plan: 'adobe-cc-teams',
+      end: 'DUPLICATE',
+      duplicateOf: 'ISSUE5',
+      description: 'Gửi lại lỗi giấy phép Adobe của cùng tài khoản.',
+    },
+  ],
   notice: {
     sender: 'NV-ENGH',
     employee: 'NV-DEV3',

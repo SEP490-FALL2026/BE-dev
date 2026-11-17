@@ -274,10 +274,18 @@ export interface DemoRequestScenario {
   summary: string;
 }
 
-/**
- * The return of a seat of the baseline (`SBF-03a`): its holder sends it with a reason that carries the tag of the return. IT takes the revocation of
- * one and completes it; the other waits for IT, so the screen shows both ends of the flow.
- */
+/** A holder's SaaS report and the point in its handling where the demo leaves it. */
+export interface DemoSaasIssue {
+  key: string;
+  reporter: string;
+  plan: string;
+  description: string;
+  end: 'NEW' | 'IN_PROGRESS' | 'RESOLVED' | 'REOPENED' | 'WAITING_PROVIDER' | 'DUPLICATE';
+  reporterReply?: string;
+  duplicateOf?: string;
+}
+
+/** A baseline seat returned by its holder, either revoked by IT or waiting for IT. */
 export interface DemoReturn {
   key: string;
   holder: string;
@@ -400,7 +408,7 @@ export interface DemoFixture {
   /** A draft that is saved and never sent (its department has no Cost Center, so it cannot be sent). */
   draft: { requester: string; plan: string; termMonths: number | null };
   /** A report of an error in the seat the request of this key granted. */
-  saasIssue: { request: string; description: string };
+  saasIssues: DemoSaasIssue[];
   /** A notice (BM-09) a head sends; it changes nothing until the Super Admin handles it. */
   notice: { sender: string; employee: string; kind: 'LONG_LEAVE'; proposedInDays: number; note: string };
 }

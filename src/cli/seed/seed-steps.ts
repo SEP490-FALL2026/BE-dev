@@ -13,6 +13,7 @@ import { ORGANIZATION_STEPS } from './steps/organization.steps';
 import { PEOPLE_ADMIN_STEPS } from './steps/people-admin.steps';
 import { PERSONNEL_STEPS } from './steps/personnel.steps';
 import { requestSteps } from './steps/request.steps';
+import { SAAS_ISSUE_STEPS } from './steps/saas-issues.steps';
 import { RETURN_STEPS } from './steps/returns.steps';
 import { SOFTWARE_LIST_STEPS } from './steps/software-list.steps';
 import { USAGE_STEPS } from './steps/usage.steps';
@@ -43,7 +44,8 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     ...budgetSteps(),
     ...requestSteps(fixture.requests),
     ...RETURN_STEPS,
-    ...extraSteps(fixture.saasIssue.request),
+    ...SAAS_ISSUE_STEPS,
+    ...extraSteps(),
     ...PERSONNEL_STEPS,
     ...USAGE_STEPS,
     // Last: the invoices, the closes of the months and the adjustments read what the requests and seats above hold; the policy published

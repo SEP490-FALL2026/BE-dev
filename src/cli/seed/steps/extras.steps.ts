@@ -21,38 +21,6 @@ async function draft(ctx: DemoRunContext): Promise<StepOutcome> {
   return { status: 'done', detail: spec.requester };
 }
 
-/** The issue is reported on the seat the scenario request granted, by the person who holds it. */
-async function saasIssue(ctx: DemoRunContext): Promise<StepOutcome> {
-  const scenario = ctx.fixture.requests.find((candidate) => candidate.key === ctx.fixture.saasIssue.request);
-  if (!scenario?.plan) return { status: 'conflict', detail: 'kịch bản cấp quyền của báo lỗi không có trong fixture' };
-  const reporter = await as(ctx, scenario.requester);
-  const planId = ctx.ids.plans.get(scenario.plan);
-  const options = await listAll<{ assignmentId: string; plan: { planId: string } }>(
-    ctx,
-    reporter,
-    '/saas-issues/options',
-  );
-  const seat = options.find((row) => row.plan.planId === planId);
-  if (!seat) return { status: 'conflict', detail: `${scenario.requester} chưa giữ ghế của gói để báo lỗi` };
-  const issues = await listAll<{ id: string; assignmentId: string }>(ctx, reporter, '/saas-issues');
-  const marker = tag(ctx, 'ISSUE');
-  for (const row of issues.filter((issue) => issue.assignmentId === seat.assignmentId)) {
-    // Only the issue whose text carries the dataset's tag is the demo one: one the person filed themselves is theirs.
-    const detail = await ctx.api.call<{ description: string }>(reporter, 'GET', `/saas-issues/${row.id}`);
-    if (detail.description.startsWith(marker)) return { status: 'present', detail: scenario.requester };
-  }
-  if (ctx.mode === 'plan') return { status: 'planned', detail: `báo lỗi của ${scenario.requester}` };
-  await ctx.api.call(reporter, 'POST', '/saas-issues', {
-    assignmentId: seat.assignmentId,
-    category: 'NO_ACCESS',
-    impact: 'PARTIAL',
-    description: ctx.fixture.saasIssue.description,
-    occurredAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-  });
-
-  return { status: 'done', detail: scenario.requester };
-}
-
 /**
  * The notice the head sent about the person with the dataset's tag, whatever happened to it since, is the demo one: a
  * second is never sent. Another pending notice of the same kind makes the API refuse the demo one (a conflict).
@@ -81,19 +49,13 @@ async function notice(ctx: DemoRunContext): Promise<StepOutcome> {
   return { status: 'done', detail: spec.employee };
 }
 
-export function extraSteps(issueRequestKey: string): DemoStep[] {
+export function extraSteps(): DemoStep[] {
   return [
     {
       key: 'requests.draft',
       title: 'Bản nháp yêu cầu chưa gửi',
       needs: ['catalog.plans', 'org.accounts', 'finance.cost-centers'],
       run: draft,
-    },
-    {
-      key: 'saas.issue',
-      title: 'Báo lỗi SaaS trên ghế đã cấp',
-      needs: [`requests.${issueRequestKey}`],
-      run: saasIssue,
     },
     { key: 'personnel.notice', title: 'Thông báo biến động BM-09 chờ Super Admin', needs: ['org.heads'], run: notice },
   ];
