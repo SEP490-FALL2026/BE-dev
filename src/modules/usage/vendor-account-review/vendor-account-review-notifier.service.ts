@@ -68,33 +68,39 @@ export class VendorAccountReviewNotifier {
 
   /**
    * The person the case is about and the head, today, of the department they last worked in (a person who has left is still told, and so is the
-   * head of where they worked last). A case about nobody in particular, such as an identifier nobody owns, tells nobody.
+   * head of where they worked last). A department with no head yet keeps the notice for the first one named (`SBF-07a` §5.1). A case about nobody
+   * in particular, such as an identifier nobody owns, tells nobody.
    */
   async caseReported(tx: DbTx, closed: OutOfProcessCaseRecord, now: Date): Promise<void> {
     const employeeId = await this.repo.employeeIdOfDiscrepancy(tx, closed.discrepancyId);
     if (employeeId === null) return;
     const today = await this.organizationReads.businessToday(now, tx);
     const placement = await this.organizationReads.getLastPlacement(employeeId, today, tx);
+    // Locked before the head is read: a notice kept for a department that gets a head meanwhile would be left undelivered.
+    if (placement) await this.organizationReads.lockDepartmentShared(tx, placement.departmentId);
     const head = placement
       ? (await this.organizationReads.getDepartmentHeads([placement.departmentId], today, tx)).get(
           placement.departmentId,
         )
       : undefined;
+    const notice = {
+      organizationId: closed.organizationId,
+      code: 'OUT_OF_PROCESS_CASE_REPORTED',
+      subject: { type: 'OUT_OF_PROCESS_CASE', id: closed.id },
+      params: {
+        caseId: closed.id,
+        applicationId: closed.applicationId,
+        vendorId: closed.vendorId,
+        employeeId,
+      },
+      eventKey: `OUT_OF_PROCESS_CASE_REPORTED:${closed.id}`,
+    } as const;
     const recipients = new Set([employeeId, ...(head ? [head.employeeId] : [])]);
     for (const recipientEmployeeId of recipients) {
-      await this.notifications.notifyInApp(tx, {
-        organizationId: closed.organizationId,
-        recipientEmployeeId,
-        code: 'OUT_OF_PROCESS_CASE_REPORTED',
-        subject: { type: 'OUT_OF_PROCESS_CASE', id: closed.id },
-        params: {
-          caseId: closed.id,
-          applicationId: closed.applicationId,
-          vendorId: closed.vendorId,
-          employeeId,
-        },
-        eventKey: `OUT_OF_PROCESS_CASE_REPORTED:${closed.id}`,
-      });
+      await this.notifications.notifyInApp(tx, { ...notice, recipientEmployeeId });
+    }
+    if (placement && !head) {
+      await this.notifications.holdForDepartment(tx, { ...notice, departmentId: placement.departmentId });
     }
   }
 
