@@ -21,6 +21,7 @@ import {
   countsRefusal,
   existingCaseOf,
   nextPeriodProblem,
+  nextStartProblem,
   noticeBasisOf,
   preflightOf,
   type RecordRefusal,
@@ -148,6 +149,8 @@ export class RenewalRecordService {
       commitment: adjustment.commitment,
     });
     if (nextPeriod) throw errorOf(nextPeriod);
+    const startRefusal = input.nextPeriod && nextStartProblem(adjustment, input.nextPeriod.startDate);
+    if (startRefusal) throw errorOf(startRefusal);
 
     return { adjustment, counts, quantity, note };
   }

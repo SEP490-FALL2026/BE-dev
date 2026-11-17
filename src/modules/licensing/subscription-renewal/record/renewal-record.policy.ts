@@ -1,4 +1,4 @@
-import type { BusinessDate } from '../../../../core/business-date';
+import { addDays, type BusinessDate } from '../../../../core/business-date';
 import type {
   PeriodAdjustment,
   PeriodNoticeSource,
@@ -151,6 +151,19 @@ export function nextPeriodProblem(input: {
   if (input.outcome === 'VENDOR_REFUSED' && input.commitment === 'MONTHLY') return null;
 
   return { problem: 'NEXT_PERIOD_REQUIRED' };
+}
+
+/**
+ * Whether the new period starts on the day of the renewal (`A1C-04`, `QĐ-103v`: a plan by the year is cut only at its renewal). A plan by the
+ * year renews on `end`, which the vendor words as the renewal day or as the day after the last day of the old period, so both are taken; a plan
+ * by the month starts on its payment day, `end`. Any other day would cut the old period in the middle or leave a gap, and the seats counted for
+ * the renewal day would not be the seats carried to the new period. Null when it starts on the day.
+ */
+export function nextStartProblem(adjustment: PeriodAdjustment, startDate: BusinessDate): RecordRefusal | null {
+  const days = adjustment.commitment === 'MONTHLY' ? [adjustment.end] : [adjustment.end, addDays(adjustment.end, 1)];
+  if (days.includes(startDate)) return null;
+
+  return { problem: 'PERIOD_REFUSED', details: { reason: 'NOT_ON_RENEWAL_DAY', renewalOn: adjustment.end } };
 }
 
 /**

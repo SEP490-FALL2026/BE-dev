@@ -360,6 +360,14 @@ describe('subscription renewal routes (e2e, no database)', () => {
         ['IT_ADMIN'],
       ],
       [
+        'a new period that does not start on the renewal day, with the day (A1C-04)',
+        new RenewalError('PERIOD_REFUSED', { reason: 'NOT_ON_RENEWAL_DAY', renewalOn: '2026-12-31' }),
+        409,
+        'SUBSCRIPTION_RENEWAL.PERIOD_REFUSED',
+        (s) => request(s).post('/api/v1/subscription-renewals').send(RECORD),
+        ['IT_ADMIN'],
+      ],
+      [
         'a result with no new period that leaves the period with no way to be recorded (A1C-03)',
         new RenewalError('NEXT_PERIOD_REQUIRED'),
         422,

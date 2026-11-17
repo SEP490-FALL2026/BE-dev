@@ -200,6 +200,41 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     });
   });
 
+  it('starts the new period on the renewal day: a reduction in the middle of a year, or a gap after it, is refused and writes nothing (A1C-04)', async () => {
+    const unit = await h.unit(2);
+    const { subscriptionId, seats } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
+    const periods = () => h.count('subscriptions');
+    const before = await periods();
+    const attempt = (startDays: number) =>
+      record({
+        subscriptionId,
+        choice: 'REDUCE',
+        proposedQuantity: 2,
+        outcome: 'AS_DECIDED',
+        nextPeriod: { ...nextYear(2), startDate: h.inDays(startDays), endDate: h.inDays(startDays + 364) },
+      });
+
+    // Tomorrow, the day before the renewal day and two days after it (the renewal day is day 64 of the year): none is the day of the renewal.
+    for (const days of [1, 63, 66]) {
+      const refused = await attempt(days);
+      expect(refused.status).toBe(409);
+      expect(h.codeOf(refused)).toBe('SUBSCRIPTION_RENEWAL.PERIOD_REFUSED');
+      expect(detailsOf(refused)).toEqual({ reason: 'NOT_ON_RENEWAL_DAY', renewalOn: h.inDays(64) });
+    }
+    expect(await periods()).toBe(before);
+    const { rows } = await h.ctx.sql.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM subscription_renewals WHERE subscription_id = $1`,
+      [subscriptionId],
+    );
+    expect(rows[0].n).toBe(0);
+    expect(await h.revocationReasons(seats)).toEqual([]);
+
+    // The renewal day itself (the last day of the old period) and the day after it are both the day of the renewal.
+    const onTheDay = await attempt(64);
+    expect(onTheDay.status).toBe(201);
+    expect(await periods()).toBe(before + 1);
+  });
+
   it('lets another IT Admin record for the one responsible: the audit says so and the one responsible is told (QĐ-58b)', async () => {
     const unit = await h.unit(2);
     const other = await handOthersToSecondItAdmin(h);

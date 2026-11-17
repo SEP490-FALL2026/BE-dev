@@ -6,6 +6,7 @@ import {
   existingCaseOf,
   lateRenewalOf,
   nextPeriodProblem,
+  nextStartProblem,
   noticeBasisOf,
   pointOf,
   preflightOf,
@@ -352,6 +353,9 @@ describe('a result with no new period (A1C-03)', () => {
       expect(without(choice, 'DIFFERENT')).toEqual(refusal);
       expect(without(choice, 'VENDOR_REFUSED')).toEqual(refusal);
     }
+    expect(
+      nextPeriodProblem({ choice: 'REDUCE', outcome: 'DIFFERENT', hasNextPeriod: true, commitment: 'ANNUAL' }),
+    ).toBeNull();
   });
 
   it('is allowed for a plan by the month when the vendor refused: the next payment day opens another point', () => {
@@ -365,10 +369,31 @@ describe('a result with no new period (A1C-03)', () => {
       expect(without('CANCEL', outcome)).toBeNull();
     }
   });
+});
 
-  it('asks nothing when the new period is given', () => {
-    expect(
-      nextPeriodProblem({ choice: 'REDUCE', outcome: 'DIFFERENT', hasNextPeriod: true, commitment: 'ANNUAL' }),
-    ).toBeNull();
+describe('the day the new period starts (A1C-04)', () => {
+  const refused = (end: string, startDate: string, commitment: 'MONTHLY' | 'ANNUAL' = 'ANNUAL') =>
+    nextStartProblem(adjustment({ end, commitment }), startDate);
+  const notOnTheDay = { problem: 'PERIOD_REFUSED', details: { reason: 'NOT_ON_RENEWAL_DAY', renewalOn: '2026-12-31' } };
+
+  it('is the renewal day of a plan by the year, or the day after the last day it ends on (either way the vendor words it)', () => {
+    expect(refused('2026-12-31', '2026-12-31')).toBeNull();
+    expect(refused('2026-12-31', '2027-01-01')).toBeNull();
+  });
+
+  it('is refused before the renewal day, which would be a reduction in the middle of the period', () => {
+    expect(refused('2026-12-31', '2026-12-30')).toEqual(notOnTheDay);
+    expect(refused('2026-12-31', '2026-06-01')).toEqual(notOnTheDay);
+  });
+
+  it('is refused after the day that follows it, which would keep the old period paying for the gap', () => {
+    expect(refused('2026-12-31', '2027-01-02')).toEqual(notOnTheDay);
+    expect(refused('2026-12-31', '2027-02-15')).toEqual(notOnTheDay);
+  });
+
+  it('is the payment day itself for a plan by the month', () => {
+    expect(refused('2026-12-31', '2026-12-31', 'MONTHLY')).toBeNull();
+    expect(refused('2026-12-31', '2027-01-01', 'MONTHLY')).toEqual(notOnTheDay);
+    expect(refused('2026-12-31', '2026-12-30', 'MONTHLY')).toEqual(notOnTheDay);
   });
 });
