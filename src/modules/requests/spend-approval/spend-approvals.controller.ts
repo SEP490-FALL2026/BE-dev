@@ -105,13 +105,18 @@ export class SpendApprovalsController {
       examples: [SPEND_ERROR_EXAMPLES.NOT_THE_ASSIGNEE, SPEND_ERROR_EXAMPLES.OWN_REQUEST],
     },
     // The decision reads the request itself first: a request that does not exist is ACCESS_REQUEST.NOT_FOUND here.
-    { ...NOT_FOUND, examples: [SPEND_ERROR_EXAMPLES.REQUEST_NOT_FOUND] },
+    {
+      ...NOT_FOUND,
+      description: 'The request does not exist (ACCESS_REQUEST.NOT_FOUND).',
+      examples: [SPEND_ERROR_EXAMPLES.REQUEST_NOT_FOUND],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
         'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD or SPEND.RECHECKED_RETURNED_TO_REQUESTER for a one-step request, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED), or the commitment of the approval could not be held (BUDGET.COMMITMENT_NOT_HOLDABLE, BUDGET.COMMITMENT_EXISTS: a safety net after the check of the budget; nothing was decided).',
       examples: [
         SPEND_ERROR_EXAMPLES.NO_SPEND_STEP,
+        SPEND_ERROR_EXAMPLES.STEP_NOT_PENDING,
         SPEND_ERROR_EXAMPLES.NOT_CHECKABLE,
         SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_HEAD,
         SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_REQUESTER,

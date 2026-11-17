@@ -113,7 +113,7 @@ export class ProposalsController {
         'The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required; existingApplicationId and plannedPlanName go together. The application named does not exist (ASSESSMENT.REFERENCE_NOT_FOUND, details.field existingApplicationId). The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). A proposal counts as a request for new access: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). The kind of plan is not known yet, so the term takes 1 to 12 months or none (ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE); a contractor, a freelancer or an intern gives the months (ACCESS_REQUEST.TERM_REQUIRED, and TERM_LONG_TERM_NOT_ALLOWED for a right with no end), and one whose contract ended before today gets no access (ACCESS_REQUEST.TERM_CONTRACT_ENDED, details.contractEndDate). Nothing is written.',
       examples: [
         VALIDATION_EXAMPLE,
-        EXAMPLES.REFERENCE_NOT_FOUND,
+        EXAMPLES.EXISTING_APPLICATION_NOT_FOUND,
         EXAMPLES.REQUEST_PARTY_INELIGIBLE,
         ACCESS_EXAMPLES.OPEN_LIMIT_REACHED,
         ACCESS_EXAMPLES.TERM_REQUIRED,

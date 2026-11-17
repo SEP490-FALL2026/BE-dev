@@ -45261,13 +45261,13 @@
                     }
                   },
                   "ASSESSMENT.REFERENCE_NOT_FOUND": {
-                    "summary": "The vendorId of the assessment does not exist.",
+                    "summary": "The existingApplicationId of the assessment does not exist.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "ASSESSMENT.REFERENCE_NOT_FOUND",
-                        "message": "The vendorId of the assessment does not exist.",
-                        "details": { "field": "vendorId" },
+                        "message": "The existingApplicationId of the assessment does not exist.",
+                        "details": { "field": "existingApplicationId" },
                         "requestId": "req_example"
                       }
                     }
@@ -50049,7 +50049,7 @@
             }
           },
           "404": {
-            "description": "The request has no spend step the caller holds (SPEND.REVIEW_NOT_FOUND).",
+            "description": "The request does not exist (ACCESS_REQUEST.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -50082,6 +50082,17 @@
                       "error": {
                         "code": "SPEND.NO_SPEND_STEP",
                         "message": "The spend step cannot be decided: NO_SPEND_STEP.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SPEND.STEP_NOT_PENDING": {
+                    "summary": "The spend step cannot be decided: STEP_NOT_PENDING.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SPEND.STEP_NOT_PENDING",
+                        "message": "The spend step cannot be decided: STEP_NOT_PENDING.",
                         "requestId": "req_example"
                       }
                     }
@@ -52712,7 +52723,7 @@
             }
           },
           "409": {
-            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE).",
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), or the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -52725,6 +52736,17 @@
                         "code": "PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE",
                         "message": "The purchase invoice was refused: REQUEST_NOT_PURCHASABLE (STATE).",
                         "details": { "reason": "STATE" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.NO_PLACE": {
+                    "summary": "The purchase invoice was refused: NO_PLACE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NO_PLACE",
+                        "message": "The purchase invoice was refused: NO_PLACE.",
                         "requestId": "req_example"
                       }
                     }
@@ -53023,7 +53045,7 @@
             }
           },
           "409": {
-            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), or the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN).",
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN), or the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -53047,6 +53069,17 @@
                       "error": {
                         "code": "PURCHASE_INVOICE.NUMBER_TAKEN",
                         "message": "The purchase invoice was refused: NUMBER_TAKEN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.NO_PLACE": {
+                    "summary": "The purchase invoice was refused: NO_PLACE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NO_PLACE",
+                        "message": "The purchase invoice was refused: NO_PLACE.",
                         "requestId": "req_example"
                       }
                     }
@@ -53566,7 +53599,7 @@
             }
           },
           "409": {
-            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN), the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).",
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN), the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE), the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -53590,6 +53623,17 @@
                       "error": {
                         "code": "PURCHASE_INVOICE.NUMBER_TAKEN",
                         "message": "The purchase invoice was refused: NUMBER_TAKEN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.NO_PLACE": {
+                    "summary": "The purchase invoice was refused: NO_PLACE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NO_PLACE",
+                        "message": "The purchase invoice was refused: NO_PLACE.",
                         "requestId": "req_example"
                       }
                     }
@@ -56865,7 +56909,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE); too many people are named (GROUP_REQUEST.TOO_MANY_LINES), fewer than two different people (GROUP_REQUEST.TOO_FEW_LINES, with min), a time of use the plan refuses (ACCESS_REQUEST.TERM_REQUIRED, TERM_MONTHS_OUT_OF_RANGE or TERM_NOT_ASKED) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER. Nothing is written.",
+            "description": "The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE, with details.reason KIND_NOT_MULTI_SEAT for a plan that gives no account of its own to each person, NOT_PAID_SOFTWARE for internal software); too many people are named (GROUP_REQUEST.TOO_MANY_LINES), fewer than two different people (GROUP_REQUEST.TOO_FEW_LINES, with min), a time of use the plan refuses (ACCESS_REQUEST.TERM_REQUIRED, TERM_MONTHS_OUT_OF_RANGE or TERM_NOT_ASKED) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER. Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -56883,13 +56927,13 @@
                     }
                   },
                   "GROUP_REQUEST.PLAN_NOT_ELIGIBLE": {
-                    "summary": "The plan does not take a request for a group: KIND_NOT_MULTI_SEAT.",
+                    "summary": "The plan does not take a request for a group: NOT_PAID_SOFTWARE.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "GROUP_REQUEST.PLAN_NOT_ELIGIBLE",
-                        "message": "The plan does not take a request for a group: KIND_NOT_MULTI_SEAT.",
-                        "details": { "reason": "KIND_NOT_MULTI_SEAT" },
+                        "message": "The plan does not take a request for a group: NOT_PAID_SOFTWARE.",
+                        "details": { "reason": "NOT_PAID_SOFTWARE" },
                         "requestId": "req_example"
                       }
                     }

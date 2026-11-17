@@ -117,7 +117,7 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
     new RequestPartyIneligibleError({ reason: 'SPENDING_APPROVER', party: 'REQUESTER', employeeIds: [PERSON] }),
   ),
   SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
-  PLAN_NOT_ELIGIBLE: example(new GroupRequestPlanNotEligibleError('KIND_NOT_MULTI_SEAT')),
+  PLAN_NOT_ELIGIBLE: example(new GroupRequestPlanNotEligibleError('NOT_PAID_SOFTWARE')),
   TOO_MANY_LINES: example(new GroupRequestTooManyLinesError(GROUP_EMPLOYEE_MAX)),
   TOO_FEW_LINES: example(new GroupRequestTooFewLinesError(GROUP_LINES_MIN)),
   DUPLICATE_LINE: example(new GroupRequestDuplicateLineError([PERSON])),

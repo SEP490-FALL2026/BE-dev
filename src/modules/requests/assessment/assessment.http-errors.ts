@@ -159,6 +159,7 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   ALTERNATIVE_PLAN_NOT_FOUND: example(new AssessmentReferenceNotFoundError('alternativePlanId')),
   // One message template whose field varies (details.field names it): the vendor stands for the fields of the save.
   REFERENCE_NOT_FOUND: example(new AssessmentReferenceNotFoundError('vendorId')),
+  EXISTING_APPLICATION_NOT_FOUND: example(new AssessmentReferenceNotFoundError('existingApplicationId')),
   CATALOG_LINK_NOT_ALLOWED: example(new CatalogLinkRefusedError('NOT_LINKABLE')),
   CATALOG_LINK_APPLICATION_MISMATCH: example(new CatalogLinkApplicationMismatchError('<application-id>')),
   DEPARTMENT_OUT_OF_SCOPE: example(new CatalogLinkRefusedError('DEPARTMENT_OUT_OF_SCOPE')),
