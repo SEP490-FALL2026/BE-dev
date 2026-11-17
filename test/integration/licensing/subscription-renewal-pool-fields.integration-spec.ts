@@ -17,7 +17,7 @@ interface PeriodRow {
 describe('the pool fields of the period a renewal records (integration, real PostgreSQL)', () => {
   const year = () => ({ startDate: h.inDays(-300), endDate: h.inDays(64) });
   const nextYear = (billingCycle: string) => ({
-    purchasedQuantity: 10,
+    purchasedQuantity: 5,
     unitPrice: { amount: '1000000', currency: 'VND' },
     billingCycle,
     startDate: h.inDays(65),
@@ -44,34 +44,50 @@ describe('the pool fields of the period a renewal records (integration, real Pos
         [id],
       )
     ).rows[0];
-  /** A decided renewal of a term of the unit; `settings` is written on the old period by SQL, as the pool fields were before. */
-  const decidedRenewal = async (settings: { primary: boolean; billingCycle?: 'MONTHLY' | 'ANNUAL' }) => {
+  /**
+   * A term of the unit at its point of adjustment, two people holding a seat; `settings` is written on the old period by SQL, as the pool
+   * fields were before. The vendor sells nothing under five seats, so the result recorded is the raise to them, with its evidence.
+   */
+  const period = async (settings: { primary: boolean; billingCycle?: 'MONTHLY' | 'ANNUAL' }) => {
     const unit = await h.unit(2);
-    const { subscriptionId } = await h.termWithSeats(unit, 20, {
-      quantity: 10,
-      ...year(),
-      ...(settings.billingCycle ? { billingCycle: settings.billingCycle } : {}),
-    });
+    const monthly = settings.billingCycle === 'MONTHLY';
+    // A plan by the month is paid on a day 5 days away, so today is inside the 7 days of its point of adjustment.
+    const subscriptionId = monthly
+      ? await h.term({
+          quantity: 3,
+          billingCycle: 'MONTHLY',
+          startDate: h.inDays(-25),
+          renewalDate: h.inDays(5),
+          endDate: h.inDays(5),
+          autoRenew: true,
+          ownerDepartmentId: unit.department.id,
+        })
+      : (await h.termWithSeats(unit, 20, { quantity: 3, ...year() })).subscriptionId;
+    if (monthly) for (const member of unit.members) await h.seatOf(member, { subscriptionId });
     await h.ctx.sql.query(`UPDATE subscriptions SET vendor_minimum_seats = 5, is_primary_for_plan = $2 WHERE id = $1`, [
       subscriptionId,
       settings.primary,
     ]);
-    const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
-    await h.confirmRenewal(id, unit.head.account).expect(200);
 
-    return { subscriptionId, id };
+    return subscriptionId;
   };
+  const body = (subscriptionId: string, nextPeriod: object) => ({
+    subscriptionId,
+    choice: 'INCREASE',
+    proposedQuantity: 5,
+    note: 'The vendor sells nothing under five seats (contract 4.2).',
+    outcome: 'AS_DECIDED',
+    nextPeriod,
+  });
 
   it('copies the commitment, the IT Admin and the vendor minimum, and moves the flag that prices the plan, recording the move (F-003, F-005)', async () => {
-    const { subscriptionId, id } = await decidedRenewal({ primary: true });
+    const subscriptionId = await period({ primary: true });
     const before = await rowOf(subscriptionId);
     expect(before).toMatchObject({ commitment: 12, minimum: 5, primary: true });
 
-    const response = await h.outcome(id, { outcome: 'AS_DECIDED', nextPeriod: nextYear('ANNUAL') }).expect(200);
+    const { nextSubscriptionId: next } = await h.recordedRenewal(body(subscriptionId, nextYear('ANNUAL')));
 
-    const next = h.dataOf<{ renewal: { outcomeDetail: { nextSubscriptionId: string } } }>(response).renewal
-      .outcomeDetail.nextSubscriptionId;
-    expect(await rowOf(next)).toMatchObject({
+    expect(await rowOf(next as string)).toMatchObject({
       commitment: 12,
       responsible: before.responsible,
       minimum: 5,
@@ -85,25 +101,45 @@ describe('the pool fields of the period a renewal records (integration, real Pos
   });
 
   it('leaves a new period without the flag when the old one had none', async () => {
-    const { subscriptionId, id } = await decidedRenewal({ primary: false });
+    const subscriptionId = await period({ primary: false });
 
-    const response = await h.outcome(id, { outcome: 'AS_DECIDED', nextPeriod: nextYear('ANNUAL') }).expect(200);
+    const { nextSubscriptionId: next } = await h.recordedRenewal(body(subscriptionId, nextYear('ANNUAL')));
 
-    const next = h.dataOf<{ renewal: { outcomeDetail: { nextSubscriptionId: string } } }>(response).renewal
-      .outcomeDetail.nextSubscriptionId;
-    expect(await rowOf(next)).toMatchObject({ commitment: 12, minimum: 5, primary: false });
+    expect(await rowOf(next as string)).toMatchObject({ commitment: 12, minimum: 5, primary: false });
     expect((await rowOf(subscriptionId)).primary).toBe(false);
   });
 
+  it('QĐ-111an: refuses a new period priced in another currency: 409 PERIOD_REFUSED with the reason PRICE_NOT_VND, nothing written, no case kept, and the same write goes through in dong', async () => {
+    const subscriptionId = await period({ primary: false });
+    const periods = await h.count('subscriptions');
+    const cases = await h.count('subscription_renewals');
+
+    const response = await h.propose(
+      body(subscriptionId, { ...nextYear('ANNUAL'), unitPrice: { amount: '40.00', currency: 'USD' } }),
+    );
+
+    expect(response.status).toBe(409);
+    expect(h.codeOf(response)).toBe('SUBSCRIPTION_RENEWAL.PERIOD_REFUSED');
+    expect(h.detailsOf(response)).toEqual({ reason: 'PRICE_NOT_VND' });
+    expect(await h.count('subscriptions')).toBe(periods);
+    // The case is written with its outcome in one transaction: the refusal leaves nothing, so the IT Admin writes again.
+    expect(await h.count('subscription_renewals')).toBe(cases);
+    await h.propose(body(subscriptionId, nextYear('ANNUAL'))).expect(201);
+  });
+
   it('refuses a new period paid by the year when the commitment it inherits is one month (R-G01, F-002), and writes nothing', async () => {
-    const { subscriptionId, id } = await decidedRenewal({ primary: false, billingCycle: 'MONTHLY' });
+    const subscriptionId = await period({ primary: false, billingCycle: 'MONTHLY' });
     expect(await rowOf(subscriptionId)).toMatchObject({ commitment: 1 });
     const periods = await h.count('subscriptions');
+    const cases = await h.count('subscription_renewals');
 
-    const response = await h.outcome(id, { outcome: 'AS_DECIDED', nextPeriod: nextYear('ANNUAL') });
+    const response = await h.propose(
+      body(subscriptionId, { ...nextYear('ANNUAL'), startDate: h.inDays(5), endDate: h.inDays(369) }),
+    );
 
     expect(h.codeOf(response)).toBe('SUBSCRIPTION_RENEWAL.PERIOD_REFUSED');
     expect(h.detailsOf(response)).toEqual({ reason: 'INVALID_TERMS' });
     expect(await h.count('subscriptions')).toBe(periods);
+    expect(await h.count('subscription_renewals')).toBe(cases);
   });
 });

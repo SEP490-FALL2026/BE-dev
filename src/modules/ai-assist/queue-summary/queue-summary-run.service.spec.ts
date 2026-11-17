@@ -200,6 +200,54 @@ describe('QueueSummaryRunService', () => {
     expect(lines.join('\n')).not.toMatch(/PROMPT|RAW|Figma|Nguyễn|duyệt|boom/);
   });
 
+  it.each([
+    [
+      'refused the token (401)',
+      new AiServiceUnavailableError(401, 'UNAUTHORIZED'),
+      'httpStatus=401 serviceCode=UNAUTHORIZED',
+    ],
+    [
+      'failed in the model (500)',
+      new AiServiceUnavailableError(500, 'MODEL_ERROR'),
+      'httpStatus=500 serviceCode=MODEL_ERROR',
+    ],
+    ['could not be reached', new AiServiceUnavailableError(null, null), 'httpStatus=none serviceCode=none'],
+    ['ran out of time', new AiServiceTimeoutError(), 'httpStatus=none serviceCode=none'],
+  ])(
+    'logs the HTTP status and the code of the AI service when it %s, never its content or a token',
+    async (_label, failure, said) => {
+      const lines: string[] = [];
+      for (const level of ['log', 'warn', 'error'] as const) {
+        jest.spyOn(Logger.prototype, level).mockImplementation((...args: unknown[]) => {
+          lines.push(args.map(String).join(' '));
+        });
+      }
+
+      const { row } = await ran(() => failure);
+
+      const ended = lines.filter((line) => line.includes(row.id) && line.includes('status=FAILED'));
+      expect(ended).toHaveLength(1);
+      expect(ended[0]).toContain(said);
+      expect(ended[0]).toContain(`errorCode=${row.errorCode}`);
+      expect(lines.join('\n')).not.toMatch(/PROMPT|RAW|Figma|Nguyễn|duyệt/);
+      expect(lines.join('\n')).not.toMatch(/bearer|token/i);
+    },
+  );
+
+  it('logs no HTTP status or code of the AI service for a call that ended with an answer', async () => {
+    const lines: string[] = [];
+    jest.spyOn(Logger.prototype, 'log').mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(' '));
+    });
+
+    const { row } = await ran(GOOD);
+
+    expect(lines.filter((line) => line.includes(row.id))).toEqual([
+      expect.stringContaining('status=COMPLETED') as unknown,
+    ]);
+    expect(lines.join('\n')).not.toMatch(/httpStatus|serviceCode/);
+  });
+
   it('writes nothing over a call that was marked FAILED while it ran', async () => {
     const { row, finished } = await ran(
       (request) => {
@@ -211,6 +259,38 @@ describe('QueueSummaryRunService', () => {
     );
 
     expect(row.status).toBe('PENDING');
+    expect(finished).toEqual([]);
+  });
+
+  it('records the answer after it finishes the call and before the audit event, all in one transaction', async () => {
+    const { repo, row } = await ran(GOOD);
+
+    const ended = repo.steps.slice(repo.steps.findIndex((entry) => entry.step === 'finish'));
+    expect(ended.map((entry) => entry.step)).toEqual(['finish', 'recordAnswered', 'audit:AI_INVOCATION.COMPLETED']);
+    expect(new Set(ended.map((entry) => entry.tx)).size).toBe(1);
+    expect(row.result).toMatchObject({ total: 2 });
+  });
+
+  it('records no answer for a call that did not answer, as a failed one', async () => {
+    const { repo, row } = await ran(() => new AiServiceUnavailableError(503, 'MODEL_LOADING'));
+
+    expect(row.status).toBe('FAILED');
+    expect(repo.steps.map((entry) => entry.step)).not.toContain('recordAnswered');
+    expect(row.result).toBeNull();
+  });
+
+  it('writes no answer and no event when it lost the race: the call was no longer RUNNING when it finished', async () => {
+    const { repo, row, finished } = await ran(GOOD, (world) => {
+      const finish = world.repo.finish.bind(world.repo);
+      jest.spyOn(world.repo, 'finish').mockImplementation((tx, id, outcome, at) => {
+        world.repo.rows.get(id)!.status = 'FAILED';
+
+        return finish(tx, id, outcome, at);
+      });
+    });
+
+    expect(repo.steps.map((entry) => entry.step)).not.toContain('recordAnswered');
+    expect(row.result).toBeNull();
     expect(finished).toEqual([]);
   });
 

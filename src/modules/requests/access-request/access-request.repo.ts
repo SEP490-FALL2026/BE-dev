@@ -3,18 +3,19 @@ import { toDateColumn } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { pricingColumns } from './access-request-pricing.mapper';
-import { SELECT_REQUEST, manyPaidSoftwareColumns, toRecord } from './access-request-record.mapper';
+import { SELECT_REQUEST, toRecord } from './access-request-record.mapper';
 import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
 import { requestPolicyJson } from './access-request.json';
-import type {
-  AccessRequestState,
-  PricingRecord,
-  NewAccessRequest,
-  NewNeedDecision,
-  NewNeedStep,
-  WithdrawalRecord,
-  AccessRequestRecord,
-  CancellationRecord,
+import {
+  ENDED_STATES,
+  type AccessRequestState,
+  type PricingRecord,
+  type NewAccessRequest,
+  type NewNeedDecision,
+  type NewNeedStep,
+  type WithdrawalRecord,
+  type AccessRequestRecord,
+  type CancellationRecord,
 } from './access-request.types';
 
 /** The durable routing columns and policy come from the same need decision. */
@@ -65,7 +66,9 @@ export class AccessRequestRepo {
       costCenterId: input.costCenterId,
       businessReason: input.businessReason,
       termMonths: input.termMonths,
-      ...manyPaidSoftwareColumns(input.manyPaidSoftware),
+      ...(input.limitExemption
+        ? { limitExemption: input.limitExemption, replacesAssignmentId: input.replacesAssignmentId ?? null }
+        : {}),
       ...pricingColumns(input.pricing),
       // The end the request names itself (a free request, a renewal) wins over the one its pricing carries.
       ...(input.expectedEndDate === undefined
@@ -108,7 +111,7 @@ export class AccessRequestRepo {
     return { id: created.id, needStepId: created.steps[0].id };
   }
 
-  async setOneStepBlockedReason(tx: DbTx, id: string, reason: 'PRICE_MISSING' | 'RATE_MISSING' | null): Promise<void> {
+  async setOneStepBlockedReason(tx: DbTx, id: string, reason: 'PRICE_MISSING' | null): Promise<void> {
     await tx.accessRequest.update({ where: { id }, data: { oneStepBlockedReason: reason } });
   }
 
@@ -124,16 +127,47 @@ export class AccessRequestRepo {
       select: { id: true },
     });
     if (existing) return;
+    await this.createAssessmentStep(tx, { requestId, sequence: 2, assignee, slaWorkingDays, now });
+  }
+
+  /** Whether the IT Admin sent the proposal back to its sender at the assessment: the last step of the assessment is closed (`QĐ-111ap`, R-24). */
+  async assessmentSentBack(tx: DbTx, requestId: string): Promise<boolean> {
+    const last = await tx.accessRequestStep.findFirst({
+      where: { requestId, kind: 'IT_ASSESSMENT' },
+      orderBy: { sequence: 'desc' },
+      select: { state: true },
+    });
+
+    return last?.state === 'CLOSED';
+  }
+
+  /** A new step of the assessment after the one that was sent back, given to the IT Admin in charge or left waiting for one; the closed step stays as the record. */
+  async reopenAssessmentStep(
+    tx: DbTx,
+    input: { requestId: string; assignee: string | null; slaWorkingDays: number; now: Date },
+  ): Promise<void> {
+    const last = await tx.accessRequestStep.aggregate({
+      where: { requestId: input.requestId },
+      _max: { sequence: true },
+    });
+    await this.createAssessmentStep(tx, { ...input, sequence: (last._max.sequence ?? 1) + 1 });
+  }
+
+  private async createAssessmentStep(
+    tx: DbTx,
+    input: { requestId: string; sequence: number; assignee: string | null; slaWorkingDays: number; now: Date },
+  ): Promise<void> {
+    const { assignee, now } = input;
     await tx.accessRequestStep.create({
       data: {
-        requestId,
+        requestId: input.requestId,
         kind: 'IT_ASSESSMENT',
-        sequence: 2,
+        sequence: input.sequence,
         state: assignee === null ? 'WAITING' : 'PENDING',
         assigneeEmployeeId: assignee,
         routingRow: 9,
         waitingReason: assignee === null ? 'NO_IT_ADMIN_IN_CHARGE' : null,
-        slaWorkingDays,
+        slaWorkingDays: input.slaWorkingDays,
         createdAt: now,
         assignedAt: assignee === null ? null : now,
       },
@@ -182,7 +216,8 @@ export class AccessRequestRepo {
     const { record } = input;
     await tx.accessRequestStep.update({
       where: { id: input.stepId },
-      data: { state: record.decision, decidedAt: record.decidedAt },
+      // A step that was sent back is closed: its record says it was returned, and the request waits for its sender, who sends it again (`QĐ-111ap`, R-24).
+      data: { state: record.decision === 'RETURNED' ? 'CLOSED' : record.decision, decidedAt: record.decidedAt },
     });
     await tx.accessRequest.update({ where: { id: input.requestId }, data: { state: input.requestState } });
     await tx.approvalRecord.create({
@@ -292,6 +327,14 @@ export class AccessRequestRepo {
     await tx.accessRequest.update({ where: { id }, data: pricingColumns(pricing) });
   }
 
+  /**
+   * The time of use of the request, in months, after a supplementary file shortened it (`QĐ-111i`) or null when the plan concluded for a proposal
+   * is bought once and takes none; the price is written by `setPricing`.
+   */
+  async setTermMonths(tx: DbTx, id: string, termMonths: number | null): Promise<void> {
+    await tx.accessRequest.update({ where: { id }, data: { termMonths } });
+  }
+
   /** Links the plan registered in the catalog to a proposal that waits for its grant (`US-05-06` AC-8). */
   async setPlan(tx: DbTx, id: string, planId: string): Promise<void> {
     await tx.accessRequest.update({ where: { id }, data: { planId } });
@@ -317,6 +360,37 @@ export class AccessRequestRepo {
          )`;
 
     return new Set(rows.map((row) => row.employee_id));
+  }
+
+  /**
+   * How many requests for the plan are not in a final state (`QĐ-103e`): a request of one person, a request for a group (its own
+   * `plan_id`) and a request to go on using, each counted once, at any step (need, assessment, spend, execution). A draft is not a
+   * request yet and a request that waits for the IT Admin to close a withdrawal is still work, so it counts.
+   */
+  countOpenOfPlan(planId: string, tx?: DbTx): Promise<number> {
+    return (tx ?? this.prisma).accessRequest.count({ where: { planId, state: { notIn: ['DRAFT', ...ENDED_STATES] } } });
+  }
+
+  /**
+   * The people the requests for the plan approved in full are still to be granted for (`QĐ-103e`, `QĐ-103v`(2)): a request of one person
+   * (or of a service account) that waits for the IT Admin (`AWAITING_EXECUTION`) is one; a request for a group is one for each person
+   * whose line is approved and not taken yet. They are the people the queue of grants shows as waiting. A request to go on using is no
+   * grant (its seat is held and read as a renewal waiting), and a request whose task was made is read by the seat it holds.
+   */
+  async countApprovedAwaitingGrantOfPlan(planId: string, tx?: DbTx): Promise<number> {
+    const db = tx ?? this.prisma;
+    // One query at a time: the client of a transaction runs one statement at once.
+    const single = await db.accessRequest.count({
+      where: { planId, type: { in: ['GRANT', 'SERVICE_ACCOUNT'] }, state: 'AWAITING_EXECUTION' },
+    });
+    const grouped = await db.accessRequestLine.count({
+      where: {
+        state: 'APPROVED',
+        request: { planId, type: 'GROUP_GRANT', state: { in: ['AWAITING_EXECUTION', 'EXECUTING'] } },
+      },
+    });
+
+    return single + grouped;
   }
 
   /**

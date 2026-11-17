@@ -4,7 +4,6 @@ import { ApiException } from '../../infrastructure/http/errors/api.exception';
 import { toMoneyApiException } from '../../infrastructure/http/errors/money-errors';
 import { toUnavailableApiException } from '../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../infrastructure/http/openapi-error-examples';
-import { CurrencyNotSupportedError } from '../../core/money/money.errors';
 import {
   NonWorkingDateInPastError,
   NonWorkingDateNotFoundError,
@@ -12,7 +11,6 @@ import {
   NonWorkingDateTakenError,
   ParameterNotFoundError,
   ParameterNotYoursError,
-  ReportingCurrencyLockedError,
   ParameterValueInvalidError,
 } from './operating-parameters.errors';
 
@@ -48,10 +46,6 @@ export function toOperatingParametersApiException(error: unknown): unknown {
     return refuse(HttpStatus.NOT_FOUND, 'NON_WORKING_DATE.NOT_FOUND', error.message, { date: error.date });
   }
 
-  if (error instanceof ReportingCurrencyLockedError) {
-    return refuse(HttpStatus.CONFLICT, 'REPORTING_CURRENCY.LOCKED', error.message, { reason: error.reason });
-  }
-
   const money = toMoneyApiException(error);
   if (money !== error) return money;
 
@@ -68,6 +62,4 @@ export const OPERATING_PARAMETERS_ERROR_EXAMPLES = {
   NON_WORKING_DATE_REASON_INVALID: example(new NonWorkingDateReasonInvalidError()),
   NON_WORKING_DATE_TAKEN: example(new NonWorkingDateTakenError('2026-01-01')),
   NON_WORKING_DATE_NOT_FOUND: example(new NonWorkingDateNotFoundError('2026-01-01')),
-  REPORTING_CURRENCY_LOCKED: example(new ReportingCurrencyLockedError('EXCHANGE_RATE')),
-  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
 } as const;

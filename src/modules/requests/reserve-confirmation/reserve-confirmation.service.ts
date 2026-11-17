@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import type { ChecklistBody, ChecklistVerdict } from '../../policies/public/policy-checklist.types';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -11,7 +11,8 @@ import type { BlockReason, BudgetOutcome } from '../spend/budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord } from '../spend/budget-check.repo';
 import { SpendNotHeadError, SpendReserveRefusedError } from '../spend/spend.errors';
 import { SpendRoutingService, type RoutingOutcome } from '../spend/spend-routing.service';
-import { SpendStepRepo } from '../spend/spend-step.repo';
+import { SpendStepRepo, type SpendStepRecord } from '../spend/spend-step.repo';
+import { ReserveConfirmationChecklist } from './reserve-confirmation-checklist.service';
 import { ReserveConfirmationRepo } from './reserve-confirmation.repo';
 import { awaitsReserveConfirmation, checkConfirmer } from './reserve-confirmation.policy';
 
@@ -43,17 +44,22 @@ export class ReserveConfirmationService {
     private readonly steps: SpendStepRepo,
     private readonly confirmations: ReserveConfirmationRepo,
     private readonly routing: SpendRoutingService,
-    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
+    private readonly checklist: ReserveConfirmationChecklist,
   ) {}
 
   /**
    * Throws AccessRequestNotFoundError, SpendNotHeadError (the caller does not head the department of the request) and
-   * SpendReserveRefusedError (the request does not wait for the confirmation, or the head is a party to it).
+   * SpendReserveRefusedError (the request does not wait for the confirmation, or the head is a party to it), and what the checklist of the step
+   * refuses (`QĐ-111ap`, `QĐ-111be`): a No locks the confirmation, so the request stays in the queue of the head.
    */
-  async confirm(actor: AuthenticatedPrincipal, requestId: string, reason: string): Promise<ReserveConfirmationResult> {
-    const today = await this.organizationReads.businessToday();
-    const headed = (await this.organizationReads.getHeadedDepartment(actor.employeeId, today))?.departmentId ?? null;
+  async confirm(
+    actor: AuthenticatedPrincipal,
+    requestId: string,
+    given: { reason: string; checklist: ChecklistBody },
+  ): Promise<ReserveConfirmationResult> {
+    const { reason } = given;
+    const headed = await this.checklist.headedDepartmentId(actor);
 
     return this.runner.run(async (tx) => {
       const request = await this.requests.lockById(tx, requestId);
@@ -75,27 +81,50 @@ export class ReserveConfirmationService {
         hasOpenSpendStep: (await this.steps.findOpen(request.id, 'SPEND_APPROVAL', tx)) !== null,
       });
       if (!waiting) throw new SpendReserveRefusedError('RESERVE_NOT_PENDING');
+      const verdict = await this.checklist.judge(tx, request, given.checklist);
 
       const now = new Date();
       const routed = await this.routing.route(tx, actor, request, 'RESERVE_CONFIRMATION', now);
       // A request that cannot be priced or converted now is not at fault of the head: it stays in the queue, as nothing was confirmed.
       if (routed.status === 'NOT_CHECKABLE') throw new SpendReserveRefusedError('RESERVE_NOT_PENDING');
+      const result = await this.resultOf(tx, actor, request, { routed, reason, now });
+      // The answers are kept with the confirmation they were given for (`US-05-04` AC-21): none was kept when the check made again said no confirmation was needed.
+      if (result.confirmationKept) {
+        await this.checklist.record(tx, actor, request, { verdict, decidedAt: now });
+      }
 
-      return this.resultOf(tx, actor, request, { routed, reason, now });
+      return result;
     });
+  }
+
+  /** The one checklist of a batch that confirms the reserve (`QĐ-111aq`), judged before any request of it is checked; throws what the checklist refuses. */
+  judgeBatchChecklist(tx: DbTx, organizationId: string, checklist: ChecklistBody): Promise<ChecklistVerdict> {
+    return this.checklist.judgeFor(tx, organizationId, checklist);
+  }
+
+  /** The answers of that checklist, once for each request whose confirmation was applied. */
+  recordBatchChecklist(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    organizationId: string,
+    kept: { verdict: ChecklistVerdict; decidedAt: Date; requestIds: readonly string[] },
+  ): Promise<void> {
+    return this.checklist.recordFor(tx, actor, organizationId, kept);
   }
 
   /**
    * The confirmation the head gave in the act of sending a batch, for a request whose check just said it uses the reserve (the check was
    * made in the same transaction, so it is not made again): opens the spend step, keeps the confirmation with it and moves the request.
+   * Returns the step it opened, whose holder the batch tells (`SPEND_BATCH_SUBMITTED`); `via` says whether the batch or the confirmation alone
+   * gave it, since only the second tells the approver of this request by itself (the batch has no id yet when this runs).
    */
   async confirmOnCheck(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     request: AccessRequestRecord,
     check: CheckRecord,
-    by: { reason: string; now: Date },
-  ): Promise<void> {
+    by: { reason: string; now: Date; via: 'BATCH' | 'CONFIRMATION' },
+  ): Promise<SpendStepRecord> {
     const { state, step } = await this.routing.openSpend(tx, request, by.now);
     await this.requests.setState(tx, request.id, state);
     await this.confirmations.insert(tx, {
@@ -122,9 +151,14 @@ export class ReserveConfirmationService {
           reason: by.reason,
           overBaseBy: check.overBaseByMinor?.toString() ?? null,
           state,
+          via: by.via,
+          // Who holds the step just opened, for the notice of a confirmation given alone (null while it waits).
+          spendAssigneeEmployeeId: step.assigneeEmployeeId,
         },
       ),
     );
+
+    return step;
   }
 
   private async resultOf(
@@ -138,7 +172,11 @@ export class ReserveConfirmationService {
     if (routed.outcome === 'BLOCKED') return { ...base, result: 'BLOCKED', confirmationKept: false };
     if (routed.outcome === 'WITHIN_BASE') return { ...base, result: 'SPEND_STEP_OPENED', confirmationKept: false };
 
-    await this.confirmOnCheck(tx, actor, request, routed.check, { reason: by.reason, now: by.now });
+    await this.confirmOnCheck(tx, actor, request, routed.check, {
+      reason: by.reason,
+      now: by.now,
+      via: 'CONFIRMATION',
+    });
 
     return { ...base, result: 'SPEND_STEP_OPENED', confirmationKept: true };
   }

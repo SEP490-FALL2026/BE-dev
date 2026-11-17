@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { OperatingParametersApi } from '../../src/modules/operating-parameters/public/operating-parameters.api';
+import { ensureVendorAdmins } from './builders/catalog.builder';
 import { pretendBusinessToday } from './pretend-today';
 import { ApiAccount, adminToken, createActivatedAccount } from './api-accounts';
 import {
@@ -10,6 +11,8 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from './http-test-app';
+import { intakeBodyOf } from './application-body';
+import { pricingOfBody, writeLegacyPricing } from './legacy-pricing';
 
 /** Subscriptions and perpetual purchases over HTTP: the set-up the subscription specs share. */
 export interface SubscriptionWire {
@@ -23,15 +26,7 @@ export interface SubscriptionWire {
   missing: string[];
   purchasedQuantity: number | null;
   unitPrice: { amount: string; currency: string } | null;
-  priceSnapshot: {
-    recordedOn: string;
-    rate: string;
-    rateDate: string;
-    rateSource: string;
-    reportingAmount: string;
-    reportingCurrency: string;
-    exchangeRateId: string | null;
-  } | null;
+  originalPrice: { amount: string; currency: string } | null;
   billingCycle: string | null;
   startDate: string | null;
   endDate: string | null;
@@ -56,6 +51,9 @@ export interface SubscriptionWire {
 
 export const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
 
+/** The unit price of a subscription is entered in dong (`QĐ-111an`); the price a vendor quoted in dollars is `originalPrice`. */
+export const VND_30M = { amount: '30000000', currency: 'VND' };
+export const VND_1_2M = { amount: '1200000', currency: 'VND' };
 export const USD_1200 = { amount: '1200.00', currency: 'USD' };
 
 export interface PlanSetup {
@@ -101,19 +99,35 @@ export class SubscriptionHttpHarness {
   /** Pretends the organization's calendar says `day`: the day a price is recorded on. */
   today = (day: string) => pretendBusinessToday(this.ctx.app, day);
 
-  /** The rate of a currency on a day, entered once: asking for the same one again returns the row that is there. */
-  rate = async (currency: string, day: string, value: string): Promise<string> => {
+  /**
+   * A stored draft whose data is whole: the price in dong with the snapshot of the same currency, five seats, a year paid by the year, the day
+   * it was recorded and the IT Admin named (none for `responsible: null`). The routes no longer leave such a draft (a price in dong needs no
+   * rate to wait for), so the rows an earlier release stored, which only `complete` or a change of the person can still move, are written by SQL.
+   */
+  wholeDraft = async (
+    planId: string,
+    over: { responsible?: string | null; day?: string; ownerDepartmentId?: string } = {},
+  ): Promise<string> => {
+    const id = randomUUID();
+    const day = over.day ?? '2026-03-15';
     await this.ctx.sql.query(
-      `INSERT INTO exchange_rates (id, organization_id, currency, rate_date, rate) VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (organization_id, currency, rate_date) DO NOTHING`,
-      [randomUUID(), this.seed.organizationId, currency, day, value],
-    );
-    const row = await this.ctx.sql.query<{ id: string }>(
-      `SELECT id FROM exchange_rates WHERE organization_id = $1 AND currency = $2 AND rate_date = $3`,
-      [this.seed.organizationId, currency, day],
+      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity,
+         unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source,
+         price_reporting_minor, price_reporting_currency, billing_cycle, commitment_term_months, start_date, end_date,
+         responsible_it_admin_employee_id)
+       VALUES ($1, $2, $3, $4, 'TERM', 'DRAFT', 5, 250000, 'VND', $5, 1, $5, 'SAME_CURRENCY', 250000, 'VND', 'ANNUAL', 12, $5,
+         '2027-03-14', $6)`,
+      [
+        id,
+        this.seed.organizationId,
+        planId,
+        over.ownerDepartmentId ?? this.seed.departmentId,
+        day,
+        over.responsible === undefined ? this.it1.employeeId : over.responsible,
+      ],
     );
 
-    return row.rows[0].id;
+    return id;
   };
 
   /** A vendor, an application and a plan, made the way the catalog makes them. */
@@ -123,13 +137,15 @@ export class SubscriptionHttpHarness {
       await request(this.server())
         .post('/api/v1/applications')
         .set(this.as(this.it1))
-        .send({
-          name: this.unique('App'),
-          kind,
-          ...(kind === 'INTERNAL' ? {} : { vendorName: setup.vendorName ?? this.unique('Vendor') }),
-          dataSensitivity: 'LOW',
-          communication: NO,
-        })
+        .send(
+          intakeBodyOf({
+            name: this.unique('App'),
+            kind,
+            ...(kind === 'INTERNAL' ? {} : { vendorName: setup.vendorName ?? this.unique('Vendor') }),
+            dataSensitivity: 'LOW',
+            communication: NO,
+          }),
+        )
         .expect(201),
     );
     const type = setup.type ?? (kind === 'INTERNAL' ? 'K5' : 'K2');
@@ -141,10 +157,14 @@ export class SubscriptionHttpHarness {
           applicationId: application.id,
           name: this.unique('Plan'),
           provisioningType: type,
-          ...(type === 'K5' ? {} : { pricingModel: setup.pricing ?? 'PER_SEAT', controlLevel: 'FULL' }),
+          ...(type === 'K5' ? {} : { ...pricingOfBody(type, setup.pricing ?? 'PER_SEAT'), controlLevel: 'FULL' }),
         })
         .expect(201),
     );
+
+    await writeLegacyPricing(this.ctx.sql, created.id, type, setup.pricing ?? 'PER_SEAT');
+    // A plan that needs admins at the vendor gets the two-person profile an active subscription asks for (X-IT.5); the rule itself is proved in its own suites.
+    await ensureVendorAdmins(this.ctx, created.id, this.it1.employeeId);
 
     return { planId: created.id, vendorId: application.vendor?.id ?? null, applicationId: application.id };
   };

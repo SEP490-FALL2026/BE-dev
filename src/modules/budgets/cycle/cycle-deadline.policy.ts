@@ -6,7 +6,7 @@ export interface DeadlineDuties {
   submissionPassed: boolean;
   /** The decision deadline has passed: the spending approver and Finance are told of the versions still waiting. */
   decisionPassed: boolean;
-  /** The cycle was published once and the deadline is not yet past: Finance is told of departments that still have no Cost Center. */
+  /** The cycle is open and the deadline is not yet past: Finance is told of departments that still have no Cost Center. */
   costCenterSetup: boolean;
 }
 
@@ -14,12 +14,13 @@ export function deadlineDuties(cycle: {
   today: BusinessDate;
   submissionDeadline: BusinessDate;
   decisionDeadline: BusinessDate;
-  publishedOnce: boolean;
+  /** Finance opened the cycle; a draft owes nothing. */
+  opened: boolean;
 }): DeadlineDuties {
   return {
     // A deadline has passed after its day is over (a day equal to the deadline is still in time).
-    submissionPassed: cycle.publishedOnce && cycle.today > cycle.submissionDeadline,
-    decisionPassed: cycle.publishedOnce && cycle.today > cycle.decisionDeadline,
-    costCenterSetup: cycle.publishedOnce && cycle.today <= cycle.submissionDeadline,
+    submissionPassed: cycle.opened && cycle.today > cycle.submissionDeadline,
+    decisionPassed: cycle.opened && cycle.today > cycle.decisionDeadline,
+    costCenterSetup: cycle.opened && cycle.today <= cycle.submissionDeadline,
   };
 }

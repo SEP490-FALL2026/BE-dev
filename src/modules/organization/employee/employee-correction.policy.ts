@@ -5,7 +5,14 @@ import { isJobTitleTooLong, placementReasons } from '../public/employee-placemen
 import type { EmploymentType } from '../public/organization.types';
 
 /** The official fields of a record a correction may touch, in the order a correction notes them. */
-export const OFFICIAL_FIELDS = ['fullName', 'workEmail', 'employmentType', 'hireDate', 'jobTitle'] as const;
+export const OFFICIAL_FIELDS = [
+  'fullName',
+  'workEmail',
+  'employmentType',
+  'hireDate',
+  'contractEndDate',
+  'jobTitle',
+] as const;
 export type OfficialField = (typeof OFFICIAL_FIELDS)[number];
 
 export interface OfficialValues {
@@ -13,6 +20,8 @@ export interface OfficialValues {
   workEmail: string | null;
   employmentType: EmploymentType;
   hireDate: BusinessDate;
+  /** The last day of the contract of a person with a term (R-38, `INV-07`); null for none, and for staff. */
+  contractEndDate: BusinessDate | null;
   jobTitle: string | null;
 }
 
@@ -20,7 +29,10 @@ export interface OfficialValues {
 export type CorrectionInput = { [F in OfficialField]?: OfficialValues[F] };
 
 /** The record as it is now; a record that never had a title may carry none at all. */
-export type CorrectionCurrent = Omit<OfficialValues, 'jobTitle'> & { jobTitle?: string | null };
+export type CorrectionCurrent = Omit<OfficialValues, 'jobTitle' | 'contractEndDate'> & {
+  jobTitle?: string | null;
+  contractEndDate?: BusinessDate | null;
+};
 
 export interface Correction {
   /** What each changed field becomes, in the order of {@link OFFICIAL_FIELDS}; a cleared field is present as null. */
@@ -91,6 +103,42 @@ const hireDateVerdict = (current: CorrectionCurrent, input: CorrectionInput, tod
   return { change: { was: current.hireDate, now: input.hireDate } };
 };
 
+export type ContractEndReason = 'CONTRACT_END_NOT_APPLICABLE' | 'CONTRACT_END_BEFORE_HIRE';
+
+/**
+ * Why a contract end cannot be kept on a record, or null (`INV-07`, R-38): only a contractor, a freelancer or an intern has one, so staff has
+ * none, and it is never before the day the person was hired. The same two rules as the checks of the table, said before the database is asked.
+ */
+export function contractEndReason(facts: {
+  employmentType: EmploymentType;
+  hireDate: BusinessDate;
+  contractEndDate: BusinessDate | null;
+}): ContractEndReason | null {
+  if (facts.contractEndDate === null) return null;
+  if (facts.employmentType === 'STAFF') return 'CONTRACT_END_NOT_APPLICABLE';
+
+  return facts.contractEndDate < facts.hireDate ? 'CONTRACT_END_BEFORE_HIRE' : null;
+}
+
+/**
+ * The end of the contract after the correction, judged with the kind and the hire date the record will have: a change of kind to staff that
+ * leaves one, and a hire date moved past it, are refused here and not by the database.
+ */
+const contractEndDateVerdict = (current: CorrectionCurrent, input: CorrectionInput): Verdict | null => {
+  if (input.contractEndDate === undefined && input.employmentType === undefined && input.hireDate === undefined)
+    return null;
+  const was = current.contractEndDate ?? null;
+  const now = input.contractEndDate === undefined ? was : input.contractEndDate;
+  const reason = contractEndReason({
+    employmentType: input.employmentType ?? current.employmentType,
+    hireDate: input.hireDate ?? current.hireDate,
+    contractEndDate: now,
+  });
+  if (reason) return { reason };
+
+  return now === was ? null : { change: { was, now } };
+};
+
 /** The title is optional free text, only bounded: the same bound the form and the people file keep. */
 const jobTitleVerdict = (current: CorrectionCurrent, input: CorrectionInput): Verdict | null => {
   if (input.jobTitle === undefined) return null;
@@ -115,6 +163,7 @@ export function correctionOf(
     ['employmentType', employmentTypeVerdict(current, input)],
     ['workEmail', workEmailVerdict(current, input, facts.workEmailTaken)],
     ['hireDate', hireDateVerdict(current, input, facts.today)],
+    ['contractEndDate', contractEndDateVerdict(current, input)],
     ['jobTitle', jobTitleVerdict(current, input)],
   ];
   const changes: Record<string, unknown> = {};

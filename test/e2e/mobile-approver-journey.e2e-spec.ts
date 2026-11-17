@@ -65,15 +65,7 @@ describe('the approvers on the phone: need step, spend step and the request a he
       .expect(200);
     unit = await h.departmentWithHead('P-DES');
     employee = await h.staff(unit.department, 'DES-E1', 'EMPLOYEE');
-    await h.budgetFor(unit, {
-      total: 100 * M,
-      lines: [
-        h.line({
-          description: 'Figma Organization 10 seats',
-          planId: plan,
-        }),
-      ],
-    });
+    await h.budgetFor(unit, { total: 100 * M });
     for (const account of [employee.account, unit.head.account, h.boss.account]) await signIn(account);
   }, 240000);
 
@@ -97,9 +89,11 @@ describe('the approvers on the phone: need step, spend step and the request a he
     );
     expect(read.request).toMatchObject({ businessReason: 'Design system', pricing: { status: 'PRICED' } });
 
-    const decided = await post(`/access-requests/${paid}/need-decision`, unit.head.account, {
-      decision: 'APPROVE',
-    }).expect(200);
+    const decided = await post(
+      `/access-requests/${paid}/need-decision`,
+      unit.head.account,
+      h.checklists.withYes('1.2', { decision: 'APPROVE' }),
+    ).expect(200);
 
     expect(h.dataOf<{ request: AccessRequestWire }>(decided).request).toMatchObject({
       state: 'AWAITING_SPEND_SUBMISSION',
@@ -122,7 +116,11 @@ describe('the approvers on the phone: need step, spend step and the request a he
   });
 
   it('the approver approves that one request on the phone: money is held once and the employee is told', async () => {
-    await post(`/access-requests/${paid}/spend-approval`, h.boss.account, { decision: 'APPROVE' }).expect(200);
+    await post(
+      `/access-requests/${paid}/spend-approval`,
+      h.boss.account,
+      h.checklists.withYes('1.7', { decision: 'APPROVE' }),
+    ).expect(200);
     await h.project();
 
     const held = await h.ctx.sql.query(`SELECT 1 FROM budget_commitments WHERE request_id = $1`, [paid]);
@@ -148,9 +146,17 @@ describe('the approvers on the phone: need step, spend step and the request a he
     expect((await inboxAbout(h.boss.account, own)).map((item) => [item.code, item.params.stepKind])).toEqual([
       ['STEP_ASSIGNED', 'SPEND_APPROVAL'],
     ]);
-    await post(`/access-requests/${own}/need-decision`, unit.head.account, { decision: 'APPROVE' }).expect(403);
+    await post(
+      `/access-requests/${own}/need-decision`,
+      unit.head.account,
+      h.checklists.withYes('1.2', { decision: 'APPROVE' }),
+    ).expect(403);
 
-    await post(`/access-requests/${own}/need-decision`, h.boss.account, { decision: 'APPROVE' }).expect(404);
+    await post(
+      `/access-requests/${own}/need-decision`,
+      h.boss.account,
+      h.checklists.withYes('1.2', { decision: 'APPROVE' }),
+    ).expect(404);
     const detail = h.dataOf<{ request: AccessRequestWire }>(
       await get(`/access-requests/${own}`, unit.head.account).expect(200),
     ).request;
@@ -158,7 +164,11 @@ describe('the approvers on the phone: need step, spend step and the request a he
     expect((await queueOf(h.boss.account)).find((item) => item.requestId === own)).toMatchObject({
       routing: { mode: 'ONE_STEP' },
     });
-    await post(`/access-requests/${own}/spend-approval`, h.boss.account, { decision: 'APPROVE' }).expect(200);
+    await post(
+      `/access-requests/${own}/spend-approval`,
+      h.boss.account,
+      h.checklists.withYes('1.7', { decision: 'APPROVE' }),
+    ).expect(200);
 
     const kept = await h.ctx.sql.query<{ kind: string; decider_role: string }>(
       `SELECT s.kind::text, r.decider_role::text FROM approval_records r JOIN access_request_steps s ON s.id = r.step_id

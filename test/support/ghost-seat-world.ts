@@ -2,38 +2,16 @@ import { randomUUID } from 'node:crypto';
 import { ownSeatBy } from './fixture-sql';
 import request from 'supertest';
 import type { ApiAccount } from './api-accounts';
+import { IT_ADMIN_DEPARTMENT_LIMIT } from '../../src/modules/organization/department/department.policy';
 import { DecisionFollowUpService } from '../../src/modules/optimization/decision/decision-follow-up.service';
 import { InternalRulesService } from '../../src/modules/optimization/internal-rules/internal-rules.service';
 import type { RuleRunRecord } from '../../src/modules/optimization/rule-run/rule-run.repo';
+import type { GhostRow } from './ghost-seat-row';
+import { DecisionChecklists } from './decision-checklist';
 import { seedUsageColumns, seedUsageEvidence } from './ghost-seat-usage-evidence';
 import { RevocationHarness } from './revocation-harness';
 
-export interface GhostRow {
-  id: string;
-  group: string;
-  state: string;
-  close_reason: string | null;
-  tier: string | null;
-  subscription_id: string | null;
-  assignment_id: string | null;
-  seat_chain_id: string | null;
-  employee_id: string | null;
-  department_id: string | null;
-  free_seats: number | null;
-  counts_toward_vacant_cost: boolean | null;
-  revocation_task_id: string | null;
-  holder_left_on: string | null;
-  superseded_by_id: string | null;
-  evidence: Record<string, unknown>;
-  decider_department_id: string | null;
-  routed_at: string | null;
-  decision_due_on: string | null;
-  overdue_noticed_at: string | null;
-  return_count: number;
-  revocation_not_before: string | null;
-  paused_at: string | null;
-  pause_transfer_id: string | null;
-}
+export type { GhostRow } from './ghost-seat-row';
 
 /**
  * The world the rules of wasted seats are judged in (`qd103-ghost-seat-g1-g2`; reused by `manager-decision`): an installation with an IT
@@ -41,19 +19,36 @@ export interface GhostRow {
  * rules on a day the test names (`nextDay` makes each run claim its own period). No assertion lives here.
  */
 export class GhostSeatWorld extends RevocationHarness {
+  readonly checklists = new DecisionChecklists();
   private day = 0;
   private bulk = 0;
   worldDepartment = '';
   worldItAdmin = { employeeId: '', account: this.it1 };
+  /** How many departments were made in the name of the IT Admin of the world: an IT Admin answers for at most four (`IT_ADMIN_DEPARTMENT_LIMIT`). */
+  private ownedByWorldItAdmin = 0;
 
   /** Boots the application and an IT Admin in charge of a department that owns the subscriptions of the world. */
   async startWorld(): Promise<void> {
     await this.start();
+    await this.checklists.load(this.ctx.sql, this.seed.organizationId);
     const itAdminEmployee = await this.person('E-WORLD-IT');
     const account = await this.account('E-WORLD-IT', itAdminEmployee, 'IT_ADMIN');
+    // Named before its first department is made, so that department counts among the four it answers for.
+    this.worldItAdmin = { employeeId: itAdminEmployee, account };
     const department = await this.department('P-WORLD', itAdminEmployee);
     this.worldDepartment = department.id;
-    this.worldItAdmin = { employeeId: itAdminEmployee, account };
+  }
+
+  /**
+   * A department, owned by the IT Admin asked for. The IT Admin of the world has room for four: a department beyond that names no IT Admin, which
+   * the IT Admin reads all the same (a department with none is in the scope of every IT Admin), so the suites that make many departments go on.
+   */
+  override async department(code: string, itAdminEmployeeId?: string): Promise<{ id: string; code: string }> {
+    const ofTheWorld = itAdminEmployeeId !== undefined && itAdminEmployeeId === this.worldItAdmin.employeeId;
+    if (ofTheWorld) this.ownedByWorldItAdmin += 1;
+    const full = ofTheWorld && this.ownedByWorldItAdmin > IT_ADMIN_DEPARTMENT_LIMIT;
+
+    return super.department(code, full ? undefined : itAdminEmployeeId);
   }
 
   /** A day not used before: one more than the last, counted from tomorrow, as an instant at noon of the organization's calendar. */
@@ -254,8 +249,12 @@ export class GhostSeatWorld extends RevocationHarness {
    * A department with a head who can sign in (a MANAGER account, placed in it) from the start of the year, owned by the IT Admin of the
    * world; `personIn` and `seatOf` put holders in it. `headEmployeeId` is the person who heads it.
    */
-  async headedDepartment(code: string): Promise<{ departmentId: string; headEmployeeId: string; head: ApiAccount }> {
-    const department = await this.department(code, this.worldItAdmin.employeeId);
+  async headedDepartment(
+    code: string,
+    /** The IT Admin that answers for the department: the one of the world by default, `null` for a department with none. */
+    itAdminEmployeeId: string | null = this.worldItAdmin.employeeId,
+  ): Promise<{ departmentId: string; headEmployeeId: string; head: ApiAccount }> {
+    const department = await this.department(code, itAdminEmployeeId ?? undefined);
     const headEmployeeId = await this.personIn(`${code}-HEAD`, department.id);
     const head = await this.account(`${code}-HEAD`, headEmployeeId, 'MANAGER');
     await this.ctx.sql.query(
@@ -342,7 +341,7 @@ export class GhostSeatWorld extends RevocationHarness {
     return id;
   }
 
-  /** The IT Admin closed the transfer (the service accounts are settled): it no longer pauses anything. */
+  /** The transfer is closed (the system does it once every right of the old department is taken back): it no longer pauses anything. */
   async closeTransfer(transferId: string): Promise<void> {
     await this.ctx.sql.query(
       `UPDATE department_transfers SET closed_at = now(), closed_by_app_user_id = gen_random_uuid() WHERE id = $1`,

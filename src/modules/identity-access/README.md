@@ -76,7 +76,10 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
 - `accounts/` — `app-users/app-users.controller.ts` (`/app-users*`, `/account-candidates`) →
   `account-invitation.service.ts`, `account-status.service.ts`, `account-query.service.ts`,
   `account-administration.policy.ts`; `role-grant.service.ts`, `action-link.service.ts`. Không còn route đổi người giữ vai
-  Super Admin trong ứng dụng (QĐ-93e).
+  Super Admin trong ứng dụng (QĐ-93e). Email đăng nhập luôn là email công việc (`workEmail`) của nhân viên đọc lại dưới khóa
+  (`resolveLoginEmail` ở `account-invitation.service.ts`): `loginEmail` trong body của `POST /app-users` là trường cũ, bỏ qua được; có gửi mà khác
+  `workEmail` (không phân biệt hoa thường) ⟹ 422 `APP_USER.LOGIN_EMAIL_NOT_WORK_EMAIL`, và không bao giờ được lưu; không có `workEmail` ⟹ 422
+  `APP_USER.LOGIN_EMAIL_REQUIRED`.
 - `credentials/` — mật khẩu của tài khoản: `credential.service.ts`, `credential.repo.ts`, `password-hasher.service.ts` (Argon2id),
   `password.policy.ts`; không import capability nào, `accounts/`, `auth/` và `recovery/` import nó (tách khỏi `accounts/` để thư
   mục đó dưới trần 25 file sau khi `mappers/`, `dto/`, `policies/` được dời vào).

@@ -75,12 +75,13 @@ export class VendorSourceRepo {
     return this.find(id, tx);
   }
 
+  /** One page of the sources, newest first, and the total from one snapshot; `applicationIds` keeps the sources of those ids. */
   async page(filter: {
-    applicationId?: string;
+    applicationIds?: readonly string[];
     skip: number;
     take: number;
   }): Promise<{ items: SourceRecord[]; total: number }> {
-    const where = filter.applicationId ? { applicationId: filter.applicationId } : {};
+    const where = filter.applicationIds ? { applicationId: { in: [...filter.applicationIds] } } : {};
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.usageSource.findMany({
         where,

@@ -24,12 +24,6 @@ const cases: Array<[string, string, string, object]> = [
   ],
   ['draft', '/api/v1/access-requests/drafts', 'EMPLOYEE', { kind: 'INDIVIDUAL', ...base }],
   [
-    'service account',
-    '/api/v1/access-requests/service-accounts',
-    'EMPLOYEE',
-    { ...base, purpose: 'Build', expectedIdentifier: 'ci-bot' },
-  ],
-  [
     'renewal',
     '/api/v1/access-requests/renewals',
     'EMPLOYEE',

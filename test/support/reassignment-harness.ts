@@ -106,6 +106,28 @@ export class ReassignmentHarness extends SpendHarness {
       .set({ Authorization: `Bearer ${this.admin}` })
       .send({ effectiveFrom: this.today() });
 
+  /**
+   * What the rule before `QĐ-110i` wrote when the head of a department left: the request one-step with the reason HEAD_LEFT, its need step
+   * closed and its lines confirmed. No rule writes it any more; a test uses it to stand for the data of an earlier deploy, which the sweep
+   * still finishes.
+   */
+  async markedOneStepByEarlierRule(requestId: string): Promise<void> {
+    await this.ctx.sql.query(
+      `UPDATE access_requests SET routing_mode = 'ONE_STEP', one_step_reason = 'HEAD_LEFT' WHERE id = $1`,
+      [requestId],
+    );
+    await this.ctx.sql.query(
+      `UPDATE access_request_steps SET state = 'CLOSED', decided_at = now(), waiting_reason = NULL, waiting_since = NULL,
+              same_person_as_spend = false, no_independent_review = false
+        WHERE request_id = $1 AND kind = 'NEED' AND state IN ('PENDING', 'WAITING')`,
+      [requestId],
+    );
+    await this.ctx.sql.query(
+      `UPDATE access_request_lines SET state = 'NEED_CONFIRMED' WHERE request_id = $1 AND state = 'AWAITING_NEED'`,
+      [requestId],
+    );
+  }
+
   /** A sweep of the worker that has not run the pass of the day yet, which is what the first sweep of a worker does. */
   freshSweep(): StepRedeterminationSweepApi {
     const app = this.ctx.app;

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { LicensingApi } from '../../../src/modules/licensing/public/licensing.api';
 import type { ApiAccount } from '../../support/api-accounts';
+import { k1Checklist } from '../../support/k1-checklist';
 import { RevocationHarness, type RevocationTaskWire } from '../../support/revocation-harness';
 
 const h = new RevocationHarness();
@@ -213,7 +214,14 @@ describe('completing a revocation by the kind of grant, over HTTP (integration, 
   });
 
   describe('K1: the renewal is cancelled and the state of the access is kept (US-07-05 AC-5, AC-19)', () => {
-    const renewal = (extra: object = {}) => ({ completion: 'RENEWAL_CANCELLED', evidence: 'đã hủy gia hạn', ...extra });
+    // A K1 revocation is completed with the checklist of its variant (`QĐ-111az`): MANAGER_NOT_NEEDED is for a person who still works, the departures below name theirs.
+    const renewal = (extra: object = {}) => ({
+      completion: 'RENEWAL_CANCELLED',
+      evidence: 'đã hủy gia hạn',
+      k1Checklist: k1Checklist('STILL_EMPLOYED'),
+      ...extra,
+    });
+    const leaving = () => ({ k1Checklist: k1Checklist('DEPARTURE') });
     const x = () => h.inDays(36);
 
     it('AC-5: locking the company account takes nothing back, and a completion without the state of the access is not stored', async () => {
@@ -234,8 +242,9 @@ describe('completing a revocation by the kind of grant, over HTTP (integration, 
       expect(h.codeOf(await h.revoked(taskId, renewal({ accessState: 'UNTIL_PAID_END' })).expect(422))).toBe(
         'REVOCATION.PAID_THROUGH_REQUIRED',
       );
+      // A K1 completion stands on its checklist and the evidence in it: with neither, it is the checklist that is missing (`QĐ-111az`).
       expect(h.codeOf(await h.revoked(taskId, { completion: 'RENEWAL_CANCELLED' }).expect(422))).toBe(
-        'PROVISIONING_TASK.EVIDENCE_REQUIRED',
+        'REVOCATION.K1_CHECKLIST_INCOMPLETE',
       );
       await unchanged(assignmentId, taskId);
     });
@@ -262,7 +271,9 @@ describe('completing a revocation by the kind of grant, over HTTP (integration, 
       expect(await h.freeSeats(subscriptionId)).toBe(0);
 
       const done = taskOf(
-        await h.revoked(taskId, renewal({ paidThroughOn: x(), accessState: 'UNTIL_PAID_END' })).expect(200),
+        await h
+          .revoked(taskId, renewal({ ...leaving(), paidThroughOn: x(), accessState: 'UNTIL_PAID_END' }))
+          .expect(200),
       );
 
       expect(done).toMatchObject({
@@ -309,7 +320,7 @@ describe('completing a revocation by the kind of grant, over HTTP (integration, 
     it('AC-19: cutting the access earlier brings the end of the seat forward, once', async () => {
       const subscriptionId = await h.subscription(1, 'K1');
       const { assignmentId, taskId } = await taken({ subscriptionId }, 'ABRUPT_DEPARTURE');
-      await h.revoked(taskId, renewal({ paidThroughOn: x(), accessState: 'UNTIL_PAID_END' })).expect(200);
+      await h.revoked(taskId, renewal({ ...leaving(), paidThroughOn: x(), accessState: 'UNTIL_PAID_END' })).expect(200);
       const cutOn = h.inDays(-3);
 
       const cut = taskOf(

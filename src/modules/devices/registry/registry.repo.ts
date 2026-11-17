@@ -195,6 +195,29 @@ export class RegistryRepo {
        WHERE id = ${id}::uuid`;
   }
 
+  /**
+   * Collection of the registration stops at `at`. One `UPDATE` sets both columns: the table never lets the head of acknowledgements and
+   * the stop be set together, so the head is cleared with it (the next acknowledgement starts a new one at its own instant).
+   */
+  async setCollectionStopped(tx: DbTx, id: string, at: Date): Promise<void> {
+    await tx.$executeRaw`
+      UPDATE device_registrations
+         SET collection_stopped_at = ${at}, acknowledged_from = NULL
+       WHERE id = ${id}::uuid`;
+  }
+
+  /**
+   * The registration ended, so the stop requests still waiting on it can never be completed: each becomes invalid, handled at `at` by
+   * nobody. Written here, not in `stop-request`, which depends on this folder. Returns how many it closed.
+   */
+  async invalidateOpenStopRequests(tx: DbTx, registrationId: string, at: Date): Promise<number> {
+    return tx.$executeRaw`
+      UPDATE device_stop_requests
+         SET state = 'INVALID'::"DeviceStopRequestState", invalid_reason = 'REGISTRATION_ENDED'::"DeviceStopInvalidReason",
+             handled_at = ${at}
+       WHERE registration_id = ${registrationId}::uuid AND state = 'OPEN'::"DeviceStopRequestState"`;
+  }
+
   async hasSignatureRecord(registrationId: string, tx?: DbTx): Promise<boolean> {
     return (await (tx ?? this.prisma).deviceSignatureRecord.count({ where: { registrationId }, take: 1 })) > 0;
   }
@@ -236,6 +259,15 @@ export class RegistryRepo {
     });
 
     return rows.map((row) => row.id);
+  }
+
+  /** Every registration of the machine, ended or not, with who held it, oldest first. */
+  async registrationsOfDevice(deviceId: string, tx?: DbTx): Promise<Array<{ id: string; holderEmployeeId: string }>> {
+    return (tx ?? this.prisma).deviceRegistration.findMany({
+      where: { deviceId },
+      select: { id: true, holderEmployeeId: true },
+      orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
+    });
   }
 
   /** Who holds each of these registrations and over which days: a registration has one holder for its whole life. */

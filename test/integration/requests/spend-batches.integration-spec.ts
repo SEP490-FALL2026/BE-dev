@@ -144,7 +144,9 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
       await h.budgetFor(other, { total: 100 * M });
       const theirs = await waiting(10 * M, other);
 
-      expect(h.codeOf(await h.sendOn([waitingId, done], design.head.account).expect(409))).toBe('SPEND.NOT_IN_QUEUE');
+      const notInQueue = await h.sendOn([waitingId, done], design.head.account).expect(409);
+      expect(h.codeOf(notInQueue)).toBe('SPEND.NOT_IN_QUEUE');
+      expect(h.detailsOf(notInQueue)).toEqual({ requestId: done });
       expect(h.codeOf(await h.sendOn([waitingId, theirs], design.head.account).expect(404))).toBe(
         'ACCESS_REQUEST.NOT_FOUND',
       );
@@ -199,6 +201,31 @@ describe('sending requests on in a batch over PostgreSQL (US-06-14)', () => {
       expect(row).toMatchObject({ stage: 'BLOCKED', blockedReasons: ['PRICE_EXPIRED'], readyToSubmit: true });
       const text = JSON.stringify((await h.spendQueue(design.head.account, { pageSize: 100 })).body);
       expect(text).not.toMatch(/remaining|INSUFFICIENT|HIGH_VALUE|NO_ACTIVE_BUDGET|budget":\{/);
+    });
+
+    it('QĐ-111an, R-4: an item an older release stored as stopped for want of a rate is read as the missing price it comes to, and the wire never carries RATE_MISSING', async () => {
+      const legacy = await waiting();
+      const batchId = (
+        await h.ctx.sql.query<{ id: string }>(
+          `INSERT INTO spend_batches (id, organization_id, department_id, submitted_by_employee_id)
+           VALUES (gen_random_uuid(), $1, $2, $3) RETURNING id`,
+          [h.seed.organizationId, design.department.id, design.head.employeeId],
+        )
+      ).rows[0].id;
+      await h.ctx.sql.query(
+        `INSERT INTO spend_batch_items (batch_id, request_id, position, outcome, stop_reason)
+         VALUES ($1, $2, 1, 'STOPPED'::"SpendBatchItemOutcome", 'RATE_MISSING')`,
+        [batchId, legacy],
+      );
+
+      const read = await items(batchId);
+
+      expect(read.map((item) => [item.requestId, item.outcome, item.stopReason])).toEqual([
+        [legacy, 'STOPPED', 'PRICE_MISSING'],
+      ]);
+      expect(JSON.stringify((await h.batchItems(batchId, design.head.account, { pageSize: 100 })).body)).not.toContain(
+        'RATE_MISSING',
+      );
     });
 
     it('BR-MF1-06g(3)(i): a request over the base and the reserve stays in the queue, blocked, and the others go to the approver (AC-12)', async () => {

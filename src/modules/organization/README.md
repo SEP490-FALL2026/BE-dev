@@ -15,10 +15,11 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
 - Hai facade, cả hai gọi trong `tx` của bên gọi. Chọn theo việc cần làm: chỉ đọc (kể cả khóa `FOR SHARE` để giữ giá trị đã đọc
   ổn định) thì `OrganizationReadApi`; ghi, khóa `FOR UPDATE` hoặc hỏi "đang được dùng" thì `OrganizationApi`. Một lớp dùng cả hai
   thì inject cả hai, tên trường `organization` và `organizationReads`.
-  - `OrganizationReadApi` ([public/organization-read.api.ts](public/organization-read.api.ts)), 37 phương thức đọc:
+  - `OrganizationReadApi` ([public/organization-read.api.ts](public/organization-read.api.ts)), 38 phương thức đọc:
     - Chung: `businessToday` — hôm nay theo múi giờ của tổ chức; `getOrganization`, `getOrganizationShared` (`FOR SHARE`),
       `getCompanyEmailDomains`, `countUnmarkedChangesAsOf` (cho `ops:inspect`).
     - Phòng ban: `getDepartmentBrief(s)`, `getActiveDepartmentIds`, `lockDepartmentShared`, `lockDepartmentForEntry`, `getDepartmentMemberIds`,
+      `getMemberIdsOfDepartments` (thành viên của nhiều phòng trong một câu lệnh),
       `getDepartmentHeads`, `getHeadedDepartment`, `isDepartmentHead`, `departmentsWithoutHead`; IT Admin phụ trách:
       `getItAdminInCharge`, `getItAdminInChargeOfDepartment`, `getItAdminScope`, `getDepartmentIdsInChargeOf`.
     - Nhân viên: `getEmployee`, `getEmployeeByCode`, `getEmployeesByCodes`, `getEmployeesByWorkEmails` (theo email công việc đã chuẩn hóa, gồm
@@ -27,8 +28,8 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
       `lockForEmployeeImport` (`FOR SHARE` trên phòng ban), `getProfileNotices`, `getOnboardingFacts`.
     - Cost Center: `getCostCentersByCodes`, `costCentersByIds`, `lockCostCentersShared`, `getOwningUnits`,
       `requireUnitCostCenter` (kiểm thuần, không chạm CSDL).
-  - `OrganizationApi` ([public/organization.api.ts](public/organization.api.ts)), 10 phương thức ghi, khóa ghi và bộ đọc "đang dùng":
-    - Ghi: `createOrganization`, `setReportingCurrency`, `createDepartment`, `createUnitCostCenter`,
+  - `OrganizationApi` ([public/organization.api.ts](public/organization.api.ts)), 9 phương thức ghi, khóa ghi và bộ đọc "đang dùng":
+    - Ghi: `createOrganization`, `createDepartment`, `createUnitCostCenter`,
       `createEmployeeWithPlacement` (cách duy nhất tạo nhân viên), `updateEmployeeOfficialFields`, `emitChange` (báo thay đổi).
     - Khóa ghi: `lockEmployeeForUpdate` (`FOR UPDATE`).
     - Đang dùng: `getDepartmentUse`, `getCostCenterUse` (hỏi các extension point bên dưới).
@@ -53,8 +54,7 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
 
 - Mở ([public/organization.extension-points.ts](public/organization.extension-points.ts)), bên đăng ký `*.listener.ts`:
   - `OrganizationChangeListeners` (`organization.change-listeners`) — organization `department/held-notice-handover`;
-    budgets `proposal/budget-head-change`; personnel `transfer/transfer-effective`,
-    `transfer-review/transfer-review`; requests `reassignment/organization-change`.
+    budgets `proposal/budget-head-change`; personnel `transfer/transfer-effective`; requests `reassignment/organization-change`.
   - `DepartmentUseContributions` (`organization.department-use-readers`) — catalog
     `subscription/subscription-department-use`; licensing `provisioning/department-use/department-open-work`; personnel
     `event-notice/department-open-work`; requests `access-request/open-request/department-open-requests`.
@@ -65,6 +65,9 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
   - `EmployeeAccountsHook` (`organization.employee-accounts`) — identity-access `accounts/employee-accounts`.
   - `DepartmentCreationWindowHook` (`organization.department-creation-window`) — budgets `cycle/department-creation-window`; chỉ `department-management/department.service.ts` hỏi lúc tạo phòng (API), không hỏi ở đường cài đặt.
 - Đăng ký vào: chỉ point của chính module (`department/held-notice-handover.listener.ts`).
+- Đăng ký vào `notifications.name-sources` (`NotificationNameContributions`, một `*.listener.ts` cho mỗi capability sở hữu bảng, khai ở `organization-http.module.ts` — không ở `organization.module.ts`, vì
+  `InstallationModule` import nó và graph cài đặt không có `NotificationsModule`): `employee-directory/employee-notification-names` (EMPLOYEE, họ tên; để ở `employee-directory` vì `employee/` đã đủ 25 file),
+  `department/department-notification-names` (DEPARTMENT, tên phòng), `cost-center/cost-center-notification-names` (COST_CENTER, `<mã> · <tên>`). Mỗi bên một truy vấn `namesOf(ids)` cho cả trang, id lạ hoặc không phải uuid thì vắng.
 
 ## Hướng phụ thuộc giữa capability (R6)
 

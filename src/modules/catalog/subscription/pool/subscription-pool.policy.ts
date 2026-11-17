@@ -1,10 +1,13 @@
+import { fromDateColumn, type BusinessDate } from '../../../../core/business-date';
 import {
   SubscriptionBillingCycleUnsupportedError,
   SubscriptionBillingLongerThanCommitmentError,
   SubscriptionCommitmentTermNotAllowedError,
   SubscriptionCommitmentTermRequiredError,
   SubscriptionK1MonthlyOnlyError,
+  SubscriptionK4PerpetualOnlyError,
   SubscriptionResponsibleRequiredError,
+  SubscriptionVendorAdminsRequiredError,
 } from '../subscription.errors';
 import type {
   BillingCycle,
@@ -49,10 +52,20 @@ export function assertDeclarableCycle(billingCycle: string | undefined): void {
   }
 }
 
+/** What the kind of provisioning says of a term: a K4 plan is bought once, never a term (`B-5`); a K1 plan is for one month and paid by the month (R-E01). */
+function assertTermOfKind(input: PoolTermsInput): void {
+  if (input.planProvisioningType === 'K4') throw new SubscriptionK4PerpetualOnlyError();
+  if (input.planProvisioningType === 'K1') {
+    const longer = input.commitmentTermMonths !== null && input.commitmentTermMonths !== 1;
+    const notMonthly = input.billingCycle !== null && input.billingCycle !== 'MONTHLY';
+    if (longer || notMonthly) throw new SubscriptionK1MonthlyOnlyError();
+  }
+}
+
 /**
  * The rules of the shared pool on a write (`QĐ-103e`, `QĐ-104d`(3), R-E01, R-G01), in a fixed order: a perpetual purchase commits to no
  * term; paying by the year for a commitment of one month is refused; a K1 plan is for one month and paid by the month; a term that
- * becomes active names its commitment. Throws the first that fails. Data older than the rules is not judged by a write that does not
+ * becomes active names its commitment; a K4 plan is bought once, so only a perpetual purchase is written for it (`B-5`). Throws the first that fails. Data older than the rules is not judged by a write that does not
  * touch these fields: the caller says when to call this.
  */
 export function assertPoolTerms(input: PoolTermsInput): void {
@@ -64,17 +77,56 @@ export function assertPoolTerms(input: PoolTermsInput): void {
   if (input.commitmentTermMonths === 1 && input.billingCycle === 'ANNUAL') {
     throw new SubscriptionBillingLongerThanCommitmentError();
   }
-  if (input.planProvisioningType === 'K1') {
-    const longer = input.commitmentTermMonths !== null && input.commitmentTermMonths !== 1;
-    const notMonthly = input.billingCycle !== null && input.billingCycle !== 'MONTHLY';
-    if (longer || notMonthly) throw new SubscriptionK1MonthlyOnlyError();
-  }
+  assertTermOfKind(input);
   if (input.activating && input.commitmentTermMonths === null) throw new SubscriptionCommitmentTermRequiredError();
 }
 
 /** An active subscription names the IT Admin who answers for it (`QĐ-103v`(4)). */
 export function assertResponsibleNamed(responsibleItAdminEmployeeId: string | null, activating: boolean): void {
   if (activating && responsibleItAdminEmployeeId === null) throw new SubscriptionResponsibleRequiredError();
+}
+
+/** The fewest different admins at the vendor a plan that needs them has recorded before it is activated (`QĐ-110k`). */
+const MIN_RECORDED_VENDOR_ADMINS = 2;
+
+/**
+ * A subscription of a plan that needs admins at the vendor (`K2`, or `K4` with an admin console) is not activated, nor a pool made, while the
+ * profile of the plan names fewer than two different ones (`QĐ-110k`, `R-53`, SPEC P19). What was recorded is judged, not who still works:
+ * a person who has left only lowers the flag a reader sees (`vendorAdminFlags`). Throws SubscriptionVendorAdminsRequiredError.
+ */
+export function assertVendorAdminsRecorded(input: { needs: boolean; given: number; planId: string }): void {
+  if (input.needs && input.given < MIN_RECORDED_VENDOR_ADMINS) {
+    throw new SubscriptionVendorAdminsRequiredError(input.planId, input.given, MIN_RECORDED_VENDOR_ADMINS);
+  }
+}
+
+/**
+ * What a reader sees of the vendor admins of a subscription, never a refusal (`QĐ-110k`, `QĐ-110u`): fewer than two of the admins recorded still
+ * work, and no email of the company account that owns the plan at the vendor is recorded. A plan that needs no admins raises neither; a
+ * subscription older than the rule has the flags and nothing blocks it.
+ */
+export function vendorAdminFlags(input: {
+  needs: boolean;
+  admins: ReadonlyArray<{ employeeId: string; working: boolean }>;
+  ownerAccountEmail: string | null;
+}): { vendorAdminsBelowMinimum: boolean; ownerAccountEmailMissing: boolean } {
+  if (!input.needs) return { vendorAdminsBelowMinimum: false, ownerAccountEmailMissing: false };
+  const working = new Set(input.admins.filter((admin) => admin.working).map((admin) => admin.employeeId)).size;
+
+  return {
+    vendorAdminsBelowMinimum: working < MIN_RECORDED_VENDOR_ADMINS,
+    ownerAccountEmailMissing: input.ownerAccountEmail === null,
+  };
+}
+
+/**
+ * A subscription as someone who is not an IT Admin reads it (Finance reads subscriptions too, SPEC P19): who administers the plan at the vendor, the email
+ * of the company account that owns it there and the note are the IT Admin's alone, so they are emptied; the shape and the two flags stay.
+ */
+export function withoutVendorAdminDetail<
+  T extends { vendorAdmins: unknown[]; ownerAccountEmail: string | null; adminNote: string | null },
+>(view: T): T {
+  return { ...view, vendorAdmins: [], ownerAccountEmail: null, adminNote: null };
 }
 
 /** The data-quality warnings of a stored subscription that come from data written before the shared-pool rules. */
@@ -203,4 +255,28 @@ export function liveSiblingsOf(live: ReadonlyMap<string, readonly string[]>, pla
 /** Only the plans whose seats are one pool (K2 workspaces and K4 keys) have the rule against a second subscription. */
 export function isPooledPlan(type: ProvisioningType): boolean {
   return type === 'K2' || type === 'K4';
+}
+
+/**
+ * Leaves out of `rows`, the subscriptions that grant seats on `today`, every period recorded ahead of its start whose previous period is among
+ * them. The period that runs and the next one are one pool: the seats carried to the next period are the seats of the one that runs, and the
+ * next adds none that can be given before it runs, so the pool counts them once (`QĐ-111n`: seats are counted, never subscription records).
+ * A next period whose previous one is not in `rows` (it is over, or another IT Admin answers for it) stays: the pool lives on it. One reading
+ * for the stock of a grant, the stock summary and the rules of wasted seats.
+ */
+export function withoutPeriodsAhead<T extends { id: string; renewedFromId: string | null; startDate: Date | null }>(
+  rows: readonly T[],
+  today: BusinessDate,
+): T[] {
+  const ids = new Set(rows.map((row) => row.id));
+
+  return rows.filter(
+    (row) =>
+      !(
+        row.renewedFromId !== null &&
+        ids.has(row.renewedFromId) &&
+        row.startDate !== null &&
+        fromDateColumn(row.startDate) > today
+      ),
+  );
 }

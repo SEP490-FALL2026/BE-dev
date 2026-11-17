@@ -1,5 +1,4 @@
 import request from 'supertest';
-import type { DutyWire } from '../support/handover-harness';
 import { type CaseWire, OffboardingHarness, type RightWire } from '../support/offboarding-harness';
 import type { Department, Person } from '../support/request-harness';
 
@@ -7,8 +6,8 @@ const h = new OffboardingHarness();
 
 /**
  * E2E smoke of D-3: a person who holds two seats leaves. The Super Admin records the departure and then that they left, the IT
- * Admin records the lock of the account and opens the revocation of every right, the head confirms the handover, the IT Admin
- * removes the accounts, and the case is closed with the seats free. Real HTTP and PostgreSQL.
+ * Admin records the lock of the account and opens the revocation of every right, the IT Admin
+ * removes the accounts (no handover is confirmed, QĐ-110g), and the case is closed with the seats free. Real HTTP and PostgreSQL.
  */
 describe('the departure of a person and the revocation of their seats (e2e, D-3)', () => {
   let design: Department;
@@ -39,16 +38,12 @@ describe('the departure of a person and the revocation of their seats (e2e, D-3)
     await h.stop();
   });
 
-  it('the Super Admin records the departure: the person still works, and the head is asked to confirm the handover of each seat', async () => {
+  it('the Super Admin records the departure: the person still works, and no handover is asked of anyone', async () => {
     const recorded = await h.recordedCase(leaver);
     caseId = recorded.id;
 
     expect(recorded).toMatchObject({ state: 'HANDING_OVER', heldRights: 2, lastWorkingDay: h.day(10) });
-    const duties = h.dataOf<{ items: DutyWire[] }>(
-      await h.duties(`?pageSize=100&employeeId=${leaver.employeeId}`, head.account).expect(200),
-    ).items;
-    expect(duties.map((duty) => duty.assignmentId).sort()).toEqual([...seats].sort());
-    expect(duties.every((duty) => duty.role === 'DEPARTMENT_HEAD' && duty.canConfirm)).toBe(true);
+    expect(await h.count('handover_duties')).toBe(0);
     await request(h.server()).get('/api/v1/me').set(h.as(leaver.account)).expect(200);
   });
 
@@ -58,6 +53,8 @@ describe('the departure of a person and the revocation of their seats (e2e, D-3)
     expect(left).toMatchObject({ state: 'LEFT', left: { leftOn: h.today() }, heldRights: 2 });
     expect(await h.workState(leaver.employeeId)).toBe('TERMINATED/LEFT');
     await request(h.server()).get('/api/v1/me').set(h.as(leaver.account)).expect(401);
+    // The hourly pass of the block moment does what the block asks (cancel the open requests, tell IT); the system closes no case before it (audit A-1).
+    await h.blockPass();
   });
 
   it('the IT Admin records the lock of the account and opens the revocation of every right', async () => {
@@ -69,12 +66,7 @@ describe('the departure of a person and the revocation of their seats (e2e, D-3)
     expect(rights.map((right) => right.revocation?.source)).toEqual(['DEPARTURE', 'DEPARTURE']);
   });
 
-  it('the head confirms the handover and the IT Admin removes each account: the seats are given back', async () => {
-    const duties = h.dataOf<{ items: DutyWire[] }>(
-      await h.duties(`?pageSize=100&employeeId=${leaver.employeeId}`, head.account).expect(200),
-    ).items;
-    for (const duty of duties) await h.confirmDuty(duty.id, { value: 'HANDED_OVER' }, head.account).expect(201);
-
+  it('the IT Admin removes each account: the seats are given back', async () => {
     for (const right of await rightsOf()) {
       const taskId = right.revocation?.taskId ?? '';
       await h.claim(taskId).expect(200);
@@ -94,12 +86,12 @@ describe('the departure of a person and the revocation of their seats (e2e, D-3)
     });
   });
 
-  it('the IT Admin closes the case', async () => {
-    const closed = h.dataOf<CaseWire>(await h.closeCase(caseId).expect(200));
+  it('the IT Admin records the lock of the mailbox and the system closes the case (QĐ-110e)', async () => {
+    const closed = h.dataOf<CaseWire>(await h.lockMailbox(caseId, {}).expect(200));
 
     expect(closed).toMatchObject({ closed: true, blockers: {} });
     expect(await h.changeKinds(caseId)).toEqual(
-      expect.arrayContaining(['RECORDED', 'MARKED_LEFT', 'REVOCATIONS_OPENED', 'CLOSED']),
+      expect.arrayContaining(['RECORDED', 'MARKED_LEFT', 'REVOCATIONS_OPENED', 'MAILBOX_LOCKED', 'CLOSED_BY_SYSTEM']),
     );
   });
 });

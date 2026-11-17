@@ -4,15 +4,22 @@ Mục đích: danh mục phần mềm dùng chung — từ điển vendor, ứng
 của plan, subscription/mua đứt, hợp đồng và file đính kèm. Story chính: US-04-01 → US-04-07, US-04-11, US-12-09 (route
 hồ sơ thuế vendor); US-05-20 (đăng ký phần mềm nội bộ, gọi qua facade). Tầng: T4 (`scripts/arch/tiers.cjs`). Phụ thuộc:
 audit, organization, identity-access, finance, operating-parameters. Được dùng bởi: licensing, budgets, requests,
-personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` và lệnh `src/cli/assign-subscription-owner/`.
+personnel, onboarding, data-import (chỉ type), installation (`CatalogBootstrapApi`); gốc `src/app/app.module.ts` và lệnh `src/cli/assign-subscription-owner/`.
 
 ## Public API (`public/`)
 
 - `CatalogPricingApi` (`public/catalog-pricing.api.ts`) — `getPlanPrice` chỉ đọc, cùng nguồn giá với `CatalogApi`.
   `CatalogPricingFacadeModule` dùng chung với worker: không controller, storage hay listener vòng đời.
 
+- `CatalogBootstrapApi` (`public/catalog-bootstrap.api.ts`, Nest module `catalog-bootstrap-facade.module.ts`: không controller, storage hay listener) — `seedStandardFunctionalGroups(tx, organizationId)`: ghi
+  bảy nhóm chức năng chuẩn của một tổ chức lúc cài đặt (`QĐ-111bf`), trong transaction của bên gọi; nhóm đã có giữ nguyên, trả số nhóm đã ghi. Dùng bởi `installation` (`InstallationApi.install`); ngoài ra không ghi gì của catalog.
+- `public/catalog-duplicate.policy.ts` — `duplicateOf`: mục danh mục đã là phần mềm đó theo tên chuẩn hóa (hoa thường, dấu, khoảng trắng bỏ qua) hoặc tên miền (host đã chuẩn hóa, tên xét trước,
+  `QĐ-111b`); hàm thuần, một luật cho lệnh tạo ứng dụng (`application-intake/`) và cho cửa case B của `requests` (qua `findCatalogEntryOfSoftware`); đăng ký trong `PUBLIC_ROOT_POLICY_FILES` vì cả hai bên dùng.
 - `CatalogApi` ([public/catalog.api.ts](public/catalog.api.ts)) — facade cho module khác:
   - `findSeatTarget`, `findPlanSeatTargets`, `lockSeatTarget` — đích ghế (một subscription hoặc một plan nội bộ).
+  - `findCatalogEntryOfSoftware(tx, { name, homepageUrl })` — mục danh mục đã là phần mềm đó theo tên chuẩn hóa hoặc tên miền (cùng quy tắc `duplicateOf` với lệnh tạo ứng dụng) kèm
+    tối đa 20 gói; cửa case B của `requests` (`QĐ-111b`). `getCatalogEntry(tx, applicationId, planName?)` — một ứng dụng với gói của nó và gói trùng tên đã hỏi (đề xuất rút gọn, `QĐ-111a`).
+  - `getCollectorApplications(ids, tx?)` — ứng dụng một allowlist của collector cần xét: tên, kiểu, `logoUrl`, cờ ứng dụng liên lạc (**suy từ nhóm _Liên lạc_**, `QĐ-111e`, không còn cờ riêng; không bao giờ báo cáo, `QĐ-62o`) và đã retired chưa.
   - `getPlanSummaries`, `getPlanRevocationInfo`, `getSimilarPlanIds`, `getPlanVendorId`, `getPlanVendorIds` (nhiều plan trong một lần đọc), `getPlanResponsibleItAdminId` — đọc
     plan.
   - `getPlanPrice(planId, tx?)` — giá của plan từ thuê bao chính (`pickPriceSource`: cờ `is_primary_for_plan`, không có thì giá tháng quy đổi
@@ -23,14 +30,19 @@ unitPrice, reportingUnitPrice, billingCycle }`, thuê bao `PERPETUAL` có giá �
   - `getGrantableSubscriptions(planId, today, tx?)` / `getGrantableSubscriptionsOfPlans` (nhiều plan, một lần đọc) — thuê bao `ACTIVE` còn hiệu lực hôm
     nay, chưa bị kỳ kế tiếp `ACTIVE` đã bắt đầu thay (kỳ đang chạy và kỳ kế tiếp ghi trước ngày bắt đầu cùng là kho; bản `DRAFT` không cấp được), thứ tự:
     thuê bao chính trước, rồi giá tháng quy đổi cao nhất (`orderBySourcePreference`); `getSubscriptionPrice` (kèm giá quy đổi; `PERPETUAL` ⟹ `ONE_TIME`).
+  - `getStockPlans({ today, responsibleItAdminEmployeeId?, planId?, skip, take })` — một trang gói K1/K2/K4 theo ứng dụng rồi gói, mỗi gói kèm các thuê bao
+    cấp được hôm nay (cùng nghĩa `getGrantableSubscriptions`; gói không có thuê bao nào bị bỏ, có `responsibleItAdminEmployeeId` thì chỉ thuê bao của IT Admin đó
+    được tính) và tổng cho cùng bộ lọc, một snapshot: nền của `GET /stock-summary` của `licensing` (`QĐ-111n`). SQL ở `SubscriptionGrantingRepo.pageStockPlans`.
   - `addPoolSeat(tx, actor, subscriptionId)` — +1 `purchased_quantity` của thuê bao `ACTIVE` đang bị bên gọi khóa (`lockSeatTarget`), gói năm tăng giữa
     kỳ được, không hỏi Cost Center của phòng sở hữu; dùng khi `provisioningTaskGrant` có `purchase` mà kho hết và khi cấp `K1` (mỗi lần cấp tự +1).
   - `getSubscriptionIdsOwnedBy`, `getApplicationsOwnedBy`, `getWorkspaceDutiesOf` — thứ một phòng ban/người đang giữ.
   - `registerInternalSoftware` — đăng ký phần mềm nội bộ trong transaction của bên gọi (US-05-20).
   - `getVendorName`, `getOnboardingFacts` — tên vendor; số ứng dụng/plan/subscription cho checklist onboarding.
+- `CatalogContractApi` ([public/catalog-contract.api.ts](public/catalog-contract.api.ts)) — `getApplicationIds(contractId)`: ứng dụng của các thuê bao đang liên kết hợp đồng, mỗi ứng dụng một lần (tối đa `CONTRACT_APPLICATIONS_READ_MAX` = 1 000, chỉ để chặn đọc), `null` khi không có hợp đồng, rỗng khi chưa liên kết thuê bao nào. Dùng bởi `usage` cho `GET /contracts/{id}/usage-sources` (`US-04-13` AC-15); catalog không đọc `usage` (T4 < T6).
 - `SubscriptionPeriodApi` ([public/subscription-period.api.ts](public/subscription-period.api.ts)) — kỳ subscription cho gia hạn
-  (licensing): `getPeriods`, `lockPeriod`, `listRenewalSubjects`, `recordNextPeriod` (kỳ mới nối chuỗi `renewed_from_id`, một
-  lần), `getRenewalAlertRecipient`; lỗi `public/subscription-period.errors.ts`, kiểu `public/subscription-period.types.ts`.
+  (licensing): `getPeriods` (cả thuê bao kho: `ownerDepartmentId` null; kèm `adjustment` điểm điều chỉnh), `lockPeriod`, `listAdjustmentSubjects` (K2 đang chạy kỳ, chưa nối tiếp, tối đa 500), `recordNextPeriod` (kỳ mới nối chuỗi `renewed_from_id`, một
+  lần), `getRenewalAlertRecipient`, `listPaymentSchedules` (PI-2: chu kỳ và ngày thanh toán của thuê bao có phòng sở hữu đang chạy kỳ, cho cờ kỳ chưa có hóa đơn của `requests`; thuê bao kho dùng chung không phòng không có trong đó); lỗi `public/subscription-period.errors.ts`, kiểu `public/subscription-period.types.ts`.
+- `CatalogResponsibilityApi` ([public/catalog-responsibility.api.ts](public/catalog-responsibility.api.ts)) — IT Admin phụ trách (`QĐ-111g`, R-8, R-26) cho bàn giao của IT Admin rời: `countResponsibilitiesOf` (số thuê bao + ứng dụng mỗi người phụ trách), `transferResponsibilities(tx, actor, from, to)` đổi MỌI thuê bao và ứng dụng sang IT Admin khác trong transaction của bên gọi, một Audit mỗi thứ; lỗi `public/catalog-responsibility.errors.ts` (`ResponsibilityHandoverRefusedError`: cùng một người / đích không phải IT Admin đang làm việc), kiểu `public/catalog-responsibility.types.ts`.
 - `SubscriptionOwnerAssignmentApi` (`public/subscription-owner-assignment.api.ts`) — `assign`: gán phòng ban sở hữu cho
   một subscription (`pnpm ops:assign-subscription-owner`).
 - `public/subscription-owner-assignment.errors.ts` — `AssignmentRefusedError`;
@@ -43,23 +55,27 @@ unitPrice, reportingUnitPrice, billingCycle }`, thuê bao `PERPETUAL` có giá �
 - Vendor: `vendors`, `vendor_groups`, `vendor_service_lines`, `vendor_dictionary_proposals`.
 - Ứng dụng: `applications`, `application_business_owners`, `application_retirement_confirmations`, `functional_groups`.
 - Plan: `plans`, `plan_workspace_profiles`, `plan_workspace_admins`, `plan_terms`, `plan_term_opinions`.
-- Subscription: `subscriptions`, `subscription_owner_assignments`. Hợp đồng: `contracts`, `document_attachments`.
+- Subscription: `subscriptions`, `subscription_owner_assignments`. Hợp đồng: `contracts`, `contract_subscriptions`, `document_attachments`.
 - Nguồn: `prisma/models/catalog.prisma`; hồ sơ thuế vendor (`VendorTaxProfile*`) thuộc `finance`.
 
 ## Extension point
 
 - Mở: `SeatOccupancyHook` (`catalog.seat-occupancy`, Hook) — bên bind: licensing
-  `assignment/assignment-seat-occupancy.listener.ts`. Chưa bind thì `get()` ném lỗi, không để rule đi qua.
+  `assignment/assignment-seat-occupancy.listener.ts` (`seatsOfSubscriptions`: ghế và ghế đang thu hồi của cả trang thuê bao trong một câu; dòng `GET /subscriptions` K2 có `seats`, `EXPIRED` chỉ khi còn ghế). Chưa bind thì `get()` ném lỗi, không để rule đi qua.
 - Mở: `SeatBaselinePhaseHook` (`catalog.seat-baseline-phase`, Hook) — bên bind: licensing `seat-baseline/seat-baseline-phase.listener.ts`; cho
   biết baseline đã đóng chưa để chặn trùng thuê bao K2/K4. Chưa bind ⟹ coi như đã đóng (chặn).
 - Đăng ký vào: `organization.department-use-readers` (`DepartmentUseContributions`, tên `catalog.subscriptions`) —
   `subscription/subscription-department-use.listener.ts`.
+- Đăng ký vào `notifications.name-sources` (`NotificationNameContributions`, tên `catalog.names`) — `requestable-software/catalog-notification-names.listener.ts`, khai ở `catalog.module.ts`:
+  APPLICATION (tên ứng dụng), PLAN và SUBSCRIPTION (`<Ứng dụng> – <Gói>`, hàm `applicationPlanName` ở `plan/plan.policy.ts`), mỗi kind một truy vấn theo lô ở repo chủ bảng (`ApplicationRepo.namesOf`,
+  `PlanRepo.namesOf`, `SubscriptionRepo.labelsOf(ids, tx, applicationPlanName)`; mặc định `labelsOf` vẫn là `<Ứng dụng> / <Gói>` cho phần "đang dùng" của phòng ban). Đặt ở `requestable-software` vì capability này đã đọc
+  cả ba bảng (không thêm cạnh capability; `subscription/` đã đủ 25 file, `catalog-entry` không import `plan`).
 
 ## Hướng phụ thuộc giữa capability (R6)
 
 Không vòng (`pnpm arch:capabilities --module catalog`, gate `capability-graph`). Từ thấp lên cao: `vendor-dictionary` →
 `vendor`, `functional-group` → `catalog-entry` → `plan` → `subscription` → `plan-terms`; `application-retirement`,
-`internal-software-registration` và `requestable-software` đứng trên `catalog-entry`, `plan` (và `subscription`). Một cạnh ngược mới là vòng: chuyển
+`application-intake`, `internal-software-registration` và `requestable-software` đứng trên `catalog-entry`, `plan` (và `subscription`). Một cạnh ngược mới là vòng: chuyển
 file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên capability mới theo tên use case.
 
 ## Capability → file chính
@@ -68,13 +84,18 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `vendor-dictionary.controller.ts`; `VendorDictionaryService`, `VendorRecognitionService`, `VendorProposalService`.
 - `vendor/` — danh sách vendor, hồ sơ thuế và ước tính thuế (US-12-09, dữ liệu qua `FinanceApi`);
   `vendors.controller.ts`; `VendorQueryService`, `VendorTaxService`.
-- `catalog-entry/` — ứng dụng (US-04-01), IT Admin phụ trách (`QĐ-111g`: người tạo, đọc `responsibleItAdmin`/`needsResponsible`), gợi ý K2 (`k2-recommendation.policy.ts`);
+- `catalog-entry/` — ứng dụng (US-04-01; `logoUrl` là một link `https://` ≤ 500 ký tự, CHECK ở DB, `null` khi sửa là xóa — đọc cùng câu truy vấn ở danh sách/chi tiết ứng dụng, `requestable-software`, gói và, qua `CatalogApi`, ở `licensing`: phần mềm của tôi, danh sách phần mềm của phòng), IT Admin phụ trách (`QĐ-111g`: người tạo, đọc `responsibleItAdmin`/`needsResponsible`), gợi ý K2 (`k2-recommendation.policy.ts`);
   `applications.controller.ts`; `ApplicationService` (phần kiểm trước khi ghi ở
   `ApplicationWriteGuards`, phần đổi trạng thái là hàm thuần trong `application-state.policy.ts`). Gốc của module: `plan/` và
   `subscription/` đọc ứng dụng qua `ApplicationFactsService`; ứng dụng muốn biết plan của mình để gợi ý K2 thì khai
   `application-plans.types.ts` (`ApplicationPlans`) và `plan/plan-facts.service.ts` trả lời, `catalog.module.ts` nối hai bên.
+- `plan/` (X-IT.4): cờ `plans.has_admin_console` (chỉ gói `K4`, `plan-vendor-admins.policy.ts`: `needsVendorAdmins` = `K2` hoặc `K4` có cờ, `assertAdminConsoleApplicable`); hồ sơ workspace (`PUT /plans/{id}/workspace-profile`) chỉ cho gói cần admin, thêm `ownerAccountEmail`/`adminNote`, `primaryOwner` + `members` ≥ 2 IT Admin khác nhau đang làm việc (`PLAN.VENDOR_ADMINS_INVALID`).
+- `application-intake/` — một lệnh tạo ứng dụng kèm gói đầu (`POST /applications`, `QĐ-111f`): `application-intake.controller.ts`; `ApplicationIntakeService` ghi cả hai trong một transaction (gói bị luật từ chối thì không để lại ứng dụng);
+  kiểu ứng dụng suy từ kiểu cấp của gói (`application-intake.policy.ts`: K5 ⟹ `INTERNAL`, còn lại `SAAS`), mô hình giá do `PlanService` suy (B-5), nhóm chức năng không nêu ⟹ _Khác_; kiểm trùng bằng `duplicateOf` chạy dưới
+  `pg_advisory_xact_lock` theo tổ chức (409 `APPLICATION.DUPLICATE` kèm mục đã có). Đứng trên `catalog-entry/` và `plan/`.
 - `application-responsibility/` — chuyển IT Admin phụ trách ứng dụng (`POST /applications/{id}/responsibility-transfer`, khóa dòng ứng dụng,
   `QĐ-111g`, R-26); `application-responsibility.policy.ts` quyết ai chuyển cho ai.
+  `responsibility-handover.service.ts` (+ `.policy.ts`) chuyển MỘT LẦN mọi thuê bao và ứng dụng của một IT Admin (facade `CatalogResponsibilityApi`).
 - `application-retirement/` — retire ứng dụng (IT Admin quyết, không ai xác nhận; chặn bởi assignment/subscription); đọc ứng dụng,
   plan và subscription nên đứng trên cả ba; controller, dto, policy, repo, `ApplicationRetirementService`.
 - `internal-software-registration/` — đăng ký phần mềm nội bộ: tạo ứng dụng và plan trong một transaction; đứng trên
@@ -94,8 +115,15 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `SeatTargetService`, `seat-guard.policy.ts` (số lượng không dưới ghế đang chiếm); `nextStateOf`, `subscriptionStatusOf`,
   `sameUnitPrice` là hàm thuần trong `subscription.policy.ts`.
   `SubscriptionPoolRulesService` giữ các luật kho dùng chung mà policy thuần không biết (ai được phụ trách thuê bao).
-- `contract/` — hợp đồng và file riêng tư trong object storage (US-04-04); `contracts.controller.ts`,
-  `documents.controller.ts`; `ContractService`, `DocumentService`; `document-expiry.job.ts` chạy mỗi giờ (DB-13).
+- `contract/` — hợp đồng (nhà cung cấp, số, hiệu lực từ/đến — để trống là vô thời hạn —, ghi chú; không có loại hợp đồng,
+  US-04-13, `QĐ-111t`) và file riêng tư trong object storage (US-04-04). `contracts.controller.ts` (danh sách, tạo, sửa kèm
+  lý do, chi tiết), `contract-subscriptions.controller.ts` (liên kết và bỏ liên kết thuê bao), `documents.controller.ts`;
+  `ContractService` (ghi), `ContractQueryService` (danh sách phân trang và chi tiết, mỗi mảng ≤ 100 kèm cờ `truncated`),
+  `ContractSubscriptionService`, `DocumentService`; `document-expiry.job.ts` chạy mỗi giờ (DB-13). Trạng thái suy ra từ ngày
+  hôm nay (`contractStatusOf`, `INCOMPLETE` cho hợp đồng cũ chỉ có tên), không lưu. `contract-fields.policy.ts` giữ trường,
+  trạng thái và luật liên kết: chỉ thuê bao `K2`/`K4` cùng nhà cung cấp, mỗi thuê bao tối đa một hợp đồng (unique index và
+  trigger `contract_subscriptions_check` giữ lần chót); nhà cung cấp không đổi khi còn thuê bao liên kết. Nguồn usage của ứng
+  dụng không đọc ở đây (catalog T4 không đọc usage T6): chi tiết trả `applicationIds`.
 - `subscription-owner-assignment/` — repo và Nest module riêng của lệnh CLI (`subscription-owner-assignment-cli.module.ts`); service nằm ở `public/`.
 - Gốc module: `catalog-audit-event.mapper.ts` (sự kiện Audit Trail, mọi capability dùng).
 
@@ -127,6 +155,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
 - Số lượng subscription không thấp hơn số ghế đang chiếm (`assertQuantityNotBelowOccupied`, `seat-guard.policy.ts`);
   retire ứng dụng chỉ khi không còn assignment/subscription chặn
   (`application-retirement/application-retirement.service.ts`). Cả hai đọc ghế qua `SeatOccupancyHook`.
+- Điểm điều chỉnh (QĐ-111o, `subscription/obligation/subscription-obligation.policy.ts` `adjustmentPointOf`/`expiryReading`): gói tháng mở 7 ngày trước ngày thanh toán (ngày gia hạn, thiếu thì ngày kết thúc), gói năm 30 ngày trước hạn chót báo hủy (khai, suy từ số ngày báo trước, thiếu cả hai thì ngày gia hạn khi tự gia hạn, hoặc ngày kết thúc); mua một lần không có điểm. `GET /subscriptions?expiry=SOON|EXPIRED` tìm trong thuê bao `ACTIVE` kiểu `TERM` chưa có kỳ nối tiếp bằng policy rồi mới phân trang; `EXPIRED` chỉ khi còn ghế; `mine=true` lọc theo IT Admin phụ trách.
 - `lockSeatTarget`: subscription `FOR UPDATE`, plan nội bộ `FOR SHARE` tới hết transaction (`seat-target.service.ts`).
 - Thay đổi tạo/tăng/kéo dài khoản phải trả của thuê bao `K1`/`K5` có phòng sở hữu cần phòng đó có Cost Center đang dùng (F26,
   `FINANCE.SETUP_INCOMPLETE`, `subscription/obligation/subscription-obligation.service.ts`). Thuê bao `K2`/`K4` KHÔNG có cổng này ở mọi đường tăng (PATCH, `addPoolSeat`): chi

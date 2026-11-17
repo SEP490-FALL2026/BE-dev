@@ -289,6 +289,33 @@ export class GhostSeatService {
     return updated;
   }
 
+  /**
+   * The IT Admin pushes a `MONITOR` that is still `OPEN` to the review tier before the weekly pass would (`QĐ-111ay`): only the tier changes, the
+   * evidence stays as the pass wrote it (the head reads the days it really had), and the audit names the batch, whether the IT Admin left a note
+   * (the note itself is kept with the batch, never in the audit) and whether they are the one in charge of the holder's department.
+   */
+  async raiseTierEarly(
+    tx: DbTx,
+    record: GhostSeatRecord,
+    actor: GhostSeatActor,
+    facts: { escalationId: string; departmentId: string; hasNote: boolean; byInCharge: boolean },
+  ): Promise<GhostSeatRecord> {
+    const updated = await this.repo.update(tx, record.id, { tier: 'REVIEW' });
+    await this.audit.record(
+      tx,
+      ghostSeatAuditEvent(
+        actor,
+        record.organizationId,
+        'GHOST_SEAT.ESCALATED',
+        record.id,
+        { ...snapshot(record), tier: record.tier },
+        { ...snapshot(updated), tier: updated.tier, ...facts },
+      ),
+    );
+
+    return updated;
+  }
+
   /** Activity came after a reclaim was decided: the row stays, the table flags the day and the IT Admin weighs giving the seat back (`Q-92`). */
   async flagActivityAfterDecision(
     tx: DbTx,

@@ -197,11 +197,11 @@ describe('the approval tickets of Super Admin events (integration, PostgreSQL)',
           employeeId: (await worker(name)).employeeId,
           toDepartmentId: fin.id,
           effectiveOn: h.day(20),
-          grounds: h.grounds,
+          groundsNote: h.groundsNote,
         });
       pendingTransfer = { table: 'department_transfers', id: (await move('MV1')).id };
       const cancelled = await move('MV2');
-      await h.cancelTransfer(cancelled.id, { reason: 'No longer needed', grounds: h.grounds }).expect(200);
+      await h.cancelTransfer(cancelled.id, { reason: 'No longer needed', groundsNote: h.groundsNote }).expect(200);
       cancelledTransfer = { table: 'department_transfers', id: cancelled.id };
       transferChange = await idOf('department_transfer_changes', `transfer_id = '${cancelled.id}'`);
 
@@ -211,12 +211,7 @@ describe('the approval tickets of Super Admin events (integration, PostgreSQL)',
           employeeId: away.employeeId,
           startedOn: h.day(-1),
           approvedReturnOn: h.day(40),
-          grounds: {
-            type: 'APPROVED_APPLICATION',
-            reference: 'DN-07/2026',
-            issuer: 'HR Department',
-            issuedOn: '2026-05-25',
-          },
+          groundsNote: 'Đơn xin nghỉ dài hạn số DN-07/2026',
         })
         .expect(201);
       leaveChange = await idOf('employee_leave_changes', `recorded_by_app_user_id IS NOT NULL`);

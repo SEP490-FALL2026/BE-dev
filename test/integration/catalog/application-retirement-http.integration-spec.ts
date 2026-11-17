@@ -4,7 +4,9 @@ import request from 'supertest';
 import { PlanRepo } from '../../../src/modules/catalog/plan/plan.repo';
 import { AssignmentRepo } from '../../../src/modules/licensing/assignment/assignment.repo';
 import { waitForLockWaiters } from '../../support/lock-wait';
+import { ensureVendorAdmins } from '../../support/builders/catalog.builder';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
+import { intakeBodyOf } from '../../support/application-body';
 
 const h = new ProvisioningHarness();
 
@@ -33,7 +35,13 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     ).rows[0].catalog_status;
   const taskCount = async (): Promise<number> =>
     Number((await h.ctx.sql.query<{ n: string }>(`SELECT count(*) AS n FROM provisioning_tasks`)).rows[0].n);
-  const subscribe = async (planId: string, extra: object) =>
+  const subscribe = async (planId: string, extra: object) => {
+    // A plan that needs admins at the vendor gets the two-person profile an active subscription asks for (X-IT.5).
+    await ensureVendorAdmins(h.ctx, planId, h.it1.employeeId);
+
+    return subscribeTo(planId, extra);
+  };
+  const subscribeTo = async (planId: string, extra: object) =>
     h.dataOf<{ id: string }>(
       await request(h.server())
         .post('/api/v1/subscriptions')
@@ -232,13 +240,15 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
       await request(h.server())
         .post('/api/v1/applications')
         .set(h.as(h.it1))
-        .send({
-          name: h.unique('Office'),
-          kind: 'LICENSED',
-          vendorName: h.unique('Vendor'),
-          dataSensitivity: 'LOW',
-          communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
-        })
+        .send(
+          intakeBodyOf({
+            name: h.unique('Office'),
+            kind: 'LICENSED',
+            vendorName: h.unique('Vendor'),
+            dataSensitivity: 'LOW',
+            communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
+          }),
+        )
         .expect(201),
     ).id;
     const planId = h.dataOf<{ id: string }>(
@@ -249,7 +259,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
           applicationId,
           name: h.unique('Office 2021'),
           provisioningType: 'K4',
-          pricingModel: 'PER_SEAT',
           controlLevel: 'FULL',
         })
         .expect(201),

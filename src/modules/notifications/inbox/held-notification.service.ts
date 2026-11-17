@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { InvalidInAppNotificationError } from '../public/notifications.errors';
 import type { HeldDepartmentNotificationInput } from '../public/notifications.types';
 import { HeldNotificationRepo } from './held-notification.repo';
 import { InboxService } from './inbox.service';
 import { isKnownCode, refuseInAppNotification } from './inbox.policy';
+import { canonicalSubjectType, isUpperSnakeSubjectType } from './notification-target.policy';
 
 /**
  * Notices for a department that has no head yet. A notice that would reach the head of a department with none is
@@ -13,6 +14,8 @@ import { isKnownCode, refuseInAppNotification } from './inbox.policy';
  */
 @Injectable()
 export class HeldNotificationService {
+  private readonly logger = new Logger(HeldNotificationService.name);
+
   constructor(
     private readonly repo: HeldNotificationRepo,
     private readonly inbox: InboxService,
@@ -27,7 +30,16 @@ export class HeldNotificationService {
     const refusal = refuseInAppNotification({ ...input, recipientEmployeeId: input.departmentId });
     if (refusal) throw new InvalidInAppNotificationError(refusal);
 
-    return this.repo.insertIfAbsent(tx, input);
+    // Same rule as `InboxService.deliver`: UPPER_SNAKE where an old spelling can be turned into it, otherwise kept and logged.
+    const subject =
+      input.subject === null ? null : { ...input.subject, type: canonicalSubjectType(input.subject.type) };
+    if (subject !== null && !isUpperSnakeSubjectType(subject.type)) {
+      this.logger.warn(
+        `Held notice ${input.code} (event key ${input.eventKey}) has a subject type that is not UPPER_SNAKE: ${subject.type}`,
+      );
+    }
+
+    return this.repo.insertIfAbsent(tx, { ...input, subject });
   }
 
   /** Hands every held notice of the department to the head, in the caller's transaction; returns how many were handed over. */

@@ -4,6 +4,7 @@ import { AssessmentReadRepo } from './access-request/assessment-read.repo';
 import { RoutingFactsService } from './access-request/routing-facts.service';
 import { StepTargetService } from './step-routing/step-target.service';
 import { RepricingService } from './repricing/repricing.service';
+import { RequestTermEndsService } from './repricing/request-term-ends.service';
 import { BudgetCheckRepo } from './spend/budget-check.repo';
 import { BudgetCheckService } from './spend/budget-check.service';
 import { SpendStepRepo } from './spend/spend-step.repo';
@@ -35,6 +36,7 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
     RoutingFactsService,
     StepTargetService,
     RepricingService,
+    RequestTermEndsService,
     BudgetCheckRepo,
     BudgetCheckService,
     SpendStepRepo,
@@ -46,6 +48,7 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
     RoutingFactsService,
     StepTargetService,
     RepricingService,
+    RequestTermEndsService,
     BudgetCheckRepo,
     BudgetCheckService,
     SpendStepRepo,

@@ -40,7 +40,7 @@ describe('a budget version from the proposal to the version in force (e2e)', () 
   });
 
   it('the head proposes the budget of the Unit Cost Center of the department for next year', async () => {
-    proposal = await h.budgetProposed(head, department.unitId, h.twoLines(), h.next);
+    proposal = await h.budgetProposed(head, department.unitId, undefined, h.next);
 
     expect(proposal).toMatchObject({
       state: 'SUBMITTED',

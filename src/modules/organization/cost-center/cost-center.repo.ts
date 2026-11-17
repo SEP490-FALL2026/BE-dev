@@ -139,6 +139,17 @@ export class CostCenterRepo {
     });
   }
 
+  /** The code and name of each of these Cost Centers, by id, in one read, as "code · name"; an id that does not exist is absent. */
+  async namesOf(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).costCenter.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, code: true, name: true },
+    });
+
+    return new Map(rows.map((row) => [row.id, `${row.code} · ${row.name}`]));
+  }
+
   /** The Cost Centers with these codes, as far as they exist, without their department. */
   async findBriefsByCodes(codes: readonly string[], tx?: DbTx): Promise<CostCenterBrief[]> {
     if (codes.length === 0) return [];

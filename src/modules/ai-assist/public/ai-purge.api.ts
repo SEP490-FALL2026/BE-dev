@@ -5,7 +5,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { contentsPurgedEvent } from '../invocation/invocation-audit-event.mapper';
-import { AiInvocationContentRepo } from '../invocation/invocation-content.repo';
+import { AiInvocationHistoryStore } from '../invocation/invocation-history-store.types';
 import { AiPurgeRefusedError } from './ai-purge.errors';
 import type { AiPurgeCommand, AiPurgeResult } from './ai-purge.types';
 
@@ -19,7 +19,7 @@ import type { AiPurgeCommand, AiPurgeResult } from './ai-purge.types';
 export class AiPurgeApi {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly contents: AiInvocationContentRepo,
+    private readonly contents: AiInvocationHistoryStore,
     private readonly organizations: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
@@ -32,7 +32,7 @@ export class AiPurgeApi {
       return {
         mode: 'DRY_RUN',
         through: command.through,
-        contentCount: await this.contents.countCreatedBefore(before),
+        contentCount: await this.contents.countPurgeable(before),
       };
     }
     const operator = command.operator;
@@ -41,7 +41,7 @@ export class AiPurgeApi {
     const deleted = await this.runner.run(async (tx) => {
       const organization = await this.organizations.getOrganization(tx);
       if (organization === null) throw new AiPurgeRefusedError('NOT_INSTALLED');
-      const count = await this.contents.deleteCreatedBefore(tx, before);
+      const count = await this.contents.purge(tx, before);
       if (count > 0) {
         await this.audit.record(
           tx,

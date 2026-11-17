@@ -14,17 +14,12 @@ import { RenewalRequestRepo } from '../renewal-apply/renewal-request.repo';
 import { RenewalRequestWriter, type RenewalSubmitted } from './renewal-request-writer.service';
 import { RenewalSeatFactsService } from './renewal-seat-facts.service';
 import type { RenewalBodyDto } from './renewal-request.dto';
-import {
-  RenewalEndDateOutOfRangeError,
-  RenewalRequestRefusedError,
-  RenewalWindowNotOpenError,
-} from './renewal-request.errors';
-import { effectiveEndOf, renewalEndOf, renewalStartOf } from '../../../core/term-limit';
+import { RenewalRequestRefusedError, RenewalWindowNotOpenError } from './renewal-request.errors';
+import { renewalStartOf } from '../../../core/term-limit';
 import {
   checkRenewable,
   checkRenewalSender,
-  monthsBetween,
-  newEndFits,
+  renewalTermMonthsOf,
   renewalWindowOf,
   routeRenewal,
 } from './renewal-request.policy';
@@ -66,21 +61,19 @@ export class RenewalRequestService {
 
       const renewing = routeRenewal({ today, previousEnd }) === 'RENEWAL';
       // A late request is a request like any other: its end is worked out when the IT Admin grants it (`QĐ-98`, R-M4).
-      if (!renewing) return this.redirect(tx, actor, { body, facts, settings, previousEnd, today });
+      if (!renewing) return this.redirect(tx, actor, { body, facts, settings });
       await this.requireWindowOpen(tx, facts.assignmentId, today, previousEnd);
-      if (await this.renewals.hasOpenFor(facts.assignmentId, tx))
-        throw new RenewalRequestRefusedError('ALREADY_REQUESTED');
-      // The new end runs from the day after the right ends, never cut at the end of a year (`QĐ-98`, R-15), at most twelve months on.
-      const newEnd = this.newEndOf(body, previousEnd, today);
+      const waiting = (await this.renewals.pendingOf([facts.assignmentId], tx)).get(facts.assignmentId);
+      if (waiting) throw new RenewalRequestRefusedError('ALREADY_REQUESTED', null, waiting.requestId);
 
+      // The new period runs from the day after the right ends, never cut at the end of a year (`QĐ-98`, R-15); its months and its end are judged
+      // by the rule of the time of use when the request is written (`QĐ-111l`).
       return this.writer.renew(tx, actor, {
         body,
         facts,
         settings,
         previousEnd,
-        newEnd,
-        termMonths: monthsBetween(previousEnd, newEnd),
-        spendStartsOn: renewalStartOf({ previousEnd, today }),
+        termStart: renewalStartOf({ previousEnd, today }),
         now,
       });
     });
@@ -101,18 +94,6 @@ export class RenewalRequestService {
     if (!window.open) throw new RenewalWindowNotOpenError(window.opensOn, windowDays);
   }
 
-  /**
-   * The new end the holder asked for (`newEndDate`, or the months of a client of before it), within twelve months of the end the right has
-   * (`QĐ-108a`). Throws RenewalEndDateOutOfRangeError.
-   */
-  private newEndOf(body: RenewalBodyDto, previousEnd: BusinessDate, today: BusinessDate): BusinessDate {
-    const maxEnd = renewalEndOf({ previousEnd, today, months: 12 });
-    const newEnd = body.newEndDate ?? renewalEndOf({ previousEnd, today, months: body.extensionMonths ?? 12 });
-    if (!newEndFits({ previousEnd, newEnd, maxEnd })) throw new RenewalEndDateOutOfRangeError(previousEnd, maxEnd);
-
-    return newEnd;
-  }
-
   /** The seat, locked, and who may ask: the holder, for a seat that has an end, renewed to a day that may be. */
   private async requireSendable(tx: DbTx, actor: AuthenticatedPrincipal, body: RenewalBodyDto) {
     // The sender and the holder cannot be the spending approver (`D-S21`): judged before any department is read.
@@ -127,33 +108,19 @@ export class RenewalRequestService {
     return { facts, previousEnd: facts.expectedEndDate };
   }
 
-  /** The right has ended: the person asks for the tool again, as for any tool, for the term from today to the end they gave. */
+  /** The right has ended: the person asks for the tool again, as for any tool, for the time of use they gave, from today. */
   private async redirect(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    input: {
-      body: RenewalBodyDto;
-      facts: AssignmentFacts;
-      settings: RequestSettings;
-      previousEnd: BusinessDate;
-      today: BusinessDate;
-    },
+    input: { body: RenewalBodyDto; facts: AssignmentFacts; settings: RequestSettings },
   ): Promise<RenewalSubmitted> {
     const { body, facts } = input;
-    // The end the holder entered becomes the end of the new request; a client of before it gave months, counted from today.
-    const expectedEndDate =
-      body.newEndDate ?? effectiveEndOf({ start: input.today, months: body.extensionMonths ?? 12 });
-    const termMonths = monthsBetween(input.today, expectedEndDate);
+    const termMonths = renewalTermMonthsOf(body);
+    // A late ask is a request for new access: GH-1/GH-2 judge it as any other (BR-MF1-01), and the rule of the time of use judges its months (`QĐ-111i`).
     const record = await this.accessRequests.submitWithin(
       tx,
       actor,
-      {
-        planId: facts.planId,
-        businessReason: body.businessReason,
-        expectedEndDate,
-        // A late ask is a request for new access: GH-1/GH-2/GH-3 judge it as any other (BR-MF1-01).
-        manyPaidSoftwareReason: body.manyPaidSoftwareReason,
-      },
+      { planId: facts.planId, businessReason: body.businessReason, termMonths },
       input.settings,
       { toleratedSeatId: facts.assignmentId },
     );
@@ -168,7 +135,7 @@ export class RenewalRequestService {
         {
           requestId: record.id,
           assignmentId: facts.assignmentId,
-          previousExpectedEndDate: input.previousEnd,
+          previousExpectedEndDate: facts.expectedEndDate,
           termMonths,
         },
       ),

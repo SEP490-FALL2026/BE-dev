@@ -26,6 +26,16 @@ export function currentStateOf<S extends string>(
     Exclude<S, 'AWAITING_FINANCE_REVIEW' | 'AWAITING_BUDGET'> | 'AWAITING_SPEND_SUBMISSION';
 }
 
+/**
+ * The reason a request or a batch item is read as when a stored one says a price is missing. An older release also wrote `RATE_MISSING` (no
+ * rate for the day to turn the price into dong); nothing is converted any more and nothing writes it (`QĐ-111an`, R-4), so a row that has
+ * it is read as the missing price it comes to: the price is not in dong. Generic over the reasons the database holds, so the retired one
+ * leaves the type of what is read.
+ */
+export function currentMissingReasonOf<R extends string>(reason: R): Exclude<R, 'RATE_MISSING'> | 'PRICE_MISSING' {
+  return (reason === 'RATE_MISSING' ? 'PRICE_MISSING' : reason) as Exclude<R, 'RATE_MISSING'> | 'PRICE_MISSING';
+}
+
 /** A link of the chain of a request. `IT_EXECUTION` is the task of the IT Admin, not an approval step. */
 export type ChainStep = (typeof CHAIN_STEPS)[number];
 

@@ -1,15 +1,10 @@
 import type { BusinessDate } from '../../../core/business-date';
 
-/** The columns of a seat baseline file: the first two are required, the others may be left out. */
-export const SEAT_COLUMNS = [
-  'employee_code',
-  'account_identifier',
-  'kind',
-  'granted_on',
-  'expected_end_date',
-  'reason',
-  'cost_center_code',
-] as const;
+/**
+ * The columns of a seat baseline file: the first two are required, the others may be left out. `reason` and `cost_center_code` were the
+ * columns of a service account (`QĐ-110m`): a file that still has them is read, and the two columns are ignored and named as ignored.
+ */
+export const SEAT_COLUMNS = ['employee_code', 'account_identifier', 'kind', 'granted_on', 'expected_end_date'] as const;
 export type SeatColumn = (typeof SEAT_COLUMNS)[number];
 export const REQUIRED_SEAT_COLUMNS: readonly SeatColumn[] = ['employee_code', 'account_identifier'];
 
@@ -24,6 +19,7 @@ export const SEAT_ROW_ERROR_CODES = [
   'EMPLOYEE_NOT_ACTIVE',
   'KIND_INVALID',
   'SHARED_ACCOUNT_NOT_SUPPORTED',
+  'SERVICE_ACCOUNT_NOT_SUPPORTED',
   'ACCOUNT_IDENTIFIER_MISSING',
   'ACCOUNT_IDENTIFIER_INVALID',
   'ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET',
@@ -36,22 +32,26 @@ export const SEAT_ROW_ERROR_CODES = [
   'EXPECTED_END_INVALID',
   'OVERLAP',
   'SEAT_LIMIT_EXCEEDED',
+  'SUBSCRIPTION_DEPARTMENT_MISMATCH',
+] as const;
+export type SeatRowErrorCode = (typeof SEAT_ROW_ERROR_CODES)[number];
+
+/**
+ * Codes the preview wrote into `seat_baseline_import_rows.errors` and stopped writing: the first two on 23/10/2026, when a Cost Center
+ * stopped being required of a seat row; the others on 13/11/2026 (`QĐ-110m`), when the import stopped taking a service account and the
+ * columns `reason` and `cost_center_code` with it. No migration rewrote the rows already stored, so an old import still reads them: the
+ * codec accepts these when it reads and never when it writes.
+ */
+export const RETIRED_SEAT_ROW_ERROR_CODES = [
+  'COST_CENTER_REQUIRED',
+  'COST_CENTER_NOT_COMPANY',
   'REASON_REQUIRED',
   'OWNING_DEPARTMENT_NOT_FOUND',
   'COST_CENTER_NOT_FOUND',
   'COST_CENTER_INACTIVE',
   'COST_CENTER_NOT_OWNING_UNIT',
   'COST_CENTER_NOT_ALLOWED',
-  'SUBSCRIPTION_DEPARTMENT_MISMATCH',
 ] as const;
-export type SeatRowErrorCode = (typeof SEAT_ROW_ERROR_CODES)[number];
-
-/**
- * Codes the preview wrote into `seat_baseline_import_rows.errors` from 20/10/2026 (G2–G4) and stopped writing on 23/10/2026, when a
- * Cost Center stopped being required of a seat row. No migration rewrote the rows already stored, so an old import still reads them:
- * the codec accepts these when it reads and never when it writes.
- */
-export const RETIRED_SEAT_ROW_ERROR_CODES = ['COST_CENTER_REQUIRED', 'COST_CENTER_NOT_COMPANY'] as const;
 export type RetiredSeatRowErrorCode = (typeof RETIRED_SEAT_ROW_ERROR_CODES)[number];
 
 export interface SeatRowError {
@@ -65,15 +65,13 @@ export interface StoredSeatRowError {
 
 /** What a valid row asks to be written, with the people and the Cost Center it names already found. */
 export interface ParsedSeatRow {
-  kind: 'PERSONAL' | 'SERVICE';
+  /** A personal seat: the import takes no service account any more (`QĐ-110m`), so it names no reason and no Cost Center. */
+  kind: 'PERSONAL';
   employeeId: string;
   accountIdentifier: string;
-  reason: string | null;
-  costCenterId: string | null;
-  /**
-   * The department the seat belongs to: for a service account the department of the responsible person on the day of the import
-   * (`QĐ-86c`), for a personal seat the owner of the subscription (`QĐ-89a`); null on an internal plan, which has no owner.
-   */
+  reason: null;
+  costCenterId: null;
+  /** The department the seat belongs to: the one the person is in on the day of the import (`QĐ-103d`); null when they are in none. */
   owningDepartmentId: string | null;
   effectiveFrom: BusinessDate;
   effectiveFromBasis: 'ACTUAL' | 'RECORDED';

@@ -3,7 +3,6 @@ import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/b
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { CeilingParts, StoredCeiling } from './cycle.policy';
 
 export interface CycleRecord {
   id: string;
@@ -12,19 +11,14 @@ export interface CycleRecord {
   submissionDeadline: BusinessDate;
   decisionDeadline: BusinessDate;
   annualCeilingMinor: bigint;
+  /** Null for a cycle written before the reserve was entered with the cycle; counted as nothing. */
   sharedPoolReserveMinor: bigint | null;
   currency: string;
   priorities: string | null;
-  openedByEmployeeId: string;
-  openedAt: Date;
-  publishedByEmployeeId: string | null;
-  publishedAt: Date | null;
-  firstPublishedAt: Date | null;
-  ceilings: StoredCeiling[];
+  /** NULL while the cycle is a draft (`QĐ-111z`). */
+  openedByEmployeeId: string | null;
+  openedAt: Date | null;
 }
-
-/** A cycle without its division: what a page of the list reads, with the ceilings added up by the database. */
-export type CycleFigures = Omit<CycleRecord, 'ceilings'> & { ceilingsTotalMinor: bigint };
 
 export interface NewCycle {
   organizationId: string;
@@ -32,24 +26,12 @@ export interface NewCycle {
   submissionDeadline: BusinessDate;
   decisionDeadline: BusinessDate;
   annualCeilingMinor: bigint;
+  sharedPoolReserveMinor: bigint;
   currency: string;
   priorities: string | null;
-  openedByEmployeeId: string;
-  openedAt: Date;
 }
 
-const WITH_CEILINGS = { ceilings: { orderBy: { departmentId: 'asc' as const } } } as const;
-type Row = NonNullable<Awaited<ReturnType<PrismaService['budgetCycle']['findFirst']>>> & {
-  ceilings: {
-    departmentId: string;
-    signedCommitmentsMinor: bigint;
-    plannedSeatsMinor: bigint;
-    priorityMinor: bigint;
-    totalMinor: bigint;
-    publishedTotalMinor: bigint | null;
-    explanation: string | null;
-  }[];
-};
+type Row = NonNullable<Awaited<ReturnType<PrismaService['budgetCycle']['findFirst']>>>;
 
 const toRecord = (row: Row): CycleRecord => ({
   id: row.id,
@@ -63,27 +45,12 @@ const toRecord = (row: Row): CycleRecord => ({
   priorities: row.priorities,
   openedByEmployeeId: row.openedByEmployeeId,
   openedAt: row.openedAt,
-  publishedByEmployeeId: row.publishedByEmployeeId,
-  publishedAt: row.publishedAt,
-  firstPublishedAt: row.firstPublishedAt,
-  ceilings: row.ceilings.map((ceiling) => ({
-    departmentId: ceiling.departmentId,
-    signedCommitmentsMinor: ceiling.signedCommitmentsMinor,
-    plannedSeatsMinor: ceiling.plannedSeatsMinor,
-    priorityMinor: ceiling.priorityMinor,
-    totalMinor: ceiling.totalMinor,
-    publishedTotalMinor: ceiling.publishedTotalMinor,
-    explanation: ceiling.explanation,
-  })),
 });
 
-export const figuresOf = (cycle: CycleRecord): CycleFigures => {
-  const { ceilings, ...rest } = cycle;
-
-  return { ...rest, ceilingsTotalMinor: ceilings.reduce((sum, ceiling) => sum + ceiling.totalMinor, 0n) };
-};
-
-/** The one writer of `budget_cycles` and `budget_department_ceilings` (`QĐ-103i`). */
+/**
+ * The one writer of `budget_cycles` (`QĐ-103i`, `QĐ-111z`). The columns `published_*` and the table `budget_department_ceilings` of the cycles
+ * written before are neither read nor written any more (`QĐ-111aa`).
+ */
 @Injectable()
 export class CycleRepo {
   constructor(private readonly prisma: PrismaService) {}
@@ -92,7 +59,6 @@ export class CycleRepo {
   async upcomingOf(organizationId: string, fromYear: number, tx?: DbTx): Promise<CycleRecord[]> {
     const rows = await (tx ?? this.prisma).budgetCycle.findMany({
       where: { organizationId, year: { gte: fromYear } },
-      include: WITH_CEILINGS,
       orderBy: { year: 'asc' },
     });
 
@@ -107,7 +73,6 @@ export class CycleRepo {
   async findByYear(organizationId: string, year: number, tx?: DbTx): Promise<CycleRecord | null> {
     const row = await (tx ?? this.prisma).budgetCycle.findUnique({
       where: { organizationId_year: { organizationId, year } },
-      include: WITH_CEILINGS,
     });
 
     return row ? toRecord(row) : null;
@@ -133,8 +98,8 @@ export class CycleRepo {
     return this.findByYear(organizationId, year, tx);
   }
 
-  /** One page of the cycles, the latest year first, and how many there are, from one snapshot; the ceilings are added up by the database. */
-  async page(organizationId: string, skip: number, take: number): Promise<{ items: CycleFigures[]; total: number }> {
+  /** One page of the cycles, the latest year first, and how many there are, from one snapshot. */
+  async page(organizationId: string, skip: number, take: number): Promise<{ items: CycleRecord[]; total: number }> {
     return this.prisma.$transaction(
       async (tx) => {
         const rows = await tx.budgetCycle.findMany({
@@ -143,25 +108,14 @@ export class CycleRepo {
           skip,
           take,
         });
-        const sums = await tx.budgetDepartmentCeiling.groupBy({
-          by: ['cycleId'],
-          where: { cycleId: { in: rows.map((row) => row.id) } },
-          _sum: { totalMinor: true },
-        });
-        const byCycle = new Map(sums.map((sum) => [sum.cycleId, sum._sum.totalMinor ?? 0n]));
-        const items = rows.map((row) => {
-          const { ceilingsTotalMinor, ...record } = figuresOf(toRecord({ ...row, ceilings: [] }));
-          void ceilingsTotalMinor;
 
-          return { ...record, ceilingsTotalMinor: byCycle.get(row.id) ?? 0n };
-        });
-
-        return { items, total: await tx.budgetCycle.count({ where: { organizationId } }) };
+        return { items: rows.map(toRecord), total: await tx.budgetCycle.count({ where: { organizationId } }) };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
   }
 
+  /** A new cycle is a draft: nobody opened it. */
   async insert(tx: DbTx, input: NewCycle): Promise<CycleRecord> {
     const row = await tx.budgetCycle.create({
       data: {
@@ -170,18 +124,16 @@ export class CycleRepo {
         submissionDeadline: toDateColumn(input.submissionDeadline),
         decisionDeadline: toDateColumn(input.decisionDeadline),
         annualCeilingMinor: input.annualCeilingMinor,
+        sharedPoolReserveMinor: input.sharedPoolReserveMinor,
         currency: input.currency,
         priorities: input.priorities,
-        openedByEmployeeId: input.openedByEmployeeId,
-        openedAt: input.openedAt,
       },
-      include: WITH_CEILINGS,
     });
 
     return toRecord(row);
   }
 
-  /** Changes the deadlines, the priorities and the annual ceiling; a change of the ceiling unpublishes the cycle (it is checked again). */
+  /** Changes the deadlines, the priorities, the annual ceiling and the reserve; what the call does not give is left as it is. */
   async update(
     tx: DbTx,
     id: string,
@@ -190,7 +142,7 @@ export class CycleRepo {
       decisionDeadline?: BusinessDate;
       priorities?: string | null;
       annualCeilingMinor?: bigint;
-      unpublish: boolean;
+      sharedPoolReserveMinor?: bigint;
     },
   ): Promise<void> {
     await tx.budgetCycle.update({
@@ -200,53 +152,19 @@ export class CycleRepo {
         ...(change.decisionDeadline ? { decisionDeadline: toDateColumn(change.decisionDeadline) } : {}),
         ...(change.priorities !== undefined ? { priorities: change.priorities } : {}),
         ...(change.annualCeilingMinor !== undefined ? { annualCeilingMinor: change.annualCeilingMinor } : {}),
-        ...(change.unpublish ? { publishedAt: null, publishedByEmployeeId: null } : {}),
+        ...(change.sharedPoolReserveMinor !== undefined
+          ? { sharedPoolReserveMinor: change.sharedPoolReserveMinor }
+          : {}),
       },
     });
   }
 
-  /** Replaces the division of the ceiling and the reserve; the total each department was told is kept for a department that stays. */
-  async replaceCeilings(
-    tx: DbTx,
-    cycle: CycleRecord,
-    reserveMinor: bigint,
-    rows: readonly (CeilingParts & { departmentId: string; totalMinor: bigint; explanation: string | null })[],
-    unpublish: boolean,
-  ): Promise<void> {
-    const told = new Map(cycle.ceilings.map((ceiling) => [ceiling.departmentId, ceiling.publishedTotalMinor]));
-    await tx.budgetDepartmentCeiling.deleteMany({ where: { cycleId: cycle.id } });
-    await tx.budgetDepartmentCeiling.createMany({
-      data: rows.map((row) => ({
-        cycleId: cycle.id,
-        departmentId: row.departmentId,
-        signedCommitmentsMinor: row.signedCommitmentsMinor,
-        plannedSeatsMinor: row.plannedSeatsMinor,
-        priorityMinor: row.priorityMinor,
-        totalMinor: row.totalMinor,
-        explanation: row.explanation,
-        publishedTotalMinor: told.get(row.departmentId) ?? null,
-      })),
-    });
-    await tx.budgetCycle.update({
-      where: { id: cycle.id },
-      data: {
-        sharedPoolReserveMinor: reserveMinor,
-        ...(unpublish ? { publishedAt: null, publishedByEmployeeId: null } : {}),
-      },
-    });
+  /** The draft becomes open: when and by whom. */
+  async open(tx: DbTx, id: string, by: string, at: Date): Promise<void> {
+    await tx.budgetCycle.update({ where: { id }, data: { openedByEmployeeId: by, openedAt: at } });
   }
 
-  /** Marks the cycle published and records, for every department, the total its head was told. */
-  async publish(tx: DbTx, cycle: CycleRecord, by: string, at: Date): Promise<void> {
-    await tx.budgetCycle.update({
-      where: { id: cycle.id },
-      data: { publishedAt: at, publishedByEmployeeId: by, firstPublishedAt: cycle.firstPublishedAt ?? at },
-    });
-    for (const ceiling of cycle.ceilings) {
-      await tx.budgetDepartmentCeiling.update({
-        where: { cycleId_departmentId: { cycleId: cycle.id, departmentId: ceiling.departmentId } },
-        data: { publishedTotalMinor: ceiling.totalMinor },
-      });
-    }
+  async remove(tx: DbTx, id: string): Promise<void> {
+    await tx.budgetCycle.delete({ where: { id } });
   }
 }

@@ -1,3 +1,4 @@
+import request from 'supertest';
 import { StatusHarness, type NoticeRow } from '../../support/status-harness';
 import type { Unit } from '../../support/spend-harness';
 
@@ -15,7 +16,6 @@ const said = (rows: NoticeRow[]) => rows.map((row) => row.code);
 describe('the status of a request told to the people it concerns, over PostgreSQL (US-05-15)', () => {
   let plan: string;
   let figma: string;
-  let internalPlan: string;
   let subscriptionId: string;
   let counter = 0;
   let superAdminEmployeeId: string;
@@ -26,7 +26,6 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     subscriptionId = await h.subscription(10);
     plan = await h.planOf(subscriptionId);
     figma = await h.planOf(await h.subscription(10));
-    internalPlan = await h.plan('K5');
     await h
       .declareTaxProfile((await h.vendorOf(plan)).id, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }])
       .expect(200);
@@ -322,8 +321,8 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     it('tells the requester that a step they were waiting on waits for a head, the Super Admin alone of the alert and nobody else, and then that it is given', async () => {
       const u = await example();
       const successor = await h.staff(u.department, `NW-S${counter}`);
-      // An internal request keeps waiting for the successor; a paid one is turned into a one-step request instead (BR-MF1-02).
-      const sent = await h.sent(u.member, internalPlan, { termMonths: 1 });
+      // A paid request keeps waiting for the successor; free internal software goes on to the IT Admin instead (QĐ-111bc, D-78).
+      const sent = await h.sent(u.member, plan, { termMonths: 1 });
       await h.vacateHead(u.department.id).expect(200);
       await h.project();
 
@@ -366,6 +365,83 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     });
   });
 
+  describe('a request sent again after it was returned, and a proposal of a head (B1, B4)', () => {
+    const resubmit = (id: string, account: Unit['member']['account']) =>
+      request(h.server()).post(`/api/v1/access-requests/${id}/resubmission`).set(h.as(account));
+    const assigned = async (employeeId: string, id: string, cause: string) =>
+      (await h.noticesOf(employeeId, 'STEP_ASSIGNED'))
+        .filter((row) => row.subject_id === id && row.params.cause === cause)
+        .map((row) => row.params);
+
+    it('tells the head the need step is theirs again when the requester sends it again, and not the requester', async () => {
+      const u = await example();
+      const sent = await h.sent(u.member, plan, { termMonths: 1 });
+      await h.decide(sent.id, { decision: 'RETURN', reason: 'Say how many seats' }, u.head.account).expect(200);
+      await h.project();
+      expect(await assigned(u.head.employeeId, sent.id, 'RESUBMITTED')).toEqual([]);
+
+      await resubmit(sent.id, u.member.account).expect(200);
+      await h.project();
+
+      expect(await assigned(u.head.employeeId, sent.id, 'RESUBMITTED')).toEqual([
+        { requestId: sent.id, stepKind: 'NEED', cause: 'RESUBMITTED' },
+      ]);
+      expect(await assigned(u.member.employeeId, sent.id, 'RESUBMITTED')).toEqual([]);
+    });
+
+    it('tells the IT Admin who holds the assessment that it is theirs again when the sender sends the proposal again', async () => {
+      const u = await example();
+      const proposed = await h.proposed(u.member);
+      await h.decide(proposed.id, { decision: 'APPROVE' }, u.head.account).expect(200);
+      // The holder of the step is read when the event is projected, so the approval is told before the step is closed by the return.
+      await h.project();
+      await h.saveAssessment(proposed.id, h.assessmentBody(), h.it1).expect(200);
+      await request(h.server())
+        .post(`/api/v1/access-requests/${proposed.id}/assessment/rejection`)
+        .set(h.as(h.it1))
+        .send({ decision: 'RETURN', reason: 'Name the vendor', checklist: h.checklists.yes('1.3') })
+        .expect(200);
+      await h.project();
+      expect(await assigned(h.it1.employeeId, proposed.id, 'RESUBMITTED')).toEqual([]);
+
+      await resubmit(proposed.id, u.member.account).expect(200);
+      await h.project();
+
+      expect(await assigned(h.it1.employeeId, proposed.id, 'RESUBMITTED')).toEqual([
+        { requestId: proposed.id, stepKind: 'IT_ASSESSMENT', cause: 'RESUBMITTED' },
+      ]);
+      expect(await assigned(h.it1.employeeId, proposed.id, 'ASSESSMENT')).toHaveLength(1);
+      expect(await assigned(u.head.employeeId, proposed.id, 'RESUBMITTED')).toEqual([]);
+    });
+
+    it('tells the IT Admin once that a head proposed new software for themselves, and the head nothing', async () => {
+      const u = await example();
+
+      const proposed = await h.proposed(u.head);
+      await h.project();
+      await h.project();
+
+      expect(await h.codesFor(h.it1.employeeId, proposed.id)).toEqual(['STEP_ASSIGNED']);
+      expect(await assigned(h.it1.employeeId, proposed.id, 'SUBMITTED')).toEqual([
+        { requestId: proposed.id, stepKind: 'IT_ASSESSMENT', cause: 'SUBMITTED' },
+      ]);
+      expect(await h.codesFor(u.head.employeeId, proposed.id)).not.toContain('STEP_ASSIGNED');
+    });
+
+    it('tells the IT Admin once, by the approval of the need and not by the proposal, when a member proposed it', async () => {
+      const u = await example();
+      const proposed = await h.proposed(u.member);
+      await h.project();
+      expect(await h.codesFor(h.it1.employeeId, proposed.id)).toEqual([]);
+
+      await h.decide(proposed.id, { decision: 'APPROVE' }, u.head.account).expect(200);
+      await h.project();
+
+      expect(await assigned(h.it1.employeeId, proposed.id, 'SUBMITTED')).toEqual([]);
+      expect(await h.codesFor(h.it1.employeeId, proposed.id)).toEqual(['STEP_ASSIGNED']);
+    });
+  });
+
   describe('the withdrawal and what follows from it (US-05-08; rows 9 to 12)', () => {
     it('tells the holder of the step that was closed, not the requester who withdrew', async () => {
       const u = await example();
@@ -400,7 +476,8 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     it('tells the IT Admin and Finance once that what was held went back, and the IT Admin that the task of the grant was cancelled', async () => {
       const u = await example();
       const id = await approved(u);
-      const task = await granted(id);
+      // Nobody has worked it: the grant takes the work for whoever presses it, so this is a task put back in the queue after a failure.
+      const task = await h.unclaimed((await granted(id)).id);
 
       await h.withdrawRequest(id, {}, u.member.account).expect(200);
       await h.project();

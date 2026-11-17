@@ -137,7 +137,7 @@ export class DashboardHarness extends NoticeHarness {
       employeeId: person.employeeId,
       toDepartmentId: to.id,
       effectiveOn: this.today(),
-      grounds: this.grounds,
+      groundsNote: this.groundsNote,
     });
   }
 

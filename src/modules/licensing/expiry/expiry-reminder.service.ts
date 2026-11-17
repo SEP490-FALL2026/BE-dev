@@ -10,7 +10,14 @@ import { expiryReminderAlert, usableOrNull } from '../licensing-alerts.policy';
 import { LicensingAlerts } from '../licensing-alerts.service';
 import type { ExpiryReminderWire } from './expiry.dto';
 import { ExpiryError } from './expiry.errors';
-import { REMINDER_OPTIONS, reminderRange, remindersOwed, type ReminderAudience } from './expiry.policy';
+import { RenewalHoldHook } from '../public/licensing.extension-points';
+import {
+  REMINDER_OPTIONS,
+  reminderHeldBack,
+  reminderRange,
+  remindersOwed,
+  type ReminderAudience,
+} from './expiry.policy';
 import { ExpiryReminderRepo, type ReminderCandidate } from './expiry-reminder.repo';
 
 /** How many rights one pass looks at; the next pass takes the rest. */
@@ -22,7 +29,9 @@ const PASS_BATCH = 200;
  * IT Admin in charge of it. A department with no head has no reminder for the head and nobody is told in its place. Each reminder
  * is a row, an audit event carrying the two choices (renew the right, or let it end) and a notice in the inbox of the person, all in
  * one transaction (`US-12-15` line 3); an IT Admin who can no longer act as one is not told. A right renewed, ended or cancelled
- * before its reminder leaves the range and is told nothing more. Nothing about the right is changed.
+ * before its reminder leaves the range and is told nothing more. A right whose renewal was approved is not told either, while the IT Admin has
+ * still to extend it: the end moves, and the reminder follows the end the right has once it is extended (R-27). Nothing about the right is
+ * changed.
  */
 @Injectable()
 export class ExpiryReminderService {
@@ -33,12 +42,13 @@ export class ExpiryReminderService {
     private readonly runner: TransactionRunner,
     private readonly audit: AuditApi,
     private readonly alerts: LicensingAlerts,
+    private readonly renewals: RenewalHoldHook,
   ) {}
 
   /** Writes the reminders that are due and returns how many were new in this pass. */
   async noticeDue(now: Date = new Date()): Promise<number> {
     const today = await this.organizationReads.businessToday(now);
-    const candidates = await this.repo.candidates(reminderRange(today), PASS_BATCH);
+    const candidates = await this.notHeldBack(await this.repo.candidates(reminderRange(today), PASS_BATCH));
     if (candidates.length === 0) return 0;
 
     const departmentOf = await this.departmentsOf(candidates, today);
@@ -57,6 +67,14 @@ export class ExpiryReminderService {
     }
 
     return told;
+  }
+
+  /** The rights whose renewal was approved are left out: the end they have is about to move (R-27). */
+  private async notHeldBack(candidates: readonly ReminderCandidate[]): Promise<ReminderCandidate[]> {
+    if (candidates.length === 0) return [];
+    const waiting = await this.renewals.get().pendingRenewalsOf(candidates.map((candidate) => candidate.assignmentId));
+
+    return candidates.filter((candidate) => !reminderHeldBack(waiting.get(candidate.assignmentId) ?? null));
   }
 
   /**

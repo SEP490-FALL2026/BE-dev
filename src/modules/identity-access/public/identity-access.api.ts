@@ -8,13 +8,16 @@ import { AccountRecordService } from '../accounts/account-record.service';
 import { ActionLinkService } from '../accounts/action-link.service';
 import { CredentialService } from '../credentials/credential.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
+import { ProfileRepo } from '../profile/profile.repo';
 import {
   AccessBlockCause,
   AccessBlockRecord,
+  AppRole,
   BootstrapSuperAdminInput,
   EmployeeAccountInspection,
   LeaverGrantRole,
   PendingBlockOutcome,
+  RoleHolderRecord,
   SuperAdminHolder,
 } from './identity-access.types';
 import { employeeHasNotLeft, isActionLinkRedeemable } from '../accounts/account.policy';
@@ -29,6 +32,7 @@ export class IdentityAccessApi {
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly profiles: ProfileRepo,
   ) {}
 
   /**
@@ -92,8 +96,19 @@ export class IdentityAccessApi {
    * Super Admin then lists such accounts and locks them with a reason. The sign-in and the guard refuse the person from the status of
    * the employee, not from this day. Nothing when the employee has no account.
    */
-  markEmployeeLeft(tx: DbTx, employeeId: string, leftOn: BusinessDate): Promise<void> {
-    return this.accounts.markEmployeeLeft(tx, employeeId, leftOn);
+  async markEmployeeLeft(tx: DbTx, employeeId: string, leftOn: BusinessDate): Promise<void> {
+    await this.accounts.markEmployeeLeft(tx, employeeId, leftOn);
+    await this.clearSelfServiceProfile(tx, employeeId);
+  }
+
+  /**
+   * The person left (`QĐ-111av`): the picture and the work phone are dropped from the account in the transaction that records it (the columns
+   * only), and the object of the picture is queued; the API process deletes it after the commit (`MAJ-12`: nothing here touches the
+   * storage, because this runs in the graph of the command too). Nothing when the employee has no account, and again changes nothing.
+   */
+  async clearSelfServiceProfile(tx: DbTx, employeeId: string): Promise<void> {
+    const cleared = await this.profiles.clearSelfService(tx, employeeId);
+    if (cleared?.previousKey) await this.profiles.enqueuePurge(tx, cleared.organizationId, cleared.previousKey);
   }
 
   /**
@@ -131,8 +146,8 @@ export class IdentityAccessApi {
   }
 
   /** The blocks on the access of these employees by employee id, one statement (an unlocked read, for lists). */
-  findDepartureBlocks(employeeIds: readonly string[]): Promise<Map<string, AccessBlockRecord>> {
-    return this.accessBlocks.findMany(employeeIds);
+  findDepartureBlocks(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, AccessBlockRecord>> {
+    return this.accessBlocks.findMany(employeeIds, tx);
   }
 
   /** Among these employees, those who hold the IT Admin role on a usable account (an unlocked read, for lists). */
@@ -143,6 +158,20 @@ export class IdentityAccessApi {
   /** Every IT Admin whose account can act, by employee code: who is told what any IT Admin may handle. */
   findAllUsableItAdminEmployeeIds(tx?: DbTx): Promise<string[]> {
     return this.accounts.findAllUsableItAdminEmployeeIds(tx);
+  }
+
+  /** Every employee who holds an effective grant of any of these roles on an account that can act, by employee code: who a notice to a role goes to. */
+  findUsableEmployeeIdsHoldingRoles(roles: readonly AppRole[], tx?: DbTx): Promise<string[]> {
+    return this.accounts.findUsableEmployeeIdsHoldingRoles(roles, tx);
+  }
+
+  /** A page of the accounts that can act and hold any of these roles, by employee code, with who each person is (an unlocked read, for a report). */
+  pageUsableRoleHolders(
+    roles: readonly AppRole[],
+    skip: number,
+    take: number,
+  ): Promise<{ rows: RoleHolderRecord[]; total: number }> {
+    return this.accounts.pageUsableRoleHolders(roles, skip, take);
   }
 
   /** The usable IT Admin with the smallest employee code, or null: who a report is given to when nobody is in charge. */

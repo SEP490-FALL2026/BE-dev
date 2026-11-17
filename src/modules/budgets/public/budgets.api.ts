@@ -2,12 +2,20 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import { CommitmentService } from '../commitment/commitment.service';
+import { OutOfProcessSpendRecorderService } from '../invoice/out-of-process-spend-recorder.service';
+import { PurchaseInvoiceRecorderService } from '../invoice/purchase-invoice-recorder.service';
 import type {
   CommittedAmount,
   CommitmentHoldInput,
   CommitmentReleaseInput,
+  HeldAmount,
   HeldCommitment,
+  OutOfProcessSpendInput,
+  OutOfProcessSpendRecorded,
+  PurchaseInvoiceRecorded,
+  PurchaseInvoiceRecordInput,
   ReleasedCommitment,
+  RequestCommitment,
   SeatCommitment,
   YearBudgetFacts,
   YearStartHoldInput,
@@ -25,6 +33,8 @@ export class BudgetsApi {
   constructor(
     private readonly facts: BudgetFactsRepo,
     private readonly commitments: CommitmentService,
+    private readonly purchaseInvoices: PurchaseInvoiceRecorderService,
+    private readonly outOfProcessSpends: OutOfProcessSpendRecorderService,
   ) {}
 
   /** The current budget of each of the years; a year without one is absent from the map, which is not a budget of nothing. */
@@ -75,13 +85,53 @@ export class BudgetsApi {
     return this.commitments.requestsHoldingYear(tx, requestIds, year);
   }
 
-  /** What each of the requests was committed for, one entry for each commitment, in one read: for a list that counts and adds them. */
-  committedByRequests(requestIds: readonly string[]): Promise<CommittedAmount[]> {
-    return this.commitments.committedBy(requestIds);
+  /** What each of the requests was committed for, one entry for each commitment, in one read (in the caller's transaction when it has one): for a list that counts and adds them. */
+  committedByRequests(requestIds: readonly string[], tx?: DbTx): Promise<CommittedAmount[]> {
+    return this.commitments.committedBy(requestIds, tx);
+  }
+
+  /**
+   * What each of the requests still holds, unspent and not given back, for the commitments that are held: what closing them would free.
+   * One read that locks nothing, in the caller's transaction when it has one; a request that holds nothing is absent.
+   */
+  heldByRequests(requestIds: readonly string[], tx?: DbTx): Promise<HeldAmount[]> {
+    return this.commitments.heldBy(requestIds, tx);
+  }
+
+  /** The commitments the request holds, the oldest year first, with what is left of each to be invoiced against (`PI-1`); one read that locks nothing. */
+  commitmentsOfRequest(requestId: string, tx?: DbTx): Promise<RequestCommitment[]> {
+    return this.commitments.commitmentsOf(requestId, tx);
   }
 
   /** Whether the request holds a commitment, which is what lets Finance read it (`US-06-09` AC-2). */
   requestHoldsCommitment(requestId: string): Promise<boolean> {
     return this.commitments.heldFor(requestId);
+  }
+
+  /**
+   * The invoice Finance signed for a purchase (`PI-1`, `D3`) is written as the one invoice of that purchase, in the transaction of the signature, booked to
+   * the month and the year the purchase pays for: into the commitment of the request for that year when the department that bears it is the
+   * commitment's own, as an expense of that department with no commitment otherwise, and as a line of the subscription for a renewal. It is never
+   * refused for being more than the budget (`C-08`). Throws PurchaseInvoiceRecordRefusedError.
+   */
+  recordPurchaseInvoice(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: PurchaseInvoiceRecordInput,
+  ): Promise<PurchaseInvoiceRecorded> {
+    return this.purchaseInvoices.record(tx, actor, input);
+  }
+
+  /**
+   * The money of a case outside the process (`SBF-07a`, R-45) is written as the one invoice of that case, in the transaction that closed it: what was
+   * already spent, in dong, with a proof of payment, an expense with no commitment booked to the month it is recorded in and to the Cost Center that
+   * bears it, or to none yet. It is never refused for being more than the budget (`C-08`). Throws OutOfProcessSpendRefusedError.
+   */
+  recordOutOfProcessSpend(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: OutOfProcessSpendInput,
+  ): Promise<OutOfProcessSpendRecorded> {
+    return this.outOfProcessSpends.record(tx, actor, input);
   }
 }

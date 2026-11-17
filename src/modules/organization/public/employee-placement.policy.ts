@@ -28,7 +28,10 @@ export interface PlacementFacts {
 
 export type PlacementSubject = 'DEPARTMENT' | 'JOB_TITLE';
 
-export type PlacementReasonCode = 'DEPARTMENT_NOT_FOUND' | 'DEPARTMENT_INACTIVE' | 'JOB_TITLE_TOO_LONG';
+/** Every reason a placement can be refused for: the one list a screen, a file and a guide of a file read. */
+export const PLACEMENT_REASON_CODES = ['DEPARTMENT_NOT_FOUND', 'DEPARTMENT_INACTIVE', 'JOB_TITLE_TOO_LONG'] as const;
+
+export type PlacementReasonCode = (typeof PLACEMENT_REASON_CODES)[number];
 
 export interface PlacementReason {
   subject: PlacementSubject;

@@ -11,6 +11,7 @@ import {
 } from '../intake-gate/intake-gate.errors';
 import { judgeIntakeState, type GateReason } from '../intake-gate/intake-gate.policy';
 import { IntakeRejectionRepo, type NewRejection } from '../intake-gate/intake-rejection.repo';
+import { VendorAccountIntakeService } from '../vendor-account-review/vendor-account-intake.service';
 import { evaluateDays, type UsageDayInput } from './ai-usage-day.policy';
 import { AiUsageRepo } from './ai-usage.repo';
 
@@ -36,7 +37,7 @@ type Outcome = { blocked: GateReason } | { results: DayResult[] };
 
 /**
  * A weekly batch of the days an AI tool was used on a company machine (`US-09-05`). One transaction: the registration is read and
- * locked `FOR SHARE`, the machine's window decides which days are believed, the allowlist of each day decides which tools, and the
+ * locked `FOR SHARE`, the machine's window decides which days are believed, the allowlist of each day decides which tools (a tool off it is dropped alone), and the
  * accepted days are written in one statement — the build made last wins, so a batch sent again, or an older one arriving late, changes
  * nothing. A refusal is written down and committed before the tool is told.
  */
@@ -47,6 +48,7 @@ export class AiUsageBatchService {
     private readonly allowlist: AllowlistFactsService,
     private readonly usage: AiUsageRepo,
     private readonly rejections: IntakeRejectionRepo,
+    private readonly review: VendorAccountIntakeService,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -84,6 +86,20 @@ export class AiUsageBatchService {
           .filter((verdict) => verdict.reason)
           .map((verdict) => this.rejection(context, verdict.reason as GateReasonOrDay, verdict.date)),
       );
+      // A tool the collector reports that is not on the allowlist in force now is software outside what the company manages: the review of
+      // the accounts sees it (RC-2.3). Not the allowlist of the day: a tool added later is not on the list of the older days. A day refused
+      // before its tools were looked at (clock, window) tells nothing.
+      const current = await this.allowlist.currentTools(context.organizationId, tx);
+      const unlisted = input.days.flatMap((day, index) =>
+        verdicts[index].reason === null ||
+        verdicts[index].reason === 'NOT_IN_ALLOWLIST' ||
+        verdicts[index].reason === 'INVALID_COVERAGE'
+          ? day.tools.filter((tool) => !current.has(tool.tool)).map((tool) => ({ tool: tool.tool, date: day.date }))
+          : [],
+      );
+      if (unlisted.length > 0) {
+        await this.review.fromUnlistedTools(tx, { organizationId: context.organizationId, sightings: unlisted }, now);
+      }
       const changed = await this.usage.upsertDays(
         tx,
         { ...context, generatedAt: input.generatedAt },

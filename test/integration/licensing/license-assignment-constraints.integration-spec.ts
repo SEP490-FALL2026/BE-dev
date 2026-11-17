@@ -8,6 +8,9 @@ import {
 } from '../../support/disposable-database';
 import { waitForLockWaiters } from '../../support/lock-wait';
 
+/** The constraint the database named the last time it refused a statement: when a row breaks two exclusions, the first created answers. */
+let lastViolatedConstraint: string | null = null;
+
 /** The SQLSTATE a rejected statement carries: the constraint, not the application, said no. */
 async function sqlState(sql: Client, text: string, values: unknown[] = []): Promise<string | null> {
   try {
@@ -15,13 +18,15 @@ async function sqlState(sql: Client, text: string, values: unknown[] = []): Prom
 
     return null;
   } catch (error) {
+    lastViolatedConstraint = (error as { constraint?: string }).constraint ?? null;
+
     return (error as { code?: string }).code ?? 'unknown';
   }
 }
 
 interface AssignmentInput {
   kind?: 'PERSONAL' | 'SERVICE';
-  source?: 'BASELINE' | 'HANDOVER' | 'REQUEST';
+  source?: 'BASELINE' | 'HANDOVER' | 'REQUEST' | 'MACHINE_ACCOUNT_CONVERSION';
   planId?: string;
   subscriptionId?: string | null;
   employeeId?: string;
@@ -35,7 +40,13 @@ interface AssignmentInput {
   validUntil?: string | null;
   expectedEnd?: string | null;
   predecessorId?: string | null;
+  /** The older right this one replaced the day it was given (R-49); a request writes one. */
+  replacesId?: string | null;
   importId?: string | null;
+  /** A personal seat of an IT Admin flagged as a machine account carries the reason (QĐ-110m); left out, the seat is not flagged. */
+  machineNote?: string | null;
+  /** The flag with no note, for the check that asks for the note. */
+  machineFlag?: boolean;
   id?: string;
 }
 
@@ -129,9 +140,10 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
       client,
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
          account_identifier, normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from,
-         valid_from_basis, valid_until, expected_end_date, predecessor_id, baseline_import_id, created_by_app_user_id)
+         valid_from_basis, valid_until, expected_end_date, predecessor_id, baseline_import_id, created_by_app_user_id,
+         is_machine_account, machine_account_note, replaces_assignment_id)
        VALUES ($1, $2, $3::"AssignmentKind", $4::"AssignmentSource", $5, $6, $7, $8, $9, $10, $11, $12, $13,
-         $14::"AssignmentDateBasis", $15, $16, $17, $18, $19)`,
+         $14::"AssignmentDateBasis", $15, $16, $17, $18, $19, $20, $21, $22)`,
       [
         input.id ?? randomUUID(),
         organizationId,
@@ -156,6 +168,9 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
         input.predecessorId === undefined ? null : input.predecessorId,
         input.importId !== undefined ? input.importId : (input.source ?? 'BASELINE') === 'BASELINE' ? importId : null,
         randomUUID(),
+        input.machineFlag ?? (input.machineNote !== undefined && input.machineNote !== null),
+        input.machineNote === undefined ? null : input.machineNote,
+        input.replacesId === undefined ? null : input.replacesId,
       ],
     );
   const personal = (subscriptionId: string, extra: AssignmentInput = {}) =>
@@ -325,6 +340,17 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
       expect(await personal(subscriptionId, { employeeId: staff, validFrom: '2026-12-01' })).toBe('23P01');
     });
 
+    it('names the rule of the person, not the one of the account, when the same person is given the same account twice (OVERLAP, not IDENTIFIER_IN_USE)', async () => {
+      const subscriptionId = await fresh(10);
+
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'twice@congty.vn' })).toBeNull();
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'twice@congty.vn' })).toBe('23P01');
+
+      // Both exclusions are broken and the database names the first one created: the rule of the person must be created before the one of the
+      // identifier, or the second grant of a seat to the same person answers that the account is in use instead of that the person has a seat.
+      expect(lastViolatedConstraint).toBe('license_assignments_personal_no_overlap');
+    });
+
     it('refuses the same person twice on an internal plan, which has no subscription', async () => {
       const first = await insert({ planId: internalPlan, subscriptionId: null, employeeId: other });
       const second = await insert({ planId: internalPlan, subscriptionId: null, employeeId: other });
@@ -363,6 +389,124 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
 
       expect(await personal(first, { employeeId: staff })).toBeNull();
       expect(await personal(second, { employeeId: staff })).toBeNull();
+    });
+  });
+
+  describe('QĐ-110m, R-9: a personal seat flagged as a machine account', () => {
+    const machine = { machineNote: 'Release pipeline of the build farm' } as const;
+
+    it('lets one IT Admin hold their own personal seat and a flagged one on the same subscription, and several flagged ones', async () => {
+      const subscriptionId = await fresh(10);
+
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'it.admin@congty.vn' })).toBeNull();
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'ci-bot', ...machine })).toBeNull();
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'release-bot', ...machine })).toBeNull();
+    });
+
+    it('still refuses a second personal seat that is not flagged, whatever the flagged seats beside it', async () => {
+      const subscriptionId = await fresh(10);
+
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'it.admin@congty.vn' })).toBeNull();
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'ci-bot', ...machine })).toBeNull();
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'second@congty.vn' })).toBe('23P01');
+    });
+
+    it('asks for the reason exactly when the flag is on, and only a personal seat takes the flag', async () => {
+      const subscriptionId = await fresh(10);
+
+      expect(await personal(subscriptionId, { employeeId: other, identifier: 'a-bot', machineFlag: true })).toBe(
+        '23514',
+      );
+      expect(
+        await personal(subscriptionId, {
+          employeeId: other,
+          identifier: 'b-bot',
+          machineFlag: true,
+          machineNote: '  ',
+        }),
+      ).toBe('23514');
+      expect(
+        await personal(subscriptionId, {
+          employeeId: other,
+          identifier: 'c-bot',
+          machineFlag: false,
+          machineNote: 'x',
+        }),
+      ).toBe('23514');
+      expect(
+        await personal(subscriptionId, {
+          kind: 'SERVICE',
+          employeeId: other,
+          identifier: 'd-bot',
+          reason: 'CI',
+          costCenterId: unitCenter,
+          ...machine,
+        }),
+      ).toBe('23514');
+    });
+
+    it('judges a seat again when its flag is turned off: refused (23P01) while the person holds another personal seat of the period', async () => {
+      const subscriptionId = await fresh(10);
+      const flagged = randomUUID();
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'it.admin@congty.vn' })).toBeNull();
+      expect(
+        await personal(subscriptionId, { id: flagged, employeeId: staff, identifier: 'ci-bot', ...machine }),
+      ).toBeNull();
+      const unflag = `UPDATE license_assignments SET is_machine_account = false, machine_account_note = NULL WHERE id = $1`;
+
+      expect(await sqlState(sql, unflag, [flagged])).toBe('23P01');
+
+      // The other personal seat ends: the flagged one may become an ordinary seat from then on, and the flag may be turned back on.
+      const alone = await fresh(10);
+      const lone = randomUUID();
+      expect(await personal(alone, { id: lone, employeeId: staff, identifier: 'lone-bot', ...machine })).toBeNull();
+      expect(await sqlState(sql, unflag, [lone])).toBeNull();
+      expect(
+        await sqlState(
+          sql,
+          `UPDATE license_assignments SET is_machine_account = true, machine_account_note = 'Again' WHERE id = $1`,
+          [lone],
+        ),
+      ).toBeNull();
+    });
+
+    it('takes the seat a service account was converted into only when it names that service account', async () => {
+      const subscriptionId = await fresh(10);
+      const service = randomUUID();
+      expect(
+        await personal(subscriptionId, {
+          id: service,
+          kind: 'SERVICE',
+          employeeId: other,
+          identifier: 'old-bot',
+          reason: 'CI',
+          costCenterId: unitCenter,
+          validFrom: '2026-10-01',
+          validUntil: '2026-11-13',
+        }),
+      ).toBeNull();
+
+      expect(
+        await personal(subscriptionId, {
+          employeeId: staff,
+          identifier: 'old-bot',
+          source: 'MACHINE_ACCOUNT_CONVERSION',
+          importId: null,
+          validFrom: '2026-11-13',
+          ...machine,
+        }),
+      ).toBe('23514');
+      expect(
+        await personal(subscriptionId, {
+          employeeId: staff,
+          identifier: 'old-bot',
+          source: 'MACHINE_ACCOUNT_CONVERSION',
+          importId: null,
+          predecessorId: service,
+          validFrom: '2026-11-13',
+          ...machine,
+        }),
+      ).toBeNull();
     });
   });
 
@@ -552,6 +696,55 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
       expect(
         await sqlState(sql, `UPDATE license_assignments SET expected_end_date = '2027-01-01' WHERE id = $1`, [id]),
       ).toBeNull();
+    });
+  });
+
+  describe('R-49, MF3-C-R6: the right a seat replaced', () => {
+    /** The old right, ended the day the new one is given, and the new one that names it. */
+    const replaced = async (): Promise<{ old: string; next: string; subscriptionId: string }> => {
+      const subscriptionId = await fresh(10);
+      const [old, next] = [randomUUID(), randomUUID()];
+      await personal(subscriptionId, { employeeId: staff, id: old, validFrom: '2026-10-01', validUntil: '2026-11-01' });
+      await personal(subscriptionId, {
+        employeeId: staff,
+        id: next,
+        source: 'REQUEST',
+        validFrom: '2026-11-01',
+        replacesId: old,
+      });
+
+      return { old, next, subscriptionId };
+    };
+
+    it('is written when the seat is, and is never edited after: not erased, not pointed at another right, not added to a seat that had none', async () => {
+      const { old, next, subscriptionId } = await replaced();
+      const plain = randomUUID();
+      await personal(subscriptionId, { employeeId: other, id: plain, source: 'REQUEST' });
+
+      expect(
+        await sqlState(sql, `UPDATE license_assignments SET replaces_assignment_id = NULL WHERE id = $1`, [next]),
+      ).toBe('55000');
+      expect(lastViolatedConstraint).toBe('license_assignments_immutable');
+      expect(
+        await sqlState(sql, `UPDATE license_assignments SET replaces_assignment_id = $2 WHERE id = $1`, [next, plain]),
+      ).toBe('55000');
+      expect(
+        await sqlState(sql, `UPDATE license_assignments SET replaces_assignment_id = $2 WHERE id = $1`, [plain, old]),
+      ).toBe('55000');
+    });
+
+    it('still lets the old right be opened again when the new one failed: the end is the one column of the old right that moves', async () => {
+      const { old, next } = await replaced();
+
+      // The grant failed: the new seat is closed with an empty period, then the old right has no end.
+      expect(
+        await sqlState(
+          sql,
+          `UPDATE license_assignments SET failed_at = now(), valid_until = valid_from WHERE id = $1`,
+          [next],
+        ),
+      ).toBeNull();
+      expect(await sqlState(sql, `UPDATE license_assignments SET valid_until = NULL WHERE id = $1`, [old])).toBeNull();
     });
   });
 

@@ -99,12 +99,20 @@ const DECISION: Record<PreflightBlocker['code'], string> = {
 };
 
 /** What each row to attend to later is, and how the operator resolves it. */
-const INFORMATION: Record<PreflightInformation['code'], { heading: string; how: string }> = {
+const INFORMATION: Record<PreflightInformation['code'], { heading: (count: number) => string; how: string }> = {
   BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE: {
-    heading: 'These budget proposals were given back because their first version was refused.',
+    heading: () => 'These budget proposals were given back because their first version was refused.',
     how:
       'The migration of this release gives each back to `REVIEWED` (R1), or links it to the proposal that sent it ' +
       'again (R2), with an audit record each; nothing is for the operator to do:',
+  },
+  SERVICE_ACCOUNT_STILL_IN_FORCE: {
+    heading: (count) => `${count} service account(s) are still in force.`,
+    how:
+      'There is no service account any more (QĐ-110m) and no operation that ends or converts one. The migration ' +
+      '`20261113000900_licensing_service_accounts_converted` converts each into the flagged seat of an IT Admin and keeps the ' +
+      'ones it cannot yet (its notice names the reason); once the reason has passed, run that file again as ' +
+      '`docs/guides/service-account-conversion.md` says. The cleanup release that drops the kind needs none left:',
   },
 };
 
@@ -122,8 +130,9 @@ export function formatPreflight(report: PreflightReport): string {
     lines.push('`prisma migrate deploy` may run. Back up the database first (the deploy workflow does).');
   }
   for (const code of [...new Set(report.information.map((item) => item.code))]) {
-    lines.push(`${INFORMATION[code].heading} ${INFORMATION[code].how}`, `  ${code}`);
-    for (const item of report.information.filter((entry) => entry.code === code)) lines.push(`    - ${infoText(item)}`);
+    const items = report.information.filter((entry) => entry.code === code);
+    lines.push(`${INFORMATION[code].heading(items.length)} ${INFORMATION[code].how}`, `  ${code}`);
+    for (const item of items) lines.push(`    - ${infoText(item)}`);
   }
   if (report.corrections.length > 0) {
     lines.push('The forward migration moves these service accounts to their recorded-day department (audited):');
@@ -144,7 +153,12 @@ export function formatPreflight(report: PreflightReport): string {
 }
 
 function infoText(item: PreflightInformation): string {
-  return `budget proposal ${item.proposalId} (${item.rule})`;
+  switch (item.code) {
+    case 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE':
+      return `budget proposal ${item.proposalId} (${item.rule})`;
+    case 'SERVICE_ACCOUNT_STILL_IN_FORCE':
+      return `assignment ${item.assignmentId}`;
+  }
 }
 
 function rowText(blocker: PreflightBlocker): string {

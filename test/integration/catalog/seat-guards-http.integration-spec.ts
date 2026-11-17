@@ -65,7 +65,8 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
   it('US-04-03 AC-5: the number of seats cannot go under the assignments that hold one, tasks waiting or failed included', async () => {
     const subscriptionId = await h.subscription(10, 'K2');
     const planId = await h.planOf(subscriptionId);
-    const queued = await h.granted(people[0], planId, { subscriptionId });
+    // A task waiting in the queue: the grant takes the work for whoever presses it, so one nobody works is one put back after a failure.
+    const queued = await h.unclaimed((await h.granted(people[0], planId, { subscriptionId })).id);
     const running = await h.granted(people[1], planId, { subscriptionId });
     await h.claim(running.id).expect(200);
     const failed = await h.granted(people[2], planId, { subscriptionId });
@@ -206,7 +207,7 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
     const task = await h.granted(people[0], planId, { subscriptionId: draft });
     const internal = await h.granted(people[1], await h.plan('K5'));
 
-    expect(task.status).toBe('QUEUED');
+    expect(task.status).toBe('IN_PROGRESS');
     expect(internal.subscriptionId).toBeNull();
   });
 
@@ -305,7 +306,7 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
           .expect(201),
       ).id;
       const task = await h.granted(people[5], software.otherPlan, { subscriptionId });
-      expect(task.status).toBe('QUEUED');
+      expect(task.status).toBe('IN_PROGRESS');
     });
 
     it('says nothing for software with no K1 plan', async () => {

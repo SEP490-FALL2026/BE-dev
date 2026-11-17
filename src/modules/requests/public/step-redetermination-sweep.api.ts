@@ -52,7 +52,6 @@ export class StepRedeterminationSweepApi {
       failedRequests: 0,
     };
 
-    await this.oneStep.markMissingHeads(now);
     for (const id of await this.oneStep.pendingIds()) {
       try {
         if (await this.oneStep.finishPending(id, now)) result.oneStepFinished++;

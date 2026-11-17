@@ -16,7 +16,7 @@ const nothingElse: Omit<ContractGateFacts, 'legacyReturns'> = {
     mismatches: [],
     notActivated: [],
   },
-  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [] },
+  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], serviceAccountIds: [] },
 };
 const returns = (legacyReturns: ContractGateFacts['legacyReturns']): ContractGateFacts => ({
   ...nothingElse,

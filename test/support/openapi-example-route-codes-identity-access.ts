@@ -1,9 +1,11 @@
 import type { RouteErrorStatus } from './openapi-example-manifest';
+import { ROUTE_ERROR_CODES_POLICIES } from './openapi-example-route-codes-policies';
 
-/** Part of ROUTE_ERROR_CODES (identity access), traced on BE `ea73c2f` (25/10/2026): see openapi-example-manifest.ts. */
+/** Part of ROUTE_ERROR_CODES (identity access, with the policies of PL-1), traced on BE `ea73c2f` (25/10/2026): see openapi-example-manifest.ts. */
 export const ROUTE_ERROR_CODES_IDENTITY_ACCESS: Readonly<
   Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>
 > = {
+  ...ROUTE_ERROR_CODES_POLICIES,
   appUserCreate: {
     '404': ['ORGANIZATION.EMPLOYEE_NOT_FOUND'],
     '409': [
@@ -14,6 +16,7 @@ export const ROUTE_ERROR_CODES_IDENTITY_ACCESS: Readonly<
     ],
     '422': [
       'APP_USER.LOGIN_EMAIL_INVALID',
+      'APP_USER.LOGIN_EMAIL_NOT_WORK_EMAIL',
       'APP_USER.LOGIN_EMAIL_REQUIRED',
       'APP_USER.SPENDING_APPROVER_ACCOUNT_NOT_USABLE',
       'APP_USER.SUPER_ADMIN_TRANSFER_ONLY',
@@ -29,6 +32,7 @@ export const ROUTE_ERROR_CODES_IDENTITY_ACCESS: Readonly<
       'APP_USER.MANAGER_STILL_HEADING',
       'APP_USER.FINANCE_ALREADY_ASSIGNED',
       'APP_USER.SPENDING_APPROVER_ALREADY_ASSIGNED',
+      'APP_USER.SPENDING_APPROVER_HEADS_DEPARTMENT',
       'APP_USER.SPENDING_APPROVER_HAS_OPEN_WORK',
     ],
     '422': [

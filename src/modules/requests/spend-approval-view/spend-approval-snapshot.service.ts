@@ -5,6 +5,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { annualVendorAmountOf } from '../access-request/pricing.policy';
 import { PricingViewService } from '../request-view/pricing-view.service';
+import { RequestCostViewService } from '../request-view/request-cost-view.service';
 import type { ReserveConfirmationRecord } from '../reserve-confirmation/reserve-confirmation.repo';
 import { BudgetCheckRepo } from '../spend/budget-check.repo';
 import { BudgetCheckService } from '../spend/budget-check.service';
@@ -30,7 +31,13 @@ export class SpendApprovalSnapshotService {
     private readonly pricing: PricingViewService,
     private readonly catalog: CatalogApi,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly costs: RequestCostViewService,
   ) {}
+
+  /** The cost by the year of the request before tax, with the part of the year after (`QĐ-111k`); null when nothing is priced by the month. */
+  termCostOf(request: AccessRequestRecord): Promise<ApprovalDetailWire['termCost']> {
+    return this.costs.of(request, request.pricing);
+  }
 
   /**
    * The budget as a check reads it: the check the decision kept once the request is decided, else the check made now, in memory, while the

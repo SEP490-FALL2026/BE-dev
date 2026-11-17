@@ -27,6 +27,9 @@ export interface NoticeWire {
   code: string;
   subject: { type: string; id: string } | null;
   params: Record<string, string | number | boolean | null>;
+  title: string;
+  message: string;
+  target: { operationId: string; pathParams: Record<string, string> } | null;
   createdAt: string;
   readAt: string | null;
 }

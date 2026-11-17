@@ -121,7 +121,7 @@ export class DecisionReturnService {
   ): Promise<void> {
     const params = {
       recommendationId: record.id,
-      employeeId: record.employeeId ?? '',
+      employeeId: record.employeeId ?? null,
       applicationId: record.applicationId,
     };
     const subject = { type: 'GHOST_SEAT_RECOMMENDATION', id: record.id };

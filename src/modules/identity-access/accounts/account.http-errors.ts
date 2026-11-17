@@ -12,6 +12,7 @@ import {
   FinanceAlreadyAssignedError,
   InvitationInvalidError,
   LoginEmailInvalidError,
+  LoginEmailNotWorkEmailError,
   LoginEmailRequiredError,
   LoginEmailTakenError,
   ManagerStillHeadingError,
@@ -62,6 +63,11 @@ export function toAccountApiException(error: unknown): unknown {
   }
   if (error instanceof LoginEmailInvalidError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'APP_USER.LOGIN_EMAIL_INVALID', error.message);
+  }
+  if (error instanceof LoginEmailNotWorkEmailError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'APP_USER.LOGIN_EMAIL_NOT_WORK_EMAIL', error.message, {
+      field: 'loginEmail',
+    });
   }
   if (error instanceof AccountAlreadyActivatedError) {
     return refuse(HttpStatus.CONFLICT, 'APP_USER.ALREADY_ACTIVATED', error.message);
@@ -120,6 +126,7 @@ export const ACCOUNT_ERROR_EXAMPLES = {
   LOGIN_EMAIL_TAKEN: example(new LoginEmailTakenError()),
   LOGIN_EMAIL_REQUIRED: example(new LoginEmailRequiredError()),
   LOGIN_EMAIL_INVALID: example(new LoginEmailInvalidError()),
+  LOGIN_EMAIL_NOT_WORK_EMAIL: example(new LoginEmailNotWorkEmailError()),
   ALREADY_ACTIVATED: example(new AccountAlreadyActivatedError()),
   ACCOUNT_LOCKED: example(new AccountLockedError()),
   SUPER_ADMIN_HOLDER_NOT_LOCKABLE: example(new SuperAdminHolderNotLockableError()),

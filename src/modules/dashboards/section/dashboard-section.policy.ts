@@ -28,8 +28,11 @@ export interface DashboardSection {
   reason: MissingSourceReason | null;
 }
 
-/** A section this overview counted. Throws a RangeError for a count that is not a whole number of at least zero. */
-export function counted(count: number, sourceOperationId: string): DashboardSection {
+/**
+ * A section this overview counted. `sourceOperationId` is null when no list gives exactly these rows (never a list that would answer another number).
+ * Throws a RangeError for a count that is not a whole number of at least zero.
+ */
+export function counted(count: number, sourceOperationId: string | null): DashboardSection {
   if (!Number.isInteger(count) || count < 0) throw new RangeError(`A section counts whole items, not ${count}.`);
 
   return { state: 'COUNTED', count, sourceOperationId, reason: null };
@@ -54,4 +57,9 @@ export type DashboardRole = 'MANAGER' | 'IT_ADMIN' | 'SUPER_ADMIN';
  */
 export function assertHoldsRole(roles: readonly string[], role: DashboardRole): void {
   if (!roles.includes(role)) throw new DashboardRefusedError();
+}
+
+/** Throws DashboardRefusedError unless the caller holds one of the roles: for a report two roles read, each in their own scope. */
+export function assertHoldsOneOf(roles: readonly string[], allowed: readonly DashboardRole[]): void {
+  if (!allowed.some((role) => roles.includes(role))) throw new DashboardRefusedError();
 }

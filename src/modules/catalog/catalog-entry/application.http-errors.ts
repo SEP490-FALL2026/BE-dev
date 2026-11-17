@@ -8,12 +8,12 @@ import {
   ApplicationDictionaryLineNotFoundError,
   ApplicationDictionaryLineTakenError,
   ApplicationDomainInvalidError,
+  ApplicationDuplicateError,
   ApplicationFunctionalGroupInvalidError,
   ApplicationInternalHasNoVendorError,
   ApplicationNameInvalidError,
   ApplicationNameTakenError,
   ApplicationNotFoundError,
-  ApplicationNoteInvalidError,
   ApplicationRetirementBlockedError,
   ApplicationTooManyDomainsError,
   ApplicationUpdateEmptyError,
@@ -48,6 +48,12 @@ export function toApplicationApiException(error: unknown): unknown {
       subscriptionTotal: error.subscriptionTotal,
     });
   }
+  if (error instanceof ApplicationDuplicateError) {
+    return refuse(HttpStatus.CONFLICT, 'APPLICATION.DUPLICATE', error.message, {
+      existing: error.existing,
+      matchedBy: error.by,
+    });
+  }
   if (error instanceof ApplicationNameTakenError) {
     return refuse(HttpStatus.CONFLICT, 'APPLICATION.NAME_TAKEN', error.message);
   }
@@ -65,9 +71,6 @@ export function toApplicationApiException(error: unknown): unknown {
   }
   if (error instanceof ApplicationTooManyDomainsError) {
     return refuse(UNPROCESSABLE, 'APPLICATION.TOO_MANY_DOMAINS', error.message);
-  }
-  if (error instanceof ApplicationNoteInvalidError) {
-    return refuse(UNPROCESSABLE, 'APPLICATION.NOTE_INVALID', error.message);
   }
   if (error instanceof ApplicationVendorRequiredError) {
     return refuse(UNPROCESSABLE, 'APPLICATION.VENDOR_REQUIRED', error.message);
@@ -125,6 +128,12 @@ export const APPLICATION_ERROR_EXAMPLES = {
   RETIREMENT_BLOCKED: example(
     new ApplicationRetirementBlockedError([blockingAssignment], [blockingSubscription], 1, 1),
   ),
+  DUPLICATE: example(
+    new ApplicationDuplicateError(
+      { id: '<application-id>', name: 'Figma', vendorName: 'Figma Inc', functionalGroup: null },
+      'NAME',
+    ),
+  ),
   NAME_TAKEN: example(new ApplicationNameTakenError()),
   DICTIONARY_LINE_TAKEN: example(new ApplicationDictionaryLineTakenError()),
   DICTIONARY_GROUP_CHANGED: example(new ApplicationVendorGroupChangedError()),
@@ -132,7 +141,6 @@ export const APPLICATION_ERROR_EXAMPLES = {
   VENDOR_NAME_INVALID: example(new ApplicationVendorNameInvalidError()),
   DOMAIN_INVALID: example(new ApplicationDomainInvalidError('not a host')),
   TOO_MANY_DOMAINS: example(new ApplicationTooManyDomainsError()),
-  NOTE_INVALID: example(new ApplicationNoteInvalidError()),
   VENDOR_REQUIRED: example(new ApplicationVendorRequiredError()),
   VENDOR_SOURCE_AMBIGUOUS: example(new ApplicationVendorSourceAmbiguousError()),
   INTERNAL_HAS_NO_VENDOR: example(new ApplicationInternalHasNoVendorError()),

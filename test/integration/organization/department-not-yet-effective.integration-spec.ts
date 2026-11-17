@@ -71,7 +71,7 @@ describe('a department that takes effect later (integration, real PostgreSQL)', 
       employeeId: mover.employeeId,
       toDepartmentId: fresh.id,
       effectiveOn,
-      grounds: h.grounds,
+      groundsNote: h.groundsNote,
     });
 
     const early = await h.recordTransfer(body(h.day(30)));

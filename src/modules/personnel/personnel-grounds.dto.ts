@@ -15,5 +15,11 @@ export const groundsBodySchema = z.strictObject({
   issuedOn: businessDay,
 });
 
+/**
+ * The basis in one box (`QĐ-110a`, `QĐ-111bd`): a sentence naming the document ("QĐ nghỉ việc số 12/2026"), 1 to 500 characters once
+ * trimmed. `groundsBodySchema` stays for the notice of a department head (`BM-09`), which keeps its four parts.
+ */
+export const groundsNoteBodySchema = z.string().trim().min(1).max(500);
+
 /** The same basis where it is only needed in some cases (a return on another day than the approved one). */
 export const optionalGroundsBodySchema = groundsBodySchema.optional();

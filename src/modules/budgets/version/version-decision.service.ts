@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
 import type { DecisionBodyDto, VersionWire } from '../budget/budget.dto';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionViewService } from '../budget/version-view.service';
@@ -26,14 +27,34 @@ export class VersionDecisionService {
     private readonly facts: BudgetFactsService,
     private readonly judge: VersionDecisionJudge,
     private readonly writer: VersionDecisionWriter,
+    private readonly checklists: PolicyChecklistApi,
   ) {}
 
-  /** Throws BudgetVersionNotFoundError, BudgetDecisionRefusedError and BudgetYearEndedError. */
+  /** Throws BudgetVersionNotFoundError, BudgetDecisionRefusedError, BudgetYearEndedError, the errors of the annual ceiling an approval checks again and what the checklist refuses. */
   async decide(actor: AuthenticatedPrincipal, id: string, body: DecisionBodyDto): Promise<VersionWire> {
     const decided = await this.runner.run(async (tx) => {
-      const judged = await this.judge.judge(tx, actor, id);
+      const judged = await this.judge.judge(tx, actor, id, body.decision);
+      // The checklist of the step (`QĐ-111ap`): a No locks the approval, and a return takes its reason from the answers when none is typed.
+      const { verdict, reason } = await this.checklists.judge(tx, {
+        organizationId: judged.version.organizationId,
+        stepCode: '4.7',
+        checklist: body.checklist,
+        decision: body.decision,
+        reason: body.reason,
+      });
+      // One hour for the decision and for the answers kept with it.
+      const now = new Date();
+      const written = await this.writer.write(tx, actor, judged, { ...body, reason: reason ?? undefined }, now);
+      await this.checklists.record(tx, {
+        organizationId: judged.version.organizationId,
+        verdict,
+        decision: body.decision,
+        decidedByEmployeeId: actor.employeeId,
+        decidedAt: now,
+        subjects: [{ kind: 'BUDGET_VERSION', id }],
+      });
 
-      return this.writer.write(tx, actor, judged, body);
+      return written;
     });
 
     // Read once the decision is committed: the view reads the record of it, which is not visible before.

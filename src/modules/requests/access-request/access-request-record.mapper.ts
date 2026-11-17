@@ -1,9 +1,10 @@
 import type { Prisma } from '../../../generated/prisma/client';
-import { fromDateColumn } from '../../../core/business-date';
+import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { toPricing } from './access-request-pricing.mapper';
 import type { NeedStepState, AccessRequestRecord, ReadableNeedWaitingReason } from './access-request.types';
 import { requestPolicyJson } from './access-request.json';
-import { currentStateOf } from './access-request.policy';
+import { currentMissingReasonOf, currentStateOf } from './access-request.policy';
+import { LIMIT_EXEMPTIONS, type LimitExemption } from './access-request.types';
 
 /** What a request is read as: the columns, the people it is for, its need steps with their decisions, and the lines of a group. */
 export const SELECT_REQUEST = {
@@ -15,8 +16,8 @@ export const SELECT_REQUEST = {
   routingMode: true,
   oneStepReason: true,
   oneStepBlockedReason: true,
-  manyPaidSoftwareCount: true,
-  manyPaidSoftwareReason: true,
+  limitExemption: true,
+  replacesAssignmentId: true,
   planId: true,
   requesterEmployeeId: true,
   departmentId: true,
@@ -130,19 +131,20 @@ function sentColumns(row: RequestRow): { costCenterId: string | null; submittedA
   return { costCenterId: row.costCenterId, submittedAt: row.submittedAt };
 }
 
-/** GH-3 of the request (`BR-MF1-01g`): the count and the reason are written together, or neither. */
-export function manyPaidSoftwareOf(row: {
-  manyPaidSoftwareCount: number | null;
-  manyPaidSoftwareReason: string | null;
-}): { count: number; reason: string } | null {
-  return row.manyPaidSoftwareCount !== null && row.manyPaidSoftwareReason !== null
-    ? { count: row.manyPaidSoftwareCount, reason: row.manyPaidSoftwareReason }
-    : null;
+/** The exemption a request carries, as the policy knows it; a value the policy does not know (the overlap of a transfer of the old rule) reads as none. */
+export function limitExemptionOf(value: string | null): LimitExemption | null {
+  return (LIMIT_EXEMPTIONS as readonly string[]).includes(value ?? '') ? (value as LimitExemption) : null;
 }
 
-/** The columns GH-3 writes on a request or a line (`BR-MF1-01g`): none when it is not flagged. */
-export function manyPaidSoftwareColumns(flag: { count: number; reason: string } | null | undefined) {
-  return flag ? { manyPaidSoftware: true, manyPaidSoftwareCount: flag.count, manyPaidSoftwareReason: flag.reason } : {};
+/** A date column that may be empty, as a business date. */
+const dayOrNull = (value: Date | null): BusinessDate | null => (value === null ? null : fromDateColumn(value));
+
+/**
+ * A request for a group keeps the step of its first head first; the step of a request for one person is the last it has, as a request that was
+ * sent back and sent on again has a new one (`QĐ-111ap`, R-24).
+ */
+function currentNeedStepOf<S>(type: string, steps: readonly S[]): S | undefined {
+  return type === 'GROUP_GRANT' ? steps[0] : steps[steps.length - 1];
 }
 
 export function toRecord(row: RequestRow): AccessRequestRecord {
@@ -165,13 +167,18 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
         step.approvalRecord.deciderRole === 'MANAGER' ? ('MANAGER' as const) : ('SPENDING_APPROVER' as const),
     },
   }));
-  const first = needSteps[0];
+  const first = currentNeedStepOf(row.type, needSteps);
   if (!first) throw new Error(`The request ${row.id} has no need step.`);
   const { decision: firstDecision, ...step } = first;
 
   return {
-    oneStepBlockedReason: row.oneStepBlockedReason as 'PRICE_MISSING' | 'RATE_MISSING' | null,
-    manyPaidSoftware: manyPaidSoftwareOf(row),
+    // An older release also wrote RATE_MISSING; it is read as the missing price it comes to (`currentMissingReasonOf`).
+    oneStepBlockedReason:
+      row.oneStepBlockedReason === null
+        ? null
+        : currentMissingReasonOf(row.oneStepBlockedReason as 'PRICE_MISSING' | 'RATE_MISSING'),
+    limitExemption: limitExemptionOf(row.limitExemption),
+    replacesAssignmentId: row.replacesAssignmentId,
     id: row.id,
     organizationId: row.organizationId,
     type: row.type,
@@ -227,7 +234,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
         : {
             assignmentId: row.renewal.assignmentId,
             previousExpectedEndDate: fromDateColumn(row.renewal.previousExpectedEndDate),
-            newExpectedEndDate: fromDateColumn(row.renewal.newExpectedEndDate),
+            newExpectedEndDate: dayOrNull(row.renewal.newExpectedEndDate),
             consecutiveMonths: row.renewal.consecutiveMonths,
             successorAssignmentId: row.renewal.successorAssignmentId,
             appliedAt: row.renewal.appliedAt,

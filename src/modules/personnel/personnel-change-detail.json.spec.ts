@@ -24,9 +24,13 @@ describe('offboardingChangeDetailJson (offboarding_case_changes.detail)', () => 
 
   it('writes the detail as it has always been written: the object itself; no detail is the database NULL', () => {
     expect(
-      offboardingChangeDetailJson.encode({ abrupt: true, departureEffectiveOn: '2026-11-30', headSuccessor: null }),
+      offboardingChangeDetailJson.encode({
+        accessBlockMode: 'BLOCK_NOW',
+        departureEffectiveOn: '2026-11-30',
+        headSuccessor: null,
+      }),
     ).toEqual({
-      abrupt: true,
+      accessBlockMode: 'BLOCK_NOW',
       departureEffectiveOn: '2026-11-30',
       headSuccessor: null,
     });

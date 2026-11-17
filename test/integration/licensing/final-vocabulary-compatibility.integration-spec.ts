@@ -95,8 +95,6 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
       expect(expired.version.state).toBe('EXPIRED');
       expect(proposals.items.map((item) => item.id)).toContain(proposal.id);
       expect(versions.items.map((item) => item.id)).toContain(version.id);
-      await h.versionLines(version.id).expect(200);
-      await h.proposalLines(proposal.id, unit.head.account).expect(200);
     });
 
     it('refuses the trigger the Finance outcome gave a check: the Finance review is gone, so no new check carries it (F65, QĐ-97c)', async () => {
@@ -195,10 +193,10 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
         employeeId: e1.employeeId,
         toDepartmentId: fin.id,
         effectiveOn: h.day(30),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
       await h
-        .rescheduleTransfer(wire.id, { newEffectiveOn: h.day(45), reason: 'Another day', grounds: h.grounds })
+        .rescheduleTransfer(wire.id, { newEffectiveOn: h.day(45), reason: 'Another day', groundsNote: h.groundsNote })
         .expect(200);
       const ticket = await ticketFor(e1.employeeId, 'TRANSFER_RECORD');
       await rewrite('department_transfers', 'recorded_by_app_user_id = NULL, recorded_by_ticket_id = $2', 'id = $1', [
@@ -267,19 +265,13 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
 
     it('reads a long leave and its changes that no account started', async () => {
       const e1 = await h.worker(des, code());
-      const approval = {
-        type: 'APPROVED_APPLICATION',
-        reference: 'DN-05/2026',
-        issuer: 'HR Department',
-        issuedOn: '2026-05-25',
-      };
       const started = h.dataOf<{ id: string }>(
         await h
           .startLongLeave({
             employeeId: e1.employeeId,
             startedOn: h.day(-1),
             approvedReturnOn: h.day(40),
-            grounds: approval,
+            groundsNote: 'Đơn xin nghỉ dài hạn số DN-05/2026',
           })
           .expect(201),
       );

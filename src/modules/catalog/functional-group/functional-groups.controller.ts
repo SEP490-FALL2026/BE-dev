@@ -44,6 +44,12 @@ const UPDATE_INVALID = {
   description: INVALID_DESCRIPTION,
   examples: [VALIDATION_EXAMPLE, EXAMPLES.NAME_INVALID, EXAMPLES.UPDATE_EMPTY],
 } as const;
+const FIXED = {
+  status: HttpStatus.CONFLICT,
+  description:
+    'The group is one of the two the system relies on, Liên lạc and Khác, and is not renamed or switched off (FUNCTIONAL_GROUP.FIXED).',
+  examples: [EXAMPLES.FIXED],
+} as const;
 const NAME_TAKEN = {
   status: HttpStatus.CONFLICT,
   description: 'A group with this name exists, ignoring case, accents and spacing (FUNCTIONAL_GROUP.NAME_TAKEN).',
@@ -54,6 +60,7 @@ const toWire = (group: FunctionalGroupRecord) => ({
   id: group.id,
   name: group.name,
   status: group.status,
+  systemKey: group.systemKey,
   createdAt: group.createdAt.toISOString(),
   updatedAt: group.updatedAt.toISOString(),
 });
@@ -119,9 +126,10 @@ export class FunctionalGroupsController {
   @ApiOperation({ operationId: 'functionalGroupUpdate', summary: 'Rename or switch a functional group' })
   @ApiSuccessResponse(FunctionalGroupResponseDto, {
     message: 'FUNCTIONAL_GROUP.UPDATED',
-    description: 'The group as it is after the change; a change of nothing is answered the same and not audited.',
+    description:
+      'The group as it is after the change; a change of nothing is answered the same and not audited. The fixed groups (systemKey set) are not renamed or switched off.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, UPDATE_INVALID, NAME_TAKEN, {
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, UPDATE_INVALID, NAME_TAKEN, FIXED, {
     status: HttpStatus.NOT_FOUND,
     description: 'The functional group does not exist (FUNCTIONAL_GROUP.NOT_FOUND).',
     examples: [EXAMPLES.NOT_FOUND],

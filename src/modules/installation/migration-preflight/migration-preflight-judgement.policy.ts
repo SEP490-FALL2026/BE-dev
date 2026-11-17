@@ -103,8 +103,25 @@ export function judgeContractGates(facts: ContractGateFacts): {
 
   return {
     blockers: [...owner.blockers, ...direction.blockers, ...judgeRetiredKinds(facts.retiredKinds), ...returns.blockers],
-    information: [...owner.information, ...direction.information, ...returns.information],
+    information: [
+      ...owner.information,
+      ...direction.information,
+      ...returns.information,
+      ...judgeServiceAccountsInForce(facts.retiredKinds),
+    ],
   };
+}
+
+/**
+ * A service account still in force is information, never a blocker (review of X-SA): the conversion migration keeps the rows it cannot
+ * convert yet, so on every database that holds one the deploy that converts it must be allowed to run, and a blocker would stop the
+ * very release that fixes it. It is listed on every run, by id, until the last one is converted or ended (the guide
+ * `service-account-conversion.md`), so the cleanup release that drops the kind finds none.
+ */
+function judgeServiceAccountsInForce(facts: ContractGateFacts['retiredKinds']): PreflightInformation[] {
+  return [...facts.serviceAccountIds]
+    .sort(compare)
+    .map((assignmentId): PreflightInformation => ({ code: 'SERVICE_ACCOUNT_STILL_IN_FORCE', assignmentId }));
 }
 
 /**

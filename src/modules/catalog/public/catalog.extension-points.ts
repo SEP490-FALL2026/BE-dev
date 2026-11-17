@@ -32,6 +32,16 @@ export interface SeatOccupancyReader {
     day: BusinessDate,
     tx?: DbTx,
   ): Promise<ReadonlySet<string>>;
+  /**
+   * For each of these subscriptions, the seats it holds from `day` on (the most assignments held on any day from then, as the database counts a
+   * new seat) and how many of the assignments not ended are held by a right whose revocation is still open: one read for any number of
+   * them. A subscription nobody holds a seat of is absent.
+   */
+  seatsOfSubscriptions(
+    subscriptionIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<ReadonlyMap<string, { occupied: number; inRevocation: number }>>;
 }
 
 /**

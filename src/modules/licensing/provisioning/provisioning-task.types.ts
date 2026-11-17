@@ -111,6 +111,7 @@ export const SUMMARY_SELECT = {
   dueOn: true,
   notBefore: true,
   createdByAppUserId: true,
+  createdBySystem: true,
   createdAt: true,
   updatedAt: true,
   assignment: { select: ASSIGNMENT_SELECT },

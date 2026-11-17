@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { maxEndDateOf } from '../access-request/pricing.policy';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AccessRequestNotFoundError, AccessRequestNotRequesterError } from '../access-request/access-request.errors';
@@ -32,7 +30,6 @@ export class SupplementService {
     private readonly pricing: SupplementPricing,
     private readonly recorder: SupplementRecorder,
     private readonly queries: SupplementQueryService,
-    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /**
@@ -47,35 +44,37 @@ export class SupplementService {
       if (request.routing?.mode === 'ONE_STEP') {
         if (request.requesterEmployeeId !== actor.employeeId) throw new AccessRequestNotRequesterError();
         if (request.state !== 'AWAITING_REQUESTER_REVISION') throw new SpendSupplementRefusedError('NOT_IN_QUEUE');
-      } else if (request.departmentId !== (await this.head.departmentOf(actor))) throw new AccessRequestNotFoundError();
+      } else {
+        if (request.departmentId !== (await this.head.departmentOf(actor))) throw new AccessRequestNotFoundError();
+        // A request that went back to its sender from the need step is not in the queue of the head: its sender sends it on again first.
+        if (request.state === 'AWAITING_REQUESTER_REVISION') throw new SpendSupplementRefusedError('NOT_IN_QUEUE');
+      }
       const { pricing } = request;
       // The people of a group the head leaves out are judged first: a request for one person has none to leave out.
       const dropped = this.groups.check(request, body.dropEmployeeIds ?? []);
       const now = new Date();
-      const today = await this.organizationReads.businessToday(now, tx);
       const refusal = checkSupplement({
         state: request.state,
         priced: pricing.status === 'PRICED' && pricing.amount !== null,
         leavesPeopleOut: dropped.length > 0,
-        term:
-          body.expectedEndDate === undefined
-            ? undefined
-            : {
-                requested: body.expectedEndDate,
-                current: request.expectedEndDate,
-                today,
-                maxEndDate: maxEndDateOf(today),
-              },
+        term: await this.pricing.termFactsOf(tx, request, body.termMonths, now),
       });
       if (refusal) throw new SpendSupplementRefusedError(refusal);
 
       const { repriced, change } = await this.pricing.repriceFor(tx, request, {
         dropped,
-        expectedEndDate: body.expectedEndDate,
+        termMonths: body.termMonths,
         now,
       });
 
-      return this.recorder.record(tx, actor, request, { reason: body.reason, repriced, change, dropped, now });
+      return this.recorder.record(tx, actor, request, {
+        reason: body.reason,
+        repriced,
+        change,
+        dropped,
+        termMonths: body.termMonths,
+        now,
+      });
     });
 
     return (await this.queries.wires(requestId, [record]))[0];

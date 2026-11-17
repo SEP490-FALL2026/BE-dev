@@ -8,6 +8,7 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../../support/http-test-app';
+import { intakeBodyOf } from '../../support/application-body';
 
 interface LineWire {
   taxType: string;
@@ -79,19 +80,23 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
   const unique = (prefix: string): string => `${prefix} ${(counter += 1)}`;
   const dataOf = <T>(response: request.Response): T => (response.body as { data: T }).data;
   const codeOf = (response: request.Response): string => (response.body as { error: { code: string } }).error.code;
+  const detailsOf = (response: request.Response): unknown =>
+    (response.body as { error: { details: unknown } }).error.details;
   /** A vendor of the organization, made the way the catalog makes one: by declaring an application. */
   const vendor = async (name = unique('Vendor')): Promise<string> =>
     dataOf<{ vendor: { id: string } }>(
       await request(server())
         .post('/api/v1/applications')
         .set(as(it1))
-        .send({
-          name: unique('App'),
-          kind: 'SAAS',
-          vendorName: name,
-          dataSensitivity: 'LOW',
-          communication: NO,
-        })
+        .send(
+          intakeBodyOf({
+            name: unique('App'),
+            kind: 'SAAS',
+            vendorName: name,
+            dataSensitivity: 'LOW',
+            communication: NO,
+          }),
+        )
         .expect(201),
     ).vendor.id;
   const declare = (id: string, body: object, account: ApiAccount = finance) =>
@@ -209,6 +214,15 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
       const id = await vendor();
 
       expect(codeOf(await estimate(id, 'abc', 'USD').expect(422))).toBe('VALIDATION_ERROR');
+      expect(detailsOf(await estimate(id, 'abc', 'USD').expect(422))).toEqual({
+        issues: [{ code: 'invalid_format', path: 'netAmount' }],
+      });
+      expect(detailsOf(await estimate(id, '1.5', 'VND').expect(422))).toEqual({
+        allowedDecimals: 0,
+        path: 'netAmount',
+      });
+      expect(detailsOf(await estimate(id, '-5', 'VND').expect(422))).toEqual({ path: 'netAmount' });
+      expect(detailsOf(await estimate(id, '10', 'XYZ').expect(422))).toEqual({ currency: 'XYZ', path: 'netAmount' });
       expect(codeOf(await estimate(id, '1000.001', 'USD').expect(422))).toBe('MONEY_SCALE_EXCEEDED');
       expect(codeOf(await estimate(id, '1.5', 'VND').expect(422))).toBe('MONEY_SCALE_EXCEEDED');
       expect(codeOf(await estimate(id, '-5', 'VND').expect(422))).toBe('MONEY_OUT_OF_RANGE');
@@ -350,11 +364,7 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
 
     it.each([
       ['an empty tax name', { lines: [{ ...VAT, taxType: '  ' }] }, 'VENDOR_TAX_PROFILE.TAX_TYPE_INVALID'],
-      [
-        'a tax name over 100 characters',
-        { lines: [{ ...VAT, taxType: 'T'.repeat(101) }] },
-        'VENDOR_TAX_PROFILE.TAX_TYPE_INVALID',
-      ],
+      ['a tax name over 100 characters', { lines: [{ ...VAT, taxType: 'T'.repeat(101) }] }, 'VALIDATION_ERROR'],
       ['a tax name used twice', { lines: [VAT, { ...CIT, taxType: 'gtgt' }] }, 'VENDOR_TAX_PROFILE.TAX_TYPE_DUPLICATE'],
       ['a negative rate', { lines: [{ ...VAT, ratePercent: '-1' }] }, 'VENDOR_TAX_PROFILE.RATE_INVALID'],
       ['a rate over 100', { lines: [{ ...VAT, ratePercent: '100.01' }] }, 'VENDOR_TAX_PROFILE.RATE_INVALID'],
@@ -369,7 +379,7 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
             deductible: false,
           })),
         },
-        'VENDOR_TAX_PROFILE.TOO_MANY_LINES',
+        'VALIDATION_ERROR',
       ],
     ])('refuses a profile with %s: 422 %s and nothing recorded', async (_name, body, code) => {
       const id = await vendor();
@@ -378,6 +388,34 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
       expect(codeOf(await declare(id, body).expect(422))).toBe(code);
       expect(await n('vendor_tax_profile_versions')).toBe(before);
       expect((await ctx.sql.query(`SELECT 1 FROM vendor_tax_profiles WHERE vendor_id = $1`, [id])).rowCount).toBe(0);
+    });
+
+    it('names the field of a body over the limits (21 lines, a name over 100 characters) and takes the limits themselves', async () => {
+      const id = await vendor();
+      const line = (taxType: string) => ({ taxType, ratePercent: '1', deductible: false });
+
+      const tooMany = await declare(id, {
+        lines: Array.from({ length: 21 }, (_, index) => line(`Tax ${index}`)),
+      }).expect(422);
+      expect(detailsOf(tooMany)).toMatchObject({ issues: [{ path: 'lines' }] });
+      const tooLong = await declare(id, { lines: [line('T'.repeat(101))] }).expect(422);
+      expect(detailsOf(tooLong)).toMatchObject({ issues: [{ path: 'lines.0.taxType' }] });
+
+      const atLimit = await profileOf(id, {
+        lines: [line('T'.repeat(100)), ...Array.from({ length: 19 }, (_, index) => line(`Tax ${index}`))],
+      });
+      expect(atLimit.lines).toHaveLength(20);
+
+      // FIX-E-O2: the length is counted as the policy keeps the name, so spaces around it and a decomposed accent do not count twice.
+      const typed = `  ${'T'.repeat(48)}     ${'U'.repeat(51)}  `;
+      const decomposed = 'Thuế'.normalize('NFD').repeat(25);
+      const kept = await profileOf(id, { lines: [line(typed), line(decomposed)] });
+      expect(kept.lines.map((entry) => entry.taxType)).toEqual([
+        `${'T'.repeat(48)} ${'U'.repeat(51)}`,
+        'Thuế'.repeat(25),
+      ]);
+      const overOnceKept = await declare(id, { lines: [line(`${typed}x`)] }).expect(422);
+      expect(detailsOf(overOnceKept)).toMatchObject({ issues: [{ path: 'lines.0.taxType' }] });
     });
 
     it('answers 404 VENDOR.NOT_FOUND on every route for a vendor that does not exist, writing nothing', async () => {

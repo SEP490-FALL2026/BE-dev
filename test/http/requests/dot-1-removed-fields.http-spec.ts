@@ -9,6 +9,8 @@ import { bearer, createHttpContractApp, principal } from '../../support/http-con
  * that was removed answers 404. One valid body per route, then each dropped field sent on top of it.
  */
 const ID = '8a4d7c1e-2b3f-4c5d-9e6f-0a1b2c3d4e5f';
+/** The checklist every decision of the need step carries (`QĐ-111ap`): the shape is judged here, not the answers. */
+const CHECKLIST = { policyVersionId: ID, answers: [] };
 
 type Call = {
   name: string;
@@ -72,29 +74,29 @@ const DROPPED: Call[] = [
     dropped: { expectedEndDate: '2027-01-01' },
   },
   {
-    name: 'accessRequestSubmit: termMonths (QĐ-104a: an end date, not months)',
+    name: 'accessRequestSubmit: expectedEndDate (QĐ-111i: the months of use, not an end date)',
     method: 'post',
     path: '/api/v1/access-requests',
     role: 'EMPLOYEE',
     body: { planId: ID, businessReason: 'Work' },
-    dropped: { termMonths: 12 },
-    control: { expectedEndDate: '2027-01-01' },
+    dropped: { expectedEndDate: '2027-01-01' },
+    control: { termMonths: 12 },
     at: '',
-    field: 'termMonths',
+    field: 'expectedEndDate',
   },
   {
-    name: 'accessRequestPreview: termMonths (QĐ-104a: an end date, not months)',
+    name: 'accessRequestPreview: expectedEndDate (QĐ-111i: the months of use, not an end date)',
     method: 'post',
     path: '/api/v1/access-requests/preview',
     role: 'EMPLOYEE',
     body: { planId: ID },
-    dropped: { termMonths: 12 },
-    control: { expectedEndDate: '2027-01-01' },
+    dropped: { expectedEndDate: '2027-01-01' },
+    control: { termMonths: 12 },
     at: '',
-    field: 'termMonths',
+    field: 'expectedEndDate',
   },
   {
-    name: 'accessRequestPropose: termMonths (QĐ-104a: an end date, not months)',
+    name: 'accessRequestPropose: expectedEndDate (QĐ-111i: the months of use, not an end date)',
     method: 'post',
     path: '/api/v1/access-requests/proposals',
     role: 'EMPLOYEE',
@@ -105,51 +107,43 @@ const DROPPED: Call[] = [
       dataDescription: 'None',
       expectedUsers: 1,
     },
-    dropped: { termMonths: 12 },
-    control: { expectedEndDate: '2027-01-01' },
+    dropped: { expectedEndDate: '2027-01-01' },
+    control: { termMonths: 12 },
     at: '',
-    field: 'termMonths',
+    field: 'expectedEndDate',
   },
   {
-    name: 'accessRequestDraftSave: termMonths (QĐ-104a: an end date, not months)',
+    name: 'accessRequestDraftSave: expectedEndDate (QĐ-111i: the months of use, not an end date)',
     method: 'post',
     path: '/api/v1/access-requests/drafts',
     role: 'EMPLOYEE',
     body: { kind: 'INDIVIDUAL', planId: ID, businessReason: 'Work' },
-    dropped: { termMonths: 12 },
-    control: { expectedEndDate: '2027-01-01' },
+    dropped: { expectedEndDate: '2027-01-01' },
+    control: { termMonths: 12 },
     at: '',
-    field: 'termMonths',
+    field: 'expectedEndDate',
   },
   {
-    name: 'groupRequestCheck: termMonths (QĐ-104a: an end date, not months)',
+    name: 'groupRequestCheck: expectedEndDate (QĐ-111i: the months of use, not an end date)',
     method: 'post',
     path: '/api/v1/group-requests/check',
     role: 'EMPLOYEE',
     body: { planId: ID, businessReason: 'Work', lines: [{ employeeId: ID }] },
-    dropped: { termMonths: 12 },
-    control: { expectedEndDate: '2027-01-01' },
+    dropped: { expectedEndDate: '2027-01-01' },
+    control: { termMonths: 12 },
     at: '',
-    field: 'termMonths',
+    field: 'expectedEndDate',
   },
   {
-    name: 'accessRequestServiceAccountSubmit: termMonths (QĐ-104a: an end date, not months)',
-    method: 'post',
-    path: '/api/v1/access-requests/service-accounts',
-    role: 'EMPLOYEE',
-    body: { planId: ID, businessReason: 'Work', purpose: 'Build', expectedIdentifier: 'ci-bot' },
-    dropped: { termMonths: 12 },
-  },
-  {
-    name: 'groupRequestSubmit: termMonths (QĐ-104a: an end date, not months)',
+    name: 'groupRequestSubmit: expectedEndDate (QĐ-111i: the months of use, not an end date)',
     method: 'post',
     path: '/api/v1/group-requests',
     role: 'EMPLOYEE',
     body: { planId: ID, businessReason: 'Work', lines: [{ employeeId: ID }] },
-    dropped: { termMonths: 12 },
-    control: { expectedEndDate: '2027-01-01' },
+    dropped: { expectedEndDate: '2027-01-01' },
+    control: { termMonths: 12 },
     at: '',
-    field: 'termMonths',
+    field: 'expectedEndDate',
   },
   {
     name: 'groupRequestSubmit: termConfirmation (step 7)',
@@ -164,7 +158,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/need-decision`,
     role: 'MANAGER',
-    body: { decision: 'APPROVE' },
+    body: { decision: 'APPROVE', checklist: CHECKLIST },
     dropped: { termConfirmation: { reason: 'Long' } },
   },
   {
@@ -172,17 +166,12 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/line-need-decisions`,
     role: 'MANAGER',
-    body: { lines: [{ employeeId: ID, decision: 'APPROVE' }] },
+    body: { lines: [{ employeeId: ID, decision: 'APPROVE' }], checklist: CHECKLIST },
     dropped: { termConfirmation: { reason: 'Long' } },
   },
   ...[
     ['accessRequestSubmit', '/api/v1/access-requests', { planId: ID, businessReason: 'Work' }],
     ['accessRequestPreview', '/api/v1/access-requests/preview', { planId: ID }],
-    [
-      'accessRequestServiceAccountSubmit',
-      '/api/v1/access-requests/service-accounts',
-      { planId: ID, businessReason: 'Work', purpose: 'Build', expectedIdentifier: 'ci-bot' },
-    ],
     [
       'accessRequestPropose',
       '/api/v1/access-requests/proposals',
@@ -225,7 +214,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/need-decision`,
     role: 'MANAGER',
-    body: { decision: 'APPROVE' },
+    body: { decision: 'APPROVE', checklist: CHECKLIST },
     dropped: { spend: { offPlan: true, expectedSpendOn: '2027-01-01' } },
   },
   {
@@ -233,7 +222,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/spend-approval`,
     role: 'SPENDING_APPROVER',
-    body: { decision: 'APPROVE' },
+    body: { decision: 'APPROVE', checklist: CHECKLIST },
     dropped: { override: { reason: 'x', years: [2026] } },
   },
   {
@@ -241,7 +230,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/line-spend-decisions`,
     role: 'SPENDING_APPROVER',
-    body: { lines: [{ employeeId: ID, decision: 'APPROVE' }] },
+    body: { lines: [{ employeeId: ID, decision: 'APPROVE' }], checklist: CHECKLIST },
     dropped: { override: { reason: 'x', years: [2026] } },
   },
   ...['highValuePercent', 'highValueAmount'].map((field) => ({
@@ -257,36 +246,37 @@ const DROPPED: Call[] = [
     method: 'put' as const,
     path: `/api/v1/budget-versions/${ID}`,
     role: 'FINANCE',
-    body: { quarters: null },
+    body: { reserveReason: null },
     dropped: {
       [field]: field === 'highValuePercent' ? 10 : field === 'reason' ? 'x' : { amount: '1' },
     },
   })),
   // `costCenterId` of the proposal is no longer dropped: a head who answers for two departments names the one (QĐ-106k, BUDGET.COST_CENTER_REQUIRED).
-  {
-    name: 'budgetProposalSubmit: lines[].amount.currency (step 11)',
-    method: 'post',
-    path: '/api/v1/budget-proposals',
-    role: 'MANAGER',
-    body: { year: 2027 },
-    dropped: {
-      lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100', currency: 'VND' } }],
-    },
-    at: 'lines.0.amount',
-    field: 'currency',
-  },
-  {
-    name: 'budgetProposalResubmit: lines[].amount.currency (step 11)',
-    method: 'post',
-    path: `/api/v1/budget-proposals/${ID}/resubmission`,
-    role: 'MANAGER',
-    body: {},
-    dropped: {
-      lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100', currency: 'VND' } }],
-    },
-    at: 'lines.0.amount',
-    field: 'currency',
-  },
+  ...['/api/v1/budget-proposals', `/api/v1/budget-proposals/${ID}/resubmission`].flatMap((path) => {
+    const name = path.includes('resubmission') ? 'budgetProposalResubmit' : 'budgetProposalSubmit';
+    const base = path.includes('resubmission') ? { attachmentIds: [ID] } : { year: 2027, attachmentIds: [ID] };
+
+    return [
+      {
+        name: `${name}: requestedAmount.currency (step 11)`,
+        method: 'post' as const,
+        path,
+        role: 'MANAGER',
+        body: base,
+        dropped: { requestedAmount: { amount: '100', currency: 'VND' } },
+        at: 'requestedAmount',
+        field: 'currency',
+      },
+      {
+        name: `${name}: lines (BG-2, BM-10 is files, an amount and a note)`,
+        method: 'post' as const,
+        path,
+        role: 'MANAGER',
+        body: { ...base, requestedAmount: { amount: '100' } },
+        dropped: { lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100' } }] },
+      },
+    ];
+  }),
   {
     name: 'budgetVersionCreate: base.currency (step 11)',
     method: 'post',
@@ -317,28 +307,6 @@ const DROPPED: Call[] = [
     at: 'base',
     field: 'currency',
   },
-  {
-    name: 'budgetVersionLineAdd: amount.currency (step 11)',
-    method: 'post',
-    path: `/api/v1/budget-versions/${ID}/lines`,
-    role: 'FINANCE',
-    body: {},
-    dropped: {
-      lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100', currency: 'VND' } }],
-    },
-    at: 'lines.0.amount',
-    field: 'currency',
-  },
-  {
-    name: 'budgetVersionLineUpdate: amount.currency (step 11)',
-    method: 'put',
-    path: `/api/v1/budget-versions/${ID}/lines/1`,
-    role: 'FINANCE',
-    body: {},
-    dropped: { amount: { amount: '100', currency: 'VND' } },
-    at: 'amount',
-    field: 'currency',
-  },
   ...['/api/v1/budget-proposals/attachments', `/api/v1/budget-versions/${ID}/attachments`].map((path) => ({
     name: `${path.includes('versions') ? 'budgetVersionAttachmentDeclare' : 'budgetProposalAttachmentDeclare'}: sizeBytes 0 (step 11)`,
     method: 'post' as const,
@@ -357,12 +325,12 @@ const DROPPED: Call[] = [
     dropped: { newExpectedEndDate: '2027-01-01' },
   },
   {
-    name: 'accessRequestRenewalSubmit: extensionMonths 13 (step 12)',
+    name: 'accessRequestRenewalSubmit: extensionMonths that is not whole (QĐ-111l: the range is judged by the kind of plan, not the schema)',
     method: 'post',
     path: '/api/v1/access-requests/renewals',
     role: 'EMPLOYEE',
     body: { assignmentId: ID, businessReason: 'Work' },
-    dropped: { extensionMonths: 13 },
+    dropped: { extensionMonths: 1.5 },
     control: { extensionMonths: 12 },
   },
   ...['/api/v1/group-requests', '/api/v1/group-requests/check'].map((path) => ({
@@ -375,72 +343,12 @@ const DROPPED: Call[] = [
     at: 'lines.0',
     field: 'expectedEndDate',
   })),
-  ...['/api/v1/budget-proposals', `/api/v1/budget-proposals/${ID}/resubmission`].flatMap((path) =>
-    ['windowFrom', 'windowTo', 'servicePeriodMonths', 'repeatCycle', 'quoteValidUntil'].map((field) => ({
-      name: `${path.includes('resubmission') ? 'budgetProposalResubmit' : 'budgetProposalSubmit'}: lines[].${field} (step 12b)`,
-      method: 'post' as const,
-      path,
-      role: 'MANAGER',
-      body: path.includes('resubmission') ? {} : { year: 2027 },
-      dropped: {
-        lines: [
-          {
-            lineType: 'RENEW',
-            priorityRank: 1,
-            description: 'Tool',
-            amount: { amount: '100' },
-            [field]: field === 'servicePeriodMonths' ? 12 : field === 'repeatCycle' ? 'ANNUAL' : '2027-01-01',
-          },
-        ],
-      },
-      at: 'lines.0',
-      field,
-    })),
-  ),
-  ...['windowFrom', 'windowTo', 'servicePeriodMonths', 'repeatCycle', 'quoteValidUntil'].map((field) => ({
-    name: `budgetVersionLineUpdate: ${field} (step 12b)`,
-    method: 'put' as const,
-    path: `/api/v1/budget-versions/${ID}/lines/1`,
-    role: 'FINANCE',
-    body: { financeComment: 'Checked' },
-    dropped: { [field]: field === 'servicePeriodMonths' ? 12 : field === 'repeatCycle' ? 'ANNUAL' : '2027-01-01' },
-  })),
-  {
-    name: 'budgetVersionLineAdd: lines[].windowFrom (step 12b)',
-    method: 'post',
-    path: `/api/v1/budget-versions/${ID}/lines`,
-    role: 'FINANCE',
-    body: {},
-    dropped: {
-      lines: [
-        {
-          lineType: 'RENEW',
-          priorityRank: 1,
-          description: 'Tool',
-          amount: { amount: '100' },
-          windowFrom: '2027-01-01',
-        },
-      ],
-    },
-    at: 'lines.0',
-    field: 'windowFrom',
-  },
-  {
-    name: 'budgetProposalSubmit: a line with neither plan nor description (step 12b)',
-    method: 'post',
-    path: '/api/v1/budget-proposals',
-    role: 'MANAGER',
-    body: { year: 2027 },
-    dropped: { lines: [{ lineType: 'RENEW', priorityRank: 1, amount: { amount: '100' } }] },
-    control: { lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100' } }] },
-    at: 'lines.0.description',
-  },
   {
     name: 'accessRequestNeedDecide: spend.planLine (step 12b)',
     method: 'post',
     path: `/api/v1/access-requests/${ID}/need-decision`,
     role: 'MANAGER',
-    body: { decision: 'APPROVE' },
+    body: { decision: 'APPROVE', checklist: CHECKLIST },
     dropped: { spend: { planLine: { position: 1 } } },
   },
   {
@@ -448,7 +356,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/need-decision`,
     role: 'MANAGER',
-    body: { decision: 'APPROVE' },
+    body: { decision: 'APPROVE', checklist: CHECKLIST },
     dropped: { spend: { offPlan: true } },
   },
   {
@@ -456,7 +364,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/line-need-decisions`,
     role: 'MANAGER',
-    body: { lines: [{ employeeId: ID, decision: 'APPROVE' }] },
+    body: { lines: [{ employeeId: ID, decision: 'APPROVE' }], checklist: CHECKLIST },
     dropped: { spend: { offPlan: true } },
   },
 ];

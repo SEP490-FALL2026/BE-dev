@@ -16,7 +16,14 @@ import { parseReport } from './parse/vendor-import-parse.policy';
 import type { ParsedReport } from './parse/vendor-import-parse.types';
 import { UsageImportFileError, UsageImportNotFoundError, UsageImportStateError } from './vendor-import.errors';
 import { VendorImportRepo } from './vendor-import.repo';
-import { MAX_REPORT_BYTES, type ImportFormat, type ImportRecord, type ImportView } from './vendor-import.types';
+import {
+  DUPLICATE_FILE_WARNING,
+  MAX_REPORT_BYTES,
+  type ImportFormat,
+  type ImportRecord,
+  type ImportSummary,
+  type ImportView,
+} from './vendor-import.types';
 
 /** A preview that is not confirmed goes stale on its own after this long. */
 export const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
@@ -90,8 +97,9 @@ export class VendorImportService {
     const { parsed, format } = this.read(input, source, application.name, today, organization.timeZone);
 
     const trackingNoticeRequired = !(await this.repo.hasCompletedForApplication(source.applicationId));
-    const { rows, summary } = await this.previews.preview({ source, parsed, today, trackingNoticeRequired });
+    const { rows, summary: judged } = await this.previews.preview({ source, parsed, today, trackingNoticeRequired });
     const contentHash = createHash('sha256').update(input.bytes).digest('hex');
+    const summary = await this.warnOfDuplicate(judged, source.id, contentHash);
 
     const id = await this.runner.run(async (tx) => {
       const createdId = await this.repo.create(tx, {
@@ -129,6 +137,19 @@ export class VendorImportService {
     if (!record) throw new UsageImportNotFoundError();
 
     return toImportView(record);
+  }
+
+  /**
+   * The summary with the warning `DUPLICATE_FILE` and the id of the import it repeats when a confirmed import of the same source holds exactly this
+   * file. It is a warning, not a refusal: a file that was corrected is another file, and one that was not changes no day (a day is binary and a
+   * later report only covers it again).
+   */
+  private async warnOfDuplicate(summary: ImportSummary, sourceId: string, contentHash: string): Promise<ImportSummary> {
+    const earlier = await this.repo.findConfirmedWithHash(sourceId, contentHash);
+
+    return earlier
+      ? { ...summary, warnings: [...summary.warnings, DUPLICATE_FILE_WARNING], duplicateOfImportId: earlier }
+      : summary;
   }
 
   /** The report of the file by the template of its source, and the format it was in. Throws UsageImportFileError. */

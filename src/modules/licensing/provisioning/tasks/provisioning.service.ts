@@ -2,9 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
-import { ProvisioningBeneficiaryDepartedError, ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
+import { ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
 import { RevocationListeners } from '../../public/licensing.extension-points';
 import type { ProvisioningChannel, ProvisioningTaskStatus } from '../../public/licensing.types';
+import type { K1ChecklistClaim } from '../k1-checklist/provisioning-k1-checklist.policy';
 import { cleanEvidence, cleanFailureReason, nextStatus } from '../provisioning.policy';
 import { assertNotBefore, assertNotRevocationTask } from '../revocation.policy';
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
@@ -12,6 +13,7 @@ import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import { ProvisioningTaskViewService, type TaskSummaryView, type TaskView } from '../provisioning-task-view.service';
 import { ProvisioningGrantCompletion } from './provisioning-grant-completion.service';
+import { ProvisioningHolderService } from './provisioning-holder.service';
 
 export type TaskScope = 'ALL' | 'MINE' | 'GENERAL';
 
@@ -29,6 +31,7 @@ export class ProvisioningService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly revocation: RevocationListeners,
     private readonly completion: ProvisioningGrantCompletion,
+    private readonly holders: ProvisioningHolderService,
   ) {}
 
   /** The queue, the oldest first: `MINE` the tasks this IT Admin is in charge of, `GENERAL` those nobody works by default. */
@@ -39,6 +42,7 @@ export class ProvisioningService {
       status?: ProvisioningTaskStatus;
       scope: TaskScope;
       claimableNow?: boolean;
+      overdue?: boolean;
       page: number;
       pageSize: number;
     },
@@ -50,6 +54,9 @@ export class ProvisioningService {
       ...(query.scope === 'GENERAL' ? { generalQueueOf: await this.responsibleWhoLeft() } : {}),
       ...(query.claimableNow !== undefined
         ? { claimableOn: { today: await this.organizationReads.businessToday(), claimable: query.claimableNow } }
+        : {}),
+      ...(query.overdue !== undefined
+        ? { overdueOn: { today: await this.organizationReads.businessToday(), overdue: query.overdue } }
         : {}),
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
@@ -67,8 +74,9 @@ export class ProvisioningService {
   }
 
   /**
-   * Takes the task (or takes it over from another IT Admin). A revocation is taken whoever its beneficiary is, a person who
-   * left included; the hook of the handover may refuse it. Throws ProvisioningTaskNotFoundError,
+   * Takes the task (or takes it over from another IT Admin, whoever its beneficiary is by then). A revocation is taken whoever its
+   * beneficiary is, a person who left included; a task to grant is begun only for a beneficiary who works and whose access is not blocked
+   * (`QĐ-77f`, `QĐ-110d`), and one already in progress is not judged again. A listener of the revocation may refuse it by throwing at `BEFORE_WORK` (none does today). Throws ProvisioningTaskNotFoundError,
    * ProvisioningTaskNotManualError, ProvisioningTaskStateError, ProvisioningBeneficiaryDepartedError and
    * ProvisioningAnotherItAdminNeededError.
    */
@@ -81,11 +89,9 @@ export class ProvisioningService {
           // A revocation with a day not before is not taken before it (`US-10-07` AC-18): nothing changes and nobody is told.
           assertNotBefore(locked.notBefore, await this.organizationReads.businessToday(now, tx));
           await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: toRevocationFacts(locked), now });
-        } else {
-          const beneficiary = await this.organizationReads.getEmployee(locked.assignment.employeeId, tx);
-          if (beneficiary && beneficiary.status !== 'ACTIVE') {
-            throw new ProvisioningBeneficiaryDepartedError(locked.requestId ?? '');
-          }
+        } else if (locked.status === 'QUEUED') {
+          // Only a task not yet begun is held back: one already being worked may change hands, for the IT Admin to check with the vendor (`QĐ-110d`).
+          await this.holders.requireCanBeginTask(tx, locked.requestId ?? '', locked.assignment.employeeId);
         }
         await this.repo.markClaimed(tx, locked.id, actor.appUserId, now);
         if (locked.kind === 'REVOKE') {
@@ -109,14 +115,16 @@ export class ProvisioningService {
    * the store its seat is given (`licenseKeyId`, `QĐ-103d`). Throws ProvisioningEvidenceRequiredError, the errors of `claim` except the
    * departed beneficiary, ProvisioningTaskStateError (`IS_REVOCATION` for a revocation), ProvisioningKeyError, LicenseKeyNotFoundError and
    * LicenseKeyStateError. A grant taken from the pool, with nothing bought for it, records the cost it avoided once (`BR-MF1-09c`). The day
-   * it is completed is the day the right begins (`BR-MF1-06a`).
+   * it is completed is the day the right begins (`BR-MF1-06a`). The grant of a K1 seat is completed with the checklist of its two steps and the
+   * evidence, which may be written in the checklist (`QĐ-111az`; ProvisioningK1ChecklistError): a body that sends one is not asked for the
+   * evidence beside it here, the checklist judges it.
    */
   async complete(
     actor: AuthenticatedPrincipal,
     id: string,
-    input: { evidence: string; licenseKeyId?: string | undefined },
+    input: { evidence: string; licenseKeyId?: string | undefined; k1Checklist?: K1ChecklistClaim | undefined },
   ): Promise<TaskView> {
-    const evidence = cleanEvidence(input.evidence);
+    const evidence = input.k1Checklist === undefined ? cleanEvidence(input.evidence) : input.evidence.trim();
     const task = await this.frame.work(actor, id, {
       check: (locked) => {
         assertNotRevocationTask(locked.kind);
@@ -127,7 +135,7 @@ export class ProvisioningService {
           tx,
           actor,
           { task: locked, now, organizationId },
-          { evidence, licenseKeyId: input.licenseKeyId },
+          { evidence, licenseKeyId: input.licenseKeyId, k1Checklist: input.k1Checklist },
         );
         const after = {
           status: 'COMPLETED',

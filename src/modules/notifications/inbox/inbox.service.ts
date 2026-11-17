@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { InAppNotificationInput, InAppNotificationRecord } from '../public/notifications.types';
@@ -6,6 +6,7 @@ import { InAppNotificationRepo } from './in-app-notification.repo';
 import { InvalidInAppNotificationError } from '../public/notifications.errors';
 import { NotificationNotFoundError } from './inbox.errors';
 import { refuseInAppNotification } from './inbox.policy';
+import { canonicalSubjectType, isUpperSnakeSubjectType } from './notification-target.policy';
 
 /**
  * The inbox of the application: it gives a notice in the transaction of the change behind it and lets a person list, count and
@@ -14,6 +15,8 @@ import { refuseInAppNotification } from './inbox.policy';
  */
 @Injectable()
 export class InboxService {
+  private readonly logger = new Logger(InboxService.name);
+
   constructor(private readonly repo: InAppNotificationRepo) {}
 
   /**
@@ -24,7 +27,17 @@ export class InboxService {
     const refusal = refuseInAppNotification(input);
     if (refusal) throw new InvalidInAppNotificationError(refusal);
 
-    return this.repo.insertIfAbsent(tx, input);
+    // The type of the subject goes in UPPER_SNAKE. One that is still not is written and logged, never refused: a refusal here would
+    // fail the business transaction around the notice (`SPEC-5B` A6); the gate `notification-subject-type` stops a new spelling.
+    const subject =
+      input.subject === null ? null : { ...input.subject, type: canonicalSubjectType(input.subject.type) };
+    if (subject !== null && !isUpperSnakeSubjectType(subject.type)) {
+      this.logger.warn(
+        `Notice ${input.code} (event key ${input.eventKey}) has a subject type that is not UPPER_SNAKE: ${subject.type}`,
+      );
+    }
+
+    return this.repo.insertIfAbsent(tx, { ...input, subject });
   }
 
   async list(

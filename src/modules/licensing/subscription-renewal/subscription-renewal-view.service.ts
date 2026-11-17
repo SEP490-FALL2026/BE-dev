@@ -11,12 +11,14 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import type {
   DeadlineEventWire,
   RankedSeatWire,
+  RenewalAdjustmentWire,
   RenewalDetailWire,
   RenewalSummaryWire,
 } from './subscription-renewal.dto';
 import { RenewalError } from './subscription-renewal.errors';
-import { renewalWaitingReason } from './decision/renewal-decision.policy';
-import { toDeadlineEvent, toRenewalDetail, toRenewalSummary } from './subscription-renewal.mapper';
+import { decidedCancelOf, existingCaseOf, lateRenewalOf, pointOf } from './record/renewal-record.policy';
+import { RenewalSeatsNeededService } from './seats-needed/renewal-seats-needed.service';
+import { toAdjustmentWire, toDeadlineEvent, toRenewalDetail, toRenewalSummary } from './subscription-renewal.mapper';
 import { RenewalPartiesService, type RenewalReadScope } from './subscription-renewal-parties.service';
 import { RenewalRankingService } from './subscription-renewal-ranking.service';
 import { SubscriptionRenewalRepo } from './subscription-renewal.repo';
@@ -25,11 +27,11 @@ import type { DeadlineOutcome, RenewalRecord, RenewalState } from './subscriptio
 type PageQuery = { page: number; pageSize: number };
 
 /**
- * The reads of the renewals (`US-11-02`, `US-11-05`): the queue of the cases and their pages, the ranked seats a reduction is
- * chosen from, and the events of milestones passed with no decision. The IT Admin and Finance read every case (Finance only reads);
- * the head of a department reads the cases of the subscriptions that department owns and no other, a case of another department
- * being as good as absent; an employee and the person who decides spending never read them (`SoD-2`). A fixed number of statements
- * per page.
+ * The reads of the renewals (`US-11-02`, `US-11-05`): the queue of the cases and their pages, the ranked seats of a case of before, and the
+ * events of renewal days passed with no result recorded. The IT Admin and Finance read every case (Finance only reads), of a subscription
+ * a department owns and of one of the shared pool (no owner department) alike; the head of a department reads the cases of the subscriptions
+ * that department owns and no other, a case of another department or of the pool being as good as absent; an employee and the person who
+ * decides spending never read them (`SoD-2`). A fixed number of statements per page.
  */
 @Injectable()
 export class RenewalViewService {
@@ -39,6 +41,7 @@ export class RenewalViewService {
     private readonly catalog: CatalogApi,
     private readonly parties: RenewalPartiesService,
     private readonly ranking: RenewalRankingService,
+    private readonly seatsNeeded: RenewalSeatsNeededService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly finance: FinanceApi,
   ) {}
@@ -62,27 +65,12 @@ export class RenewalViewService {
       query.pageSize,
     );
     const periods = await this.periodsOf(items.map((item) => item.subscriptionId));
-    // Read once for the page, and only when some case waits to be confirmed.
-    const heads = items.some((item) => item.state === 'PROPOSED')
-      ? await this.parties.ownerHeadsOf(
-          [...periods.values()].map((period) => period.ownerDepartmentId),
-          today,
-        )
-      : new Map<string, string>();
 
     return pageOf(
       items.flatMap((item) => {
         const period = periods.get(item.subscriptionId);
 
-        return period
-          ? [
-              toRenewalSummary(
-                item,
-                period,
-                renewalWaitingReason(item.state, heads.get(period.ownerDepartmentId) ?? null),
-              ),
-            ]
-          : [];
+        return period ? [toRenewalSummary(item, period)] : [];
       }),
       total,
       query.page,
@@ -101,6 +89,39 @@ export class RenewalViewService {
     return this.detailOf(record, actor);
   }
 
+  /**
+   * The seats a subscription needs for its next period, read before a result is recorded (`SBF-20` §4.6, §5): the point of adjustment, the count in
+   * its three parts, the target and whether a cancellation is allowed. Read by the IT Admin and Finance (the route checks the role), with no lock:
+   * the write counts again under the lock of the period. It is read from any day, before the point has come too. Throws RenewalError
+   * (`NOT_FOUND`, `NOT_RENEWABLE`, `CONTRACT_DATA_INCOMPLETE`).
+   */
+  async adjustmentOf(actor: AuthenticatedPrincipal, subscriptionId: string): Promise<RenewalAdjustmentWire> {
+    const period = (await this.periodsOf([subscriptionId])).get(subscriptionId);
+    if (!period) throw new RenewalError('NOT_FOUND');
+    const cases = (await this.repo.ofSubscriptions([subscriptionId])).get(subscriptionId) ?? [];
+    const decidedCancel = decidedCancelOf(cases);
+    // A cancellation decided before the one-write rule is answered by its case; CANCELLED is for one recorded as decided (V-3).
+    const ending = (await this.repo.endingAmong([subscriptionId])).has(subscriptionId) && decidedCancel === null;
+    const found = pointOf(period, ending);
+    if ('refusal' in found) throw new RenewalError(found.refusal.problem, found.refusal.details);
+    if (decidedCancel) throw new RenewalError('ALREADY_PROPOSED', { renewalId: decidedCancel.id });
+    const { adjustment } = found;
+    const counts = await this.seatsNeeded.countFor({
+      subscriptionId,
+      planId: period.planId,
+      vendorMinimumSeats: period.vendorMinimumSeats,
+      isPrimaryForPlan: period.isPrimaryForPlan,
+      renewalOn: adjustment.end,
+      today: await this.organizationReads.businessToday(),
+    });
+
+    return toAdjustmentWire(period, adjustment, counts, {
+      ...(await this.parties.substituteOf(actor, period)),
+      callerEmployeeId: actor.employeeId,
+      recordedRenewalId: existingCaseOf(cases, adjustment.deadline)?.id ?? null,
+    });
+  }
+
   /** The page of a case just written, read as its route answers it to the caller; the IT Admin does not read the money snapshot. */
   async detailOf(record: RenewalRecord, actor: AuthenticatedPrincipal): Promise<RenewalDetailWire> {
     const period = (await this.periodsOf([record.subscriptionId])).get(record.subscriptionId);
@@ -114,10 +135,9 @@ export class RenewalViewService {
       usageAvailable: seats.usageAvailable,
       released: await this.repo.releasedOf(record.id),
       savings: await this.savingsOf(record),
-      waitingReason: renewalWaitingReason(
-        record.state,
-        record.state === 'PROPOSED' ? await this.parties.ownerHeadOf(period.ownerDepartmentId, today) : null,
-      ),
+      lateRenewal: record.outcome
+        ? lateRenewalOf(record, period, await this.organizationReads.businessToday(record.outcome.recordedAt))
+        : false,
       showSnapshot: !actor.roles.includes('IT_ADMIN'),
     });
   }
@@ -175,7 +195,7 @@ export class RenewalViewService {
     };
   }
 
-  /** The events of milestones passed with no decision, newest first: the incidents counted by `KPI-4` and the marks of an end. */
+  /** The events of renewal days passed with no result recorded, newest first: the incidents counted by `KPI-4` and the marks of an end. */
   async deadlineEvents(
     query: PageQuery & { kind?: DeadlineOutcome; from?: string; to?: string },
   ): Promise<Page<DeadlineEventWire>> {
@@ -205,7 +225,7 @@ export class RenewalViewService {
     return scope;
   }
 
-  /** A case of another department is as good as absent to the head who asks for it. */
+  /** A case of another department, or of the shared pool (no owner), is as good as absent to the head who asks for it. */
   private inScope(scope: RenewalReadScope, period: RenewalPeriodFacts): boolean {
     return scope.kind === 'ALL' || scope.departmentId === period.ownerDepartmentId;
   }

@@ -16,6 +16,7 @@ flowchart BT
   subgraph T3["T3"]
     finance["finance"]
     operating_parameters["operating-parameters"]
+    policies["policies"]
   end
   subgraph T4["T4"]
     catalog["catalog"]
@@ -44,95 +45,116 @@ flowchart BT
   ai_assist -->|2| operating_parameters
   ai_assist -->|4| organization
   ai_assist -->|4| requests
-  budgets -->|19| audit
-  budgets -->|5| catalog
-  budgets -->|3| finance
+  budgets -->|26| audit
+  budgets -->|8| catalog
+  budgets -->|2| finance
   budgets -->|5| identity_access
-  budgets -->|2| licensing
-  budgets -->|5| notifications
+  budgets -->|5| licensing
+  budgets -->|12| notifications
   budgets -->|4| operating_parameters
-  budgets -->|18| organization
-  catalog -->|20| audit
-  catalog -->|11| finance
-  catalog -->|6| identity_access
-  catalog -->|4| operating_parameters
-  catalog -->|28| organization
+  budgets -->|23| organization
+  budgets -->|8| policies
+  catalog -->|23| audit
+  catalog -->|10| finance
+  catalog -->|8| identity_access
+  catalog -->|3| notifications
+  catalog -->|3| operating_parameters
+  catalog -->|33| organization
+  dashboards -->|2| catalog
   dashboards -->|2| devices
-  dashboards -->|3| identity_access
-  dashboards -->|4| licensing
+  dashboards -->|4| identity_access
+  dashboards -->|7| licensing
+  dashboards -->|2| operating_parameters
   dashboards -->|3| optimization
-  dashboards -->|5| organization
-  dashboards -->|4| personnel
-  dashboards -->|3| requests
-  dashboards -->|2| usage
+  dashboards -->|6| organization
+  dashboards -->|6| personnel
+  dashboards -->|5| requests
+  dashboards -->|3| usage
   data_import -->|6| audit
   data_import -->|1| catalog
   data_import -->|9| licensing
   data_import -->|2| notifications
   data_import -->|11| organization
-  devices -->|10| audit
+  data_import -->|5| policies
+  devices -->|12| audit
   devices -->|3| catalog
-  devices -->|2| identity_access
-  devices -->|12| organization
-  finance -->|4| audit
-  finance -->|4| organization
-  identity_access -->|16| audit
+  devices -->|3| identity_access
+  devices -->|2| notifications
+  devices -->|2| operating_parameters
+  devices -->|16| organization
+  finance -->|3| audit
+  finance -->|3| organization
+  identity_access -->|18| audit
   identity_access -->|10| notifications
   identity_access -->|36| organization
   installation -->|6| audit
+  installation -->|2| catalog
   installation -->|2| finance
   installation -->|11| identity_access
   installation -->|8| organization
-  licensing -->|34| audit
-  licensing -->|54| catalog
+  installation -->|2| policies
+  licensing -->|30| audit
+  licensing -->|57| catalog
   licensing -->|2| finance
-  licensing -->|8| identity_access
-  licensing -->|7| notifications
-  licensing -->|8| operating_parameters
-  licensing -->|59| organization
+  licensing -->|12| identity_access
+  licensing -->|10| notifications
+  licensing -->|6| operating_parameters
+  licensing -->|55| organization
+  licensing -->|4| policies
   onboarding -->|2| catalog
   onboarding -->|2| data_import
   onboarding -->|2| identity_access
   onboarding -->|2| licensing
   onboarding -->|2| organization
-  operating_parameters -->|5| audit
-  operating_parameters -->|2| finance
-  operating_parameters -->|7| organization
+  operating_parameters -->|4| audit
+  operating_parameters -->|6| organization
   optimization -->|7| audit
   optimization -->|8| catalog
-  optimization -->|5| identity_access
-  optimization -->|24| licensing
+  optimization -->|6| identity_access
+  optimization -->|25| licensing
   optimization -->|7| notifications
   optimization -->|6| operating_parameters
-  optimization -->|18| organization
-  optimization -->|6| personnel
+  optimization -->|19| organization
+  optimization -->|7| personnel
+  optimization -->|9| policies
   optimization -->|9| usage
   organization -->|10| audit
-  organization -->|5| notifications
+  organization -->|8| notifications
   personnel -->|24| audit
-  personnel -->|5| catalog
-  personnel -->|2| devices
-  personnel -->|17| identity_access
-  personnel -->|30| licensing
-  personnel -->|5| notifications
-  personnel -->|4| operating_parameters
-  personnel -->|88| organization
-  personnel -->|6| requests
-  requests -->|60| audit
-  requests -->|23| budgets
-  requests -->|29| catalog
-  requests -->|9| finance
-  requests -->|30| identity_access
-  requests -->|50| licensing
-  requests -->|7| notifications
+  personnel -->|11| catalog
+  personnel -->|3| devices
+  personnel -->|21| identity_access
+  personnel -->|31| licensing
+  personnel -->|6| notifications
+  personnel -->|8| operating_parameters
+  personnel -->|97| organization
+  personnel -->|8| requests
+  policies -->|5| audit
+  policies -->|4| identity_access
+  policies -->|2| notifications
+  policies -->|7| organization
+  requests -->|64| audit
+  requests -->|32| budgets
+  requests -->|43| catalog
+  requests -->|11| finance
+  requests -->|38| identity_access
+  requests -->|60| licensing
+  requests -->|14| notifications
   requests -->|12| operating_parameters
-  requests -->|84| organization
-  usage -->|7| audit
-  usage -->|7| catalog
-  usage -->|15| devices
-  usage -->|7| licensing
-  usage -->|2| notifications
-  usage -->|10| organization
+  requests -->|97| organization
+  requests -->|34| policies
+  usage -->|10| audit
+  usage -->|3| budgets
+  usage -->|16| catalog
+  usage -->|17| devices
+  usage -->|3| finance
+  usage -->|3| identity_access
+  usage -->|8| licensing
+  usage -->|3| notifications
+  usage -->|2| operating_parameters
+  usage -->|19| organization
+  usage -->|4| policies
+  usage -->|4| requests
 ```
 
-93 module edges.
+114 module edges.

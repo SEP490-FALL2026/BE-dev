@@ -41,7 +41,8 @@ describe('requests over HTTP: the amount of a request (integration, real Postgre
         unitPrice: { amount: '1000000', currency: 'VND' },
         monthlyPrice: { amount: '1000000', currency: 'VND' },
         billingCycle: 'MONTHLY',
-        nextYearAmount: null,
+        // A right with no end holds twelve months of the next year (R-46).
+        nextYearAmount: { amount: '12000000', currency: 'VND' },
       });
       expect(sent.pricing).not.toHaveProperty('periodCount');
       expect(sent.pricing).not.toHaveProperty('firstDueOn');
@@ -49,11 +50,11 @@ describe('requests over HTTP: the amount of a request (integration, real Postgre
       expect(sent).not.toHaveProperty('expectedSpendOn');
     });
 
-    it('BR-MF1-06c: an end date in the month of today counts that month whole and no more', async () => {
-      const sent = await h.sent(designer, pricedPlan, { expectedEndDate: h.today() });
+    it('BR-MF1-06c, R-39: a time of use of one month counts that month whole and no more; the request keeps the months, not a day', async () => {
+      const sent = await h.sent(designer, pricedPlan, { termMonths: 1 });
 
-      expect(sent.pricing).toMatchObject({ months: 1, amount: { amount: '1000000' } });
-      expect(sent.expectedEndDate).toBe(h.today());
+      expect(sent.pricing).toMatchObject({ months: 1, amount: { amount: '1000000' }, nextYearAmount: null });
+      expect(sent).toMatchObject({ termMonths: 1, expectedEndDate: null });
     });
 
     it('is not something the sender can give: no amount or price in the form is accepted', async () => {
@@ -65,7 +66,7 @@ describe('requests over HTTP: the amount of a request (integration, real Postgre
     });
 
     it('is written into the audit trail of the request', async () => {
-      const sent = await h.sent(designer, pricedPlan, { expectedEndDate: h.today() });
+      const sent = await h.sent(designer, pricedPlan, { termMonths: 1 });
 
       const [event] = await h.auditEvents('ACCESS_REQUEST', sent.id);
 

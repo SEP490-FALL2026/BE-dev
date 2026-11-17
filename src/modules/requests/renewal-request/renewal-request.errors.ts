@@ -19,23 +19,14 @@ export class RenewalWindowNotOpenError extends Error {
   }
 }
 
-/** The new end asked for is not after the end the right has, or is more than twelve months after it (`QĐ-108a`). */
-export class RenewalEndDateOutOfRangeError extends Error {
-  constructor(
-    readonly previousEndDate: string,
-    readonly maxEndDate: string,
-  ) {
-    super('The new end date must be after the current end date and at most twelve months after it.');
-    this.name = 'RenewalEndDateOutOfRangeError';
-  }
-}
-
 /** The renewal cannot be asked for as sent: the reason says why (`US-05-14`). */
 export class RenewalRequestRefusedError extends Error {
   constructor(
     readonly reason: RenewalRefusal,
     /** Why the seat cannot be renewed, for `ASSIGNMENT_NOT_RENEWABLE`. */
     readonly problem: RenewableProblem | null = null,
+    /** The request that already waits for its decision, for `ALREADY_REQUESTED`. */
+    readonly blockingRequestId: string | null = null,
   ) {
     super(`The renewal is refused: ${reason}.`);
     this.name = 'RenewalRequestRefusedError';

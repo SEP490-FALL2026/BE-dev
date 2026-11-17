@@ -1,11 +1,16 @@
+import { termEndOf } from '../../../core/term-limit';
 import {
   daysOverdue,
   isDebt,
   isExpired,
   queueStatusOf,
+  reminderDayOf,
+  reminderHeldBack,
   reminderRange,
   remindersOwed,
+  revocationOpensOn,
   startRefusalOf,
+  systemRevocationOwed,
 } from './expiry.policy';
 
 describe('the rules of a right that ends on a day (US-03-05)', () => {
@@ -72,6 +77,57 @@ describe('the rules of a right that ends on a day (US-03-05)', () => {
       [{ status: 'WAITING_RENEWAL_DECISION' }, 'RENEWAL_PENDING'],
     ] as const)('with %j: %s', (change, expected) => {
       expect(startRefusalOf({ ...base, ...change })).toBe(expected);
+    });
+  });
+
+  describe('T-RQ3: what the end of the time of use does to a right (QĐ-111l, R-27)', () => {
+    // A `K1` plan granted on 05/08/2026 for 3 months: the last day is the day before the same day 3 months later.
+    const end = termEndOf('2026-08-05', 3);
+
+    it('ends on 04/11/2026, is reminded from 28/10 and has its revocation opened by the system on 05/11', () => {
+      expect(end).toBe('2026-11-04');
+      expect(reminderDayOf(end)).toBe('2026-10-28');
+      expect(revocationOpensOn(end)).toBe('2026-11-05');
+      // The reminder range is the same rule seen from the day of the pass: it reaches the end on the 28th and not on the 27th.
+      expect(reminderRange('2026-10-27').to < end).toBe(true);
+      expect(reminderRange('2026-10-28').to >= end).toBe(true);
+    });
+
+    it('follows the new end when the renewal moves it: 04/02/2027 is reminded from 28/01/2027, the old reminder is not owed', () => {
+      const renewedEnd = termEndOf('2026-11-05', 3);
+
+      expect(renewedEnd).toBe('2027-02-04');
+      expect(reminderDayOf(renewedEnd)).toBe('2027-01-28');
+      expect(revocationOpensOn(renewedEnd)).toBe('2027-02-05');
+    });
+
+    const owed = {
+      expectedEndDate: end,
+      renewal: null,
+      revocationEver: false,
+      today: '2026-11-05',
+    } as const;
+
+    it('opens the revocation on the day after the end and not on the end day itself', () => {
+      expect(systemRevocationOwed({ ...owed, today: '2026-11-04' })).toBe(false);
+      expect(systemRevocationOwed({ ...owed, today: '2026-11-05' })).toBe(true);
+      expect(systemRevocationOwed({ ...owed, today: '2026-11-20' })).toBe(true);
+    });
+
+    it('opens nothing while a renewal waits, approved or not, and once more when it is refused or withdrawn', () => {
+      expect(systemRevocationOwed({ ...owed, renewal: { approved: false } })).toBe(false);
+      expect(systemRevocationOwed({ ...owed, renewal: { approved: true } })).toBe(false);
+      expect(systemRevocationOwed({ ...owed, renewal: null })).toBe(true);
+    });
+
+    it('opens it once for a right: not again after a revocation of the expiry was opened, whatever became of it', () => {
+      expect(systemRevocationOwed({ ...owed, revocationEver: true })).toBe(false);
+    });
+
+    it('holds the reminder of the old end back only when the renewal is approved (R-27)', () => {
+      expect(reminderHeldBack(null)).toBe(false);
+      expect(reminderHeldBack({ approved: false })).toBe(false);
+      expect(reminderHeldBack({ approved: true })).toBe(true);
     });
   });
 });

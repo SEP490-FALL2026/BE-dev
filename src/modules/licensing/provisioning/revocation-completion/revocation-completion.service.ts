@@ -63,7 +63,10 @@ export class RevocationCompletionService {
         await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: facts, now });
         const plan = await this.completedFacts.planOf(tx, locked.assignment.planId);
         const assignment = await this.ending.lock(tx, locked.assignmentId);
-        const done = planCompletion(input, { type: plan.provisioningType, startsOn: assignment.effectiveFrom, today });
+        // A K1 completion stands on its checklist, which is kept now: the transaction ends with the completion or not at all (`QĐ-111az`).
+        const checklist = await this.aftermath.keepChecklist(tx, locked, plan.provisioningType, input);
+        const stated = checklist ? { ...input, evidence: checklist.evidence } : input;
+        const done = planCompletion(stated, { type: plan.provisioningType, startsOn: assignment.effectiveFrom, today });
         // A K4 seat granted before the key pool holds no key: nothing is asked about one (Owner 12/11/2026).
         const holdsKey = plan.provisioningType === 'K4' && (await this.aftermath.holdsKey(tx, locked.assignmentId));
         const key = planKeyReturn(input, plan.provisioningType, holdsKey);
@@ -75,6 +78,7 @@ export class RevocationCompletionService {
           provisioningType: plan.provisioningType,
           endedOn: done.endOn,
           paidThroughOn: done.paidThroughOn,
+          k1Checklist: checklist?.facts ?? null,
         });
         await this.revocation.emit(tx, {
           moment: 'AFTER_WORK',

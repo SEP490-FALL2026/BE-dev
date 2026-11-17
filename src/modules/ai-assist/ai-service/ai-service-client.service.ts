@@ -11,6 +11,7 @@ import {
   type QueueSummaryServiceRequest,
   type QueueSummaryServiceResponse,
   SERVICE_ERROR_CODES,
+  STUB_MODEL_ID,
   queueSummaryServiceResponseSchema,
 } from './ai-service.types';
 
@@ -172,6 +173,8 @@ export class HttpAiServiceClient extends AiServiceClient {
     if (answer.data.invocationId.toLowerCase() !== invocationId.toLowerCase()) {
       throw new AiServiceAnswerInvalidError('OTHER_INVOCATION');
     }
+    // A stub answer is not a model answer (QĐ-102f): never recorded as MODEL, so never shown without the simulation label.
+    if (answer.data.modelId === STUB_MODEL_ID) throw new AiServiceUnavailableError(200, null);
 
     return answer.data;
   }

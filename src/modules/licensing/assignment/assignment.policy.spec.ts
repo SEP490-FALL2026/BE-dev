@@ -1,13 +1,14 @@
-import {
-  AssignmentEffectiveDateInvalidError,
-  AssignmentExpectedEndRequiredError,
-  AssignmentNotOpenError,
-  AssignmentNotServiceAccountError,
-  AssignmentResponsibleInvalidError,
-} from '../public/licensing.errors';
 import type { AssignmentRecord } from '../public/licensing.types';
-import { AssignmentResponsibleAfterDeadlineError } from './service-account.errors';
-import { assertResponsibleChange, effectiveFromLabel, toAssignmentView, usableDayOf } from './assignment.policy';
+import {
+  carriedPast,
+  effectiveFromLabel,
+  nextPeriodStart,
+  replacedByGrant,
+  revocationOf,
+  seatsToCarry,
+  toAssignmentView,
+  usableDayOf,
+} from './assignment.policy';
 
 const bot: AssignmentRecord = {
   id: 'a1',
@@ -25,11 +26,12 @@ const bot: AssignmentRecord = {
   validUntil: null,
   expectedEndDate: null,
   predecessorId: null,
+  isMachineAccount: false,
+  machineAccountNote: null,
   failedAt: null,
   cancelledAt: null,
   createdAt: new Date('2026-10-01T00:00:00.000Z'),
 };
-const staff = { status: 'ACTIVE', workState: 'WORKING', employmentType: 'STAFF', departmentId: 'd-des' } as const;
 
 describe('effectiveFromLabel (AC-8, QĐ-43b: a recorded start is never shown as a grant date)', () => {
   it('says the real grant date is not known when the start is only the day of recording', () => {
@@ -60,124 +62,6 @@ describe('toAssignmentView', () => {
   });
 });
 
-describe('assertResponsibleChange (AC-10)', () => {
-  const change = { employeeId: 'e5', effectiveFrom: '2026-10-15', expectedEndDate: null };
-  const today = '2026-10-10';
-
-  it('lets an open service account pass to an active person from a day after it began and not in the past', () => {
-    expect(() => assertResponsibleChange(bot, change, staff, today)).not.toThrow();
-    expect(() => assertResponsibleChange(bot, { ...change, effectiveFrom: today }, staff, today)).not.toThrow();
-  });
-
-  it('refuses a personal seat', () => {
-    expect(() => assertResponsibleChange({ ...bot, kind: 'PERSONAL' }, change, staff, today)).toThrow(
-      AssignmentNotServiceAccountError,
-    );
-  });
-
-  it('refuses an assignment that has ended or is set to end', () => {
-    expect(() => assertResponsibleChange({ ...bot, validUntil: '2026-12-01' }, change, staff, today)).toThrow(
-      AssignmentNotOpenError,
-    );
-  });
-
-  it('refuses a day that is not after the one the service account began, and a day in the past', () => {
-    expect(() => assertResponsibleChange(bot, { ...change, effectiveFrom: '2026-10-01' }, staff, '2026-09-01')).toThrow(
-      AssignmentEffectiveDateInvalidError,
-    );
-    expect(() => assertResponsibleChange(bot, { ...change, effectiveFrom: '2026-10-09' }, staff, today)).toThrow(
-      AssignmentEffectiveDateInvalidError,
-    );
-  });
-
-  it('refuses a person that is not found, one who has left, and the person already responsible', () => {
-    expect(() => assertResponsibleChange(bot, change, null, today)).toThrow(AssignmentResponsibleInvalidError);
-    expect(() =>
-      assertResponsibleChange(
-        bot,
-        change,
-        { status: 'TERMINATED', workState: 'LEFT', employmentType: 'STAFF', departmentId: 'd-des' },
-        today,
-      ),
-    ).toThrow(AssignmentResponsibleInvalidError);
-    expect(() => assertResponsibleChange(bot, { ...change, employeeId: 'e2' }, staff, today)).toThrow(
-      AssignmentResponsibleInvalidError,
-    );
-  });
-
-  it('refuses a person who is handing over, and takes one who is on long leave (US-03-08 AC-7)', () => {
-    expect(() => assertResponsibleChange(bot, change, { ...staff, workState: 'HANDING_OVER' }, today)).toThrow(
-      expect.objectContaining({ problem: 'HANDING_OVER' }) as Error,
-    );
-    expect(() => assertResponsibleChange(bot, change, { ...staff, workState: 'ON_LONG_LEAVE' }, today)).not.toThrow();
-  });
-
-  it('holds the day of the change to the day the file of the current person takes effect while that day has not come (US-03-01 AC-9)', () => {
-    expect(() => assertResponsibleChange(bot, change, staff, today, '2026-10-14')).toThrow(
-      AssignmentResponsibleAfterDeadlineError,
-    );
-    expect(() => assertResponsibleChange(bot, change, staff, today, '2026-10-15')).not.toThrow();
-    expect(() => assertResponsibleChange(bot, change, staff, today, '2026-10-20')).not.toThrow();
-    expect(() => assertResponsibleChange(bot, { ...change, effectiveFrom: today }, staff, today, today)).not.toThrow();
-  });
-
-  it('binds nothing when the day of the file is past or there is no file', () => {
-    expect(() => assertResponsibleChange(bot, change, staff, today, '2026-10-09')).not.toThrow();
-    expect(() => assertResponsibleChange(bot, change, staff, today, null)).not.toThrow();
-  });
-
-  it('reads the deadline after the date checks and before the person', () => {
-    expect(() => assertResponsibleChange(bot, change, null, today, '2026-10-12')).toThrow(
-      AssignmentResponsibleAfterDeadlineError,
-    );
-    expect(() =>
-      assertResponsibleChange(bot, { ...change, effectiveFrom: '2026-10-09' }, staff, today, '2026-10-12'),
-    ).toThrow(AssignmentEffectiveDateInvalidError);
-  });
-
-  it('refuses a person of another department, or of none: a service account stays in the department that owns it (QĐ-86c)', () => {
-    for (const departmentId of ['d-other', null]) {
-      expect(() => assertResponsibleChange(bot, change, { ...staff, departmentId }, today)).toThrow(
-        expect.objectContaining({ problem: 'OUTSIDE_OWNING_DEPARTMENT' }) as Error,
-      );
-    }
-  });
-
-  it('asks time-limited staff for an expected end date no earlier than the day the change takes effect (INV-07)', () => {
-    const intern = { status: 'ACTIVE', workState: 'WORKING', employmentType: 'INTERN', departmentId: 'd-des' } as const;
-
-    expect(() => assertResponsibleChange(bot, change, intern, today)).toThrow(AssignmentExpectedEndRequiredError);
-    expect(() => assertResponsibleChange(bot, { ...change, expectedEndDate: '2026-10-14' }, intern, today)).toThrow(
-      AssignmentEffectiveDateInvalidError,
-    );
-    expect(() =>
-      assertResponsibleChange(bot, { ...change, expectedEndDate: '2027-03-31' }, intern, today),
-    ).not.toThrow();
-  });
-
-  it('checks in order: the kind, then whether it is open, then the date, then the person', () => {
-    const closedPersonal = { ...bot, kind: 'PERSONAL', validUntil: '2026-12-01' } as const;
-
-    expect(() => assertResponsibleChange(closedPersonal, change, null, today)).toThrow(
-      AssignmentNotServiceAccountError,
-    );
-    expect(() =>
-      assertResponsibleChange(
-        { ...bot, validUntil: '2026-12-01' },
-        { ...change, effectiveFrom: '2026-10-01' },
-        null,
-        today,
-      ),
-    ).toThrow(AssignmentNotOpenError);
-    expect(() => assertResponsibleChange(bot, { ...change, effectiveFrom: '2026-10-01' }, null, '2026-09-01')).toThrow(
-      AssignmentEffectiveDateInvalidError,
-    );
-  });
-});
-
-// Gói 9: assertSubscriptionDepartment + holdersOfOtherDepartments functions removed — all related tests deleted.
-// (Phần cấp từ kho được phép cấp qua phòng: không guard phòng, không tìm người khác phòng)
-
 describe('usableDayOf — M5-01 (FR-4.9 gate 4, QĐ-77n)', () => {
   const day = (instant: Date) => instant.toISOString().slice(0, 10);
 
@@ -198,5 +82,139 @@ describe('usableDayOf — M5-01 (FR-4.9 gate 4, QĐ-77n)', () => {
     expect(
       usableDayOf('2026-06-01', [{ status: 'COMPLETED', completedAt: new Date('2026-05-20T03:00:00Z') }], day),
     ).toBe('2026-06-01');
+  });
+});
+
+describe('the right a grant replaces on the same subscription (R-49, QĐ-110q)', () => {
+  const old: AssignmentRecord = { ...bot, id: 'old', kind: 'PERSONAL', employeeId: 'e1', effectiveFrom: '2026-10-01' };
+  const grant = (over: Partial<Parameters<typeof replacedByGrant>[1]> = {}) => ({
+    employeeId: 'e1',
+    target: { planId: 'p1', subscriptionId: 's1' },
+    today: '2026-11-18',
+    revocationUnderWay: false,
+    ...over,
+  });
+
+  it('is ended by the grant of the same person on the same subscription, the day of the grant', () => {
+    expect(replacedByGrant(old, grant())).toBe(true);
+  });
+
+  it('is the same seat target for an internal plan with no subscription: the plan is the target', () => {
+    expect(
+      replacedByGrant({ ...old, subscriptionId: null }, grant({ target: { planId: 'p1', subscriptionId: null } })),
+    ).toBe(true);
+    expect(
+      replacedByGrant({ ...old, subscriptionId: null }, grant({ target: { planId: 'p2', subscriptionId: null } })),
+    ).toBe(false);
+  });
+
+  it.each([
+    [
+      'another subscription of the plan (no overlap to settle: the grace ends it)',
+      { target: { planId: 'p1', subscriptionId: 's2' } },
+    ],
+    ['another person', { employeeId: 'e9' }],
+    ['a revocation under way: it takes the right away itself', { revocationUnderWay: true }],
+  ])('is not touched for %s', (_name, over) => {
+    expect(replacedByGrant(old, grant(over))).toBe(false);
+  });
+
+  it.each([
+    ['a service account', { kind: 'SERVICE' as const }],
+    ['a seat used for a machine account', { isMachineAccount: true }],
+    ['a right that ended', { validUntil: '2026-11-17' }],
+    ['a grant that failed', { failedAt: new Date('2026-10-02T00:00:00.000Z') }],
+    ['a grant that was cancelled', { cancelledAt: new Date('2026-10-02T00:00:00.000Z') }],
+    ['a right that begins the day of the grant: it would end the day it begins', { effectiveFrom: '2026-11-18' }],
+    ['a right that begins after the day of the grant', { effectiveFrom: '2026-11-19' }],
+  ])('is not touched when it is %s', (_name, over) => {
+    expect(replacedByGrant({ ...old, ...over }, grant())).toBe(false);
+  });
+});
+
+describe('revocationOf (QĐ-111p: the revocation a seat has, from the task that is open for it)', () => {
+  const task = { id: 't1', status: 'QUEUED' as const, notBefore: null };
+
+  it('names the task and its state, and is claimable at once when no reason asks for a day not before', () => {
+    expect(revocationOf(task, '2026-11-15')).toEqual({ taskId: 't1', status: 'QUEUED', claimableNow: true });
+  });
+
+  it('is not claimable while the day not before is still ahead, and is on that day', () => {
+    expect(revocationOf({ ...task, notBefore: '2026-11-20' }, '2026-11-19').claimableNow).toBe(false);
+    expect(revocationOf({ ...task, notBefore: '2026-11-20' }, '2026-11-20').claimableNow).toBe(true);
+    expect(revocationOf({ ...task, notBefore: '2026-11-20' }, '2026-11-25').claimableNow).toBe(true);
+  });
+
+  it('carries the state of a task that is being worked or has failed', () => {
+    expect(revocationOf({ ...task, status: 'IN_PROGRESS' }, '2026-11-15').status).toBe('IN_PROGRESS');
+    expect(revocationOf({ ...task, status: 'FAILED' }, '2026-11-15').status).toBe('FAILED');
+  });
+});
+
+describe('the seats carried to the new period (QĐ-35c, US-11-03 AC-2)', () => {
+  const seat = (id: string, extra: object) => ({
+    assignmentId: id,
+    validFrom: '2026-01-05',
+    validUntil: null as string | null,
+    expectedEndDate: null as string | null,
+    ...extra,
+  });
+
+  it('are those held on its first day', () => {
+    const carried = seatsToCarry(
+      [
+        seat('open', {}),
+        seat('ends-before', { validUntil: '2026-12-15' }),
+        seat('ends-later', { validUntil: '2027-02-01' }),
+        seat('expected-before', { expectedEndDate: '2026-12-31' }),
+        seat('expected-on', { expectedEndDate: '2027-01-01' }),
+        seat('starts-on', { validFrom: '2027-01-01' }),
+      ],
+      '2027-01-01',
+    );
+
+    expect(carried.map((s) => s.assignmentId)).toEqual(['open', 'ends-later', 'expected-on']);
+  });
+});
+
+describe('the next period a seat granted today goes on into (FX2-R1, QĐ-35c)', () => {
+  it('is an active period recorded ahead of its start', () => {
+    expect(nextPeriodStart({ status: 'ACTIVE', startDate: '2027-01-01' }, '2026-11-15')).toBe('2027-01-01');
+  });
+
+  it('is none when it has begun, begins today, is a draft, has no start, or there is no next period', () => {
+    expect(nextPeriodStart({ status: 'ACTIVE', startDate: '2026-11-15' }, '2026-11-15')).toBeNull();
+    expect(nextPeriodStart({ status: 'ACTIVE', startDate: '2026-11-01' }, '2026-11-15')).toBeNull();
+    expect(nextPeriodStart({ status: 'DRAFT', startDate: '2027-01-01' }, '2026-11-15')).toBeNull();
+    expect(nextPeriodStart({ status: 'ACTIVE', startDate: null }, '2026-11-15')).toBeNull();
+    expect(nextPeriodStart(undefined, '2026-11-15')).toBeNull();
+  });
+});
+
+describe('the seats that go on into the new period when the renewal day ends some (R2-2, QĐ-106i(2))', () => {
+  const seat = (id: string, validUntil: string | null, expectedEndDate: string | null) => ({
+    id,
+    validFrom: '2026-01-05',
+    validUntil,
+    expectedEndDate,
+  });
+
+  it('leaves on the old period a seat whose last day is the renewal day or before, and carries the others', () => {
+    const seats = [
+      seat('open', null, null),
+      seat('ends-on-renewal-expected', null, '2026-12-31'),
+      seat('ends-on-renewal-until', '2027-01-01', null),
+      seat('ends-after', null, '2027-01-01'),
+      seat('until-after', '2027-01-03', null),
+      seat('expected-before', null, '2026-12-30'),
+    ];
+
+    expect(carriedPast(seats, '2026-12-31').map((s) => s.id)).toEqual(['open', 'ends-after', 'until-after']);
+  });
+
+  it('counts the earlier of the day before the end of the right and the expected end', () => {
+    expect(carriedPast([seat('both', '2027-01-10', '2026-12-31')], '2026-12-31')).toEqual([]);
+    expect(carriedPast([seat('both', '2027-01-01', '2027-02-01')], '2026-12-31')).toEqual([]);
+    expect(carriedPast([seat('both', '2027-01-02', '2027-02-01')], '2026-12-31')).toHaveLength(1);
   });
 });

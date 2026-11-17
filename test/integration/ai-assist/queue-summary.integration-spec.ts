@@ -24,6 +24,7 @@ const REASONS = ['Thiết kế bộ nhận diện mới', 'Làm mẫu giao diệ
  */
 describe('the AI summary of the queue of a head (integration, real HTTP to a stand-in AI service, real PostgreSQL)', () => {
   let internal: string;
+  let paid: string;
   let applicationName: string;
   let superAdmin: ApiAccount;
 
@@ -32,9 +33,20 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
     h.dataOf<{ items: unknown[] }>(
       await request(h.server()).get('/api/v1/need-decisions').query({ pageSize: 100 }).set(h.as(account)).expect(200),
     ).items;
-  const sendAll = async (unit: Unit, reasons: readonly string[]): Promise<AccessRequestWire[]> => {
+  const sendAll = async (
+    unit: Unit,
+    reasons: readonly string[],
+    options: { plan?: string; termMonths?: number } = {},
+  ): Promise<AccessRequestWire[]> => {
     const sent: AccessRequestWire[] = [];
-    for (const reason of reasons) sent.push(await h.sent(unit.member, internal, { businessReason: reason }));
+    for (const reason of reasons) {
+      sent.push(
+        await h.sent(unit.member, options.plan ?? internal, {
+          businessReason: reason,
+          ...(options.termMonths === undefined ? {} : { termMonths: options.termMonths }),
+        }),
+      );
+    }
 
     return sent;
   };
@@ -48,6 +60,7 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
     await h.start();
     await h.withApprover();
     internal = await h.plan('K5');
+    paid = await h.planOf(await h.subscription(100));
     [{ applicationName }] = await h.ctx.app.get(CatalogApi, { strict: false }).getPlanSummaries([internal]);
     await h.switchAll('ON');
     superAdmin = {
@@ -179,9 +192,11 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
         'invocationId',
         'lines',
         'omittedCount',
+        'simulated',
         'sourceStale',
         'status',
       ]);
+      expect(view.simulated).toBe(false);
     });
 
     it('asking again for the same revision gives back the same call: no second call to the AI service, one row', async () => {
@@ -233,6 +248,7 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
         ['AI_INVOCATION.CONTENT_READ', h.seed.superAdmin.appUserId],
       ]);
       expect(events[2].after).toEqual({ invocationId: view.invocationId });
+      expect(events.slice(0, 2).map((event) => event.after.providerMode)).toEqual(['MODEL', 'MODEL']);
       for (const event of events) {
         expect(Object.keys(event.after).filter((key) => SECRET_LIKE.test(key))).toEqual([]);
         expect(JSON.stringify(event.after)).not.toContain(REASONS[0]);
@@ -395,7 +411,8 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
 
   it('AC-12: R3 approved, R2 withdrawn and R1 handed to the next head after composing: their lines go, the record stays', async () => {
     const u = await h.unit();
-    const [r1, r2, r3] = await sendAll(u, REASONS);
+    // Paid requests: free internal software does not wait for the next head, it goes to the IT Admin when the head leaves (QĐ-111bc).
+    const [r1, r2, r3] = await sendAll(u, REASONS, { plan: paid, termMonths: 1 });
     const view = await h.summarize(u.head.account);
     expect(view.lines.map((line) => line.requestId)).toEqual([r1.id, r2.id, r3.id]);
     const reread = async () => h.dataOf<SummaryWire>(await h.read(u.head.account, view.invocationId).expect(200));

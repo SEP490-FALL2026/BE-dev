@@ -101,21 +101,16 @@ describe('noticeWarnings', () => {
 });
 
 describe('alertDates', () => {
-  it('AC-1: counts back from the base date by each number of days of the parameter', () => {
-    expect(alertDates('2026-12-01', [15, 7])).toEqual(['2026-11-16', '2026-11-24']);
+  it('a plan by the year: the point of adjustment, then the red alert', () => {
+    expect(alertDates({ point: '2026-11-01', redAlertOn: '2026-11-24' })).toEqual(['2026-11-01', '2026-11-24']);
   });
 
-  it('AC-7: counts from the end date when that is the base', () => {
-    expect(alertDates('2026-12-31', [15, 7])).toEqual(['2026-12-16', '2026-12-24']);
+  it('a plan by the month: the point of adjustment only, it has no red alert', () => {
+    expect(alertDates({ point: '2026-11-24', redAlertOn: null })).toEqual(['2026-11-24']);
   });
 
-  it('is empty without a base date', () => {
-    expect(alertDates(null, [15, 7])).toEqual([]);
-  });
-
-  it('follows the parameter: one alert, or five', () => {
-    expect(alertDates('2026-12-31', [30])).toEqual(['2026-12-01']);
-    expect(alertDates('2026-12-31', [60, 30, 15, 7, 1])).toHaveLength(5);
+  it('is empty without a point of adjustment', () => {
+    expect(alertDates(null)).toEqual([]);
   });
 });
 
@@ -127,7 +122,6 @@ describe('missingData (what keeps a subscription a draft)', () => {
     startDate: '2026-01-01',
     billingCycle: 'ANNUAL',
     hasPrice: true,
-    hasSnapshot: true,
   };
 
   it('is empty when everything a per-seat term subscription needs is there', () => {
@@ -143,13 +137,12 @@ describe('missingData (what keeps a subscription a draft)', () => {
         startDate: null,
         billingCycle: null,
         hasPrice: false,
-        hasSnapshot: false,
       }),
     ).toEqual(['QUANTITY', 'START_DATE', 'BILLING_CYCLE', 'UNIT_PRICE']);
   });
 
-  it('US-04-05 AC-5: a price with no snapshot lacks the exchange rate, not the price', () => {
-    expect(missingData({ ...complete, hasSnapshot: false })).toEqual(['EXCHANGE_RATE']);
+  it('QĐ-111an: no exchange rate is asked for, so none can be missing: a price that is not usable (not in dong, or with no snapshot) lacks the price', () => {
+    expect(missingData({ ...complete, hasPrice: false })).toEqual(['UNIT_PRICE']);
   });
 
   it('a flat-rate plan does not need a quantity', () => {
@@ -200,10 +193,10 @@ describe('assertSubscriptionShape', () => {
     );
   });
 
-  it('keeps a perpetual purchase to licensed software', () => {
-    expect(() => assertSubscriptionShape({ ...perpetual, applicationKind: 'SAAS' })).toThrow(
-      SubscriptionPerpetualNeedsLicensedApplicationError,
-    );
+  it('keeps a perpetual purchase to licensed software or to a K4 plan, the plan bought once (B-5)', () => {
+    const saas = { ...perpetual, applicationKind: 'SAAS' as const };
+    expect(() => assertSubscriptionShape(saas)).toThrow(SubscriptionPerpetualNeedsLicensedApplicationError);
+    expect(() => assertSubscriptionShape({ ...saas, planProvisioningType: 'K4' })).not.toThrow();
   });
 
   it.each([
@@ -324,7 +317,7 @@ describe('what an update of a subscription makes of its state, and when it is a 
     purchasedQuantity: 5,
     startDate: '2026-01-01',
     billingCycle: 'ANNUAL',
-    unitPrice: {},
+    unitPrice: { currency: 'VND' },
     priceSnapshot: {},
   };
 
@@ -339,6 +332,12 @@ describe('what an update of a subscription makes of its state, and when it is a 
     expect(subscriptionStatusOf({ pricingModel: 'FLAT_RATE' }, 'TERM', { ...whole, priceSnapshot: null })).toBe(
       'DRAFT',
     );
+  });
+
+  it('QĐ-111an: stays a draft while the price is one an earlier release left in dollars', () => {
+    expect(
+      subscriptionStatusOf({ pricingModel: 'PER_SEAT' }, 'TERM', { ...whole, unitPrice: { currency: 'USD' } }),
+    ).toBe('DRAFT');
   });
 });
 

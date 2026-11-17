@@ -6,6 +6,7 @@ import { ProvisioningItAdminRequiredError } from '../../../src/modules/licensing
 import { ProvisioningService } from '../../../src/modules/licensing/provisioning/tasks/provisioning.service';
 import type { AuthenticatedPrincipal } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
 import type { ApiAccount } from '../../support/api-accounts';
+import { k1Checklist } from '../../support/k1-checklist';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
@@ -131,7 +132,7 @@ describe('the grant of a seat and the work on a task: the department of the seat
       for (const attempt of attempts) await expect(attempt()).rejects.toBeInstanceOf(ProvisioningItAdminRequiredError);
 
       expect(await counts()).toEqual(before);
-      expect((await h.getTask(task.id).expect(200)).body).toMatchObject({ data: { task: { status: 'QUEUED' } } });
+      expect((await h.getTask(task.id).expect(200)).body).toMatchObject({ data: { task: { status: 'IN_PROGRESS' } } });
     });
   });
 
@@ -195,7 +196,12 @@ describe('the grant of a seat and the work on a task: the department of the seat
         expect(await taskStatus(id)).toBe('IN_PROGRESS');
 
         await h
-          .complete(id, { evidence: `đã làm ${kind}`, ...(kind === 'K4' ? { licenseKeyId: k4Key } : {}) })
+          .complete(id, {
+            evidence: `đã làm ${kind}`,
+            ...(kind === 'K4' ? { licenseKeyId: k4Key } : {}),
+            // The grant of a K1 seat is completed with its checklist as well as the evidence (QĐ-111az).
+            ...(kind === 'K1' ? { k1Checklist: k1Checklist('GRANT') } : {}),
+          })
           .expect(200);
         expect(await taskStatus(id)).toBe('COMPLETED');
       },
@@ -236,8 +242,9 @@ describe('the grant of a seat and the work on a task: the department of the seat
       expect(count.mock.calls.length).toBeGreaterThan(0);
       expect(count.mock.calls.every(([employeeId, tx]) => employeeId === selfEmployee && tx !== undefined)).toBe(true);
       count.mockRestore();
+      // The grant of the other IT Admin is the first claim; the one that serves themselves takes it over.
       const claimed = (await h.auditEvents('ProvisioningTask', task.id)).find(
-        (event) => event.action === 'PROVISIONING_TASK.CLAIMED',
+        (event) => event.action === 'PROVISIONING_TASK.CLAIMED' && event.actor_app_user_id === selfAccount.appUserId,
       );
       expect(claimed?.after).toMatchObject({ selfExecuted: true });
       await h.complete(task.id, { evidence: 'đã làm cho chính mình' }, selfAccount).expect(200);

@@ -80,6 +80,7 @@ describe('the owner department of a subscription: the finance gate of a change a
         const response = await patch(withoutUnit, body).expect(409);
 
         expect(h.codeOf(response)).toBe('FINANCE.SETUP_INCOMPLETE');
+        expect(h.detailsOf(response)).toEqual({ departmentId: bare.id });
         expect({ row: await stored(withoutUnit), audit: await audits(withoutUnit) }).toEqual(before);
       },
     );

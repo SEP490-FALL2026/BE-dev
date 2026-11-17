@@ -2,14 +2,16 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
+  BudgetVersionAttachmentRequiredError,
   BudgetCycleCurrencyMismatchError,
-  BudgetCycleNotPublishedError,
+  BudgetCycleNotOpenError,
   BudgetOverAnnualCeilingError,
   BudgetVersionNotEditableError,
   BudgetVersionNotFoundError,
   BudgetYearEndedError,
 } from '../budget/budget.errors';
-import { annualCheck, isEditable, yearHasEnded } from '../budget/budget.policy';
+import { annualCheck, isEditable, versionAttachmentMissing, yearHasEnded } from '../budget/budget.policy';
+import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
 import { cycleAcceptsWork } from '../cycle/cycle.policy';
@@ -27,6 +29,7 @@ export class VersionAccessService {
     private readonly versions: VersionRepo,
     private readonly facts: BudgetFactsService,
     private readonly cycles: CycleRepo,
+    private readonly budgetFacts: BudgetFactsRepo,
   ) {}
 
   /** Only Finance changes a version. */
@@ -71,14 +74,29 @@ export class VersionAccessService {
   /**
    * The cycle of the version's year, locked `FOR UPDATE` before any proposal or version row (the order of the module: cycle, proposal,
    * version, year), so that two sendings of two departments take turns and cannot both pass the annual check. Null for a year that
-   * has ended (the sending is refused as ended later). Throws BudgetCycleNotPublishedError.
+   * has ended (the sending is refused as ended later). Throws BudgetCycleNotOpenError.
    */
   async lockCycleOf(tx: DbTx, version: Pick<VersionRecord, 'organizationId' | 'year'>): Promise<CycleRecord | null> {
     if (yearHasEnded(version.year, await this.facts.today(new Date(), tx))) return null;
     const cycle = await this.cycles.lockByYear(tx, version.organizationId, version.year, 'UPDATE');
-    if (!cycle || !cycleAcceptsWork(cycle)) throw new BudgetCycleNotPublishedError(version.year);
+    if (!cycle || !cycleAcceptsWork(cycle)) throw new BudgetCycleNotOpenError(version.year);
 
     return cycle;
+  }
+
+  /**
+   * The cycle of the version's year, locked `FOR UPDATE` before any version of it (the order of the module), whatever its state: a decision on a
+   * version that waits makes the check of the ceiling again, it does not take work in. Null for a year with no cycle.
+   */
+  lockCycleOfYear(tx: DbTx, version: Pick<VersionRecord, 'organizationId' | 'year'>): Promise<CycleRecord | null> {
+    return this.cycles.lockByYear(tx, version.organizationId, version.year, 'UPDATE');
+  }
+
+  /** One file at least explains a version that is sent (`QĐ-111ac`); a draft is saved without one. Throws BudgetVersionAttachmentRequiredError. */
+  async requireExplained(tx: DbTx, versionId: string): Promise<void> {
+    if (versionAttachmentMissing(await this.versions.countAttachedFiles(tx, versionId))) {
+      throw new BudgetVersionAttachmentRequiredError();
+    }
   }
 
   /**
@@ -89,7 +107,7 @@ export class VersionAccessService {
   async requireWithinAnnualCeiling(tx: DbTx, cycle: CycleRecord | null, version: VersionRecord): Promise<void> {
     if (cycle === null) return;
     const availableMinor = cycle.annualCeilingMinor - (cycle.sharedPoolReserveMinor ?? 0n);
-    const counted = await this.versions.countedInYear(version.organizationId, version.year, tx);
+    const counted = await this.countedWithAdjustments(tx, version);
     const verdict = annualCheck({
       cycleCurrency: cycle.currency,
       availableMinor,
@@ -98,5 +116,22 @@ export class VersionAccessService {
     });
     if (verdict.kind === 'CURRENCY') throw new BudgetCycleCurrencyMismatchError(cycle.currency, verdict.currency);
     if (verdict.kind === 'OVER') throw new BudgetOverAnnualCeilingError(verdict.gapMinor, availableMinor);
+  }
+
+  /**
+   * The versions that count towards the ceiling, the approved ones with the adjustments approved for them (`AD-1`, `QĐ-111ag`): what the Cost Centers hold together is
+   * what the ceiling is checked against, and an adjustment moves money between them without leaving the ceiling.
+   */
+  private async countedWithAdjustments(tx: DbTx, version: VersionRecord): Promise<VersionRecord[]> {
+    const counted = await this.versions.countedInYear(version.organizationId, version.year, tx);
+    const approved = new Map<string, string>();
+    for (const one of counted) if (one.state === 'APPROVED') approved.set(one.costCenterId, one.id);
+    const deltas = await this.budgetFacts.adjustmentsOf(version.year, approved, tx);
+
+    return counted.map((one) =>
+      one.state === 'APPROVED' && deltas.has(one.costCenterId)
+        ? { ...one, baseMinor: one.baseMinor + (deltas.get(one.costCenterId) as bigint) }
+        : one,
+    );
   }
 }

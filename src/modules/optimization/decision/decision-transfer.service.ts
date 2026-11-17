@@ -18,8 +18,11 @@ const SYSTEM = { kind: 'SYSTEM' } as const;
 /**
  * A holder in a transfer that has taken effect and is not closed has the recommendation about the seat paused (`QĐ-90c`, `US-10-06` AC-15):
  * nothing is asked of a head until the transfer is over. A reclaim already decided is not paused (`Q-89`, the task waits). When the transfer
- * is over the recommendation ends with the seat (`TRANSFER_SEAT_REVOKED`), goes to the head of the department the holder is in now with a new
- * due day counted from the day it enters the queue (`US-10-06` AC-16, AC-19), or, for the watch tier, goes back to open (`DA6-20`).
+ * is over (the system closes it once every right of the old department is taken back, `QĐ-110r`) the recommendation ends with the seat
+ * (`TRANSFER_SEAT_REVOKED`). A seat that is still open then is not "a seat the new head keeps" (`US-10-06` AC-19 is gone: the new head decides
+ * nothing about the old rights, `QĐ-110p`); it only happens when the transfer ended without taking the seat back, and the recommendation goes
+ * to the head of the department the holder is in now with a new due day counted from the day it enters the queue (`US-10-06` AC-16), or, for
+ * the watch tier, goes back to open (`DA6-20`).
  */
 @Injectable()
 export class DecisionTransferService {

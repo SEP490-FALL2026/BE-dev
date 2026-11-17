@@ -75,9 +75,15 @@ export class OffboardingEndings {
       tx,
       actor,
       transferId,
-      { reason: DEPARTURE_BEFORE_TRANSFER, grounds: input.grounds },
+      { reason: DEPARTURE_BEFORE_TRANSFER, groundsNote: input.groundsNote },
       today,
     );
-    if (refused) throw new OffboardingRefusedError('PENDING_EVENT_EXISTS', { kind: 'TRANSFER', reason: refused.code });
+    if (refused) {
+      throw new OffboardingRefusedError('PENDING_EVENT_EXISTS', {
+        kind: 'TRANSFER',
+        reason: refused.code,
+        eventId: transferId,
+      });
+    }
   }
 }

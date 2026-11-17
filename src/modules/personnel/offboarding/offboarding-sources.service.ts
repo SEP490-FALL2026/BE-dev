@@ -1,25 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import {
-  OffboardingBlockerContributions,
-  OffboardingWarningContributions,
-  type OffboardingSource,
-} from '../public/personnel.extension-points';
+import { OffboardingWarningContributions, type OffboardingSource } from '../public/personnel.extension-points';
 
 /**
- * Counts what the flows that come after the record of a departure added (`OffboardingBlockerContributions`,
- * `OffboardingWarningContributions`): one count for each code, read in the order the sources were added.
+ * Counts what the flows that come after the record of a departure added (`OffboardingWarningContributions`): one count for each code, read in
+ * the order the sources were added.
  */
 @Injectable()
 export class OffboardingSources {
-  constructor(
-    private readonly blockers: OffboardingBlockerContributions,
-    private readonly warnings: OffboardingWarningContributions,
-  ) {}
-
-  blockersOf(employeeId: string, tx?: DbTx): Promise<Record<string, number>> {
-    return this.countAll(this.blockers.all(), employeeId, tx);
-  }
+  constructor(private readonly warnings: OffboardingWarningContributions) {}
 
   warningsOf(employeeId: string, tx?: DbTx): Promise<Record<string, number>> {
     return this.countAll(this.warnings.all(), employeeId, tx);

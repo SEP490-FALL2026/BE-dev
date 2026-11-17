@@ -47,6 +47,12 @@ export const createEmployeeBodySchema = z.strictObject({
     .nullish(),
   employmentType,
   hireDate: businessDateSchema('hireDate must be a real date as YYYY-MM-DD.'),
+  contractEndDate: businessDateSchema('contractEndDate must be a real date as YYYY-MM-DD.')
+    .meta({
+      description:
+        'A date that must exist, as YYYY-MM-DD: the last day of the contract of a contractor, a freelancer or an intern, not before the hire date; null or omitted for none. Staff has none (EMPLOYEE.ROW_INVALID, CONTRACT_END_NOT_APPLICABLE). A time of use that runs past it is cut there.',
+    })
+    .nullish(),
   departmentCode: z
     .string()
     .meta({
@@ -77,6 +83,13 @@ export const updateEmployeeBodySchema = z.strictObject({
     .optional(),
   employmentType: employmentType.optional(),
   hireDate: businessDateSchema('hireDate must be a real date as YYYY-MM-DD.').optional(),
+  contractEndDate: businessDateSchema('contractEndDate must be a real date as YYYY-MM-DD.')
+    .meta({
+      description:
+        'A date that must exist, as YYYY-MM-DD: the last day of the contract of a contractor, a freelancer or an intern; null clears it. Refused for staff, before the hire date, and when a change of kind to staff leaves one (EMPLOYEE.ROW_INVALID: CONTRACT_END_NOT_APPLICABLE, CONTRACT_END_BEFORE_HIRE).',
+    })
+    .nullable()
+    .optional(),
   jobTitle: z.string().max(1000).nullable().optional(),
 });
 export const employeeIdParamSchema = z.strictObject({ id: z.uuid() });
@@ -90,6 +103,7 @@ const employeeSchema = z.strictObject({
   workEmail: z.string().nullable(),
   employmentType,
   hireDate: z.string(),
+  contractEndDate: z.string().nullable(),
   status: z.literal('ACTIVE'),
   workState: employeeWorkState,
   memberSince: z.string().nullable(),
@@ -116,6 +130,7 @@ const maintainedEmployeeSchema = z.strictObject({
   workEmail: z.string().nullable(),
   employmentType,
   hireDate: z.string(),
+  contractEndDate: z.string().nullable(),
   jobTitle: z.string().nullable(),
   status: z.enum(['ACTIVE', 'TERMINATED']),
   workState: employeeWorkState,

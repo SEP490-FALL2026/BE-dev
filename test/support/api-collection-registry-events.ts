@@ -335,14 +335,6 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     'The new history route of a version (F66, spec J.4): each entry shows the fields one edit changed, at most HISTORY_CHANGES_MAX.',
     'added',
   ),
-  boundedNested(
-    'transferReviewGet#unfinishedRequests',
-    'UNFINISHED_REQUESTS_MAX',
-    'LD-14',
-    'g0-g6-final-business-baseline-remediation',
-    'The review of a transfer lists the open Requests of the person beside the tools (F29), at most UNFINISHED_REQUESTS_MAX.',
-    'added',
-  ),
   {
     registry: 'nested',
     key: 'operatingParameterList#constraints.options',

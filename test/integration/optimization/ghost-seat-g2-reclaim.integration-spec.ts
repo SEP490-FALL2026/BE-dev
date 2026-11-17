@@ -213,7 +213,7 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
       await get('/api/v1/ghost-seat-optimization-summary', account).expect(403);
     }
     expect(
-      await get(`/api/v1/ghost-seat-recommendations/${g2.id}`)
+      await get(`/api/v1/ghost-seat-recommendations/${g2.id}`, w.worldItAdmin.account)
         .expect(200)
         .then((r) => dataOf(r).recommendation),
     ).toMatchObject({

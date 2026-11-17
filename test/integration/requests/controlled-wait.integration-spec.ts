@@ -52,11 +52,14 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
 
     return unit;
   };
-  /** New headless requests are one-step; this fixture is an internal request sent before its head leaves. */
-  const waitingInternal = async (department: Department, person: Person) => {
+  /**
+   * A paid request sent before its head leaves, so it waits for the next one. Free internal software does not wait for a head any more: it
+   * goes straight to the IT Admin (`QĐ-111bc`, D-78; `department-head-loss.integration-spec.ts`).
+   */
+  const waitingForHead = async (department: Department, person: Person) => {
     const head = await h.staff(department, `WAIT-H${++n}`);
     await h.makeHead(department, head);
-    const sent = await h.sent(person, internal);
+    const sent = await h.sent(person, paid);
     await h.vacateHead(department.id).expect(200);
     return sent;
   };
@@ -258,7 +261,7 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
   });
 
   describe('a department with no head (AC-6, AC-7, D-S20)', () => {
-    it('BR-MF1-02 keeps an existing internal request waiting after its head leaves, with one alert and scoped queue access', async () => {
+    it('BR-MF1-02 keeps an existing paid request waiting after its head leaves, with one alert and scoped queue access', async () => {
       n += 1;
       const headless = await h.departmentWithUnit(`P-HL${n}`);
       const e4 = await h.staff(headless, `HL-E${n}`);
@@ -268,7 +271,7 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
       const itElsewhere = await h.staff(otherDepartment, `IT-OT${n}`, 'IT_ADMIN');
       await h.setItAdminInCharge(otherDepartment, itElsewhere);
 
-      const sent = await waitingInternal(headless, e4);
+      const sent = await waitingForHead(headless, e4);
       const step = await h.stepOf(sent.id, 'NEED');
       // Nobody takes the step in place of a head: it waits, on the row it was routed on, with the request under control.
       expect(step).toMatchObject({
@@ -320,7 +323,7 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
     it('makes the step wait in the transaction of the change, tells it at once, decides nothing, and gives it to the head who is named after', async () => {
       const unit = await h.departmentWithHead(`P-EV${(n += 1)}`);
       const successor = await h.staff(unit.department, `EV-S${n}`);
-      const sent = await h.sent(unit.member, internal);
+      const sent = await h.sent(unit.member, paid);
       expect((await h.stepOf(sent.id, 'NEED')).assignee_employee_id).toBe(unit.head.employeeId);
 
       await h.vacateHead(unit.department.id).expect(200);
@@ -363,7 +366,7 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
       n += 1;
       const headless = await h.departmentWithUnit(`P-Q${n}`);
       for (let index = 0; index < 4; index += 1)
-        await waitingInternal(headless, await h.staff(headless, `Q-E${n}-${index}`));
+        await waitingForHead(headless, await h.staff(headless, `Q-E${n}-${index}`));
       const all = await listed(h.admin, { pageSize: 100 });
       const expected = (
         await h.ctx.sql.query<{ id: string }>(
@@ -397,10 +400,10 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
       n += 1;
       const headless = await h.departmentWithUnit(`P-N${n}`);
       const read = () => counter.run(() => listed(h.admin, { pageSize: 100 }));
-      await waitingInternal(headless, await h.staff(headless, `N-E${n}-0`));
+      await waitingForHead(headless, await h.staff(headless, `N-E${n}-0`));
       const few = await read();
       for (let index = 1; index < 6; index += 1)
-        await waitingInternal(headless, await h.staff(headless, `N-E${n}-${index}`));
+        await waitingForHead(headless, await h.staff(headless, `N-E${n}-${index}`));
       const many = await read();
 
       expect(many.result.items.length).toBeGreaterThan(few.result.items.length);

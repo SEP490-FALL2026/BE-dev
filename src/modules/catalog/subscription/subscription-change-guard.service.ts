@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SeatOccupancyHook } from '../public/catalog.extension-points';
+import { SubscriptionSeatIncreaseService, type SeatIncrease } from './seat-increase/subscription-seat-increase.service';
 import { assertQuantityNotBelowOccupied } from './seat-guard.policy';
 import { SubscriptionPoolService, type PoolChange } from './pool/subscription-pool.service';
 
@@ -12,6 +13,7 @@ export class SubscriptionChangeGuard {
     private readonly organizationReads: OrganizationReadApi,
     private readonly occupancy: SeatOccupancyHook,
     private readonly poolRules: SubscriptionPoolService,
+    private readonly seatIncrease: SubscriptionSeatIncreaseService,
   ) {}
 
   async requireOrganizationId(): Promise<string> {
@@ -24,6 +26,11 @@ export class SubscriptionChangeGuard {
   /** The person named to answer for the subscription works, holds the IT Admin role and can sign in (an unlocked read, before the transaction). */
   async requireResponsible(employeeId: string | undefined): Promise<void> {
     if (employeeId !== undefined) await this.poolRules.requireItAdmin(employeeId);
+  }
+
+  /** What a change tells the others: a rise of the seats of a K2 or K4 pool goes to the IT Admin who answers for it (`QĐ-110v`, SPEC P24). */
+  tellSeatIncrease(tx: DbTx, rise: SeatIncrease): Promise<number> {
+    return this.seatIncrease.told(tx, rise);
   }
 
   /** The rules of the shared pool on the state a change leaves (`QĐ-103e`): see `SubscriptionPoolService.judgeChange`. */

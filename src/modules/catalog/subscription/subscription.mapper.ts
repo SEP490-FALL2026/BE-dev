@@ -1,6 +1,5 @@
 import { formatRate } from '../../../core/money/rate';
-import type { ConversionSnapshot } from '../../finance/public/finance.types';
-import type { PriceSnapshotRecord, SubscriptionRecord, SubscriptionState } from './subscription.types';
+import type { SubscriptionRecord, SubscriptionState } from './subscription.types';
 
 /** What the audit trail keeps of a subscription: the business fields, the price and its frozen conversion as text. */
 export const snapshotOf = (record: SubscriptionRecord) => ({
@@ -12,6 +11,7 @@ export const snapshotOf = (record: SubscriptionRecord) => ({
   reporting: record.priceSnapshot
     ? `${record.priceSnapshot.reportingMinor} ${record.priceSnapshot.reportingCurrency} at ${formatRate(record.priceSnapshot.rate)} of ${record.priceSnapshot.rateDate}`
     : null,
+  originalPrice: record.originalPrice ? `${record.originalPrice.amountMinor} ${record.originalPrice.currency}` : null,
   billingCycle: record.billingCycle,
   commitmentTermMonths: record.commitmentTermMonths,
   startDate: record.startDate,
@@ -33,6 +33,7 @@ export const stateOf = (record: SubscriptionRecord): SubscriptionState => ({
   purchasedQuantity: record.purchasedQuantity,
   unitPrice: record.unitPrice,
   priceSnapshot: record.priceSnapshot,
+  originalPrice: record.originalPrice,
   billingCycle: record.billingCycle,
   commitmentTermMonths: record.commitmentTermMonths,
   startDate: record.startDate,
@@ -61,6 +62,7 @@ const canonical = (state: SubscriptionState): string =>
       state.priceSnapshot.reportingCurrency,
       state.priceSnapshot.exchangeRateId,
     ],
+    state.originalPrice && [state.originalPrice.amountMinor.toString(), state.originalPrice.currency],
     state.billingCycle,
     state.commitmentTermMonths,
     state.startDate,
@@ -77,15 +79,3 @@ const canonical = (state: SubscriptionState): string =>
 
 /** True when two states hold the same data. */
 export const sameState = (a: SubscriptionState, b: SubscriptionState): boolean => canonical(a) === canonical(b);
-
-/** The stored form of a conversion the finance facade took. */
-export function toSnapshot(result: ConversionSnapshot): PriceSnapshotRecord {
-  return {
-    rate: result.rate,
-    rateDate: result.rateDate,
-    rateSource: result.rateSource,
-    reportingMinor: result.reportingAmountMinor,
-    reportingCurrency: result.reportingCurrency,
-    exchangeRateId: result.exchangeRateId,
-  };
-}

@@ -4,7 +4,12 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
-import type { OpenRevocationInput, RevocationSource } from '../public/licensing.types';
+import {
+  isSystemActor,
+  type OpenRevocationInput,
+  type RevocationSource,
+  type SystemActor,
+} from '../public/licensing.types';
 import { RevocationListeners } from '../public/licensing.extension-points';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
 import { toRevocationFacts, type ProvisioningTaskRecord } from './provisioning-task.types';
@@ -36,7 +41,7 @@ export class RevocationRecorder {
 
   async record(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: AuthenticatedPrincipal | SystemActor,
     opened: {
       organizationId: string;
       task: ProvisioningTaskRecord;
@@ -74,7 +79,7 @@ export class RevocationRecorder {
     const event = [recorded.action, 'ProvisioningTask', task.id, recorded.before, recorded.after] as const;
     await this.audit.record(tx, licensingAuditEvent(actor, opened.organizationId, ...event));
     // An IT Admin who asks for their own seat to go because no other IT Admin can is told to the Super Admin (`SoD-5`).
-    if (opened.selfExecuted) await this.frame.tellSuperAdmin(tx, opened.organizationId, task.id, actor.employeeId);
+    await this.tellSelfExecuted(tx, actor, opened.selfExecuted, opened.organizationId, task.id);
     const standing = await this.reasons.listOf([task.id], tx);
     // A task that was completed is final: its timing is read from the reasons only while it can still be worked.
     if (task.status !== 'COMPLETED') await this.tasks.markTiming(tx, task.id, effectiveTiming(standing));
@@ -85,9 +90,21 @@ export class RevocationRecorder {
       task: toRevocationFacts(task),
       reasons: standing.map(reasonFactsOf),
       context: input.context ?? {},
-      actor,
+      actor: isSystemActor(actor) ? null : actor,
       now: opened.now,
     });
+  }
+
+  /** An IT Admin who asks for their own seat to go is told to the Super Admin (`SoD-5`); the system is nobody's own seat. */
+  private async tellSelfExecuted(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal | SystemActor,
+    selfExecuted: boolean,
+    organizationId: string,
+    taskId: string,
+  ): Promise<void> {
+    if (!selfExecuted || isSystemActor(actor)) return;
+    await this.frame.tellSuperAdmin(tx, organizationId, taskId, actor.employeeId);
   }
 
   /**

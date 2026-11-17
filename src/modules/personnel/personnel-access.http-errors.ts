@@ -31,10 +31,23 @@ export function groundsIssuedOnFutureException(today: string): ApiException {
   });
 }
 
+/** The code of the refusal of a head who leaves without naming who follows them: the same for a departure and a transfer (`QĐ-110h`). */
+export const SUCCESSOR_REQUIRED_CODE = 'PERSONNEL.SUCCESSOR_REQUIRED';
+
+/** A head who leaves must name an employee to follow them: nothing given and "nobody" are both refused (`QĐ-110h`). */
+export function successorRequiredException(details?: Record<string, unknown>): ApiException {
+  return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+    code: SUCCESSOR_REQUIRED_CODE,
+    message: 'The person heads the department they leave: name an employee of it who follows them as head.',
+    ...(details && Object.keys(details).length > 0 ? { details } : {}),
+  });
+}
+
 /** The answer above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const PERSONNEL_ACCESS_ERROR_EXAMPLES = {
   SELF_CHANGE_FORBIDDEN: errorExampleOf(
     toPersonnelAccessApiException(new PersonnelAccessRefusedError('SELF_CHANGE_FORBIDDEN')),
   ),
   GROUNDS_ISSUED_ON_FUTURE: errorExampleOf(groundsIssuedOnFutureException('2026-01-01')),
+  SUCCESSOR_REQUIRED: errorExampleOf(successorRequiredException({ departmentId: '<department-id>' })),
 } as const;

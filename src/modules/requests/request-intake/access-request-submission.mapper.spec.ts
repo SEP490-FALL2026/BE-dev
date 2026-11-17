@@ -18,6 +18,7 @@ const base = (decision: unknown, extra: Partial<SubmittedRequest> = {}): Submitt
       budgetYear: 2026,
     },
     routing: { decision, departmentHeadEmployeeId: 'head-1' },
+    term: { start: '2026-10-30', months: 6, end: '2027-04-29', cutAt: null, startedMonths: 6 },
   } as unknown as SubmittedRequest['assessed'],
   now: new Date('2026-10-30T03:00:00Z'),
   ...extra,
@@ -44,6 +45,8 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
       beneficiaryEmployeeIds: ['emp-1'],
       departmentId: 'dep-1',
       costCenterId: 'cc-1',
+      // The request keeps the months of use it asked for and no end date: the seat ends from the day it is granted (`QĐ-111i`).
+      termMonths: 6,
       expectedEndDate: null,
       draftId: null,
       createdByAppUserId: 'user-1',
@@ -81,21 +84,39 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
       branch: 'PAID_IN_CATALOG',
       state: 'PENDING',
       planId: 'plan-1',
-      expectedEndDate: null,
+      termMonths: 6,
+      termCutAt: null,
       requesterEmployeeId: 'emp-1',
       beneficiaryEmployeeIds: ['emp-1'],
       departmentId: 'dep-1',
       costCenterId: 'cc-1',
       policyVersion: 3,
       hasSpendStep: true,
-      // GH-3 (BR-MF1-01g): how many paid applications the person used when it was sent; null when not flagged.
-      manyPaidSoftwareCount: null,
       slaWorkingDays: 2,
       pricingStatus: 'COMPUTED',
       amountMinor: '1200',
       amountCurrency: 'VND',
       budgetYear: 2026,
     });
+  });
+
+  it('QĐ-110q, R-49: a request let through for the grace of a transfer carries the exemption and the old right it replaces, and the first entry says so', () => {
+    const facts = base(assigned, { graceHold: { transferId: 'tr-1', assignmentId: 'seat-old' } });
+
+    expect(newRequestOf(facts)).toMatchObject({ limitExemption: 'TRANSFER_GRACE', replacesAssignmentId: 'seat-old' });
+    expect(submittedAuditDetail(facts)).toMatchObject({
+      limitExemption: 'TRANSFER_GRACE',
+      replacesAssignmentId: 'seat-old',
+      transferId: 'tr-1',
+    });
+  });
+
+  it('writes no exemption and no old right for a request that is not in the grace of a transfer', () => {
+    const row = newRequestOf(base(assigned));
+
+    expect(row.limitExemption ?? null).toBeNull();
+    expect(row.replacesAssignmentId ?? null).toBeNull();
+    expect(submittedAuditDetail(base(assigned))).not.toHaveProperty('limitExemption');
   });
 
   it('says in the second entry who was named and in which role, or why nobody was', () => {

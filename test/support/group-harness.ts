@@ -76,9 +76,12 @@ export class GroupHarness extends StatusHarness {
   linesOf = (id: string, account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get(`/api/v1/access-requests/${id}/lines`).query(query).set(this.as(account));
   decideLines = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/line-need-decisions`).set(this.as(account)).send(body);
+    request(this.server())
+      .post(`/api/v1/access-requests/${id}/line-need-decisions`)
+      .set(this.as(account))
+      .send(this.checklists.withYes('1.2', body));
   decideSpendLines = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/line-spend-decisions`).set(this.as(account)).send(body);
+    this.decisionPost(`/api/v1/access-requests/${id}/line-spend-decisions`, account, '1.7', body);
   withdrawLine = (id: string, employeeId: string, body: object, account: ApiAccount) =>
     request(this.server())
       .post(`/api/v1/access-requests/${id}/lines/${employeeId}/withdraw`)
@@ -96,7 +99,10 @@ export class GroupHarness extends StatusHarness {
   grantLine = (body: object, account: ApiAccount) =>
     request(this.server()).post('/api/v1/provisioning-tasks').set(this.as(account)).send(body);
   decideNeed = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/need-decision`).set(this.as(account)).send(body);
+    request(this.server())
+      .post(`/api/v1/access-requests/${id}/need-decision`)
+      .set(this.as(account))
+      .send(this.checklists.withYes('1.2', body));
 
   /** The person has left the company: the employee record is terminated, as the departure of a person leaves it. */
   async depart(person: Person): Promise<void> {
@@ -132,7 +138,25 @@ export class GroupHarness extends StatusHarness {
         released_at: Date | null;
       }>(
         `SELECT employee_id, budget_year, amount_minor::text, released_at FROM access_request_line_amounts
-          WHERE request_id = $1 ORDER BY employee_id, budget_year`,
+          WHERE request_id = $1 AND held ORDER BY employee_id, budget_year`,
+        [requestId],
+      )
+    ).rows;
+  }
+
+  /** The part of the year after that each person of the request keeps (`QĐ-111k`): no commitment holds it, so it is never given back. */
+  async nextYearShares(
+    requestId: string,
+  ): Promise<Array<{ employee_id: string; budget_year: number; amount_minor: string; released_at: Date | null }>> {
+    return (
+      await this.ctx.sql.query<{
+        employee_id: string;
+        budget_year: number;
+        amount_minor: string;
+        released_at: Date | null;
+      }>(
+        `SELECT employee_id, budget_year, amount_minor::text, released_at FROM access_request_line_amounts
+          WHERE request_id = $1 AND NOT held ORDER BY employee_id, budget_year`,
         [requestId],
       )
     ).rows;

@@ -30,13 +30,15 @@ export interface RequestableApplicationRecord {
   id: string;
   name: string;
   kind: ApplicationKind;
+  /** The https link to the logo image the IT Admin pasted, or null. */
+  logoUrl: string | null;
   vendorName: string | null;
-  functionalGroup: { id: string; name: string } | null;
+  functionalGroup: { id: string; name: string };
   planCount: number;
 }
 
 export interface RequestableApplicationDetailRecord extends RequestableApplicationRecord {
-  dataSensitivity: DataSensitivity;
+  dataSensitivity: DataSensitivity | null;
 }
 
 /** A plan a person may ask for, as a row of the list reads it. */
@@ -44,7 +46,7 @@ export interface RequestablePlanRecord {
   id: string;
   name: string;
   provisioningType: ProvisioningType;
-  application: { id: string; name: string; kind: ApplicationKind };
+  application: { id: string; name: string; kind: ApplicationKind; logoUrl: string | null };
 }
 
 export interface RequestablePlanDetailRecord extends RequestablePlanRecord {

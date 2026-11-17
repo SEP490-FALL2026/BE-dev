@@ -27,7 +27,7 @@ export class AssessmentPatchService {
       patch.opinionStatus = opinion?.status ?? null;
       patch.opinionNote = opinion?.note ?? null;
     }
-    if (quote !== undefined) patch.quote = quote === null ? null : await this.quotes.read(quote);
+    if (quote !== undefined) patch.quote = quote === null ? null : await this.quotes.read(quote, 'quote');
 
     return patch;
   }

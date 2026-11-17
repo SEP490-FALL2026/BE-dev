@@ -22,7 +22,7 @@ interface Refusal {
 
 /**
  * `qd93-direct-manager-spending-approver-roles`, Task 6b (US-01-03 AC-12, AC-13; QĐ-93d(3); spec rule 10): the Super Admin cannot give
- * SPENDING_APPROVER to a person who is a party of work that is still open — a Request, a return, a BM-10 proposal, a service account.
+ * SPENDING_APPROVER to a person who is a party of work that is still open — a Request, a return, a BM-10 proposal.
  * The refusal lists the work (409 `APP_USER.SPENDING_APPROVER_HAS_OPEN_WORK`); a draft is not work (OD-5); once the work is over the grant
  * goes through. `lockSpendingApproverAmong` is what the creating side of a Request uses to meet the same rows (`FOR SHARE`).
  */
@@ -210,34 +210,6 @@ describe('the grant of SPENDING_APPROVER and the work that is still open (integr
     });
   });
 
-  describe('service accounts (US-01-03 AC-13)', () => {
-    it('refuses the person who answers for a service account that is still in effect, and grants once it is over', async () => {
-      const u = await unit();
-      const person = await h.staff(u.department, `E9-${counter}`);
-      const subscriptionId = await h.subscription(10, 'K2', u.department.id);
-      await h.ctx.sql.query(`UPDATE employees SET hire_date = '2020-01-01' WHERE id = $1`, [person.employeeId]);
-      await h.written({ subscriptionId }, [
-        {
-          employee_code: `E9-${counter}`,
-          account_identifier: `ci-bot-${counter}`,
-          kind: 'service',
-          reason: 'CI pipeline',
-          granted_on: '2026-01-05',
-        },
-      ]);
-      const bot = (await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' }))[0];
-
-      const refusal = await refused(person);
-
-      expect(refusal.blockers).toEqual([
-        expect.objectContaining({ kind: 'SERVICE_ACCOUNT', id: bot.id, partyRole: 'RESPONSIBLE' }),
-      ]);
-
-      await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = current_date WHERE id = $1`, [bot.id]);
-      await grant(person).expect(200);
-    });
-  });
-
   describe('the answer', () => {
     it('lists at most 50 blockers and says it cut the list', async () => {
       const u = await unit();
@@ -250,14 +222,10 @@ describe('the grant of SPENDING_APPROVER and the work that is still open (integr
       expect(refusal.truncated).toBe(true);
     });
 
-    it('is told by the three modules above identity-access, through one extension point of the API graph', () => {
+    it('is told by the two modules above identity-access, through one extension point of the API graph', () => {
       const checks = h.ctx.app.get(SpendingApproverGrantChecks, { strict: false });
 
-      expect(checks.names().sort()).toEqual([
-        'budgets.open-proposals',
-        'licensing.service-accounts',
-        'requests.open-work',
-      ]);
+      expect(checks.names().sort()).toEqual(['budgets.open-proposals', 'requests.open-work']);
     });
   });
 

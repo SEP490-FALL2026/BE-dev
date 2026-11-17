@@ -1,48 +1,1 @@
-import { budgetNumbers } from './budget-view.mapper';
-
-const money = (minor: bigint) => ({ amount: String(minor), currency: 'VND' });
-const budget = { baseMinor: 100n, reserveMinor: 20n, totalMinor: 120n };
-
-describe('BR-MF4-05 department budget numbers', () => {
-  it('deducts held, spent and pending exactly once from both remaining amounts', () => {
-    expect(
-      budgetNumbers(budget, { committed: 30n, spent: 20n, pendingSpend: 10n, priorPeriodAdjustment: 0n }, money),
-    ).toMatchObject({
-      remainingBase: money(40n),
-      remainingWithReserve: money(60n),
-      overBudget: false,
-    });
-  });
-
-  it('keeps negative remaining amounts and flags only below zero', () => {
-    const figures = { committed: 30n, spent: 90n, pendingSpend: 0n, priorPeriodAdjustment: 0n };
-    expect(budgetNumbers(budget, figures, money)).toMatchObject({ remainingWithReserve: money(0n), overBudget: false });
-    expect(budgetNumbers(budget, { ...figures, pendingSpend: 1n }, money)).toMatchObject({
-      remainingWithReserve: money(-1n),
-      overBudget: true,
-    });
-  });
-
-  it('preserves held commitments without inventing a budget when none is approved', () => {
-    expect(
-      budgetNumbers(
-        { baseMinor: null, reserveMinor: null, totalMinor: null },
-        {
-          committed: 30n,
-          spent: 10n,
-          pendingSpend: 0n,
-          priorPeriodAdjustment: 0n,
-        },
-        money,
-      ),
-    ).toMatchObject({
-      base: null,
-      reserve: null,
-      total: null,
-      committed: money(30n),
-      remainingBase: null,
-      remainingWithReserve: null,
-      overBudget: false,
-    });
-  });
-});
+import { budgetNumbers } from './budget-view.mapper';const money = (minor: bigint) => ({ amount: String(minor), currency: 'VND' });const budget = { baseMinor: 100n, reserveMinor: 20n, totalMinor: 120n };describe('BR-MF4-05 department budget numbers', () => {  it('deducts held, spent and pending exactly once from both remaining amounts', () => {    expect(      budgetNumbers(budget, { committed: 30n, spent: 20n, pendingSpend: 10n, priorPeriodAdjustment: 0n }, money),    ).toMatchObject({      remainingBase: money(40n),      remainingWithReserve: money(60n),      overBudget: false,    });  });  it('keeps negative remaining amounts and flags only below zero', () => {    const figures = { committed: 30n, spent: 90n, pendingSpend: 0n, priorPeriodAdjustment: 0n };    expect(budgetNumbers(budget, figures, money)).toMatchObject({ remainingWithReserve: money(0n), overBudget: false });    expect(budgetNumbers(budget, { ...figures, pendingSpend: 1n }, money)).toMatchObject({      remainingWithReserve: money(-1n),      overBudget: true,    });  });  it('preserves held commitments without inventing a budget when none is approved', () => {    expect(      budgetNumbers(        { baseMinor: null, reserveMinor: null, totalMinor: null },        {          committed: 30n,          spent: 10n,          pendingSpend: 0n,          priorPeriodAdjustment: 0n,        },        money,      ),    ).toMatchObject({      base: null,      reserve: null,      total: null,      committed: money(30n),      remainingBase: null,      remainingWithReserve: null,      overBudget: false,    });  });  it('AD-1: works out what is left on the effective budget, the base of the version and the adjustments, and keeps the figures of the version (QĐ-111bh)', () => {    const figures = { committed: 30n, spent: 90n, pendingSpend: 0n, priorPeriodAdjustment: 0n };    expect(budgetNumbers({ ...budget, adjustmentMinor: 20n }, figures, money)).toMatchObject({      base: money(100n),      total: money(120n),      effectiveBudget: { base: money(120n), reserve: money(20n), total: money(140n), adjustment: money(20n) },      remainingBase: money(0n),      remainingWithReserve: money(20n),      overBudget: false,    });    expect(budgetNumbers({ ...budget, adjustmentMinor: -20n }, figures, money)).toMatchObject({      effectiveBudget: { base: money(80n), total: money(100n), adjustment: money(-20n) },      remainingWithReserve: money(-20n),      overBudget: true,    });    expect(budgetNumbers(budget, figures, money).effectiveBudget).toMatchObject({ adjustment: money(0n) });  });});

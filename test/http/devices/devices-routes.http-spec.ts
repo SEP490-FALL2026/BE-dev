@@ -41,6 +41,7 @@ describe('company machine routes (http contract, no database)', () => {
     ['post', DEVICES, { assetCode: 'AS-1', hostname: 'h', os: 'Windows 11', holderEmployeeId: ID }],
     ['get', DEVICES, undefined],
     ['get', `${DEVICES}/${ID}`, undefined],
+    ['get', `${DEVICES}/${ID}/registrations`, undefined],
     ['post', `${DEVICES}/${ID}/holder-changes`, { holderEmployeeId: ID }],
     ['post', `${DEVICES}/${ID}/retirements`, { reason: 'broken' }],
     ['post', `${REGISTRATIONS}/${ID}/signature-records`, { documentId: ID, noticeVersionId: ID }],
@@ -72,6 +73,7 @@ describe('company machine routes (http contract, no database)', () => {
       await as(request(server).post(DEVICES).send(routes[0][2])),
       await as(request(server).get(DEVICES)),
       await as(request(server).get(`${DEVICES}/${ID}`)),
+      await as(request(server).get(`${DEVICES}/${ID}/registrations`)),
       await as(request(server).post(`${DEVICES}/${ID}/holder-changes`).send({ holderEmployeeId: ID })),
       await as(request(server).post(`${DEVICES}/${ID}/retirements`).send({ reason: 'x' })),
       await as(
@@ -182,6 +184,15 @@ describe('company machine routes (http contract, no database)', () => {
     ['a page size over 100', 'get', `${DEVICES}?pageSize=101`, undefined],
     ['a state that does not exist', 'get', `${DEVICES}?state=BROKEN`, undefined],
     ['an id that is not a UUID', 'get', `${DEVICES}/not-a-uuid`, undefined],
+    ['the registrations of an id that is not a UUID', 'get', `${DEVICES}/not-a-uuid/registrations`, undefined],
+    ['a page size over 100 of the registrations', 'get', `${DEVICES}/${ID}/registrations?pageSize=101`, undefined],
+    ['page 0 of the registrations', 'get', `${DEVICES}/${ID}/registrations?page=0`, undefined],
+    [
+      'a filter the registrations never take',
+      'get',
+      `${DEVICES}/${ID}/registrations?holderEmployeeId=${ID}`,
+      undefined,
+    ],
     [
       'a holder change that names the registration',
       'post',
@@ -290,9 +301,21 @@ describe('company machine routes (http contract, no database)', () => {
         bodyOf_('DevicePageResponseDto'),
         bodyOf_('DeviceDetailResponseDto'),
         bodyOf_('MyDevicePageResponseDto'),
+        bodyOf_('DeviceRegistrationPageResponseDto'),
       ]);
 
       expect(text).not.toMatch(/"(?:ip|address|ipAddress|token|credential|url|link)[A-Za-z]*"/i);
+    });
+
+    it('says in the list of machines and in the history of one the last time an intake was accepted, and lists the history a page at a time', () => {
+      for (const name of ['DevicePageResponseDto', 'DeviceDetailResponseDto', 'DeviceRegistrationPageResponseDto']) {
+        expect(JSON.stringify(bodyOf_(name))).toContain('lastAcceptedAt');
+      }
+      const registrations = document.paths?.[`/api/v1/devices/{id}/registrations`]?.get;
+      const parameters = ((registrations?.parameters ?? []) as { name: string }[]).map((parameter) => parameter.name);
+
+      expect(registrations?.operationId).toBe('deviceRegistrationList');
+      expect(parameters.sort()).toEqual(['id', 'page', 'pageSize']);
     });
   });
 });

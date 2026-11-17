@@ -107,20 +107,11 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
     request(h.server()).post(`/api/v1/access-requests/drafts/${id}/submission`).set(h.as(account)).send({});
   const deleteDraft = (id: string, account: ApiAccount) =>
     request(h.server()).delete(`/api/v1/access-requests/drafts/${id}`).set(h.as(account));
-  const submitService = (body: object, account: ApiAccount) =>
-    request(h.server()).post('/api/v1/access-requests/service-accounts').set(h.as(account)).send(body);
-  const serviceBody = (extra: Record<string, unknown> = {}) => ({
-    planId: plan,
-    purpose: 'Build bot of the CI pipeline',
-    expectedIdentifier: `ci-bot-${(counter += 1)}`,
-    businessReason: 'Run the builds of the product',
-    ...extra,
-  });
   const saved = async (body: object, account: ApiAccount) =>
     h.dataOf<{ draft: DraftWire }>(await save(body, account).expect(201)).draft;
 
   describe('every operation that charges a cost to the department (F27)', () => {
-    it('refuses a request, a proposal, a request for a group and one for a service account with 409 FINANCE.SETUP_INCOMPLETE, and writes nothing', async () => {
+    it('refuses a request, a proposal and a request for a group with 409 FINANCE.SETUP_INCOMPLETE, and writes nothing', async () => {
       const u = await bare();
       const [e1, e2] = await h.colleagues(u, 2);
       const before = await footprint();
@@ -128,11 +119,10 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
       const individual = await h.submit(h.form(plan), u.member.account);
       const proposal = await h.propose(h.proposeBody(), u.member.account);
       const group = await h.submitGroup(h.groupBody(plan, [e1, e2]), u.head.account);
-      const service = await submitService(serviceBody(), u.member.account);
 
-      expect([individual, proposal, group, service].map((response) => response.status)).toEqual([409, 409, 409, 409]);
-      expect([individual, proposal, group, service].map((response) => h.codeOf(response))).toEqual(
-        Array(4).fill('FINANCE.SETUP_INCOMPLETE'),
+      expect([individual, proposal, group].map((response) => response.status)).toEqual([409, 409, 409]);
+      expect([individual, proposal, group].map((response) => h.codeOf(response))).toEqual(
+        Array(3).fill('FINANCE.SETUP_INCOMPLETE'),
       );
       expect(await footprint()).toEqual(before);
     });
@@ -157,17 +147,6 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
       // Nothing is charged: no budget check and no commitment, and no Cost Center is made up for it.
       expect(await table('request_budget_checks')).toBe(checks);
       expect(await table('budget_commitments')).toBe(commitments);
-    });
-
-    it('still refuses what ends in a service seat, even of internal software, because that seat is charged to the Unit (QĐ-86a)', async () => {
-      const internalPlan = await h.plan('K5');
-      const u = await bare();
-      const before = await footprint();
-
-      const refused = await submitService(serviceBody({ planId: internalPlan }), u.member.account).expect(409);
-
-      expect(h.codeOf(refused)).toBe('FINANCE.SETUP_INCOMPLETE');
-      expect(await footprint()).toEqual(before);
     });
 
     it('does not let the gate answer for a group of internal software: the group refuses that plan with its own answer', async () => {
@@ -202,13 +181,12 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
   });
 
   describe('saving what cannot be sent (spec L.1)', () => {
-    it('keeps a draft of each kind with no gate: no Cost Center, no moment it was sent, no step, no check, no commitment, and says so in the Audit Trail', async () => {
+    it('keeps a draft of each kind (an individual and a group) with no gate: no Cost Center, no moment it was sent, no step, no check, no commitment, and says so in the Audit Trail', async () => {
       const u = await bare();
       const [e1, e2] = await h.colleagues(u, 2);
 
       const individual = await saved({ kind: 'INDIVIDUAL', ...h.form(plan) }, u.member.account);
       const group = await saved({ kind: 'GROUP', ...h.groupBody(plan, [e1, e2]) }, u.head.account);
-      const service = await saved({ kind: 'SERVICE_ACCOUNT', ...serviceBody() }, u.member.account);
 
       expect(individual).toMatchObject({
         kind: 'INDIVIDUAL',
@@ -217,12 +195,9 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
         beneficiaryCount: 1,
       });
       expect(group).toMatchObject({ kind: 'GROUP', departmentId: u.department.id, planId: plan, beneficiaryCount: 2 });
-      expect(service).toMatchObject({ kind: 'SERVICE_ACCOUNT', beneficiaryCount: 1 });
-      // A draft of a service account has no detail row yet, which a request of that type must have, so it is a plain request until it is sent.
       for (const [draft, type] of [
         [individual, 'GRANT'],
         [group, 'GROUP_GRANT'],
-        [service, 'GRANT'],
       ] as const) {
         expect(await draftRow(draft.id)).toEqual({ state: 'DRAFT', type, cost_center_id: null, submitted_at: null });
         expect(await workOf(draft.id)).toEqual([0, 0, 0]);
@@ -368,27 +343,17 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
       expect(h.dataOf<{ items: DraftWire[] }>(await listDrafts(u.member.account).expect(200)).items).toEqual([]);
     });
 
-    it('sends a draft of a group and one of a service account as the operations that send them do, with their messages', async () => {
+    it('sends a draft of a group as the operation that sends a group does, with its message', async () => {
       const u = await bare();
       const [e1, e2] = await h.colleagues(u, 2);
       const group = await saved({ kind: 'GROUP', ...h.groupBody(plan, [e1, e2]) }, u.head.account);
-      const service = await saved({ kind: 'SERVICE_ACCOUNT', ...serviceBody() }, u.member.account);
       await costCenterFor(u);
-      // A request for a service account is sent only once the seat baseline is closed (US-05-21): the draft answers as it does.
-      const early = await sendDraft(service.id, u.member.account).expect(409);
-      expect(h.codeOf(early)).toBe('SERVICE_ACCOUNT_REQUEST.BASELINE_NOT_CLOSED');
-      expect((await draftRow(service.id)).state).toBe('DRAFT');
-      await h.closeBaseline().expect(200);
 
       const groupSent = await sendDraft(group.id, u.head.account).expect(201);
-      const serviceSent = await sendDraft(service.id, u.member.account).expect(201);
 
       expect((groupSent.body as { message: string }).message).toBe('GROUP_REQUEST.SUBMITTED');
-      expect((serviceSent.body as { message: string }).message).toBe('ACCESS_REQUEST.SERVICE_ACCOUNT_SUBMITTED');
       expect(await draftRow(group.id)).toMatchObject({ type: 'GROUP_GRANT' });
       expect((await draftRow(group.id)).state).not.toBe('DRAFT');
-      expect(await draftRow(service.id)).toMatchObject({ type: 'SERVICE_ACCOUNT' });
-      expect((await draftRow(service.id)).state).not.toBe('DRAFT');
       expect(await h.lineStates(group.id)).toHaveLength(2);
     });
 
@@ -446,7 +411,7 @@ describe('a department with no Cost Center, and the drafts of what it cannot sen
       const u = await bare();
       const leaver: Person = await h.staff(u.department, `GT-L${(counter += 1)}`);
       const mine = await saved({ kind: 'INDIVIDUAL', ...h.form(plan) }, leaver.account);
-      const second = await saved({ kind: 'SERVICE_ACCOUNT', ...serviceBody() }, leaver.account);
+      const second = await saved({ kind: 'INDIVIDUAL', ...h.form(plan) }, leaver.account);
       const stays = await saved({ kind: 'INDIVIDUAL', ...h.form(plan) }, u.member.account);
 
       await h.leave(leaver.employeeId);

@@ -419,11 +419,14 @@ describe('the layers of requests, as the command prints them and as the module c
     return rows;
   };
 
-  // 39 until 09/11/2026; then request-limits (GH-1/2/3), renewal-apply and request-history (P1-09/P1-10) made 42.
-  test('prints one line with a layer for each of the 42 capabilities, every one in exactly one layer', () => {
+  // 39 until 09/11/2026; then request-limits (GH-1/2/3), renewal-apply and request-history (P1-09/P1-10) made 42; service-account-request left (QĐ-110m): 41;
+  // catalog-link left assessment (FIX-B2a, B2A-R1: the folder was at the 25 files of the cap): 42; purchase-invoice (PI-1) made 43, and invoice-discrepancy with
+  // invoice-discrepancy-queue (RC-1: the case is opened by the signature of purchase-invoice, a capability with a controller, so it has none) made 45;
+  // assessment-decision (PL-2.4: the checklist of the assessment of a proposal, an L2 the module card already lists) made 46.
+  test('prints one line with a layer for each of the 46 capabilities, every one in exactly one layer', () => {
     assert.equal(printed.status, 0);
-    assert.equal(lines.length, 42);
-    assert.equal(new Set(lines.map(([, , name]) => name)).size, 42);
+    assert.equal(lines.length, 46);
+    assert.equal(new Set(lines.map(([, , name]) => name)).size, 46);
   });
 
   test('marks as isolated, and only as such, the capability that imports nothing and that nothing imports', () => {
@@ -443,12 +446,11 @@ describe('the layers of requests, as the command prints them and as the module c
 
   test('has no capability below L3 that imports a capability with a controller, and names the importers of each L3 that is imported', () => {
     const imported = lines.filter(([, layer, , , by]) => layer === 'L3' && Number(by) > 0);
-    // the five exceptions of the card (the list itself is in the gate capability-graph)
+    // the four exceptions of the card (the list itself is in the gate capability-graph)
     assert.deepEqual(imported.map(([, , name]) => name).sort(), [
       'draft',
       'group-request-submission',
       'line-closure',
-      'service-account-request',
       'sla',
     ]);
     for (const [, , name, , , importers] of imported) assert.ok(importers, name);

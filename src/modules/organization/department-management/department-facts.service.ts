@@ -5,16 +5,18 @@ import { EmployeeRecordService } from '../employee/employee-record.service';
 import { EmployeeRecord, OrganizationRecord } from '../public/organization.types';
 
 /**
- * Locks the employee through the facade (`FOR SHARE`: still there, not changed, until commit) and reads it in the same
- * transaction. Only a missing employee becomes null; every other error goes through unchanged.
+ * Locks the employee through the facade (`FOR SHARE`: still there, not changed, until commit; `FOR UPDATE` when the caller counts
+ * something over the employee and must be the only one counting) and reads it in the same transaction. Only a missing employee
+ * becomes null; every other error goes through unchanged.
  */
 export async function lockAndReadEmployee(
   employees: EmployeeRecordService,
   tx: DbTx,
   employeeId: string,
+  mode: 'SHARE' | 'UPDATE' = 'SHARE',
 ): Promise<EmployeeRecord | null> {
   try {
-    await employees.lock(tx, employeeId, 'SHARE');
+    await employees.lock(tx, employeeId, mode);
   } catch (error) {
     if (error instanceof EmployeeNotFoundError) return null;
     throw error;

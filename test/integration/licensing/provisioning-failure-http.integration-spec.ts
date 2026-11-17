@@ -199,7 +199,7 @@ describe('what a failed try of the connector leads to, over HTTP (integration, r
     await expect(h.recordFailure(byHand.id, 'PERMANENT')).rejects.toBeInstanceOf(ProvisioningTaskNotConnectorError);
     await expect(h.recordFailure(randomUUID(), 'PERMANENT')).rejects.toBeInstanceOf(ProvisioningTaskNotFoundError);
     await expect(h.recordFailure(over.id, 'PERMANENT')).rejects.toEqual(new ProvisioningTaskStateError('NOT_RUNNING'));
-    expect((await task(byHand.id)).status).toBe('QUEUED');
+    expect((await task(byHand.id)).status).toBe('IN_PROGRESS');
   });
 
   it('shows a failure of a task by hand as the kind NOT_DONE, so that it goes the same way', async () => {

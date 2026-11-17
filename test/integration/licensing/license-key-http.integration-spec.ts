@@ -3,6 +3,7 @@ import request from 'supertest';
 import { ApiAccount } from '../../support/api-accounts';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
 import { changeRoleTo } from '../../support/builders/account.builder';
+import { intakeBodyOf } from '../../support/application-body';
 
 const h = new ProvisioningHarness();
 
@@ -353,13 +354,15 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
       await request(h.server())
         .post('/api/v1/applications')
         .set(h.as(h.it1))
-        .send({
-          name: h.unique('Office'),
-          kind: 'LICENSED',
-          vendorName: h.unique('Vendor'),
-          dataSensitivity: 'LOW',
-          communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
-        })
+        .send(
+          intakeBodyOf({
+            name: h.unique('Office'),
+            kind: 'LICENSED',
+            vendorName: h.unique('Vendor'),
+            dataSensitivity: 'LOW',
+            communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
+          }),
+        )
         .expect(201),
     );
     const planId = h.dataOf<{ id: string }>(
@@ -370,7 +373,6 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
           applicationId: application.id,
           name: h.unique('Plan'),
           provisioningType: 'K4',
-          pricingModel: 'PER_SEAT',
           controlLevel: 'FULL',
         })
         .expect(201),

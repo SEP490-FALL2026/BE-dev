@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { pretendBusinessToday } from '../../support/pretend-today';
+import { ensureVendorAdmins } from '../../support/builders/catalog.builder';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
+import { intakeBodyOf } from '../../support/application-body';
+import { pricingOfBody, writeLegacyPricing } from '../../support/legacy-pricing';
 
 interface TermsWire {
   termsUrl: string | null;
@@ -99,13 +102,15 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
       await request(server())
         .post('/api/v1/applications')
         .set(as(it1))
-        .send({
-          name: unique('App'),
-          kind,
-          ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
-          dataSensitivity: 'LOW',
-          communication: NO,
-        })
+        .send(
+          intakeBodyOf({
+            name: unique('App'),
+            kind,
+            ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
+            dataSensitivity: 'LOW',
+            communication: NO,
+          }),
+        )
         .expect(201),
     );
     const type = setup.type ?? (kind === 'INTERNAL' ? 'K5' : 'K2');
@@ -117,10 +122,14 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
           applicationId: application.id,
           name: unique('Plan'),
           provisioningType: type,
-          ...(type === 'K5' ? {} : { pricingModel: setup.pricing ?? 'PER_SEAT', controlLevel: 'FULL' }),
+          ...(type === 'K5' ? {} : { ...pricingOfBody(type, setup.pricing ?? 'PER_SEAT'), controlLevel: 'FULL' }),
         })
         .expect(201),
     );
+
+    await writeLegacyPricing(ctx.sql, created.id, type, setup.pricing ?? 'PER_SEAT');
+    // A plan that needs admins at the vendor gets the two-person profile an active subscription asks for (X-IT.5).
+    await ensureVendorAdmins(ctx, created.id, it1.employeeId);
 
     return { planId: created.id, applicationId: application.id };
   };
@@ -271,7 +280,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
       const response = await request(server())
         .patch(`/api/v1/plans/${k4.planId}`)
         .set(as(it1))
-        .send({ provisioningType: 'K1', pricingModel: 'FLAT_RATE', controlLevel: 'PARTIAL' })
+        .send({ provisioningType: 'K1', controlLevel: 'PARTIAL' })
         .expect(409);
 
       expect(codeOf(response)).toBe('PLAN.TERMS_BLOCK_TYPE_CHANGE');
@@ -292,7 +301,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
   });
 
   describe('the alert that the terms need a new review (AC-3, AC-4, AC-9)', () => {
-    it('AC-3: with a deadline of 01/12/2026 and the last review on 15/11/2025, the alert opens on 16/11 and ends after 01/12', async () => {
+    it('AC-3: with a deadline of 01/12/2026 and the last review on 15/11/2025, the alert opens on 01/11 (30 days before it) and ends after 01/12', async () => {
       const { planId } = await plan();
       await putTerms(planId, { lastReviewedOn: '2025-11-15' }).expect(200);
       const subscriptionId = await subscription(planId, {
@@ -301,10 +310,10 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
         autoRenew: true,
       });
 
-      today('2026-11-15');
+      today('2026-10-31');
       expect(await warningsOf(planId)).toEqual([]);
 
-      for (const day of ['2026-11-16', '2026-11-24', '2026-12-01']) {
+      for (const day of ['2026-11-01', '2026-11-24', '2026-12-01']) {
         today(day);
         const [warning] = await warningsOf(planId);
         expect(warning).toMatchObject({
@@ -312,7 +321,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
           subscriptionId,
           noticeDeadline: { value: '2026-12-01', source: 'DECLARED' },
           baseDate: '2026-12-01',
-          reviewFrom: '2026-11-16',
+          reviewFrom: '2026-11-01',
           lastReviewedOn: '2025-11-15',
         });
         expect(dataOf<TermsView>(await getTerms(planId).expect(200)).warnings).toHaveLength(1);
@@ -328,7 +337,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
 
       today('2026-11-20');
       expect(await warningsOf(planId)).toHaveLength(1);
-      await putTerms(planId, { lastReviewedOn: '2026-11-15' }).expect(200);
+      await putTerms(planId, { lastReviewedOn: '2026-10-31' }).expect(200);
       expect(await warningsOf(planId)).toHaveLength(1);
       await putTerms(planId, {
         lastReviewedOn: '2026-11-20',
@@ -365,15 +374,15 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
         commitmentTermMonths: 1,
       });
 
-      today('2026-12-15');
+      today('2026-11-30');
       expect(await warningsOf(planId)).toEqual([]);
-      today('2026-12-16');
+      today('2026-12-01');
       const [warning] = await warningsOf(planId);
 
       expect(warning).toMatchObject({
         noticeDeadline: { value: null, source: 'BY_END_DATE' },
         baseDate: '2026-12-31',
-        reviewFrom: '2026-12-16',
+        reviewFrom: '2026-12-01',
       });
     });
 
@@ -413,19 +422,19 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
       await subscription(late.planId, { noticeDeadline: '2027-03-10', renewalDate: '2027-03-10' });
       await subscription(early.planId, { noticeDeadline: '2027-03-05', renewalDate: '2027-03-05' });
 
-      today('2027-02-20');
+      today('2027-02-05');
       const all = dataOf<{ items: WarningWire[]; pagination: { totalItems: number }; asOf: string }>(
         await request(server()).get('/api/v1/plan-warnings').query({ pageSize: 100 }).set(as(it1)).expect(200),
       );
       const mine = all.items.filter((item) => [early.planId, late.planId].includes(item.planId));
 
       expect(mine.map((item) => item.planId)).toEqual([early.planId]);
-      today('2027-02-25');
+      today('2027-02-10');
       const later = dataOf<{ items: WarningWire[] }>(
         await request(server()).get('/api/v1/plan-warnings').query({ pageSize: 100 }).set(as(it1)).expect(200),
       ).items.filter((item) => [early.planId, late.planId].includes(item.planId));
       expect(later.map((item) => item.planId)).toEqual([early.planId, late.planId]);
-      expect(all.asOf).toBe('2027-02-20');
+      expect(all.asOf).toBe('2027-02-05');
       const paged = dataOf<{ items: WarningWire[]; pagination: { pageSize: number } }>(
         await request(server()).get('/api/v1/plan-warnings').query({ page: 2, pageSize: 1 }).set(as(it1)).expect(200),
       );

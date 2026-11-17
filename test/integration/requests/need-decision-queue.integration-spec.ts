@@ -116,9 +116,9 @@ describe('the queue of the need steps of the person who holds them (integration,
         requester: { employeeId: design.member.employeeId },
         beneficiary: { employeeId: design.member.employeeId },
         department: { id: design.department.id, code: design.department.code },
-        // The term is the day it ends now, the last day of the sixth month (`QĐ-104a`), not months.
-        termMonths: null,
-        expectedEndDate: h.endDated({ termMonths: 6 }).expectedEndDate,
+        // The time of use is the months asked for (`QĐ-111i`); the request carries no end date.
+        termMonths: 6,
+        expectedEndDate: null,
         pricing: { status: 'PRICED' },
       });
       // The head confirms the need alone: no line of the plan is asked, and no term needs a confirmation (QĐ-101n, QĐ-98).
@@ -138,7 +138,8 @@ describe('the queue of the need steps of the person who holds them (integration,
       const item = (await queue(design.head.account)).find((row) => row.requestId === free.id);
 
       expect(item).toMatchObject({
-        expectedEndDate: h.endDated({ termMonths: 12 }).expectedEndDate,
+        termMonths: 12,
+        expectedEndDate: null,
         pricing: { status: 'NOT_APPLICABLE', amount: null },
       });
     });
@@ -217,7 +218,7 @@ describe('the queue of the need steps of the person who holds them (integration,
       const refused = await request(h.server())
         .post(`/api/v1/access-requests/${own.id}/need-decision`)
         .set(h.as(h.boss.account))
-        .send({ decision: 'APPROVE' });
+        .send(h.checklists.withYes('1.2', { decision: 'APPROVE' }));
       // There is no need step to decide: the route has none for the approver to reach.
       expect([refused.status, h.codeOf(refused)]).toEqual([404, 'ACCESS_REQUEST.NOT_FOUND']);
     });

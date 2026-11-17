@@ -1,3 +1,4 @@
+import { k1Checklist } from '../../support/k1-checklist';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
 
@@ -25,9 +26,12 @@ describe('the cost avoided by a grant from the pool, and the grant that names no
         [taskId],
       )
     ).rows;
-  const worked = async (taskId: string) => {
+  /** Takes and completes a task; the grant of a K1 seat is completed with its checklist (QĐ-111az). */
+  const worked = async (taskId: string, options: { k1?: boolean } = {}) => {
     await h.claim(taskId).expect(200);
-    await h.complete(taskId, { evidence: 'done' }).expect(200);
+    await h
+      .complete(taskId, { evidence: 'done', ...(options.k1 ? { k1Checklist: k1Checklist('GRANT') } : {}) })
+      .expect(200);
   };
   const quantityOf = async (id: string) =>
     (await h.ctx.sql.query<{ q: number }>(`SELECT purchased_quantity AS q FROM subscriptions WHERE id = $1`, [id]))
@@ -84,7 +88,7 @@ describe('the cost avoided by a grant from the pool, and the grant that names no
     const subscriptionId = await h.subscription(5, 'K1');
     const task = await h.granted(await person(), await h.planOf(subscriptionId), { subscriptionId });
 
-    await worked(task.id);
+    await worked(task.id, { k1: true });
 
     expect(await avoided(task.id)).toEqual([]);
   });

@@ -9,6 +9,7 @@ import { seatMonthlyOf } from '../access-request/pricing.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { BudgetCheckRepo, type CheckRecord } from '../spend/budget-check.repo';
+import { SpendDecisionRepo } from '../spend/spend-decision.repo';
 import type { ReturnReason } from '../spend/spend-decision.policy';
 import { SpendStepRepo, type SpendStepRecord } from '../spend/spend-step.repo';
 
@@ -26,6 +27,7 @@ export class SpendEffectsService {
     private readonly checkRepo: BudgetCheckRepo,
     private readonly budgets: BudgetsApi,
     private readonly audit: AuditApi,
+    private readonly decisions: SpendDecisionRepo,
   ) {}
 
   /**
@@ -86,6 +88,53 @@ export class SpendEffectsService {
   }
 
   /**
+   * The spending approver sends the request back with the reason of the checklist or their own (`QĐ-111ap`, R-24): the step closes with a record of
+   * approval that says it was returned, and the request goes to the queue of its head, or to its sender when it has no head step. Nothing is held or
+   * refused. `ACCESS_REQUEST.SPEND_RETURNED` is what tells the sender and the head.
+   */
+  async returnByApprover(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+    step: SpendStepRecord,
+    by: { now: Date; reason: string },
+  ): Promise<{ requestState: 'AWAITING_SPEND_SUBMISSION' | 'AWAITING_REQUESTER_REVISION' }> {
+    const oneStep = request.routing?.mode === 'ONE_STEP';
+    const requestState = oneStep ? ('AWAITING_REQUESTER_REVISION' as const) : ('AWAITING_SPEND_SUBMISSION' as const);
+    await this.decisions.recordReturn(tx, {
+      organizationId: request.organizationId,
+      requestId: request.id,
+      stepId: step.id,
+      departmentId: request.departmentId,
+      reason: by.reason,
+      decidedByEmployeeId: actor.employeeId,
+      decidedAt: by.now,
+      requestState,
+    });
+    if (oneStep) await this.requests.setOneStepBlockedReason(tx, request.id, null);
+    await this.audit.record(
+      tx,
+      accessRequestAuditEvent(
+        actor,
+        request.organizationId,
+        'ACCESS_REQUEST.SPEND_RETURNED',
+        'ACCESS_REQUEST_STEP',
+        step.id,
+        {
+          requestId: request.id,
+          stepId: step.id,
+          decision: 'RETURNED',
+          reason: by.reason,
+          requestState,
+          to: oneStep ? 'REQUESTER' : 'HEAD',
+        },
+      ),
+    );
+
+    return { requestState };
+  }
+
+  /**
    * Closes the step with no decision, because the request is not for the approver now, puts the request back in the queue of its head and says
    * why in the Audit Trail: `ACCESS_REQUEST.SPEND_RETURNED_AT_DECISION` is what tells the requester and the head (`BR-MF1-07c`).
    */
@@ -98,7 +147,7 @@ export class SpendEffectsService {
   ): Promise<void> {
     await this.steps.end(tx, step, 'CLOSED', null, by.now);
     if (request.routing?.mode === 'ONE_STEP') {
-      const missing = by.reasons.find((reason) => reason === 'PRICE_MISSING' || reason === 'RATE_MISSING');
+      const missing = by.reasons.find((reason) => reason === 'PRICE_MISSING');
       await this.requests.setOneStepBlockedReason(tx, request.id, missing ?? null);
     }
     await this.requests.setState(

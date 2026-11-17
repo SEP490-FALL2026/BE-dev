@@ -77,9 +77,12 @@ describe('requests over HTTP: registering internal software (integration, real P
         vendor_id: string | null;
         type: string;
         model: string | null;
+        group_key: string | null;
       }>(
-        `SELECT a.kind, a.responsible_it_admin_employee_id AS owner, a.vendor_id, p.provisioning_type AS type, p.pricing_model AS model
-           FROM plans p JOIN applications a ON a.id = p.application_id WHERE p.id = $1`,
+        `SELECT a.kind, a.responsible_it_admin_employee_id AS owner, a.vendor_id, p.provisioning_type AS type, p.pricing_model AS model,
+                g.system_key AS group_key
+           FROM plans p JOIN applications a ON a.id = p.application_id
+           LEFT JOIN functional_groups g ON g.id = a.functional_group_id WHERE p.id = $1`,
         [done.plan?.planId],
       );
       expect(registered.rows[0]).toEqual({
@@ -88,6 +91,8 @@ describe('requests over HTTP: registering internal software (integration, real P
         vendor_id: null,
         type: 'K5',
         model: null,
+        // QĐ-111d, CT-1.5: every road that makes an application puts it in a group; this one names none, so it stands in Khác.
+        group_key: 'OTHER',
       });
     });
 
@@ -275,11 +280,34 @@ describe('requests over HTTP: registering internal software (integration, real P
 
   describe('when the grant itself needs a payment (AC-10)', () => {
     const quote = (over: Record<string, unknown> = {}) => ({
-      unitPrice: { amount: '8', currency: 'USD' },
+      unitPrice: { amount: '200000', currency: 'VND' },
       billingCycle: 'MONTHLY',
       validFrom: `${year}-01-01`,
       validUntil: null,
       ...over,
+    });
+
+    it('FIX-E-R1: names quote.unitPrice, the field of the body, in the money errors of the assessment quote it saves', async () => {
+      const proposed = await classified();
+      const saved = (amount: string) =>
+        h.saveAssessment(proposed.id, { quote: quote({ unitPrice: { amount, currency: 'VND' } }) }, itAdmin.account);
+
+      expect(h.detailsOf(await saved('1.5').expect(422))).toEqual({ allowedDecimals: 0, path: 'quote.unitPrice' });
+      expect(h.detailsOf(await saved('-1').expect(422))).toEqual({ path: 'quote.unitPrice' });
+      expect(h.detailsOf(await saved('abc').expect(422))).toEqual({
+        issues: [{ code: 'invalid_format', path: 'quote.unitPrice.amount' }],
+      });
+    });
+
+    it('FIX-E-R1: names spend.quote.unitPrice, the field of the body, in the money errors of the quote', async () => {
+      const proposed = await classified();
+
+      const refused = await register(
+        proposed.id,
+        asOwner({ spend: { quote: quote({ unitPrice: { amount: '1.5', currency: 'VND' } }) } }),
+      ).expect(422);
+
+      expect(h.detailsOf(refused)).toEqual({ allowedDecimals: 0, path: 'spend.quote.unitPrice' });
     });
 
     it('registers the software without a spending approver, and keeps the spend step with the amount of the quote', async () => {
@@ -292,7 +320,11 @@ describe('requests over HTTP: registering internal software (integration, real P
       expect(done).toMatchObject({
         branch: 'NEW_SOFTWARE',
         state: 'AWAITING_SPEND_SUBMISSION',
-        pricing: { status: 'PRICED', amount: { amount: `${8 * monthsLeft}.00`, currency: 'USD' }, months: monthsLeft },
+        pricing: {
+          status: 'PRICED',
+          amount: { amount: `${200000 * monthsLeft}`, currency: 'VND' },
+          months: monthsLeft,
+        },
         policy: { hasSpendStep: true },
       });
       expect(done.plan?.planId).toBeTruthy();

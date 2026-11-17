@@ -56,7 +56,7 @@ describe('requests over HTTP: from an approved request to a granted seat (integr
 
       const task = await taskOf(requestId);
 
-      expect(task.status).toBe('QUEUED');
+      expect(task.status).toBe('IN_PROGRESS');
       expect(await stateOf(requestId)).toBe('EXECUTING');
       expect(await assignmentsOf(person.employeeId, planId)).toEqual([{ source: 'REQUEST' }]);
       expect(
@@ -133,17 +133,19 @@ describe('requests over HTTP: from an approved request to a granted seat (integr
       expect(h.codeOf(await h.grant({ requestId: randomUUID() }).expect(404))).toBe('REQUEST.NOT_FOUND');
     });
 
-    it('grants a request once: a second grant finds it granted, and two at the same time make one', async () => {
+    it('grants a request once: a second press gives back the task that exists, and two at the same time make one', async () => {
       const first = await asker();
       const once = await approved(first.person, first.planId);
-      await taskOf(once);
-      expect(h.codeOf(await h.grant({ requestId: once }).expect(409))).toBe('PROVISIONING.REQUEST_ENDED');
+      const made = await taskOf(once);
+      const again = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId: once }).expect(201)).task;
+      expect(again.id).toBe(made.id);
 
       const second = await asker();
       const twice = await approved(second.person, second.planId);
       const answers = await Promise.all([h.grant({ requestId: twice }), h.grant({ requestId: twice })]);
 
-      expect(answers.map((answer) => answer.status).sort()).toEqual([201, 409]);
+      expect(answers.map((answer) => answer.status)).toEqual([201, 201]);
+      expect(new Set(answers.map((answer) => h.dataOf<{ task: { id: string } }>(answer).task.id)).size).toBe(1);
       expect(await assignmentsOf(second.person.employeeId, second.planId)).toHaveLength(1);
       expect(await assignmentsOf(first.person.employeeId, first.planId)).toHaveLength(1);
     });

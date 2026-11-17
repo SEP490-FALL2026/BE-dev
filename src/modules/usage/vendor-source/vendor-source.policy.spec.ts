@@ -1,4 +1,10 @@
-import { canConcludeAbsence, detectableGroups, judgeTemplate, limitationOf } from './vendor-source.policy';
+import {
+  canConcludeAbsence,
+  detectableGroups,
+  judgeTemplate,
+  limitationOf,
+  sourceStatusOf,
+} from './vendor-source.policy';
 import type { SourceCapabilities, SourceTemplate } from './vendor-source.types';
 
 const members: SourceCapabilities = { memberList: true, lastActivity: false, eventDetail: false, maxHistoryDays: null };
@@ -62,5 +68,12 @@ describe('FR-4.2 judgeTemplate: the template fits the shape and the capabilities
         lastActivity,
       ),
     ).toBe('COLUMN_USED_TWICE');
+  });
+});
+
+describe('US-04-13 AC-15 sourceStatusOf: the status a contract shows of a source', () => {
+  it('is ACTIVE for a source that reads reports and RETIRED once it is retired', () => {
+    expect(sourceStatusOf(null)).toBe('ACTIVE');
+    expect(sourceStatusOf(new Date('2026-11-01T00:00:00Z'))).toBe('RETIRED');
   });
 });

@@ -15,7 +15,10 @@ const body = (response: request.Response) => response.body as Wire;
 const dataOf = <T>(response: request.Response): T => (response.body as { data: T }).data;
 
 const decide = (account: ApiAccount, payload: object) =>
-  request(w.server()).post('/api/v1/ghost-seat-decisions').set(w.as(account)).send(payload);
+  request(w.server())
+    .post('/api/v1/ghost-seat-decisions')
+    .set(w.as(account))
+    .send(w.checklists.withYes('5.4', payload));
 const read = (account: ApiAccount, id: string) =>
   request(w.server()).get(`/api/v1/ghost-seat-recommendations/${id}`).set(w.as(account));
 const queue = (account: ApiAccount) => request(w.server()).get('/api/v1/ghost-seat-queue').set(w.as(account));

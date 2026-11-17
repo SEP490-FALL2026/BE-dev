@@ -116,25 +116,6 @@ export class MyRequestsFactsRepo {
     return new Set(rows.map((row) => row.requestId));
   }
 
-  /**
-   * GH-3 (`BR-MF1-01g`): the requests flagged when they were sent because the person used many paid applications, with how many and the
-   * reason given, by request; a request not flagged is absent.
-   */
-  async manyPaidSoftware(requestIds: readonly string[]): Promise<Map<string, { count: number; reason: string }>> {
-    if (requestIds.length === 0) return new Map();
-    const rows = await this.prisma.accessRequest.findMany({
-      where: { id: { in: unique(requestIds) }, manyPaidSoftware: true },
-      select: { id: true, manyPaidSoftwareCount: true, manyPaidSoftwareReason: true },
-    });
-    const flags = new Map<string, { count: number; reason: string }>();
-    for (const row of rows) {
-      if (row.manyPaidSoftwareCount === null || row.manyPaidSoftwareReason === null) continue;
-      flags.set(row.id, { count: row.manyPaidSoftwareCount, reason: row.manyPaidSoftwareReason });
-    }
-
-    return flags;
-  }
-
   /** What the IT Admin wrote when they refused the software at the gate, by request. */
   async assessmentRefusals(requestIds: readonly string[]): Promise<OutcomeFacts['assessmentRefusals']> {
     if (requestIds.length === 0) return new Map();
@@ -144,5 +125,32 @@ export class MyRequestsFactsRepo {
     });
 
     return new Map(rows.flatMap((row) => (row.rejectionReason === null ? [] : [[row.requestId, row.rejectionReason]])));
+  }
+
+  /**
+   * The requests sent in the grace of a transfer by the person it is for (`limitExemption = TRANSFER_GRACE`, `QĐ-110q`) from an instant to another: who sent
+   * it, when, and the day its grant was completed. Only these three facts leave. `departmentIds` narrows to the departments the requests are sent from.
+   */
+  async sentInTransferGrace(input: {
+    from: Date;
+    to: Date;
+    departmentIds?: readonly string[] | undefined;
+  }): Promise<{ requesterEmployeeId: string; submittedAt: Date; grantedOn: Date | null }[]> {
+    if (input.departmentIds?.length === 0) return [];
+    const rows = await this.prisma.accessRequest.findMany({
+      where: {
+        limitExemption: 'TRANSFER_GRACE',
+        submittedAt: { gte: input.from, lt: input.to },
+        ...(input.departmentIds ? { departmentId: { in: [...input.departmentIds] } } : {}),
+      },
+      select: { requesterEmployeeId: true, submittedAt: true, grantedOn: true },
+      orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.flatMap((row) =>
+      row.submittedAt
+        ? [{ requesterEmployeeId: row.requesterEmployeeId, submittedAt: row.submittedAt, grantedOn: row.grantedOn }]
+        : [],
+    );
   }
 }

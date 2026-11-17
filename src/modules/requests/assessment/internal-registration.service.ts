@@ -10,7 +10,7 @@ import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import type { InternalRegistrationBodyDto } from './assessment.dto';
 import { AssessmentIncompleteError, InternalRegistrationRefusedError } from './assessment.errors';
-import { internalRegistrationBasis, registeredShapeOf } from './assessment.policy';
+import { assessmentScopeOf, internalRegistrationBasis, registeredShapeOf } from './assessment.policy';
 import { AssessmentRepo } from './assessment.repo';
 import { AssessmentGate } from './assessment-gate.service';
 import { AssessmentPricingService } from './assessment-pricing.service';
@@ -51,7 +51,7 @@ export class InternalRegistrationService {
       if (!request) throw new AccessRequestNotFoundError();
       this.gate.requireAssessor(actor, request);
       const { assessment, proposal } = await this.gate.requireProposalFacts(tx, requestId);
-      const basis = internalRegistrationBasis(assessment, body.dataSensitivity);
+      const basis = internalRegistrationBasis(assessment, body.dataSensitivity, assessmentScopeOf(proposal));
       if (basis.kind === 'NOT_INTERNAL') throw new InternalRegistrationRefusedError('NOT_INTERNAL');
       if (basis.kind === 'DATA_SENSITIVITY_MISSING') throw new AssessmentIncompleteError(['dataSensitivity']);
 
@@ -81,7 +81,8 @@ export class InternalRegistrationService {
         actor.employeeId,
       );
       const standsIn = await this.gate.finishStep(tx, requestId, actor, { now });
-      await this.assessments.complete(tx, requestId, actor.employeeId, now);
+      // It was classified internal to get here: that classification stands.
+      await this.assessments.complete(tx, requestId, actor.employeeId, now, null);
       await this.auditRegistered(tx, actor, request, { registered, body, withSpend, standsIn });
       await this.startOneStep(tx, actor, requestId, request.routing?.mode === 'ONE_STEP', withSpend, now);
 

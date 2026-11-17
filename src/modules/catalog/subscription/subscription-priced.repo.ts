@@ -1,11 +1,13 @@
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
+import { DONG } from '../../../core/money/money';
 import { Prisma } from '../../../generated/prisma/client';
 import type { BillingCycle } from './subscription.types';
 
 /** The queries that tell which subscription prices a plan: shared by the price reads of `SubscriptionRepo`. */
 
 /**
- * The subscriptions that can price a plan: active, with a unit price, a currency and a billing cycle, and not already continued by a later
+ * The subscriptions that can price a plan: active, with a unit price in dong (`QĐ-111an`: a price an earlier release left in another currency
+ * is no price of the new flow, B1A-03) and a billing cycle, and not already continued by a later
  * period that is active itself (that one prices the plan; a later period still a draft leaves the price with this one, F-012). Its end date
  * is not looked at here, the repository has no calendar. No department is asked: the pool is the plan's. A draft has no price to rely on.
  * `pickPriceSource` chooses the one that prices the plan among them (`Q-04` C).
@@ -13,7 +15,7 @@ import type { BillingCycle } from './subscription.types';
 export const livePricedOf = (): Prisma.SubscriptionWhereInput => ({
   status: 'ACTIVE',
   unitPriceMinor: { not: null },
-  unitPriceCurrency: { not: null },
+  unitPriceCurrency: DONG,
   AND: [
     { OR: [{ renewedBy: null }, { renewedBy: { is: { status: { not: 'ACTIVE' } } } }] },
     // A perpetual purchase has a price and no billing cycle: its price is the price of the purchase (`QĐ-106d`).
@@ -33,7 +35,7 @@ export const pricedOn = (on: BusinessDate): Prisma.SubscriptionWhereInput => {
   return {
     status: 'ACTIVE',
     unitPriceMinor: { not: null },
-    unitPriceCurrency: { not: null },
+    unitPriceCurrency: DONG,
     AND: [
       { OR: [{ billingCycle: { not: null } }, { kind: 'PERPETUAL' }] },
       { OR: [{ startDate: null }, { startDate: { lte: day } }] },

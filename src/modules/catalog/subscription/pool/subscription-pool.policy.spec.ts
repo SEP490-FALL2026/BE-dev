@@ -1,15 +1,19 @@
+import { toDateColumn } from '../../../../core/business-date';
 import {
   SubscriptionBillingCycleUnsupportedError,
   SubscriptionBillingLongerThanCommitmentError,
   SubscriptionCommitmentTermNotAllowedError,
   SubscriptionCommitmentTermRequiredError,
   SubscriptionK1MonthlyOnlyError,
+  SubscriptionK4PerpetualOnlyError,
   SubscriptionResponsibleRequiredError,
+  SubscriptionVendorAdminsRequiredError,
 } from '../subscription.errors';
 import {
   assertDeclarableCycle,
   assertPoolTerms,
   assertResponsibleNamed,
+  assertVendorAdminsRecorded,
   defaultResponsibleOf,
   isLiveSubscription,
   isPooledPlan,
@@ -18,6 +22,9 @@ import {
   orderBySourcePreference,
   pickPriceSource,
   poolWarnings,
+  vendorAdminFlags,
+  withoutPeriodsAhead,
+  withoutVendorAdminDetail,
   type LivenessFacts,
   type PriceSource,
 } from './subscription-pool.policy';
@@ -69,6 +76,21 @@ describe('the rules of the shared pool on a write (QĐ-103e, QĐ-104d(3), R-E01,
     );
     expect(() =>
       assertPoolTerms({ ...k1, billingCycle: 'MONTHLY', commitmentTermMonths: 1, activating: true }),
+    ).not.toThrow();
+  });
+
+  it('B-5: a K4 plan is bought once, so what is written for it is a perpetual purchase and never a term', () => {
+    const k4 = { ...term, planProvisioningType: 'K4' as const, billingCycle: 'MONTHLY' as const };
+
+    expect(() => assertPoolTerms({ ...k4, commitmentTermMonths: 1 })).toThrow(SubscriptionK4PerpetualOnlyError);
+    expect(() => assertPoolTerms({ ...k4, commitmentTermMonths: null, activating: false })).toThrow(
+      SubscriptionK4PerpetualOnlyError,
+    );
+    expect(() =>
+      assertPoolTerms({ ...k4, kind: 'PERPETUAL', billingCycle: null, commitmentTermMonths: null, activating: true }),
+    ).not.toThrow();
+    expect(() =>
+      assertPoolTerms({ ...term, planProvisioningType: 'K2' as const, commitmentTermMonths: 12 }),
     ).not.toThrow();
   });
 
@@ -231,6 +253,44 @@ describe('the order a grant that names no subscription takes them (P0-05)', () =
   });
 });
 
+describe('withoutPeriodsAhead: the seats of the period that runs and of the next one recorded ahead are one pool, counted once (QĐ-111n)', () => {
+  const TODAY = '2026-11-15';
+  const period = (id: string, renewedFromId: string | null = null, startsOn: string | null = '2026-01-05') => ({
+    id,
+    renewedFromId,
+    startDate: startsOn === null ? null : toDateColumn(startsOn),
+  });
+  const idsOf = (rows: readonly { id: string }[]) => rows.map((row) => row.id);
+
+  it('keeps every period when none of them continues another, and answers nothing for nothing', () => {
+    expect(idsOf(withoutPeriodsAhead([period('a'), period('b')], TODAY))).toEqual(['a', 'b']);
+    expect(withoutPeriodsAhead([], TODAY)).toEqual([]);
+  });
+
+  it('leaves out a next period that begins after today when the period it continues is among them', () => {
+    expect(idsOf(withoutPeriodsAhead([period('a'), period('b', 'a', '2026-12-15')], TODAY))).toEqual(['a']);
+  });
+
+  it('keeps a next period that begins today or before: it has taken the pool over, the period it continues is no longer one of them', () => {
+    expect(idsOf(withoutPeriodsAhead([period('a'), period('b', 'a', TODAY)], TODAY))).toEqual(['a', 'b']);
+    expect(idsOf(withoutPeriodsAhead([period('a'), period('b', 'a', '2026-11-01')], TODAY))).toEqual(['a', 'b']);
+  });
+
+  it('keeps a next period whose previous one is not among them (it is over, or another IT Admin answers for it): the pool lives on it', () => {
+    expect(idsOf(withoutPeriodsAhead([period('b', 'a', '2026-12-15')], TODAY))).toEqual(['b']);
+  });
+
+  it('keeps only the period that runs of a chain of periods recorded ahead, in the order given', () => {
+    const chain = [period('c', 'b', '2027-12-15'), period('a'), period('b', 'a', '2026-12-15')];
+
+    expect(idsOf(withoutPeriodsAhead(chain, TODAY))).toEqual(['a']);
+  });
+
+  it('keeps a period with no start date: nothing says it is ahead', () => {
+    expect(idsOf(withoutPeriodsAhead([period('a'), period('b', 'a', null)], TODAY))).toEqual(['a', 'b']);
+  });
+});
+
 describe('the IT Admin a new subscription answers to when the declaration names none (QĐ-111g, BB-3)', () => {
   const given = (over: Partial<Parameters<typeof defaultResponsibleOf>[0]> = {}) =>
     defaultResponsibleOf({
@@ -254,5 +314,87 @@ describe('the IT Admin a new subscription answers to when the declaration names 
   it('leaves it NULL when the application names nobody, or the one it names is no longer a usable IT Admin', () => {
     expect(given({ applicationResponsible: null, applicationResponsibleIsUsable: false })).toBeNull();
     expect(given({ applicationResponsible: 'it-gone', applicationResponsibleIsUsable: false })).toBeNull();
+  });
+});
+
+describe('the vendor admins of a plan that needs them (QĐ-110k, QĐ-110u, R-53)', () => {
+  describe('assertVendorAdminsRecorded: a plan that needs admins is not activated without two different ones recorded', () => {
+    it.each([[0], [1]])('refuses a plan that needs them with %i recorded', (given) => {
+      expect(() => assertVendorAdminsRecorded({ needs: true, given, planId: 'p-1' })).toThrow(
+        SubscriptionVendorAdminsRequiredError,
+      );
+    });
+
+    it('lets it through with two or more', () => {
+      expect(() => assertVendorAdminsRecorded({ needs: true, given: 2, planId: 'p-1' })).not.toThrow();
+      expect(() => assertVendorAdminsRecorded({ needs: true, given: 5, planId: 'p-1' })).not.toThrow();
+    });
+
+    it('never judges a plan that needs none (K1, K5, K4 with no admin console)', () => {
+      expect(() => assertVendorAdminsRecorded({ needs: false, given: 0, planId: 'p-1' })).not.toThrow();
+    });
+  });
+
+  describe('vendorAdminFlags: what the reader sees, never a refusal (a subscription older than the rule only carries the flags)', () => {
+    const working = (n: number) =>
+      Array.from({ length: n }, (_unused, index) => ({ employeeId: `e${index}`, working: true }));
+
+    it('says below the minimum when fewer than two of the admins recorded still work', () => {
+      expect(vendorAdminFlags({ needs: true, admins: working(2), ownerAccountEmail: 'it@acme.vn' })).toEqual({
+        vendorAdminsBelowMinimum: false,
+        ownerAccountEmailMissing: false,
+      });
+      expect(
+        vendorAdminFlags({
+          needs: true,
+          admins: [...working(1), { employeeId: 'gone', working: false }],
+          ownerAccountEmail: 'it@acme.vn',
+        }),
+      ).toMatchObject({ vendorAdminsBelowMinimum: true });
+      expect(vendorAdminFlags({ needs: true, admins: [], ownerAccountEmail: null })).toEqual({
+        vendorAdminsBelowMinimum: true,
+        ownerAccountEmailMissing: true,
+      });
+    });
+
+    it('says the email of the company account is missing only when the plan needs admins and none is recorded', () => {
+      expect(vendorAdminFlags({ needs: true, admins: working(3), ownerAccountEmail: null })).toMatchObject({
+        ownerAccountEmailMissing: true,
+      });
+    });
+
+    it('is quiet for a plan that needs no admins, whatever it holds', () => {
+      expect(vendorAdminFlags({ needs: false, admins: [], ownerAccountEmail: null })).toEqual({
+        vendorAdminsBelowMinimum: false,
+        ownerAccountEmailMissing: false,
+      });
+    });
+  });
+});
+
+describe('withoutVendorAdminDetail: only an IT Admin reads who administers a plan at the vendor (SPEC P19)', () => {
+  const view = {
+    id: 's1',
+    vendorAdmins: [{ employeeId: 'a', employeeCode: 'E-A', fullName: 'A', role: 'OWNER' as const, working: true }],
+    ownerAccountEmail: 'it@acme.vn',
+    adminNote: 'a note',
+    vendorAdminsBelowMinimum: true,
+    ownerAccountEmailMissing: false,
+  };
+
+  it('empties the people, the email and the note, and keeps everything else, the two flags included', () => {
+    expect(withoutVendorAdminDetail(view)).toEqual({
+      ...view,
+      vendorAdmins: [],
+      ownerAccountEmail: null,
+      adminNote: null,
+    });
+  });
+
+  it('does not change the view it was given', () => {
+    withoutVendorAdminDetail(view);
+
+    expect(view.vendorAdmins).toHaveLength(1);
+    expect(view.ownerAccountEmail).toBe('it@acme.vn');
   });
 });

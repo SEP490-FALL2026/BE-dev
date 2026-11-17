@@ -125,12 +125,18 @@ export class SlaHarness extends StatusHarness {
     const server = this.server();
 
     return [
-      request(server).post(`/api/v1/access-requests/${requestId}/need-decision`).set(as).send({ decision: 'APPROVE' }),
-      request(server).post(`/api/v1/access-requests/${requestId}/spend-approval`).set(as).send({ decision: 'APPROVE' }),
+      request(server)
+        .post(`/api/v1/access-requests/${requestId}/need-decision`)
+        .set(as)
+        .send(this.checklists.withYes('1.2', { decision: 'APPROVE' })),
+      request(server)
+        .post(`/api/v1/access-requests/${requestId}/spend-approval`)
+        .set(as)
+        .send(this.checklists.withYes('1.7', { decision: 'APPROVE' })),
       request(server)
         .post(`/api/v1/spend-batches/${batchId}/decisions`)
         .set(as)
-        .send({ decision: 'APPROVE', requestIds: [requestId] }),
+        .send(this.checklists.withYes('1.7', { decision: 'APPROVE', requestIds: [requestId] })),
     ];
   }
 

@@ -20,4 +20,11 @@ export class AllowlistFactsService {
 
     return new Map(dates.map((date) => [date, allowedToolsOn(versions, date, timeZone)] as const));
   }
+
+  /** The tools on the version in force now; empty when none was published. A tool outside it is software the company does not manage. */
+  async currentTools(organizationId: string, tx?: DbTx): Promise<ReadonlySet<AiToolKey>> {
+    const current = await this.repo.current(organizationId, tx);
+
+    return new Set(current?.entries.map((entry) => entry.tool) ?? []);
+  }
 }

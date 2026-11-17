@@ -1,0 +1,21 @@
+import type { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { toRenewalApiException } from './subscription-renewal.http-errors';
+import { RenewalError } from './subscription-renewal.errors';
+import type { NotRenewableReason } from './record/renewal-record.policy';
+
+describe('NOT_RENEWABLE message (F4)', () => {
+  it('names every reason the policy can give, CANCELLED included', () => {
+    const reasons: Record<NotRenewableReason, true> = {
+      PERPETUAL: true,
+      INTERNAL: true,
+      NOT_POOL_TERM: true,
+      NOT_ACTIVE: true,
+      ALREADY_CONTINUED: true,
+      CANCELLED: true,
+    };
+    const exception = toRenewalApiException(new RenewalError('NOT_RENEWABLE', { reason: 'CANCELLED' })) as ApiException;
+    const message = (exception.getResponse() as { message: string }).message;
+
+    for (const reason of Object.keys(reasons)) expect(message).toContain(reason);
+  });
+});

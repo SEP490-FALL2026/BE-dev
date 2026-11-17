@@ -19,8 +19,15 @@ import {
   PlanUpdateEmptyError,
   PlanWorkspaceProfileBlocksTypeChangeError,
 } from './plan.errors';
-import { assertPlanShape, cleanPlanName, cleanRevocationNote } from './plan.policy';
+import {
+  assertPlanShape,
+  assertPricingModelDerived,
+  cleanPlanName,
+  cleanRevocationNote,
+  derivedPricingModel,
+} from './plan.policy';
 import { PlanRepo } from './plan.repo';
+import { assertAdminConsoleApplicable } from './plan-vendor-admins.policy';
 import { PlanWorkspaceService } from './plan-workspace.service';
 import type {
   ControlLevel,
@@ -42,6 +49,8 @@ export interface DeclarePlanInput {
   revocationNote?: string | null;
   dataLossOnRemoval?: boolean;
   sharingPolicy?: SharingPolicy;
+  /** A `K4` plan only (`R-53`); any other kind that gives it is refused. */
+  hasAdminConsole?: boolean;
 }
 
 export interface UpdatePlanInput {
@@ -52,6 +61,7 @@ export interface UpdatePlanInput {
   revocationNote?: string | null;
   dataLossOnRemoval?: boolean;
   sharingPolicy?: SharingPolicy | null;
+  hasAdminConsole?: boolean;
 }
 
 const snapshot = (plan: PlanRecord) => ({
@@ -63,6 +73,7 @@ const snapshot = (plan: PlanRecord) => ({
   revocationNote: plan.revocationNote,
   dataLossOnRemoval: plan.dataLossOnRemoval,
   sharingPolicy: plan.sharingPolicy,
+  hasAdminConsole: plan.hasAdminConsole,
 });
 
 /**
@@ -84,12 +95,18 @@ export class PlanService {
   async list(query: {
     applicationId?: string;
     provisioningType?: ProvisioningType;
+    functionalGroupId?: string;
+    status?: 'APPROVED' | 'RETIRED';
+    search?: string;
     page: number;
     pageSize: number;
   }): Promise<Page<PlanSummaryRecord>> {
     const { items, total } = await this.plans.list({
       ...(query.applicationId ? { applicationId: query.applicationId } : {}),
       ...(query.provisioningType ? { provisioningType: query.provisioningType } : {}),
+      ...(query.functionalGroupId ? { functionalGroupId: query.functionalGroupId } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.search ? { search: query.search } : {}),
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     });
@@ -126,13 +143,16 @@ export class PlanService {
           applicationId: application.id,
           name,
           provisioningType: input.provisioningType,
-          pricingModel: input.pricingModel ?? null,
+          pricingModel: input.pricingModel ?? derivedPricingModel(input.provisioningType),
           controlLevel: input.controlLevel ?? null,
           revocationNote,
           dataLossOnRemoval: input.dataLossOnRemoval ?? false,
           sharingPolicy: input.sharingPolicy ?? null,
+          hasAdminConsole: input.hasAdminConsole ?? false,
         };
         assertPlanShape({ ...plan, applicationKind: application.kind });
+        assertPricingModelDerived(input.provisioningType, input.pricingModel);
+        assertAdminConsoleApplicable(plan.provisioningType, input.hasAdminConsole);
 
         const created = await this.plans.insert(tx, plan);
         await this.audit.record(
@@ -147,7 +167,7 @@ export class PlanService {
     try {
       return await (outer ? write(outer) : this.runner.run(write));
     } catch (error) {
-      throw this.mapWriteError(error);
+      throw await this.mapWriteError(error, { applicationId: input.applicationId, name });
     }
   }
 
@@ -169,16 +189,23 @@ export class PlanService {
         const next = {
           name: name ?? current.name,
           provisioningType: input.provisioningType ?? current.provisioningType,
-          pricingModel: input.pricingModel === undefined ? current.pricingModel : input.pricingModel,
+          pricingModel: this.pricingModelOf(current, input),
           controlLevel: input.controlLevel === undefined ? current.controlLevel : input.controlLevel,
           revocationNote: revocationNote === undefined ? current.revocationNote : revocationNote,
           dataLossOnRemoval: input.dataLossOnRemoval ?? current.dataLossOnRemoval,
           sharingPolicy: input.sharingPolicy === undefined ? current.sharingPolicy : input.sharingPolicy,
+          // The flag belongs to a K4 plan: a plan that stops being one loses it (the row says so too), and one that is not K4 cannot be given it.
+          hasAdminConsole:
+            input.hasAdminConsole ??
+            ((input.provisioningType ?? current.provisioningType) === 'K4' ? current.hasAdminConsole : false),
         };
         assertPlanShape({ ...next, applicationKind: current.applicationKind });
+        assertPricingModelDerived(next.provisioningType, input.pricingModel);
+        assertAdminConsoleApplicable(next.provisioningType, input.hasAdminConsole);
         if (
           next.provisioningType !== current.provisioningType &&
           next.provisioningType !== 'K2' &&
+          next.provisioningType !== 'K4' &&
           (await this.plans.findProfile(id, tx))
         ) {
           throw new PlanWorkspaceProfileBlocksTypeChangeError();
@@ -192,6 +219,7 @@ export class PlanService {
         if (next.revocationNote !== current.revocationNote) changes.revocationNote = next.revocationNote;
         if (next.dataLossOnRemoval !== current.dataLossOnRemoval) changes.dataLossOnRemoval = next.dataLossOnRemoval;
         if (next.sharingPolicy !== current.sharingPolicy) changes.sharingPolicy = next.sharingPolicy;
+        if (next.hasAdminConsole !== current.hasAdminConsole) changes.hasAdminConsole = next.hasAdminConsole;
         if (Object.keys(changes).length === 0) return current;
 
         const updated = await this.plans.update(tx, id, changes);
@@ -203,18 +231,41 @@ export class PlanService {
         return updated;
       });
     } catch (error) {
-      throw this.mapWriteError(error);
+      throw await this.mapWriteError(error, { planId: id, name });
     }
   }
 
-  private mapWriteError(error: unknown): unknown {
-    if (isUniqueViolation(error, 'normalized_name')) return new PlanNameTakenError();
+  /** The pricing model after an update: the one named, else the one the plan has, else (the kind changed) the one the new kind implies (`B-5`). */
+  private pricingModelOf(current: PlanRecord, input: UpdatePlanInput): PricingModel | null {
+    if (input.pricingModel !== undefined) return input.pricingModel;
+    if (input.provisioningType === undefined || input.provisioningType === current.provisioningType) {
+      return current.pricingModel;
+    }
+
+    return derivedPricingModel(input.provisioningType);
+  }
+
+  /** What the database refused, as a rule of the catalog; a name already taken carries the plan that has it. */
+  private async mapWriteError(
+    error: unknown,
+    context: { applicationId?: string; planId?: string; name?: string },
+  ): Promise<unknown> {
+    if (isUniqueViolation(error, 'normalized_name')) return new PlanNameTakenError(await this.planNamed(context));
     if (isCheckViolation(error, 'keeps a numeric install limit')) return new PlanTermsBlockTypeChangeError();
     const blocked = changeBlockOf(error);
     if (blocked) return new PlanInUseBlocksChangeError(blocked);
     if (isCheckViolation(error)) return new PlanProvisioningTypeMismatchError();
 
     return error;
+  }
+
+  /** The plan that holds the name a write wanted, read after the write failed; null when it cannot be found. */
+  private async planNamed(context: { applicationId?: string; planId?: string; name?: string }) {
+    if (context.name === undefined) return null;
+    const applicationId =
+      context.applicationId ?? (context.planId ? (await this.plans.find(context.planId))?.applicationId : undefined);
+
+    return applicationId ? this.plans.findByName(applicationId, context.name) : null;
   }
 
   private async requireOrganizationId(): Promise<string> {
@@ -228,6 +279,9 @@ export class PlanService {
 const CHANGE_BLOCKS: readonly PlanChangeBlock[] = [
   'ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY',
   'LICENSE_KEYS',
+  'PERPETUAL_SUBSCRIPTIONS',
+  'TERM_SUBSCRIPTIONS',
+  'CONTRACT_LINKS',
   'SUBSCRIPTIONS',
 ];
 

@@ -12,6 +12,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { CHECKLIST_ERROR_EXAMPLES } from '../../policies/public/policy-checklist.http-errors';
 import { ReserveConfirmationService } from '../reserve-confirmation/reserve-confirmation.service';
 import { SpendBatchService } from './spend-batch.service';
 import { SpendBatchListService } from './spend-batch-list.service';
@@ -102,7 +103,7 @@ export class SpendSubmissionController {
     status: HttpStatus.CREATED,
     message: 'SPEND_BATCH.SUBMITTED',
     description:
-      'Sends the requests chosen, one or more, on in one batch. The amount of each is worked out again for the month of the batch and each is checked against the budget (BR-MF1-06g): within the base it goes to the spending approver; if it uses the reserve it goes only when the head gives a line of reason for it in the same act (reserveConfirmations, 1 to 500 characters, only for a request of the batch, only used when its check says it uses the reserve; the answer says IGNORED for one that does not), and otherwise stays in the queue waiting for the confirmation (AWAITING_RESERVE_CONFIRMATION); blocked (over the reserve, no approved budget in the current Cost Center, a quote that is no longer valid) or with a price or a rate missing, it stays in the queue with the reason and the others go on. results says how each fared and what became of its confirmation.',
+      'Sends the requests chosen, one or more, on in one batch. The amount of each is worked out again for the month of the batch and each is checked against the budget (BR-MF1-06g): within the base it goes to the spending approver; if it uses the reserve it goes only when the head gives a line of reason for it in the same act (reserveConfirmations, 1 to 500 characters, only for a request of the batch, only used when its check says it uses the reserve; the answer says IGNORED for one that does not; the batch then carries the checklist of the step, one for the whole batch, and an answer No refuses the whole batch), and otherwise stays in the queue waiting for the confirmation (AWAITING_RESERVE_CONFIRMATION); blocked (over the reserve, no approved budget in the current Cost Center, a quote that is no longer valid) or with a price in dong missing, it stays in the queue with the reason and the others go on. results says how each fared and what became of its confirmation.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -111,19 +112,34 @@ export class SpendSubmissionController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'A request chosen is not waiting in the queue: it was sent on, or does not cost money (SPEND.NOT_IN_QUEUE), or the department has no Cost Center in use now, which stops the batch before any request is checked against a budget (FINANCE.SETUP_INCOMPLETE). Nothing is written.',
-      examples: [SPEND_ERROR_EXAMPLES.NOT_IN_QUEUE, SPEND_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE],
+        'A request chosen is not waiting in the queue: it was sent on, or does not cost money (SPEND.NOT_IN_QUEUE), or the department has no Cost Center in use now, which stops the batch before any request is checked against a budget (FINANCE.SETUP_INCOMPLETE); or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE). Nothing is written.',
+      examples: [
+        SPEND_ERROR_EXAMPLES.NOT_IN_QUEUE,
+        SPEND_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+        CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a reason that is empty, over 500 characters or on more than one line), or a confirmation names a request that is not in the batch (SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH). Nothing is written.',
-      examples: [VALIDATION_EXAMPLE, SPEND_ERROR_EXAMPLES.CONFIRMATION_NOT_IN_BATCH],
+        'The body is invalid (VALIDATION_ERROR: a reason that is empty, over 500 characters or on more than one line, or a confirmation of the reserve with no checklist), a confirmation names a request that is not in the batch (SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No, which refuses the whole batch (POLICY.CHECKLIST_HAS_NO). Nothing is written.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        SPEND_ERROR_EXAMPLES.CONFIRMATION_NOT_IN_BATCH,
+        CHECKLIST_ERROR_EXAMPLES.INCOMPLETE,
+        CHECKLIST_ERROR_EXAMPLES.HAS_NO,
+      ],
     },
   )
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: SubmitBatchBodyDto) {
     try {
-      const { batchId, results } = await this.batches.submit(actor, body.requestIds, body.reserveConfirmations);
+      const { batchId, results } = await this.batches.submit(
+        actor,
+        body.requestIds,
+        body.reserveConfirmations,
+        body.checklist,
+      );
 
       return { batch: await this.batchViews.get(actor, batchId), results };
     } catch (error) {
@@ -154,10 +170,19 @@ export class SpendSubmissionController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request does not wait for the confirmation of the reserve: its check is within the base or blocked, a spend step is open, it was withdrawn or is not in the queue, or another confirmation came first (SPEND.RESERVE_NOT_PENDING).',
-      examples: [SPEND_ERROR_EXAMPLES.RESERVE_NOT_PENDING],
+        'The request does not wait for the confirmation of the reserve: its check is within the base or blocked, a spend step is open, it was withdrawn or is not in the queue, or another confirmation came first (SPEND.RESERVE_NOT_PENDING); or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
+      examples: [
+        SPEND_ERROR_EXAMPLES.RESERVE_NOT_PENDING,
+        CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
+      ],
     },
-    INVALID,
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'The request is invalid (VALIDATION_ERROR), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No, which locks the confirmation (POLICY.CHECKLIST_HAS_NO).',
+      examples: [VALIDATION_EXAMPLE, CHECKLIST_ERROR_EXAMPLES.INCOMPLETE, CHECKLIST_ERROR_EXAMPLES.HAS_NO],
+    },
   )
   async confirmReserve(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -165,7 +190,12 @@ export class SpendSubmissionController {
     @Body() body: ReserveConfirmationBodyDto,
   ) {
     try {
-      return { reserveConfirmation: await this.reserve.confirm(actor, params.id, body.reason) };
+      return {
+        reserveConfirmation: await this.reserve.confirm(actor, params.id, {
+          reason: body.reason,
+          checklist: body.checklist,
+        }),
+      };
     } catch (error) {
       throw toSpendApiException(error);
     }
@@ -215,7 +245,7 @@ export class SpendSubmissionController {
   @ApiSuccessResponse(BatchItemListResponseDto, {
     message: 'SPEND_BATCH.ITEMS_LISTED',
     description:
-      'The requests of the batch in the order they were sent, each with how it fared (sent to the approver, sent to Finance, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head who sent the batch and Finance see all of them; the person who holds a spend step sees the requests they hold.',
+      'The requests of the batch in the order they were sent, each with how it fared (sent to the approver, waiting for the head to confirm the reserve, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head who sent the batch and Finance see all of them; the person who holds a spend step sees the requests they hold.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, BATCH_NOT_FOUND, INVALID)
   async items(
@@ -254,13 +284,14 @@ export class SpendSubmissionController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), the end date is not earlier than the one the request has (SPEND.SUPPLEMENT_TERM_NOT_REDUCED), the end date is before today or more than a year from today (SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).',
+        'The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), the time of use is not shorter than the one the request has (SPEND.SUPPLEMENT_TERM_NOT_REDUCED), the time of use is not 1 to 12 whole months, 1 to 9 for a plan bought by the month (SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE), or the plan is bought once and takes none (SPEND.SUPPLEMENT_TERM_NOT_ASKED), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).',
       examples: [
         GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_NOT_IN_QUEUE,
         GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_NOT_PRICED,
         GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_NO_CHANGE,
         GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_TERM_NOT_REDUCED,
-        GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_END_DATE_OUT_OF_RANGE,
+        GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE,
+        GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_TERM_NOT_ASKED,
         GROUP_REQUEST_ERROR_EXAMPLES.NOT_PRICEABLE,
         GROUP_REQUEST_ERROR_EXAMPLES.LINE_NOT_DROPPABLE,
       ],

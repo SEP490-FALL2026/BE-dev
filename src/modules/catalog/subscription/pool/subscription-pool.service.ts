@@ -5,8 +5,8 @@ import { AuditApi } from '../../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../../catalog-audit-event.mapper';
-import { ApplicationFactsService } from '../../catalog-entry/application-facts.service';
-import type { LockedPlan } from '../../plan/plan-facts.service';
+import { PlanFactsService, type LockedPlan } from '../../plan/plan-facts.service';
+import { needsVendorAdmins } from '../../plan/plan-vendor-admins.policy';
 import { PoolSeatNotAddableError } from '../../public/catalog.errors';
 import { SeatBaselinePhaseHook } from '../../public/catalog.extension-points';
 import {
@@ -17,11 +17,13 @@ import {
 import {
   assertPoolTerms,
   assertResponsibleNamed,
+  assertVendorAdminsRecorded,
   defaultResponsibleOf,
   isPooledPlan,
   liveIdsByPlan,
   liveSiblingsOf,
 } from './subscription-pool.policy';
+import { SubscriptionSeatIncreaseService } from '../seat-increase/subscription-seat-increase.service';
 import { stateOf } from '../subscription.mapper';
 import { SubscriptionRepo } from '../subscription.repo';
 import type {
@@ -63,16 +65,18 @@ export class SubscriptionPoolService {
     private readonly subscriptions: SubscriptionRepo,
     private readonly audit: AuditApi,
     private readonly baselinePhase: SeatBaselinePhaseHook,
-    private readonly applications: ApplicationFactsService,
+    private readonly planFacts: PlanFactsService,
+    private readonly seatIncrease: SubscriptionSeatIncreaseService,
   ) {}
 
   /**
    * The IT Admin a subscription being declared answers to (`QĐ-111g`): the one the declaration names, else the one responsible for the
-   * application of its plan while they are a usable IT Admin, else none. Read inside the transaction of the declaration.
+   * application of its plan while they are a usable IT Admin, else none. The one responsible is read through the plan, one column and not
+   * the whole application row. Read inside the transaction of the declaration.
    */
-  async responsibleOfDeclaration(tx: DbTx, applicationId: string, named: string | undefined): Promise<string | null> {
+  async responsibleOfDeclaration(tx: DbTx, planId: string, named: string | undefined): Promise<string | null> {
     if (named !== undefined) return named;
-    const responsible = await this.applications.responsibleItAdminOf(applicationId, tx);
+    const responsible = await this.planFacts.responsibleItAdminIdOf(planId, tx);
     const usable =
       responsible === null ? new Set<string>() : await this.identity.findUsableItAdminEmployeeIds([responsible], tx);
 
@@ -109,8 +113,10 @@ export class SubscriptionPoolService {
 
   /**
    * The rules for a subscription that becomes active with the data it holds (a draft completed): the commitment, the K1 plan and the
-   * IT Admin it names, who must still work, hold the role and be able to sign in now, not only when the name was written (R-E03).
-   * Throws the errors of `assert` and SubscriptionResponsibleNotItAdminError.
+   * IT Admin it names, who must still work, hold the role and be able to sign in now, not only when the name was written (R-E03). A draft that is
+   * not the period of a renewal is a new subscription and also needs the vendor admins of its plan (`continuesPeriod` false); the period a renewal
+   * continues never does (`QĐ-110k`: a subscription older than the rule is only flagged, X-IT-R4). Throws the errors of `assert`,
+   * SubscriptionResponsibleNotItAdminError and SubscriptionVendorAdminsRequiredError.
    */
   async assertActivation(
     tx: DbTx,
@@ -121,9 +127,26 @@ export class SubscriptionPoolService {
       commitmentTermMonths: CommitmentTermMonths | null;
       responsibleItAdminEmployeeId: string | null;
     },
+    continuesPeriod: boolean,
   ): Promise<void> {
     this.assert(plan, kind, state, true);
     await this.requireItAdmin(state.responsibleItAdminEmployeeId as string, tx);
+    if (!continuesPeriod) await this.assertVendorAdmins(tx, plan);
+  }
+
+  /**
+   * A plan that needs admins at the vendor (`K2`, or `K4` with an admin console) is activated, or its pool made, only when its profile names at
+   * least two different ones (`QĐ-110k`, `R-53`): what was recorded is judged, the plan is locked by the caller. Throws SubscriptionVendorAdminsRequiredError.
+   */
+  async assertVendorAdmins(tx: DbTx, plan: LockedPlan): Promise<void> {
+    const needs = needsVendorAdmins(plan.provisioningType, plan.hasAdminConsole);
+    if (!needs) return;
+    const profile = (await this.planFacts.vendorAdminsOf([plan.id], tx)).get(plan.id);
+    assertVendorAdminsRecorded({
+      needs,
+      given: new Set(profile?.members.map((member) => member.employeeId) ?? []).size,
+      planId: plan.id,
+    });
   }
 
   /**
@@ -137,7 +160,7 @@ export class SubscriptionPoolService {
     const activating = current.status === 'DRAFT' && state.status === 'ACTIVE';
     // Changing only the person who answers does not judge a commitment and cycle the write did not touch (F-009).
     const touches = input.billingCycle !== undefined || input.commitmentTermMonths !== undefined;
-    if (activating) await this.assertActivation(tx, plan, current.kind, state);
+    if (activating) await this.assertActivation(tx, plan, current.kind, state, current.renewedFromId !== null);
     else if (touches) this.assert(plan, current.kind, state, false);
     if (input.isPrimaryForPlan) await this.makePrimary(tx, change);
   }
@@ -188,7 +211,12 @@ export class SubscriptionPoolService {
    * audit event. No gate of a Cost Center is asked: the request that takes the seat is charged to the department of its beneficiary
    * (`QĐ-103d`(2)). Throws PoolSeatNotAddableError.
    */
-  async addSeat(tx: DbTx, actor: AuthenticatedPrincipal, subscriptionId: string): Promise<number> {
+  async addSeat(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    subscriptionId: string,
+    requestId: string | null = null,
+  ): Promise<number> {
     const current = await this.subscriptions.find(subscriptionId, tx);
     if (!current) throw new PoolSeatNotAddableError('NOT_FOUND');
     if (current.status !== 'ACTIVE') throw new PoolSeatNotAddableError('NOT_ACTIVE');
@@ -209,6 +237,18 @@ export class SubscriptionPoolService {
         { purchasedQuantity: next, cause: 'SEAT_BOUGHT_WITH_GRANT' },
       ),
     );
+    // The IT Admin who answers for a K2 or K4 pool is told of the seat bought for a request (`QĐ-110v`); a K1 purchase tells nobody (`S-4`).
+    await this.seatIncrease.told(tx, {
+      organizationId: organization.id,
+      subscriptionId: current.id,
+      planProvisioningType: current.planProvisioningType,
+      status: current.status,
+      responsibleItAdminEmployeeId: current.responsibleItAdminEmployeeId,
+      from: current.purchasedQuantity,
+      to: next,
+      requestId,
+      actor,
+    });
 
     return next;
   }

@@ -16,8 +16,6 @@ import {
   BudgetSummaryResponseDto,
   BudgetTablePageResponseDto,
   BudgetsQueryDto,
-  MineLinePageResponseDto,
-  MineLinesQueryDto,
   MineQueryDto,
   MineResponseDto,
   MineVersionPageResponseDto,
@@ -57,29 +55,12 @@ export class BudgetsController {
   @ApiSuccessResponse(MineResponseDto, {
     message: 'BUDGET.FETCHED',
     description:
-      'The Cost Center of the department the caller heads, the year, whether it has a current budget (ACTIVE) or not (NO_ACTIVE_BUDGET), its base, reserve, commitments, spend, pending spend, both remaining amounts, the published department ceiling and cycle deadlines, and the proposal behind it.',
+      'The Cost Center of the department the caller heads, the year, whether it has a current budget (ACTIVE) or not (NO_ACTIVE_BUDGET), its base, reserve, commitments, spend, pending spend, both remaining amounts, the state and the deadlines of the cycle of the year, the version in force, the refusal of the latest version when it was refused, and the proposal behind it.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, MINE_INVALID)
   async mine(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineQueryDto) {
     try {
       return { budget: await this.budgets.mine(actor, query.year, query.costCenterId) };
-    } catch (error) {
-      throw toBudgetApiException(error);
-    }
-  }
-
-  @Get('mine/lines')
-  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
-  @ApiOperation({ operationId: 'budgetMineLineList', summary: 'List the lines of the budget of my department' })
-  @ApiSuccessResponse(MineLinePageResponseDto, {
-    message: 'BUDGET.LINES_LISTED',
-    description:
-      'The lines of the current version: what is planned to be bought (Renew, Change, New or Cancel), its seats and its amount, by priority rank. Without the comments Finance made.',
-  })
-  @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, MINE_INVALID)
-  async mineLines(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineLinesQueryDto) {
-    try {
-      return await this.budgets.mineLines(actor, query.year, query);
     } catch (error) {
       throw toBudgetApiException(error);
     }

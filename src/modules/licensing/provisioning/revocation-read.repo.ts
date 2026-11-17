@@ -3,7 +3,7 @@ import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/b
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { ProvisioningTaskStatus, RevocationSource } from '../public/licensing.types';
+import type { ProvisioningKind, ProvisioningTaskStatus, RevocationSource } from '../public/licensing.types';
 
 export interface PersonalSeatRow {
   assignmentId: string;
@@ -154,35 +154,54 @@ export class RevocationReadRepo {
   }
 
   /**
-   * The paid applications each of these people uses on `day` or will (GH-3, `BR-MF1-01g`): their personal seats not failed, not
-   * cancelled and not ended, of an application that is not internal and of a plan that is not `K5`. Two plans of one application are
-   * one application. One statement; the people with none are absent.
+   * How many personal seats each of these people holds on `day` or will that have **no task of revocation completed**, in one statement (the
+   * people with none are absent): the seats nobody has opened a task for and those whose task waits, runs or failed. What the late rights of
+   * a departure are counted by (`QĐ-110c`); the seats are the ones `personalSeatsOf` reads, so the two never disagree.
    */
-  async paidApplicationsOf(
+  async countPersonalSeatsWithoutCompletedTask(
     employeeIds: readonly string[],
     day: BusinessDate,
     tx?: DbTx,
-  ): Promise<Map<string, Set<string>>> {
+  ): Promise<Map<string, number>> {
     if (employeeIds.length === 0) return new Map();
-    const rows = await (tx ?? this.prisma).licenseAssignment.findMany({
+    const rows = await (tx ?? this.prisma).licenseAssignment.groupBy({
+      by: ['employeeId'],
       where: {
         employeeId: { in: [...employeeIds] },
         kind: 'PERSONAL',
         failedAt: null,
         cancelledAt: null,
         OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
-        plan: { provisioningType: { not: 'K5' }, application: { kind: { not: 'INTERNAL' } } },
+        provisioningTasks: { none: { kind: 'REVOKE', status: 'COMPLETED' } },
       },
-      select: { employeeId: true, plan: { select: { applicationId: true } } },
+      _count: { _all: true },
     });
-    const found = new Map<string, Set<string>>();
-    for (const row of rows) {
-      const applications = found.get(row.employeeId) ?? new Set<string>();
-      applications.add(row.plan.applicationId);
-      found.set(row.employeeId, applications);
-    }
 
-    return found;
+    return new Map(rows.map((row) => [row.employeeId, row._count._all]));
+  }
+
+  /**
+   * How many personal seats of one kind of provisioning a person holds on `day` or will that have **no task of revocation completed**: the
+   * seats counted by {@link countPersonalSeatsWithoutCompletedTask}, narrowed to a kind. What tells that a person still uses the mailbox
+   * (K1) while their departure waits to lock it for good (`B-1`, `QĐ-110e`).
+   */
+  countPersonalSeatsOfKindWithoutCompletedTask(
+    employeeId: string,
+    kind: ProvisioningKind,
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<number> {
+    return (tx ?? this.prisma).licenseAssignment.count({
+      where: {
+        employeeId,
+        kind: 'PERSONAL',
+        failedAt: null,
+        cancelledAt: null,
+        OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
+        plan: { provisioningType: kind },
+        provisioningTasks: { none: { kind: 'REVOKE', status: 'COMPLETED' } },
+      },
+    });
   }
 
   /**

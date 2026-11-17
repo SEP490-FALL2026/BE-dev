@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '../../../generated/prisma/client';
+import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { UsageIdentifierType } from '../vendor-source/vendor-source.types';
@@ -147,14 +147,15 @@ export class IdentityRepo {
 
   async pageMappings(filter: {
     applicationId?: string;
-    employeeId?: string;
+    /** Only the mappings of these people (the ones the reader may read). */
+    employeeIds: readonly string[];
     inForceOnly: boolean;
     skip: number;
     take: number;
   }): Promise<{ items: MappingRecord[]; total: number }> {
     const where: Prisma.UsageIdentityMappingWhereInput = {
       ...(filter.applicationId ? { applicationId: filter.applicationId } : {}),
-      ...(filter.employeeId ? { employeeId: filter.employeeId } : {}),
+      employeeId: { in: [...filter.employeeIds] },
       ...(filter.inForceOnly ? { endedAt: null } : {}),
     };
     const [rows, total] = await this.prisma.$transaction([
@@ -338,10 +339,12 @@ export class IdentityRepo {
 
   async pageUnmatched(filter: {
     applicationId?: string;
+    importId?: string;
     statuses: readonly UnmatchedStatus[];
     skip: number;
     take: number;
   }): Promise<{ items: UnmatchedRecord[]; total: number }> {
+    if (filter.importId) return this.pageUnmatchedOfImport({ ...filter, importId: filter.importId });
     const where: Prisma.UsageUnmatchedIdentityWhereInput = {
       status: { in: [...filter.statuses] },
       ...(filter.applicationId ? { applicationId: filter.applicationId } : {}),
@@ -357,5 +360,51 @@ export class IdentityRepo {
     ]);
 
     return { items: rows.map(toUnmatched), total };
+  }
+
+  /**
+   * The identifiers of the result of one import (`US-08-04` AC-8): the ones whose line in that import was not matched or matched two people, and the
+   * ones it first or last met. The page of ids and the count are one snapshot; the records of the page come in one read, in the order of the ids.
+   */
+  private async pageUnmatchedOfImport(filter: {
+    applicationId?: string;
+    importId: string;
+    statuses: readonly UnmatchedStatus[];
+    skip: number;
+    take: number;
+  }): Promise<{ items: UnmatchedRecord[]; total: number }> {
+    const conditions = Prisma.join(
+      [
+        Prisma.sql`u.status::text = ANY(${[...filter.statuses]}::text[])`,
+        filter.applicationId ? Prisma.sql`u.application_id = ${filter.applicationId}::uuid` : Prisma.sql`true`,
+        Prisma.sql`(u.first_import_id = ${filter.importId}::uuid OR u.last_import_id = ${filter.importId}::uuid
+          OR EXISTS (SELECT 1 FROM usage_import_rows r JOIN usage_imports i ON i.id = r.import_id
+                      WHERE r.import_id = ${filter.importId}::uuid AND i.source_id = u.source_id
+                        AND r.identifier_normalized = u.normalized_identifier AND r.outcome IN ('UNMATCHED', 'AMBIGUOUS')))`,
+      ],
+      ' AND ',
+    );
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const ids = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT u.id FROM usage_unmatched_identities u WHERE ${conditions}
+           ORDER BY u.last_import_id DESC, u.id ASC LIMIT ${filter.take} OFFSET ${filter.skip}`;
+        const counted = await tx.$queryRaw<Array<{ total: bigint }>>`
+          SELECT count(*) AS total FROM usage_unmatched_identities u WHERE ${conditions}`;
+        const rows = await tx.usageUnmatchedIdentity.findMany({ where: { id: { in: ids.map((row) => row.id) } } });
+        const byId = new Map(rows.map((row) => [row.id, row]));
+
+        return {
+          items: ids.flatMap((row) => {
+            const found = byId.get(row.id);
+
+            return found ? [toUnmatched(found)] : [];
+          }),
+          total: Number(counted[0]?.total ?? 0n),
+        };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
   }
 }

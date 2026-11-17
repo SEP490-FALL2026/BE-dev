@@ -74,29 +74,13 @@
   (one line that names the kind of error, the code and whether it can be retried: the bullet after this one).
   A change written for today is told in the transaction that writes it. It runs in the API graph because that is where every
   listener (requests, personnel) is registered. Run one by hand with `OrganizationHistoryService.announceDueChanges(day)`.
-  The API also runs `HandoverDutySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each
-  handover duty whose deadline has passed unconfirmed it writes `overdue_noticed_at`, the audit event `HANDOVER_DUTY.OVERDUE` and an inbox
-  notice (`HANDOVER_CONFIRMATION_OVERDUE`) to the person who confirms today and the IT Admin in charge in one transaction, so a duty is told
-  once for a deadline however many instances run; a failed pass only logs. Run one by hand with
-  `HandoverOverdueService.noticeOverdue(now)`.
-  The API also runs `TransferReviewSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each open
-  transfer review past its deadline whose department has a head today it writes `overdue_noticed_at` and the audit event
-  `TRANSFER_REVIEW.OVERDUE` in one transaction, so a review is told once however many instances run; a department without a head is
-  left for a later pass, and a failed pass only logs. It only tells: it never revokes, reassigns or decides. Run one by hand with
-  `TransferReviewOverdueService.noticeOverdue(now)`.
+  The API also runs `SeatMonthSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each month of this year that has ended (and December of the year before in January) it charges, for each subscription that has no mark for it (`seat_month_runs`, written with its rows), the seats of the shared pool (`K2`) to the departments of their holders, day by day, and takes the commitment of a seat down by the amount of the same Cost Center, never the commitment of another (`SM-1`). A lock of the subscription and the month queues two instances, a subscription that fails does not stop the others and is charged by the next pass, charging a month again gives the same rows and applies nothing twice, a month charged again (on request, whatever was charged before: the numbers of a month are a picture, not a lock, `QĐ-111ae`) gives back to a commitment, through an append-only reversal, what a row applied and applies no more, and a failed pass only logs.
+
   The API also runs `LeaveReturnSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each long leave
   that runs past its approved day of return it writes `return_overdue_noticed_for` (that approved day) and the audit event
   `LONG_LEAVE.RETURN_OVERDUE` in one transaction, so a day is told once however many instances run, and told again when the day moves
   and passes; a failed pass only logs. It only tells: the work state of a person never changes by the calendar. Run one by hand with
   `LeaveOverdueService.noticeOverdue(now)`.
-  The API also runs `ServiceAccountDutySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each open
-  service account whose responsible person has a transfer or a departure that is not closed and whose day has passed it writes a row of
-  `service_account_duty_notices` (unique for the account and the day), the audit event `SERVICE_ACCOUNT_DUTY.OVERDUE` and an inbox notice
-  (`SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE`) to the IT Admin in charge of the owning department in one transaction, so a day is told once however
-  many instances run; a failed pass only logs. It only tells: the transfer or the departure still takes
-  effect, the account keeps its person and nothing is revoked. It reads which people have a file that waits through the provider that the
-  personnel module registers, so it finds nothing in a process that does not load it. Run one by hand with
-  `ServiceAccountDutyService.noticeOverdue(now)`.
   The API also runs `ExpiryReminderSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each open
   personal right whose end date falls between today and seven days ahead it writes, in one transaction, at most three rows of
   `assignment_expiry_reminders` (unique for the right, the end date and the audience: the holder, the head of their department today, the
@@ -105,11 +89,84 @@
   a failed pass only logs. It only tells: the right stays in force, nothing is revoked or renewed
   by the calendar, and the queue of the rights that have ended is read from the assignments, not stored. Run one by hand with
   `ExpiryReminderService.noticeDue(now)`.
+  The API also runs `ExpiryRevocationSweeper` once an hour (the first pass five minutes after start, unreferenced timer): the start of the day after the end
+  of a right (`QĐ-111l`, `US-03-05` AC-2, AC-14) it asks the one gate that opens a revocation (`RevocationService.open`) for every open personal right whose end
+  day has passed and for which no revocation of the expiry was ever opened and no live revocation of another source is working: the source
+  `TIME_LIMITED_EXPIRY`, the system as the actor (`SystemActor`, the task is marked `created_by_system` and the audit event `PROVISIONING_TASK.REVOCATION_OPENED` says
+  `SYSTEM`), `referenceKind ASSIGNMENT_END_DATE` and the right as the reference, in the queue of the IT Admin in charge of the holder's department today. A right whose
+  renewal waits for its decision or for the IT Admin to extend it (`RenewalHoldHook.pendingRenewalsOf`) is left alone (R-13); when the renewal is refused or withdrawn the
+  next pass opens the task. The key that makes it once for a right is the reason row of the task (`provisioning_task_reasons`, source `TIME_LIMITED_EXPIRY`), so two
+  instances, a pass run again and the IT Admin who starts the task from the queue never make a second task or reason (the gate locks the seat and adds none), and a task
+  the IT Admin closed as failed is not opened again by the pass. Each right has a transaction of its own; one that fails is logged and tried again at the next pass without
+  stopping the others. It takes nothing away (`SoD-6`): the right stays in force until the IT Admin completes the task. Run one by hand with `ExpiryRevocationService.openDue(now)`.
   The API also runs `NoticeOverdueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each notice of a
   department head that still waits for the IT Admin past its day (`personnel_notices.due_on`, fixed when it was sent from
   `PERSONNEL_NOTICE_REVIEW_WORKING_DAYS`) it sets `overdue_noticed_at` and writes the audit event `PERSONNEL_NOTICE.OVERDUE` in one
   transaction, so a notice is told once however many instances run; a failed pass only logs. It only tells: the notice is never recorded or
   rejected by the calendar and the person it is about is not changed. Run one by hand with `NoticeOverdueService.noticeOverdue(now)`.
+  The API also runs `RevocationOverdueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each departure that
+  is not cancelled or closed and is past `offboarding_cases.revocation_due_on` (the `DEPARTURE_REVOCATION_WORKING_DAYS`th working day after the last
+  working day, `QĐ-110c`) and whose person still holds a personal seat with **no task of revocation completed** (counted through
+  `LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`, whether or not the IT Admin ever opened a task), on a working day, it writes the
+  notice `REVOCATION_OVERDUE` to the IT Admin in charge of the department (never the person who left; the first IT Admin who can act when none
+  is named) and to the Super Admin, with the audit event `OFFBOARDING_CASE.REVOCATION_OVERDUE` (actor `SYSTEM`) in the same transaction. The key
+  `offboarding:<case>:<day>` is unique for a recipient, so a case is told once for each working day however many instances or passes run; no
+  notice on a Saturday, a Sunday or a non-working date; a failed pass only logs. It only tells: no task is opened, no seat taken away, the case is
+  never changed. It judges departures only: the tasks of revocation a transfer opens when its grace ends (`TRANSFER`) carry no `due_on` and have no case, so it
+  tells nothing about them; their deadline is worked out for the report of the SLA (`GET /reports/revocation-sla`, D-124), which counts them as overdue. Run one
+  by hand with `RevocationOverdueService.noticeOverdue(now)`.
+  The API also runs `BlockMomentSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each departure that is
+  not cancelled or closed, has `block_announced_at IS NULL` and whose person is refused from today or earlier (the block of the case, or the
+  day they left) it announces the block once (`QĐ-110b`, `QĐ-110d`). Each case has a transaction of its own that locks the employee, then the case
+  `FOR UPDATE`, reads the case and the block again and sets `block_announced_at` before anything else, so a pass on another instance, a pass
+  run again or a cancellation at the same time never both act; a case that fails is logged and tried again at the next pass without
+  stopping the others. In that transaction the system ends the registrations of the machines of the person (cause `DEPARTURE_BLOCKED`), closes
+  every open request of the person through `RequestsApi.cancelForBeneficiaryGone` with the scope `ALL_OPEN` (the ones whose grant is being
+  carried out stay and the IT Admin is told), writes the audit event `OFFBOARDING_CASE.ACCESS_BLOCKED` (actor `SYSTEM`) and the line
+  `ACCESS_BLOCKED` of the log of the case (no account and no ticket wrote it), and tells the Super Admin (only while the person is not yet
+  marked as left) and the IT Admin (`DEPARTURE_ACCESS_BLOCKED`, one key per audience). A deadline of revocation already on the case is never
+  changed; it is written only when the case has none. The same pass then tells the IT Admin and the Super Admin (`ACCOUNT_LOCK_OVERDUE`, key
+  `ACCOUNT_LOCK_OVERDUE:<case>`, once for the case, with the audit event `OFFBOARDING_CASE.ACCOUNT_LOCK_OVERDUE`) when a departure blocked now
+  has no lock of the company account from the day after it was recorded. It revokes nothing and opens no task. Run one by hand with
+  `BlockAnnouncementService.announce(now)` and `AccountLockOverdueService.notice(now)`.
+  The API also runs `DepartureClosureSweeper` once an hour (the first pass five minutes after start, unreferenced timer). It first writes the lock of
+  the mailbox (1b) that the listener of the last K1 revocation could not write because another command held the case (`MailboxLockSettlement`,
+  D-72): for each departure that is not closed and has (1a) and not (1b), when `LicensingApi.listPeopleWithMailboxLockTicked` says a completed K1
+  revocation of the person kept a departure checklist with the step `MAILBOX_LOCKED` ticked, and the person holds no K1 seat without a completed
+  revocation, it writes (1b) by the system (the line `MAILBOX_LOCKED` with no account, the audit event `OFFBOARDING_CASE.MAILBOX_LOCK_RECORDED`, actor
+  `SYSTEM`) and closes the case if that was the last thing it waited for, in a transaction of its own that locks the employee, then the case. Then,
+  for each departure whose person has left, that is not closed and has the lock of the mailbox (1b) written (`offboarding_cases.mailbox_lock_at`), it
+  closes the case when
+  nothing keeps it open (`QĐ-110e`, `B-1`): every personal seat of the person has a completed task of revocation (counted through
+  `LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`) and the lock of the company account (1a) is written. Each case has a transaction of
+  its own that locks the employee, then the case `FOR UPDATE`, reads it again and writes `closed_at` with no account (`closed_by_app_user_id`
+  NULL), the line `CLOSED_BY_SYSTEM` of the log of the case and the audit event `OFFBOARDING_CASE.CLOSED` (actor `SYSTEM`), so a pass on another
+  instance, a pass run again or a command at the same time never both act; a case that fails is logged and tried again at the next pass without
+  stopping the others. The same closing is asked for at the moment a fact that closes the case is written (the last revocation of the person
+  completed, (1b) recorded on the route), so the hourly pass only settles what those did not reach. It revokes nothing and opens no task. Run one by
+  hand with `MailboxLockSettlement.settle(now)` and `DepartureClosureService.sweep(now)`.
+  The API also runs `TransferGraceSweeper` once an hour (the first pass five minutes after start, unreferenced timer): the grace of the old rights of a
+  person who moved (`QĐ-110p`, `QĐ-110r`, SPEC MF3-C.1). It (1) tells the start of the grace (`TRANSFER_GRACE_STARTED`) of a transfer that took effect
+  before the grace existed (the migration of m-17 gave it one and nobody was told; it has no `snapshot_before`, and the picture of the rights is kept
+  in the same transaction, so it is told once), (2) reminds the person who moved (`TRANSFER_GRACE_ENDING`, event key `TRANSFER_GRACE_ENDING:{transfer}`)
+  from `grace_reminder_on` to the last day of the grace, once for the transfer (`reminded_at` is claimed first; a person who holds nothing to lose is
+  not told), and (3) the day after `grace_ends_on` asks `LicensingApi.openRevocation` for a revocation with the source `TRANSFER`, the system as the
+  actor (`SystemActor`, the task is made by the system), `referenceKind DEPARTMENT_TRANSFER` and the transfer as the reference, for every personal
+  right the person held from the day the transfer took effect or before that is still in force and has a revocation (K3 has none), in the queue of
+  the IT Admin in charge of the new department; it writes the audit event `DEPARTMENT_TRANSFER.REVOCATION_OPENED` (actor `SYSTEM`) and tells the person
+  and that IT Admin (`TRANSFER_RIGHTS_REVOKING`) once. Asking again changes nothing (the gate adds no second task and no second reason, and a seat that
+  has a live task of another source is given the reason besides). Each transfer has a transaction of its own that locks the employee, then the transfer
+  `FOR UPDATE`, reads it again and acts, so two instances, a pass run again or a command at the same time never both act; one that fails is logged and
+  tried again at the next pass without stopping the others. Run one by hand with `TransferTellingService.announceUnannounced(now)`,
+  `TransferTellingService.remind(now)` and `TransferRevocationService.sweep(now)`. At the end of its transaction for a transfer whose grace is over, the pass
+  asks `TransferClosureService.closeIfDue`: when no right of the old department is left to take back (every task completed, the person held nothing, or
+  the rights ended another way) the system closes the transfer (`closed_at`, `closed_by_system`, no account, `snapshot_after`, the audit event
+  `DEPARTMENT_TRANSFER.CLOSED`, actor `SYSTEM`), so a person whose transfer had nothing to revoke can be moved again (`QĐ-110r`). The same closing is asked
+  the moment a task of revocation of the person is completed (a listener of `RevocationListeners`), and a departure recorded while the grace lasts
+  closes the transfer as superseded (`DEPARTMENT_TRANSFER.SUPERSEDED`, `superseded_by_case_id`) so the sweep opens nothing for it. When that departure is
+  cancelled the transfer opens again, whole (`DEPARTMENT_TRANSFER.REOPENED`: no closing, no `snapshot_after`, no `superseded_by_case_id`), unless the person was moved
+  again since; nothing is taken back at the cancellation, the sweep does it when the grace is over. A transfer is not closed while a grant of a right the person
+  asked for again (R-49) still waits, because a grant that fails gives its old right back.
   The API also runs `SaasIssueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it closes each resolved
   report of an error in a SaaS right whose last day to reopen (`saas_issues.reopen_until`, fixed when it was resolved from
   `SAAS_ISSUE_REOPEN_WORKING_DAYS`) has passed (state `CLOSED`, a `SYSTEM` entry and the audit event `SAAS_ISSUE.CLOSED`, under the row lock),
@@ -117,17 +174,29 @@
   passed it sets `response_overdue_noticed_at` and writes the audit event `SAAS_ISSUE.RESPONSE_OVERDUE` in one transaction, so a report is
   told once however many instances run; a failed pass only logs. The reminder only tells: the report keeps its IT Admin and its state and
   is never closed by the calendar while it is not resolved. Run one by hand with `SaasIssueSweepService.run(now)`.
-  The API also runs `SubscriptionRenewalSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each term
-  subscription period whose notice deadline falls from sixty days back to the largest `RENEWAL_ALERT_DAYS_BEFORE_DEADLINE` ahead it tells
-  the milestones due (inbox notices `SUBSCRIPTION_RENEWAL_ALERT`, with the audit event `SUBSCRIPTION_RENEWAL.ALERT_SENT`, and
-  `SUBSCRIPTION_RENEWAL_DATA_QUALITY` with `SUBSCRIPTION_RENEWAL.DATA_QUALITY_WARNED` when the contract has no date to count from), flags a
-  decision not carried out by its deadline late (`late_flagged_at`, the audit event `SUBSCRIPTION_RENEWAL.FLAGGED_LATE`, the notice
-  `SUBSCRIPTION_RENEWAL_LATE`) and records the event of a deadline passed with no decision (`subscription_deadline_events`, unique per
-  subscription and immutable, the audit event `SUBSCRIPTION.AUTO_RENEWAL_INCIDENT` or `SUBSCRIPTION.EXPIRY_MARKED` and its notice). It is
-  idempotent however many instances run: each notice carries an event key (`subscription-renewal-alert:{subscription}:{base date}:{days}`,
-  one per recipient), the late flag is a conditional update written once, and the deadline event has `ON CONFLICT DO NOTHING`; a failed
-  pass only logs. It only tells and flags late: it never renews, cancels, decides or records an outcome, never changes a subscription or
-  a seat, and a decision taken after the deadline is never voided. Run one by hand with `SubscriptionRenewalSweepService.sweep(now)`.
+  The API also runs `StopRequestSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each request of a holder
+  to stop the collection of a machine that is still `OPEN` after its `due_at` it sets `overdue_noticed_at` and writes the inbox notice
+  `DEVICE_STOP_REQUEST_OVERDUE` in one transaction, so a request is told once however many instances run; a failed pass only logs. The reminder
+  only tells: the request stays open and collection goes on until an IT Admin completes it. Run one by hand with `StopRequestSweepService.run(now)`.
+  The API also runs `SubscriptionRenewalSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each active
+  K2 term subscription not yet continued (the catalog gives at most 500, no order) it reads the point of adjustment of the period (`SBF-20`: a
+  plan by the month opens `SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY` days before its payment day, a plan by the year `SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL`
+  days before its deadline to cancel, the red alert `SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL` days before it; each value is the one the subscription
+  had when its period began) and, for a period for which no case stands, tells the IT Admin in charge `SUBSCRIPTION_RENEWAL_ALERT` from the point to
+  the renewal day, the IT Admin and Finance `SUBSCRIPTION_RENEWAL_RED_ALERT` once a plan by the year is at its red alert, the IT Admin
+  `SUBSCRIPTION_RENEWAL_KEPT` on the payment day of a plan by the month that has more seats bought than it needs (audit event
+  `SUBSCRIPTION_RENEWAL.ALERT_SENT`), and warns the IT Admin of the quality of the contract data (`SUBSCRIPTION_RENEWAL_DATA_QUALITY`, problem
+  `NO_ALERT_ANCHOR` when no date gives a point, `NO_NOTICE_DEADLINE` for a plan by the year counted from its renewal date; audit event
+  `SUBSCRIPTION_RENEWAL.DATA_QUALITY_WARNED`). Past the renewal day (up to sixty days), with no case and seats still held, it records the event
+  of the period (`subscription_deadline_events`, unique per subscription and immutable, `notice_base_date` = the renewal day): an incident for a
+  period that renews itself (audit `SUBSCRIPTION.AUTO_RENEWAL_INCIDENT`, told to the IT Admin, Finance and the person who decides spending —
+  they hear of an incident only) or _expired without renewal_ for one that does not (audit `SUBSCRIPTION.EXPIRY_MARKED`, told to the IT Admin
+  and Finance). The seats a period needs are counted only for a period with something due that day. It is idempotent however many instances
+  run: each notice carries an event key (`subscription-adjustment-point:{subscription}:{deadline}`, `subscription-renewal-red:…`,
+  `subscription-renewal-kept:…`, `subscription-incident:{subscription}:{renewal day}`, `subscription-expiry:…`, one per recipient) and the
+  deadline event has `ON CONFLICT DO NOTHING`; a subscription whose period fails does not stop the others (it is logged by its id and the kind of the failure, counted in `failed`, which the job warns of, and tried again at the next pass), and a failed pass only logs. It only tells and records the event: it never renews, cancels,
+  decides or records an outcome, never changes a subscription or a seat. Run one by hand with `SubscriptionRenewalSweepService.sweep(now)`.
+  The API also runs `VendorAccountEvidenceSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it deletes the evidence of the review of the accounts at the vendors (`SBF-08`, `vendor_account_discrepancies`) whose day is older than 24 months (`US-14-04` AC-2), open or decided, at most 500 rows per transaction (`DELETE … FOR UPDATE SKIP LOCKED`, the oldest first, passes repeat until none is left), and writes one audit event `VENDOR_ACCOUNT_EVIDENCE.EXPIRED` with actor `SYSTEM` for each organization and batch with the number deleted and the cutoff, never what was deleted. A case outside the process (`out_of_process_cases`) and the expense it recorded are kept; a failed pass only logs. Run one by hand with `VendorAccountEvidenceRetentionService.sweep(now)`.
   The API also runs `BudgetAttachmentExpirySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each unattached document upload whose deadline has passed (`AWAITING_UPLOAD` older than 24 hours, `UPLOADED` older than 7 days) it marks the attachment `EXPIRED`, writes the audit event `BUDGET_ATTACHMENT.EXPIRED` with actor `SYSTEM`, and deletes the abandoned storage object(s) after commit; each file is picked and locked `FOR UPDATE SKIP LOCKED` inside its own transaction (a file a proposal send holds is skipped, never waited for; at most 100 per pass), attached, removed and discarded records are left untouched, and a failed pass only logs. Run one by hand with `BudgetAttachmentExpiryService.expire(now)`.
   The API also runs `YearStartCommitmentsSweeper` once an hour (the first pass five minutes after start, unreferenced timer): the first pass after
   midnight of 01/01 in the time zone of the organization makes one commitment of the new year (`budget_commitments.origin = 'YEAR_START'`) for each
@@ -136,8 +205,8 @@
   a request holds one commitment a year (unique key and a check under the row lock), the rows of the requests are locked `FOR UPDATE` in order of id
   before the lock of the Cost Center and year (the order of the budgets), the batches (at most 100 requests) are separate transactions, and the pass
   that completes the mark writes the audit event `BUDGET_COMMITMENT.YEAR_START_RUN` once (`BUDGET_COMMITMENT.CREATED` for each commitment and
-  `BUDGET_COMMITMENT.YEAR_START_SKIPPED` with `NO_PRICE`, `NO_COST_CENTER`, `AMOUNT_TOO_LARGE`, `NO_RATE` or `CURRENCY_MISMATCH` for a request left
-  out, all by the `SYSTEM`). The amount is the price of 01/01 converted into the reporting currency (rate of 01/01, else of the day of the pass). Each
+  `BUDGET_COMMITMENT.YEAR_START_SKIPPED` with `NO_PRICE`, `NO_COST_CENTER` or `AMOUNT_TOO_LARGE` for a request left
+  out, all by the `SYSTEM`). The amount of a seat that still stands after 31/12 is what its approval kept of the year after (`QĐ-111ak`: the part of the year after of a request for months of use, one row of `access_request_line_amounts` for each person of a group; a person who left or whose seat was closed holds nothing; a seat that closes in the new year before its term holds the months to that day at the price its approval counted with, never more than it kept), or twelve months of the price of 01/01 for a right with no end; a request of an older release that kept nothing is counted by the months to the end of its seat at that price. The price is in dong as it stands: nothing is converted, and a price left in another currency is `NO_PRICE`. A number its approval kept in another currency than dong (a request approved before the prices were all in dong) is not read as dong either: the seat is counted by its months at the price of 01/01 and the audit event `BUDGET_COMMITMENT.YEAR_START_SAVED_AMOUNT_IGNORED` (by the `SYSTEM`, with the request, the currency and the number left) says so. Each
   step (opening, each batch) first takes `pg_try_advisory_xact_lock` of the organization and year; an instance that finds it taken leaves the pass to
   the holder. Each batch records the last request it went through (`resume_after_id`) and adds its counts, so a pass after a failure goes on after it
   and writes no event twice. A year with no approved budget makes the commitment waiting for one (`NO_BUDGET`), attached when a version is approved;
@@ -145,6 +214,15 @@
   an organization with no mark only marks its first year when it sent no request before that year began; a gap in the marks is logged as a
   warning; a failed pass only logs and is tried again at the next hour. Run one by hand with `YearStartCommitmentsService.run(now)`; after 01/01 check `year_start_commitment_runs` has the year with `completed_at` and
   `budget_commitments` has rows with `origin = 'YEAR_START'`.
+  The API also runs `NextYearReminderSweeper` once an hour (the first pass five minutes after start, unreferenced timer): on 01/12 in the time zone of
+  the organization and then on every Monday, until a version is approved (`QĐ-111am`, B-4), it tells Finance and the spending approver, for each Cost Center
+  in use of the departments of the year asked for that has no approved budget of it (`BudgetFactsRepo.approvedOfCostCenters`), with the inbox notice
+  `BUDGET_NEXT_YEAR_MISSING` (the Cost Center and the year only, never a figure). The year asked for is the next one in December and the year that runs from
+  01/01 (the Mondays of January and after go on for it), and nothing is told on any other day. The key `nextYearBudget:<costCenterId>:<day>` is unique
+  for a recipient, so a Cost Center is told once for each day however many instances or passes run; each Cost Center has a transaction of its own, a
+  failure is logged and tried again at the next pass of the day without stopping the others, and a failed pass only logs. It only tells: no budget, version
+  or request is changed. Run one by hand with `NextYearReminderService.noticeDue(now)`.
+  The API also runs `BudgetReviewSweeper` once an hour (the first pass five minutes after start, unreferenced timer): on the fifth working day of a month (the calendar of working days of the operating parameters, in the time zone of the organization; a fixed rule, not a parameter, R-47) it asks Finance, with the inbox notice `BUDGET_REVIEW_DUE` (the year and the month only), to close the month before when no review period of it exists (`BudgetReviewReminderService.noticeDue`); and on every pass it sets the line "not allocated, shared pool" of the year, up to the month that ended last, against the reserve of the budget cycle and, when it is above, warns Finance with `BUDGET_SHARED_POOL_OVER_RESERVE` (the year and the month only, `QĐ-104i`). The keys `budgetReviewDue:<year>-<month>` and `sharedPoolOverReserve:<year>-<month>` are unique for a recipient, so a month is asked for, and a pool warned about, once however many instances or passes run (the close of the month by Finance writes the same warning with the same key); a failed pass only logs and is tried again at the next hour. On the same pass it reminds the heads of departments to explain a quarterly review (`RV-3`, `B-7`, `BudgetReviewExplanationReminderService.remind`): for each quarter that waits for explanations (`state = AWAITING_EXPLANATIONS`) whose due day (`explanations_due_on`, the fifth working day from the close, a fixed rule) is today or past, on the due day and then on every Monday, it tells the head of each Cost Center that was asked and has not explained with `BUDGET_REVIEW_EXPLANATION_DUE` (the period, the Cost Center, the year, the month and the due day, no figure); a department with no head has nobody to tell. The key `review:<period>:<Cost Center>:<day>` is unique for a recipient (`D12`), so a day is told once however many instances or passes run, and a quarter that Finance signed or a head who explained is never told again. A late explanation is never refused: the day only reminds. It only tells: no month is closed, no budget or request is changed. Run one by hand with `BudgetReviewReminderService.noticeDue(now)`.
   The API also runs `InternalRulesSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it asks for the run of the rules `G1` (free seats of a `PER_SEAT` subscription) and `G2` (a seat still held by a person who left) for the period `RULE_SCHEDULE_G1_G2` names (a day, or an ISO week). The run is claimed with `INSERT … ON CONFLICT DO NOTHING` on `ghost_seat_rule_runs` (one row per organization, rule set and period), so two instances make one run; a run `RUNNING` for two hours or `FAILED`, with fewer than three attempts, is taken over (`attempt + 1`). Each subscription and each seat is judged in a transaction of its own (one that fails is counted in `failed_count`, the others go on), the audit events `GHOST_SEAT.*` have actor `SYSTEM`, and why a subject was left out is kept in `ghost_seat_rule_skips` (append-only). It opens no revocation and changes no seat (`SoD-6`); a failed pass only logs. Run one by hand with `InternalRulesService.run(now)`, or over HTTP with `POST /api/v1/ghost-seat-rule-runs` (IT Admin, Super Admin): it runs `G1`/`G2` and `G3`/`G4` now under a period key of its own (`MANUAL-<instant>`), so a period already run does not stop it, while an open recommendation stays unique. Every run, scheduled or by hand, holds the session advisory lock `ghost-seat-rule-run:<organization>:<rule set>` while it works: a scheduled tick that finds it taken leaves the period for the next tick, a run by hand answers 409 `GHOST_SEAT.RULE_RUN_BUSY`.
   The API also runs `UsageRulesSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it asks for the run of the rules `G3` (a seat never used) and `G4` (a seat no longer used) for the period `RULE_SCHEDULE_G3_G4` names (a day or an ISO week; weekly by default), claimed by `INSERT … ON CONFLICT DO NOTHING` so one instance runs it. It reads the evidence of the usage per application through `UsageEvidenceApi`, judges each seat in a transaction of its own, changes no seat, and a failed pass only logs. Run one by hand with `UsageRulesService.run(now)`.
   The record of a departure has no job of its own: `EMPLOYEE_LEFT` is told once in the transaction that sets the employee `TERMINATED` (the
@@ -161,6 +239,7 @@
   priority, the workspaces by name and whether an emergency account is declared, never a password, a key or the name of that account) once, again
   when the roles change before the last working day and, with the highest priority, when a person who left still holds the Super Admin role or a
   workspace. Nothing here locks, revokes or reassigns anything; the notification channel reads the event (`g4-notification-delivery`).
+
 - A failed pass of a job (`*.job.ts`, the loops of the worker) or of a sweep that works record by record logs one line,
   `<kind> failed: <description>`, where the description is `describeForOperator`
   ([operator-error.ts](../../src/infrastructure/observability/operator-error.ts)): the class name of the error, its Prisma

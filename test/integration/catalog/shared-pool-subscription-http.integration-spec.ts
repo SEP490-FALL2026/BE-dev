@@ -16,12 +16,12 @@ interface PoolWire extends SubscriptionWire {
  */
 describe('the shared-pool fields of a subscription over HTTP (integration, real PostgreSQL)', () => {
   const h = new SubscriptionHttpHarness();
-  const { dataOf, codeOf, detailsOf, today, rate, plan, create, patch, get, complete, n } = h;
+  const { dataOf, codeOf, detailsOf, today, plan, create, patch, get, complete, n } = h;
 
   const BASE = {
     kind: 'TERM',
     purchasedQuantity: 5,
-    unitPrice: { amount: '10.00', currency: 'USD' },
+    unitPrice: { amount: '250000', currency: 'VND' },
     startDate: '2026-03-15',
     endDate: '2027-03-14',
   };
@@ -44,9 +44,8 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
   }, 120000);
 
   // The clock the harness pretends is restored after each test, so each one sets the day its price is recorded on.
-  beforeEach(async () => {
+  beforeEach(() => {
     today('2026-03-15');
-    await rate('USD', '2026-03-15', '25000');
   });
 
   afterEach(() => h.afterEach());
@@ -217,19 +216,8 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
       await h.ctx.sql.query(`UPDATE applications SET responsible_it_admin_employee_id = NULL WHERE id = $1`, [
         applicationId,
       ]);
-      // The rate of the day of the price is missing, so the subscription is a draft whatever else it holds.
-      today('2026-03-16');
-      const draft = dataOf<PoolWire>(
-        await create({
-          ...BASE,
-          planId,
-          startDate: '2026-03-16',
-          billingCycle: 'ANNUAL',
-          responsibleItAdminEmployeeId: undefined,
-        }).expect(201),
-      );
-      expect(draft).toMatchObject({ status: 'DRAFT', missing: ['EXCHANGE_RATE'] });
-      await rate('USD', '2026-03-16', '25000');
+      // A stored draft whose data is whole and that names nobody, as an earlier release stored one (no route leaves one now).
+      const draft = { id: await h.wholeDraft(planId, { responsible: null, day: '2026-03-16' }) };
 
       expect(codeOf(await complete(draft.id).expect(422))).toBe('SUBSCRIPTION.RESPONSIBLE_REQUIRED');
       await patch(draft.id, { responsibleItAdminEmployeeId: h.it1.employeeId }).expect(200);
@@ -252,23 +240,11 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
         });
       });
 
-      /** A draft that names the second IT Admin and waits only for the rate of its price day. */
+      /** A stored draft whose data is whole and that names the second IT Admin (no route leaves one now: a price in dong waits for no rate). */
       const waitingForRate = async (day: string) => {
         const { planId } = await plan();
-        today(day);
-        const draft = dataOf<PoolWire>(
-          await create({
-            ...BASE,
-            planId,
-            startDate: day,
-            billingCycle: 'ANNUAL',
-            responsibleItAdminEmployeeId: second.employeeId,
-          }).expect(201),
-        );
-        expect(draft).toMatchObject({ status: 'DRAFT', missing: ['EXCHANGE_RATE'] });
-        await rate('USD', day, '25000');
 
-        return draft;
+        return { id: await h.wholeDraft(planId, { responsible: second.employeeId, day }) };
       };
       const restore = async () => {
         await h.ctx.sql.query(`UPDATE role_grants SET revoked_at = NULL WHERE app_user_id = $1`, [second.appUserId]);
@@ -301,7 +277,7 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
       });
 
       it('refuses the update that makes a draft active when the person stored lost the role', async () => {
-        // A draft that waits only for the seats bought: the rate of its day is there, so naming them makes it active.
+        // A draft that waits only for the seats bought: naming them makes it active.
         const { planId } = await plan();
         const draft = dataOf<PoolWire>(
           await create({

@@ -9,6 +9,23 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
 import { OrganizationModule } from '../organization/organization.module';
 import { RequestsModule } from '../requests/requests.module';
 import { DepartmentMemberController } from './department-member/department-member.controller';
+import { DepartureClosureSweeper } from './departure-closure/departure-closure.job';
+import { DepartureClosureRepo } from './departure-closure/departure-closure.repo';
+import { DepartureClosureService } from './departure-closure/departure-closure.service';
+import { MailboxLockRevocationListener } from './departure-closure/mailbox-lock-revocation.listener';
+import { MailboxLockController } from './departure-closure/mailbox-lock.controller';
+import { MailboxLockSettlement } from './departure-closure/mailbox-lock-settlement.service';
+import { MailboxLockService } from './departure-closure/mailbox-lock.service';
+import { AccountLockOverdueService } from './departure-deadline/account-lock-overdue.service';
+import { BlockAnnouncementService } from './departure-deadline/block-announcement.service';
+import { BlockMomentSweeper } from './departure-deadline/block-moment.job';
+import { BlockMomentEffects } from './departure-deadline/block-moment-effects.service';
+import { BlockMomentRepo } from './departure-deadline/block-moment.repo';
+import { DepartureDeadlineRepo } from './departure-deadline/departure-deadline.repo';
+import { DepartureDeadlineService } from './departure-deadline/departure-deadline.service';
+import { DepartureImpactService } from './departure-deadline/departure-impact.service';
+import { RevocationOverdueSweeper } from './departure-deadline/revocation-overdue.job';
+import { RevocationOverdueService } from './departure-deadline/revocation-overdue.service';
 import { DepartmentMemberQueryService } from './department-member/department-member-query.service';
 import { DepartmentOpenWorkReader } from './event-notice/department-open-work.listener';
 import { DepartmentOpenWorkRepo } from './event-notice/department-open-work.repo';
@@ -31,6 +48,8 @@ import { NoticeRepo } from './notice/notice.repo';
 import { NoticeService } from './notice/notice.service';
 import { OffboardingAuditService } from './offboarding/offboarding-audit.service';
 import { OffboardingCaseWriter } from './offboarding/offboarding-case-writer.service';
+import { OffboardingCancelTakeBack } from './offboarding/change/offboarding-cancel-takeback.service';
+import { OffboardingCancelWriter } from './offboarding/change/offboarding-cancel-writer.service';
 import { OffboardingChangeJudge } from './offboarding/change/offboarding-change-judge.service';
 import { OffboardingChangeWriter } from './offboarding/change/offboarding-change-writer.service';
 import { OffboardingChangeService } from './offboarding/change/offboarding-change.service';
@@ -54,7 +73,6 @@ import { OpenRequestsSource } from './offboarding/open-requests/open-requests.li
 import { OffboardingService } from './offboarding/offboarding.service';
 import {
   NoticeRecorderContributions,
-  OffboardingBlockerContributions,
   OffboardingWarningContributions,
   PersonnelFileHookContributions,
 } from './public/personnel.extension-points';
@@ -69,17 +87,30 @@ import { RoleDutiesService } from './role-duties/role-duties.service';
 import { RoleDutiesViewService } from './role-duties/role-duties-view.service';
 import { RoleWarningSource } from './role-duties/role-warning.listener';
 import { SuperAdminWatchController } from './role-duties/super-admin-watch.controller';
-import { WorkspaceBlockerSource } from './role-duties/workspace-blocker.listener';
-import { PersonnelFileDeadlinesRepo } from './service-account/personnel-file-deadlines.repo';
-import { PersonnelFileDeadlines } from './service-account/personnel-file-deadlines.listener';
 import { PersonnelApi } from './public/personnel.api';
 import { PersonnelDashboardApi } from './public/personnel-dashboard.api';
 import { PersonnelDashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
-import { ServiceAccountBlockerSource } from './service-account/service-account-blocker.listener';
-import { ServiceAccountDutyHook } from './service-account/service-account-duty.listener';
+import { PersonnelDashboardFactsService } from './dashboard-facts/dashboard-facts.service';
+import { MeDepartmentTransferController } from './transfer-grace/me-department-transfer.controller';
+import { MyTransferService } from './transfer-grace/my-transfer.service';
+import { TransferClosureListener } from './transfer-grace/transfer-closure.listener';
+import { TransferClosureService } from './transfer-grace/transfer-closure.service';
+import { TransferEffectsService } from './transfer-grace/transfer-effects.service';
+import { TransferGraceHoldListener } from './transfer-grace/transfer-grace-hold.listener';
+import { TransferGraceSweeper } from './transfer-grace/transfer-grace.job';
+import { TransferGraceRepo } from './transfer-grace/transfer-grace.repo';
+import { TransferGraceService } from './transfer-grace/transfer-grace.service';
+import { TransferImpactService } from './transfer-grace/transfer-impact.service';
+import { DeparturePreviewController } from './impact-preview/departure-preview.controller';
+import { DeparturePreviewService } from './impact-preview/departure-preview.service';
+import { ImpactPreviewFrame } from './impact-preview/impact-preview-frame.service';
+import { TransferPreviewController } from './impact-preview/transfer-preview.controller';
+import { TransferPreviewService } from './impact-preview/transfer-preview.service';
+import { TransferOldRightsService } from './transfer-grace/transfer-old-rights.service';
+import { TransferRevocationService } from './transfer-grace/transfer-revocation.service';
+import { TransferTellingService } from './transfer-grace/transfer-telling.service';
 import { TransferChangeWriter } from './transfer/transfer-change-writer.service';
 import { TransferChangeService } from './transfer/transfer-change.service';
-import { TransferClosureService } from './transfer/transfer-closure.service';
 import { TransferEffectiveListener } from './transfer/transfer-effective.listener';
 import { TransferGuardService } from './transfer/transfer-guard.service';
 import { TransferNoticeRecorder } from './notice/transfer-notice.listener';
@@ -91,19 +122,14 @@ import { TransferPreconditions } from './transfer/transfer-preconditions.service
 import { TransferRecorder } from './transfer/transfer-recorder.service';
 import { TransferService } from './transfer/transfer.service';
 import { TransfersController } from './transfer/transfers.controller';
-import { TransferReviewDecisionService } from './transfer-review/transfer-review-decision.service';
-import { PostSetupReviewListener } from './transfer-review/post-setup-review.listener';
-import { PostSetupReviewService } from './transfer-review/post-setup-review.service';
-import { TransferReviewListRepo } from './transfer-review/transfer-review-list.repo';
-import { TransferReviewListener } from './transfer-review/transfer-review.listener';
-import { TransferReviewOverdueService } from './transfer-review/transfer-review-overdue.service';
-import { TransferReviewOutcomeListener } from './transfer-review/transfer-review-outcome.listener';
-import { TransferReviewReplacementService } from './transfer-review/transfer-review-replacement.service';
-import { TransferReviewRepo } from './transfer-review/transfer-review.repo';
-import { TransferReviewService } from './transfer-review/transfer-review.service';
-import { TransferReviewSweeper } from './transfer-review/transfer-review.job';
-import { TransferReviewViewService } from './transfer-review/transfer-review-view.service';
-import { TransferReviewsController } from './transfer-review/transfer-reviews.controller';
+import { ItHandoverController } from './it-handover/it-handover.controller';
+import { ItHandoverMilestoneService } from './it-handover/it-handover-milestone.service';
+import { ItHandoverRecorder } from './it-handover/it-handover-recorder.listener';
+import { ItHandoverRepo } from './it-handover/it-handover.repo';
+import { ItHandoverSourceRepo } from './it-handover/it-handover-source.repo';
+import { ItHandoverTellingService } from './it-handover/it-handover-telling.service';
+import { ItHandoverService } from './it-handover/it-handover.service';
+import { ItHandoverViewService } from './it-handover/it-handover-view.service';
 
 /**
  * What happens to the place of a person in the organization (ADR-0017): the transfer to another department or job title
@@ -117,7 +143,8 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
  * a late return is only told by an hourly sweep, never acted on, and the facade `PersonnelApi` gives the days of leave to the rules
  * that read them. The departure of a person (a handover with the last working day or an abrupt departure, the rights the person
  * holds, the lock of the company account, the revocations the IT Admin asks for and the closing of the case) is kept here as well:
- * nothing is revoked by itself, and the flows that come after add what keeps a case open to `OffboardingBlockerContributions`.
+ * nothing is revoked by itself, the system closes the case when the person has left, every revocation is completed and the lock of the mailbox for good is
+ * written (`departure-closure/`), and the flows that come after add what only shows beside a case to `OffboardingWarningContributions`.
  * The notice a head of department sends about a change coming for one of their people is kept here too: information with no effect, which
  * the IT Admin rejects or verifies and records through the transfer, the long leave or the departure (each adds its own recorder
  * to `NoticeRecorderContributions`), told as late by an hourly sweep and never acted on.
@@ -142,17 +169,59 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
   ],
   controllers: [
     TransfersController,
-    TransferReviewsController,
     LongLeavesController,
     OffboardingController,
+    DeparturePreviewController,
+    TransferPreviewController,
     OffboardingStepsController,
+    MailboxLockController,
+    ItHandoverController,
     OpenRequestsController,
     DepartmentMemberController,
     MeDepartureNoticeController,
+    MeDepartmentTransferController,
     SuperAdminWatchController,
     NoticesController,
   ],
   providers: [
+    ItHandoverRepo,
+    ItHandoverSourceRepo,
+    ItHandoverTellingService,
+    ItHandoverService,
+    ItHandoverViewService,
+    ItHandoverMilestoneService,
+    ItHandoverRecorder,
+    DepartureClosureRepo,
+    DepartureClosureService,
+    DepartureClosureSweeper,
+    MailboxLockService,
+    MailboxLockSettlement,
+    MailboxLockRevocationListener,
+    AccountLockOverdueService,
+    BlockAnnouncementService,
+    BlockMomentEffects,
+    BlockMomentRepo,
+    BlockMomentSweeper,
+    DepartureDeadlineRepo,
+    DepartureDeadlineService,
+    DepartureImpactService,
+    TransferImpactService,
+    ImpactPreviewFrame,
+    DeparturePreviewService,
+    TransferPreviewService,
+    TransferEffectsService,
+    TransferGraceRepo,
+    TransferGraceService,
+    TransferGraceSweeper,
+    TransferClosureService,
+    TransferClosureListener,
+    TransferGraceHoldListener,
+    TransferTellingService,
+    TransferRevocationService,
+    TransferOldRightsService,
+    MyTransferService,
+    RevocationOverdueService,
+    RevocationOverdueSweeper,
     PersonnelFileHookContributions,
     PersonnelFileHooks,
     PersonnelGroundsDateService,
@@ -168,21 +237,8 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     TransferService,
     TransferChangeWriter,
     TransferChangeService,
-    TransferClosureService,
     TransferQueryService,
     PersonnelOverlapRepo,
-    TransferReviewRepo,
-    TransferReviewListRepo,
-    TransferReviewService,
-    TransferReviewListener,
-    TransferReviewReplacementService,
-    TransferReviewOutcomeListener,
-    PostSetupReviewService,
-    PostSetupReviewListener,
-    TransferReviewDecisionService,
-    TransferReviewViewService,
-    TransferReviewOverdueService,
-    TransferReviewSweeper,
     LeaveRepo,
     LeaveService,
     LeaveQueryService,
@@ -191,7 +247,6 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     LeaveReturnSweeper,
     OffboardingRepo,
     OffboardingListRepo,
-    OffboardingBlockerContributions,
     OffboardingWarningContributions,
     OffboardingSources,
     OffboardingAuditService,
@@ -204,6 +259,8 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     OffboardingCaseWriter,
     OffboardingService,
     OffboardingChangeJudge,
+    OffboardingCancelTakeBack,
+    OffboardingCancelWriter,
     OffboardingChangeWriter,
     OffboardingChangeService,
     OffboardingRevocationService,
@@ -212,17 +269,12 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     OpenRequestsService,
     OpenRequestsSource,
     DepartmentMemberQueryService,
-    PersonnelFileDeadlinesRepo,
-    PersonnelFileDeadlines,
-    ServiceAccountDutyHook,
-    ServiceAccountBlockerSource,
     RoleDutiesRepo,
     RoleDutiesService,
     RoleDutiesViewService,
     RoleDutiesHook,
     DeviceRegistrationHook,
     RoleWarningSource,
-    WorkspaceBlockerSource,
     NoticeRepo,
     NoticeRecorderContributions,
     NoticeService,
@@ -235,6 +287,7 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     OffboardingNoticeRecorder,
     PersonnelApi,
     PersonnelDashboardFactsRepo,
+    PersonnelDashboardFactsService,
     PersonnelDashboardApi,
   ],
   // The facade and the extension point of the file hooks, and the services of the writes the controlled procedure runs with an operator

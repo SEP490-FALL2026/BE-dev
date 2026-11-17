@@ -8,9 +8,8 @@ import { OrganizationChangeListeners } from '../../src/modules/organization/publ
 import type { OrganizationChange } from '../../src/modules/organization/public/organization.types';
 import type { ApiAccount } from './api-accounts';
 import { waitForLockWaiters } from './lock-wait';
-import type { Person } from './request-harness';
 import { ReassignmentHarness } from './reassignment-harness';
-import type { Department } from './request-harness';
+import type { Department, Person } from './request-harness';
 
 export interface TransferWire {
   id: string;
@@ -19,7 +18,7 @@ export interface TransferWire {
   to: { department: { id: string; code: string; name: string } };
   effectiveOn: string;
   status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
-  grounds: { type: string; reference: string; issuer: string; issuedOn: string } | null;
+  groundsNote: string | null;
   headSuccessor: { kind: 'EMPLOYEE' | 'NONE'; employee: { id: string } | null } | null;
   recordedByAppUserId: string | null;
   recordedByProcedure: boolean;
@@ -52,6 +51,8 @@ export class TransferHarness extends ReassignmentHarness {
     };
   }
 
+  /** The basis in one box (QĐ-110a): what every personnel event of the Super Admin is written on. */
+  readonly groundsNote = 'Quyết định số QD-12/2026 của phòng Nhân sự';
   readonly grounds = { type: 'HR_DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-10-01' };
 
   /**
@@ -117,6 +118,17 @@ export class TransferHarness extends ReassignmentHarness {
     if (response.status !== 201) throw new Error(`record: ${response.status} ${JSON.stringify(response.body)}`);
 
     return this.dataOf<TransferWire>(response);
+  }
+
+  /** The transfer of the person to the department from today, recorded as the Super Admin does. */
+  moveToday(person: Person, to: Department, extra: object = {}): Promise<TransferWire> {
+    return this.recorded({
+      employeeId: person.employeeId,
+      toDepartmentId: to.id,
+      effectiveOn: this.today(),
+      groundsNote: this.groundsNote,
+      ...extra,
+    });
   }
 
   /** The placements of the person, oldest first, as the database keeps them (dates as `YYYY-MM-DD`). */

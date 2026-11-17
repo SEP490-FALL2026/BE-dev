@@ -3,24 +3,29 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { ProposalAttachmentBinder } from '../attachment/proposal-attachment-binder.service';
-import type { BudgetProposalBodyDto } from '../budget/budget.dto';
 import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { ProposalRepo, type ProposalRecord } from '../budget/proposal.repo';
 import { VersionRepo } from '../budget/version.repo';
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
-import { countedTotalOf, proposalIsSucceedable, yearIsOpen } from '../budget/budget.policy';
-import { BudgetProposalNotFoundError, BudgetProposalOpenError, BudgetYearEndedError } from '../budget/budget.errors';
-import type { CycleRecord } from '../cycle/cycle.repo';
-import { ProposalLineJudge, type ProposalLineDraft } from './proposal-line-judge.service';
+import { proposalIsSucceedable, yearIsOpen } from '../budget/budget.policy';
+import {
+  BudgetCycleLockedError,
+  BudgetCycleNotOpenError,
+  BudgetProposalNotFoundError,
+  BudgetProposalOpenError,
+  BudgetYearEndedError,
+} from '../budget/budget.errors';
+import { proposalWorkRefusal } from '../cycle/cycle.policy';
+import { CycleRepo, type CycleRecord } from '../cycle/cycle.repo';
 
-type LineBody = BudgetProposalBodyDto['lines'][number];
-
+/** `BM-10` (`QĐ-111ab`): the files, one amount for the year and a note; there are no lines. */
 export interface ProposalSendInput {
   year: number;
-  lines: LineBody[];
+  requestedAmount: { amount: string };
+  note?: string;
   previous: string | null;
-  attachmentIds?: readonly string[];
+  attachmentIds: readonly string[];
   /** The Cost Center the work is for: needed only when the head answers for more than one that year. */
   costCenterId?: string;
 }
@@ -35,12 +40,22 @@ export class ProposalSender {
     private readonly yearLock: BudgetYearLockRepo,
     private readonly audit: AuditApi,
     private readonly binder: ProposalAttachmentBinder,
-    private readonly judge: ProposalLineJudge,
+    private readonly cycles: CycleRepo,
   ) {}
 
-  /** A head proposes only once the cycle of the year was published, and may go on while it is changed (`Q-02`); see `ProposalLineJudge`. */
-  requirePublishedCycle(tx: DbTx, year: number): Promise<CycleRecord> {
-    return this.judge.requirePublishedCycle(tx, year);
+  /**
+   * The work of `BM-10` is done only while the cycle of the year is open (`QĐ-111z`, `QĐ-111ab`): not before Finance opened it, and not
+   * from the day after the submission deadline. The cycle is read `FOR SHARE`, so a change of it waits for the work; it is taken first,
+   * before the proposal and the year (the order of the module: cycle, proposal, version, year). Returns the cycle. Throws
+   * BudgetCycleNotOpenError and BudgetCycleLockedError.
+   */
+  async requireOpenCycle(tx: DbTx, year: number): Promise<CycleRecord> {
+    const cycle = await this.cycles.lockByYear(tx, await this.facts.organizationId(tx), year, 'SHARE');
+    const refusal = proposalWorkRefusal(cycle, await this.facts.today(new Date(), tx));
+    if (refusal === 'LOCKED') throw new BudgetCycleLockedError(year);
+    if (refusal !== null || cycle === null) throw new BudgetCycleNotOpenError(year);
+
+    return cycle;
   }
 
   async send(tx: DbTx, actor: AuthenticatedPrincipal, input: ProposalSendInput): Promise<string> {
@@ -53,32 +68,21 @@ export class ProposalSender {
     });
     const costCenter = await this.facts.costCenterInUse(own, tx);
     if (!yearIsOpen(input.year, today)) throw new BudgetYearEndedError(input.year);
-    const cycle = await this.requirePublishedCycle(tx, input.year);
-
-    await this.facts.requirePlans(input.lines.map((line) => line.planId));
+    await this.requireOpenCycle(tx, input.year);
 
     const reporting = await this.facts.reportingCurrency(tx);
-    // The ceiling the head was told is the one that was published, not the one Finance may be editing now (S4-01).
-    const ceiling = cycle.ceilings.find((entry) => entry.departmentId === costCenter.departmentId);
-    const lines = await this.judge.judge(tx, {
-      lines: await this.buildProposalLines(tx, input.lines, reporting),
-      ceilingMinor: ceiling?.publishedTotalMinor ?? null,
-      currency: reporting,
-      now,
-    });
+    const total = await this.facts.money(input.requestedAmount, reporting, 'requestedAmount', tx);
 
     const successorOf = input.previous === null ? await this.proposalToFollow(tx, costCenter.id, input.year) : null;
     await this.yearLock.lock(tx, costCenter.id, [input.year]);
-    const open = (await this.proposals.chainOf(costCenter.id, input.year, tx)).some(
+    const open = (await this.proposals.chainOf(costCenter.id, input.year, tx)).find(
       (proposal) =>
         proposal.state === 'SUBMITTED' ||
         (proposal.state === 'REVIEWED' && proposal.succeededAt === null && proposal.id !== successorOf),
     );
-    if (open) throw new BudgetProposalOpenError();
+    if (open) throw new BudgetProposalOpenError(open.id);
 
     const organizationId = await this.facts.organizationId(tx);
-    // A CANCEL line is shown and not added (QĐ-109c).
-    const total = countedTotalOf(lines);
     const id = await this.proposals.insert(tx, {
       organizationId,
       costCenterId: costCenter.id,
@@ -87,14 +91,11 @@ export class ProposalSender {
       successorOfProposalId: successorOf,
       currency: reporting,
       totalMinor: total,
+      note: input.note ?? null,
       submittedByEmployeeId: actor.employeeId,
       now,
-      lines,
     });
-
-    if (input.attachmentIds && input.attachmentIds.length > 0) {
-      await this.binder.bind(tx, actor, id, input.attachmentIds);
-    }
+    await this.binder.bind(tx, actor, id, input.attachmentIds);
 
     await this.recordAudit(tx, {
       actor,
@@ -102,7 +103,6 @@ export class ProposalSender {
       id,
       costCenterId: costCenter.id,
       input,
-      lines,
       total,
       reporting,
       successorOf,
@@ -110,25 +110,6 @@ export class ProposalSender {
     await this.notifier.proposalSubmitted(tx, await this.require(id, tx));
 
     return id;
-  }
-
-  private async buildProposalLines(tx: DbTx, lines: LineBody[], reporting: string): Promise<ProposalLineDraft[]> {
-    const records: ProposalLineDraft[] = [];
-    const names = await this.facts.planNames(lines.map((line) => line.planId));
-    for (const line of lines) {
-      records.push({
-        description: line.description ?? names.get(line.planId as string) ?? '',
-        planId: line.planId ?? null,
-        seats: line.seats ?? null,
-        amountMinor: await this.facts.money(line.amount, reporting, tx),
-        note: line.note ?? null,
-        lineType: line.lineType,
-        zbb: line.zbb ?? null,
-        priorityRank: line.priorityRank,
-        overCeilingMinor: null,
-      });
-    }
-    return records;
   }
 
   private async recordAudit(
@@ -139,7 +120,6 @@ export class ProposalSender {
       id: string;
       costCenterId: string;
       input: ProposalSendInput;
-      lines: ProposalLineDraft[];
       total: bigint;
       reporting: string;
       successorOf: string | null;
@@ -150,8 +130,9 @@ export class ProposalSender {
       budgetAuditEvent(data.actor, data.organizationId, 'BUDGET_PROPOSAL.SUBMITTED', 'BUDGET_PROPOSAL', data.id, {
         costCenterId: data.costCenterId,
         year: data.input.year,
-        lines: data.lines.length,
         totalMinor: data.total.toString(),
+        note: data.input.note ?? null,
+        attachments: data.input.attachmentIds.length,
         currency: data.reporting,
         previousProposalId: data.input.previous,
         successorOfProposalId: data.successorOf,

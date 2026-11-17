@@ -6,7 +6,7 @@ import { requestPolicyJson } from '../access-request/access-request.json';
 import { hasSpendStep } from '../access-request/access-request.policy';
 import type { NeedStepState, ReadableNeedWaitingReason } from '../access-request/access-request.types';
 import { needStepOf } from './my-requests.policy';
-import type { MyRequestFilter, MyRequestRow, RequestScope, SentState } from './my-requests.types';
+import type { MyRequestFilter, MyRequestRow, RequestedSoftware, RequestScope, SentState } from './my-requests.types';
 
 /** What a row of the list is read as: the columns of the summary, the first person it is for, how many there are, the need steps. */
 const SELECT_ROW = {
@@ -106,6 +106,22 @@ export class MyRequestsRepo {
   /** The count of the requests of the scope for the same filter. */
   async countOf(filter: Omit<MyRequestFilter, 'skip' | 'take'>): Promise<number> {
     return this.prisma.accessRequest.count({ where: whereOf(filter) });
+  }
+
+  /**
+   * What each of these Requests asks for, by id, in one read: the plan, and the name of the software proposed when it is not in the catalog (or the plan is
+   * not linked yet). A Request that does not exist is absent; the notification text names a Request by it.
+   */
+  async softwareOf(requestIds: readonly string[]): Promise<Map<string, RequestedSoftware>> {
+    if (requestIds.length === 0) return new Map();
+    const rows = await this.prisma.accessRequest.findMany({
+      where: { id: { in: [...requestIds] } },
+      select: { id: true, planId: true, proposal: { select: { softwareName: true } } },
+    });
+
+    return new Map(
+      rows.map((row) => [row.id, { planId: row.planId, proposedName: row.proposal?.softwareName ?? null }]),
+    );
   }
 
   /** What the person who proposed software that is not in the catalog called it, by request. */

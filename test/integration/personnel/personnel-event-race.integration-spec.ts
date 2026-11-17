@@ -37,7 +37,7 @@ describe('events about one person that meet at once (integration, real PostgreSQ
         employeeId: who.employeeId,
         toDepartmentId: fin.id,
         effectiveOn: h.day(20),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
   const departureOf =
     (who: Person): Call =>
@@ -50,12 +50,7 @@ describe('events about one person that meet at once (integration, real PostgreSQ
         employeeId: who.employeeId,
         startedOn: h.day(-1),
         approvedReturnOn: h.day(60),
-        grounds: {
-          type: 'APPROVED_APPLICATION',
-          reference: 'DN-07/2026',
-          issuer: 'HR Department',
-          issuedOn: '2026-05-25',
-        },
+        groundsNote: 'Đơn xin nghỉ dài hạn số DN-07/2026',
       });
 
   /** Holds the row of the person, lets `first` and then `second` reach the lock, releases it, and gives both answers in that order. */

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 
 /**
@@ -10,18 +11,25 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 export class AssignmentChainRepo {
   /**
    * The request whose grant made the right this assignment continues: the request of the most recently completed grant task among the
-   * assignment and its predecessors. Null for a right that no request made (the baseline, a role). It is what the money a request holds
-   * for the right is found by, whichever assignment of the chain is ended.
+   * assignment and its predecessors, with the days the seat that grant made began and ends (the end null when it has none). Null for a right that
+   * no request made (the baseline, a role). It is what the money a request holds for the right is found by, whichever assignment of the chain is
+   * ended: a request with months of use records no end date, so the seat it made says the last day it pays for and, with its start, the days its
+   * months begin on (B-C1).
    */
-  async grantRequestOfChain(tx: DbTx, assignmentId: string): Promise<string | null> {
-    const rows = await tx.$queryRaw<{ request_id: string }[]>`
+  async grantOfChain(
+    tx: DbTx,
+    assignmentId: string,
+  ): Promise<{ requestId: string; startDate: BusinessDate; endDate: BusinessDate | null } | null> {
+    const rows = await tx.$queryRaw<{ request_id: string; start_date: string; end_date: string | null }[]>`
       WITH RECURSIVE chain AS (
         SELECT "id", "predecessor_id" FROM "license_assignments" WHERE "id" = ${assignmentId}::uuid
         UNION
         SELECT a."id", a."predecessor_id" FROM "license_assignments" a JOIN chain c ON a."id" = c."predecessor_id"
       )
-      SELECT t."request_id" AS request_id
+      SELECT t."request_id" AS request_id, to_char(s."valid_from", 'YYYY-MM-DD') AS start_date,
+             to_char(s."expected_end_date", 'YYYY-MM-DD') AS end_date
         FROM "provisioning_tasks" t
+        JOIN "license_assignments" s ON s."id" = t."assignment_id"
        WHERE t."assignment_id" IN (SELECT "id" FROM chain)
          AND t."kind" = 'GRANT'
          AND t."status" = 'COMPLETED'
@@ -29,7 +37,30 @@ export class AssignmentChainRepo {
        ORDER BY t."completed_at" DESC NULLS LAST, t."id" DESC
        LIMIT 1`;
 
-    return rows[0]?.request_id ?? null;
+    return rows[0] === undefined
+      ? null
+      : { requestId: rows[0].request_id, startDate: rows[0].start_date, endDate: rows[0].end_date };
+  }
+
+  /**
+   * `grantOfChain` for many assignments in one statement: the request of the most recently completed grant task along the chain of each, by the id of the
+   * assignment asked about; an assignment no request made (the baseline, a role) is not in the map. It is how the seats of a month find the request that
+   * holds the money for them, a seat a renewal carried on being the one the first seat's request asked for (`SM1-01`).
+   */
+  async grantsOfChains(db: Pick<DbTx, '$queryRaw'>, assignmentIds: readonly string[]): Promise<Map<string, string>> {
+    if (assignmentIds.length === 0) return new Map();
+    const rows = await db.$queryRaw<{ assignment_id: string; request_id: string }[]>`
+      WITH RECURSIVE chain AS (
+        SELECT "id" AS root, "id", "predecessor_id" FROM "license_assignments" WHERE "id" = ANY(${[...assignmentIds]}::uuid[])
+        UNION
+        SELECT c.root, a."id", a."predecessor_id" FROM "license_assignments" a JOIN chain c ON a."id" = c."predecessor_id"
+      )
+      SELECT DISTINCT ON (c.root) c.root::text AS assignment_id, t."request_id"::text AS request_id
+        FROM chain c JOIN "provisioning_tasks" t ON t."assignment_id" = c."id"
+       WHERE t."kind" = 'GRANT' AND t."status" = 'COMPLETED' AND t."request_id" IS NOT NULL
+       ORDER BY c.root, t."completed_at" DESC NULLS LAST, t."id" DESC`;
+
+    return new Map(rows.map((row) => [row.assignment_id, row.request_id]));
   }
 
   /**

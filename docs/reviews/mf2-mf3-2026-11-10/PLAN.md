@@ -1,5 +1,8 @@
-# PLAN v2.3 — MF-2, MF-3 và các thay đổi đi kèm (`QĐ-110` + vế MF-2/MF-3 của `QĐ-111` + `OWNER-REVIEW`)
+# PLAN v2.4 — MF-2, MF-3 và các thay đổi đi kèm (`QĐ-110` + vế MF-2/MF-3 của `QĐ-111` + `OWNER-REVIEW`)
 
+> **v2.4:** thêm gói `AUDIT-LEFT` (#18, sau `RD`, trước `Z`): năm việc Optional để lại của [audit gói bug](../be-bugfix-2026-11-12/AUDIT.md)
+> §2 "Để lại". Không đổi SPEC (v2.3), không đổi hành vi nghiệp vụ.
+>
 > **v2.3 (13/11):** theo [SPEC v2.3](SPEC.md) — gate cuối mỗi gói (S-5); enum ở migration `_values` đầu đợt; X-SA tách ràng buộc / chuyển dữ
 > liệu (kết thúc `SERVICE` + chèn `PERSONAL`); hạn thu hồi trên hồ sơ + quá hạn cả quyền chưa mở tác vụ; (1b) + tự đóng; hủy mọi Request của
 > người nghỉ; BLK-3 (`afterRevocation` bỏ qua nguồn `TRANSFER`); R-49 cấp lại trong ân hạn; R-53 cờ `K4` có trang quản trị; S-4 báo tăng seat
@@ -38,27 +41,28 @@ sweeper trong API process (ADR-0018), Jest.
 
 ## 2. Thứ tự gói (tuần tự, một nhánh)
 
-| #   | Gói   | Cần trước     | Cỡ  | Ghi chú                                                                        |
-| --- | ----- | ------------- | --- | ------------------------------------------------------------------------------ |
-| 1   | X0    | §1            | M   | nền dùng chung; migration `_values` là task đầu                                |
-| 2   | X-H   | 1             | M   | bỏ bàn giao, xóa route, giải phóng 2 file `licensing/public/`                  |
-| 3   | X-SA  | 1             | M   | bỏ tài khoản dịch vụ, R-9; giải phóng 2 file `licensing/public/`               |
-| 4   | MF2-A | 1             | S   |                                                                                |
-| 5   | MF2-B | 4             | S   | policy kế nhiệm + service tác động dùng chung                                  |
-| 6   | MF2-C | 5             | S   | R-41                                                                           |
-| 7   | MF2-D | 1             | M   | hạn trên hồ sơ                                                                 |
-| 8   | MF2-E | 6, 7          | M   | R-1, hủy mọi Request                                                           |
-| 9   | K1-CL | 1             | S   | SPEC FE `K1-GR` dùng lại                                                       |
-| 10  | MF2-G | 2, 3, 8, 9    | M   | **mốc:** MF-2 trọn (S1–S3, S6, S7, S16, S17)                                   |
-| 11  | MF1-X | 1             | S   | `QĐ-111bc`, R-43                                                               |
-| 12  | MF3-A | 5             | S   |                                                                                |
-| 13  | MF3-B | 12            | M   | `QĐ-111bg`, R-21, BLK-3                                                        |
-| 14  | MF3-C | 13            | M   | **mốc:** MF-3 trọn (S4, S5); R-49                                              |
-| 15  | X-IT  | 1, BUG-B BB-4 | M   | S10, S13, S15; R-53, S-4                                                       |
-| 16  | DS    | 2, 3          | M   | **mốc:** S8, S9; facade `licensing-department-tools.api.ts` cho SPEC FE `IN-1` |
-| 17  | RD    | 10, 14, 15    | M   | S14                                                                            |
-| —   | —     | —             | —   | sang [PLAN feedback FE](../fe-feedback-2026-11-11/PLAN.md); pha cuối chung     |
-| 18  | Z     | pha cuối      | M   | seed + `test:flows` + roadmap                                                  |
+| #   | Gói        | Cần trước     | Cỡ  | Ghi chú                                                                        |
+| --- | ---------- | ------------- | --- | ------------------------------------------------------------------------------ |
+| 1   | X0         | §1            | M   | nền dùng chung; migration `_values` là task đầu                                |
+| 2   | X-H        | 1             | M   | bỏ bàn giao, xóa route, giải phóng 2 file `licensing/public/`                  |
+| 3   | X-SA       | 1             | M   | bỏ tài khoản dịch vụ, R-9; giải phóng 2 file `licensing/public/`               |
+| 4   | MF2-A      | 1             | S   |                                                                                |
+| 5   | MF2-B      | 4             | S   | policy kế nhiệm + service tác động dùng chung                                  |
+| 6   | MF2-C      | 5             | S   | R-41                                                                           |
+| 7   | MF2-D      | 1             | M   | hạn trên hồ sơ                                                                 |
+| 8   | MF2-E      | 6, 7          | M   | R-1, hủy mọi Request                                                           |
+| 9   | K1-CL      | 1             | S   | SPEC FE `K1-GR` dùng lại                                                       |
+| 10  | MF2-G      | 2, 3, 8, 9    | M   | **mốc:** MF-2 trọn (S1–S3, S6, S7, S16, S17)                                   |
+| 11  | MF1-X      | 1             | S   | `QĐ-111bc`, R-43                                                               |
+| 12  | MF3-A      | 5             | S   |                                                                                |
+| 13  | MF3-B      | 12            | M   | `QĐ-111bg`, R-21, BLK-3                                                        |
+| 14  | MF3-C      | 13            | M   | **mốc:** MF-3 trọn (S4, S5); R-49                                              |
+| 15  | X-IT       | 1, BUG-B BB-4 | M   | S10, S13, S15; R-53, S-4                                                       |
+| 16  | DS         | 2, 3          | M   | **mốc:** S8, S9; facade `licensing-department-tools.api.ts` cho SPEC FE `IN-1` |
+| 17  | RD         | 10, 14, 15    | M   | S14                                                                            |
+| 18  | AUDIT-LEFT | BUG-B, 15     | S   | việc để lại của audit gói bug; mỗi mục một commit; không đổi nghiệp vụ         |
+| —   | —          | —             | —   | sang [PLAN feedback FE](../fe-feedback-2026-11-11/PLAN.md); pha cuối chung     |
+| 19  | Z          | pha cuối      | M   | seed + `test:flows` + roadmap                                                  |
 
 Migration: tên `YYYYMMDDHHMMSS_<snake_case>` tăng dần sau migration của bug-fix (`20261112000000…`), đặt theo gói; không sửa migration đã
 merge (`docs/rules/database-business.md` DB-15).
@@ -177,6 +181,22 @@ Cột "File chính" là điểm vào; một task không chạm quá ~5 file (kh�
 | RD.3    | P23 xem trước: chỉ thêm route trên `departure-impact.service.ts` / `transfer-impact.service.ts` (MF2-B.3, MF3-A.2)                                                                                                      | `personnel/departure-deadline/` + `personnel/transfer-grace/` (controller preview, dto)                                                                        | 1 file integration: gọi preview rồi đếm bảng không đổi                                                                                     |
 | RD-G    | **Gate cuối gói**                                                                                                                                                                                                       | —                                                                                                                                                              | `pnpm test:gates`, `pnpm rules:check`                                                                                                      |
 
+### AUDIT-LEFT — việc để lại của audit gói bug
+
+Nguồn: [AUDIT §2 "Để lại"](../be-bugfix-2026-11-12/AUDIT.md) (năm trong sáu mục Optional). Quy trình §0, **mỗi mục một commit** (tiền tố
+commit ghi ở đầu cột "Việc"), mỗi commit một dòng [HANDOFF-CODE.md](HANDOFF-CODE.md). Không đổi luật nghiệp vụ nên không cần SPEC mới; gặp
+việc phải đổi hành vi ⟹ dừng, ghi câu hỏi HANDOFF. Mục thứ sáu **không** nằm trong gói: hàng đợi trưởng phòng `GET /ghost-seat-queue` vẫn trả
+họ tên người giữ — chờ Owner xác nhận phạm vi màn usage (BRD 7.5).
+
+| Task | Việc                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | File chính                                                                                                                                                                                | Verify                                                                                                                                                                                                                                                                                                     |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AL.1 | `refactor(licensing)`: `RenewalPartiesService.itAdminOf` — nhánh rơi về IT phòng sở hữu cũng phải là IT Admin **dùng được**. Đọc IT phòng sở hữu (`getItAdminInChargeOfDepartment`) trước, gọi `findUsableItAdminEmployeeIds` **một lần** cho `[người phụ trách, IT phòng]`; người phụ trách dùng được ⟹ trả ngay, **không** tính nhánh cuối (`findFirstUsableItAdminEmployeeId`); không thì IT phòng dùng được ⟹ trả; không thì mới tới IT Admin dùng được đầu tiên | `licensing/subscription-renewal/subscription-renewal-parties.service.ts` (+ spec), `renewal-it-admin.policy.ts` (+ spec) nếu chữ ký phải đổi                                              | Test đỏ trước: bảng ca của policy (phụ trách dùng được / không; IT phòng dùng được / đã nghỉ chưa khóa / không có) + unit service (đúng 1 lời gọi `findUsable…`; phụ trách dùng được ⟹ không gọi `findFirstUsable…`). Giữ xanh `subscription-renewal-sweep`, `subscription-renewal-decision` (integration) |
+| AL.2 | `perf(organization, optimization)`: `OrganizationReadApi` thêm đọc thành viên của **nhiều** phòng trong **một** câu lệnh (`department_id = ANY(...)`, cùng điều kiện ngày hiệu lực như `memberIdsOn`; phòng không tồn tại ⟹ không có dòng, không lỗi); `BoardQueryService.holdersInScope` dùng nó thay cho `Promise.all(getDepartmentMemberIds)` từng phòng (hiện 2 câu lệnh mỗi phòng)                                                                              | `organization/department/department.repo.ts`, `organization/public/organization-read.api.ts`, `optimization/board/board-query.service.ts` (+ spec)                                        | Unit board-query (nhiều phòng ⟹ 1 lời gọi, tập thành viên không đổi, `employeeId` ngoài phạm vi ⟹ rỗng) + 1 file integration organization (gộp đúng, loại trùng, phòng rỗng/không có; số câu lệnh không đổi theo số phòng); `pnpm arch:check`                                                              |
+| AL.3 | `docs(optimization)`: mô tả OpenAPI `departmentId` của **hai** route bảng ghost seat nói rõ nghĩa lọc — `ghost-seat-recommendations`: theo phòng **của khuyến nghị**; `ghost-seat-seat-states`: theo phòng **hiện tại của người giữ**. Không đưa mã `QĐ-*` vào mô tả (test `openapi-presentation` cấm)                                                                                                                                                               | `optimization/board/board.dto.ts` (hai schema query), `board.controller.ts` nếu mô tả route nhắc phòng                                                                                    | `pnpm openapi:export`; `test/http/platform/openapi-presentation.http-spec.ts` + `src/infrastructure/http/openapi-presentation.spec.ts`                                                                                                                                                                     |
+| AL.4 | `refactor(catalog)`: CO-10 (`SubscriptionPoolService.responsibleOfDeclaration`) đọc IT phụ trách ứng dụng qua `PlanFactsService.responsibleItAdminIdOf(planId)` (select một cột) thay vì `ApplicationFactsService.responsibleItAdminOf` (đọc cả dòng ứng dụng): nhận `planId` (nơi gọi `SubscriptionService` đã có `plan.id`); bỏ `ApplicationFactsService.responsibleItAdminOf` và phụ thuộc `applications` của pool service khi `grep` = 0 chỗ dùng                | `catalog/subscription/pool/subscription-pool.service.ts`, `catalog/subscription/subscription.service.ts`, `catalog/catalog-entry/application-facts.service.ts`                            | `pnpm typecheck` + `grep -rn responsibleItAdminOf src` chỉ còn `PlanFactsService`/`SubscriptionFactsService`; giữ xanh `subscription-pool.policy.spec` và `shared-pool-subscription-http.integration-spec` (khai báo không nêu người phụ trách lấy IT phụ trách ứng dụng còn dùng được); `pnpm arch:check` |
+| AL.5 | `test(catalog)`: test hai IT Admin cùng nhận phụ trách thành **tất định**: một kết nối riêng giữ khóa dòng ứng dụng (`BEGIN` + `SELECT … FOR UPDATE`), gửi hai request, `waitForLockWaiters(ctx.sql, 2)`, `COMMIT`, rồi kiểm như cũ (`[200, 403]`, đúng một người phụ trách, đúng một Audit); `finally` luôn `ROLLBACK` + đóng kết nối — theo mẫu test retirement                                                                                                    | `test/integration/catalog/application-responsibility-http.integration-spec.ts` (thay `Promise.all` ở ca "two IT Admins who take an application…"), `test/support/lock-wait.ts` (chỉ dùng) | 1 file test chạy 3 lần liền đều xanh; mutation: bỏ `FOR UPDATE` trong luồng chuyển phụ trách ⟹ test đỏ (không treo: barrier hết hạn báo lỗi), hoàn lại ⟹ xanh                                                                                                                                              |
+| AL-G | **Gate cuối gói:** `pnpm test:gates`, `pnpm rules:check`; `pnpm openapi:export` (mô tả đổi ở AL.3), `pnpm arch:routes`, `pnpm arch:graph`; tài liệu API FE (`D:\FPT\FALL2026\Docs\Figma UI-UX\API-Integration\`): sinh lại từ clone sạch của BE rồi `node tools/build-api-docs.mjs --be <BE> --check`, thêm mục `changes/CHANGELOG.md`. **Không commit repo Docs**                                                                                                   | —                                                                                                                                                                                         | ghi kết quả HANDOFF (số suite/test, `--check` OK + số operation)                                                                                                                                                                                                                                           |
+
 ### Z — seed, flows, roadmap (pha cuối chung, sau full test)
 
 - [ ] Seed `src/cli/seed/fixture/shared-demo-v4/` với **ngày tương đối theo `seedDate`** (M-16): thêm `NV-ITA3`, chia lại phòng để mỗi IT Admin
@@ -198,7 +218,8 @@ ràng buộc `INV-02`, K1-CL biến thể + thứ tự); ghi `REVIEW.md` (Critic
 
 - Mọi P1…P29 có task: P1/P2 ⟹ X0.5–6 + MF2-B/C; P3 ⟹ MF2-A/D + X-H/X-SA + X-IT.3; P4 ⟹ MF2-G.3; P5 ⟹ X-IT.2–3; P6/P9 ⟹ MF3-A; P7/P8 ⟹
   MF3-B.5; P10 ⟹ MF3-C.3–4; P11 ⟹ MF1-X; P12/P13 ⟹ X-SA; P14/P15 ⟹ X-H; P16–P18 ⟹ DS; P19 ⟹ X-IT.4b–5; P20 ⟹ X-IT.1; P21–P23 ⟹ RD; P24 ⟹
-  X-IT.7; P25 ⟹ K1-CL; P26 ⟹ X0.6a; P27 ⟹ MF2-E.2; P28 ⟹ MF2-G.1–2; P29 ⟹ X-IT.4a.
+  X-IT.7; P25 ⟹ K1-CL; P26 ⟹ X0.6a; P27 ⟹ MF2-E.2; P28 ⟹ MF2-G.1–2; P29 ⟹ X-IT.4a. Không thuộc P/S nào: `AUDIT-LEFT` (AL.1–AL.5) ⟹ năm
+  mục "Để lại" của AUDIT §2, không đổi API ngoài mô tả OpenAPI của AL.3.
 - Mọi S có gói: S1–S3, S17 ⟹ MF2-\*; S4–S5 ⟹ MF3-\*; S6 ⟹ X-H; S7 ⟹ X-SA; S8 ⟹ MF1-X; S9 ⟹ DS; S10, S13, S15 ⟹ X-IT; S11 ⟹ MF2-A, MF3-A; S12 ⟹
   gate cuối gói + Z + pha cuối; S14 ⟹ RD; S16 ⟹ K1-CL.
 - Hàm dùng chéo định nghĩa ở task trước: enum (X0.0), `nthWorkingDayFrom` (X0.1), `BeneficiaryGoneCancellation` (X0.7), `created_by_system`

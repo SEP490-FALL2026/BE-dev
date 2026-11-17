@@ -1,5 +1,4 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
-import { PersonnelGroundsDateService } from '../personnel-grounds-date.service';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -28,14 +27,13 @@ import {
 } from './transfer.dto';
 import { TRANSFER_ERROR_EXAMPLES as EXAMPLES, toTransferApiException } from './transfer.http-errors';
 import { TransferChangeService } from './transfer-change.service';
-import { TransferClosureService } from './transfer-closure.service';
 import { TransferQueryService } from './transfer-query.service';
 import { TransferService } from './transfer.service';
 
 const FORBIDDEN = {
   status: HttpStatus.FORBIDDEN,
   description:
-    'Only the Super Admin records, moves or cancels a transfer, and reads it in full; the IT Admin reads a minimal projection and closes it (AUTHORIZATION.FORBIDDEN).',
+    'Only the Super Admin records, moves or cancels a transfer, and reads it in full; the IT Admin reads a minimal projection (AUTHORIZATION.FORBIDDEN).',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 /** A write by the Super Admin is also refused about themselves: the controlled procedure records that event. */
@@ -54,10 +52,7 @@ const NOT_FOUND = {
 } as const;
 
 /** The refusals of the basis of a change, the same on every write that needs one. */
-const GROUNDS_EXAMPLES = [
-  EXAMPLES.GROUNDS_IS_NOTICE,
-  PERSONNEL_ACCESS_ERROR_EXAMPLES.GROUNDS_ISSUED_ON_FUTURE,
-] as const;
+const GROUNDS_EXAMPLES = [EXAMPLES.GROUNDS_IS_NOTICE] as const;
 /** The refusals of a change of a transfer that waits: it took effect or was cancelled, or the head or the placements were changed meanwhile. */
 const SETTLED_EXAMPLES = [EXAMPLES.ALREADY_EFFECTIVE, EXAMPLES.ALREADY_CANCELLED, EXAMPLES.CONCURRENT_CHANGE] as const;
 /** The refusals of the day of a change. */
@@ -68,13 +63,13 @@ const DAY_EXAMPLES = [
 ] as const;
 
 const GROUNDS_REFUSALS =
-  'the basis is the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR';
+  'the basis (groundsNote) is only the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR';
 
 /**
  * Transfers of a person to another department with the day they take effect and the basis they rest on. The Super Admin records,
- * moves and cancels them (`QĐ-87a`); the IT Admin reads a minimal projection of the departments in their charge and closes the
- * record once the service accounts have a person to answer for them. Finance, a department head and an employee are refused. The role
- * is judged again by the service, so this guard is only the outer layer.
+ * moves and cancels them (`QĐ-87a`); the IT Admin reads a minimal projection of the departments in their charge. Nobody closes a
+ * transfer by hand: the system closes it once every right of the old department is taken back (`QĐ-110r`). Finance, a department head
+ * and an employee are refused. The role is judged again by the service, so this guard is only the outer layer.
  */
 @ApiTags('department-transfers')
 @Controller({ path: 'department-transfers', version: '1' })
@@ -83,8 +78,6 @@ export class TransfersController {
     private readonly transfers: TransferService,
     private readonly changes: TransferChangeService,
     private readonly query: TransferQueryService,
-    private readonly closures: TransferClosureService,
-    private readonly groundsDate: PersonnelGroundsDateService,
   ) {}
 
   @Post()
@@ -94,7 +87,7 @@ export class TransfersController {
     status: HttpStatus.CREATED,
     message: 'DEPARTMENT_TRANSFER.RECORDED',
     description:
-      'The transfer was recorded: the placement the person has ends on the day and the new one begins on it, and the head of the department they leave is handed over or left empty as chosen. A day of today takes effect at once. The seats the person holds are not touched.',
+      'The transfer was recorded: the placement the person has ends on the day and the new one begins on it, and the head of the department they leave is handed over or left empty as chosen. A day of today takes effect at once: the paid requests sent from the old department that are still open are closed by the system, the money held for the old rights goes back to the budget of the old department, and the grace of the old rights begins. The seats the person holds are not touched.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -106,7 +99,7 @@ export class TransfersController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The person has left (DEPARTMENT_TRANSFER.EMPLOYEE_LEFT) or has another event waiting (PENDING_EVENT_EXISTS), the destination department cannot take people (DEPARTMENT_INACTIVE; a department with no Cost Center takes people like any other), or the placements cannot take it (PLACEMENT_OVERLAP, CONCURRENT_CHANGE).',
+        'The person has left (DEPARTMENT_TRANSFER.EMPLOYEE_LEFT) or has another event waiting (PENDING_EVENT_EXISTS: details.kind is TRANSFER for a transfer that waits, HEAD_HANDOVER, OFFBOARDING, or TRANSFER_SETTLING for a transfer before that took effect and is not closed yet), the destination department cannot take people (DEPARTMENT_INACTIVE; a department with no Cost Center takes people like any other), or the placements cannot take it (PLACEMENT_OVERLAP, CONCURRENT_CHANGE).',
       examples: [
         EXAMPLES.EMPLOYEE_LEFT,
         EXAMPLES.PENDING_EVENT_EXISTS,
@@ -117,20 +110,19 @@ export class TransfersController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), the destination takes effect later than the day (DEPARTMENT_NOT_YET_EFFECTIVE), ${GROUNDS_REFUSALS}, or the head of the department they leave is not provided for (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE).`,
+      description: `The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), the destination takes effect later than the day (DEPARTMENT_NOT_YET_EFFECTIVE), ${GROUNDS_REFUSALS}, or the head of the department they leave is not provided for (PERSONNEL.SUCCESSOR_REQUIRED: a head who is moved names an employee to follow them, "nobody" is refused; DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE).`,
       examples: [
         VALIDATION_EXAMPLE,
         ...DAY_EXAMPLES,
         EXAMPLES.DEPARTMENT_NOT_FOUND,
         EXAMPLES.DEPARTMENT_NOT_YET_EFFECTIVE,
         ...GROUNDS_EXAMPLES,
-        EXAMPLES.HEAD_SUCCESSOR_REQUIRED,
+        PERSONNEL_ACCESS_ERROR_EXAMPLES.SUCCESSOR_REQUIRED,
         EXAMPLES.SUCCESSOR_NOT_A_MEMBER_ON_DATE,
       ],
     },
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordTransferBodyDto) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       return await this.query.recordedOf(await this.transfers.record(userActor(actor), body));
     } catch (error) {
@@ -144,7 +136,7 @@ export class TransfersController {
   @ApiSuccessResponse(TransferPageResponseDto, {
     message: 'DEPARTMENT_TRANSFER.LISTED',
     description:
-      'A page of transfers, the latest day first, optionally of one person, one state or a range of days. Each row says who, what changes, from where to where, the day and where it stands; the basis and the head handover are in the detail. An IT Admin reads only the transfers that leave or enter a department they are in charge of.',
+      'A page of transfers, the latest day first, optionally of one person, one state or a range of days. Each row says who, what changes, from where to where, the day, where it stands (phase: PENDING, IN_GRACE while the person keeps the rights of the old department, REVOKING once the grace is over, CLOSED when the system closed it with nothing left to take back, SUPERSEDED when a departure recorded in the grace took the rights over, CANCELLED) and the grace (the last day the person keeps those rights and the day they are told once more; graceEndsBefore keeps the transfers whose grace ends before a day and graceEndsFrom those whose grace ends on or after one, so both give the graces that end in a range of days, as the calendar of the next working days of the overview reads them); the basis, the head handover and the old rights are in the detail. An IT Admin reads only the transfers that leave or enter a department they are in charge of.',
   })
   @ApiErrorResponses(...COMMON, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -165,7 +157,7 @@ export class TransfersController {
   @ApiSuccessResponse(TransferDetailResponseDto, {
     message: 'DEPARTMENT_TRANSFER.RETRIEVED',
     description:
-      'The transfer with its basis, who follows the head of the old department, who recorded it (an account, or the controlled procedure) and how it ended. The IT Admin reads a minimal projection: no basis, no head handover and no reason of a cancellation.',
+      'The transfer with its basis, who follows the head of the old department, who recorded it (an account, or the controlled procedure) and how it ended (closure: the system closes it with no account once every right of the old department is taken back, or a departure recorded in the grace closes it as superseded and names the case), where it stands and its grace, the rights of the old department (oldRights: each with whether it is still held, the task that takes it away and whether the person was given it again), the money that went back to the budget of the old department the day it took effect (commitmentsReleased) and the picture of the rights before and after (snapshot). The IT Admin reads a minimal projection: no basis, no head handover, no reason of a cancellation, no money and no snapshot.',
   })
   @ApiErrorResponses(...COMMON, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -224,8 +216,14 @@ export class TransfersController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), ${GROUNDS_REFUSALS}, the day is the same, in the past or not after the current placement (NO_CHANGE, EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), or the head of the department cannot be handed over on the new day (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
-      examples: [VALIDATION_EXAMPLE, ...GROUNDS_EXAMPLES, ...DAY_EXAMPLES, EXAMPLES.SUCCESSOR_NOT_A_MEMBER_ON_DATE],
+      description: `The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), ${GROUNDS_REFUSALS}, the day is the same, in the past or not after the current placement (NO_CHANGE, EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), or the head of the department cannot be handed over on the new day (PERSONNEL.SUCCESSOR_REQUIRED, DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
+      examples: [
+        VALIDATION_EXAMPLE,
+        ...GROUNDS_EXAMPLES,
+        ...DAY_EXAMPLES,
+        PERSONNEL_ACCESS_ERROR_EXAMPLES.SUCCESSOR_REQUIRED,
+        EXAMPLES.SUCCESSOR_NOT_A_MEMBER_ON_DATE,
+      ],
     },
   )
   async reschedule(
@@ -233,7 +231,6 @@ export class TransfersController {
     @Param() params: TransferIdParamDto,
     @Body() body: RescheduleTransferBodyDto,
   ) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       const record = await this.changes.reschedule(userActor(actor), params.id, body);
 
@@ -271,42 +268,10 @@ export class TransfersController {
     @Param() params: TransferIdParamDto,
     @Body() body: CancelTransferBodyDto,
   ) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       const record = await this.changes.cancel(userActor(actor), params.id, body);
 
       return await this.query.detailOf(record);
-    } catch (error) {
-      throw toTransferApiException(error);
-    }
-  }
-
-  @Post(':id/closure')
-  @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'departmentTransferClose', summary: 'Close a transfer that has taken effect' })
-  @ApiSuccessResponse(TransferDetailResponseDto, {
-    message: 'DEPARTMENT_TRANSFER.CLOSED',
-    description:
-      'The transfer is closed: the people who answer for the service accounts of the person are named, so none of them waits on the person any more. Recording a transfer and its taking effect never wait for this; only the closing does.',
-  })
-  @ApiErrorResponses(
-    ...COMMON,
-    NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The transfer cannot be closed yet (DEPARTMENT_TRANSFER.NOT_CLOSEABLE: details.blockers lists NOT_EFFECTIVE while it waits, or SERVICE_ACCOUNT_UNASSIGNED while a service account still has the person responsible), or it was closed already (ALREADY_CLOSED) or cancelled (ALREADY_CANCELLED). Nothing changes.',
-      examples: [EXAMPLES.NOT_CLOSEABLE, EXAMPLES.ALREADY_CLOSED, EXAMPLES.ALREADY_CANCELLED],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The id is not valid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
-    },
-  )
-  async close(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: TransferIdParamDto) {
-    try {
-      return await this.query.detailOf(await this.closures.close(actor, params.id));
     } catch (error) {
       throw toTransferApiException(error);
     }

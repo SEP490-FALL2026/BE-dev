@@ -2,7 +2,7 @@ import type { DbTx, TransactionRunner } from '../../../infrastructure/database/t
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { AuditEventInput } from '../../audit/public/audit.types';
-import type { AiInvocationContentRepo } from '../invocation/invocation-content.repo';
+import type { AiInvocationHistoryStore } from '../invocation/invocation-history-store.types';
 import type { InvocationContentRecord } from '../invocation/invocation.types';
 import { InvocationContentNotFoundError } from './invocation-content.errors';
 import { InvocationContentQueryService } from './invocation-content-query.service';
@@ -22,6 +22,7 @@ const ADMIN = {
 const RECORD: InvocationContentRecord = {
   invocationId: INVOCATION_ID,
   organizationId: ORGANIZATION_ID,
+  providerMode: 'MODEL',
   context: { generatedAt: '2026-11-04T09:00:00.000Z', requests: [] },
   promptText: 'the prompt',
   rawResponse: '{"items":[]}',
@@ -48,7 +49,7 @@ function world(found: InvocationContentRecord | null = RECORD) {
   const run = jest.fn(<T>(work: (tx: DbTx) => Promise<T>) => work(TX));
   const service = new InvocationContentQueryService(
     { run } as unknown as TransactionRunner,
-    repo as unknown as AiInvocationContentRepo,
+    repo as unknown as AiInvocationHistoryStore,
     audit as unknown as AuditApi,
   );
 
@@ -61,12 +62,19 @@ describe('InvocationContentQueryService.read', () => {
 
     await expect(service.read(ADMIN, INVOCATION_ID)).resolves.toEqual({
       invocationId: INVOCATION_ID,
+      providerMode: 'MODEL',
       context: RECORD.context,
       promptText: 'the prompt',
       rawResponse: '{"items":[]}',
       parsed: { items: [] },
       result: RECORD.result,
     });
+  });
+
+  it('gives the mode the call was made in, so a simulated answer is never read as one of the model', async () => {
+    const { service } = world({ ...RECORD, providerMode: 'SIMULATED' });
+
+    await expect(service.read(ADMIN, INVOCATION_ID)).resolves.toMatchObject({ providerMode: 'SIMULATED' });
   });
 
   it('keeps the fields the table lets be empty as null', async () => {

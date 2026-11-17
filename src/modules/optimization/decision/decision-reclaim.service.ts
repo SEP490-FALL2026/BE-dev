@@ -5,6 +5,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { LicensingGhostSeatApi } from '../../licensing/public/licensing-ghost-seat.api';
 import type { RuleSeat } from '../../licensing/public/licensing-ghost-seat.types';
 import { LicensingApi } from '../../licensing/public/licensing.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import type { GhostSeatRecord } from '../ghost-seat/ghost-seat.types';
 import { GhostSeatDecisionRefusedError, isSeatNotRevocable } from './decision.errors';
@@ -28,6 +29,7 @@ export class DecisionReclaimService {
     private readonly licensing: LicensingApi,
     private readonly seats: LicensingGhostSeatApi,
     private readonly parameters: OperatingParametersApi,
+    private readonly notifications: NotificationsApi,
   ) {}
 
   /** The open seat of each recommendation's chain today, by recommendation id; a chain with no open seat is absent. */
@@ -89,5 +91,21 @@ export class DecisionReclaimService {
       }
       throw error;
     }
+  }
+
+  /**
+   * A reclaim the IT Admin returned and the head now does not make: the holder, told once that it was coming, is told it is cancelled
+   * (`QĐ-62p`(1)). A recommendation never returned told the holder nothing, so there is nothing to cancel.
+   */
+  async tellCancelled(tx: DbTx, record: GhostSeatRecord, organizationId: string): Promise<void> {
+    if (record.returnCount !== 1 || record.employeeId === null) return;
+    await this.notifications.notifyInApp(tx, {
+      organizationId,
+      recipientEmployeeId: record.employeeId,
+      code: 'REVOCATION_CANCELLED',
+      subject: { type: 'GHOST_SEAT_RECOMMENDATION', id: record.id },
+      params: { planId: record.planId, applicationId: record.applicationId, source: 'GHOST_SEAT' },
+      eventKey: `REVOCATION_CANCELLED:${record.id}`,
+    });
   }
 }

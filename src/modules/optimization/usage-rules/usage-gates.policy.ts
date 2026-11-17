@@ -14,7 +14,7 @@ export interface GateSkip {
   detail: RuleSkipDetail;
 }
 
-/** The status a seat shows for the gate that left it out: a seat left out for what it is (a service account, a handover) is `EXCLUDED`. */
+/** The status a seat shows for the gate that left it out: a seat left out for what it is (a machine account, a handover) is `EXCLUDED`. */
 export function statusOfGate(gate: SkipGate): SeatStatus {
   switch (gate) {
     case 'NO_DATA':
@@ -34,6 +34,8 @@ const skip = (gate: SkipGate, detail: RuleSkipDetail): GateSkip => ({ gate, stat
 
 export interface SeatGateFacts {
   kind: 'PERSONAL' | 'SERVICE';
+  /** The seat is flagged as used for a machine account (`QĐ-110m`, `R-9`). */
+  isMachineAccount: boolean;
   today: BusinessDate;
   handingOver: boolean;
   onLongLeave: boolean;
@@ -55,12 +57,15 @@ export function endsWithinMonth(expectedEndDate: BusinessDate | null, today: Bus
 }
 
 /**
- * The gates that look at the seat itself, in the order of `FR-4.9`, stopping at the first that leaves it out (`US-10-02`): a service account (2),
+ * The gates that look at the seat itself, in the order of `FR-4.9`, stopping at the first that leaves it out (`US-10-02`): a machine account (2),
  * a person on long leave or handing over — a head's seat is judged like any (`QĐ-104h`) (3), a seat that cannot be used yet or that is new (4),
  * a right that ends within a month, an exemption still running (7), a revocation under way (8).
  */
 export function seatGateOf(facts: SeatGateFacts): GateSkip | null {
-  if (facts.kind === 'SERVICE') return skip('SERVICE_ACCOUNT', { reason: 'service account' });
+  // Gate 2 reads the flag of the seat (`QĐ-110m`); a service account of the earlier releases that was not converted yet is left out as well.
+  if (facts.isMachineAccount || facts.kind === 'SERVICE') {
+    return skip('SERVICE_ACCOUNT', { reason: facts.isMachineAccount ? 'machine account' : 'service account' });
+  }
   if (facts.handingOver) return skip('LEAVE_OR_HANDOVER', { reason: 'handing over before leaving' });
   if (facts.onLongLeave) return skip('LEAVE_OR_HANDOVER', { reason: 'on long leave today' });
   if (facts.usableOn === null) return skip('NOT_USABLE', { reason: 'the grant or the invitation is still waiting' });

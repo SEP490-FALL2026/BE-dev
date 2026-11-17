@@ -1,56 +1,51 @@
 import { Injectable } from '@nestjs/common';
-import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
-  AccessRequestManyPaidSoftwareReasonRequiredError,
   AccessRequestOpenLimitReachedError,
   AccessRequestOpenRequestExistsError,
 } from '../access-request/access-request.errors';
-import type { ManyPaidSoftwareFlag } from '../access-request/access-request.types';
 import { RequestLimitsRepo } from './request-limits.repo';
 import {
   judgeNewRequestLimits,
-  manyPaidSoftwareReasonOf,
+  weekWindowOf,
   type LimitExemption,
   type LimitVerdict,
+  type OpenNewRequest,
 } from './request-limits.policy';
 
-/** GH-2 and GH-3 as the Super Admin set them, read before the transaction opens and applied to that sending (`QĐ-106h`(2)). */
+/** GH-2 as the Super Admin set it, read before the transaction opens and applied to that sending (`QĐ-106h`(2)). */
 export interface LimitSettings {
-  openLimit: number;
-  paidThreshold: number;
+  /** The most requests for new access one person may be named in a calendar week (`REQUEST_OPEN_NEW_LIMIT`, `QĐ-111h`). */
+  weeklyLimit: number;
 }
 
 export interface LimitInput {
   employeeIds: readonly string[];
   planId: string | null;
-  applicationId: string | null;
-  today: BusinessDate;
+  /** The moment the request is sent (or would be): the calendar week of GH-2 is the one of the organization that holds it. */
+  now: Date;
   settings: LimitSettings;
   /** Why a person is exempt from GH-1/GH-2, when they are; nobody is in this release unless the caller says so. */
   exemptions?: ReadonlyMap<string, LimitExemption>;
 }
 
 /**
- * The limits of a request for new access (`BR-MF1-01` GH-1/GH-2/GH-3), for each person it is for: one read of the open requests and
- * one of the paid applications, however many people. Sending takes `lock` first, under the lock of the sender and before a department
- * is locked; a preview or a check locks nothing. It writes nothing: the callers refuse or record.
+ * The limits of a request for new access (`BR-MF1-01` GH-1/GH-2), for each person it is for: one read of the open requests and one of
+ * the requests sent this calendar week, however many people. Sending takes `lock` first, under the lock of the sender and before a
+ * department is locked; a preview or a check locks nothing. It writes nothing: the callers refuse or record.
  */
 @Injectable()
 export class RequestLimitsService {
   constructor(
     private readonly repo: RequestLimitsRepo,
-    private readonly licensing: LicensingApi,
     private readonly parameters: OperatingParametersApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   async settings(): Promise<LimitSettings> {
-    return {
-      openLimit: Number(await this.parameters.getValue('REQUEST_OPEN_NEW_LIMIT')),
-      paidThreshold: Number(await this.parameters.getValue('PAID_SOFTWARE_FLAG_THRESHOLD')),
-    };
+    return { weeklyLimit: Number(await this.parameters.getValue('REQUEST_OPEN_NEW_LIMIT')) };
   }
 
   lock(tx: DbTx, employeeIds: readonly string[]): Promise<void> {
@@ -58,19 +53,28 @@ export class RequestLimitsService {
   }
 
   async judge(tx: DbTx, input: LimitInput): Promise<Map<string, LimitVerdict>> {
+    const organization = await this.organizationReads.getOrganization(tx);
+    if (!organization) throw new Error('The limits of a request were judged before the organization exists.');
+    const week = weekWindowOf(input.now, organization.timeZone);
     const open = await this.repo.openNewRequestsOf(tx, input.employeeIds);
-    const paid = await this.licensing.listPaidApplicationsOf(input.employeeIds, input.today, tx);
+    const sent = await this.repo.sentNewRequestsOf(tx, input.employeeIds, week);
+    // Only a person in the grace of a transfer is judged against the exempt requests too, for the duplicate of a plan.
+    const inGrace = input.employeeIds.filter((employeeId) => input.exemptions?.get(employeeId) === 'TRANSFER_GRACE');
+    const openAll =
+      inGrace.length === 0
+        ? new Map<string, OpenNewRequest[]>()
+        : await this.repo.openNewRequestsOf(tx, inGrace, { includeExempt: true });
 
     return new Map(
       input.employeeIds.map((employeeId) => [
         employeeId,
         judgeNewRequestLimits({
           planId: input.planId,
-          applicationId: input.applicationId,
           openNew: open.get(employeeId) ?? [],
-          openLimit: input.settings.openLimit,
-          paidApplicationIds: paid.get(employeeId) ?? new Set<string>(),
-          paidThreshold: input.settings.paidThreshold,
+          ...(openAll.has(employeeId) ? { openIncludingExempt: openAll.get(employeeId) } : {}),
+          sentThisWeek: sent.get(employeeId) ?? 0,
+          weeklyLimit: input.settings.weeklyLimit,
+          resetsOn: week.resetsOn,
           exemption: input.exemptions?.get(employeeId) ?? null,
         }),
       ]),
@@ -78,31 +82,17 @@ export class RequestLimitsService {
   }
 
   /**
-   * GH-1 (an open request of the plan), GH-2 and GH-3 of the person a request of one person is for, under the lock the caller took:
-   * refused, or the flag the request carries (`BR-MF1-01`). Throws AccessRequestOpenRequestExistsError,
-   * AccessRequestOpenLimitReachedError and AccessRequestManyPaidSoftwareReasonRequiredError.
+   * GH-1 (an open request of the plan) and GH-2 of the person a request of one person is for, under the lock the caller took: refused,
+   * or let through (`BR-MF1-01`). Throws AccessRequestOpenRequestExistsError and AccessRequestOpenLimitReachedError.
    */
-  async requireForOne(
-    tx: DbTx,
-    input: Omit<LimitInput, 'employeeIds'> & { employeeId: string; reason: string | null | undefined },
-  ): Promise<ManyPaidSoftwareFlag | null> {
+  async requireForOne(tx: DbTx, input: Omit<LimitInput, 'employeeIds'> & { employeeId: string }): Promise<void> {
     const verdict = await this.judgeOne(tx, input);
     if (verdict.refusal === 'HAS_OPEN_REQUEST' && verdict.openRequestId !== null) {
       throw new AccessRequestOpenRequestExistsError(verdict.openRequestId);
     }
     if (verdict.refusal === 'OPEN_LIMIT_REACHED') {
-      throw new AccessRequestOpenLimitReachedError(input.settings.openLimit, verdict.openRequestIds);
+      throw new AccessRequestOpenLimitReachedError(input.settings.weeklyLimit, verdict.resetsOn);
     }
-    const given = manyPaidSoftwareReasonOf(verdict, input.reason);
-    if (verdict.manyPaidSoftware === null) return null;
-    if (given.reason === null) {
-      throw new AccessRequestManyPaidSoftwareReasonRequiredError(
-        verdict.manyPaidSoftware.count,
-        verdict.manyPaidSoftware.threshold,
-      );
-    }
-
-    return { count: verdict.manyPaidSoftware.count, reason: given.reason };
   }
 
   /** The verdict of one person (the request of one person). */

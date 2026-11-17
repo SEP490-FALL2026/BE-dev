@@ -70,6 +70,15 @@ export const DECISION_ERROR_EXAMPLES = {
     new GhostSeatDecisionRefusedError([{ recommendationId: 'recommendation-id', code: 'NOT_DECIDER' }]),
   ),
   PAUSED: example(new GhostSeatDecisionRefusedError([{ recommendationId: 'recommendation-id', code: 'PAUSED' }])),
+  NOT_DECIDABLE: example(
+    new GhostSeatDecisionRefusedError([{ recommendationId: 'recommendation-id', code: 'NOT_DECIDABLE' }]),
+  ),
+  SEAT_NOT_REVOCABLE: example(
+    new GhostSeatDecisionRefusedError([{ recommendationId: 'recommendation-id', code: 'SEAT_NOT_REVOCABLE' }]),
+  ),
+  EXEMPTION_REQUIRED: example(
+    new GhostSeatDecisionRefusedError([{ recommendationId: 'recommendation-id', code: 'EXEMPTION_REQUIRED' }]),
+  ),
   EXEMPTION_TOO_LONG: example(
     new GhostSeatDecisionRefusedError([{ recommendationId: 'recommendation-id', code: 'EXEMPTION_TOO_LONG' }]),
   ),

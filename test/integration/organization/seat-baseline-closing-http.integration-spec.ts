@@ -3,13 +3,12 @@ import { Client } from 'pg';
 import request from 'supertest';
 import { waitForLockWaiters } from '../../support/lock-wait';
 import { pretendBusinessToday } from '../../support/pretend-today';
-import { AssignmentWire, SeatHarness } from '../../support/seat-baseline-harness';
+import { SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
 
 describe('a closed seat baseline over HTTP (integration, real PostgreSQL)', () => {
   let subscriptionId: string;
-  let botId: string;
 
   beforeAll(async () => {
     await h.start();
@@ -27,24 +26,15 @@ describe('a closed seat baseline over HTTP (integration, real PostgreSQL)', () =
       await request(h.server()).get('/api/v1/seat-baseline').set(h.as(h.it1)).expect(200),
     );
 
-  it('is open at the start: the baseline can be imported, and a service account is kept for later', async () => {
+  it('is open at the start: the baseline can be imported', async () => {
     expect(await state()).toEqual({ closed: false, closedAt: null });
     subscriptionId = await h.subscription(10);
     await h.person('OPEN1');
     await h.person('OPEN2');
 
-    const { import: written } = await h.written({ subscriptionId }, [
-      row('OPEN1'),
-      {
-        employee_code: 'OPEN2',
-        account_identifier: 'open-bot',
-        kind: 'service',
-        reason: 'CI pipeline',
-      },
-    ]);
+    const { import: written } = await h.written({ subscriptionId }, [row('OPEN1'), row('OPEN2')]);
 
     expect(written.result?.created).toBe(2);
-    botId = (await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' }))[0].id;
   });
 
   it('refuses a confirmation that meets the closing: it waits for it and then finds the baseline closed (AC-6)', async () => {
@@ -127,22 +117,5 @@ describe('a closed seat baseline over HTTP (integration, real PostgreSQL)', () =
         [randomUUID(), h.seed.organizationId, planId, targetId, holder, importId, randomUUID()],
       ),
     ).rejects.toMatchObject({ code: '55000' });
-  });
-
-  it('still lets the person responsible for a service account change, because that grants no new seat', async () => {
-    const next = await h.person('LATE4');
-
-    const response = await request(h.server())
-      .post(`/api/v1/license-assignments/${botId}/responsible-changes`)
-      .set(h.as(h.it1))
-      .send({ employeeId: next, effectiveFrom: '2026-10-08' })
-      .expect(200);
-
-    expect(h.dataOf<{ created: AssignmentWire }>(response).created).toMatchObject({
-      source: 'HANDOVER',
-      predecessorId: botId,
-      employeeId: next,
-    });
-    expect(await h.assignmentsOf({ subscriptionId, source: 'HANDOVER' })).toHaveLength(1);
   });
 });

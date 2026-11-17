@@ -4,6 +4,7 @@ import { OpenGrantTaskService } from '../provisioning/open-grants/open-grant-tas
 import type { BusinessDate } from '../../../core/business-date';
 import type {
   GrantCompletion,
+  GrantExecution,
   GrantedSeatOfRequest,
   OpenGrantTask,
   SeatRootsOfRequests,
@@ -49,5 +50,14 @@ export class LicensingOpenGrantsApi {
    */
   listGrantCompletionsOfRequests(requestIds: readonly string[], tx?: DbTx): Promise<Map<string, GrantCompletion>> {
     return this.openGrants.grantCompletionsOf(requestIds, tx);
+  }
+
+  /**
+   * The grant tasks of these requests that were not cancelled, each with the person it is for, its state and channel and why it failed, the
+   * newest first: where the grant of each person of a request stands. A request nobody has granted has none. One statement, whatever the
+   * number of requests; nothing here changes a task.
+   */
+  listGrantExecutionsOfRequests(requestIds: readonly string[], tx?: DbTx): Promise<GrantExecution[]> {
+    return this.openGrants.grantExecutionsOf(requestIds, tx);
   }
 }

@@ -13,6 +13,11 @@ describe('the steps of the shared dataset', () => {
     });
   });
 
+  it('has no step for the exchange rates: the price of a plan is written in dong and the route of the rates is gone (FX-2)', () => {
+    expect(keys).not.toContain('finance.exchange-rates');
+    for (const step of steps) expect(step.needs).not.toContain('finance.exchange-rates');
+  });
+
   it('has a step for every scenario request, after the baseline and the approved budgets they stand on', () => {
     for (const request of SHARED_DEMO_V4.requests) {
       expect(keys).toContain(`requests.${request.key}`);

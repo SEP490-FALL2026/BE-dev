@@ -1,4 +1,10 @@
-import { claimMatchesAnswer, grantPurchaseOf, grantTaskAudit, grantWarnings } from './provisioning-grant.policy';
+import {
+  beneficiaryGrantRefusal,
+  claimMatchesAnswer,
+  grantPurchaseOf,
+  grantTaskAudit,
+  grantWarnings,
+} from './provisioning-grant.policy';
 
 describe('what the grant of the seat of a request is judged and recorded by (US-07-01, QĐ-89a, SoD-5)', () => {
   const answer = { employeeId: 'emp-1', planId: 'plan-1', seat: 'PERSONAL' as const };
@@ -46,6 +52,11 @@ describe('G9-04 what a grant records as bought (BR-MF1-09b, BR-MF1-09d)', () => 
     });
   });
 
+  it('R-49: records nothing for a grant that carries on a right it replaced, K1 included: the seat of the old right is the seat of the new one', () => {
+    expect(grantPurchaseOf('K1', { purchased: false }, now, true)).toBeNull();
+    expect(grantPurchaseOf('K2', { purchased: false }, now, true)).toBeNull();
+  });
+
   it('records the purchase the pool allowed for K2 or K4, and none for a seat taken from the pool', () => {
     expect(grantPurchaseOf('K2', { purchased: true, kind: 'POOL_TOP_UP', reason: 'why' }, now)).toEqual({
       kind: 'POOL_TOP_UP',
@@ -54,5 +65,18 @@ describe('G9-04 what a grant records as bought (BR-MF1-09b, BR-MF1-09d)', () => 
     });
     expect(grantPurchaseOf('K2', { purchased: false }, now)).toBeNull();
     expect(grantPurchaseOf('K5', { purchased: false }, now)).toBeNull();
+  });
+
+  it.each([
+    ['works and is not blocked', { status: 'ACTIVE', accessBlocked: false }, null],
+    ['has left', { status: 'TERMINATED', accessBlocked: false }, 'LEFT'],
+    ['has left and is blocked', { status: 'TERMINATED', accessBlocked: true }, 'LEFT'],
+    [
+      'still has the status of work but a departure blocks their access today (QĐ-110d)',
+      { status: 'ACTIVE', accessBlocked: true },
+      'ACCESS_BLOCKED',
+    ],
+  ] as const)('does not begin the grant for a beneficiary who %s', (_name, facts, expected) => {
+    expect(beneficiaryGrantRefusal(facts)).toBe(expected);
   });
 });

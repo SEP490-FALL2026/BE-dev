@@ -3,6 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { PersonnelActor } from '../public/personnel.types';
 import type { EventBasis, SuperAdminEventParameters } from '../public/super-admin-event.types';
 import { TransferChangeService } from '../transfer/transfer-change.service';
+import { groundsNoteOfBasis } from '../personnel-grounds.policy';
 import { TransferService } from '../transfer/transfer.service';
 import { SuperAdminEventAnchor, type Subject } from './super-admin-event-anchor.service';
 
@@ -43,7 +44,7 @@ export class SuperAdminTransferEvents {
             employeeId: subject.id,
             toDepartmentId: parameters.toDepartmentId,
             effectiveOn: parameters.effectiveOn,
-            grounds: basis,
+            groundsNote: groundsNoteOfBasis(basis),
             successor: parameters.successor,
           })
         ).id;
@@ -58,7 +59,7 @@ export class SuperAdminTransferEvents {
             {
               newEffectiveOn: parameters.newEffectiveOn,
               reason: parameters.reason,
-              grounds: basis,
+              groundsNote: groundsNoteOfBasis(basis),
               successor: parameters.successor,
             },
             tx,
@@ -71,7 +72,7 @@ export class SuperAdminTransferEvents {
           await this.transferChanges.cancel(
             actor,
             parameters.transferId,
-            { reason: parameters.reason, grounds: basis },
+            { reason: parameters.reason, groundsNote: groundsNoteOfBasis(basis) },
             tx,
           )
         ).id;

@@ -13,7 +13,9 @@ import {
   PlanWorkspaceTextInvalidError,
 } from './plan.errors';
 import { assertWorkspaceShape, cleanWorkspaceText } from './plan.policy';
+import { PlanFactsService } from './plan-facts.service';
 import { PlanRepo } from './plan.repo';
+import { assertVendorAdminsEnough, needsVendorAdmins } from './plan-vendor-admins.policy';
 import type {
   PersonView,
   WorkspaceMemberRecord,
@@ -34,6 +36,8 @@ export interface WorkspaceProfileInput {
     holderEmployeeId: string;
     lastReviewedOn: string;
   } | null;
+  ownerAccountEmail?: string | null;
+  adminNote?: string | null;
 }
 
 const snapshot = (profile: WorkspaceProfileRecord | null) =>
@@ -49,15 +53,18 @@ const snapshot = (profile: WorkspaceProfileRecord | null) =>
         emergencyOccupiesSeat: profile.emergencyAccount?.occupiesSeat ?? null,
         emergencyHolderEmployeeId: profile.emergencyAccount?.holderEmployeeId ?? null,
         emergencyLastReviewedOn: profile.emergencyAccount?.lastReviewedOn ?? null,
+        ownerAccountEmail: profile.ownerAccountEmail,
+        adminNote: profile.adminNote,
       };
 
 const sameSnapshot = (a: ReturnType<typeof snapshot>, b: ReturnType<typeof snapshot>): boolean =>
   JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * The workspace profile of a K2 plan (`QĐ-77d`): who owns and administers the workspace and the emergency account,
- * recorded as a whole and replaced as a whole. Every person named must be an employee still working with a usable
- * IT Admin account; no password or secret is stored or accepted.
+ * The workspace profile of a plan the company administers at the vendor (`QĐ-77d`, `QĐ-110k`, `QĐ-110u`): a K2 plan, or a K4 plan the IT Admin
+ * said has an admin console. Who owns and administers it, the emergency account, the email of the company account that owns it there and a note,
+ * recorded as a whole and replaced as a whole. Every person named must be an employee still working with a usable IT Admin account, and at least
+ * two different ones administer the plan; no password or secret is stored or accepted.
  */
 @Injectable()
 export class PlanWorkspaceService {
@@ -65,13 +72,14 @@ export class PlanWorkspaceService {
     private readonly plans: PlanRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
+    private readonly facts: PlanFactsService,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
 
   /**
-   * Replaces the profile. Throws PlanNotFoundError, PlanWorkspaceProfileNotApplicableError (not a K2 plan), the shape
-   * errors of `assertWorkspaceShape`, PlanWorkspaceTextInvalidError and PlanWorkspacePersonInvalidError.
+   * Replaces the profile. Throws PlanNotFoundError, PlanWorkspaceProfileNotApplicableError (a plan that needs no admins at the vendor), the shape
+   * errors of `assertWorkspaceShape`, PlanVendorAdminsInvalidError, PlanWorkspaceTextInvalidError and PlanWorkspacePersonInvalidError.
    */
   async set(
     actor: AuthenticatedPrincipal,
@@ -82,26 +90,25 @@ export class PlanWorkspaceService {
     const adminLimit = input.adminLimit ?? null;
     const procedure = cleanWorkspaceText(input.ownerTransferProcedure);
     const emergency = input.emergencyAccount ? this.cleanEmergency(input.emergencyAccount) : null;
+    const adminNote = cleanWorkspaceText(input.adminNote);
+    const ownerAccountEmail = cleanWorkspaceText(input.ownerAccountEmail);
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The workspace profile was used before installation');
 
     const stored = await this.runner.run(async (tx) => {
       const plan = await this.plans.lock(tx, planId);
       if (!plan) throw new PlanNotFoundError();
-      if (plan.provisioningType !== 'K2') throw new PlanWorkspaceProfileNotApplicableError();
+      if (!needsVendorAdmins(plan.provisioningType, plan.hasAdminConsole))
+        throw new PlanWorkspaceProfileNotApplicableError();
       assertWorkspaceShape({
         primaryOwnerEmployeeId: input.primaryOwnerEmployeeId,
         members: input.members,
         ownerLimit,
         adminLimit,
       });
+      assertVendorAdminsEnough(input.members.map((member) => member.employeeId));
 
-      const people = new Set<string>([
-        input.primaryOwnerEmployeeId,
-        ...input.members.map((member) => member.employeeId),
-        ...(emergency ? [emergency.holderEmployeeId] : []),
-      ]);
-      for (const employeeId of [...people].sort()) await this.requireItAdmin(tx, employeeId);
+      await this.requirePeople(tx, input, emergency);
 
       const before = await this.plans.findProfile(planId, tx);
       const members: WorkspaceMemberRecord[] = input.members.map((member) => ({
@@ -116,6 +123,8 @@ export class PlanWorkspaceService {
         adminLimit,
         ownerTransferProcedure: procedure,
         emergencyAccount: emergency,
+        ownerAccountEmail,
+        adminNote,
       };
       if (before && sameSnapshot(snapshot(before), snapshot({ ...next, updatedAt: before.updatedAt }))) return before;
 
@@ -137,6 +146,27 @@ export class PlanWorkspaceService {
     });
 
     return this.view(stored);
+  }
+
+  /**
+   * Every person the profile names (owner, admins, the holder of the emergency account) is an IT Admin who works now, in id order: an account that can
+   * act, whose departure has not blocked yet (`workingAdminsAmong`, the judgment of the flags and of the hand-over).
+   */
+  private async requirePeople(
+    tx: DbTx,
+    input: WorkspaceProfileInput,
+    emergency: { holderEmployeeId: string } | null,
+  ): Promise<void> {
+    const people = new Set<string>([
+      input.primaryOwnerEmployeeId,
+      ...input.members.map((member) => member.employeeId),
+      ...(emergency ? [emergency.holderEmployeeId] : []),
+    ]);
+    const ordered = [...people].sort();
+    for (const employeeId of ordered) await this.requireItAdmin(tx, employeeId);
+    const working = await this.facts.workingAdminsAmong(ordered, tx);
+    const gone = ordered.find((employeeId) => !working.has(employeeId));
+    if (gone !== undefined) throw new PlanWorkspacePersonInvalidError(gone);
   }
 
   /** The profile with its people named from the organization. */
@@ -166,6 +196,8 @@ export class PlanWorkspaceService {
       ownerLimit: profile.ownerLimit,
       adminLimit: profile.adminLimit,
       ownerTransferProcedure: profile.ownerTransferProcedure,
+      ownerAccountEmail: profile.ownerAccountEmail,
+      adminNote: profile.adminNote,
       emergencyAccount: profile.emergencyAccount
         ? {
             identity: profile.emergencyAccount.identity,

@@ -8,18 +8,24 @@ import { ReturnRequestRefusedError, type ReturnRefusal } from './return-request.
 const STATUS: Record<ReturnRefusal, HttpStatus> = {
   NOT_HOLDER: HttpStatus.FORBIDDEN,
   OUTSIDE_DEPARTMENT: HttpStatus.FORBIDDEN,
-  NOT_REQUESTER: HttpStatus.FORBIDDEN,
   ASSIGNMENT_NOT_FOUND: HttpStatus.NOT_FOUND,
   NOT_FOUND: HttpStatus.NOT_FOUND,
   NO_DEPARTMENT: HttpStatus.CONFLICT,
   ASSIGNMENT_NOT_RETURNABLE: HttpStatus.CONFLICT,
   ALREADY_REQUESTED: HttpStatus.CONFLICT,
   RENEWAL_PENDING: HttpStatus.CONFLICT,
-  HANDOVER_NOT_REQUIRED: HttpStatus.CONFLICT,
-  HANDOVER_ALREADY_CONFIRMED: HttpStatus.CONFLICT,
-  NOT_AWAITING: HttpStatus.CONFLICT,
   ORIGIN_MISMATCH: HttpStatus.UNPROCESSABLE_ENTITY,
 };
+
+/** The reason a seat cannot be returned, or the request that blocks the return (nothing when the error knows neither). */
+function refusalDetailsOf(error: ReturnRequestRefusedError): { details?: Record<string, unknown> } {
+  const details = {
+    ...(error.problem ? { reason: error.problem } : {}),
+    ...(error.blockingRequestId ? { requestId: error.blockingRequestId } : {}),
+  };
+
+  return Object.keys(details).length > 0 ? { details } : {};
+}
 
 /** Maps the errors of the routes of returns to their HTTP answers and leaves the rest to the request mapper. */
 export function toReturnApiException(error: unknown): unknown {
@@ -29,7 +35,7 @@ export function toReturnApiException(error: unknown): unknown {
     return new ApiException(STATUS[error.reason], {
       code: `RETURN_REQUEST.${error.reason}`,
       message: error.message,
-      ...(error.problem ? { details: { reason: error.problem } } : {}),
+      ...refusalDetailsOf(error),
     });
   }
 
@@ -42,7 +48,6 @@ const example = (error: Error) => errorExampleOf(toReturnApiException(error));
 export const RETURN_ERROR_EXAMPLES = {
   NOT_HOLDER: example(new ReturnRequestRefusedError('NOT_HOLDER')),
   OUTSIDE_DEPARTMENT: example(new ReturnRequestRefusedError('OUTSIDE_DEPARTMENT')),
-  NOT_REQUESTER: example(new ReturnRequestRefusedError('NOT_REQUESTER')),
   ASSIGNMENT_NOT_FOUND: example(new ReturnRequestRefusedError('ASSIGNMENT_NOT_FOUND')),
   NOT_FOUND: example(new ReturnRequestRefusedError('NOT_FOUND')),
   NO_DEPARTMENT: example(new ReturnRequestRefusedError('NO_DEPARTMENT')),
@@ -54,10 +59,7 @@ export const RETURN_ERROR_EXAMPLES = {
     }),
   ),
   ASSIGNMENT_NOT_RETURNABLE: example(new ReturnRequestRefusedError('ASSIGNMENT_NOT_RETURNABLE', 'NOT_OPEN')),
-  ALREADY_REQUESTED: example(new ReturnRequestRefusedError('ALREADY_REQUESTED')),
-  RENEWAL_PENDING: example(new ReturnRequestRefusedError('RENEWAL_PENDING')),
-  HANDOVER_NOT_REQUIRED: example(new ReturnRequestRefusedError('HANDOVER_NOT_REQUIRED')),
-  HANDOVER_ALREADY_CONFIRMED: example(new ReturnRequestRefusedError('HANDOVER_ALREADY_CONFIRMED')),
-  NOT_AWAITING: example(new ReturnRequestRefusedError('NOT_AWAITING')),
+  ALREADY_REQUESTED: example(new ReturnRequestRefusedError('ALREADY_REQUESTED', null, '<request-id>')),
+  RENEWAL_PENDING: example(new ReturnRequestRefusedError('RENEWAL_PENDING', null, '<request-id>')),
   ORIGIN_MISMATCH: example(new ReturnRequestRefusedError('ORIGIN_MISMATCH')),
 } as const;

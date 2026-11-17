@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
+import { CatalogApi } from '../../../src/modules/catalog/public/catalog.api';
+import { intakeBodyOf } from '../../support/application-body';
 
 interface ApplicationWire {
   id: string;
@@ -10,16 +12,10 @@ interface ApplicationWire {
   vendor: { id: string; name: string } | null;
   dictionaryServiceLineId: string | null;
   domains: string[];
-  dataSensitivity: string;
+  dataSensitivity: string | null;
   responsibleItAdmin: { employeeId: string; employeeCode: string; fullName: string } | null;
   needsResponsible: boolean;
-  communication: {
-    personToPersonMessaging: boolean;
-    callsOrMeetings: boolean;
-    mailbox: boolean;
-    isCommunicationService: boolean;
-    note: string | null;
-  };
+  isCommunicationService: boolean;
   usageCollectionDefault: string | null;
   functionalGroup: { id: string; name: string } | null;
   status: string;
@@ -77,7 +73,7 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
     ...extra,
   });
   const create = (body: object, account: ApiAccount = it1) =>
-    request(server()).post('/api/v1/applications').set(as(account)).send(body);
+    request(server()).post('/api/v1/applications').set(as(account)).send(intakeBodyOf(body));
   const patch = (id: string, body: object, account: ApiAccount = it1) =>
     request(server()).patch(`/api/v1/applications/${id}`).set(as(account)).send(body);
   const get = (id: string, account: ApiAccount = it1) =>
@@ -121,16 +117,14 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
       )
     ).rows;
   describe('declaring an application (US-04-01)', () => {
-    it('AC-1: Figma with a dictionary line, the IT Admin who declares it as the one responsible and three "no" is stored without the flag, vendor made once, all audited', async () => {
+    it('AC-1: Figma with a dictionary line, the IT Admin who declares it as the one responsible, in Khác and with no communication flag, is stored, vendor made once, all audited', async () => {
       const { groupId, lineId } = await dictionary('Figma Inc', 'Figma');
 
       const created = dataOf<ApplicationWire>(
         await create({
           name: 'Figma',
-          kind: 'SAAS',
           dictionaryServiceLineId: lineId,
           dataSensitivity: 'MEDIUM',
-          communication: NO,
           domains: ['WWW.figma.com'],
         }).expect(201),
       );
@@ -144,9 +138,9 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
         dataSensitivity: 'MEDIUM',
         responsibleItAdmin: { employeeId: it1.employeeId, employeeCode: 'E-IT1' },
         needsResponsible: false,
-        communication: { ...NO, isCommunicationService: false, note: null },
+        isCommunicationService: false,
         usageCollectionDefault: null,
-        functionalGroup: null,
+        functionalGroup: { name: 'Khác' },
         status: 'APPROVED',
         proposedToDictionary: false,
       });
@@ -164,24 +158,27 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
       });
     });
 
-    it('AC-2: a "yes" to any one question marks a communication service, collected by default for nothing', async () => {
-      for (const answers of [
-        { personToPersonMessaging: true, callsOrMeetings: false, mailbox: false },
-        { personToPersonMessaging: false, callsOrMeetings: true, mailbox: false },
-        { personToPersonMessaging: false, callsOrMeetings: false, mailbox: true },
-      ]) {
-        const created = await app({ communication: answers });
+    it('QĐ-111e: an application of the group Liên lạc is a communication service, collected by default for nothing; one of any other group is not', async () => {
+      const communication = (
+        await ctx.sql.query<{ id: string }>(`SELECT id FROM functional_groups WHERE system_key = 'COMMUNICATION'`)
+      ).rows[0].id;
 
-        expect(created.communication).toMatchObject({ ...answers, isCommunicationService: true });
-        expect(created.usageCollectionDefault).toBe('NOT_COLLECTED');
-      }
+      const chat = await app({ functionalGroupId: communication });
+      const design = await app({ functionalGroupId: (await functionalGroup()).id });
+
+      expect(chat).toMatchObject({ isCommunicationService: true, usageCollectionDefault: 'NOT_COLLECTED' });
+      expect(design).toMatchObject({ isCommunicationService: false, usageCollectionDefault: null });
+      expect(dataOf<ApplicationWire>(await get(chat.id).expect(200)).isCommunicationService).toBe(true);
     });
 
-    it('AC-3: a note that mentions ticket comments, with three "no", does not make a communication service', async () => {
-      const created = await app({ communication: { ...NO, note: '  có bình luận   trên ticket ' } });
+    it('QĐ-111e: the three questions about communication are no longer asked, a body that answers them is refused whole', async () => {
+      const before = await counts();
+      const body = { ...intakeBodyOf(base()), communication: NO };
 
-      expect(created.communication).toMatchObject({ isCommunicationService: false, note: 'có bình luận trên ticket' });
-      expect(created.usageCollectionDefault).toBeNull();
+      const response = await request(server()).post('/api/v1/applications').set(as(it1)).send(body).expect(422);
+
+      expect(codeOf(response)).toBe('VALIDATION_ERROR');
+      expect(await counts()).toEqual(before);
     });
 
     it('QĐ-111g: there is no field for a Business Owner, a body that names one is refused whole and nothing is stored; the IT Admin who declares is the one responsible', async () => {
@@ -248,8 +245,8 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
         },
       ]);
 
-      // Another vendor's application of the same name does not raise a second open proposal.
-      await create(base({ name: name.toUpperCase() })).expect(201);
+      // The same name under another vendor is the same software (QĐ-111b): refused, so no second open proposal is raised.
+      expect(codeOf(await create(base({ name: name.toUpperCase() })).expect(409))).toBe('APPLICATION.DUPLICATE');
       const after = await ctx.sql.query(`SELECT 1 FROM vendor_dictionary_proposals WHERE normalized_name = $1`, [
         name.toLowerCase(),
       ]);
@@ -364,24 +361,29 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
       expect(
         codeOf(await create({ ...body, name: unique('P3'), dictionaryServiceLineId: randomUUID() }).expect(422)),
       ).toBe('APPLICATION.INTERNAL_HAS_NO_VENDOR');
-      expect(codeOf(await create({ ...body, name: name.toUpperCase() }).expect(409))).toBe('APPLICATION.NAME_TAKEN');
+      expect(codeOf(await create({ ...body, name: name.toUpperCase() }).expect(409))).toBe('APPLICATION.DUPLICATE');
     });
 
-    it('BBI-D09 (QĐ-82n): there is no kind for free external software; the request schema refuses it whole, with no application, vendor, proposal or audit event', async () => {
+    it('BBI-D09 (QĐ-82n, QĐ-111d): there is no kind to name any more, and none for free external software; the request schema refuses it whole, with no application, vendor, proposal or audit event', async () => {
       const before = await counts();
       const audited = await n('audit_events');
 
-      const response = await create(base({ kind: 'FREE_EXTERNAL', name: 'Photo editor (Free plan)' })).expect(422);
+      const response = await request(server())
+        .post('/api/v1/applications')
+        .set(as(it1))
+        .send({ ...intakeBodyOf(base({ name: 'Photo editor (Free plan)' })), kind: 'FREE_EXTERNAL' })
+        .expect(422);
 
       expect(codeOf(response)).toBe('VALIDATION_ERROR');
       expect(await counts()).toEqual(before);
       expect(await n('audit_events')).toBe(audited);
     });
 
-    it('AC-13: licensed software is stored without any plan or subscription', async () => {
-      const created = await app({ kind: 'LICENSED', name: 'Office 2021', vendorName: unique('Microsoft Corporation') });
+    it('QĐ-111d, QĐ-111f: an application is made with its first plan and no subscription; its kind follows the plan, never asked', async () => {
+      const created = await app({ name: 'Office 2021', vendorName: unique('Microsoft Corporation') });
 
-      expect(created).toMatchObject({ kind: 'LICENSED', status: 'APPROVED' });
+      expect(created).toMatchObject({ kind: 'SAAS', status: 'APPROVED' });
+      expect(await n('subscriptions')).toBe(0);
     });
 
     it('needs a vendor for a SaaS or licensed application, from exactly one source', async () => {
@@ -399,14 +401,16 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
   });
 
   describe('names, vendors and one dictionary line per application', () => {
-    it('refuses a name already used by the same vendor (case, accents, spacing) and allows it for another vendor', async () => {
+    it('refuses a name the catalog has already (case, accents, spacing), under the same vendor or another: the same software (QĐ-111b)', async () => {
       const vendorName = unique('Name vendor');
       await create(base({ name: 'Notion', vendorName })).expect(201);
 
       expect(codeOf(await create(base({ name: ' NOTION ', vendorName: vendorName.toUpperCase() })).expect(409))).toBe(
-        'APPLICATION.NAME_TAKEN',
+        'APPLICATION.DUPLICATE',
       );
-      await create(base({ name: 'Notion', vendorName: unique('Other vendor') })).expect(201);
+      expect(codeOf(await create(base({ name: 'Notion', vendorName: unique('Other vendor') })).expect(409))).toBe(
+        'APPLICATION.DUPLICATE',
+      );
     });
 
     it('makes the vendor once for two applications, however its name is spelled', async () => {
@@ -511,18 +515,51 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
     });
   });
 
+  describe('what the usage rules read (CT-1.8)', () => {
+    it('QĐ-111e: the facade says an application is a communication service when it stands in Liên lạc, whatever the old flag says, and follows a change of group', async () => {
+      const communication = (
+        await ctx.sql.query<{ id: string }>(`SELECT id FROM functional_groups WHERE system_key = 'COMMUNICATION'`)
+      ).rows[0].id;
+      const chat = await app({ functionalGroupId: communication });
+      const other = await app();
+      const legacyFlagged = await app();
+      // A row written before the groups: the old flag is up and the group is not Liên lạc. The group decides.
+      await ctx.sql.query(
+        `UPDATE applications SET comm_mailbox = true, is_communication_service = true WHERE id = $1`,
+        [legacyFlagged.id],
+      );
+      const catalog = ctx.app.get(CatalogApi, { strict: false });
+      const read = async (ids: string[]) =>
+        Object.fromEntries(
+          (await catalog.getCollectorApplications(ids)).map((row) => [row.id, row.isCommunicationService]),
+        );
+
+      expect(await read([chat.id, other.id, legacyFlagged.id])).toEqual({
+        [chat.id]: true,
+        [other.id]: false,
+        [legacyFlagged.id]: false,
+      });
+
+      await patch(chat.id, { functionalGroupId: (await functionalGroup()).id }).expect(200);
+      await patch(other.id, { functionalGroupId: communication }).expect(200);
+
+      expect(await read([chat.id, other.id])).toEqual({ [chat.id]: false, [other.id]: true });
+    });
+  });
+
   describe('changing and reading', () => {
-    it('updates the name, sensitivity, domains, one answer and the note, auditing before and after', async () => {
+    it('updates the name, sensitivity, domains and group, auditing before and after, and clears the rating with null', async () => {
       const created = await app({ domains: ['a.example.com'] });
-      const group = await functionalGroup();
+      const communicationGroup = (
+        await ctx.sql.query<{ id: string }>(`SELECT id FROM functional_groups WHERE system_key = 'COMMUNICATION'`)
+      ).rows[0].id;
 
       const updated = dataOf<ApplicationWire>(
         await patch(created.id, {
           name: unique('Renamed'),
           dataSensitivity: 'HIGH',
           domains: ['https://B.example.com/x', 'a.example.com'],
-          communication: { mailbox: true, note: 'shared mailbox' },
-          functionalGroupId: group.id,
+          functionalGroupId: communicationGroup,
         }).expect(200),
       );
 
@@ -530,21 +567,20 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
         dataSensitivity: 'HIGH',
         domains: ['b.example.com', 'a.example.com'],
         responsibleItAdmin: { employeeId: it1.employeeId },
-        communication: { mailbox: true, isCommunicationService: true, note: 'shared mailbox' },
+        isCommunicationService: true,
         usageCollectionDefault: 'NOT_COLLECTED',
-        functionalGroup: { id: group.id },
+        functionalGroup: { id: communicationGroup },
       });
       const events = await auditOf(created.id);
       expect(events.map((event) => event.action)).toEqual(['APPLICATION.CREATED', 'APPLICATION.UPDATED']);
       expect(events[1]).toMatchObject({
-        before: { dataSensitivity: 'MEDIUM', isCommunicationService: false },
-        after: { dataSensitivity: 'HIGH', isCommunicationService: true },
+        before: { dataSensitivity: 'MEDIUM' },
+        after: { dataSensitivity: 'HIGH', functionalGroupId: communicationGroup },
       });
 
-      await patch(created.id, { functionalGroupId: null, communication: { mailbox: false } }).expect(200);
+      await patch(created.id, { dataSensitivity: null }).expect(200);
       const cleared = dataOf<ApplicationWire>(await get(created.id).expect(200));
-      expect(cleared.functionalGroup).toBeNull();
-      expect(cleared.communication.isCommunicationService).toBe(false);
+      expect(cleared.dataSensitivity).toBeNull();
     });
 
     it('answers 200 and records nothing for an update that changes nothing', async () => {
@@ -577,7 +613,6 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
         { domains: Array.from({ length: 21 }, (_, index) => `d${index}.example.com`) },
         'APPLICATION.TOO_MANY_DOMAINS',
       ],
-      ['a note over 1000 characters', { communication: { ...NO, note: 'n'.repeat(1001) } }, 'APPLICATION.NOTE_INVALID'],
     ])('refuses a declaration with %s: 422 %s and nothing stored', async (_name, extra, code) => {
       const before = await counts();
 

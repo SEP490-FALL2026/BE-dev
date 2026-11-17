@@ -6,6 +6,7 @@ import type { EmploymentType } from '../../modules/organization/public/organizat
 import {
   SUPER_ADMIN_EVENT_MODES,
   VERIFICATION_METHODS,
+  type EventBasis,
   type EventSuccessor,
   type NoticeSource,
   type ParsedSuperAdminEventArguments,
@@ -50,6 +51,12 @@ Modes (the options of a mode are the fields of the body of the write it stands f
                            the account, its roles and the login email are never changed here. What is typed is personal data: it is
                            written to the record and to the Audit Trail only, and never printed back.
 
+  --successor-employee-id / --successor-none name who follows the head of the department the person leaves. For a departure (departure-record,
+  departure-change, abrupt-departure-record) and for a transfer (transfer-record, transfer-reschedule) a head of a department MUST give
+  --successor-employee-id, a member of it who holds MANAGER: --successor-none, or none at all, is refused with PERSONNEL.SUCCESSOR_REQUIRED
+  (QĐ-110h); for a person who heads no department it is ignored. A transfer is also refused while the transfer before is not closed
+  (DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS, kind TRANSFER_SETTLING). abrupt-departure-record blocks now: its --last-working-day must be today (BLOCK_NOW_DAY_IS_TODAY otherwise).
+
   --from-notice (the four recording modes) records the event from a notice of a head (BM-09) about the person: the notice becomes RECORDED
   with the record of how it was checked, as the application writes it. --verification-method ATTACHED_DOCUMENT|EMAIL_FROM_ISSUER|
   DIRECT_CONTACT (default ATTACHED_DOCUMENT) and --verification-reference <text> (default the reference of the basis) go with it.
@@ -61,8 +68,11 @@ Required for every mode
                                person the event is about (by employee code, login email or work email).
   --environment <name>         LOCAL_TEST or SHARED (recorded in the Audit Trail).
   --subject-code <code>        The employee code of the person who holds the Super Admin role.
+  --basis <text>               The authoritative document outside the system the event rests on, in one box, as written on the document
+                               (for example "QĐ nghỉ việc số 12/2026 của Giám đốc, 20/10/2026").
   --basis-type <text> --basis-reference <text> --basis-issuer <text> --basis-issued-on <YYYY-MM-DD>
-                               The authoritative document outside the system the event rests on.
+                               The same document in four parts: the form --from-notice takes (the notice is checked against it).
+                               Give --basis or the four parts, never both; --from-notice takes only the four parts.
   --help
 
 Runs like \`pnpm ops:recover\`: the full environment of the application and the runtime database role. One transaction: the ticket, the event,
@@ -76,6 +86,7 @@ const OPTIONS = {
   operator: { type: 'string' },
   environment: { type: 'string' },
   'subject-code': { type: 'string' },
+  basis: { type: 'string' },
   'basis-type': { type: 'string' },
   'basis-reference': { type: 'string' },
   'basis-issuer': { type: 'string' },
@@ -115,6 +126,7 @@ const COMMON: readonly OptionName[] = [
   'operator',
   'environment',
   'subject-code',
+  'basis',
   'basis-type',
   'basis-reference',
   'basis-issuer',
@@ -240,13 +252,34 @@ function contextOf(values: Values): SuperAdminEventContext {
     operator: text(values, 'operator'),
     environment,
     subjectCode: text(values, 'subject-code'),
-    basis: {
+    basis: basisOf(values),
+  };
+}
+
+const BASIS_PARTS = ['basis-type', 'basis-reference', 'basis-issuer', 'basis-issued-on'] as const;
+
+/**
+ * The basis as one box (`--basis`, `QĐ-110a`, `QĐ-111bd`) or, for an event from a notice of a head, as the four parts the notice is
+ * checked against. One form only.
+ */
+function basisOf(values: Values): EventBasis {
+  if (values.basis === undefined) {
+    return {
       type: basisType(values),
       reference: text(values, 'basis-reference'),
       issuer: text(values, 'basis-issuer'),
       issuedOn: day(values, 'basis-issued-on'),
-    },
-  };
+    };
+  }
+  if (values['from-notice'] !== undefined) {
+    throw new SuperAdminEventArgumentError(
+      '--from-notice takes the basis in four parts (--basis-type, --basis-reference, --basis-issuer, --basis-issued-on), not --basis.',
+    );
+  }
+  const part = BASIS_PARTS.find((name) => values[name] !== undefined);
+  if (part) throw new SuperAdminEventArgumentError(`Give --basis or the four --basis-* parts, not both (--${part}).`);
+
+  return { note: text(values, 'basis') };
 }
 
 /** The kind of the basis is one of the closed list every personnel operation takes (`BM-04`). */

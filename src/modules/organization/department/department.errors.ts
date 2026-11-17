@@ -41,6 +41,14 @@ export class DepartmentItAdminInvalidError extends Error {
   }
 }
 
+/** The IT Admin named already answers for four departments, the most one may (`QĐ-110l`): a state of the IT Admin, so 409. */
+export class DepartmentItAdminLimitReachedError extends Error {
+  constructor(readonly limit: number) {
+    super(`An IT Admin answers for at most ${limit} departments.`);
+    this.name = 'DepartmentItAdminLimitReachedError';
+  }
+}
+
 export class DepartmentUpdateEmptyError extends Error {
   constructor() {
     super('There is nothing to change.');

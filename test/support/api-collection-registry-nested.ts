@@ -79,8 +79,7 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     owner: 'g3-subscription-purchase',
     businessMaximum: {
       maxItems: 4,
-      source:
-        'missingData in subscription.policy.ts: QUANTITY, START_DATE, BILLING_CYCLE and one of UNIT_PRICE or EXCHANGE_RATE',
+      source: 'missingData in subscription.policy.ts: QUANTITY, START_DATE, BILLING_CYCLE and UNIT_PRICE',
     },
     rationale: 'The data a subscription still lacks.',
     removeWhen: 'Review when missingData or MissingItem changes.',
@@ -91,13 +90,13 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     findings: [],
     owner: 'g3-subscription-purchase',
     businessMaximum: {
-      maxItems: 5,
+      maxItems: 2,
       source:
-        'alertDates over RENEWAL_ALERT_DAYS_BEFORE_DEADLINE, an int-list of length 1–5 in parameter-definitions.ts',
+        'alertDates in subscription.policy.ts: the point of adjustment and, for a plan by the year, the red alert',
     },
     rationale:
-      'One date per configured alert offset; whether alerts stay on list rows is LD-13 decision 3 (subscriptionList#owner-decision).',
-    removeWhen: 'Review when the parameter length limit or alertDates changes.',
+      'The point of adjustment, and the red alert of a plan by the year; whether alerts stay on list rows is LD-13 decision 3 (subscriptionList#owner-decision).',
+    removeWhen: 'Review when alertDates changes.',
   },
   {
     key: 'subscriptionList#warnings',
@@ -118,8 +117,7 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     owner: 'g3-subscription-purchase',
     businessMaximum: {
       maxItems: 4,
-      source:
-        'missingData in subscription.policy.ts: QUANTITY, START_DATE, BILLING_CYCLE and one of UNIT_PRICE or EXCHANGE_RATE',
+      source: 'missingData in subscription.policy.ts: QUANTITY, START_DATE, BILLING_CYCLE and UNIT_PRICE',
     },
     rationale: 'The data the subscription still lacks.',
     removeWhen: 'Review when missingData or MissingItem changes.',
@@ -130,12 +128,12 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     findings: [],
     owner: 'g3-subscription-purchase',
     businessMaximum: {
-      maxItems: 5,
+      maxItems: 2,
       source:
-        'alertDates over RENEWAL_ALERT_DAYS_BEFORE_DEADLINE, an int-list of length 1–5 in parameter-definitions.ts',
+        'alertDates in subscription.policy.ts: the point of adjustment and, for a plan by the year, the red alert',
     },
-    rationale: 'One date per configured alert offset.',
-    removeWhen: 'Review when the parameter length limit or alertDates changes.',
+    rationale: 'The point of adjustment, and the red alert of a plan by the year.',
+    removeWhen: 'Review when alertDates changes.',
   },
   {
     key: 'subscriptionGet#warnings',
@@ -302,20 +300,6 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
       'The fields one edit of a version changed, with their values before and after (F66, spec J.4); the history is paged.',
     removeWhen:
       'Review when a field is added to the figures or to a line of a version, or HISTORY_CHANGES_MAX changes.',
-  },
-  {
-    key: 'transferReviewGet#unfinishedRequests',
-    classification: 'bounded',
-    findings: ['LD-14'],
-    owner: 'g0-g6-final-business-baseline-remediation',
-    businessMaximum: {
-      maxItems: 20,
-      source:
-        'UNFINISHED_REQUESTS_MAX in transfer-review.dto.ts, the maxItems of the schema, and the take of unfinishedRequestsOf in transfer-review-view.service.ts: the open Requests of the person who moved, for the head to read beside the tools (F29)',
-    },
-    rationale:
-      'The open Requests of the person who was transferred, information only (F29); the Request list has the rest.',
-    removeWhen: 'Review when UNFINISHED_REQUESTS_MAX changes or the review shows the Requests as a paged subresource.',
   },
   {
     key: 'employeeGet#placements',

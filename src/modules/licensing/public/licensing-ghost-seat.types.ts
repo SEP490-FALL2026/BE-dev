@@ -30,6 +30,8 @@ export interface RuleSeat {
   /** The first assignment of the chain of the seat (`predecessor_id`): one chain is one seat for gate 8. */
   chainRootId: string;
   kind: AssignmentKind;
+  /** The seat of an IT Admin used for a machine account (`QĐ-110m`): the rules of wasted seats leave it out, as they left out a service account. */
+  isMachineAccount: boolean;
   planId: string;
   applicationId: string;
   subscriptionId: string | null;

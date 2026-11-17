@@ -143,14 +143,6 @@ describe('the commitments of 01/01 over PostgreSQL (BR-MF1-09e, FR-5.8a, QĐ-109
       [subscriptionId, period.nextFrom, period.unitPrice.toString()],
     );
   };
-  /** A rate of a currency on a day, in the reporting currency, entered once. */
-  const rateOn = async (currency: string, day: string, rate: string): Promise<void> => {
-    await h.ctx.sql.query(
-      `INSERT INTO exchange_rates (id, organization_id, currency, rate_date, rate) VALUES (gen_random_uuid(), $1, $2, $3, $4)
-       ON CONFLICT (organization_id, currency, rate_date) DO NOTHING`,
-      [h.seed.organizationId, currency, day, rate],
-    );
-  };
   const rows = async (requestId: string, year = h.next) =>
     (
       await h.ctx.sql.query<CommitmentRow>(
@@ -390,36 +382,20 @@ describe('the commitments of 01/01 over PostgreSQL (BR-MF1-09e, FR-5.8a, QĐ-109
     });
   });
 
-  describe('the reporting currency (FR-5.8(6))', () => {
-    it('FR-5.8(6): a plan priced in USD is held in the reporting currency at the rate of 01/01, the price of a month as well', async () => {
+  describe('the currency (FR-5.8(6), QĐ-111an)', () => {
+    it('QĐ-111an: a price an older release left in another currency is left out with the reason NO_PRICE, never held in its own currency and never converted', async () => {
       const subscription = await h.subscription(100);
       const id = await approved(await unit(), await h.planOf(subscription));
-      // 20 USD a month; 25 000 VND for one dollar on 01/01.
+      // 20 USD a month, even with a rate entered for 01/01 in an older release: nothing reads it.
       await h.ctx.sql.query(
         `UPDATE subscriptions SET unit_price_minor = 2000, unit_price_currency = 'USD' WHERE id = $1`,
-        [subscription],
-      );
-      await rateOn('USD', `${h.next}-01-01`, '25000');
-
-      await passOn();
-
-      expect((await rows(id)).map((row) => [row.currency, row.amount_minor, row.seat_monthly_minor])).toEqual([
-        [h.reporting, String(12n * 500_000n), String(500_000n)],
-      ]);
-    });
-
-    it('FR-5.8(6): a price that no rate converts is left out with the reason NO_RATE, never held in its own currency', async () => {
-      const subscription = await h.subscription(100);
-      const id = await approved(await unit(), await h.planOf(subscription));
-      await h.ctx.sql.query(
-        `UPDATE subscriptions SET unit_price_minor = 2000, unit_price_currency = 'AUD' WHERE id = $1`,
         [subscription],
       );
 
       await passOn();
 
       expect(await rows(id)).toEqual([]);
-      expect((await events('BUDGET_COMMITMENT.YEAR_START_SKIPPED', id))[0].after).toMatchObject({ reason: 'NO_RATE' });
+      expect((await events('BUDGET_COMMITMENT.YEAR_START_SKIPPED', id))[0].after).toMatchObject({ reason: 'NO_PRICE' });
     });
   });
 

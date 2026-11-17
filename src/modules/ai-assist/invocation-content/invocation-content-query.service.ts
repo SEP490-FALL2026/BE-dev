@@ -3,7 +3,7 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { contentReadEvent } from '../invocation/invocation-audit-event.mapper';
-import { AiInvocationContentRepo } from '../invocation/invocation-content.repo';
+import { AiInvocationHistoryStore } from '../invocation/invocation-history-store.types';
 import type { InvocationContentRecord } from '../invocation/invocation.types';
 import { InvocationContentNotFoundError } from './invocation-content.errors';
 
@@ -21,7 +21,7 @@ export type InvocationContentView = Omit<InvocationContentRecord, 'organizationI
 export class InvocationContentQueryService {
   constructor(
     private readonly runner: TransactionRunner,
-    private readonly contents: AiInvocationContentRepo,
+    private readonly contents: AiInvocationHistoryStore,
     private readonly audit: AuditApi,
   ) {}
 

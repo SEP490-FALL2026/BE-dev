@@ -12,6 +12,7 @@ const URL = `/api/v1/ai/invocations/${INVOCATION_ID}/content`;
 
 const CONTENT = {
   invocationId: INVOCATION_ID,
+  providerMode: 'MODEL',
   context: { generatedAt: '2026-11-04T09:00:00.000Z', requests: [{ sourceRef: 'R001', softwareName: 'Figma' }] },
   promptText: 'the prompt',
   rawResponse: '{"items":[]}',
@@ -87,6 +88,17 @@ describe('the content of a call of the AI (e2e, no database)', () => {
 
       expect(bodyOf(response)).toEqual({ success: true, message: 'AI.CONTENT_READ', data: CONTENT });
       expect(read).toHaveBeenCalledWith(expect.objectContaining({ appUserId: 'root-account' }), INVOCATION_ID);
+    });
+
+    it('carries the mode the call was made in, SIMULATED for one the simulation answered', async () => {
+      read.mockResolvedValueOnce({ ...CONTENT, providerMode: 'SIMULATED' });
+
+      const response = await request(server())
+        .get(URL)
+        .set('Authorization', as(['SUPER_ADMIN']))
+        .expect(200);
+
+      expect(bodyOf(response).data).toEqual({ ...CONTENT, providerMode: 'SIMULATED' });
     });
 
     it('carries the fields the table lets be empty as null, not as missing', async () => {

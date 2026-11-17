@@ -20,6 +20,7 @@ describe('judgeSeatRows: overlap and the same identifier (AC-3, AC-9, INV-02)', 
       {
         employeeId: 'e1',
         kind: 'PERSONAL',
+        isMachineAccount: false,
         normalizedAccountIdentifier: 'old@congty.vn',
         effectiveFrom: '2026-01-01',
         validUntil: null,
@@ -36,6 +37,7 @@ describe('judgeSeatRows: overlap and the same identifier (AC-3, AC-9, INV-02)', 
       {
         employeeId: 'e1',
         kind: 'PERSONAL',
+        isMachineAccount: false,
         normalizedAccountIdentifier: 'old@congty.vn',
         effectiveFrom: '2026-01-01',
         validUntil: '2026-09-01',
@@ -45,47 +47,73 @@ describe('judgeSeatRows: overlap and the same identifier (AC-3, AC-9, INV-02)', 
     expect(judgeOne({ employee_code: 'E1', account_identifier: 'e1@congty.vn' }, { existing }).outcome).toBe('VALID');
   });
 
-  it('lets one person hold a personal seat and two service accounts on the same subscription (AC-9)', () => {
-    const bot = (identifier: string) => ({
-      employee_code: 'E2',
-      account_identifier: identifier,
-      kind: 'service',
-      reason: 'CI',
-      cost_center_code: 'CC-DES',
-    });
-    const results = judgeSeatRows(
-      [
-        row(2, { employee_code: 'E2', account_identifier: 'e2@congty.vn' }),
-        row(3, bot('ci-bot')),
-        row(4, bot('release-bot')),
-      ],
-      facts(),
-    );
+  it('lets a person who already holds seats flagged as a machine account, or a service account of the earlier releases, take their own personal seat (R-9)', () => {
+    const existing: ExistingAssignment[] = [
+      {
+        employeeId: 'e2',
+        kind: 'PERSONAL',
+        isMachineAccount: true,
+        normalizedAccountIdentifier: 'ci-bot',
+        effectiveFrom: '2026-01-01',
+        validUntil: null,
+      },
+      {
+        employeeId: 'e2',
+        kind: 'SERVICE',
+        isMachineAccount: false,
+        normalizedAccountIdentifier: 'release-bot',
+        effectiveFrom: '2026-01-01',
+        validUntil: null,
+      },
+    ];
 
-    expect(results.map((result) => result.outcome)).toEqual(['VALID', 'VALID', 'VALID']);
+    expect(judgeOne({ employee_code: 'E2', account_identifier: 'e2@congty.vn' }, { existing }).outcome).toBe('VALID');
+  });
+
+  it('refuses a person who holds a personal seat that is not flagged, however many flagged seats are beside it (INV-02)', () => {
+    const existing: ExistingAssignment[] = [
+      {
+        employeeId: 'e2',
+        kind: 'PERSONAL',
+        isMachineAccount: true,
+        normalizedAccountIdentifier: 'ci-bot',
+        effectiveFrom: '2026-01-01',
+        validUntil: null,
+      },
+      {
+        employeeId: 'e2',
+        kind: 'PERSONAL',
+        isMachineAccount: false,
+        normalizedAccountIdentifier: 'e2@congty.vn',
+        effectiveFrom: '2026-01-01',
+        validUntil: null,
+      },
+    ];
+
+    expect(codesOf(judgeOne({ employee_code: 'E2', account_identifier: 'e2.alt@congty.vn' }, { existing }))).toEqual([
+      'OVERLAP',
+    ]);
   });
 
   it('refuses an identifier already used, whatever its case and spaces, in the file or in what is kept (AC-9)', () => {
-    const bot = (code: string, identifier: string) => ({
-      employee_code: code,
-      account_identifier: identifier,
-      kind: 'service',
-      reason: 'CI',
-      cost_center_code: 'CC-DES',
-    });
-    const inFile = judgeSeatRows([row(2, bot('E2', 'ci-bot')), row(3, bot('E3', ' CI-Bot '))], facts());
+    const bot = (code: string, identifier: string) => ({ employee_code: code, account_identifier: identifier });
+    const inFile = judgeSeatRows(
+      [row(2, bot('E2', 'ci-bot@congty.vn')), row(3, bot('E3', ' CI-Bot@congty.vn '))],
+      facts(),
+    );
     const kept: ExistingAssignment[] = [
       {
         employeeId: 'e9',
-        kind: 'SERVICE',
-        normalizedAccountIdentifier: 'ci-bot',
+        kind: 'PERSONAL',
+        isMachineAccount: true,
+        normalizedAccountIdentifier: 'ci-bot@congty.vn',
         effectiveFrom: '2026-01-01',
         validUntil: null,
       },
     ];
 
     expect(codesOf(inFile[1])).toEqual(['ACCOUNT_IDENTIFIER_IN_USE']);
-    expect(codesOf(judgeOne(bot('E2', 'CI-BOT'), { existing: kept }))).toEqual(['ACCOUNT_IDENTIFIER_IN_USE']);
+    expect(codesOf(judgeOne(bot('E2', 'CI-BOT@congty.vn'), { existing: kept }))).toEqual(['ACCOUNT_IDENTIFIER_IN_USE']);
   });
 
   it('lets an identifier of an assignment that has ended be used again', () => {
@@ -93,24 +121,16 @@ describe('judgeSeatRows: overlap and the same identifier (AC-3, AC-9, INV-02)', 
       {
         employeeId: 'e9',
         kind: 'SERVICE',
-        normalizedAccountIdentifier: 'ci-bot',
+        isMachineAccount: false,
+        normalizedAccountIdentifier: 'ci-bot@congty.vn',
         effectiveFrom: '2026-01-01',
         validUntil: '2026-09-01',
       },
     ];
 
-    expect(
-      judgeOne(
-        {
-          employee_code: 'E2',
-          account_identifier: 'ci-bot',
-          kind: 'service',
-          reason: 'CI',
-          cost_center_code: 'CC-DES',
-        },
-        { existing: kept },
-      ).outcome,
-    ).toBe('VALID');
+    expect(judgeOne({ employee_code: 'E2', account_identifier: 'ci-bot@congty.vn' }, { existing: kept }).outcome).toBe(
+      'VALID',
+    );
   });
 });
 
@@ -142,6 +162,7 @@ describe('judgeSeatRows: the seats bought (AC-2, AC-12, INV-01)', () => {
     const existing: ExistingAssignment[] = Array.from({ length: 8 }, (_, index) => ({
       employeeId: `x${index}`,
       kind: 'PERSONAL' as const,
+      isMachineAccount: false,
       normalizedAccountIdentifier: `x${index}@congty.vn`,
       effectiveFrom: '2026-01-01',
       validUntil: null,
@@ -159,6 +180,7 @@ describe('judgeSeatRows: the seats bought (AC-2, AC-12, INV-01)', () => {
       {
         employeeId: 'x',
         kind: 'PERSONAL',
+        isMachineAccount: false,
         normalizedAccountIdentifier: 'x@congty.vn',
         effectiveFrom: '2026-01-01',
         validUntil: '2026-09-01',
@@ -209,10 +231,10 @@ describe('judgeSeatRows: the seats bought (AC-2, AC-12, INV-01)', () => {
 
 describe('maskSecretCells (AC-9: a secret is never kept)', () => {
   it('replaces an identifier that looks like a secret and leaves the rest of the row as it is', () => {
-    expect(maskSecretCells({ employee_code: 'E2', account_identifier: 'ghp_abc123', kind: 'service' })).toEqual({
+    expect(maskSecretCells({ employee_code: 'E2', account_identifier: 'ghp_abc123', kind: 'personal' })).toEqual({
       employee_code: 'E2',
       account_identifier: '[masked]',
-      kind: 'service',
+      kind: 'personal',
     });
     expect(maskSecretCells({ employee_code: 'E2', account_identifier: 'ci-bot' })).toEqual({
       employee_code: 'E2',
@@ -221,13 +243,7 @@ describe('maskSecretCells (AC-9: a secret is never kept)', () => {
   });
 
   it('judges a stored row again as the token it replaced, so a preview with a token still confirms (AC-9)', () => {
-    const cells = {
-      employee_code: 'E2',
-      account_identifier: 'ghp_abc123',
-      kind: 'service',
-      reason: 'CI',
-      cost_center_code: 'CC-DES',
-    };
+    const cells = { employee_code: 'E2', account_identifier: 'ghp_abc123' };
     const preview = judgeOne(cells);
     const confirmed = judgeOne(maskSecretCells(cells));
 

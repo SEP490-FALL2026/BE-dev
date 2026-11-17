@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { formatAmount, parseDecimalAmount } from '../../../core/money/money';
+import { withMoneyPath } from '../../../core/money/money-path';
 import { CurrencyNotSupportedError, MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -18,7 +19,6 @@ import {
   BudgetNotFinanceError,
   BudgetCostCenterRequiredError,
   BudgetNotYourCostCenterError,
-  BudgetPlanNotFoundError,
 } from './budget.errors';
 
 export interface CostCenterRef {
@@ -113,24 +113,6 @@ export class BudgetFactsService {
     throw new BudgetNotAReaderError();
   }
 
-  /** Throws BudgetPlanNotFoundError when a line names a plan the catalog does not have: a line points at a plan, it never makes one. */
-  async requirePlans(planIds: readonly (string | null | undefined)[]): Promise<void> {
-    const wanted = [...new Set(planIds.filter((id): id is string => typeof id === 'string'))];
-    if (wanted.length === 0) return;
-    const found = new Set((await this.catalog.getPlanSummaries(wanted)).map((plan) => plan.planId));
-    const missing = wanted.filter((id) => !found.has(id));
-    if (missing.length > 0) throw new BudgetPlanNotFoundError(missing);
-  }
-
-  /** The name a line takes when only its plan is given: the plan and its application (`QĐ-101n`). */
-  async planNames(planIds: readonly (string | null | undefined)[]): Promise<Map<string, string>> {
-    const wanted = [...new Set(planIds.filter((id): id is string => typeof id === 'string'))];
-    if (wanted.length === 0) return new Map();
-    const found = await this.catalog.getPlanSummaries(wanted);
-
-    return new Map(found.map((plan) => [plan.planId, `${plan.applicationName} - ${plan.planName}`.slice(0, 200)]));
-  }
-
   /** The share of the base a new version sets aside as its reserve when Finance gives none (`QĐ-98`); read before a transaction opens. */
   async reserveDefaultPercent(): Promise<number> {
     return Number(await this.parameters.getValue('BUDGET_RESERVE_DEFAULT_PERCENT'));
@@ -138,6 +120,11 @@ export class BudgetFactsService {
 
   today(now: Date, tx?: DbTx): Promise<BusinessDate> {
     return this.organizationReads.businessToday(now, tx);
+  }
+
+  /** The days the organization does not work from `from` up to but not including `to`: what the days of a deadline are counted without. */
+  nonWorkingDates(from: BusinessDate, to: BusinessDate): Promise<Set<BusinessDate>> {
+    return this.parameters.getNonWorkingDates(from, to);
   }
 
   async organizationId(tx?: DbTx): Promise<string> {
@@ -233,7 +220,11 @@ export class BudgetFactsService {
       if (units.length === 1 && units[0].costCenter === null) return units[0];
       throw new BudgetNotYourCostCenterError();
     }
-    if (units.length > 1) throw new BudgetCostCenterRequiredError();
+    if (units.length > 1) {
+      throw new BudgetCostCenterRequiredError(
+        units.flatMap((unit) => (unit.costCenter === null ? [] : [unit.costCenter.id])),
+      );
+    }
 
     return units[0];
   }
@@ -333,42 +324,55 @@ export class BudgetFactsService {
     return new Map(found.map((center) => [center.id, center.departmentId]));
   }
 
-  /** Reads an amount in whole minor units. Throws the money errors, and BudgetCurrencyError for any currency but the reporting one. */
-  async money(input: { amount: string; currency?: string }, reporting: string, tx?: DbTx): Promise<bigint> {
+  /**
+   * Reads an amount in whole minor units. Throws the money errors, and BudgetCurrencyError for any currency but the reporting one.
+   * `path` is where the amount sits in the request body (`requestedAmount`, `base`), which the money errors carry.
+   */
+  async money(
+    input: { amount: string; currency?: string },
+    reporting: string,
+    path: string,
+    tx?: DbTx,
+  ): Promise<bigint> {
     // An amount of a budget is always in the reporting currency: whoever gives it does not name one (`QĐ-98`).
-    const parsed = await this.finance.parseMoney({ amount: input.amount, currency: input.currency ?? reporting }, tx);
+    const parsed = await this.finance.parseMoney(
+      { amount: input.amount, currency: input.currency ?? reporting },
+      path,
+      tx,
+    );
     if (parsed.currency !== reporting) throw new BudgetCurrencyError(parsed.currency, reporting);
     // A budget never holds a negative amount.
-    if (parsed.amountMinor < 0n) throw new MoneyOutOfRangeError();
+    if (parsed.amountMinor < 0n) throw new MoneyOutOfRangeError(path);
 
     return parsed.amountMinor;
   }
 
-  /** Reads an amount in the minor units of a given currency, as an invoice states it in the currency of its commitment. Throws the money errors. */
-  async moneyIn(input: { amount: string }, currency: string, tx?: DbTx): Promise<bigint> {
-    return (await this.finance.parseMoney({ amount: input.amount, currency }, tx)).amountMinor;
-  }
-
   /** `money` for a threshold: it must be more than nothing, since a threshold of nothing would flag every line. */
-  async positiveMoney(input: { amount: string; currency?: string }, reporting: string, tx?: DbTx): Promise<bigint> {
-    const minor = await this.money(input, reporting, tx);
-    if (minor <= 0n) throw new MoneyOutOfRangeError();
+  async positiveMoney(
+    input: { amount: string; currency?: string },
+    reporting: string,
+    path: string,
+    tx?: DbTx,
+  ): Promise<bigint> {
+    const minor = await this.money(input, reporting, path, tx);
+    if (minor <= 0n) throw new MoneyOutOfRangeError(path);
 
     return minor;
   }
 
   /** Reads amounts in whole minor units of one currency, the minor unit read once: a cycle keeps the currency it was opened in. */
-  async parserOf(currency: string, tx?: DbTx): Promise<(input: { amount: string }) => bigint> {
+  async parserOf(currency: string, tx?: DbTx): Promise<(input: { amount: string }, path: string) => bigint> {
     const found = await this.finance.findCurrency(currency, tx);
     if (!found) throw new CurrencyNotSupportedError(currency);
 
-    return (input) => {
-      const minor = parseDecimalAmount(input.amount, found.minorUnit);
-      // A budget never holds a negative amount.
-      if (minor < 0n) throw new MoneyOutOfRangeError();
+    return (input, path) =>
+      withMoneyPath(path, () => {
+        const minor = parseDecimalAmount(input.amount, found.minorUnit);
+        // A budget never holds a negative amount.
+        if (minor < 0n) throw new MoneyOutOfRangeError();
 
-      return minor;
-    };
+        return minor;
+      });
   }
 
   async formatter(currency: string): Promise<(minor: bigint) => MoneyView> {

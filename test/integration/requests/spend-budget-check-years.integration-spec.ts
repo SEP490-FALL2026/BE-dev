@@ -1,4 +1,3 @@
-import request from 'supertest';
 import { SpendHarness, Unit } from '../../support/spend-harness';
 
 const h = new SpendHarness();
@@ -196,22 +195,20 @@ describe('the check of the budget by year over PostgreSQL (US-06-12 AC-11 to AC-
       expect(await h.route(sent.id, u.head.account)).toMatchObject({ status: 'ROUTED', outcome: 'WITHIN_BASE' });
     });
 
-    it('is not checked in a currency with no rate for the day, and is converted when there is one', async () => {
+    it('QĐ-111an: an amount left in another currency is not checked and nothing converts it; once it is in dong it is checked as it stands', async () => {
       const u = await unit();
       await h.budgetFor(u, { total: 100 * M });
       const id = await h.paidRequest(u, plan, { amount: 100_000, currency: 'USD' }); // 1 000 USD, written in cents
 
-      expect(await h.route(id, u.head.account)).toEqual({ status: 'NOT_CHECKABLE', reason: 'RATE_MISSING' });
+      expect(await h.route(id, u.head.account)).toEqual({ status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' });
       expect(await h.state(id)).toBe('AWAITING_SPEND_SUBMISSION');
+      const kept = await h.ctx.sql.query(`SELECT 1 FROM request_budget_checks WHERE request_id = $1`, [id]);
+      expect(kept.rowCount).toBe(0);
 
-      await request(h.server())
-        .post('/api/v1/exchange-rates')
-        .set(h.as(h.finance))
-        .send({ currency: 'USD', rateDate: h.today(), rate: '25000' })
-        .expect(201);
+      await h.setPayments(id, { amount: 25 * M });
       await checked(id, u);
 
-      expect((await years(id))[0].cost.amount).toBe(String(25_000_000));
+      expect((await years(id))[0].cost.amount).toBe(String(25 * M));
     });
   });
 });

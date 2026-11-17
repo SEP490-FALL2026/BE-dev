@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { groundsSnapshot, normalizedGrounds } from '../personnel-grounds.policy';
+import { groundsNoteOfBasis, groundsSnapshot, normalizedGrounds } from '../personnel-grounds.policy';
 import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { actorColumns, type PersonnelActor } from '../public/personnel.types';
@@ -88,7 +88,12 @@ export class NoticeHandlingService {
 
       const recorder = this.recorderFor(eventKindOf(held.kind));
       // The refusals of the event come out with their own codes and undo everything, the notice included.
-      const event = await recorder.record(tx, { actor, notice: held, grounds, event: input.event });
+      const event = await recorder.record(tx, {
+        actor,
+        notice: held,
+        groundsNote: groundsNoteOfBasis(grounds) ?? '',
+        event: input.event,
+      });
       const recorded = await this.complete(tx, actor, held, event, input.verification);
       await this.audit.record(
         tx,

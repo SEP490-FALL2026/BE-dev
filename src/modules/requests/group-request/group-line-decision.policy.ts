@@ -174,3 +174,52 @@ export function groupSpendDecidedDetail(
     rejectedEmployeeIds: decided.verdicts.filter((v) => v.decision === 'REJECT').map((v) => v.employeeId),
   };
 }
+
+/** What the decider says of one person at the need step: besides going on or refusing, the group can be sent back to its sender (`US-05-04` AC-22). */
+export interface NeedLineVerdict {
+  employeeId: string;
+  decision: 'APPROVE' | 'REJECT' | 'RETURN';
+  reason?: string;
+}
+
+/** What the one checklist of the group is judged as: the decision that goes on when anybody does, a return when everybody is sent back, a refusal otherwise. */
+export function needChecklistDecisionOf(verdicts: readonly NeedLineVerdict[]): 'APPROVE' | 'REJECT' | 'RETURN' {
+  if (verdicts.some((verdict) => verdict.decision === 'APPROVE')) return 'APPROVE';
+
+  return verdicts.every((verdict) => verdict.decision === 'RETURN') ? 'RETURN' : 'REJECT';
+}
+
+/**
+ * The reason the checklist is offered as typed: the first one given, only when every person who is refused or sent back has one, so that a
+ * person with none is judged on the answers No (and the decision is not valid when there are none).
+ */
+export function typedReasonOf(verdicts: readonly NeedLineVerdict[]): string | undefined {
+  const refusing = verdicts.filter((verdict) => verdict.decision !== 'APPROVE');
+  const typed = refusing.map((verdict) => (verdict.reason ?? '').trim());
+  if (refusing.length === 0 || typed.some((reason) => reason === '')) return undefined;
+
+  return typed[0];
+}
+
+/** Each person who is refused or sent back with the reason they typed, or the one the answers No give; an approval carries none. */
+export function withReasons(verdicts: readonly NeedLineVerdict[], autoReason: string | null): NeedLineVerdict[] {
+  return verdicts.map((verdict) => {
+    if (verdict.decision === 'APPROVE') return { employeeId: verdict.employeeId, decision: verdict.decision };
+    const reason = (verdict.reason ?? '').trim() || autoReason;
+
+    return { employeeId: verdict.employeeId, decision: verdict.decision, ...(reason ? { reason } : {}) };
+  });
+}
+
+/** What the record of approval of a step sent back keeps: the reasons of its people, each once, in the order of the lines. */
+export function returnReasonOf(verdicts: readonly { reason?: string | null }[]): string {
+  return [...new Set(verdicts.map((verdict) => (verdict.reason ?? '').trim()).filter((reason) => reason !== ''))].join(
+    '; ',
+  );
+}
+
+/** The people who are refused or sent back with no reason, after the reasons of the answers No were filled in: the decision is not valid while there are any. */
+export const peopleWithoutReason = (verdicts: readonly NeedLineVerdict[]): string[] =>
+  verdicts
+    .filter((verdict) => verdict.decision !== 'APPROVE' && (verdict.reason ?? '').trim() === '')
+    .map((verdict) => verdict.employeeId);

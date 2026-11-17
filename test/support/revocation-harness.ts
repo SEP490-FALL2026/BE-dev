@@ -8,9 +8,11 @@ import type {
   RevocationContext,
   RevocationDecision,
   RevocationSource,
+  SystemActor,
   WithdrawnRevocation,
 } from '../../src/modules/licensing/public/licensing.types';
 import type { ApiAccount } from './api-accounts';
+import type { K1ChecklistCardWire } from './k1-checklist';
 import { ProvisioningHarness, type TaskWire } from './provisioning-harness';
 
 /** What a task of a revocation says of it on the wire, in a row of the list and in the detail. */
@@ -39,6 +41,8 @@ export interface RevocationBlockWire {
 export type RevocationTaskWire = Omit<TaskWire, 'requestId'> & {
   requestId: string | null;
   revocation: RevocationBlockWire | null;
+  /** The checklist of a K1 revocation (`QĐ-111az`); null on any other task. */
+  k1Checklist: K1ChecklistCardWire | null;
 };
 
 export interface OpenOptions {
@@ -47,7 +51,8 @@ export interface OpenOptions {
   /** The timing a source asks for (BR-MF5-04) and the notice to the holder (US-10-06 AC-2). */
   timing?: { dueOn?: string; notBefore?: string };
   notice?: { holder: true };
-  actor?: AuthenticatedPrincipal;
+  /** An account, or the system (a sweeper): the task is then marked as made by the system and no account made it. */
+  actor?: AuthenticatedPrincipal | SystemActor;
   now?: Date;
 }
 

@@ -5,7 +5,15 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { REMINDER_LEAD_DAYS } from '../expiry/expiry.policy';
 import type { RightFacts } from '../my-software/my-software.policy';
 import { OPEN_GRANT_TASK_STATUSES } from '../public/licensing-open-grants.types';
-import type { ItAdminLicensingFacts } from '../public/licensing-dashboard.types';
+import type { ItAdminLicensingFacts, SeatsReturnedFacts } from '../public/licensing-dashboard.types';
+
+/** What the report reads of one task of revocation, the day still an instant. */
+export interface RevocationTaskRow {
+  referenceId: string;
+  status: 'QUEUED' | 'RETRY_SCHEDULED' | 'IN_PROGRESS' | 'FAILED' | 'COMPLETED';
+  completedAt: Date | null;
+  responsibleEmployeeId: string | null;
+}
 
 /** A task that is not finished: to be done, being done, or failed and waiting for a decision. The same for a grant and a revocation. */
 const OPEN_TASK = [...OPEN_GRANT_TASK_STATUSES];
@@ -96,7 +104,90 @@ export class DashboardFactsRepo {
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
   }
+
+  /**
+   * The tasks of revocation that a departure or a transfer asked for (a reason of the task that is not withdrawn names it): the ones still to do, failed or
+   * completed. A task cancelled or closed as failed is no work of the unit any more. One statement for each hundred references, whatever the number of tasks.
+   */
+  async revocationTasksOf(
+    referenceKind: 'OFFBOARDING_CASE' | 'DEPARTMENT_TRANSFER',
+    referenceIds: readonly string[],
+  ): Promise<RevocationTaskRow[]> {
+    const rows: RevocationTaskRow[] = [];
+    for (let at = 0; at < referenceIds.length; at += REFERENCES_PER_READ) {
+      const found = await this.prisma.provisioningTaskReason.findMany({
+        where: {
+          referenceKind,
+          referenceId: { in: referenceIds.slice(at, at + REFERENCES_PER_READ) },
+          withdrawnAt: null,
+          task: { kind: 'REVOKE', status: { in: [...OPEN_TASK, 'COMPLETED'] } },
+        },
+        select: {
+          referenceId: true,
+          task: { select: { status: true, completedAt: true, defaultResponsibleEmployeeId: true } },
+        },
+        orderBy: [{ referenceId: 'asc' }, { taskId: 'asc' }],
+      });
+      for (const row of found) {
+        if (!row.referenceId) continue;
+        rows.push({
+          referenceId: row.referenceId,
+          status: row.task.status as RevocationTaskRow['status'],
+          completedAt: row.task.completedAt,
+          responsibleEmployeeId: row.task.defaultResponsibleEmployeeId,
+        });
+      }
+    }
+
+    return rows;
+  }
+
+  /**
+   * The seats of the shared pools taken back for a departure or a transfer and handed out again in a stretch of time (`[from, to)`; the days of the
+   * grants are the days `[fromDay, toDay)`): `K2` only, since a key (K4) is deactivated and a personal seat (K1) is bought for one person. With
+   * `responsibleEmployeeId` only the tasks that IT Admin is in charge of by default (the queues call them "mine"); without it the whole company.
+   */
+  async seatsReturned(input: {
+    from: Date;
+    to: Date;
+    fromDay: BusinessDate;
+    toDay: BusinessDate;
+    responsibleEmployeeId?: string | undefined;
+  }): Promise<SeatsReturnedFacts> {
+    const responsible = input.responsibleEmployeeId
+      ? { defaultResponsibleEmployeeId: input.responsibleEmployeeId }
+      : {};
+
+    return this.prisma.$transaction(
+      async (tx) => ({
+        returned: await tx.provisioningTask.count({
+          where: {
+            ...responsible,
+            kind: 'REVOKE',
+            status: 'COMPLETED',
+            completedAt: { gte: input.from, lt: input.to },
+            reasons: { some: { source: { in: [...LEAVING_SOURCES] } } },
+            assignment: { plan: { provisioningType: 'K2' } },
+          },
+        }),
+        reused: await tx.poolGrantAvoidedCost.count({
+          where: {
+            provisioningType: 'K2',
+            recordedOn: { gte: toDateColumn(input.fromDay), lt: toDateColumn(input.toDay) },
+            ...(input.responsibleEmployeeId ? { provisioningTask: responsible } : {}),
+          },
+        }),
+      }),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
 }
+
+/** How many departures or transfers one statement asks the tasks of. */
+const REFERENCES_PER_READ = 100;
+
+/** The reasons of a revocation that come from a departure or a transfer of the holder (`QĐ-110c`, `QĐ-110p`). */
+const LEAVING_SOURCES = ['DEPARTURE', 'ABRUPT_DEPARTURE', 'TRANSFER'] as const;
 
 function toFacts(row: {
   validFrom: Date;

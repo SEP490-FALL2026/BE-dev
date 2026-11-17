@@ -34,15 +34,42 @@ describe('grantAnswerFor a request of a person (US-07-01 AC-3, AC-16)', () => {
       expectedEndDate: null,
       termMonths: 6,
       termBound: true,
+      replacesAssignmentId: null,
     });
   });
 
-  it('ends no seat by term for free internal software, which costs nothing and has no term to bind (R-H1, Q-03 a1)', () => {
+  it('R-49: names the right of the person the request replaces, for the grant to end it the day it is given on the same subscription', () => {
+    expect(grantAnswerFor({ ...request('AWAITING_EXECUTION'), replacesAssignmentId: 'seat-old' })).toMatchObject({
+      status: 'GRANTABLE',
+      seat: 'PERSONAL',
+      replacesAssignmentId: 'seat-old',
+    });
+  });
+
+  it('names no right to replace for a request of a group, whatever the lines say: only a request of one person is sent in the grace', () => {
+    expect(
+      grantAnswerFor(
+        {
+          ...request('AWAITING_EXECUTION'),
+          type: 'GROUP_GRANT',
+          replacesAssignmentId: 'seat-old',
+          lines: [{ employeeId: 'e5', state: 'APPROVED', expectedEndDate: null }],
+        },
+        'e5',
+      ),
+    ).not.toHaveProperty('replacesAssignmentId');
+  });
+
+  it('QĐ-111i: free internal software (K5) takes months of use too, and its seat ends with them; with none it has no end', () => {
     expect(grantAnswerFor({ ...request('AWAITING_EXECUTION'), branch: 'INTERNAL_FREE' })).toMatchObject({
       status: 'GRANTABLE',
       seat: 'PERSONAL',
-      termBound: false,
+      termMonths: 6,
+      termBound: true,
     });
+    expect(
+      grantAnswerFor({ ...request('AWAITING_EXECUTION'), branch: 'INTERNAL_FREE', termMonths: null }),
+    ).toMatchObject({ status: 'GRANTABLE', termBound: false });
   });
 
   it('R-D01: a request with no term in months and no end date has a seat with no end, and one with an end date ends with it', () => {
@@ -111,6 +138,7 @@ describe('grantAnswerFor a request of a service account (US-05-21 AC-3)', () => 
       expectedEndDate: null,
       termMonths: 6,
       termBound: true,
+      replacesAssignmentId: null,
     });
   });
 

@@ -2,31 +2,30 @@ import { dayOffset } from '../demo-dates';
 import { as, emailOf, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoSeat } from '../fixture/demo-fixture.types';
+import { catalogAdmin } from './catalog.steps';
 
 type Result = { status: StepOutcome['status']; label: string };
 
 /** Seats are granted this many days ago unless the fixture says otherwise: past the 90-day tier of the optimization rules. */
 const DEFAULT_GRANTED_DAYS_AGO = 130;
-const HEADER = 'employee_code,account_identifier,kind,granted_on,expected_end_date,reason';
+/** The columns of the seat template: a column it does not know (the old `reason`) would come back as `ignoredColumns` on every preview. */
+const HEADER = 'employee_code,account_identifier,kind,granted_on,expected_end_date';
 
 const cell = (value: string): string => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
 
-/** One line of the seat file for a seat of the fixture. */
-function lineOf(ctx: DemoRunContext, seat: DemoSeat): string {
+/** One line of the seat file for a seat of the fixture: the import takes personal seats only (`QĐ-110m`). */
+export function lineOf(ctx: DemoRunContext, seat: DemoSeat): string {
   const grantedOn = dayOffset(ctx.today, -(seat.grantedDaysAgo ?? DEFAULT_GRANTED_DAYS_AGO));
   const end = seat.endInDays === undefined ? '' : dayOffset(ctx.today, seat.endInDays);
-  if (typeof seat.holder === 'string') {
-    return [seat.holder, emailOf(ctx, seat.holder), 'personal', grantedOn, end, ''].map(cell).join(',');
-  }
-  const { serviceAccount, responsible, reason } = seat.holder;
 
-  return [responsible, serviceAccount, 'service', grantedOn, end, reason].map(cell).join(',');
+  return [seat.holder, emailOf(ctx, seat.holder), 'personal', grantedOn, end].map(cell).join(',');
 }
 
 interface ImportPreview {
   id: string;
   previewVersion: number;
   summary: { totalRows: number; valid: number; errors: number };
+  ignoredColumns: string[];
 }
 
 /** The seats of one subscription: one file, previewed, confirmed under a key of the dataset (so a rerun writes none twice). */
@@ -34,7 +33,9 @@ async function oneSubscription(ctx: DemoRunContext, key: string): Promise<Result
   const subscription = ctx.fixture.subscriptions.find((candidate) => candidate.key === key);
   const subscriptionId = ctx.ids.subscriptions.get(key);
   if (!subscription || !subscriptionId) return { status: 'conflict', label: `${key}: thuê bao chưa có` };
-  const admin = await as(ctx, subscription.responsible);
+  // The IT Admin who writes the catalog imports every file: the one who answers for a subscription may be the IT Admin who leaves, and a
+  // rerun after his last day could not sign him in.
+  const admin = await as(ctx, catalogAdmin(ctx));
   const existing = await listAll<{ id: string }>(ctx, admin, `/license-assignments?subscriptionId=${subscriptionId}`);
   if (existing.length > 0) return { status: 'present', label: `${key}: ${existing.length} ghế nền` };
   const seats = ctx.fixture.seats.filter((seat) => seat.subscription === key);
@@ -48,6 +49,9 @@ async function oneSubscription(ctx: DemoRunContext, key: string): Promise<Result
   );
   if (preview.summary.errors > 0 || preview.summary.valid !== seats.length) {
     return { status: 'conflict', label: `${key}: bản xem trước có ${preview.summary.errors} dòng lỗi` };
+  }
+  if (preview.ignoredColumns.length > 0) {
+    return { status: 'conflict', label: `${key}: mẫu ghế bỏ qua cột ${preview.ignoredColumns.join(', ')}` };
   }
   await ctx.api.call(admin, 'POST', `/seat-baseline-imports/${preview.id}/confirm`, {
     previewVersion: preview.previewVersion,

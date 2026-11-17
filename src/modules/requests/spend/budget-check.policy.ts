@@ -1,3 +1,5 @@
+import { DONG, type Money } from '../../../core/money/money';
+
 /**
  * The check of the budget of a request (`US-06-12`, `FR-3.20`, `BR-MF1-06e..g`), as a pure judgement. It reads the figures it is given and
  * decides nothing about a person: it says which of three outcomes the request has on the one year it falls in. The check never approves or
@@ -37,6 +39,15 @@ export function wireRouteOf(
   if (route !== 'FINANCE_REVIEW') return route;
 
   return outcome === 'BLOCKED' ? 'BLOCKED' : 'SPEND_APPROVAL';
+}
+
+/**
+ * What a request costs the company (`QĐ-111an`, S-1): its amount as it stands, since every amount is in dong and nothing is converted.
+ * Null for an amount left in another currency (a price an older release recorded and no one entered again in dong): no check can judge
+ * it, so the request has no cost to check until its price is in dong.
+ */
+export function costInDong(amount: Money): Money | null {
+  return amount.currency === DONG ? amount : null;
 }
 
 /** The approved version of a Cost Center and year, with what is held and spent against it, in the reporting currency. */

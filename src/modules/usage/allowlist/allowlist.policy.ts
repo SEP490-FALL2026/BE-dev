@@ -14,6 +14,7 @@ export interface ToolMapping {
 
 export interface CollectorApplication {
   kind: 'SAAS' | 'LICENSED' | 'INTERNAL';
+  /** The application stands in the group Liên lạc (`QĐ-111e`): the catalog says so from the group, never from a question asked. */
   isCommunicationService: boolean;
   retiredAt: Date | null;
 }

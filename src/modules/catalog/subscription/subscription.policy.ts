@@ -1,4 +1,5 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
+import { isPricedInDong } from './price/subscription-price.policy';
 import {
   SubscriptionDatesInvalidError,
   SubscriptionPerpetualHasNoTermError,
@@ -61,11 +62,17 @@ export function noticeWarnings(source: NoticeSource): SubscriptionWarning[] {
   return source === 'MISSING' ? ['NO_ALERT_ANCHOR'] : [];
 }
 
-/** The alert dates: the base date minus each number of days the parameter sets, in the parameter's order. */
-export function alertDates(baseDate: BusinessDate | null, daysBefore: readonly number[]): BusinessDate[] {
-  if (baseDate === null) return [];
+/**
+ * The alert dates of a subscription are the days it needs the IT Admin (`FR-8.2`): the point of adjustment, and for a plan by the year
+ * the red alert after it. A subscription with no point of adjustment (a purchase made once, a draft, a period a later one continues,
+ * no date to count from) has none.
+ */
+export function alertDates(
+  adjustment: { point: BusinessDate; redAlertOn: BusinessDate | null } | null,
+): BusinessDate[] {
+  if (adjustment === null) return [];
 
-  return daysBefore.map((days) => addDays(baseDate, -days));
+  return adjustment.redAlertOn === null ? [adjustment.point] : [adjustment.point, adjustment.redAlertOn];
 }
 
 export interface CompletenessInput {
@@ -74,14 +81,14 @@ export interface CompletenessInput {
   quantity: number | null;
   startDate: BusinessDate | null;
   billingCycle: string | null;
+  /** The unit price is entered in dong with its snapshot (`isPricedInDong`): a price left in another currency is no price. */
   hasPrice: boolean;
-  hasSnapshot: boolean;
 }
 
 /**
  * What keeps a subscription a draft, in a fixed order. A per-seat plan and a perpetual purchase need a quantity; a
- * term subscription needs a billing cycle; any needs a start (purchase) date and a price. A price with no snapshot is
- * missing the exchange rate of its day, not the price.
+ * term subscription needs a billing cycle; any needs a start (purchase) date and a price in dong (`QĐ-111an`: no exchange rate is
+ * asked for, so none can be missing).
  */
 export function missingData(input: CompletenessInput): MissingItem[] {
   const missing: MissingItem[] = [];
@@ -91,7 +98,6 @@ export function missingData(input: CompletenessInput): MissingItem[] {
   if (input.startDate === null) missing.push('START_DATE');
   if (input.kind === 'TERM' && input.billingCycle === null) missing.push('BILLING_CYCLE');
   if (!input.hasPrice) missing.push('UNIT_PRICE');
-  else if (!input.hasSnapshot) missing.push('EXCHANGE_RATE');
 
   return missing;
 }
@@ -112,12 +118,13 @@ export interface ShapeInput {
 
 /**
  * The rules a subscription meets whatever its state, in a fixed order: a K5 plan has none; a perpetual purchase belongs
- * to licensed software and carries no term; the dates are in order. Throws the first that fails.
+ * to licensed software or to a K4 plan (the plan bought once, `B-5`) and carries no term; the dates are in order. Throws the first that fails.
  */
 export function assertSubscriptionShape(input: ShapeInput): void {
   if (input.planProvisioningType === 'K5') throw new SubscriptionPlanHasNoSubscriptionError();
   if (input.kind === 'PERPETUAL') {
-    if (input.applicationKind !== 'LICENSED') throw new SubscriptionPerpetualNeedsLicensedApplicationError();
+    if (input.applicationKind !== 'LICENSED' && input.planProvisioningType !== 'K4')
+      throw new SubscriptionPerpetualNeedsLicensedApplicationError();
     const fields = [
       input.endDate !== null ? 'endDate' : null,
       input.renewalDate !== null ? 'renewalDate' : null,
@@ -220,29 +227,35 @@ export function sameUnitPrice(
   );
 }
 
-/** Active when nothing keeps the subscription a draft (`missingData`), a draft otherwise. */
-export function subscriptionStatusOf(
+/** What keeps a state a draft (`missingData`), read from the fields of a subscription: a price that is not in dong is no price. */
+export function missingDataOf(
   plan: { pricingModel: PlanPricingModel | null },
   kind: SubscriptionKind,
   state: {
     purchasedQuantity: number | null;
     startDate: BusinessDate | null;
     billingCycle: string | null;
-    unitPrice: unknown;
+    unitPrice: { currency: string } | null;
     priceSnapshot: unknown;
   },
-): 'ACTIVE' | 'DRAFT' {
-  const missing = missingData({
+): MissingItem[] {
+  return missingData({
     kind,
     planPricingModel: plan.pricingModel,
     quantity: state.purchasedQuantity,
     startDate: state.startDate,
     billingCycle: state.billingCycle,
-    hasPrice: state.unitPrice !== null,
-    hasSnapshot: state.priceSnapshot !== null,
+    hasPrice: isPricedInDong(state),
   });
+}
 
-  return missing.length === 0 ? 'ACTIVE' : 'DRAFT';
+/** Active when nothing keeps the subscription a draft (`missingData`), a draft otherwise. */
+export function subscriptionStatusOf(
+  plan: { pricingModel: PlanPricingModel | null },
+  kind: SubscriptionKind,
+  state: Parameters<typeof missingDataOf>[2],
+): 'ACTIVE' | 'DRAFT' {
+  return missingDataOf(plan, kind, state).length === 0 ? 'ACTIVE' : 'DRAFT';
 }
 
 /** The value a declaration gives, or the one a subscription starts with when it gives none. */

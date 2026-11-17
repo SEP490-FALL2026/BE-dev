@@ -9,6 +9,7 @@ import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
 import type { FetchLike } from '../../../src/cli/seed/demo-api-client';
 import { SHARED_DEMO_V4 } from '../../../src/cli/seed/fixture/shared-demo-v4';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
+import { SeedStorage } from '../../support/flows/seed-storage';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
 import { SHARED_DEMO_V4_REQUEST_STATES } from '../../support/seed-demo-v4-states';
 
@@ -19,6 +20,8 @@ import { SHARED_DEMO_V4_REQUEST_STATES } from '../../support/seed-demo-v4-states
  * states, a rerun writes nothing twice, a run stopped half-way goes on, and a plan writes no record of the dataset.
  */
 describe('ops:seed (integration, real API and PostgreSQL)', () => {
+  // The bytes the seed puts at upload links land in the storage the application reads (BM-10, files of a version).
+  const seedStorage = new SeedStorage();
   let ctx: HttpTestApp;
   let demo: INestApplicationContext;
   let baseUrl: string;
@@ -85,7 +88,8 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
   }
 
   beforeAll(async () => {
-    ctx = await createHttpTestApp();
+    await seedStorage.start();
+    ctx = await createHttpTestApp({ providerOverrides: [seedStorage.override] });
     const install = await NestFactory.createApplicationContext(
       (await import('../../../src/modules/installation/installation.module')).InstallationModule,
       { logger: false },
@@ -105,6 +109,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
   afterAll(async () => {
     await demo?.close();
     await ctx?.close();
+    await seedStorage.stop();
   });
 
   it('refuses another organization, a wrong Super Admin password, an unknown fixture or an unreachable API, writing nothing', async () => {
@@ -169,30 +174,41 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     expect(resumed.steps.filter((step) => step.status !== 'done' && step.status !== 'present')).toEqual([]);
     expect(resumed.exitCode).toBe(0);
     expect(await requestStates()).toEqual(SHARED_DEMO_V4_REQUEST_STATES);
-    // Shared demo v4 records no invoice (no purchase-invoice route in this wave); every department with a Cost Center holds the approved
-    // budget of this year, and of next year Marketing's version waits for the spending approver and Sales' was sent back for changes.
+    // Every department with a Cost Center and a head holds the approved budget of this year (BM-10 → version → decision); of next year
+    // each department of the fixture stands at its stage (DEMO-15) and Information Technology's BM-10 waits for Finance.
     const year = new Date().getFullYear();
     const versions = await ctx.sql.query<{ code: string; year: number; state: string }>(
       `SELECT c.code, v.year, v.state::text AS state FROM budget_versions v JOIN cost_centers c ON c.id = v.cost_center_id
         ORDER BY v.year, c.code`,
     );
-    const withUnit = SHARED_DEMO_V4.departments
-      .flatMap((department) => (department.costCenter ? [department.costCenter.code] : []))
-      .sort();
+    const unitOf = (code: string) => SHARED_DEMO_V4.departments.find((d) => d.code === code)?.costCenter?.code ?? '';
+    const versionState = { APPROVED: 'APPROVED', VERSION_SENT: 'SENT', VERSION_RETURNED: 'CHANGES_REQUESTED' } as const;
     expect(versions.rows).toEqual([
-      ...withUnit.map((code) => ({ code, year, state: 'APPROVED' })),
-      { code: 'CC-MKT', year: year + 1, state: 'SENT' },
-      { code: 'CC-SAL', year: year + 1, state: 'CHANGES_REQUESTED' },
+      ...SHARED_DEMO_V4.budgets
+        .map((b) => ({ code: unitOf(b.department), year, state: 'APPROVED' }))
+        .sort((a, b) => a.code.localeCompare(b.code)),
+      ...SHARED_DEMO_V4.nextYear
+        .flatMap((n) =>
+          n.stage === 'PROPOSAL_SUBMITTED'
+            ? []
+            : [{ code: unitOf(n.department), year: year + 1, state: versionState[n.stage] }],
+        )
+        .sort((a, b) => a.code.localeCompare(b.code)),
     ]);
-    // Engineering and Information Technology proposed next year and wait for Finance, with no version made from it.
     const proposals = await ctx.sql.query<{ code: string; state: string }>(
       `SELECT c.code, p.state::text AS state FROM budget_proposals p JOIN cost_centers c ON c.id = p.cost_center_id
-        WHERE p.year = $1 AND c.code IN ('CC-ENG', 'CC-ITO') ORDER BY c.code`,
+        WHERE p.year = $1 AND p.state = 'SUBMITTED' ORDER BY c.code`,
       [year + 1],
     );
-    expect(proposals.rows).toEqual([
-      { code: 'CC-ENG', state: 'SUBMITTED' },
-      { code: 'CC-ITO', state: 'SUBMITTED' },
+    expect(proposals.rows).toEqual([{ code: 'CC-ITO', state: 'SUBMITTED' }]);
+    // The cycles of the year and the next are open, the one after a draft (`QĐ-111z`).
+    const cycles = await ctx.sql.query<{ year: number; opened: boolean }>(
+      'SELECT year, opened_at IS NOT NULL AS opened FROM budget_cycles ORDER BY year',
+    );
+    expect(cycles.rows).toEqual([
+      { year, opened: true },
+      { year: year + 1, opened: true },
+      { year: year + 2, opened: false },
     ]);
     // Heads hold MANAGER as a direct grant and the spending approver holds SPENDING_APPROVER, nothing derived (QĐ-93a).
     const grants = await ctx.sql.query<{ code: string; role: string }>(

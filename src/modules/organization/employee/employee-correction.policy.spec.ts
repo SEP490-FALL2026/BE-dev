@@ -1,4 +1,9 @@
-import { correctionOf, workEmailToCheck, type CorrectionCurrent } from './employee-correction.policy';
+import {
+  contractEndReason,
+  correctionOf,
+  workEmailToCheck,
+  type CorrectionCurrent,
+} from './employee-correction.policy';
 
 describe('employee-correction.policy (what a correction of the official fields changes and refuses, QĐ-82m, QĐ-87a, QĐ-87e)', () => {
   const current: CorrectionCurrent = {
@@ -9,6 +14,55 @@ describe('employee-correction.policy (what a correction of the official fields c
     jobTitle: null,
   };
   const facts = { today: '2026-10-30', workEmailTaken: false };
+
+  describe('the end of the contract of a person with a term (R-38, INV-07)', () => {
+    const intern: CorrectionCurrent = { ...current, employmentType: 'INTERN', contractEndDate: '2027-01-31' };
+
+    it('says why a contract end cannot be kept: staff has none, and it is never before the hire date', () => {
+      const base = { employmentType: 'INTERN' as const, hireDate: '2026-12-01', contractEndDate: '2027-01-31' };
+
+      expect(contractEndReason(base)).toBeNull();
+      expect(contractEndReason({ ...base, contractEndDate: '2026-12-01' })).toBeNull();
+      expect(contractEndReason({ ...base, contractEndDate: '2026-11-30' })).toBe('CONTRACT_END_BEFORE_HIRE');
+      expect(contractEndReason({ ...base, contractEndDate: null })).toBeNull();
+      expect(contractEndReason({ ...base, employmentType: 'STAFF' })).toBe('CONTRACT_END_NOT_APPLICABLE');
+      expect(contractEndReason({ ...base, employmentType: 'STAFF', contractEndDate: null })).toBeNull();
+    });
+
+    it('gives a person with a term the end of their contract, and notes it after the hire date', () => {
+      const result = correctionOf(
+        { ...current, employmentType: 'CONTRACTOR' },
+        { contractEndDate: '2027-02-28', hireDate: '2026-12-15' },
+        facts,
+      );
+
+      expect(Object.keys(result.changes)).toEqual(['hireDate', 'contractEndDate']);
+      expect(result.changes).toEqual({ hireDate: '2026-12-15', contractEndDate: '2027-02-28' });
+      expect(result.before).toEqual({ hireDate: '2026-12-01', contractEndDate: null });
+      expect(result.reasons).toEqual([]);
+    });
+
+    it('clears it with null, and changes nothing when it is the day already on the record', () => {
+      expect(correctionOf(intern, { contractEndDate: null }, facts).changes).toEqual({ contractEndDate: null });
+      expect(correctionOf(intern, { contractEndDate: '2027-01-31' }, facts).changes).toEqual({});
+    });
+
+    it('refuses an end for staff, a change to staff that keeps one, an end before the hire date and a hire date moved past it', () => {
+      expect(correctionOf(current, { contractEndDate: '2027-01-31' }, facts).reasons).toEqual([
+        { field: 'contractEndDate', code: 'CONTRACT_END_NOT_APPLICABLE' },
+      ]);
+      expect(correctionOf(intern, { employmentType: 'STAFF' }, facts).reasons).toEqual([
+        { field: 'contractEndDate', code: 'CONTRACT_END_NOT_APPLICABLE' },
+      ]);
+      expect(correctionOf(intern, { employmentType: 'STAFF', contractEndDate: null }, facts).reasons).toEqual([]);
+      expect(correctionOf(intern, { contractEndDate: '2026-11-30' }, facts).reasons).toEqual([
+        { field: 'contractEndDate', code: 'CONTRACT_END_BEFORE_HIRE' },
+      ]);
+      expect(correctionOf(intern, { hireDate: '2027-02-15' }, facts).reasons).toEqual([
+        { field: 'contractEndDate', code: 'CONTRACT_END_BEFORE_HIRE' },
+      ]);
+    });
+  });
 
   describe('correctionOf', () => {
     it('changes nothing when every value given is the one on the record, and keeps the email as it was typed', () => {

@@ -21,6 +21,16 @@ describe('a second live subscription of a K2 or K4 plan (integration, real Postg
     responsibleItAdminEmployeeId: h.it1.employeeId,
     ...extra,
   });
+  /** A plan bought once is a purchase made once: a perpetual subscription with no billing cycle and no commitment (the plan of a key, `B-5`). */
+  const k4Body = (planId: string) => ({
+    ownerDepartmentId: h.seed.departmentId,
+    planId,
+    kind: 'PERPETUAL',
+    unitPrice: { amount: '1000000', currency: 'VND' },
+    startDate: '2026-01-05',
+    purchasedQuantity: 5,
+    responsibleItAdminEmployeeId: h.it1.employeeId,
+  });
   const post = (payload: object) => request(h.server()).post('/api/v1/subscriptions').set(h.as(h.it1)).send(payload);
   const complete = (id: string) => request(h.server()).post(`/api/v1/subscriptions/${id}/completions`).set(h.as(h.it1));
   const get = (id: string) => request(h.server()).get(`/api/v1/subscriptions/${id}`).set(h.as(h.it1));
@@ -108,7 +118,7 @@ describe('a second live subscription of a K2 or K4 plan (integration, real Postg
       drafted = await h.plan('K2');
       draftSibling = await h.plan('K2');
       await post(body(k2)).expect(201);
-      await post(body(k4)).expect(201);
+      await post(k4Body(k4)).expect(201);
       // A draft and its duplicate made while the baseline was open: the second is only warned about then.
       draftId = idOf(await draftOf(drafted).expect(201));
       const twin = await draftOf(drafted).expect(201);
@@ -125,7 +135,7 @@ describe('a second live subscription of a K2 or K4 plan (integration, real Postg
     });
 
     it('refuses a second K4 subscription too', async () => {
-      const refused = await post(body(k4)).expect(409);
+      const refused = await post(k4Body(k4)).expect(409);
 
       expect(h.codeOf(refused)).toBe('SUBSCRIPTION.DUPLICATE_PLAN');
     });
@@ -135,6 +145,8 @@ describe('a second live subscription of a K2 or K4 plan (integration, real Postg
       // Completing is the other way in: the draft has the data now, but its twin lives.
       await h.ctx.sql.query(
         `UPDATE subscriptions SET unit_price_minor = 100, unit_price_currency = 'VND', price_recorded_on = '2026-01-05',
+                price_rate = 1, price_rate_date = '2026-01-05', price_rate_source = 'SAME_CURRENCY',
+                price_reporting_minor = 100, price_reporting_currency = 'VND',
                 billing_cycle = 'MONTHLY', start_date = '2026-01-05', commitment_term_months = 1,
                 responsible_it_admin_employee_id = $2 WHERE id = $1`,
         [draftId, h.it1.employeeId],

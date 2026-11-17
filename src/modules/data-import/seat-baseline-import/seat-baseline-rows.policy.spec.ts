@@ -2,6 +2,13 @@ import { lookupNamesOf, mapSeatColumns } from './seat-baseline-rows.policy';
 import { TODAY, codesOf, judgeOne } from '../../../../test/support/seat-baseline-facts';
 
 describe('mapSeatColumns', () => {
+  it('ignores the columns of a service account that the file may still carry: reason and cost_center_code (QĐ-110m)', () => {
+    const mapped = mapSeatColumns(['employee_code', 'account_identifier', 'kind', 'reason', 'cost_center_code']);
+
+    expect(mapped.indexOf).toEqual({ employee_code: 0, account_identifier: 1, kind: 2 });
+    expect(mapped.ignored).toEqual(['reason', 'cost_center_code']);
+  });
+
   it('finds the columns by their names however the header is cased, spaced or dashed', () => {
     const mapped = mapSeatColumns(['Employee Code', 'ACCOUNT-IDENTIFIER', 'Kind', 'Notes']);
 
@@ -67,11 +74,11 @@ describe('judgeSeatRows: the person and the account', () => {
     expect(
       lookupNamesOf([
         { cells: { employee_code: ' nv-1 ' } },
-        { cells: { employee_code: 'NV-1', cost_center_code: 'CC-1' } },
+        { cells: { employee_code: 'NV-1' } },
         { cells: { employee_code: 'Nv-2' } },
         { cells: { employee_code: '  ' } },
       ]),
-    ).toEqual({ employeeCodes: ['NV-1', 'NV-2'], costCenterCodes: ['CC-1'] });
+    ).toEqual({ employeeCodes: ['NV-1', 'NV-2'] });
   });
 
   it('asks for an account identifier, and refuses one with a space and one that looks like a secret (AC-9)', () => {
@@ -83,10 +90,7 @@ describe('judgeSeatRows: the person and the account', () => {
       codesOf(
         judgeOne({
           employee_code: 'E1',
-          kind: 'service',
           account_identifier: 'ghp_abc123',
-          reason: 'CI',
-          cost_center_code: 'CC-DES',
         }),
       ),
     ).toEqual(['ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET']);
@@ -98,6 +102,14 @@ describe('judgeSeatRows: the person and the account', () => {
     ]);
     expect(codesOf(judgeOne({ employee_code: 'E4', account_identifier: 'e4' }))).toEqual(['NOT_COMPANY_ACCOUNT']);
     expect(judgeOne({ employee_code: 'E4', account_identifier: 'e4@congty.vn' }).outcome).toBe('VALID');
+  });
+
+  it('refuses a service account: there is none any more, the seat of an IT Admin is flagged after the grant (QĐ-110m)', () => {
+    const bot = { employee_code: 'E2', account_identifier: 'ci-bot', kind: 'service', reason: 'CI pipeline' };
+
+    expect(codesOf(judgeOne(bot))).toEqual(['SERVICE_ACCOUNT_NOT_SUPPORTED']);
+    expect(codesOf(judgeOne({ ...bot, kind: ' Service ' }))).toEqual(['SERVICE_ACCOUNT_NOT_SUPPORTED']);
+    expect(judgeOne(bot).parsed).toBeUndefined();
   });
 
   it('refuses a shared account (AC-14) and a kind it does not know, and takes the kind in any case', () => {
@@ -113,48 +125,7 @@ describe('judgeSeatRows: the person and the account', () => {
   });
 });
 
-describe('judgeSeatRows: a service account (AC-7)', () => {
-  const bot = {
-    employee_code: 'E2',
-    account_identifier: 'ci-bot',
-    kind: 'service',
-    reason: 'CI pipeline',
-  };
-
-  it('is valid with a reason alone: owned by the department of the person, charged to its Unit (QĐ-86c)', () => {
-    const result = judgeOne(bot);
-
-    expect(result.outcome).toBe('VALID');
-    expect(result.parsed).toMatchObject({
-      kind: 'SERVICE',
-      employeeId: 'e2',
-      reason: 'CI pipeline',
-      costCenterId: 'cc-des',
-      owningDepartmentId: 'd-des',
-    });
-    expect(judgeOne({ ...bot, cost_center_code: 'CC-DES' }).parsed).toMatchObject({ costCenterId: 'cc-des' });
-  });
-
-  it('asks for a reason, and refuses a Cost Center that does not exist, one that is not the owning Unit, and a Company code', () => {
-    expect(codesOf(judgeOne({ ...bot, reason: '' }))).toEqual(['REASON_REQUIRED']);
-    expect(codesOf(judgeOne({ ...bot, cost_center_code: 'CC-NONE' }))).toEqual(['COST_CENTER_NOT_FOUND']);
-    expect(codesOf(judgeOne({ ...bot, cost_center_code: 'CC-CORP' }))).toEqual(['COST_CENTER_NOT_FOUND']);
-    expect(codesOf(judgeOne({ ...bot, cost_center_code: 'CC-A' }))).toEqual(['COST_CENTER_NOT_OWNING_UNIT']);
-  });
-
-  // Rewritten for BR-MF1-09 / L3-06: the pool of seats is every department's, so a service account of another department than the owner of the
-  // subscription is a valid row (it was SUBSCRIPTION_DEPARTMENT_MISMATCH); the case of the internal plan is kept.
-  it('accepts a service account on the subscription of another department (L3-06, QĐ-103d)', () => {
-    const owned = (ownerDepartmentId: string | null) => ({
-      target: { kind: 'SUBSCRIPTION' as const, purchasedQuantity: 100, ownerDepartmentId },
-    });
-
-    expect(judgeOne(bot, owned('d-fin')).outcome).toBe('VALID');
-    expect(judgeOne(bot, owned('d-des')).outcome).toBe('VALID');
-    // An internal plan has no subscription and no owner: nothing is compared.
-    expect(judgeOne(bot, owned(null)).outcome).toBe('VALID');
-  });
-
+describe('judgeSeatRows: where a personal seat is held (QĐ-103d)', () => {
   it('writes a personal seat with the department of the person, whoever owns the subscription (L3-06, QĐ-103d)', () => {
     const owned = (ownerDepartmentId: string | null) => ({
       target: { kind: 'SUBSCRIPTION' as const, purchasedQuantity: 100, ownerDepartmentId },
@@ -167,20 +138,11 @@ describe('judgeSeatRows: a service account (AC-7)', () => {
     expect(judgeOne(own, owned(null)).parsed).toMatchObject({ owningDepartmentId: 'd-des' });
   });
 
-  it('refuses a service account whose owning Unit is not in use, and one whose person is in no department', () => {
-    expect(codesOf(judgeOne({ ...bot, employee_code: 'E6' }))).toEqual(['COST_CENTER_INACTIVE']);
-    expect(codesOf(judgeOne({ ...bot, employee_code: 'E7' }))).toEqual(['OWNING_DEPARTMENT_NOT_FOUND']);
-  });
+  it('writes no reason and no Cost Center: the columns of a service account are ignored, and a personal seat names none', () => {
+    // The file still has the two columns: they are not read (`mapSeatColumns` ignores them), so the cells never carry them.
+    const parsed = judgeOne({ employee_code: 'E1', account_identifier: 'e1@congty.vn' }).parsed;
 
-  it('still asks an email identifier to be on a company domain', () => {
-    expect(codesOf(judgeOne({ ...bot, account_identifier: 'bot@gmail.com' }))).toEqual(['NOT_COMPANY_ACCOUNT']);
-    expect(judgeOne({ ...bot, account_identifier: 'bot@congty.vn' }).outcome).toBe('VALID');
-  });
-
-  it('does not take a Cost Center on a personal row: a personal seat is charged by the department of the holder', () => {
-    expect(
-      codesOf(judgeOne({ employee_code: 'E1', account_identifier: 'e1@congty.vn', cost_center_code: 'CC-DES' })),
-    ).toEqual(['COST_CENTER_NOT_ALLOWED']);
+    expect(parsed).toMatchObject({ kind: 'PERSONAL', reason: null, costCenterId: null });
   });
 });
 

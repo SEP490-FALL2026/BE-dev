@@ -61,11 +61,10 @@ describe('an internal request with no fee, straight to its grant (e2e)', () => {
     expect(waiting.items.map((item) => item.requestId)).toContain(requestId);
   });
 
-  it('the IT Admin grants it, takes the task and completes it with evidence: the seat exists and the request is completed', async () => {
+  it('the IT Admin grants it, which takes the task for them, and completes it with evidence: the seat exists and the request is completed', async () => {
     task = h.dataOf<{ task: TaskWire }>(await h.grant({ requestId }).expect(201)).task;
-    expect(task).toMatchObject({ kind: 'GRANT', status: 'QUEUED', subscriptionId: null });
+    expect(task).toMatchObject({ kind: 'GRANT', status: 'IN_PROGRESS', subscriptionId: null });
 
-    await h.claim(task.id).expect(200);
     await h.complete(task.id, { evidence: 'Added to the portal by IT1' }).expect(200);
 
     expect((await requestOf(requestId)).state).toBe('COMPLETED');

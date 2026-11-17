@@ -20,12 +20,7 @@ describe('MF-2 nghỉ việc có ngày cuối @MF2 @D1', () => {
   let leftBefore: number;
 
   const call = () => world.calls;
-  const grounds = () => ({
-    type: 'HR_DECISION',
-    reference: 'QĐ-NV-2026-01',
-    issuer: 'Phòng Nhân sự',
-    issuedOn: call().today(),
-  });
+  const groundsNote = 'Quyết định nghỉ việc QĐ-NV-2026-01 của Phòng Nhân sự';
   const login = async (code: string) =>
     call().anonymous('post', '/auth/login', { email: world.actors.emailOf(code), password: FLOW_DEMO_PASSWORD });
   const caseOf = async () =>
@@ -56,21 +51,21 @@ describe('MF-2 nghỉ việc có ngày cuối @MF2 @D1', () => {
         employeeId: dev2,
         lastWorkingDay: lastDay,
         accessBlockMode: 'WITH_LAST_DAY',
-        grounds: grounds(),
+        groundsNote,
         successor: { kind: 'NONE' },
       });
       expect(recorded.status).toBe(201);
       const id = call().data<{ id: string }>(recorded).id;
       expect(await world.facts.count('employee_access_blocks', 'employee_id = $1', [dev2])).toBe(1);
 
-      const noReason = await call().post('NV-SA', `/offboarding-cases/${id}/cancellation`, { grounds: grounds() });
+      const noReason = await call().post('NV-SA', `/offboarding-cases/${id}/cancellation`, { groundsNote });
       expect(noReason.status).toBe(422);
       expect(call().codeOf(noReason)).toBe('VALIDATION_ERROR');
       expect(await world.facts.count('employee_access_blocks', 'employee_id = $1', [dev2])).toBe(1);
 
       const cancelled = await call().post('NV-SA', `/offboarding-cases/${id}/cancellation`, {
         reason: 'Người lao động rút đơn xin nghỉ',
-        grounds: grounds(),
+        groundsNote,
       });
       expect(cancelled.status).toBe(200);
       expect(call().data<{ state: string }>(cancelled).state).toBe('CANCELLED');
@@ -79,7 +74,7 @@ describe('MF-2 nghỉ việc có ngày cuối @MF2 @D1', () => {
       // A cancelled handover cannot be cancelled again.
       const again = await call().post('NV-SA', `/offboarding-cases/${id}/cancellation`, {
         reason: 'x',
-        grounds: grounds(),
+        groundsNote,
       });
       expect(again.status).toBe(409);
     });
@@ -92,7 +87,7 @@ describe('MF-2 nghỉ việc có ngày cuối @MF2 @D1', () => {
         employeeId: dev2,
         lastWorkingDay: lastDay,
         accessBlockMode: 'WITH_LAST_DAY',
-        grounds: grounds(),
+        groundsNote,
       };
       const before = await world.facts.count('offboarding_cases');
 
@@ -112,11 +107,11 @@ describe('MF-2 nghỉ việc có ngày cuối @MF2 @D1', () => {
     it('thiếu căn cứ, ngày cuối hoặc chế độ chặn ⟹ 422; field cũ abrupt ⟹ 422; không ghi gì #3 #24 @B0', async () => {
       const dev3 = await world.facts.employeeId('NV-DEV3');
       const before = await world.facts.count('offboarding_cases');
-      const full = { employeeId: dev3, lastWorkingDay: lastDay, accessBlockMode: 'WITH_LAST_DAY', grounds: grounds() };
+      const full = { employeeId: dev3, lastWorkingDay: lastDay, accessBlockMode: 'WITH_LAST_DAY', groundsNote };
 
       const bodies: Record<string, unknown>[] = [
         { employeeId: dev3, lastWorkingDay: lastDay, accessBlockMode: 'WITH_LAST_DAY' },
-        { ...full, grounds: { type: 'HR_DECISION', reference: 'QĐ-1' } },
+        { ...full, groundsNote: undefined, grounds: { type: 'HR_DECISION', reference: 'QĐ-1' } },
         { ...full, accessBlockMode: undefined },
         { ...full, lastWorkingDay: undefined },
         { ...full, abrupt: true },
@@ -137,7 +132,7 @@ describe('MF-2 nghỉ việc có ngày cuối @MF2 @D1', () => {
         employeeId: dev1,
         lastWorkingDay: lastDay,
         accessBlockMode: 'WITH_LAST_DAY',
-        grounds: grounds(),
+        groundsNote,
         successor: { kind: 'NONE' },
       });
 

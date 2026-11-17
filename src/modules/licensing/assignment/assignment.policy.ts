@@ -1,14 +1,11 @@
-import type { BusinessDate } from '../../../core/business-date';
-import type { EmployeeWorkState } from '../../organization/public/organization.types';
-import {
-  AssignmentEffectiveDateInvalidError,
-  AssignmentExpectedEndRequiredError,
-  AssignmentNotOpenError,
-  AssignmentNotServiceAccountError,
-  AssignmentResponsibleInvalidError,
-} from '../public/licensing.errors';
-import type { AssignmentDateBasis, AssignmentRecord, AssignmentView } from '../public/licensing.types';
-import { AssignmentResponsibleAfterDeadlineError } from './service-account.errors';
+import { addDays, type BusinessDate } from '../../../core/business-date';
+import type {
+  AssignmentDateBasis,
+  AssignmentRecord,
+  AssignmentRevocation,
+  AssignmentView,
+  ProvisioningTaskStatus,
+} from '../public/licensing.types';
 
 /** What the audit event of a new assignment says of it; the account identifier and the purpose are never written to the trail. */
 export const assignmentCreatedSnapshot = (record: AssignmentRecord, importId: string | null) => ({
@@ -45,46 +42,15 @@ export function toAssignmentView(record: AssignmentRecord): AssignmentView {
   };
 }
 
-const TIME_LIMITED = new Set(['CONTRACTOR', 'FREELANCER', 'INTERN']);
-
 /**
- * The rules of passing a service account to another responsible person (`AC-10`, `QĐ-43a`), in a fixed order: it is a
- * service account and still open; the day it takes effect is after the day the account began and not in the past, and no later
- * than the day the file of the current person takes effect while that day has not come (`US-03-01` AC-9: a file that is past its
- * day or gone binds nothing); the person is found, still working and not handing over, not the one already responsible and in the
- * department that owns the account (`US-03-08` AC-7); the expected end date, which time-limited staff must have (`INV-07`), is not
- * before the day the change takes effect. Throws the matching error from `licensing.errors` and `service-account.errors`.
+ * The revocation a seat has from the task that is open for it (`QĐ-111p`): the task and its state, and whether it may be taken today, which is the
+ * reading the task itself gives (`claimableNow`): only a reason that asks for a day not before, still ahead, holds it back.
  */
-export function assertResponsibleChange(
-  current: AssignmentRecord,
-  change: { employeeId: string; effectiveFrom: BusinessDate; expectedEndDate: BusinessDate | null },
-  holder: { status: string; workState: EmployeeWorkState; employmentType: string; departmentId: string | null } | null,
+export function revocationOf(
+  task: { id: string; status: ProvisioningTaskStatus; notBefore: BusinessDate | null },
   today: BusinessDate,
-  deadline: BusinessDate | null = null,
-): void {
-  if (current.kind !== 'SERVICE') throw new AssignmentNotServiceAccountError();
-  if (current.validUntil !== null) throw new AssignmentNotOpenError();
-  if (change.effectiveFrom <= current.effectiveFrom) throw new AssignmentEffectiveDateInvalidError('NOT_AFTER_START');
-  if (change.effectiveFrom < today) throw new AssignmentEffectiveDateInvalidError('IN_THE_PAST');
-  if (deadline !== null && deadline >= today && change.effectiveFrom > deadline) {
-    throw new AssignmentResponsibleAfterDeadlineError(deadline);
-  }
-
-  if (!holder) throw new AssignmentResponsibleInvalidError('NOT_FOUND');
-  if (holder.status !== 'ACTIVE') throw new AssignmentResponsibleInvalidError('NOT_ACTIVE');
-  if (holder.workState === 'HANDING_OVER') throw new AssignmentResponsibleInvalidError('HANDING_OVER');
-  if (change.employeeId === current.employeeId) throw new AssignmentResponsibleInvalidError('SAME_PERSON');
-  // A service account stays in the department that owns it (`QĐ-86c`): the person responsible is chosen among the people of that department.
-  if (holder.departmentId !== current.owningDepartmentId) {
-    throw new AssignmentResponsibleInvalidError('OUTSIDE_OWNING_DEPARTMENT');
-  }
-
-  if (change.expectedEndDate !== null && change.expectedEndDate < change.effectiveFrom) {
-    throw new AssignmentEffectiveDateInvalidError('EXPECTED_END_BEFORE_START');
-  }
-  if (TIME_LIMITED.has(holder.employmentType) && change.expectedEndDate === null) {
-    throw new AssignmentExpectedEndRequiredError();
-  }
+): AssignmentRevocation {
+  return { taskId: task.id, status: task.status, claimableNow: task.notBefore === null || task.notBefore <= today };
 }
 
 /** The day a first assignment could be used from its `valid_from` and its grant tasks that were not dropped; null while one is still open. */
@@ -100,4 +66,105 @@ export function usableDayOf(
     .at(-1);
 
   return done !== undefined && done > validFrom ? done : validFrom;
+}
+
+/**
+ * Whether the grant of a request ends the right the request replaces the day it is given (R-49, `QĐ-110q`, SPEC MF3-C.4): a person in the grace of a transfer
+ * asked again for software they hold, and the grant lands on the same seat target (the same subscription, or the same plan when it has none), where the
+ * database would refuse two personal rights of one person at once (`INV-02`). The old right is the person's own personal seat, still open, begun before
+ * the day of the grant (it would otherwise end the day it begins), not used for a machine account, and nobody is taking it away already. A grant on
+ * another subscription ends nothing: the grace does, as it does for every other right.
+ */
+export function replacedByGrant(
+  old: Pick<
+    AssignmentRecord,
+    | 'kind'
+    | 'employeeId'
+    | 'planId'
+    | 'subscriptionId'
+    | 'effectiveFrom'
+    | 'validUntil'
+    | 'failedAt'
+    | 'cancelledAt'
+    | 'isMachineAccount'
+  >,
+  grant: {
+    employeeId: string;
+    target: { planId: string; subscriptionId: string | null };
+    today: BusinessDate;
+    revocationUnderWay: boolean;
+  },
+): boolean {
+  const open = old.validUntil === null && old.failedAt === null && old.cancelledAt === null;
+
+  return (
+    old.kind === 'PERSONAL' &&
+    !old.isMachineAccount &&
+    old.employeeId === grant.employeeId &&
+    open &&
+    old.effectiveFrom < grant.today &&
+    !grant.revocationUnderWay &&
+    (old.subscriptionId ?? old.planId) === (grant.target.subscriptionId ?? grant.target.planId)
+  );
+}
+
+/** What the rule of carrying a seat into a next period reads of it: the days it begins, ends and is expected to end. */
+export interface CarriableSeat {
+  validFrom: BusinessDate;
+  validUntil: BusinessDate | null;
+  expectedEndDate: BusinessDate | null;
+}
+
+/**
+ * The seats that go on into the new period (`QĐ-35c`): those held on its first day — begun before it, not ended by it, and not
+ * expected to end before it. A seat that ends before the new period stays where it is and is never carried. The one rule for the
+ * seats held when a renewal is recorded and for a seat granted after it was.
+ */
+export function seatsToCarry<T extends CarriableSeat>(seats: readonly T[], startDate: BusinessDate): T[] {
+  return seats.filter(
+    (seat) =>
+      seat.validFrom < startDate &&
+      (seat.validUntil === null || seat.validUntil > startDate) &&
+      (seat.expectedEndDate === null || seat.expectedEndDate >= startDate),
+  );
+}
+
+/** The days a seat holds, as the rule of its last day reads them. */
+export interface SeatDays {
+  validUntil: BusinessDate | null;
+  expectedEndDate: BusinessDate | null;
+}
+
+/** The last day of a seat: the earlier of the day before its right ends and its expected end; null when it does not end. */
+export function lastDayOf(seat: SeatDays): BusinessDate | null {
+  const days = [seat.validUntil === null ? null : addDays(seat.validUntil, -1), seat.expectedEndDate].filter(
+    (day) => day !== null,
+  );
+
+  return days.length === 0 ? null : days.reduce((first, day) => (day < first ? day : first));
+}
+
+/**
+ * The seats that go on into the new period of a renewal recorded at the point of adjustment (`QĐ-106i`(2), R2-2): the seat whose last day
+ * is the renewal day or before stays on the old period to its last day, since the count of the seats needed (`SBF-20` §4.3) leaves it out.
+ */
+export function carriedPast<T extends SeatDays>(seats: readonly T[], endingBy: BusinessDate): T[] {
+  return seats.filter((seat) => {
+    const last = lastDayOf(seat);
+
+    return last === null || last > endingBy;
+  });
+}
+
+/**
+ * The first day of the next period a seat granted today goes on into: the period recorded ahead of its start that continues the
+ * one the seat is on, when it is active (a draft takes no seat). Null when there is none, it has begun, or it is not yet a pool.
+ */
+export function nextPeriodStart(
+  next: { status: 'DRAFT' | 'ACTIVE'; startDate: BusinessDate | null } | undefined,
+  today: BusinessDate,
+): BusinessDate | null {
+  if (!next || next.status !== 'ACTIVE' || next.startDate === null) return null;
+
+  return next.startDate > today ? next.startDate : null;
 }

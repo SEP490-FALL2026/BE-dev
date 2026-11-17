@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Page } from '../../../core/application/pagination';
 import { formatAmount } from '../../../core/money/money';
+import { withFlatMoneyField, withMoneyPath } from '../../../core/money/money-path';
 import { CurrencyNotSupportedError } from '../../../core/money/money.errors';
 import { formatRatePercent } from '../../../core/money/tax-estimate';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -74,11 +75,15 @@ export class VendorTaxService {
    */
   async estimate(vendorId: string, input: { netAmount: string; currency: string }): Promise<TaxEstimateView> {
     await this.vendors.require(vendorId);
-    const money = await this.finance.parseMoney({ amount: input.netAmount, currency: input.currency });
+    // `netAmount` is a flat field of the query, not a money object: a malformed text points at `netAmount`, not `netAmount.amount`.
+    const money = await withFlatMoneyField(() =>
+      this.finance.parseMoney({ amount: input.netAmount, currency: input.currency }, 'netAmount'),
+    );
     const currency = await this.finance.findCurrency(money.currency);
     if (!currency) throw new CurrencyNotSupportedError(money.currency);
 
-    const estimate = await this.finance.estimateTax(vendorId, money.amountMinor);
+    // A negative price is refused by the estimate itself: it is the same field of the query.
+    const estimate = await withMoneyPath('netAmount', () => this.finance.estimateTax(vendorId, money.amountMinor));
     const show = (minor: bigint): string => formatAmount(minor, currency.minorUnit);
     const payer: TaxPayer = estimate.group === 'T2' ? 'BUYER_REMITS' : 'VENDOR_COLLECTS';
 

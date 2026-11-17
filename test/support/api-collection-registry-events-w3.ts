@@ -1,6 +1,18 @@
 import type { RegistryEvent } from './api-collection-registry';
+import { CO1_REGISTRY_EVENTS } from './api-collection-registry-events-co1';
+import { PL1_REGISTRY_EVENTS } from './api-collection-registry-events-pl1';
 import { G9_REGISTRY_EVENTS } from './api-collection-registry-events-g9';
+import { IA1_REGISTRY_EVENTS } from './api-collection-registry-events-ia1';
+import { K1CL_REGISTRY_EVENTS } from './api-collection-registry-events-k1cl';
+import { MF3B_REGISTRY_EVENTS } from './api-collection-registry-events-mf3b';
+import { RD_REGISTRY_EVENTS } from './api-collection-registry-events-rd';
+import { PI1_REGISTRY_EVENTS } from './api-collection-registry-events-pi1';
+import { RC1_REGISTRY_EVENTS } from './api-collection-registry-events-rc1';
+import { RC2_REGISTRY_EVENTS } from './api-collection-registry-events-rc2';
+import { SM1_REGISTRY_EVENTS } from './api-collection-registry-events-sm1';
+import { US1_REGISTRY_EVENTS } from './api-collection-registry-events-us1';
 import { W6_REGISTRY_EVENTS } from './api-collection-registry-events-w6';
+import { XIT_REGISTRY_EVENTS } from './api-collection-registry-events-xit';
 
 /** The events of the nested-array registry written by the package 3 (MF1-B) of `mf1-mf4-reaudit`. */
 const W3_OWN_EVENTS: readonly RegistryEvent[] = [
@@ -29,4 +41,16 @@ export const W3_REGISTRY_EVENTS: readonly RegistryEvent[] = [
   ...W3_OWN_EVENTS,
   ...G9_REGISTRY_EVENTS,
   ...W6_REGISTRY_EVENTS,
+  ...K1CL_REGISTRY_EVENTS,
+  ...MF3B_REGISTRY_EVENTS,
+  ...XIT_REGISTRY_EVENTS,
+  ...RD_REGISTRY_EVENTS,
+  ...IA1_REGISTRY_EVENTS,
+  ...CO1_REGISTRY_EVENTS,
+  ...PL1_REGISTRY_EVENTS,
+  ...US1_REGISTRY_EVENTS,
+  ...PI1_REGISTRY_EVENTS,
+  ...RC1_REGISTRY_EVENTS,
+  ...RC2_REGISTRY_EVENTS,
+  ...SM1_REGISTRY_EVENTS,
 ];

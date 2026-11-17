@@ -287,7 +287,8 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       const head = await person();
       await h.makeHead(department, head);
       const member = await person(['EMPLOYEE']);
-      const sent = await h.sent(member, await h.plan('K5'));
+      // A paid request: free internal software does not stay with a head who leaves, it goes to the IT Admin (QĐ-111bc).
+      const sent = await h.sent(member, await h.planOf(await h.subscription(10)));
       const token = head.account.accessToken;
       // The head holds MANAGER as a grant (the fixture gives it before naming the head) and heads this department today.
       expect(await meOf(token)).toMatchObject({

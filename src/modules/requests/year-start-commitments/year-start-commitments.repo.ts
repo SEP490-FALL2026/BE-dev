@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
+import { DONG } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { BillingCycleCode } from '../access-request/access-request.types';
 import { YEAR_START_REQUEST_STATES } from './year-start-commitments.policy';
 
 /** A request the pass may commit for, as it stands now (its row is locked until the transaction ends). */
@@ -13,6 +15,24 @@ export interface YearStartCandidate {
   departmentId: string;
   /** The day the right the request is for ends, when it names one (a single request; a group names it for each person). */
   expectedEndDate: BusinessDate | null;
+  /** The months of use the request asked for (`QĐ-111i`); null for a right with no end, a purchase, or a request of an older release. */
+  termMonths: number | null;
+  /** The year the approval worked the amount out for, and what it kept of the year after (`QĐ-111k`): null when it kept nothing. */
+  budgetYear: number | null;
+  nextYearAmountMinor: bigint | null;
+  /** The currency the approval worked its amounts out in: a request approved before the prices were all in dong may still have another (`QĐ-111an`). */
+  amountCurrency: string | null;
+  /** The price of a seat per billing period the approval worked out at, in that currency (`unit_price_minor`, `billing_cycle` of the request). */
+  unitPriceMinor: bigint | null;
+  billingCycle: BillingCycleCode | null;
+}
+
+/** A number the approval of a person of a group kept of a year in a currency other than dong. */
+export interface ForeignKeptLine {
+  requestId: string;
+  employeeId: string;
+  currency: string;
+  amountMinor: bigint;
 }
 
 interface CandidateRow {
@@ -22,6 +42,12 @@ interface CandidateRow {
   plan_id: string;
   department_id: string;
   expected_end_date: Date | null;
+  term_months: number | null;
+  budget_year: number | null;
+  next_year_amount_minor: bigint | null;
+  amount_currency: string | null;
+  unit_price_minor: bigint | null;
+  billing_cycle: BillingCycleCode | null;
 }
 
 /**
@@ -141,15 +167,31 @@ export class YearStartCommitmentsRepo {
    * refused, withdrawn, failed nor cancelled — with their rows locked. Which of them are paid, of which kind of provisioning and with what seats
    * is for the caller to judge.
    */
-  async lockBatch(
+  lockBatch(tx: DbTx, organizationId: string, afterId: string | null, limit: number): Promise<YearStartCandidate[]> {
+    return this.batchAfter(tx, organizationId, afterId, limit, Prisma.sql`FOR UPDATE OF r`);
+  }
+
+  /**
+   * The same requests as `lockBatch`, read as they stand and locked by nobody: for the caller that only works out what the pass would commit
+   * (`QĐ-111ac`, what a Cost Center carries into the year) and writes nothing, so it neither waits for a request that is being decided nor
+   * keeps one from being decided.
+   */
+  readBatch(tx: DbTx, organizationId: string, afterId: string | null, limit: number): Promise<YearStartCandidate[]> {
+    return this.batchAfter(tx, organizationId, afterId, limit, Prisma.empty);
+  }
+
+  private async batchAfter(
     tx: DbTx,
     organizationId: string,
     afterId: string | null,
     limit: number,
+    lock: Prisma.Sql,
   ): Promise<YearStartCandidate[]> {
     const after = afterId === null ? Prisma.empty : Prisma.sql`AND r."id" > ${afterId}::uuid`;
     const rows = await tx.$queryRaw<CandidateRow[]>`
-      SELECT r."id", r."type"::text AS "type", r."state"::text AS "state", r."plan_id", r."department_id", r."expected_end_date"
+      SELECT r."id", r."type"::text AS "type", r."state"::text AS "state", r."plan_id", r."department_id", r."expected_end_date",
+             r."term_months", r."budget_year", r."next_year_amount_minor", r."amount_currency", r."unit_price_minor",
+             r."billing_cycle"::text AS "billing_cycle"
         FROM "access_requests" r
        WHERE r."organization_id" = ${organizationId}::uuid
          AND r."type" IN ('GRANT', 'SERVICE_ACCOUNT', 'GROUP_GRANT', 'RENEWAL')
@@ -158,7 +200,7 @@ export class YearStartCommitmentsRepo {
          AND r."plan_id" IS NOT NULL ${after}
        ORDER BY r."id"
        LIMIT ${limit}
-         FOR UPDATE OF r`;
+       ${lock}`;
 
     return rows.map((row) => ({
       id: row.id,
@@ -167,6 +209,12 @@ export class YearStartCommitmentsRepo {
       planId: row.plan_id,
       departmentId: row.department_id,
       expectedEndDate: row.expected_end_date ? fromDateColumn(row.expected_end_date) : null,
+      termMonths: row.term_months,
+      budgetYear: row.budget_year,
+      nextYearAmountMinor: row.next_year_amount_minor,
+      amountCurrency: row.amount_currency,
+      unitPriceMinor: row.unit_price_minor,
+      billingCycle: row.billing_cycle,
     }));
   }
 
@@ -180,15 +228,15 @@ export class YearStartCommitmentsRepo {
   async unclaimedSeats(
     tx: DbTx,
     candidates: readonly YearStartCandidate[],
-  ): Promise<Map<string, { expectedEndDate: BusinessDate | null }[]>> {
-    const seats = new Map<string, { expectedEndDate: BusinessDate | null }[]>();
-    const add = (requestId: string, expectedEndDate: BusinessDate | null): void => {
-      seats.set(requestId, [...(seats.get(requestId) ?? []), { expectedEndDate }]);
+  ): Promise<Map<string, { expectedEndDate: BusinessDate | null; employeeId: string | null }[]>> {
+    const seats = new Map<string, { expectedEndDate: BusinessDate | null; employeeId: string | null }[]>();
+    const add = (requestId: string, expectedEndDate: BusinessDate | null, employeeId: string | null): void => {
+      seats.set(requestId, [...(seats.get(requestId) ?? []), { expectedEndDate, employeeId }]);
     };
     for (const candidate of candidates) {
       const single = candidate.type === 'GRANT' || candidate.type === 'SERVICE_ACCOUNT' || candidate.type === 'RENEWAL';
       if (single && candidate.state === 'AWAITING_EXECUTION') {
-        add(candidate.id, candidate.expectedEndDate);
+        add(candidate.id, candidate.expectedEndDate, null);
       }
     }
     const groupIds = candidates
@@ -197,13 +245,55 @@ export class YearStartCommitmentsRepo {
     if (groupIds.length > 0) {
       const lines = await tx.accessRequestLine.findMany({
         where: { requestId: { in: groupIds }, state: 'APPROVED' },
-        select: { requestId: true, expectedEndDate: true },
+        select: { requestId: true, employeeId: true, expectedEndDate: true },
         orderBy: [{ requestId: 'asc' }, { employeeId: 'asc' }],
       });
-      for (const line of lines) add(line.requestId, line.expectedEndDate ? fromDateColumn(line.expectedEndDate) : null);
+      for (const line of lines) {
+        add(line.requestId, line.expectedEndDate ? fromDateColumn(line.expectedEndDate) : null, line.employeeId);
+      }
     }
 
     return seats;
+  }
+
+  /**
+   * What the approval kept of the year `year` for each person of these requests for a group (`QĐ-111k`, M-13): the rows of
+   * `access_request_line_amounts` that no commitment holds, by request and person, in dong only (`QĐ-111an`: a number kept in another currency is
+   * never read as dong, see `foreignKeptNextYearOfLines`). A person who has none kept nothing.
+   */
+  async keptNextYearOfLines(
+    tx: DbTx,
+    requestIds: readonly string[],
+    year: number,
+  ): Promise<Map<string, Map<string, bigint>>> {
+    const kept = new Map<string, Map<string, bigint>>();
+    if (requestIds.length === 0) return kept;
+    const rows = await tx.accessRequestLineAmount.findMany({
+      where: { requestId: { in: [...requestIds] }, budgetYear: year, held: false, currency: DONG },
+      select: { requestId: true, employeeId: true, amountMinor: true },
+      orderBy: [{ requestId: 'asc' }, { employeeId: 'asc' }],
+    });
+    for (const row of rows) {
+      const ofRequest = kept.get(row.requestId) ?? new Map<string, bigint>();
+      ofRequest.set(row.employeeId, row.amountMinor);
+      kept.set(row.requestId, ofRequest);
+    }
+
+    return kept;
+  }
+
+  /**
+   * The numbers the approval kept of the year `year` for the people of these requests for a group in a currency other than dong (a request approved
+   * before the prices were all in dong): the pass does not read them, and says which it left (`BUDGET_COMMITMENT.YEAR_START_SAVED_AMOUNT_IGNORED`).
+   */
+  async foreignKeptNextYearOfLines(tx: DbTx, requestIds: readonly string[], year: number): Promise<ForeignKeptLine[]> {
+    if (requestIds.length === 0) return [];
+
+    return tx.accessRequestLineAmount.findMany({
+      where: { requestId: { in: [...requestIds] }, budgetYear: year, held: false, currency: { not: DONG } },
+      select: { requestId: true, employeeId: true, amountMinor: true, currency: true },
+      orderBy: [{ requestId: 'asc' }, { employeeId: 'asc' }],
+    });
   }
 
   /** The record that follows the renewed one, for each of these renewals that was applied: the seat the renewal stands for. */

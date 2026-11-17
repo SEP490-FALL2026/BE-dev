@@ -22,12 +22,7 @@ describe('MF-2 chặn ngay với ngày cuối ở tương lai @MF2 @D1', () => {
   let leftBefore: number;
 
   const call = () => world.calls;
-  const grounds = () => ({
-    type: 'WRITTEN_DIRECTIVE',
-    reference: 'CT-2026-17',
-    issuer: 'Ban Giám đốc',
-    issuedOn: call().today(),
-  });
+  const groundsNote = 'Chỉ thị CT-2026-17 của Ban Giám đốc';
   const login = async (code: string) =>
     call().anonymous('post', '/auth/login', { email: world.actors.emailOf(code), password: FLOW_DEMO_PASSWORD });
 
@@ -52,7 +47,7 @@ describe('MF-2 chặn ngay với ngày cuối ở tương lai @MF2 @D1', () => {
         employeeId: dev1,
         lastWorkingDay: lastDay,
         accessBlockMode: 'BLOCK_NOW',
-        grounds: grounds(),
+        groundsNote,
         successor: { kind: 'NONE' },
       });
 
@@ -86,7 +81,7 @@ describe('MF-2 chặn ngay với ngày cuối ở tương lai @MF2 @D1', () => {
         lastWorkingDay: lastDay,
         accessBlockMode: 'BLOCK_NOW',
         abrupt: true,
-        grounds: grounds(),
+        groundsNote,
       });
 
       expect(response.status).toBe(422);
@@ -144,7 +139,7 @@ describe('MF-2 chặn ngay với ngày cuối ở tương lai @MF2 @D1', () => {
         employeeId: nobody,
         lastWorkingDay: lastDay,
         accessBlockMode: 'BLOCK_NOW',
-        grounds: grounds(),
+        groundsNote,
       });
       const id = call().data<{ id: string }>(recorded).id;
       const tasks = await world.facts.count('provisioning_tasks', "kind = 'REVOKE'");

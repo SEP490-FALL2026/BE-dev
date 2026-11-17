@@ -7,7 +7,13 @@ import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { SubscriptionGrantingRepo } from './subscription-granting.repo';
 import { SubscriptionPriceService } from './price/subscription-price.service';
 import { SubscriptionRepo } from './subscription.repo';
-import type { BaselineSubscription, RuleSubscription, SubscriptionPrice } from '../public/catalog.types';
+import type {
+  BaselineSubscription,
+  RuleSubscription,
+  StockPlanFilter,
+  StockPlanPage,
+  SubscriptionPrice,
+} from '../public/catalog.types';
 import type { SubscriptionKind } from './subscription.types';
 
 /** What the rules of another capability need to know of the subscriptions of some plans: their kind and their end. */
@@ -20,9 +26,14 @@ export class SubscriptionFactsService {
     private readonly pricing: SubscriptionPriceService,
   ) {}
 
-  /** Buys one more seat on a subscription the caller holds locked (see `CatalogApi.addPoolSeat`). Throws PoolSeatNotAddableError. */
-  addSeat(tx: DbTx, actor: AuthenticatedPrincipal, subscriptionId: string): Promise<number> {
-    return this.pool.addSeat(tx, actor, subscriptionId);
+  /** Buys one more seat on a subscription the caller holds locked, for the request that asks for it when there is one (see `CatalogApi.addPoolSeat`). Throws PoolSeatNotAddableError. */
+  addSeat(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    subscriptionId: string,
+    requestId: string | null = null,
+  ): Promise<number> {
+    return this.pool.addSeat(tx, actor, subscriptionId, requestId);
   }
 
   /** Every active subscription of the company, for the baseline of the budget: one statement. */
@@ -51,14 +62,36 @@ export class SubscriptionFactsService {
     return this.pricing.priceOfPlan(planId, tx, on);
   }
 
+  /** The price the vendor quoted for the main subscription of the plan, in the currency it was quoted in; null when none was kept. */
+  originalPriceOfPlan(
+    planId: string,
+    tx?: DbTx,
+    on?: BusinessDate,
+  ): Promise<{ amountMinor: bigint; currency: string } | null> {
+    return this.pricing.originalPriceOfPlan(planId, tx, on);
+  }
+
+  /** The price the vendor quoted for this subscription, in the currency it was quoted in; null when none was kept or it does not exist. */
+  async originalPriceOfSubscription(
+    subscriptionId: string,
+    tx?: DbTx,
+  ): Promise<{ amountMinor: bigint; currency: string } | null> {
+    return (await this.subscriptions.find(subscriptionId, tx))?.originalPrice ?? null;
+  }
+
   /** The subscriptions of a plan a seat can be taken from today (the shared pool of the plan). */
   grantableOfPlan(planId: string, today: BusinessDate, tx?: DbTx) {
-    return this.subscriptions.findGrantableOfPlan(planId, today, tx);
+    return this.granting.findGrantableOfPlan(planId, today, tx);
   }
 
   /** The subscriptions a seat can be taken from today for many plans, in one read, by plan, each in the order a grant takes them. */
   grantableOfPlans(planIds: readonly string[], today: BusinessDate, tx?: DbTx) {
-    return this.subscriptions.findGrantableOfPlans(planIds, today, tx);
+    return this.granting.findGrantableOfPlans(planIds, today, tx);
+  }
+
+  /** One page of the plans that give out seats, keys or personal accounts, each with the subscriptions a seat can be taken from today (see `CatalogApi.getStockPlans`). */
+  stockPlansPage(filter: StockPlanFilter): Promise<StockPlanPage> {
+    return this.granting.pageStockPlans(filter);
   }
 
   /**

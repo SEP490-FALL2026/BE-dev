@@ -4,7 +4,9 @@ import {
   fromDateColumn,
   isBusinessDate,
   isValidTimeZone,
+  monthBoundsOf,
   toDateColumn,
+  weekBoundsOf,
 } from './business-date';
 
 describe('business dates', () => {
@@ -47,5 +49,29 @@ describe('addDays', () => {
     ['2026-01-01', -1, '2025-12-31'],
   ])('%s shifted by %d days is %s', (date, days, expected) => {
     expect(addDays(date, days)).toBe(expected);
+  });
+});
+
+describe('monthBoundsOf (this month up to a day)', () => {
+  it.each<[string, string, string]>([
+    ['2026-11-14', '2026-11-01', '2026-12-01'],
+    ['2026-11-01', '2026-11-01', '2026-12-01'],
+    ['2026-12-31', '2026-12-01', '2027-01-01'],
+    ['2026-02-28', '2026-02-01', '2026-03-01'],
+  ])('%s starts on %s and the next month on %s', (day, start, nextStart) => {
+    expect(monthBoundsOf(day)).toEqual({ start, nextStart });
+  });
+});
+
+describe('weekBoundsOf (the calendar week, Monday to Sunday)', () => {
+  it.each<[string, string, string]>([
+    ['2026-11-09', '2026-11-09', '2026-11-16'],
+    ['2026-11-12', '2026-11-09', '2026-11-16'],
+    ['2026-11-15', '2026-11-09', '2026-11-16'],
+    ['2026-11-16', '2026-11-16', '2026-11-23'],
+    ['2027-01-01', '2026-12-28', '2027-01-04'],
+    ['2026-03-01', '2026-02-23', '2026-03-02'],
+  ])('%s is in the week that starts on %s and ends before %s', (day, start, nextStart) => {
+    expect(weekBoundsOf(day)).toEqual({ start, nextStart });
   });
 });

@@ -13,6 +13,7 @@ export interface MyDeviceRow {
   acknowledgedFrom: Date | null;
   collectionStoppedAt: Date | null;
   signatureRecorded: boolean;
+  stopRequestPending: boolean;
   acknowledgedVersionNumber: number | null;
 }
 
@@ -33,6 +34,8 @@ export class MyDevicesRepo {
                  r.valid_from AS "validFrom", r.ended_at AS "endedAt", r.acknowledged_from AS "acknowledgedFrom",
                  r.collection_stopped_at AS "collectionStoppedAt",
                  EXISTS (SELECT 1 FROM device_signature_records s WHERE s.registration_id = r.id) AS "signatureRecorded",
+                 EXISTS (SELECT 1 FROM device_stop_requests q
+                          WHERE q.registration_id = r.id AND q.state = 'OPEN'::"DeviceStopRequestState") AS "stopRequestPending",
                  (SELECT n.version_number FROM device_acknowledgements a
                     JOIN monitoring_notice_versions n ON n.id = a.notice_version_id
                    WHERE a.registration_id = r.id ORDER BY a.acknowledged_at DESC, a.id DESC LIMIT 1)::int

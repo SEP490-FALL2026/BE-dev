@@ -87,6 +87,36 @@ export class LicenseKeyRepo {
     return (tx ?? this.prisma).licenseKey.count({ where: { subscriptionId, withdrawnAt: null } });
   }
 
+  /**
+   * For each of these purchases, the keys in the store and not withdrawn, those given to a seat and those withdrawn from the store (a withdrawn
+   * key stays in the store and is never given out again), in one statement whatever their number. A purchase with no key is absent.
+   */
+  async countsOfSubscriptions(
+    subscriptionIds: readonly string[],
+  ): Promise<Map<string, { inStore: number; assigned: number; withdrawn: number }>> {
+    const result = new Map<string, { inStore: number; assigned: number; withdrawn: number }>();
+    if (subscriptionIds.length === 0) return result;
+    const rows = await this.prisma.$queryRaw<
+      { subscription_id: string; in_store: bigint; assigned: bigint; withdrawn: bigint }[]
+    >`
+      SELECT "subscription_id" AS subscription_id,
+             count(*) FILTER (WHERE "status" = 'IN_STORE' AND "withdrawn_at" IS NULL) AS in_store,
+             count(*) FILTER (WHERE "status" = 'ASSIGNED') AS assigned,
+             count(*) FILTER (WHERE "withdrawn_at" IS NOT NULL) AS withdrawn
+        FROM "license_keys"
+       WHERE "subscription_id" = ANY(${[...subscriptionIds]}::uuid[])
+       GROUP BY "subscription_id"`;
+    for (const row of rows) {
+      result.set(row.subscription_id, {
+        inStore: Number(row.in_store),
+        assigned: Number(row.assigned),
+        withdrawn: Number(row.withdrawn),
+      });
+    }
+
+    return result;
+  }
+
   /** One page, the total for the filter and the keys still usable, all from one snapshot: a key imported meanwhile is in none or in all. */
   async page(input: {
     subscriptionId: string;

@@ -5,11 +5,13 @@ import { ASSET_STEPS } from './steps/assets.steps';
 import { BASELINE_STEPS } from './steps/baseline.steps';
 import { budgetSteps } from './steps/budget.steps';
 import { CATALOG_STEPS } from './steps/catalog.steps';
+import { DEMO_STEPS } from './steps/demo.steps';
 import { extraSteps } from './steps/extras.steps';
 import { FINANCE_STEPS } from './steps/finance.steps';
 import { ORGANIZATION_STEPS } from './steps/organization.steps';
 import { PERSONNEL_STEPS } from './steps/personnel.steps';
 import { requestSteps } from './steps/request.steps';
+import { SOFTWARE_LIST_STEPS } from './steps/software-list.steps';
 import { USAGE_STEPS } from './steps/usage.steps';
 
 /** The fixtures the command knows, by id. A new version of the data is a new entry, never an edit of an applied one. */
@@ -27,16 +29,19 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
   return [
     ...ORGANIZATION_STEPS,
     pick('finance.cost-centers'),
-    pick('finance.exchange-rates'),
     ...CATALOG_STEPS,
     pick('finance.tax-profile'),
     ...BASELINE_STEPS,
     ...ASSET_STEPS,
+    ...SOFTWARE_LIST_STEPS,
     pick('budget.cycles'),
     ...budgetSteps(),
     ...requestSteps(fixture.requests),
     ...extraSteps(fixture.saasIssue.request),
     ...PERSONNEL_STEPS,
     ...USAGE_STEPS,
+    // Last: the invoices, the closes of the months and the adjustments read what the requests and seats above hold; the policy published
+    // again changes the version every checklist answers, so it comes after every decision of the dataset.
+    ...DEMO_STEPS,
   ];
 }

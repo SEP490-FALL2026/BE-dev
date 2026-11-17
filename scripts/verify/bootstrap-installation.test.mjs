@@ -278,7 +278,7 @@ describe('bootstrap-installation.sh: one explicit run from the private file', ()
       world,
       text(
         withSettings({
-          BOOTSTRAP_CURRENCY: 'USD',
+          BOOTSTRAP_CURRENCY: 'VND',
           BOOTSTRAP_LOGIN_EMAIL: 'sign.in@example.test',
           BOOTSTRAP_ADMIN_TYPE: 'CONTRACTOR',
         }),
@@ -287,7 +287,7 @@ describe('bootstrap-installation.sh: one explicit run from the private file', ()
     const set = run(world);
     assert.equal(set.status, 0, set.output);
     const argv = calls(world)[1].argv.slice(COMPOSE(world).length);
-    assert.ok(argv.includes('--currency=USD'));
+    assert.ok(argv.includes('--currency=VND'));
     assert.ok(argv.includes('--login-email=sign.in@example.test'));
     assert.ok(argv.includes('--admin-type=CONTRACTOR'));
 
@@ -833,7 +833,9 @@ describe('the template and the ignore rules', () => {
 
   it('is accepted by the parser: copied unfilled, the wrapper reports the first required setting empty, not a syntax error', () => {
     const world = host();
-    writeConfig(world, readFileSync(TEMPLATE, 'utf8'));
+    // Git keeps the template with LF; a Windows checkout with `core.autocrlf` writes it with CRLF, which the wrapper refuses by design.
+    // The test is about the content of the template, so it copies it as Git stores it, whatever the line endings of the checkout.
+    writeConfig(world, readFileSync(TEMPLATE, 'utf8').replace(/\r\n/g, '\n'));
 
     assertRefusedBeforeDocker(world, run(world), /BOOTSTRAP_TIMEZONE.*(empty|required)/i);
   });

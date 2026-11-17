@@ -42,7 +42,7 @@ export class OffboardingChangeJudge {
       placementFrom,
       newLastWorkingDay: input.lastWorkingDay,
       reason: input.reason,
-      grounds: input.grounds,
+      groundsNote: input.groundsNote,
     });
     const early = changeLastDayRefusal({ ...facts, successor: null });
     if (early) throw new OffboardingRefusedError(early.code, early.details);

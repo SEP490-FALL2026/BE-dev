@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { LicensingApi } from '../../../licensing/public/licensing.api';
-import { LicensingHandoverApi } from '../../../licensing/public/licensing-handover.api';
 import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { EmployeeRecord } from '../../../organization/public/organization.types';
 import type { ReadAccess } from '../../personnel-self-action.policy';
+import { ItHandoverViewService } from '../../it-handover/it-handover-view.service';
 import { RoleDutiesService } from '../../role-duties/role-duties.service';
 import type { OffboardingDetailWire } from '../offboarding.dto';
 import { toDetail } from '../offboarding.mapper';
@@ -17,8 +17,7 @@ const nonZero = (counts: Record<string, number>): Record<string, number> =>
   Object.fromEntries(Object.entries(counts).filter(([, count]) => count > 0));
 
 /**
- * One departure in full (`US-03-04` AC-7, AC-20): for a case that is not cancelled, what the person still holds with the
- * confirmation of each handover, the four steps, what keeps the case open and what needs a person; the minimal projection for the IT Admin.
+ * One departure in full (`US-03-04` AC-7, AC-20): for a case that is not cancelled, what the person still holds, the four steps, what keeps the case open and what needs a person; the minimal projection for the IT Admin.
  */
 @Injectable()
 export class OffboardingDetailService {
@@ -26,10 +25,10 @@ export class OffboardingDetailService {
     private readonly repo: OffboardingRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly licensing: LicensingApi,
-    private readonly licensingHandovers: LicensingHandoverApi,
     private readonly sources: OffboardingSources,
     private readonly roleDuties: RoleDutiesService,
     private readonly identity: IdentityAccessApi,
+    private readonly itHandovers: ItHandoverViewService,
   ) {}
 
   /** The case in full: for a case that is not cancelled, what the person still holds, the four steps and what keeps it open. */
@@ -37,15 +36,18 @@ export class OffboardingDetailService {
     const today = await this.organizationReads.businessToday();
     const live = record.state !== 'CANCELLED';
     const seats = live ? await this.licensing.listPersonalSeatsOf(record.employeeId, today) : [];
+    const withoutCompletedTask = live
+      ? ((await this.licensing.countPersonalSeatsWithoutCompletedTaskOf([record.employeeId], today)).get(
+          record.employeeId,
+        ) ?? 0)
+      : 0;
     const terminating = new Set(
       live
         ? (await this.licensing.listTerminatingAccess([record.employeeId])).map((access) => access.assignmentId)
         : [],
     );
-    const duties = await this.licensingHandovers.getHandoverDutiesOf(seats.map((seat) => seat.assignmentId));
     const opened = live ? await this.repo.openedAssignmentIds(record.id) : [];
-    const registered = live ? await this.sources.blockersOf(record.employeeId) : {};
-    const facts = departureDetailFacts(record, { live, seats, terminating, duties, opened, registered });
+    const facts = departureDetailFacts(record, { live, seats, withoutCompletedTask, terminating, opened });
 
     const roles = await this.rolesOf(record, live);
     const [employees, department, warnings] = await this.othersOf(record, live);
@@ -58,6 +60,7 @@ export class OffboardingDetailService {
         today,
         block: await this.identity.findDepartureBlock(record.employeeId),
         heldRights: facts.heldRights,
+        rightsWithoutCompletedTask: facts.rightsWithoutCompletedTask,
         roleFlags: roles?.map,
         workspaces: Object.fromEntries(
           (roles?.workspaces ?? []).map((duty) => [duty.planId, `${duty.applicationName} / ${duty.planName}`]),
@@ -65,6 +68,7 @@ export class OffboardingDetailService {
         checklist: facts.checklist,
         blockers: facts.blockers,
         registeredWarnings: nonZero(warnings),
+        itHandover: await this.itHandovers.wireOf({ kind: 'OFFBOARDING_CASE', id: record.id }, record.employeeId),
       },
       access,
     );

@@ -22,6 +22,7 @@ import {
   EmployeeRecord,
   EmployeeWorkState,
   OfficialFieldsPatch,
+  EmployeePlacementSpan,
   PlacementInForce,
   ScheduledStructureChange,
   StructureChangeInput,
@@ -38,6 +39,7 @@ function toEmployeeRecord(row: {
   status: EmployeeRecord['status'];
   workState: EmployeeWorkState;
   hireDate: Date;
+  contractEndDate: Date | null;
   jobTitle: string | null;
 }): EmployeeRecord {
   return {
@@ -50,7 +52,28 @@ function toEmployeeRecord(row: {
     status: row.status,
     workState: row.workState,
     hireDate: fromDateColumn(row.hireDate),
+    contractEndDate: row.contractEndDate ? fromDateColumn(row.contractEndDate) : null,
     jobTitle: row.jobTitle,
+  };
+}
+
+/** The columns a correction of the official fields writes: only the fields it gives. */
+function officialFieldsData(patch: OfficialFieldsPatch): Prisma.EmployeeUpdateInput {
+  return {
+    ...(patch.fullName !== undefined ? { fullName: patch.fullName } : {}),
+    ...(patch.workEmail !== undefined
+      ? {
+          workEmail: patch.workEmail,
+          normalizedWorkEmail: patch.workEmail === null ? null : normalizeEmail(patch.workEmail),
+        }
+      : {}),
+    ...(patch.employmentType !== undefined ? { employmentType: patch.employmentType } : {}),
+    ...(patch.hireDate !== undefined ? { hireDate: toDateColumn(patch.hireDate) } : {}),
+    ...(patch.contractEndDate !== undefined
+      ? { contractEndDate: patch.contractEndDate === null ? null : toDateColumn(patch.contractEndDate) }
+      : {}),
+    // The display form (T-12) whoever calls; an empty one clears the title.
+    ...(patch.jobTitle !== undefined ? { jobTitle: normalizeDisplayName(patch.jobTitle ?? '') || null } : {}),
   };
 }
 
@@ -111,6 +134,7 @@ export class EmployeeRepo {
           jobTitle: normalizeDisplayName(input.jobTitle ?? '') || null,
           employmentType: input.employmentType,
           hireDate: toDateColumn(input.hireDate),
+          contractEndDate: input.contractEndDate ? toDateColumn(input.contractEndDate) : null,
           status: 'ACTIVE',
         },
         select: { id: true },
@@ -136,22 +160,7 @@ export class EmployeeRepo {
   /** Changes the official fields of the employee whose row the caller holds `FOR UPDATE`; the unique email is the last word. */
   async updateOfficialFields(tx: DbTx, employeeId: string, patch: OfficialFieldsPatch): Promise<void> {
     try {
-      await tx.employee.update({
-        where: { id: employeeId },
-        data: {
-          ...(patch.fullName !== undefined ? { fullName: patch.fullName } : {}),
-          ...(patch.workEmail !== undefined
-            ? {
-                workEmail: patch.workEmail,
-                normalizedWorkEmail: patch.workEmail === null ? null : normalizeEmail(patch.workEmail),
-              }
-            : {}),
-          ...(patch.employmentType !== undefined ? { employmentType: patch.employmentType } : {}),
-          ...(patch.hireDate !== undefined ? { hireDate: toDateColumn(patch.hireDate) } : {}),
-          // The display form (T-12) whoever calls; an empty one clears the title.
-          ...(patch.jobTitle !== undefined ? { jobTitle: normalizeDisplayName(patch.jobTitle ?? '') || null } : {}),
-        },
-      });
+      await tx.employee.update({ where: { id: employeeId }, data: officialFieldsData(patch) });
     } catch (error) {
       if (isUniqueViolation(error, 'normalized_work_email')) throw new EmployeeEmailTakenError();
       // The trigger of migration 20261023110000 (INV-07 from the side of the person).
@@ -319,6 +328,32 @@ export class EmployeeRepo {
           validTo: row.valid_to ? fromDateColumn(row.valid_to) : null,
         }
       : null;
+  }
+
+  /** The placements of these employees that touch `[from, to)`, by employee then first day, in one read (a day nobody was placed is just not covered). */
+  async placementsBetween(
+    employeeIds: readonly string[],
+    from: BusinessDate,
+    to: BusinessDate,
+    tx?: DbTx,
+  ): Promise<EmployeePlacementSpan[]> {
+    if (employeeIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).employeePlacement.findMany({
+      where: {
+        employeeId: { in: [...employeeIds] },
+        validFrom: { lt: toDateColumn(to) },
+        OR: [{ validTo: null }, { validTo: { gt: toDateColumn(from) } }],
+      },
+      select: { employeeId: true, departmentId: true, validFrom: true, validTo: true },
+      orderBy: [{ employeeId: 'asc' }, { validFrom: 'asc' }],
+    });
+
+    return rows.map((row) => ({
+      employeeId: row.employeeId,
+      departmentId: row.departmentId,
+      validFrom: fromDateColumn(row.validFrom),
+      validTo: row.validTo ? fromDateColumn(row.validTo) : null,
+    }));
   }
 
   /** The first day of a placement, or null when it does not exist. */

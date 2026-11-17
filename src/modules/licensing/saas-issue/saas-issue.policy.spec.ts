@@ -5,6 +5,7 @@ import {
   canMove,
   duplicateTargetProblem,
   isReopenLapsed,
+  issueTitleOf,
   isResponseOverdue,
   messageProblem,
   occurredProblem,
@@ -172,5 +173,31 @@ describe('what is added to a report and what it duplicates (US-07-11 AC-5)', () 
       'DUPLICATE_TARGET_INVALID',
     );
     expect(duplicateTargetProblem({ issueId: 'P2', original: null })).toBe('DUPLICATE_TARGET_INVALID');
+  });
+});
+
+describe('the title of a SaaS issue: the first line of what the reporter wrote (`IA-1`)', () => {
+  it('is the first line that says something, trimmed', () => {
+    expect(issueTitleOf('  Figma does not open on my laptop  \nIt shows a blank page since Monday.')).toBe(
+      'Figma does not open on my laptop',
+    );
+    expect(issueTitleOf('\n\r\n   \nCannot sign in\r\nThe code never arrives')).toBe('Cannot sign in');
+  });
+
+  it('keeps a short description whole, and collapses the spaces inside the line', () => {
+    expect(issueTitleOf('Cannot   sign\tin')).toBe('Cannot sign in');
+  });
+
+  it('cuts a long first line to 120 characters, the last one a single ellipsis, and does not cut one that fits', () => {
+    const exact = 'a'.repeat(120);
+    const long = `${'b'.repeat(119)}XYZ`;
+
+    expect(issueTitleOf(exact)).toBe(exact);
+    expect(issueTitleOf(long)).toBe(`${'b'.repeat(119)}…`);
+    expect(issueTitleOf(long)).toHaveLength(120);
+  });
+
+  it('is never empty: a description of nothing but blanks (the form refuses it) gives a fixed word instead', () => {
+    expect(issueTitleOf('   \n \n')).toBe('(no description)');
   });
 });

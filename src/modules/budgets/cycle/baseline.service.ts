@@ -10,25 +10,24 @@ import {
   BudgetCycleNotFoundError,
   BudgetNotYourCostCenterError,
 } from '../budget/budget.errors';
+import { BaselineFlags, type BaselineCarried } from './baseline-flags.service';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
 import {
   allocateSeats,
-  baselineLinesOf,
-  type BaselineLine,
   inOrderOf,
   listedDepartments,
   poolIdleSeats,
   SOFTWARE_LISTED_MAX,
   baselineVersionRefusal,
-  cancelledCost,
   type SeatAllocation,
   shouldSuggestRenewal,
   subscriptionCost,
 } from './baseline.policy';
 import type { BaselineSubscription } from '../../catalog/public/catalog.types';
 import type { BaselineWire } from './cycle.dto';
+import { cycleStateOf } from './cycle.policy';
 import { CycleRepo } from './cycle.repo';
 
 type Reading = {
@@ -53,6 +52,12 @@ export function departmentOf(
   costCenterId: string | null,
   subscriptions: readonly BaselineSubscription[],
   reading: Reading,
+  carried: BaselineCarried = {
+    carriedOver: 0n,
+    noProposalSubmitted: false,
+    belowCarriedOver: false,
+    carriedOverShortfall: 0n,
+  },
 ): BaselineWire['departments'][number] {
   const { year, today, seats, ending, kpi3ByPlan, spent, format } = reading;
   const software: BaselineWire['departments'][number]['software'] = [];
@@ -91,6 +96,10 @@ export function departmentOf(
     departmentCode: brief.code,
     departmentName: brief.name,
     costCenterId,
+    carriedOverNextYear: format(carried.carriedOver),
+    noProposalSubmitted: carried.noProposalSubmitted,
+    belowCarriedOver: carried.belowCarriedOver,
+    carriedOverShortfall: format(carried.carriedOverShortfall),
     spentThisYear: format(spent),
     estimatedAnnualCost: format(total),
     hasUnknownCost: unknown,
@@ -169,6 +178,7 @@ export class BaselineService {
     private readonly licensing: LicensingApi,
     private readonly commitments: CommitmentRepo,
     private readonly proposals: ProposalRepo,
+    private readonly flags: BaselineFlags,
   ) {}
 
   /** Throws BudgetCycleNotFoundError and BudgetNotYourCostCenterError (a head asking for a department that is not theirs, or for none). */
@@ -192,6 +202,9 @@ export class BaselineService {
     const kpi3ByPlan = await this.catalog.getPlanKpi3([...new Set(subscriptions.map((one) => one.planId))]);
     const spentOf = await this.spentByDepartment(history, today);
 
+    const costCenterIds = [...costCenters.values()];
+    // Locked is a state of the cycle (`QĐ-111z`): a draft whose deadline is behind us is not locked, and nobody missed a deadline yet.
+    const carriedOf = await this.flags.of(costCenterIds, year, cycleStateOf(cycle, today) === 'LOCKED');
     const departments = inOrderOf(wanted, briefs).map((brief) => {
       const seats = allocation.byDepartment.get(brief.id) ?? new Map<string, number>();
 
@@ -200,6 +213,7 @@ export class BaselineService {
         costCenters.get(brief.id) ?? null,
         subscriptions.filter((subscription) => (seats.get(subscription.subscriptionId) ?? 0) > 0),
         { year, today, seats, ending, kpi3ByPlan, spent: spentOf(brief.id), format },
+        carriedOf(costCenters.get(brief.id) ?? ''),
       );
     });
 
@@ -272,62 +286,16 @@ export class BaselineService {
   ): Promise<{ departmentId: string; currency: string }> {
     const cycle = await this.cycles.lockByYear(tx, await this.facts.organizationId(tx), year, 'UPDATE');
     const unit = await this.facts.costCenterInUse(costCenterId, tx);
-    const heads = await this.organizationReads.getDepartmentHeads([unit.departmentId], today, tx);
     const refusal = baselineVersionRefusal({
-      cyclePublishedOnce: cycle !== null && cycle.firstPublishedAt !== null,
-      inCycle: cycle !== null && (await this.isInCycle(cycle, unit.departmentId, year, tx)),
+      cycleOpen: cycle !== null && cycle.openedAt !== null,
+      inCycle: (await this.organizationReads.getActiveDepartmentIds(year, tx)).includes(unit.departmentId),
       today,
       submissionDeadline: cycle?.submissionDeadline ?? today,
-      headsToday: heads.has(unit.departmentId),
-      headToCome: await this.organizationReads.hasHeadStartingAfter(unit.departmentId, today, tx),
       openProposal: (await this.proposals.openOfCostCenters([costCenterId], year, tx)).has(costCenterId),
     });
-    if (refusal !== null || cycle === null)
-      throw new BudgetBaselineVersionNotAllowedError(refusal ?? 'CYCLE_NOT_PUBLISHED');
+    if (refusal !== null || cycle === null) throw new BudgetBaselineVersionNotAllowedError(refusal ?? 'CYCLE_NOT_OPEN');
 
     return { departmentId: unit.departmentId, currency: cycle.currency };
-  }
-
-  /** Whether the department is in the cycle of the year: it has a ceiling there and takes effect no later than the year ends. */
-  private async isInCycle(
-    cycle: { ceilings: readonly { departmentId: string }[] },
-    departmentId: string,
-    year: number,
-    tx: DbTx,
-  ): Promise<boolean> {
-    if (!cycle.ceilings.some((ceiling) => ceiling.departmentId === departmentId)) return false;
-    const [brief] = await this.organizationReads.getDepartmentBriefs([departmentId], tx);
-
-    return brief !== undefined && brief.effectiveFrom <= `${year}-12-31`;
-  }
-
-  /**
-   * The lines of a first version built from the baseline (`QĐ-100h`, `C4-14`), read the way the baseline reads the department
-   * (`QĐ-103k`): one `Renew` line for what each plan its people hold seats of costs in the year at a known price (the months before an
-   * ordered end included), and a `Cancel` line (shown, not added) for what ending one that was ordered to end saves. The idle seats of the
-   * shared pool are no department's line. Throws nothing; a department whose people hold nothing gives none.
-   */
-  async renewalLinesOf(departmentId: string, year: number, today: BusinessDate, tx?: DbTx): Promise<BaselineLine[]> {
-    const subscriptions = await this.catalog.getBaselineSubscriptions(tx);
-    const { allocation, ending } = await this.seatsOf(subscriptions, today, tx);
-    const seats = allocation.byDepartment.get(departmentId) ?? new Map<string, number>();
-
-    return baselineLinesOf(
-      subscriptions
-        .filter((subscription) => (seats.get(subscription.subscriptionId) ?? 0) > 0)
-        .map((subscription) => {
-          const held = seats.get(subscription.subscriptionId) ?? 0;
-          const terminated = ending.has(subscription.subscriptionId);
-
-          return {
-            planId: subscription.planId,
-            label: `${subscription.applicationName} ${subscription.planName}`,
-            seats: held,
-            costMinor: subscriptionCost(year, today, held, subscription, terminated).costMinor,
-            cancelledMinor: terminated ? cancelledCost(year, held, subscription) : null,
-          };
-        }),
-    );
   }
 
   /** A head reads the baseline of their own department only, and names it. */

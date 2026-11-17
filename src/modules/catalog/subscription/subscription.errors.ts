@@ -74,6 +74,16 @@ export class SubscriptionQuantityBelowOccupiedError extends Error {
   }
 }
 
+/** A unit price is entered in dong only: the system has no exchange rate to turn another currency into it (`QĐ-111an`). */
+export class SubscriptionPriceNotVndError extends Error {
+  constructor(readonly currency: string) {
+    super(
+      'The unit price is entered in dong (VND). Convert it first and keep the price quoted by the vendor as the original price.',
+    );
+    this.name = 'SubscriptionPriceNotVndError';
+  }
+}
+
 export class SubscriptionStillDraftError extends Error {
   constructor(readonly missing: string[]) {
     super('The subscription still lacks data to be complete.');
@@ -105,6 +115,14 @@ export class SubscriptionK1MonthlyOnlyError extends Error {
   }
 }
 
+/** A K4 plan is bought once: what is written for it is a perpetual purchase, never a term (B-5). */
+export class SubscriptionK4PerpetualOnlyError extends Error {
+  constructor() {
+    super('A plan of provisioning type K4 is bought once: its subscription is a perpetual purchase, not a term.');
+    this.name = 'SubscriptionK4PerpetualOnlyError';
+  }
+}
+
 /** Paying by the year for a commitment of one month would bill what is not committed (R-G01). */
 export class SubscriptionBillingLongerThanCommitmentError extends Error {
   constructor() {
@@ -122,6 +140,18 @@ export class SubscriptionBillingCycleUnsupportedError extends Error {
 }
 
 /** An active subscription names the IT Admin who answers for it (`QĐ-103v`(4)). */
+/** The plan needs at least two different admins at the vendor and its profile names fewer (`QĐ-110k`, `R-53`): it is not activated. */
+export class SubscriptionVendorAdminsRequiredError extends Error {
+  constructor(
+    readonly planId: string,
+    readonly given: number,
+    readonly required: number,
+  ) {
+    super(`The plan needs at least ${required} different IT Admins who administer it at the vendor.`);
+    this.name = 'SubscriptionVendorAdminsRequiredError';
+  }
+}
+
 export class SubscriptionResponsibleRequiredError extends Error {
   constructor() {
     super('An active subscription needs the IT Admin who answers for it.');

@@ -3,6 +3,7 @@ import { ApiException } from '../../../infrastructure/http/errors/api.exception'
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
+  FunctionalGroupFixedError,
   FunctionalGroupNameInvalidError,
   FunctionalGroupNameTakenError,
   FunctionalGroupNotFoundError,
@@ -21,6 +22,9 @@ export function toFunctionalGroupApiException(error: unknown): unknown {
   if (error instanceof FunctionalGroupNameTakenError) {
     return refuse(HttpStatus.CONFLICT, 'FUNCTIONAL_GROUP.NAME_TAKEN', error.message);
   }
+  if (error instanceof FunctionalGroupFixedError) {
+    return refuse(HttpStatus.CONFLICT, 'FUNCTIONAL_GROUP.FIXED', error.message);
+  }
   if (error instanceof FunctionalGroupNameInvalidError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'FUNCTIONAL_GROUP.NAME_INVALID', error.message);
   }
@@ -37,6 +41,7 @@ const example = (error: Error) => errorExampleOf(toFunctionalGroupApiException(e
 export const FUNCTIONAL_GROUP_ERROR_EXAMPLES = {
   NOT_FOUND: example(new FunctionalGroupNotFoundError()),
   NAME_TAKEN: example(new FunctionalGroupNameTakenError()),
+  FIXED: example(new FunctionalGroupFixedError()),
   NAME_INVALID: example(new FunctionalGroupNameInvalidError()),
   UPDATE_EMPTY: example(new FunctionalGroupUpdateEmptyError()),
 } as const;

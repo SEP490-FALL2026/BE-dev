@@ -21,6 +21,10 @@ const groupSchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   status,
+  systemKey: z.enum(['COMMUNICATION', 'OTHER']).nullable().meta({
+    description:
+      'COMMUNICATION (Liên lạc) or OTHER (Khác) for the two fixed groups, which are never renamed or switched off; null for every other group.',
+  }),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

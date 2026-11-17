@@ -109,16 +109,16 @@ describe('the need step of a request that costs money over PostgreSQL (US-05-04 
   });
 
   describe('a request nobody can send on in a batch (US-06-14 AC-8)', () => {
-    it('BR-MF1-02 headless paid submission checks immediately and remains saved for revision without a budget', async () => {
+    it('QĐ-110i a paid submission from a headless department waits at the need step: no budget check, no spend step, nobody else decides it, and the head who is named takes it', async () => {
       const headless = await h.departmentWithUnit('P-HR');
       const member = await h.staff(headless, 'HR-E1');
       const newHead = await h.staff(headless, 'HR-H8');
       const bystander = await h.staff(await h.departmentWithUnit('P-FB'), 'FB-R0');
       const sent = await h.sent(member, plan, { termMonths: 1 });
       expect(await h.steps(sent.id, 'NEED')).toEqual([
-        expect.objectContaining({ state: 'NOT_REQUIRED', assignee_employee_id: null, waiting_reason: null }),
+        expect.objectContaining({ state: 'WAITING', assignee_employee_id: null, waiting_reason: 'NO_DEPARTMENT_HEAD' }),
       ]);
-      expect(await h.state(sent.id)).toBe('AWAITING_REQUESTER_REVISION');
+      expect(await h.state(sent.id)).toBe('WAITING_CONTROLLED');
       await h.decide(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(404);
       await h.decide(sent.id, { decision: 'APPROVE' }, bystander.account).expect(404);
       expect(await h.steps(sent.id, 'FINANCE_REVIEW')).toEqual([]);
@@ -126,11 +126,11 @@ describe('the need step of a request that costs money over PostgreSQL (US-05-04 
       const checks = await h.ctx.sql.query(`SELECT outcome FROM request_budget_checks WHERE request_id = $1`, [
         sent.id,
       ]);
-      expect(checks.rows).toEqual([{ outcome: 'BLOCKED' }]);
+      expect(checks.rows).toEqual([]);
       await h.makeHead(headless, newHead);
-      expect(await h.state(sent.id)).toBe('AWAITING_REQUESTER_REVISION');
+      expect(await h.state(sent.id)).toBe('PENDING');
       expect(await h.steps(sent.id, 'NEED')).toEqual([
-        expect.objectContaining({ state: 'NOT_REQUIRED', assignee_employee_id: null, waiting_reason: null }),
+        expect.objectContaining({ state: 'PENDING', assignee_employee_id: newHead.employeeId, waiting_reason: null }),
       ]);
     });
 
@@ -146,16 +146,21 @@ describe('the need step of a request that costs money over PostgreSQL (US-05-04 
       ]);
     });
 
-    it('BR-MF1-02 a headless new-software proposal goes immediately to IT assessment and keeps that routing', async () => {
+    it('R-43 a headless new-software proposal waits at the need step and reaches the IT assessment only when the head who is named decides the need', async () => {
       const headless = await h.departmentWithUnit('P-HN');
       await h.setItAdminInCharge(headless, { employeeId: h.it1.employeeId, account: h.it1 });
       const proposed = await h.proposed(await h.staff(headless, 'HN-E1'));
       const newHead = await h.staff(headless, 'HN-H1');
-      expect(await h.state(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
-      expect(await h.steps(proposed.id, 'NEED')).toEqual([expect.objectContaining({ state: 'NOT_REQUIRED' })]);
+      expect(await h.state(proposed.id)).toBe('WAITING_CONTROLLED');
+      expect(await h.steps(proposed.id, 'NEED')).toEqual([
+        expect.objectContaining({ state: 'WAITING', assignee_employee_id: null, waiting_reason: 'NO_DEPARTMENT_HEAD' }),
+      ]);
       await h.makeHead(headless, newHead);
-      expect(await h.state(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
+      expect(await h.state(proposed.id)).toBe('PENDING');
       expect(await decisions(proposed.id)).toBe(0);
+      await h.decide(proposed.id, { decision: 'APPROVE' }, newHead.account).expect(200);
+      expect(await h.state(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
+      expect(await decisions(proposed.id)).toBe(1);
     });
 
     it('waits in the queue of the head when the head approved it and is not the approver', async () => {

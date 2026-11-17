@@ -3,7 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import type { RevocationSource } from '../public/licensing.types';
+import { isSystemActor, type RevocationSource, type SystemActor } from '../public/licensing.types';
 import { maxAttempts as maxAttemptsFor } from './failure.policy';
 import type { ProvisioningTaskRecord } from './provisioning-task.types';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
@@ -19,7 +19,7 @@ export class RevocationTaskFactory {
 
   async create(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: AuthenticatedPrincipal | SystemActor,
     input: {
       organizationId: string;
       assignment: { id: string; employeeId: string };
@@ -37,7 +37,7 @@ export class RevocationTaskFactory {
       assignmentId: input.assignment.id,
       source: input.source,
       defaultResponsibleEmployeeId: inCharge?.itAdminEmployeeId ?? null,
-      createdByAppUserId: actor.appUserId,
+      creator: isSystemActor(actor) ? { system: true } : { appUserId: actor.appUserId },
       maxAttempts,
     });
   }

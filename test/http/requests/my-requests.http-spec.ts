@@ -83,7 +83,7 @@ describe('my requests route (e2e, no database)', () => {
     const item = {
       ...ROW,
       state: 'AWAITING_REQUESTER_REVISION',
-      routing: { mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' },
+      routing: { mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' },
       needStep: { state: 'NOT_REQUIRED', assignee: null, waitingReason: null },
     };
     list.mockResolvedValue({ ...PAGE, items: [item] });

@@ -20,7 +20,8 @@ export class PlanNotFoundError extends Error {
 }
 
 export class PlanNameTakenError extends Error {
-  constructor() {
+  /** `existing` is the plan of the application that has the name, when it could be read (`QĐ-111b`). */
+  constructor(readonly existing: { id: string; name: string; provisioningType: string } | null = null) {
     super('The application already has a plan with this name.');
     this.name = 'PlanNameTakenError';
   }
@@ -61,6 +62,14 @@ export class PlanPricingModelRequiredError extends Error {
   }
 }
 
+/** A pricing model that is sent is the one the kind of provisioning implies (`B-5`): the system works it out, the IT Admin is not asked. */
+export class PlanPricingModelNotDerivedError extends Error {
+  constructor(readonly expected: 'PER_SEAT' | null) {
+    super('The pricing model follows the kind of provisioning: leave it out, or send the one the kind implies.');
+    this.name = 'PlanPricingModelNotDerivedError';
+  }
+}
+
 export class PlanPricingModelNotApplicableError extends Error {
   constructor() {
     super('A K5 plan has no pricing model.');
@@ -89,9 +98,28 @@ export class PlanUpdateEmptyError extends Error {
   }
 }
 
+/** The flag "has an admin console" is given for a plan that is not a `K4` plan (`R-53`). */
+export class PlanAdminConsoleNotApplicableError extends Error {
+  constructor() {
+    super('Only a K4 plan says whether it has an admin console.');
+    this.name = 'PlanAdminConsoleNotApplicableError';
+  }
+}
+
+/** The people who administer the plan at the vendor are fewer than two (`QĐ-110k`). */
+export class PlanVendorAdminsInvalidError extends Error {
+  constructor(
+    readonly given: number,
+    readonly required: number,
+  ) {
+    super(`At least ${required} different IT Admins must administer the plan at the vendor.`);
+    this.name = 'PlanVendorAdminsInvalidError';
+  }
+}
+
 export class PlanWorkspaceProfileNotApplicableError extends Error {
   constructor() {
-    super('Only a K2 plan has a workspace profile.');
+    super('Only a plan that needs admins at the vendor (K2, or K4 with an admin console) has a workspace profile.');
     this.name = 'PlanWorkspaceProfileNotApplicableError';
   }
 }
@@ -146,7 +174,13 @@ export class PlanTermsBlockTypeChangeError extends Error {
 }
 
 /** What the database found on the plan that the change would leave invalid (`plans_keep_children_valid`). */
-export type PlanChangeBlock = 'ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY' | 'LICENSE_KEYS' | 'SUBSCRIPTIONS';
+export type PlanChangeBlock =
+  | 'ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY'
+  | 'LICENSE_KEYS'
+  | 'PERPETUAL_SUBSCRIPTIONS'
+  | 'TERM_SUBSCRIPTIONS'
+  | 'CONTRACT_LINKS'
+  | 'SUBSCRIPTIONS';
 
 export class PlanInUseBlocksChangeError extends Error {
   constructor(readonly reason: PlanChangeBlock) {

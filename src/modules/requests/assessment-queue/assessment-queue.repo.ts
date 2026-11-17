@@ -19,6 +19,10 @@ export interface AssessmentQueueRow {
   readerIsParty: boolean;
   softwareName: string;
   expectedUsers: number;
+  /** The proposal names an application of the catalog: only the plan is assessed (`QĐ-111a`). */
+  planOnly: boolean;
+  /** That application; null for software that is new. */
+  existingApplicationId: string | null;
   /** The IT Admin has saved the assessment at least once. */
   started: boolean;
   fields: AssessmentFields;
@@ -44,6 +48,8 @@ const ASSESSMENT_FIELDS = {
   quoteBillingCycle: true,
   quoteValidFrom: true,
   quoteValidUntil: true,
+  quoteOriginalUnitPriceMinor: true,
+  quoteOriginalCurrency: true,
   savedByEmployeeId: true,
 } as const;
 
@@ -63,6 +69,10 @@ function quoteOf(row: AssessmentColumns): Quote | null {
 
   return {
     unitPrice: { amountMinor: row.quoteUnitPriceMinor, currency: row.quoteCurrency },
+    originalPrice:
+      row.quoteOriginalUnitPriceMinor !== null && row.quoteOriginalCurrency !== null
+        ? { amountMinor: row.quoteOriginalUnitPriceMinor, currency: row.quoteOriginalCurrency }
+        : null,
     billingCycle: row.quoteBillingCycle,
     validFrom: fromDateColumn(row.quoteValidFrom),
     validUntil: row.quoteValidUntil ? fromDateColumn(row.quoteValidUntil) : null,
@@ -83,7 +93,7 @@ const stepSelect = (readerEmployeeId: string) =>
         requesterEmployeeId: true,
         departmentId: true,
         beneficiaries: { where: { employeeId: readerEmployeeId }, select: { employeeId: true }, take: 1 },
-        proposal: { select: { softwareName: true, expectedUsers: true } },
+        proposal: { select: { softwareName: true, expectedUsers: true, existingApplicationId: true } },
         assessment: { select: ASSESSMENT_FIELDS },
       },
     },
@@ -128,14 +138,29 @@ function rowOf(step: StepColumns, readerEmployeeId: string): AssessmentQueueRow 
     readerIsParty: request.requesterEmployeeId === readerEmployeeId || beneficiaries.length > 0,
     softwareName: proposal.softwareName,
     expectedUsers: proposal.expectedUsers,
+    planOnly: proposal.existingApplicationId !== null,
+    existingApplicationId: proposal.existingApplicationId,
     started: assessment.savedByEmployeeId !== null,
     fields: fieldsOf(assessment),
   };
 }
 
 /**
+ * The open assessments of a scope, as the counts by department read them. `page()` lists the same assessments with the Prisma filter it keeps beside
+ * it (an open step of the assessment, a request waiting for it, an assessment still a draft): two spellings of one meaning, held equal by
+ * `assessment-decisions.integration-spec.ts` (the count of a department is the total of its list).
+ */
+const openAssessmentsIn = (departmentIds: readonly string[]) => Prisma.sql`
+  FROM access_request_steps s
+  JOIN access_requests r ON r.id = s.request_id
+  JOIN access_request_assessments a ON a.request_id = r.id
+ WHERE s.kind = 'IT_ASSESSMENT' AND s.state IN ('PENDING', 'WAITING')
+   AND r.state = 'AWAITING_IT_ASSESSMENT' AND a.status = 'DRAFT'
+   AND r.department_id = ANY(${[...departmentIds]}::uuid[])`;
+
+/**
  * The assessments of new software that wait for an IT Admin, read as the IT Admin discovers them: the open assessment steps of the
- * departments in their scope, the oldest first. It only reads; the assessment itself is `AssessmentReadRepo`'s and the writes are
+ * scope of the IT Admin, the oldest first. It only reads; the assessment itself is `AssessmentReadRepo`'s and the writes are
  * the assessment capability's.
  */
 @Injectable()
@@ -143,7 +168,7 @@ export class AssessmentQueueRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * One page of the open assessments of the departments, and the total for the same filter, from one snapshot so an assessment that
+   * One page of the open assessments of the scope, and the total for the same filter, from one snapshot so an assessment that
    * ends meanwhile cannot make the total disagree with the page. `id` breaks ties between steps that came at the same instant.
    */
   async page(
@@ -176,5 +201,31 @@ export class AssessmentQueueRepo {
     );
 
     return { rows: steps.map((step) => rowOf(step, readerEmployeeId)), total };
+  }
+
+  /**
+   * One page of the units (one per department) that have proposals waiting, each with how many (the most first, `department_id` breaking ties), and how many
+   * units there are, from one snapshot. A department with none waiting is not listed.
+   */
+  async departmentCounts(
+    departmentIds: readonly string[],
+    skip: number,
+    take: number,
+  ): Promise<{ rows: { departmentId: string; waiting: number }[]; total: number }> {
+    const open = openAssessmentsIn(departmentIds);
+    const { counts, total } = await this.prisma.$transaction(
+      async (tx) => ({
+        counts: await tx.$queryRaw<{ department_id: string; waiting: number }[]>`
+          SELECT r.department_id, count(*)::int AS waiting ${open}
+          GROUP BY r.department_id ORDER BY count(*) DESC, r.department_id ASC LIMIT ${take} OFFSET ${skip}`,
+        total: await tx.$queryRaw<{ total: number }[]>`SELECT count(DISTINCT r.department_id)::int AS total ${open}`,
+      }),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+
+    return {
+      rows: counts.map((row) => ({ departmentId: row.department_id, waiting: row.waiting })),
+      total: total[0]?.total ?? 0,
+    };
   }
 }

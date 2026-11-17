@@ -8,7 +8,7 @@ import { TransactionRunner } from '../../../src/infrastructure/database/transact
 import { FinanceApi } from '../../../src/modules/finance/public/finance.api';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
 
-describe('the finance facade: money in, conversion snapshot out (integration, real PostgreSQL)', () => {
+describe('the finance facade: money in, the snapshot of the same currency out (integration, real PostgreSQL)', () => {
   let ctx: HttpTestApp;
   let seed: SeededInstallation;
   let finance: FinanceApi;
@@ -37,26 +37,41 @@ describe('the finance facade: money in, conversion snapshot out (integration, re
 
   describe('parseMoney', () => {
     it('reads the amount with the minor digits of its currency', async () => {
-      expect(await finance.parseMoney({ amount: '1200.5', currency: 'USD' })).toEqual({
+      expect(await finance.parseMoney({ amount: '1200.5', currency: 'USD' }, 'unitPrice')).toEqual({
         amountMinor: 120050n,
         currency: 'USD',
       });
-      expect(await finance.parseMoney({ amount: '30000000', currency: 'VND' })).toEqual({
+      expect(await finance.parseMoney({ amount: '30000000', currency: 'VND' }, 'unitPrice')).toEqual({
         amountMinor: 30000000n,
         currency: 'VND',
       });
     });
 
     it('refuses decimals a currency does not have, a currency it does not know, and an amount too large', async () => {
-      await expect(finance.parseMoney({ amount: '1200.5', currency: 'VND' })).rejects.toBeInstanceOf(
+      await expect(finance.parseMoney({ amount: '1200.5', currency: 'VND' }, 'unitPrice')).rejects.toBeInstanceOf(
         MoneyScaleExceededError,
       );
-      await expect(finance.parseMoney({ amount: '1.00', currency: 'XYZ' })).rejects.toBeInstanceOf(
+      await expect(finance.parseMoney({ amount: '1.00', currency: 'XYZ' }, 'unitPrice')).rejects.toBeInstanceOf(
         CurrencyNotSupportedError,
       );
-      await expect(finance.parseMoney({ amount: '10000000000000.01', currency: 'USD' })).rejects.toBeInstanceOf(
-        MoneyOutOfRangeError,
-      );
+      await expect(
+        finance.parseMoney({ amount: '10000000000000.01', currency: 'USD' }, 'unitPrice'),
+      ).rejects.toBeInstanceOf(MoneyOutOfRangeError);
+    });
+
+    it('says where the amount sat in the body on every money error it throws', async () => {
+      await expect(finance.parseMoney({ amount: '1200.5', currency: 'VND' }, 'lines.2.amount')).rejects.toMatchObject({
+        path: 'lines.2.amount',
+      });
+      await expect(finance.parseMoney({ amount: '1.00', currency: 'XYZ' }, 'originalPrice')).rejects.toMatchObject({
+        path: 'originalPrice',
+      });
+      await expect(
+        finance.parseMoney({ amount: '10000000000000.01', currency: 'USD' }, 'requestedAmount'),
+      ).rejects.toMatchObject({ path: 'requestedAmount' });
+      await expect(finance.parseMoney({ amount: '1e5', currency: 'USD' }, 'unitPrice')).rejects.toMatchObject({
+        path: 'unitPrice',
+      });
     });
   });
 
@@ -64,82 +79,26 @@ describe('the finance facade: money in, conversion snapshot out (integration, re
     const snapshot = (amountMinor: bigint, currency: string, date: string) =>
       runner.run((tx) => finance.snapshotMoney(tx, { amountMinor, currency }, date));
 
-    it('M1: freezes 1,200.00 USD at the 25,000 rate of that very day as 30,000,000 VND, naming the rate used', async () => {
-      const rateId = await insertRate('USD', '2026-09-01', '25000');
-
-      const result = await snapshot(120000n, 'USD', '2026-09-01');
-
-      expect(result).toEqual({
-        status: 'CONVERTED',
-        snapshot: {
-          rate: 25000n * 10n ** 10n,
-          rateDate: '2026-09-01',
-          rateSource: 'MANUAL',
-          reportingAmountMinor: 30000000n,
-          reportingCurrency: 'VND',
-          exchangeRateId: rateId,
-        },
+    it('QĐ-111an: records the organization reporting currency as itself: rate 1, SAME_CURRENCY, no rate row used', async () => {
+      expect(await snapshot(1500000n, 'VND', '2026-09-05')).toEqual({
+        rate: 10n ** 10n,
+        rateDate: '2026-09-05',
+        rateSource: 'SAME_CURRENCY',
+        reportingAmountMinor: 1500000n,
+        reportingCurrency: 'VND',
+        exchangeRateId: null,
       });
     });
 
-    it('M2: a later rate does not change the snapshot already taken, and does not apply to another day', async () => {
-      await insertRate('USD', '2026-10-01', '26000');
+    it('QĐ-111an: money in another currency is a programming error: nothing converts it, even with a rate an older release entered for that day', async () => {
+      await insertRate('USD', '2026-09-01', '25000');
 
-      const september = await snapshot(120000n, 'USD', '2026-09-01');
-      const october = await snapshot(120000n, 'USD', '2026-10-01');
-
-      expect(september).toMatchObject({ status: 'CONVERTED', snapshot: { reportingAmountMinor: 30000000n } });
-      expect(october).toMatchObject({ status: 'CONVERTED', snapshot: { reportingAmountMinor: 31200000n } });
-    });
-
-    it('M16: with no rate for that day it is MISSING_RATE; a rate for another day, earlier or later, does not stand in', async () => {
-      await insertRate('EUR', '2026-09-10', '27000');
-      await insertRate('EUR', '2026-09-12', '27500');
-
-      expect(await snapshot(100n, 'EUR', '2026-09-11')).toEqual({ status: 'MISSING_RATE' });
-
-      await insertRate('EUR', '2026-09-11', '27200');
-      expect(await snapshot(100n, 'EUR', '2026-09-11')).toMatchObject({ status: 'CONVERTED' });
-    });
-
-    it('records the organization reporting currency as itself: rate 1, SAME_CURRENCY, no rate row used', async () => {
-      const result = await snapshot(1500000n, 'VND', '2026-09-05');
-
-      expect(result).toEqual({
-        status: 'CONVERTED',
-        snapshot: {
-          rate: 10n ** 10n,
-          rateDate: '2026-09-05',
-          rateSource: 'SAME_CURRENCY',
-          reportingAmountMinor: 1500000n,
-          reportingCurrency: 'VND',
-          exchangeRateId: null,
-        },
-      });
-    });
-
-    it('converts through a rate with ten decimals read back from PostgreSQL, and rounds a half away from zero', async () => {
-      const rateId = await insertRate('GBP', '2026-09-20', '25431.5000000001');
-
-      // 100.00 GBP x 25431.5000000001 = 2,543,150.00001 VND -> 2543150
-      expect(await snapshot(10000n, 'GBP', '2026-09-20')).toMatchObject({
-        status: 'CONVERTED',
-        snapshot: { rate: 254315000000001n, reportingAmountMinor: 2543150n, exchangeRateId: rateId },
-      });
-      // 0.03 GBP x 25431.5000000001 = 762.945000000003 VND -> 763
-      expect(await snapshot(3n, 'GBP', '2026-09-20')).toMatchObject({ snapshot: { reportingAmountMinor: 763n } });
-
-      await insertRate('GBP', '2026-09-21', '25450');
-      // 0.01 GBP x 25450 = exactly 254.5 VND -> 255 (the half moves away from zero)
-      expect(await snapshot(1n, 'GBP', '2026-09-21')).toMatchObject({ snapshot: { reportingAmountMinor: 255n } });
+      await expect(snapshot(120000n, 'USD', '2026-09-01')).rejects.toThrow(/USD.*reporting currency VND/);
+      await expect(snapshot(100n, 'XYZ', '2026-09-01')).rejects.toThrow(/XYZ.*reporting currency VND/);
     });
 
     it('refuses a rate date that is not a business date instead of reaching SQL with it', async () => {
-      await expect(snapshot(100n, 'USD', '2026-13-45')).rejects.toBeInstanceOf(RangeError);
-    });
-
-    it('refuses a currency the system does not support', async () => {
-      await expect(snapshot(100n, 'XYZ', '2026-09-01')).rejects.toBeInstanceOf(CurrencyNotSupportedError);
+      await expect(snapshot(100n, 'VND', '2026-13-45')).rejects.toBeInstanceOf(RangeError);
     });
   });
 });

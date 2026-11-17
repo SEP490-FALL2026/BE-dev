@@ -218,13 +218,12 @@ export class SeatBaselineImportService {
 
   // --- helpers ------------------------------------------------------------------------
 
-  /** The facts a judgement stands on, with the people and the Cost Centers the rows name read now (in `tx` when given). */
+  /** The facts a judgement stands on, with the people the rows name read now (in `tx` when given). */
   private async factsFor(rows: readonly { cells: SeatCells }[], base: BaselineFacts, tx?: DbTx): Promise<SeatFacts> {
     const names = lookupNamesOf(rows);
     const employees = await this.organizationReads.getEmployeesByCodes(names.employeeCodes, tx);
-    const costCenters = await this.organizationReads.getCostCentersByCodes(names.costCenterCodes, tx);
     const companyDomains = await this.organizationReads.getCompanyEmailDomains(tx);
-    // The department of each person on the day of the import and its Unit: a service account is owned and charged there.
+    // The department of each person on the day of the import: a personal seat is held there (`QĐ-103d`).
     const units = await this.organizationReads.getOwningUnits(
       employees.map((employee) => employee.id),
       base.recordedOn,
@@ -250,29 +249,17 @@ export class SeatBaselineImportService {
           },
         ]),
       ),
-      costCenters: new Map(
-        costCenters.map((costCenter) => [
-          costCenter.code,
-          { id: costCenter.id, kind: costCenter.kind, status: costCenter.status },
-        ]),
-      ),
       companyDomains,
       existing: base.existing,
     };
   }
 
-  /** Reads the facts, holds the people and the Cost Centers they name `FOR SHARE` in id order, and reads them again. */
+  /** Reads the facts, holds the people they name `FOR SHARE` in id order, and reads them again. */
   private async lockedFacts(tx: DbTx, stored: readonly StoredRow[], base: BaselineFacts): Promise<SeatFacts> {
     const before = await this.factsFor(stored, base, tx);
     const names = lookupNamesOf(stored);
     const employeeIds = names.employeeCodes.flatMap((code) => before.employees.get(code)?.id ?? []).sort();
     for (const employeeId of employeeIds) await this.organizationReads.lockEmployeeForShare(tx, employeeId);
-    // The Cost Centers the rows name and the Unit of each person's department, held so none is retired meanwhile.
-    const costCenterIds = [
-      ...names.costCenterCodes.flatMap((code) => before.costCenters.get(code)?.id ?? []),
-      ...[...before.employees.values()].flatMap((employee) => employee.owningUnit?.costCenter?.id ?? []),
-    ];
-    await this.organizationReads.lockCostCentersShared(tx, [...new Set(costCenterIds)]);
 
     return this.factsFor(stored, base, tx);
   }

@@ -10,6 +10,7 @@ import {
   DepartmentInUseError,
   DepartmentInactiveError,
   DepartmentItAdminInvalidError,
+  DepartmentItAdminLimitReachedError,
   DepartmentNameInvalidError,
   DepartmentNotFoundError,
   DepartmentNotYetEffectiveError,
@@ -60,6 +61,9 @@ export function toDepartmentApiException(error: unknown): unknown {
   if (error instanceof DepartmentItAdminInvalidError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.IT_ADMIN_INVALID', error.message);
   }
+  if (error instanceof DepartmentItAdminLimitReachedError) {
+    return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.IT_ADMIN_LIMIT_REACHED', error.message, { limit: error.limit });
+  }
   if (error instanceof DepartmentUpdateEmptyError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.UPDATE_EMPTY', error.message);
   }
@@ -104,6 +108,7 @@ export const DEPARTMENT_ERROR_EXAMPLES = {
   DEPARTMENT_NOT_YET_EFFECTIVE: example(new DepartmentNotYetEffectiveError('2027-01-01')),
   DEPARTMENT_NAME_INVALID: example(new DepartmentNameInvalidError()),
   DEPARTMENT_IT_ADMIN_INVALID: example(new DepartmentItAdminInvalidError()),
+  DEPARTMENT_IT_ADMIN_LIMIT_REACHED: example(new DepartmentItAdminLimitReachedError(4)),
   DEPARTMENT_UPDATE_EMPTY: example(new DepartmentUpdateEmptyError()),
   DEPARTMENT_INACTIVE: example(new DepartmentInactiveError()),
   DEPARTMENT_IN_USE: example(

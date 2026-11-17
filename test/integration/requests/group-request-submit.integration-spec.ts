@@ -157,7 +157,8 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
         .expect(422);
 
       // An end date past a year from today is refused as the domain says it (`US-05-23` AC-9), the confirmation in words as a field that is gone.
-      expect(h.codeOf(long)).toBe('GROUP_REQUEST.TERM_BEYOND_LIMIT');
+      expect(h.codeOf(long)).toBe('ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE');
+      expect(h.detailsOf(long)).toMatchObject({ maxMonths: 12 });
       expect(h.codeOf(confirmed)).toBe('VALIDATION_ERROR');
       expect(await h.requestRows()).toBe(rows);
       expect((await sent(u.head.account, h.groupBody(paid, [e1, e2], { termMonths: 12 }))).type).toBe('GROUP_GRANT');
@@ -190,7 +191,6 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
         employeeId: u.head.employeeId,
         ok: false,
         reason: 'HEAD_IN_GROUP',
-        manyPaidSoftware: null,
       });
     });
 
@@ -296,8 +296,8 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
       expect(await h.requestRows()).toBe(rows);
     });
 
-    it('FR-2.8: needs the end date of the group for an intern, takes it for every line, and takes no end date of one line alone', async () => {
-      // Rewritten from "takes no end day of an intern from the sender" (Q-03): the group names one end date for all of its people now.
+    it('FR-2.8: needs the months of the group for an intern, takes them for every line, and takes no end date of one line alone', async () => {
+      // Rewritten from "takes no end day of an intern from the sender" (Q-03): the group names one time of use for all of its people now (`QĐ-111i`).
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
       await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN' WHERE id = $1`, [e2.employeeId]);
@@ -308,7 +308,7 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
 
       const refusedLine = await h.submitGroup(perLine, u.head.account).expect(422);
       const refusedNone = await h.submitGroup(h.groupBody(paid, [e1, e2]), u.head.account).expect(422);
-      const request = await sent(u.head.account, h.groupBody(paid, [e1, e2], { expectedEndDate: h.today() }));
+      const request = await sent(u.head.account, h.groupBody(paid, [e1, e2], { termMonths: 1 }));
 
       expect(h.codeOf(refusedLine)).toBe('VALIDATION_ERROR');
       expect(refusedNone.body as Refused).toMatchObject({
@@ -317,7 +317,8 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
           details: { lines: [{ employeeId: e2.employeeId, reason: 'TERM_REQUIRED' }] },
         },
       });
-      expect((await h.lineRows(request.id)).map((line) => line.expected_end_date)).toEqual([h.today(), h.today()]);
+      // The end of each seat is worked out when it is granted, from the months and the contract of the person: no line keeps a day.
+      expect((await h.lineRows(request.id)).map((line) => line.expected_end_date)).toEqual([null, null]);
     });
 
     it('names a person twice, and refuses a plan that is not for a group by what it grants and never by its name', async () => {

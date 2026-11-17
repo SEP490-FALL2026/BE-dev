@@ -15,18 +15,22 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(defaults.APPROVAL_SLA_WORKING_DAYS).toBe(2);
     expect(defaults.ACTIVITY_WINDOW_MINUTES).toBe(5);
     expect(defaults.SPEND_SUBMISSION_WAIT_WORKING_DAYS).toBe(2);
-    expect(defaults.TRANSFER_REVIEW_WORKING_DAYS).toBe(5);
+    // The new head reviews nothing after a transfer, so there is no deadline for it (QĐ-110p).
+    expect(defaults).not.toHaveProperty('TRANSFER_REVIEW_WORKING_DAYS');
+    expect(definitionOf('TRANSFER_REVIEW_WORKING_DAYS')).toBeUndefined();
     expect(defaults.PERSONNEL_NOTICE_REVIEW_WORKING_DAYS).toBe(2);
     expect(defaults.SAAS_ISSUE_RESPONSE_WORKING_DAYS).toBe(1);
     expect(defaults.SAAS_ISSUE_REOPEN_WORKING_DAYS).toBe(5);
-    expect(defaults.ABRUPT_DEPARTURE_HOLD_WORKING_DAYS).toBe(1);
+    expect(defaults.DEPARTURE_REVOCATION_WORKING_DAYS).toBe(1);
+    expect(defaults.TRANSFER_GRACE_WORKING_DAYS).toBe(5);
+    expect(defaults.TRANSFER_GRACE_REMINDER_WORKING_DAYS).toBe(2);
     expect(defaults.BACKLOG_ALERT_THRESHOLD).toBe(10);
     expect(defaults.DETECTION_THRESHOLD_DAYS).toEqual([30, 60, 90]);
-    expect(defaults.RENEWAL_ALERT_DAYS_BEFORE_DEADLINE).toEqual([15, 7]);
     expect(defaults.GHOST_SEAT_DECISION_WORKING_DAYS).toBe(5);
     expect(defaults.GHOST_SEAT_REVOCATION_GRACE_DAYS).toBe(7);
     expect(defaults.RULE_SCHEDULE_G1_G2).toBe('DAILY');
     expect(defaults.RULE_SCHEDULE_G3_G4).toBe('WEEKLY');
+    expect(defaults.AI_PROVIDER_MODE).toBe('SIMULATED');
   });
 
   it('has no budget period kind and no high-value threshold: the budget period is the fiscal year (AC-8, AC-14)', () => {
@@ -74,8 +78,6 @@ describe('operating parameter definitions (US-01-04)', () => {
     ['thresholds out of order', 'DETECTION_THRESHOLD_DAYS', [60, 30, 90]],
     ['thresholds with a repeat', 'DETECTION_THRESHOLD_DAYS', [30, 30, 90]],
     ['two thresholds instead of three', 'DETECTION_THRESHOLD_DAYS', [30, 60]],
-    ['alerts that do not fall', 'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE', [7, 15]],
-    ['an empty alert list', 'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE', []],
     ['a schedule that is not one', 'RULE_SCHEDULE_G1_G2', 'HOURLY'],
   ])('refuses %s', (_name, key, value) => {
     expect(validateParameterValue(key, value, defaultValues())).toMatchObject({ ok: false });
@@ -102,6 +104,24 @@ describe('operating parameter definitions (US-01-04)', () => {
     }
   });
 
+  it('QĐ-111h: the limit of requests for new access is one of the calendar week, ten to begin with', () => {
+    expect(defaultValues().REQUEST_OPEN_NEW_LIMIT).toBe(10);
+    expect(definitionOf('REQUEST_OPEN_NEW_LIMIT')?.description).toMatch(/calendar week/);
+    expect(validateParameterValue('REQUEST_OPEN_NEW_LIMIT', 15, defaultValues())).toEqual({ ok: true });
+  });
+
+  it('QĐ-111h: there is no GH-3, so no threshold of paid applications is known, set or read', () => {
+    expect(defaultValues()).not.toHaveProperty('PAID_SOFTWARE_FLAG_THRESHOLD');
+    expect(definitionOf('PAID_SOFTWARE_FLAG_THRESHOLD')).toBeUndefined();
+  });
+
+  it('QĐ-111ab: a budget line carries no zero-based-budget explanation, so no ZBB threshold is known, set or read', () => {
+    for (const key of ['BUDGET_ZBB_KPI3_BELOW_PERCENT', 'BUDGET_ZBB_PRICE_INCREASE_PERCENT']) {
+      expect(defaultValues()).not.toHaveProperty(key);
+      expect(definitionOf(key)).toBeUndefined();
+    }
+  });
+
   it('knows its own keys and nothing else', () => {
     expect(definitionOf('APPROVAL_SLA_WORKING_DAYS')?.unit).toBe('working days');
     expect(definitionOf('TIME_ZONE')).toBeUndefined();
@@ -109,28 +129,37 @@ describe('operating parameter definitions (US-01-04)', () => {
   });
 });
 
+const SWITCH_LABELS = { ON: 'Bật', OFF: 'Tắt' };
+const SCHEDULE_LABELS = { DAILY: 'Hằng ngày', WEEKLY: 'Hằng tuần' };
+const OPTION_LABELS: Record<string, Record<string, string>> = {
+  RULE_SCHEDULE_G1_G2: SCHEDULE_LABELS,
+  RULE_SCHEDULE_G3_G4: SCHEDULE_LABELS,
+  AI_ENABLED: SWITCH_LABELS,
+  AI_ACCESS_REQUEST_SUMMARY_ENABLED: SWITCH_LABELS,
+  AI_PROVIDER_MODE: { SIMULATED: 'Giả lập (không gọi model)', MODEL: 'Model AI' },
+};
+
 const EXPECTED_KEYS = [
   'APPROVAL_SLA_WORKING_DAYS',
   'BACKLOG_ALERT_THRESHOLD',
   'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
   'REQUEST_OPEN_NEW_LIMIT',
-  'PAID_SOFTWARE_FLAG_THRESHOLD',
   'RENEWAL_WINDOW_DAYS',
   'FORECAST_ERROR_THRESHOLD_PERCENT',
   'BUDGET_RESERVE_DEFAULT_PERCENT',
-  'BUDGET_ZBB_KPI3_BELOW_PERCENT',
-  'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
-  'TRANSFER_REVIEW_WORKING_DAYS',
   'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
-  'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
-  'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
+  'DEPARTURE_REVOCATION_WORKING_DAYS',
+  'TRANSFER_GRACE_WORKING_DAYS',
+  'TRANSFER_GRACE_REMINDER_WORKING_DAYS',
   'PROVISIONING_RETRY_COUNT',
   'SAAS_ISSUE_RESPONSE_WORKING_DAYS',
   'SAAS_ISSUE_REOPEN_WORKING_DAYS',
   'INVITATION_REMINDER_DAYS',
   'INVITATION_WITHDRAW_DAYS',
   'DOCUMENT_MAX_SIZE_MB',
-  'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
+  'SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY',
+  'SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL',
+  'SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL',
   'ACTIVITY_WINDOW_MINUTES',
   'DETECTION_THRESHOLD_DAYS',
   'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
@@ -140,10 +169,11 @@ const EXPECTED_KEYS = [
   'RULE_SCHEDULE_G3_G4',
   'AI_ENABLED',
   'AI_ACCESS_REQUEST_SUMMARY_ENABLED',
+  'AI_PROVIDER_MODE',
 ];
 
 describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
-  it('pins the twenty-six keys, ordered by group and, inside a group, as the spec table lists them', () => {
+  it('pins the thirty keys, ordered by group and, inside a group, as the spec table lists them', () => {
     expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
   });
 
@@ -203,32 +233,10 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['APPROVAL_SLA_WORKING_DAYS', 'Hạn xử lý một bước phê duyệt', 'WORKFLOW', 'working days', 'ngày làm việc'],
       ['BACKLOG_ALERT_THRESHOLD', 'Ngưỡng tồn đọng bước phê duyệt', 'WORKFLOW', 'steps', 'bước'],
       ['SPEND_SUBMISSION_WAIT_WORKING_DAYS', 'Hạn chờ trình duyệt chi', 'WORKFLOW', 'working days', 'ngày làm việc'],
-      ['REQUEST_OPEN_NEW_LIMIT', 'Số Request cấp mới đang mở tối đa của một người', 'WORKFLOW', 'requests', 'Request'],
-      [
-        'PAID_SOFTWARE_FLAG_THRESHOLD',
-        'Ngưỡng số phần mềm trả phí cần lý do khi xin thêm',
-        'WORKFLOW',
-        'applications',
-        'phần mềm',
-      ],
+      ['REQUEST_OPEN_NEW_LIMIT', 'Số Request cấp mới tối đa mỗi tuần của một người', 'WORKFLOW', 'requests', 'Request'],
       ['RENEWAL_WINDOW_DAYS', 'Cửa sổ gửi Request tiếp tục trước ngày kết thúc', 'WORKFLOW', 'days', 'ngày'],
       ['FORECAST_ERROR_THRESHOLD_PERCENT', 'Ngưỡng sai số dự báo chi phí', 'BUDGET', 'percent', '%'],
       ['BUDGET_RESERVE_DEFAULT_PERCENT', 'Tỷ lệ dự phòng mặc định của ngân sách năm', 'BUDGET', 'percent', '%'],
-      [
-        'BUDGET_ZBB_KPI3_BELOW_PERCENT',
-        'Ngưỡng sử dụng dưới đó dòng ngân sách cần giải trình ZBB',
-        'BUDGET',
-        'percent',
-        '%',
-      ],
-      ['BUDGET_ZBB_PRICE_INCREASE_PERCENT', 'Ngưỡng tăng đơn giá cần giải trình ZBB', 'BUDGET', 'percent', '%'],
-      [
-        'TRANSFER_REVIEW_WORKING_DAYS',
-        'Hạn rà soát quyền sau điều chuyển',
-        'PERSONNEL',
-        'working days',
-        'ngày làm việc',
-      ],
       [
         'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
         'Hạn xử lý thông báo biến động nhân sự',
@@ -237,15 +245,22 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
         'ngày làm việc',
       ],
       [
-        'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
-        'Thời gian giữ công cụ khi nghỉ đột xuất',
+        'DEPARTURE_REVOCATION_WORKING_DAYS',
+        'Hạn thu hồi quyền sau khi chặn người nghỉ việc',
         'PERSONNEL',
         'working days',
         'ngày làm việc',
       ],
       [
-        'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
-        'Hạn ngắn xác nhận bàn giao dữ liệu',
+        'TRANSFER_GRACE_WORKING_DAYS',
+        'Thời gian ân hạn quyền cũ sau điều chuyển',
+        'PERSONNEL',
+        'working days',
+        'ngày làm việc',
+      ],
+      [
+        'TRANSFER_GRACE_REMINDER_WORKING_DAYS',
+        'Nhắc người chuyển trước khi hết ân hạn',
         'PERSONNEL',
         'working days',
         'ngày làm việc',
@@ -262,7 +277,21 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['INVITATION_REMINDER_DAYS', 'Nhắc lời mời chưa kích hoạt sau', 'ACCOUNT', 'days', 'ngày'],
       ['INVITATION_WITHDRAW_DAYS', 'Thu hồi lời mời chưa kích hoạt sau', 'ACCOUNT', 'days', 'ngày'],
       ['DOCUMENT_MAX_SIZE_MB', 'Dung lượng tối đa của tệp tài liệu', 'DOCUMENT', 'MB', 'MB'],
-      ['RENEWAL_ALERT_DAYS_BEFORE_DEADLINE', 'Cảnh báo trước hạn báo hủy thuê bao', 'SUBSCRIPTION', 'days', 'ngày'],
+      [
+        'SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY',
+        'Mở điểm điều chỉnh gói tháng trước ngày thanh toán',
+        'SUBSCRIPTION',
+        'days',
+        'ngày',
+      ],
+      [
+        'SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL',
+        'Mở điểm điều chỉnh gói năm trước hạn báo hủy',
+        'SUBSCRIPTION',
+        'days',
+        'ngày',
+      ],
+      ['SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL', 'Cảnh báo đỏ gói năm trước hạn báo hủy', 'SUBSCRIPTION', 'days', 'ngày'],
       ['ACTIVITY_WINDOW_MINUTES', 'Số phút tính là một ngày có hoạt động', 'USAGE', 'minutes per day', 'phút mỗi ngày'],
       ['DETECTION_THRESHOLD_DAYS', 'Ngưỡng ngày không dùng của ghế', 'USAGE', 'days', 'ngày'],
       ['GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS', 'Ân hạn cho ghế mới cấp', 'USAGE', 'days', 'ngày'],
@@ -278,6 +307,7 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['RULE_SCHEDULE_G3_G4', 'Lịch chạy luật lãng phí (dữ liệu usage)', 'USAGE', 'schedule', 'lịch'],
       ['AI_ENABLED', 'Công tắc tổng của các tính năng AI', 'AI', 'switch', 'công tắc'],
       ['AI_ACCESS_REQUEST_SUMMARY_ENABLED', 'Tóm tắt hàng chờ duyệt bằng AI', 'AI', 'switch', 'công tắc'],
+      ['AI_PROVIDER_MODE', 'Nguồn trả lời của AI', 'AI', 'mode', 'chế độ'],
     ]);
   });
 
@@ -289,15 +319,14 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       'RULE_SCHEDULE_G3_G4',
       'AI_ENABLED',
       'AI_ACCESS_REQUEST_SUMMARY_ENABLED',
+      'AI_PROVIDER_MODE',
     ]);
     expect(ENUM_OPTIONS_MAX).toBe(10);
     for (const definition of enums) {
       if (definition.shape.kind !== 'enum') continue;
       expect(Object.keys(definition.shape.optionLabels).sort()).toEqual([...definition.shape.options].sort());
       expect(definition.shape.options.length).toBeLessThanOrEqual(ENUM_OPTIONS_MAX);
-      expect(definition.shape.optionLabels).toEqual(
-        definition.group === 'AI' ? { ON: 'Bật', OFF: 'Tắt' } : { DAILY: 'Hằng ngày', WEEKLY: 'Hằng tuần' },
-      );
+      expect(definition.shape.optionLabels).toEqual(OPTION_LABELS[definition.key]);
     }
   });
 
@@ -321,12 +350,33 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
     expect(definitionOf('AI_FINANCE_NARRATIVE_ENABLED')).toBeUndefined();
   });
 
-  it('describes the notice review as the Super Admin task and the transfer review as every right a person holds (API-DOC-F07)', () => {
+  it('answers with the simulation until the Super Admin chooses the model, and takes nothing but SIMULATED or MODEL', () => {
+    const definition = definitionOf('AI_PROVIDER_MODE');
+
+    expect(definition).toMatchObject({
+      label: 'Nguồn trả lời của AI',
+      group: 'AI',
+      shape: { kind: 'enum', options: ['SIMULATED', 'MODEL'] },
+      default: 'SIMULATED',
+      unit: 'mode',
+      unitLabel: 'chế độ',
+    });
+    expect(definition?.description).toContain('Chỉ có hiệu lực khi công tắc AI đang bật.');
+    expect(defaultValues().AI_PROVIDER_MODE).toBe('SIMULATED');
+    for (const value of ['SIMULATED', 'MODEL']) {
+      expect(validateParameterValue('AI_PROVIDER_MODE', value, defaultValues())).toEqual({ ok: true });
+    }
+    for (const value of ['simulated', 'model', 'ON', 'OFF', 'OPENAI', '', true, 1, null]) {
+      expect(validateParameterValue('AI_PROVIDER_MODE', value, defaultValues())).toEqual({
+        ok: false,
+        reason: 'OUT_OF_RANGE',
+      });
+    }
+  });
+
+  it('describes the notice review as the Super Admin task (API-DOC-F07)', () => {
     expect(definitionOf('PERSONNEL_NOTICE_REVIEW_WORKING_DAYS')?.description).toBe(
       'How long the Super Admin has to verify and record, or reject, the notice of a department head about a change coming for one of their people.',
-    );
-    expect(definitionOf('TRANSFER_REVIEW_WORKING_DAYS')?.description).toBe(
-      'How long the new head of a department has to review every right a transferred person holds, paid or internal, counted in working days from the day the transfer takes effect.',
     );
     for (const definition of PARAMETER_DEFINITIONS) {
       expect(definition.description).not.toMatch(

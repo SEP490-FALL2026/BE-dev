@@ -1,3 +1,5 @@
+import type { BusinessDate } from '../../../core/business-date';
+import type { TermKind, TermRefusal } from '../../../core/term-limit';
 import type { WithdrawalRefusal } from './withdrawal.policy';
 import type { CancellationRefusal, HeldAccess } from './access-request.types';
 
@@ -65,25 +67,14 @@ export class AccessRequestOpenRequestExistsError extends Error {
   }
 }
 
-/** GH-2 (`BR-MF1-01f`): the person already has as many requests for new access open as they may. */
+/** GH-2 (`BR-MF1-01f`, `QĐ-111h`): the person was already named in as many requests for new access this calendar week as they may; the count starts again on `resetsOn`. */
 export class AccessRequestOpenLimitReachedError extends Error {
   constructor(
     readonly limit: number,
-    readonly openRequestIds: readonly string[],
+    readonly resetsOn: BusinessDate,
   ) {
-    super('The person already has as many requests for new access open as they may.');
+    super('The person was already named in as many requests for new access this week as they may.');
     this.name = 'AccessRequestOpenLimitReachedError';
-  }
-}
-
-/** GH-3 (`BR-MF1-01g`): the person uses many paid applications already, so a reason is needed to ask for another one. */
-export class AccessRequestManyPaidSoftwareReasonRequiredError extends Error {
-  constructor(
-    readonly count: number,
-    readonly threshold: number,
-  ) {
-    super('The person uses many paid applications already: a reason is required to ask for another one.');
-    this.name = 'AccessRequestManyPaidSoftwareReasonRequiredError';
   }
 }
 
@@ -95,24 +86,31 @@ export class AccessRequestNotPriceableError extends Error {
   }
 }
 
-/**
- * The end date asked for is before today or later than a year from today (`US-05-23` AC-9, `QĐ-104a`): the last day a right may
- * end is the day before the same day twelve months later. A draft saved with a date that no longer fits must be saved again.
- */
-export class AccessRequestEndDateOutOfRangeError extends Error {
-  constructor(readonly maxEndDate: string) {
-    super(
-      'The end date is before today or more than a year from today. A draft saved with such a date must be saved again with a date inside the year.',
-    );
-    this.name = 'AccessRequestEndDateOutOfRangeError';
-  }
-}
+const TERM_MESSAGES: Readonly<Record<TermRefusal, string>> = {
+  TERM_REQUIRED: 'Give the time of use in months.',
+  TERM_MONTHS_OUT_OF_RANGE:
+    'The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.',
+  TERM_NOT_ASKED: 'This plan is bought once: it takes no time of use.',
+  TERM_LONG_TERM_NOT_ALLOWED:
+    'A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.',
+  TERM_CONTRACT_ENDED: 'The contract of the person ended before the time of use begins: no access is given beyond it.',
+};
 
-/** The person it is for is not staff (a contractor, a freelancer, an intern) and the request names no end date (`FR-2.8`). */
-export class AccessRequestTermRequiredError extends Error {
-  constructor() {
-    super('A contractor, a freelancer or an intern gets access for a term: give the end date.');
-    this.name = 'AccessRequestTermRequiredError';
+/**
+ * The time of use the request gives is refused (`QĐ-111i`, `FR-2.8`, `INV-07`): it is missing, outside what the kind of plan takes, given to a
+ * plan that asks none, no end for a person who has a term, or a contract that ended before the time of use begins (`contractEndDate` says
+ * when). A term that runs past the end of the contract is not refused: it is cut (R-38).
+ */
+export class AccessRequestTermRefusedError extends Error {
+  constructor(
+    readonly reason: TermRefusal,
+    /** The last day of the contract, for `TERM_CONTRACT_ENDED`. */
+    readonly contractEndDate: BusinessDate | null = null,
+    /** The kind of the plan the time of use is judged for; null for a proposal, whose plan is not known (the rule that takes the most judges it). */
+    readonly kind: TermKind | null = null,
+  ) {
+    super(TERM_MESSAGES[reason]);
+    this.name = 'AccessRequestTermRefusedError';
   }
 }
 

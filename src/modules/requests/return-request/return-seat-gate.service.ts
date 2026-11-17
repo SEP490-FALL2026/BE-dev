@@ -9,7 +9,7 @@ import {
 } from '../../licensing/public/licensing.errors';
 import { LicensingRenewalApi } from '../../licensing/public/licensing-renewal.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
-import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.types';
+import type { AssignmentFacts, PendingRenewal } from '../../licensing/public/licensing-renewal.types';
 import { ReturnRequestRefusedError } from './return-request.errors';
 
 /**
@@ -44,8 +44,9 @@ export class ReturnSeatGate {
     return facts;
   }
 
-  hasPendingRenewal(assignmentId: string, tx: DbTx): Promise<boolean> {
-    return this.licensingRenewals.hasPendingRenewal(assignmentId, tx);
+  /** The renewal of the seat that waits for its decision, or null. */
+  pendingRenewalOf(assignmentId: string, tx: DbTx): Promise<PendingRenewal | null> {
+    return this.licensingRenewals.pendingRenewalOf(assignmentId, tx);
   }
 
   /**

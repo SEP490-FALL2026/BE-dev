@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Contributions } from '../../../core/extension/contributions';
 import { Listeners } from '../../../core/extension/listeners';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { ApprovalRoleChange } from './identity-access.types';
+import type { AppRole, ApprovalRoleChange } from './identity-access.types';
 
 // The points identity-access opens for the modules above it (`core/extension`): they add to them from a `*.listener.ts` when
 // their module starts, so identity-access never imports them. One instance of each per application.
@@ -28,7 +28,7 @@ export class ApprovalRoleChangeListeners extends Listeners<ApprovalRoleChange, D
 }
 
 /** What kind of open work stands in the way of the grant of SPENDING_APPROVER (`QĐ-93d`(3)). */
-export type SpendingApproverBlockerKind = 'REQUEST' | 'RETURN_REQUEST' | 'BUDGET_PROPOSAL' | 'SERVICE_ACCOUNT';
+export type SpendingApproverBlockerKind = 'REQUEST' | 'RETURN_REQUEST' | 'BUDGET_PROPOSAL';
 
 /** One piece of open work the person is a party of: what the refusal shows the Super Admin so they can finish or hand it on. */
 export interface SpendingApproverBlocker {
@@ -54,13 +54,44 @@ export interface SpendingApproverGrantCheck {
 }
 
 /**
- * Who tells the grant of SPENDING_APPROVER of the work that is still open (`QĐ-93d`(3), `US-01-03` AC-12, AC-13): the Request, the budget
- * proposal and the service account sit in modules above identity-access, which add one check each from a `*.listener.ts`. Held by the
+ * Who tells the grant of SPENDING_APPROVER of the work that is still open (`QĐ-93d`(3), `US-01-03` AC-12, AC-13): the Request and the budget
+ * proposal sit in modules above identity-access, which add one check each from a `*.listener.ts`. Held by the
  * facade module, one per application; with nobody added a grant finds no work.
  */
 @Injectable()
 export class SpendingApproverGrantChecks extends Contributions<SpendingApproverGrantCheck> {
   constructor() {
     super('identity-access.spending-approver-grant-checks');
+  }
+}
+
+/** A policy in force that a person owes an acknowledgement of: what `GET /me` lists so the interface can ask before the dashboard (`QĐ-111ar`). */
+export interface PendingPolicyAcknowledgement {
+  code: string;
+  title: string;
+  versionNumber: number;
+}
+
+/** The person to ask about: the account and the roles it holds, as `GET /me` knows them. */
+export interface PolicyReader {
+  appUserId: string;
+  employeeId: string;
+  roles: readonly AppRole[];
+}
+
+/** A module that knows policies the person has not acknowledged yet. */
+export interface PendingPolicyAcknowledgementSource {
+  pendingFor(reader: PolicyReader): Promise<PendingPolicyAcknowledgement[]>;
+}
+
+/**
+ * Who tells `GET /me` which policies the caller owes an acknowledgement of (`QĐ-111ar`): the library of policies sits in a module above
+ * identity-access, which adds one source from a `*.listener.ts`. Held by the facade module, one per application; with nobody added the
+ * list is empty. The route only tells: no other route refuses a person who has not acknowledged.
+ */
+@Injectable()
+export class PendingPolicyAcknowledgements extends Contributions<PendingPolicyAcknowledgementSource> {
+  constructor() {
+    super('identity-access.pending-policy-acknowledgements');
   }
 }

@@ -73,7 +73,8 @@ export interface ServiceAccountRecord {
 export interface RenewalRecord {
   assignmentId: string;
   previousExpectedEndDate: BusinessDate;
-  newExpectedEndDate: BusinessDate;
+  /** Null for a renewal that goes on with no end (_Dùng lâu dài_). */
+  newExpectedEndDate: BusinessDate | null;
   /** The months the right would run on without a break once renewed; over twelve needs the confirmation of the head. */
   consecutiveMonths: number;
   /** The record that follows the old one, written when the request was approved; null until then. */
@@ -106,8 +107,10 @@ export interface NewAccessRequest {
   createdByAppUserId: string;
   now: Date;
   needStep: NewNeedStep;
-  /** GH-3 of the person, fixed when it is sent; absent or null when the request is not flagged. */
-  manyPaidSoftware?: ManyPaidSoftwareFlag | null;
+  /** Why the request was left out of GH-1/GH-2 when it was sent; absent or null when it was not (`QĐ-110q`). */
+  limitExemption?: LimitExemption | null;
+  /** The old right of the person, held from before a transfer, that this request replaces (R-49): only beside the exemption of the grace. */
+  replacesAssignmentId?: string | null;
   /**
    * The draft this request is made from: the row of the draft becomes the request, so it is the same request from the
    * day it was saved. Absent for a request written new. The caller holds the lock of the draft (`RequestDraftRepo.lock`).
@@ -144,7 +147,8 @@ export interface NeedStepWithDecision extends NeedStepRecord {
 
 /** The electronic approval record of a decision (never changed once written). */
 export interface ApprovalRecordRecord {
-  decision: 'APPROVED' | 'REJECTED';
+  /** `RETURNED`: sent back to the person who sent the request, to add what is missing (`QĐ-111ap`, R-24). */
+  decision: 'APPROVED' | 'REJECTED' | 'RETURNED';
   decidedByEmployeeId: string;
   deciderRole: DeciderRole;
   reason: string | null;
@@ -179,17 +183,17 @@ export interface CancellationRecord {
   note: string | null;
 }
 
-/** GH-3 (`BR-MF1-01g`): the beneficiary used this many paid applications when the request was sent, and why they asked for more. */
-export interface ManyPaidSoftwareFlag {
-  count: number;
-  reason: string;
-}
+/** Why a request is left out of GH-1/GH-2: a request again in the grace of a transfer (`QĐ-110q`, R-49), or after a role ended (`QĐ-108c`). */
+export const LIMIT_EXEMPTIONS = ['TRANSFER_GRACE', 'ROLE_ENDED'] as const;
+export type LimitExemption = (typeof LIMIT_EXEMPTIONS)[number];
 
 export interface AccessRequestRecord {
   routing?: import('./routing.policy').RequestRouting;
-  /** GH-3 of the person of a request of one person; null (or absent on a record made in a test) when it is not flagged. */
-  manyPaidSoftware?: ManyPaidSoftwareFlag | null;
-  oneStepBlockedReason?: 'PRICE_MISSING' | 'RATE_MISSING' | null;
+  /** Why the request was left out of GH-1/GH-2 when it was sent (`QĐ-110q`: `TRANSFER_GRACE`); null (or absent) when it was not. */
+  limitExemption?: LimitExemption | null;
+  /** The old right of the person this request replaces (R-49); internal, never on the wire. */
+  replacesAssignmentId?: string | null;
+  oneStepBlockedReason?: 'PRICE_MISSING' | null;
   id: string;
   organizationId: string;
   type: AccessRequestKind;

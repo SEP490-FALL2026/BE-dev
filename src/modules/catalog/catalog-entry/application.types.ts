@@ -2,14 +2,6 @@ export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
 export type DataSensitivity = 'LOW' | 'MEDIUM' | 'HIGH';
 export type CatalogStatus = 'APPROVED' | 'RETIRED';
 
-export interface ApplicationCommunication {
-  personToPersonMessaging: boolean;
-  callsOrMeetings: boolean;
-  mailbox: boolean;
-  isCommunicationService: boolean;
-  note: string | null;
-}
-
 export interface ApplicationRecord {
   id: string;
   name: string;
@@ -17,11 +9,15 @@ export interface ApplicationRecord {
   vendor: { id: string; name: string; dictionaryGroupId: string | null } | null;
   dictionaryServiceLineId: string | null;
   domains: string[];
-  dataSensitivity: DataSensitivity;
+  /** `QĐ-111f`: may be left empty. */
+  dataSensitivity: DataSensitivity | null;
+  /** The https link to the logo image the IT Admin pasted; null when there is none. */
+  logoUrl: string | null;
   /** QĐ-111g: the IT Admin who answers for the application; null when the creator was not a usable IT Admin and nobody took it over. */
   responsibleItAdminEmployeeId: string | null;
-  communication: ApplicationCommunication;
-  functionalGroup: { id: string; name: string } | null;
+  /** `QĐ-111e`: an application is a communication service when it stands in the group Liên lạc; nobody answers three questions any more. */
+  isCommunicationService: boolean;
+  functionalGroup: { id: string; name: string };
   status: CatalogStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -33,10 +29,12 @@ export interface ApplicationSummaryRecord {
   name: string;
   kind: ApplicationKind;
   vendor: { id: string; name: string } | null;
-  dataSensitivity: DataSensitivity;
+  dataSensitivity: DataSensitivity | null;
+  /** The https link to the logo image the IT Admin pasted; null when there is none. */
+  logoUrl: string | null;
   responsibleItAdminEmployeeId: string | null;
   isCommunicationService: boolean;
-  functionalGroup: { id: string; name: string } | null;
+  functionalGroup: { id: string; name: string };
   status: CatalogStatus;
   updatedAt: Date;
 }
@@ -74,18 +72,19 @@ export interface NewApplication {
   kind: ApplicationKind;
   vendorId: string | null;
   dictionaryServiceLineId: string | null;
-  functionalGroupId: string | null;
+  functionalGroupId: string;
   responsibleItAdminEmployeeId: string | null;
-  dataSensitivity: DataSensitivity;
-  communication: ApplicationCommunication;
+  dataSensitivity: DataSensitivity | null;
+  /** The https link to the logo image the IT Admin pasted; null when there is none. */
+  logoUrl: string | null;
   domains: string[];
 }
 
 export interface ApplicationChanges {
   name?: string;
   dictionaryServiceLineId?: string | null;
-  functionalGroupId?: string | null;
-  dataSensitivity?: DataSensitivity;
-  communication?: ApplicationCommunication;
+  functionalGroupId?: string;
+  dataSensitivity?: DataSensitivity | null;
+  logoUrl?: string | null;
   domains?: string[];
 }

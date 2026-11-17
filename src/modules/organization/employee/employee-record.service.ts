@@ -13,6 +13,7 @@ import {
   EmployeeRecord,
   EmployeeWorkState,
   OfficialFieldsPatch,
+  EmployeePlacementSpan,
   PlacementInForce,
   ProfileNotice,
   ProfileNoticeRequest,
@@ -157,6 +158,15 @@ export class EmployeeRecordService {
 
   profile(employeeId: string, onDate: Date): Promise<EmployeeProfile | null> {
     return this.repo.findProfile(employeeId, onDate);
+  }
+
+  placementsBetween(
+    employeeIds: readonly string[],
+    from: BusinessDate,
+    to: BusinessDate,
+    tx?: DbTx,
+  ): Promise<EmployeePlacementSpan[]> {
+    return this.repo.placementsBetween(employeeIds, from, to, tx);
   }
 
   /** The database clock at the start of the caller's transaction: the instant the new employee's `created_at` gets. */

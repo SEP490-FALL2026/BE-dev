@@ -139,24 +139,61 @@ describe('account management over HTTP (integration, real PostgreSQL): an invali
         .expect(200);
     });
 
-    it('accepts a separate login email, which must be unique (AC-8)', async () => {
+    it('logs the account in with the work email: omitting loginEmail stores workEmail (FX-T7)', async () => {
+      const employee = await newEmployee('Work.Mixed@acme.vn');
+
+      const account = dataOf(await h.admin.post('/api/v1/app-users', { employeeId: employee.employeeId }).expect(201));
+
+      expect(account.loginEmail).toBe('Work.Mixed@acme.vn');
+    });
+
+    it('accepts a loginEmail equal to the work email apart from case, and stores the work email, not the sent text (FX-T7)', async () => {
+      const employee = await newEmployee('Same.Person@acme.vn');
+
+      const account = dataOf(
+        await h.admin
+          .post('/api/v1/app-users', { employeeId: employee.employeeId, loginEmail: 'same.PERSON@ACME.vn' })
+          .expect(201),
+      );
+
+      expect(account.loginEmail).toBe('Same.Person@acme.vn');
+      const stored = await h.ctx.sql.query<{ login_email: string }>('SELECT login_email FROM app_users WHERE id = $1', [
+        account.id,
+      ]);
+      expect(stored.rows[0].login_email).toBe('Same.Person@acme.vn');
+    });
+
+    it('refuses a loginEmail that is not the work email with 422 and creates nothing (FX-T7)', async () => {
+      const employee = await newEmployee();
+      const before = (await h.ctx.sql.query<{ n: number }>('SELECT count(*)::int AS n FROM app_users')).rows[0].n;
+
+      const refused = await h.admin
+        .post('/api/v1/app-users', { employeeId: employee.employeeId, loginEmail: 'someone.else@acme.vn' })
+        .expect(422);
+
+      expect(errorCode(refused)).toBe('APP_USER.LOGIN_EMAIL_NOT_WORK_EMAIL');
+      expect(bodyOf(refused).error.details.field).toBe('loginEmail');
+      const after = (await h.ctx.sql.query<{ n: number }>('SELECT count(*)::int AS n FROM app_users')).rows[0].n;
+      expect(after).toBe(before);
+    });
+
+    it('keeps an invalid loginEmail as LOGIN_EMAIL_INVALID, and the login email unique (AC-8)', async () => {
       const first = await newEmployee();
       const second = await newEmployee();
-      await h.admin
-        .post('/api/v1/app-users', {
-          employeeId: first.employeeId,
-          loginEmail: 'Shared.Login@acme.vn',
-          role: 'EMPLOYEE',
-        })
-        .expect(201);
 
-      const clash = await h.admin
-        .post('/api/v1/app-users', {
-          employeeId: second.employeeId,
-          loginEmail: 'shared.login@ACME.vn',
-          role: 'EMPLOYEE',
-        })
-        .expect(409);
+      const invalid = await h.admin
+        .post('/api/v1/app-users', { employeeId: first.employeeId, loginEmail: 'not-an-address' })
+        .expect(422);
+      expect(errorCode(invalid)).toBe('APP_USER.LOGIN_EMAIL_INVALID');
+
+      // An account whose login email was later changed to the second employee's work email holds that address.
+      const held = dataOf(await h.admin.post('/api/v1/app-users', { employeeId: first.employeeId }).expect(201));
+      await h.ctx.sql.query('UPDATE app_users SET login_email = $2, normalized_login_email = $2 WHERE id = $1', [
+        held.id,
+        second.email.toLowerCase(),
+      ]);
+
+      const clash = await h.admin.post('/api/v1/app-users', { employeeId: second.employeeId }).expect(409);
 
       expect(errorCode(clash)).toBe('APP_USER.LOGIN_EMAIL_TAKEN');
     });

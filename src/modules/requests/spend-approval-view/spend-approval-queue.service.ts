@@ -9,6 +9,7 @@ import { SpendWireViewService } from '../spend/spend-wire-view.service';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 import type { ApprovalSummaryWire } from './spend-approval.dto';
 import { approvalSummaryOf, type QueueLookups } from './spend-approval.mapper';
+import { NextYearBudgetService } from './next-year-budget.service';
 import { StepDueOnService } from './step-due-on.service';
 
 type OpenSpendRows = Awaited<ReturnType<SpendStepRepo['pageOpenSpendOf']>>['rows'];
@@ -27,6 +28,7 @@ export class SpendApprovalQueueService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly wireView: SpendWireViewService,
     private readonly deadlines: StepDueOnService,
+    private readonly nextYear: NextYearBudgetService,
   ) {}
 
   /** The spend steps waiting for the caller, the oldest first. */
@@ -52,7 +54,7 @@ export class SpendApprovalQueueService {
   private async lookupsFor(rows: OpenSpendRows): Promise<QueueLookups> {
     const requestIds = rows.map((row) => row.requestId);
     const planIds = [...new Set(rows.map((row) => row.request.planId).filter((id): id is string => id !== null))];
-    const [checks, batches, plans, people, units, centers, due] = await Promise.all([
+    const [checks, batches, plans, people, units, centers, due, nextYear] = await Promise.all([
       this.checks.latestOf(requestIds),
       this.batches.latestBatchOf(requestIds),
       planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
@@ -70,8 +72,17 @@ export class SpendApprovalQueueService {
       this.deadlines.dueOn(
         rows.map((row) => ({ id: row.id, createdAt: row.createdAt, slaWorkingDays: row.slaWorkingDays })),
       ),
+      this.nextYear.of(
+        rows.map((row) => ({
+          requestId: row.requestId,
+          costCenterId: row.request.costCenterId,
+          budgetYear: row.request.budgetYear,
+          nextYearAmountMinor: row.request.nextYearAmountMinor,
+          currency: row.request.amountCurrency,
+        })),
+      ),
     ]);
 
-    return { checks, batches, plans, people, units, centers, due };
+    return { checks, batches, plans, people, units, centers, due, nextYear };
   }
 }

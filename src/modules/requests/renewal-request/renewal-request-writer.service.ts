@@ -5,12 +5,13 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { AccessRequestTermRefusedError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { RequestFactsService, type RequestSettings } from '../access-request/request-facts.service';
 import { RenewalRequestRepo } from '../renewal-apply/renewal-request.repo';
 import type { RenewalBodyDto } from './renewal-request.dto';
-import { monthsBetween } from './renewal-request.policy';
+import { monthsBetween, renewalTermMonthsOf } from './renewal-request.policy';
 import { renewalRequestOf, type RenewalSubmission, type RenewedSeat } from './renewal-request-submission.mapper';
 import { RenewalRequestTrail } from './renewal-request-trail.service';
 
@@ -35,7 +36,12 @@ export class RenewalRequestWriter {
     private readonly trail: RenewalRequestTrail,
   ) {}
 
-  /** Writes the request for the renewal, its detail and its audit events, and applies it at once when nobody is left to decide. */
+  /**
+   * Writes the request for the renewal, its detail and its audit events. The months of use are judged and run from the day the new period begins as
+   * for any request (`QĐ-111l`): the end is the day before the same day that many months later, cut at the end of the contract of a person who has
+   * one (R-38), and none for a right that goes on with no end; the amount counts the months that begin in this year and the part of the year after
+   * (`QĐ-111j`, `QĐ-111k`, R-39, R-46). Throws AccessRequestTermRefusedError.
+   */
   async renew(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
@@ -44,30 +50,34 @@ export class RenewalRequestWriter {
       facts: AssignmentFacts;
       settings: RequestSettings;
       previousEnd: BusinessDate;
-      newEnd: BusinessDate;
-      /** The months from the end the right has to the new end, worked out by the system (`BR-MF1-08b`). */
-      termMonths: number;
-      /** The day the new term begins: the money is priced and charged to the budget year from this day, not from today (R-M3). */
-      spendStartsOn: BusinessDate;
+      /** The day the new period begins: the day after the right ends. The money is priced and charged to the budget year from this day, not from today (R-M3). */
+      termStart: BusinessDate;
       now: Date;
     },
   ): Promise<RenewalSubmitted> {
     const { body, facts, now } = input;
-    const { newEnd } = input;
-    const { termMonths } = input;
-    const consecutiveMonths = monthsBetween(facts.chainStartsOn, newEnd);
+    const termMonths = renewalTermMonthsOf(body);
 
     const assessed = await this.assessment.assess(tx, {
       employeeId: facts.employeeId,
       requesterEmployeeId: actor.employeeId,
       planId: facts.planId,
-      // The new period is priced from the day it begins to the end it asks for, in the year it is judged in (`QĐ-109b`, `QĐ-109e`).
-      expectedEndDate: newEnd,
-      pricingFrom: input.spendStartsOn,
+      termMonths,
+      termStart: input.termStart,
       now,
       settings: input.settings,
       lockDepartment: true,
     });
+    if (assessed.termRefusal !== null) {
+      throw new AccessRequestTermRefusedError(
+        assessed.termRefusal,
+        assessed.contractEndDate,
+        assessed.target.provisioningType,
+      );
+    }
+    const newEnd = assessed.term.end;
+    // Counted to the end of the new period, or to the end the right has when it goes on with no end: a stay is never less than a month.
+    const consecutiveMonths = Math.max(1, monthsBetween(facts.chainStartsOn, newEnd ?? input.previousEnd));
     const organizationId = (await this.requireOrganization(tx)).id;
     const sent: RenewalSubmission = {
       actor,

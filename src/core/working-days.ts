@@ -38,6 +38,19 @@ export function addWorkingDays(date: BusinessDate, count: number, nonWorkingDate
   return current;
 }
 
+/**
+ * The `n`th working day counting `start` as day 1 (`QĐ-110c`, `QĐ-110p`): the first day is `start` itself when it is a working
+ * day, and the next working day when it is not, so "day 5 of a grace that begins on a Saturday" is the Friday after. Unlike
+ * `addWorkingDays`, which never counts the day it starts from. `n` is at least 1.
+ */
+export function nthWorkingDayFrom(start: BusinessDate, n: number, nonWorkingDates: NonWorkingDates): BusinessDate {
+  if (!Number.isInteger(n) || n < 1) throw new RangeError(`There is no working day number ${n}: counting starts at 1.`);
+  let first = start;
+  while (!isWorkingDay(first, nonWorkingDates)) first = addDays(first, 1);
+
+  return addWorkingDays(first, n - 1, nonWorkingDates);
+}
+
 export function subtractWorkingDays(date: BusinessDate, count: number, nonWorkingDates: NonWorkingDates): BusinessDate {
   return addWorkingDays(date, -count, nonWorkingDates);
 }

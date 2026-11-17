@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
+import { assignHead } from '../../support/builders/organization.builder';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
@@ -133,8 +134,10 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
   it('BR-MF1-02/07: requester revision keeps both the department and its Cost Center in use', async () => {
     const department = await h.department('P-REVISION');
     const employeeId = await h.member(department.code, 'E-REVISION', 'Specialist');
-    const account = await h.account('E-REVISION', employeeId);
-    // No head and no approved budget: the paid request is retained for its requester to revise.
+    // The requester is the head (a department with no head makes a paid request wait, `QĐ-111bc`): the need step is skipped, and with
+    // no approved budget the paid request is retained for its requester to revise. A head holds `MANAGER` before it is named.
+    const account = await h.account('E-REVISION', employeeId, 'MANAGER');
+    await assignHead(h.ctx, h.admin, department.id, { employeeId, effectiveFrom: today });
     const sent = await request(h.server())
       .post('/api/v1/access-requests')
       .set(h.as(account))
@@ -175,5 +178,33 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
       .expect(409);
     expect(h.codeOf(retireCostCenter)).toBe('COST_CENTER.IN_USE');
     expect(h.detailsOf(retireCostCenter).requests).toEqual([{ kind: 'ACCESS_REQUEST', id: revision.id, label: null }]);
+  });
+
+  it('QĐ-111bc: a paid request waiting for a head that is not named yet keeps the department and its Cost Center in use as well', async () => {
+    const department = await h.department('P-NO-HEAD');
+    const employeeId = await h.member(department.code, 'E-NO-HEAD', 'Specialist');
+    const account = await h.account('E-NO-HEAD', employeeId);
+    const sent = await request(h.server())
+      .post('/api/v1/access-requests')
+      .set(h.as(account))
+      .send({ planId: ownerPlan, businessReason: 'Work in a department with no head' })
+      .expect(201);
+    const waiting = h.dataOf<{ request: { id: string; state: string } }>(sent).request;
+    expect(waiting.state).toBe('WAITING_CONTROLLED');
+    const stored = await h.ctx.sql.query<{ cost_center_id: string }>(
+      `SELECT cost_center_id FROM access_requests WHERE id = $1`,
+      [waiting.id],
+    );
+    const api = h.ctx.app.get(OrganizationApi, { strict: false });
+
+    expect((await api.getDepartmentUse(department.id, today, 50)).openWork.items).toContainEqual({
+      kind: 'ACCESS_REQUEST',
+      id: waiting.id,
+      label: null,
+    });
+    expect((await api.getCostCenterUse(stored.rows[0].cost_center_id, 50)).requests).toEqual({
+      total: 1,
+      items: [{ kind: 'ACCESS_REQUEST', id: waiting.id, label: null }],
+    });
   });
 });

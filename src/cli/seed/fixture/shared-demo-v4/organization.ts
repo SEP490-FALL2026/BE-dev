@@ -5,7 +5,8 @@ const unit = (code: string, name: string) => ({ code: `CC-${code}`, name });
 /*
  * Nine flat departments, no hierarchy (`QĐ-52`). Every head holds the MANAGER role and every department has an IT Admin in charge. On
  * purpose Legal has no head (its requests go in one step to the spending approver, `BR-MF1-02`) and Operations has no Cost Center (a
- * paid request there can only be saved as a draft). There is exactly one Finance and exactly one spending approver.
+ * paid request there can only be saved as a draft). There is exactly one Finance and exactly one spending approver. An IT Admin answers
+ * for at most four departments (`QĐ-110l`): the first two take four each and the third takes Operations; the fourth, who leaves, takes none.
  */
 const DEPARTMENTS: DemoDepartment[] = [
   {
@@ -77,7 +78,7 @@ const DEPARTMENTS: DemoDepartment[] = [
     name: 'Phòng Vận hành',
     function: 'Phòng mới thành lập, đang hoàn thiện cấu hình.',
     head: 'NV-OPSH',
-    itAdmin: 'NV-ITA2',
+    itAdmin: 'NV-ITA3',
     costCenter: null,
   },
 ];
@@ -102,8 +103,11 @@ const PEOPLE: DemoPerson[] = [
   person('NV-DEV3', 'Vũ Thị Giang', 'giang.vu', 'ENG', 'EMPLOYEE'),
   person('NV-DEV4', 'Lương Hoàng Phi', 'phi.luong', 'ENG', 'EMPLOYEE'),
   person('NV-OFF1', 'Hà Văn Nam', 'nam.ha', 'ENG', 'EMPLOYEE'),
-  person('NV-CTR1', 'Vũ Quốc Phong', 'phong.vu', 'ENG', 'EMPLOYEE', 'CONTRACTOR'),
+  // The contract ends in 20 days: his request names months and his right is cut there, inside the 30-day window of the request to go on.
+  { ...person('NV-CTR1', 'Vũ Quốc Phong', 'phong.vu', 'ENG', 'EMPLOYEE', 'CONTRACTOR'), contractEndInDays: 20 },
   person('NV-INT1', 'Đặng Quốc Huy', 'huy.dang', 'ENG', null, 'INTERN'),
+  // An intern whose contract ends in about two and a half months: a K1 request of 9 months is cut there (DEMO-3).
+  { ...person('NV-INT2', 'Lê Thị Hạnh', 'hanh.le', 'ENG', 'EMPLOYEE', 'INTERN'), contractEndInDays: 76 },
   // Design: the department of the usage scenarios (MF-5); most of its people only hold seats.
   person('NV-DESH', 'Bùi Ngọc Khánh', 'khanh.bui', 'DES', 'MANAGER'),
   person('NV-DES1', 'Đỗ Thị Lan', 'lan.do', 'DES', 'EMPLOYEE'),
@@ -124,6 +128,9 @@ const PEOPLE: DemoPerson[] = [
   person('NV-ITOH', 'Trần Minh Thanh', 'thanh.tran', 'ITO', 'MANAGER'),
   person('NV-ITA1', 'Lý Minh Quân', 'quan.ly', 'ITO', 'IT_ADMIN'),
   person('NV-ITA2', 'Mai Thị Rạng', 'rang.mai', 'ITO', 'IT_ADMIN'),
+  person('NV-ITA3', 'Đoàn Văn Sáng', 'sang.doan', 'ITO', 'IT_ADMIN'),
+  // An IT Admin in charge of no department who leaves in a few working days: he answers for Mailchimp and owns its workspace (MF-2, P5).
+  person('NV-ITA4', 'Kim Văn Tú', 'tu.kim', 'ITO', 'IT_ADMIN'),
   // Marketing and Sales: tight budgets, the reserve and the block of the budget check.
   person('NV-MKTH', 'Đinh Thị Uyên', 'uyen.dinh', 'MKT', 'MANAGER'),
   person('NV-MKT1', 'Lâm Văn Vinh', 'vinh.lam', 'MKT', 'EMPLOYEE'),

@@ -3,6 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OffboardingService } from '../offboarding/offboarding.service';
 import type { PersonnelActor } from '../public/personnel.types';
 import type { EventBasis, SuperAdminEventParameters } from '../public/super-admin-event.types';
+import { groundsNoteOfBasis } from '../personnel-grounds.policy';
 import { DepartureChanges } from './departure-changes.types';
 import { SuperAdminEventAnchor, type Subject } from './super-admin-event-anchor.service';
 
@@ -49,7 +50,7 @@ export class SuperAdminDepartureEvents {
             employeeId: subject.id,
             lastWorkingDay: parameters.lastWorkingDay,
             accessBlockMode,
-            grounds: basis,
+            groundsNote: groundsNoteOfBasis(basis),
             successor: parameters.successor,
             cancelPendingTransfer,
           })
@@ -65,7 +66,7 @@ export class SuperAdminDepartureEvents {
             {
               lastWorkingDay: parameters.lastWorkingDay,
               reason: parameters.reason,
-              grounds: basis,
+              groundsNote: groundsNoteOfBasis(basis),
               successor: parameters.successor,
             },
             tx,
@@ -78,7 +79,7 @@ export class SuperAdminDepartureEvents {
           await this.offboardingChanges.cancel(
             actor,
             parameters.caseId,
-            { reason: parameters.reason, grounds: basis },
+            { reason: parameters.reason, groundsNote: groundsNoteOfBasis(basis) },
             tx,
           )
         ).id;

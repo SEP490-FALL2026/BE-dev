@@ -1,6 +1,7 @@
 import { GhostSeatRepo } from '../../../src/modules/optimization/ghost-seat/ghost-seat.repo';
 import { withAssignmentsUnlocked } from '../../support/fixture-sql';
 import { GhostSeatWorld } from '../../support/ghost-seat-world';
+import { k1Checklist } from '../../support/k1-checklist';
 
 const w = new GhostSeatWorld();
 
@@ -286,6 +287,7 @@ describe('G2: the seat of a person who left (integration, real PostgreSQL)', () 
         evidence: 'đã hủy gia hạn',
         paidThroughOn: until,
         accessState: 'UNTIL_PAID_END',
+        k1Checklist: k1Checklist('DEPARTURE'),
       })
       .expect(200);
 

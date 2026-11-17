@@ -17,14 +17,6 @@ export class GroupRequestTooManyLinesError extends Error {
   }
 }
 
-/** The end date asked for is before today or more than a year from today (`US-05-23` AC-9, `QĐ-104a`). */
-export class GroupRequestTermBeyondLimitError extends Error {
-  constructor(readonly maxEndDate: string) {
-    super('The end date is before today or more than a year from today.');
-    this.name = 'GroupRequestTermBeyondLimitError';
-  }
-}
-
 /** Fewer different people were named than a request for a group needs, whoever sends it (`QĐ-100aa`, `S-01`). */
 export class GroupRequestTooFewLinesError extends Error {
   constructor(readonly min: number) {

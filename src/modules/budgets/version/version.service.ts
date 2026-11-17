@@ -38,7 +38,7 @@ export class VersionService {
 
   /**
    * Throws BudgetNotFinanceError, BudgetVersionNotFoundError, BudgetYearEndedError, BudgetVersionNotEditableError,
-   * BudgetReasonRequiredError, BudgetQuartersMismatchError and the money errors.
+   * BudgetReasonRequiredError, and the money errors.
    */
   async update(actor: AuthenticatedPrincipal, id: string, patch: VersionPatchDto): Promise<VersionWire> {
     this.access.begin(actor);
@@ -62,6 +62,8 @@ export class VersionService {
    */
   async send(actor: AuthenticatedPrincipal, id: string): Promise<VersionWire> {
     this.access.begin(actor);
+    // The default share of the organization, read before the transaction opens, is what the reserve is judged against.
+    const defaultPercent = await this.figures.defaultPercent();
 
     return this.runner.run(async (tx) => {
       // The row of the grant of the spending approver first, `FOR SHARE`: a revocation that is being made and this sending take turns, so
@@ -76,8 +78,9 @@ export class VersionService {
       const version = await this.access.lockEditable(tx, id);
       // A revision of the budget of a year is gone (`QĐ-97b`): one that an older release left is neither sent nor decided.
       if (version.kind === 'REVISION') throw new BudgetVersionNotEditableError(version.state);
-      // A reserve that is not the default share of the base says why; a version made before the share was kept asks nothing.
-      if (reserveReasonMissing(version)) throw new BudgetReasonRequiredError('RESERVE');
+      // A reserve that is not the default share of the organization says why, whoever chose it; a version made before the share was kept asks nothing.
+      if (reserveReasonMissing(version, defaultPercent)) throw new BudgetReasonRequiredError('RESERVE');
+      await this.access.requireExplained(tx, id);
       if (version.proposalId && (!proposal || (proposal.state !== 'SUBMITTED' && proposal.state !== 'REVIEWED'))) {
         throw new BudgetProposalStateError('REVIEW', proposal?.state ?? 'MISSING');
       }

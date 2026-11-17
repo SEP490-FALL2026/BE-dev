@@ -8,6 +8,7 @@ import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
 import type { FetchLike } from '../../../src/cli/seed/demo-api-client';
 import { SHARED_DEMO_V4 } from '../../../src/cli/seed/fixture/shared-demo-v4';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
+import { SeedStorage } from '../../support/flows/seed-storage';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
 import { PgRelay } from '../../support/pg-relay';
 
@@ -27,6 +28,8 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
   const demoAccounts = SHARED_DEMO_V4.people.filter((person) => person.account !== null).length;
   const secrets = { superAdminPassword: SEED_PASSWORD, demoAccountPassword: 'a demo password for the tests' };
 
+  // The bytes the seed puts at upload links land in the storage the application reads (BM-10, files of a version).
+  const seedStorage = new SeedStorage();
   let ctx: HttpTestApp;
   let relay: PgRelay;
   let demo: INestApplicationContext;
@@ -87,7 +90,8 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
   }
 
   beforeAll(async () => {
-    ctx = await createHttpTestApp();
+    await seedStorage.start();
+    ctx = await createHttpTestApp({ providerOverrides: [seedStorage.override] });
     baseUrl = `http://127.0.0.1:${((ctx.app.getHttpServer() as unknown as Server).address() as AddressInfo).port}`;
 
     const direct = new URL(ctx.database.url);
@@ -124,6 +128,7 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
     await demo?.close();
     await relay?.stop();
     await ctx?.close();
+    await seedStorage.stop();
   });
 
   beforeEach(() => {

@@ -1,7 +1,7 @@
 import { dayOffset } from '../demo-dates';
 import { as, listAll, tag } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
-import { endDateOf } from './request.steps';
+import { termBody } from './request.steps';
 
 async function draft(ctx: DemoRunContext): Promise<StepOutcome> {
   const spec = ctx.fixture.draft;
@@ -15,7 +15,7 @@ async function draft(ctx: DemoRunContext): Promise<StepOutcome> {
     kind: 'INDIVIDUAL',
     planId,
     businessReason: `${tag(ctx, 'DRAFT')} Bản nháp chưa gửi: phòng chưa có Cost Center nên chưa gửi được.`,
-    ...(endDateOf(ctx, spec.end) ? { expectedEndDate: endDateOf(ctx, spec.end) } : {}),
+    ...termBody(spec.termMonths),
   });
 
   return { status: 'done', detail: spec.requester };

@@ -1,3 +1,5 @@
+import type { BusinessDate } from '../../../core/business-date';
+
 /** What a seat is held against: a subscription of a paid plan, or an internal plan that has no subscription. */
 export type SeatTargetRef = { subscriptionId: string } | { planId: string };
 
@@ -48,6 +50,37 @@ export interface PoolSubscription {
   isPrimaryForPlan: boolean;
 }
 
+/**
+ * A plan that gives out seats (K2), keys (K4) or personal accounts (K1), with the subscriptions they sit on today: the shared pool of the plan,
+ * as a grant reads it (`PoolSubscription`). What the stock summary of the IT Admin counts the plan over (`QĐ-111n`).
+ */
+export interface StockPlan {
+  planId: string;
+  planName: string;
+  provisioningType: 'K1' | 'K2' | 'K4';
+  applicationId: string;
+  applicationName: string;
+  /** The https link the IT Admin pasted for the logo of the application, never checked, or null. */
+  applicationLogoUrl: string | null;
+  subscriptions: { subscriptionId: string; purchasedQuantity: number | null }[];
+}
+
+/** A page of plans by application then plan, and how many there are in all for the same filter. */
+export interface StockPlanPage {
+  items: StockPlan[];
+  total: number;
+}
+
+/** Which plans a stock summary lists: those with a subscription a seat can be taken from on `today`, of this IT Admin only when named (`QĐ-111n`). */
+export interface StockPlanFilter {
+  today: BusinessDate;
+  /** Only the subscriptions this IT Admin answers for, and the plans that have one. */
+  responsibleItAdminEmployeeId?: string;
+  planId?: string;
+  skip: number;
+  take: number;
+}
+
 /** What one subscription is bought at: the price a seat granted from it would have cost (`QĐ-106e`). */
 export interface SubscriptionPrice {
   kind: 'RECURRING' | 'ONE_TIME';
@@ -80,6 +113,8 @@ export interface PlanRevocationInfo {
   planName: string;
   applicationId: string;
   applicationName: string;
+  /** The https link to the logo image the IT Admin pasted, or null. */
+  applicationLogoUrl: string | null;
   provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
   revocationNote: string | null;
   dataLossOnRemoval: boolean;
@@ -97,12 +132,35 @@ export interface RuleSubscription {
   purchasedQuantity: number | null;
 }
 
+/** What the catalog holds of one application for a person who asks for software: the application and up to twenty of its plans by name (`planTotal` says how many there are). */
+export interface CatalogEntry {
+  applicationId: string;
+  name: string;
+  status: 'APPROVED' | 'RETIRED';
+  vendor: { id: string; name: string } | null;
+  plans: { planId: string; name: string; provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5' }[];
+  planTotal: number;
+  /** The plan of the application that has the name asked for (names compared ignoring case, accents and blanks); null when there is none or none was asked. */
+  planNamed: { planId: string; name: string } | null;
+}
+
+/** The entry of the catalog that is the same software as a declaration, and what made it the same: the name or a domain (`QĐ-111b`). */
+export interface CatalogEntryMatch {
+  by: 'NAME' | 'DOMAIN';
+  entry: CatalogEntry;
+}
+
 /** A plan and the application it belongs to, by name, for the views that list seats. */
 export interface PlanSummary {
   planId: string;
   planName: string;
   applicationId: string;
   applicationName: string;
+}
+
+/** A plan summary with the logo of its application: the https link the IT Admin pasted, never checked, or null (`CT-1`). */
+export interface PlanSummaryWithLogo extends PlanSummary {
+  applicationLogoUrl: string | null;
 }
 
 /**

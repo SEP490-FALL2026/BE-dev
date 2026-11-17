@@ -238,7 +238,7 @@ describe('the allowlist, the days of usage and the status of tools a collector s
     expect(reasons).toEqual(['OUTSIDE_WINDOW', 'INVALID_COVERAGE', 'FUTURE_GENERATED_AT', 'INVALID_COVERAGE']);
   });
 
-  it('a tool left out of a day does not touch the count kept for it, and a tool the allowlist does not name refuses the whole day', async () => {
+  it('a tool left out of a day does not touch the count kept for it, and a tool the allowlist did not name that day is dropped alone', async () => {
     const { device, token } = await h.collected(await holder(), notice);
     await h
       .allowlistPublish({
@@ -406,5 +406,49 @@ describe('the allowlist, the days of usage and the status of tools a collector s
     await expect(
       sql().query(`UPDATE ai_usage_days SET coverage = 'NOT_OBSERVABLE' WHERE responses > 0`),
     ).rejects.toMatchObject({ code: '23514' });
+  });
+  it('US-09-02 AC-7, FX-T8: a tool added to the allowlist after a day is dropped from that day alone, the day is accepted, and the review of the accounts hears nothing of a tool the list now names', async () => {
+    const { device, token } = await h.collected(await holder(), notice);
+    const registrationId = device.registrationId as string;
+    const daysAgo = (days: number) =>
+      new Date(Date.parse(`${h.today()}T00:00:00.000Z`) - days * 86_400_000).toISOString().slice(0, 10);
+    await sql().query(`UPDATE device_registrations SET acknowledged_from = now() - interval '5 days' WHERE id = $1`, [
+      registrationId,
+    ]);
+    // Version X lists Codex only and was in force on the day; version Y adds Claude Code a day after it. A version is never changed, so the
+    // days of the two are set back by hand, with the trigger that keeps them still put aside for these two statements.
+    const publish = (aiTools: string[]) =>
+      h
+        .allowlistPublish({
+          reason: 'Set by the case.',
+          aiTools: aiTools.map((tool) => ({ tool, applicationId: apps[tool] })),
+        })
+        .expect(201);
+    await publish(['CODEX']);
+    await publish(['CODEX', 'CLAUDE_CODE']);
+    await sql().query(`ALTER TABLE collector_allowlist_versions DISABLE TRIGGER USER`);
+    try {
+      await sql().query(
+        `UPDATE collector_allowlist_versions v SET published_at = now() - (CASE WHEN n.rn = 1 THEN interval '4 days' ELSE interval '1 day' END)
+           FROM (SELECT id, row_number() OVER (ORDER BY version_number DESC) - 1 AS rn FROM collector_allowlist_versions) n
+          WHERE v.id = n.id AND n.rn IN (0, 1)`,
+      );
+    } finally {
+      await sql().query(`ALTER TABLE collector_allowlist_versions ENABLE TRIGGER USER`);
+    }
+    const unlistedClaude = async () =>
+      (
+        await sql().query(
+          `SELECT 1 FROM vendor_account_discrepancies WHERE source = 'COLLECTOR_UNLISTED' AND source_ref = 'CLAUDE_CODE'`,
+        )
+      ).rowCount;
+
+    const oldDay = daysAgo(3);
+    const sent = await h.sendUsage(token, h.usageBatch(oldDay, new Date(), ['CODEX', 'CLAUDE_CODE'])).expect(200);
+
+    expect(resultsOf(sent)).toEqual([{ date: oldDay, outcome: 'ACCEPTED', reasonCode: null }]);
+    expect((await rowsOf(registrationId)).map((row) => row.tool)).toEqual(['CODEX']);
+    expect(await rejectionsIn(device.id)).toEqual([]);
+    expect(await unlistedClaude()).toBe(0);
   });
 });

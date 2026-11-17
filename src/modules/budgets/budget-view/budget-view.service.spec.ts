@@ -1,5 +1,7 @@
 import type { BudgetFactsService } from '../budget/budget-facts.service';
 import type { ReferenceFigures } from '../budget/version.repo';
+import { SeatMonthPoolService } from '../seat-month/seat-month-pool.service';
+import { SeatMonthRepo } from '../seat-month/seat-month.repo';
 import { BudgetTableViewService } from './budget-table-view.service';
 import type { BudgetViewRepo } from './budget-view.repo';
 import type { BudgetViewNumbersService } from './budget-view-numbers.service';
@@ -27,6 +29,7 @@ function serviceOver(
       rows: jest.fn().mockResolvedValue(versions.map((row) => ({ ...row, versionId: 'version', number: 1 }))),
     } as unknown as BudgetViewRepo,
     {
+      adjustmentOf: jest.fn().mockResolvedValue(0n),
       totals: jest.fn().mockResolvedValue(
         new Map(
           versions.map((row) => {
@@ -49,6 +52,10 @@ function serviceOver(
     {
       formatter: (currency: string) => Promise.resolve((minor: bigint) => ({ amount: minor.toString(), currency })),
     } as unknown as BudgetFactsService,
+    {
+      yearTotals: jest.fn().mockResolvedValue({ companyMinor: 0n, withoutCostCenterMinor: 0n }),
+    } as unknown as SeatMonthRepo,
+    { yearLineMinor: jest.fn().mockResolvedValue(0n) } as unknown as SeatMonthPoolService,
   );
 }
 
@@ -72,6 +79,12 @@ describe('BR-MF4-05 BudgetTableViewService.summary', () => {
       base: { amount: '1350', currency: 'VND' },
       reserve: { amount: '150', currency: 'VND' },
       total: { amount: '1500', currency: 'VND' },
+      effectiveBudget: {
+        base: { amount: '1350', currency: 'VND' },
+        reserve: { amount: '150', currency: 'VND' },
+        total: { amount: '1500', currency: 'VND' },
+        adjustment: { amount: '0', currency: 'VND' },
+      },
       committed: { amount: '700', currency: 'VND' },
       spent: { amount: '350', currency: 'VND' },
       remaining: { amount: '450', currency: 'VND' },

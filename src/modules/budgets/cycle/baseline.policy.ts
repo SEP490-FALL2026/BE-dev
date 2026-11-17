@@ -1,6 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { BaselineVersionRefusal } from '../budget/budget.errors';
-import type { LineType } from '../budget/budget-line-zbb.json';
 
 /**
  * The monthly price of one seat from the unit price in the reporting currency and the cycle it is paid in (`R-I03`): a year's price
@@ -150,32 +149,28 @@ export function poolIdleSeats(provisioningType: string, purchased: number | null
 }
 
 /**
- * Whether Finance may build the first version of a department from the baseline (`QĐ-100h`, `R-I05`): the cycle of the year was
- * published once and the department is in it (a ceiling there, in effect by the end of the year); the day is after the submission deadline; nobody heads the department today and nobody is to head it later (a
- * successor, a department made for next year included); and no proposal waits or is being reviewed. The first that fails is named.
+ * Whether Finance may build the version of a department from the baseline (`QĐ-111bb`, `R-11`): the cycle of the year is open and the
+ * department is in it (in effect by the end of the year); the day is after the submission deadline; and no proposal waits or is being
+ * reviewed. Whether somebody heads the department no longer matters: a head that submitted nothing by the deadline, and a department made
+ * after it, are built the same way. The first that fails is named.
  */
 export function baselineVersionRefusal(input: {
-  cyclePublishedOnce: boolean;
+  cycleOpen: boolean;
   inCycle: boolean;
   today: BusinessDate;
   submissionDeadline: BusinessDate;
-  headsToday: boolean;
-  headToCome: boolean;
   openProposal: boolean;
 }): BaselineVersionRefusal | null {
-  if (!input.cyclePublishedOnce) return 'CYCLE_NOT_PUBLISHED';
+  if (!input.cycleOpen) return 'CYCLE_NOT_OPEN';
   if (!input.inCycle) return 'DEPARTMENT_NOT_IN_CYCLE';
   if (input.today <= input.submissionDeadline) return 'BEFORE_DEADLINE';
-  if (input.headsToday) return 'HAS_HEAD';
-  if (input.headToCome) return 'HAS_SUCCESSOR';
   if (input.openProposal) return 'HAS_PROPOSAL';
 
   return null;
 }
 
 /**
- * The most departments a baseline or a package lists: a division of the ceiling names at most this many (`budgetDepartmentCeilingsSet`),
- * and the answer says how many there are in all (`departmentsTotal`) when it lists fewer.
+ * The most departments a baseline or a package lists; the answer says how many there are in all (`departmentsTotal`) when it lists fewer.
  */
 export const DEPARTMENTS_LISTED_MAX = 500;
 /** The most subscriptions the baseline lists for one department; `softwareTotal` says how many it owns. */
@@ -194,82 +189,4 @@ export function inOrderOf<T extends { id: string }>(ids: readonly string[], rows
   const position = new Map(ids.map((id, index) => [id, index]));
 
   return [...rows].sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
-}
-
-/**
- * What ending a subscription saves in `year` (`FR-5.15`, `QĐ-109c`): the months of the year after the month it stops, at the seats it
- * holds and the monthly price of a seat. One that ends before the year saves the whole year, one with no end or that runs past the
- * year saves nothing, and one a later period follows saves nothing (that period carries the year). None when a figure is unknown.
- */
-export function cancelledCost(
-  year: number,
-  seatsHeld: number,
-  subscription: Pick<RenewalFacts, 'endDate' | 'renewalDate' | 'hasSuccessor'> & {
-    unitPriceReportingMinor: bigint | null;
-    billingCycle: string | null;
-  },
-): bigint | null {
-  const monthlyMinor = monthlyUnitPrice(subscription.unitPriceReportingMinor, subscription.billingCycle);
-  const end = endOf(subscription);
-  if (subscription.hasSuccessor === true || end === null || end > `${year}-12-31`) return 0n;
-  const monthsSaved = end < `${year}-01-01` ? 12 : 12 - Number(end.slice(5, 7));
-
-  return estimatedCost(seatsHeld, monthlyMinor, monthsSaved);
-}
-
-/** A line of a first version built from the baseline (`QĐ-100h`): what it estimates for one plan, and what kind of line it is. */
-export interface BaselineLine {
-  description: string;
-  planId: string;
-  seats: number | null;
-  amountMinor: bigint;
-  lineType: LineType;
-  zbb: null;
-  priorityRank: number;
-}
-
-/**
- * The lines of a version built from the baseline (`C4-14`, `QĐ-109c`): what a subscription still costs in the year is a `RENEW` line,
- * added to the base like the baseline adds it, the months that run before an ordered end included; what ending it saves is a `CANCEL`
- * line (shown, never added). The periods of one plan of one kind are one line, so that a period and the one that follows it do not
- * show twice: the amounts add up and the seats are the same people, counted once (the most of them). An unknown or empty amount gives
- * no line. Ranks follow the order, from 1.
- */
-export function baselineLinesOf(
-  entries: readonly {
-    planId: string;
-    /** The application and the plan, as the description names them. */
-    label: string;
-    seats: number | null;
-    /** What it costs in the year, as the baseline counts it. */
-    costMinor: bigint | null;
-    /** What ending it saves in the year (`cancelledCost`); zero or none when it runs on. */
-    cancelledMinor: bigint | null;
-  }[],
-): BaselineLine[] {
-  const merged = new Map<string, Omit<BaselineLine, 'priorityRank'>>();
-  const add = (entry: (typeof entries)[number], lineType: LineType, amountMinor: bigint | null): void => {
-    if (amountMinor === null || amountMinor <= 0n) return;
-    const key = `${lineType}:${entry.planId}`;
-    const known = merged.get(key);
-    merged.set(key, {
-      description: known?.description ?? `${lineType === 'CANCEL' ? 'Cancel' : 'Renew'} ${entry.label}`.slice(0, 200),
-      planId: entry.planId,
-      seats: known === undefined ? entry.seats : Math.max(known.seats ?? 0, entry.seats ?? 0),
-      amountMinor: (known?.amountMinor ?? 0n) + amountMinor,
-      lineType,
-      zbb: null,
-    });
-  };
-  for (const entry of entries) {
-    add(entry, 'RENEW', entry.costMinor);
-    add(entry, 'CANCEL', entry.cancelledMinor);
-  }
-  const lines = [...merged.values()];
-  const ordered = [
-    ...lines.filter((line) => line.lineType !== 'CANCEL'),
-    ...lines.filter((line) => line.lineType === 'CANCEL'),
-  ];
-
-  return ordered.map((line, index) => ({ ...line, priorityRank: index + 1 }));
 }

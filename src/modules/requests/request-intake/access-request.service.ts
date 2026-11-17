@@ -9,13 +9,12 @@ import {
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
-  AccessRequestEndDateOutOfRangeError,
-  AccessRequestTermRequiredError,
+  AccessRequestTermRefusedError,
 } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { RequestFactsService, type RequestSettings } from '../access-request/request-facts.service';
+import { RequestFactsService, type Assessment, type RequestSettings } from '../access-request/request-facts.service';
 import { RequestLimitsService, type LimitSettings } from '../request-limits/request-limits.service';
 import { RequestSenderService } from './request-sender.service';
 import { RequestDraftRepo } from '../request-draft/request-draft.repo';
@@ -44,7 +43,7 @@ export interface SubmitOptions {
   toleratedSeatId?: string;
   /** The draft this request is sent from: it is locked first, judged again under the lock, and becomes the request. */
   draftId?: string;
-  /** GH-2 and GH-3 as read before the transaction opened; read here when the caller did not. */
+  /** GH-2 as read before the transaction opened; read here when the caller did not. */
   limitSettings?: LimitSettings;
 }
 
@@ -97,23 +96,25 @@ export class AccessRequestService {
     const assessed = await this.assessment.assess(tx, {
       employeeId: actor.employeeId,
       planId: body.planId,
-      expectedEndDate: body.expectedEndDate ?? null,
+      termMonths: body.termMonths,
       now,
       settings,
       lockDepartment: true,
     });
-    if (assessed.heldAccess && assessed.heldAccess.assignmentId !== options.toleratedSeatId) {
-      throw new AccessRequestAlreadyHoldsAccessError(assessed.heldAccess);
+    this.requireNotHeld(assessed, options.toleratedSeatId);
+    if (assessed.termRefusal !== null) {
+      throw new AccessRequestTermRefusedError(
+        assessed.termRefusal,
+        assessed.contractEndDate,
+        assessed.target.provisioningType,
+      );
     }
-    if (assessed.endDateOutOfRange) throw new AccessRequestEndDateOutOfRangeError(assessed.maxEndDate);
-    if (assessed.termRequired) throw new AccessRequestTermRequiredError();
-    const manyPaidSoftware = await this.limits.requireForOne(tx, {
+    await this.limits.requireForOne(tx, {
       employeeId: actor.employeeId,
       planId: body.planId,
-      applicationId: assessed.target.applicationId,
-      today: assessed.today,
+      now,
       settings: options.limitSettings ?? (await this.limits.settings()),
-      reason: body.manyPaidSoftwareReason,
+      exemptions: assessed.graceHold ? new Map([[actor.employeeId, 'TRANSFER_GRACE' as const]]) : undefined,
     });
     const sent: SubmittedRequest = {
       actor,
@@ -122,7 +123,7 @@ export class AccessRequestService {
       assessed,
       now,
       draftId: options.draftId,
-      manyPaidSoftware,
+      graceHold: assessed.graceHold,
     };
     const created = await this.repo.insert(tx, newRequestOf(sent));
     await this.auditSubmitted(tx, actor, sent, created);
@@ -132,6 +133,21 @@ export class AccessRequestService {
     if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
 
     return record;
+  }
+
+  /**
+   * The seat the person already holds of the plan refuses the request, but for the one a renewal tolerates and a right held from before a transfer whose
+   * grace lasts: they may ask again for what they are about to lose, and the request replaces that right (`QĐ-110q`, R-49).
+   * Throws AccessRequestAlreadyHoldsAccessError.
+   */
+  private requireNotHeld(
+    assessed: Pick<Assessment, 'heldAccess' | 'graceHold'>,
+    toleratedSeatId: string | undefined,
+  ): void {
+    const held = assessed.heldAccess;
+    if (held && held.assignmentId !== toleratedSeatId && assessed.graceHold === null) {
+      throw new AccessRequestAlreadyHoldsAccessError(held);
+    }
   }
 
   /** A draft is locked before anything is read for the sending, and judged again under the lock: two sendings of one draft leave one. */

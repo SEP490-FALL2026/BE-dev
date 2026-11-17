@@ -74,8 +74,8 @@ describe('the AI summary of the queue of the spending approver (integration, rea
     await h.sendOn([r11], engineering.head.account).expect(201);
     r12 = await h.proposed(design.member, { softwareName: 'Loom' });
     await h.decide(r12.id, { decision: 'APPROVE' }, design.head.account).expect(200);
-    // S1 of AC-13: a renewal of a subscription that waits for the decision of C1, which is no Access Request.
-    renewal = await h.proposedRenewal(design.department.id, RENEWAL_OPINION);
+    // S1 of AC-13: a renewal recorded on a subscription, which is no Access Request and which C1 never decides.
+    renewal = await h.recordedRenewal(design.department.id, RENEWAL_OPINION);
     stepsBefore = await h.stepRows(allIds());
 
     // First a model that writes figures of its own on every line: nothing is shown and the call is not kept for the revision.
@@ -148,7 +148,7 @@ describe('the AI summary of the queue of the spending approver (integration, rea
         softwareName: applicationName,
         beneficiaryDisplayName: names[0],
         reason: r9.businessReason,
-        // A request carries an end date now, not months (`QĐ-104a`): the AI source has no duration in months to give.
+        // R9 is sent with no *Thời gian dùng* (a right with no end): there is no number of months to label (`QĐ-111i`).
         requestedDurationLabel: null,
         estimatedCostRef: 'C001',
       },
@@ -158,7 +158,9 @@ describe('the AI summary of the queue of the spending approver (integration, rea
         softwareName: applicationName,
         beneficiaryDisplayName: names[1],
         reason: expect.any(String) as string,
-        requestedDurationLabel: null,
+        // R10 is made by `paidRequest`, which asks for one month of use (`termMonths: 1`, `QĐ-111i`): the label is that month,
+        // whatever day the suite runs.
+        requestedDurationLabel: '1 tháng',
         estimatedCostRef: 'C002',
       },
       {
@@ -201,12 +203,12 @@ describe('the AI summary of the queue of the spending approver (integration, rea
     expect(years[0].remaining).toEqual({ amount: String(40 * M - pending), currency: 'VND' });
   });
 
-  it('AC-13: a renewal waiting for its decision stays out of the summary of C1, who no longer reads renewals (QĐ-101, step 13)', async () => {
-    // The head of the owning department confirms a renewal now, not the spending approver: C1 is refused the renewal queue.
+  it('AC-13: a renewal recorded on a subscription stays out of the summary of C1, who does not read renewals (QĐ-101, step 13)', async () => {
+    // The IT Admin records a renewal in one write, nobody waits for the spending approver: C1 is refused the list of renewals.
     expect(h.codeOf(await h.renewalQueue(h.boss.account).expect(403))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
-    const waiting = (
+    const recorded = (
       await h.ctx.sql.query<{ id: string }>(
-        `SELECT id FROM subscription_renewals WHERE id = $1 AND state = 'PROPOSED'`,
+        `SELECT id FROM subscription_renewals WHERE id = $1 AND state = 'OUTCOME_RECORDED'`,
         [renewal.renewalId],
       )
     ).rows;
@@ -218,8 +220,8 @@ describe('the AI summary of the queue of the spending approver (integration, rea
       )
     ).rows[0];
 
-    expect(waiting).toHaveLength(1);
-    // The three Access Request lines of AC-8 and nothing else, though the renewal waited for C1 when the summary was made.
+    expect(recorded).toHaveLength(1);
+    // The three Access Request lines of AC-8 and nothing else, though the renewal was recorded before the summary was made.
     expect(view.lines.map((line) => line.requestId)).toEqual([r9.id, r10, r11]);
     expect(call.body.context.requests).toHaveLength(3);
     for (const text of [call.raw, JSON.stringify(view)]) {
