@@ -147,14 +147,15 @@ export class IdentityRepo {
 
   async pageMappings(filter: {
     applicationId?: string;
-    employeeId?: string;
+    /** Only the mappings of these people (the ones the reader may read). */
+    employeeIds: readonly string[];
     inForceOnly: boolean;
     skip: number;
     take: number;
   }): Promise<{ items: MappingRecord[]; total: number }> {
     const where: Prisma.UsageIdentityMappingWhereInput = {
       ...(filter.applicationId ? { applicationId: filter.applicationId } : {}),
-      ...(filter.employeeId ? { employeeId: filter.employeeId } : {}),
+      employeeId: { in: [...filter.employeeIds] },
       ...(filter.inForceOnly ? { endedAt: null } : {}),
     };
     const [rows, total] = await this.prisma.$transaction([
