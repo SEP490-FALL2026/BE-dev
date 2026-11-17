@@ -1,3 +1,5 @@
+import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import { SpendBatchRecorder } from '../../../src/modules/requests/spend-submission/spend-batch-recorder.service';
 import { StatusHarness } from '../../support/status-harness';
 import type { Unit } from '../../support/spend-harness';
 
@@ -72,6 +74,33 @@ describe('the spending approver told of the requests sent to them, over PostgreS
       // The head who sent the batch is told nothing, and no request of the batch has a notice of its own for the approver.
       expect(await h.noticesOf(unit.head.employeeId, 'SPEND_BATCH_SUBMITTED')).toEqual([]);
       for (const id of [within, uses, blocked]) expect(await h.codesFor(h.boss.employeeId, id)).toEqual([]);
+    });
+
+    it('T1: writing the same submitted batch again tells the approver once, not twice', async () => {
+      const unit = await reserveUnit();
+      const within = await waiting(unit, 10 * M);
+      const before = (await batchNotices()).length;
+      const { batch } = await submit(unit, [within]);
+      const again = () =>
+        h.ctx.app.get(TransactionRunner, { strict: false }).run((tx) =>
+          h.ctx.app
+            .get(SpendBatchRecorder, { strict: false })
+            .submitted(tx, h.principal(unit.head.account, ['MANAGER']), {
+              organizationId: h.seed.organizationId,
+              departmentId: unit.department.id,
+              batchId: batch.id,
+              requestIds: [within],
+              outcomes: ['SENT_TO_APPROVER'],
+              openedFor: [h.boss.employeeId],
+            }),
+        );
+
+      await again();
+      await again();
+      await h.project();
+
+      const told = (await batchNotices()).slice(before).filter((row) => row.subject_id === batch.id);
+      expect(told).toHaveLength(1);
     });
 
     it('tells nobody of a batch that opens no step: the requests are blocked or wait for the head', async () => {
