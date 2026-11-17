@@ -40273,7 +40273,7 @@
                       "error": {
                         "code": "MONEY_SCALE_EXCEEDED",
                         "message": "This currency allows at most 2 decimal digit(s).",
-                        "details": { "allowedDecimals": 2 },
+                        "details": { "allowedDecimals": 2, "path": "nextPeriod.unitPrice" },
                         "requestId": "req_example"
                       }
                     }
@@ -40285,7 +40285,7 @@
                       "error": {
                         "code": "CURRENCY_NOT_SUPPORTED",
                         "message": "The currency XYZ is not supported.",
-                        "details": { "currency": "XYZ" },
+                        "details": { "currency": "XYZ", "path": "nextPeriod.unitPrice" },
                         "requestId": "req_example"
                       }
                     }
@@ -41208,7 +41208,7 @@
                       "error": {
                         "code": "MONEY_SCALE_EXCEEDED",
                         "message": "This currency allows at most 2 decimal digit(s).",
-                        "details": { "allowedDecimals": 2, "path": "unitPrice" },
+                        "details": { "allowedDecimals": 2, "path": "nextPeriod.unitPrice" },
                         "requestId": "req_example"
                       }
                     }
@@ -41220,7 +41220,7 @@
                       "error": {
                         "code": "CURRENCY_NOT_SUPPORTED",
                         "message": "The currency XYZ is not supported.",
-                        "details": { "currency": "XYZ", "path": "unitPrice" },
+                        "details": { "currency": "XYZ", "path": "nextPeriod.unitPrice" },
                         "requestId": "req_example"
                       }
                     }

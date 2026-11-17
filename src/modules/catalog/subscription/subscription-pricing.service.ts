@@ -20,19 +20,25 @@ export class SubscriptionPricingService {
     private readonly organizationReads: OrganizationReadApi,
   ) {}
 
-  /** Reads the unit price in dong; another currency is refused before the amount is read, and a negative price is out of range. */
-  async read(unitPrice: { amount: string; currency: string }): Promise<Money> {
+  /**
+   * Reads the unit price in dong; another currency is refused before the amount is read, and a negative price is out of range. `path` is where
+   * the price sits in the body of the request the money errors answer (`unitPrice` of a subscription, `nextPeriod.unitPrice` of a renewal).
+   */
+  async read(unitPrice: { amount: string; currency: string }, path = 'unitPrice'): Promise<Money> {
     assertPriceInDong(unitPrice.currency);
-    const money = await this.finance.parseMoney(unitPrice, 'unitPrice');
-    if (money.amountMinor < 0n) throw new MoneyOutOfRangeError('unitPrice');
+    const money = await this.finance.parseMoney(unitPrice, path);
+    if (money.amountMinor < 0n) throw new MoneyOutOfRangeError(path);
 
     return money;
   }
 
-  /** Reads the price the vendor quoted, in the minor units of its own currency; a negative price is out of range. */
-  async readOriginal(originalPrice: { amount: string; currency: string }): Promise<OriginalPriceRecord> {
-    const money = await this.finance.parseMoney(originalPrice, 'originalPrice');
-    if (money.amountMinor < 0n) throw new MoneyOutOfRangeError('originalPrice');
+  /** Reads the price the vendor quoted, in the minor units of its own currency; a negative price is out of range. `path` is as for `read`. */
+  async readOriginal(
+    originalPrice: { amount: string; currency: string },
+    path = 'originalPrice',
+  ): Promise<OriginalPriceRecord> {
+    const money = await this.finance.parseMoney(originalPrice, path);
+    if (money.amountMinor < 0n) throw new MoneyOutOfRangeError(path);
 
     return { amountMinor: money.amountMinor, currency: money.currency };
   }

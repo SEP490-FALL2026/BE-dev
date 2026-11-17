@@ -64,6 +64,8 @@ export interface NextPeriodInput {
   previousSubscriptionId: string;
   purchasedQuantity: number;
   unitPrice: { amount: string; currency: string };
+  /** Where the price sits in the body of the request the caller answers (`nextPeriod.unitPrice`), so a money error points at that field; `unitPrice` when absent. */
+  unitPricePath?: string;
   billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
   startDate: BusinessDate;
   endDate?: BusinessDate;

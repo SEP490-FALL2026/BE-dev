@@ -212,7 +212,7 @@ export class SubscriptionPeriodService {
     };
     this.assertNextPeriod(plan, state, input.billingCycle, previous);
     // A price is entered in dong only (`QĐ-111an`): the continuation of a period is refused for one in another currency, nothing written.
-    const money = await this.pricing.read(input.unitPrice).catch((error: unknown) => {
+    const money = await this.pricing.read(input.unitPrice, input.unitPricePath).catch((error: unknown) => {
       if (error instanceof SubscriptionPriceNotVndError) throw new SubscriptionPeriodRefusedError('PRICE_NOT_VND');
       throw error;
     });
