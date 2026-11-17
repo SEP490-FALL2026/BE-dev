@@ -300,17 +300,6 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'US-04-04 AC-10',
   },
   {
-    key: 'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
-    label: 'Cảnh báo trước hạn báo hủy thuê bao',
-    group: 'SUBSCRIPTION',
-    shape: { kind: 'int-list', min: 1, max: 180, length: { min: 1, max: 5 }, order: 'descending' },
-    default: [15, 7],
-    unit: 'days',
-    unitLabel: 'ngày',
-    description: 'How many days before the cancellation deadline of a subscription an alert is sent.',
-    source: 'FR-1.4',
-  },
-  {
     key: 'ACTIVITY_WINDOW_MINUTES',
     label: 'Số phút tính là một ngày có hoạt động',
     group: 'USAGE',

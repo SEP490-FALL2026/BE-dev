@@ -58,7 +58,7 @@ flowchart BT
   catalog -->|10| finance
   catalog -->|8| identity_access
   catalog -->|2| notifications
-  catalog -->|4| operating_parameters
+  catalog -->|2| operating_parameters
   catalog -->|33| organization
   dashboards -->|2| catalog
   dashboards -->|2| devices
@@ -96,7 +96,7 @@ flowchart BT
   licensing -->|2| finance
   licensing -->|12| identity_access
   licensing -->|8| notifications
-  licensing -->|7| operating_parameters
+  licensing -->|6| operating_parameters
   licensing -->|55| organization
   licensing -->|4| policies
   onboarding -->|2| catalog

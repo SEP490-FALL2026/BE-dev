@@ -60,9 +60,14 @@ export function increasesObligation(current: ObligationState, next: ObligationSt
 
 /** The days before the payment day of a plan by the month, and before the deadline of a plan by the year, that the point of adjustment opens (`FR-1.4`). */
 const MONTHLY_WINDOW_DAYS = 7;
-const ANNUAL_WINDOW_DAYS = 30;
+export const ANNUAL_WINDOW_DAYS = 30;
 /** The days before the deadline of a plan by the year that the red alert opens (`FR-8.2`; a constant until the parameter of S20-T9b). */
 export const RED_ALERT_DAYS_ANNUAL = 7;
+
+/** The day the red alert opens for a plan by the year, `RED_ALERT_DAYS_ANNUAL` before its deadline; a plan by the month has none. */
+export function redAlertOf(deadline: BusinessDate, commitment: 'MONTHLY' | 'ANNUAL'): BusinessDate | null {
+  return commitment === 'ANNUAL' ? addDays(deadline, -RED_ALERT_DAYS_ANNUAL) : null;
+}
 
 export interface AdjustmentInput {
   kind: SubscriptionKind;

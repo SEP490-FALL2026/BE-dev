@@ -26,7 +26,6 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(defaults.TRANSFER_GRACE_REMINDER_WORKING_DAYS).toBe(2);
     expect(defaults.BACKLOG_ALERT_THRESHOLD).toBe(10);
     expect(defaults.DETECTION_THRESHOLD_DAYS).toEqual([30, 60, 90]);
-    expect(defaults.RENEWAL_ALERT_DAYS_BEFORE_DEADLINE).toEqual([15, 7]);
     expect(defaults.GHOST_SEAT_DECISION_WORKING_DAYS).toBe(5);
     expect(defaults.GHOST_SEAT_REVOCATION_GRACE_DAYS).toBe(7);
     expect(defaults.RULE_SCHEDULE_G1_G2).toBe('DAILY');
@@ -78,8 +77,6 @@ describe('operating parameter definitions (US-01-04)', () => {
     ['thresholds out of order', 'DETECTION_THRESHOLD_DAYS', [60, 30, 90]],
     ['thresholds with a repeat', 'DETECTION_THRESHOLD_DAYS', [30, 30, 90]],
     ['two thresholds instead of three', 'DETECTION_THRESHOLD_DAYS', [30, 60]],
-    ['alerts that do not fall', 'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE', [7, 15]],
-    ['an empty alert list', 'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE', []],
     ['a schedule that is not one', 'RULE_SCHEDULE_G1_G2', 'HOURLY'],
   ])('refuses %s', (_name, key, value) => {
     expect(validateParameterValue(key, value, defaultValues())).toMatchObject({ ok: false });
@@ -144,7 +141,6 @@ const EXPECTED_KEYS = [
   'INVITATION_REMINDER_DAYS',
   'INVITATION_WITHDRAW_DAYS',
   'DOCUMENT_MAX_SIZE_MB',
-  'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
   'ACTIVITY_WINDOW_MINUTES',
   'DETECTION_THRESHOLD_DAYS',
   'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
@@ -157,7 +153,7 @@ const EXPECTED_KEYS = [
 ];
 
 describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
-  it('pins the twenty-nine keys, ordered by group and, inside a group, as the spec table lists them', () => {
+  it('pins the twenty-eight keys, ordered by group and, inside a group, as the spec table lists them', () => {
     expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
   });
 
@@ -201,7 +197,9 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       (group, index, all) => index === 0 || group !== all[index - 1],
     );
 
-    expect(runs).toEqual([...PARAMETER_GROUPS]);
+    // SUBSCRIPTION has no parameter between the removal of the list of alert days (S20-T9a) and the three of the point of adjustment
+    // (S20-T9b); every group that has parameters still appears once, in the display order.
+    expect(runs).toEqual(PARAMETER_GROUPS.filter((group) => runs.includes(group)));
   });
 
   it('gives the label, group and unit label the spec table fixes to each parameter', () => {
@@ -269,7 +267,6 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['INVITATION_REMINDER_DAYS', 'Nhắc lời mời chưa kích hoạt sau', 'ACCOUNT', 'days', 'ngày'],
       ['INVITATION_WITHDRAW_DAYS', 'Thu hồi lời mời chưa kích hoạt sau', 'ACCOUNT', 'days', 'ngày'],
       ['DOCUMENT_MAX_SIZE_MB', 'Dung lượng tối đa của tệp tài liệu', 'DOCUMENT', 'MB', 'MB'],
-      ['RENEWAL_ALERT_DAYS_BEFORE_DEADLINE', 'Cảnh báo trước hạn báo hủy thuê bao', 'SUBSCRIPTION', 'days', 'ngày'],
       ['ACTIVITY_WINDOW_MINUTES', 'Số phút tính là một ngày có hoạt động', 'USAGE', 'minutes per day', 'phút mỗi ngày'],
       ['DETECTION_THRESHOLD_DAYS', 'Ngưỡng ngày không dùng của ghế', 'USAGE', 'days', 'ngày'],
       ['GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS', 'Ân hạn cho ghế mới cấp', 'USAGE', 'days', 'ngày'],

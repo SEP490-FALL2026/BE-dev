@@ -3,7 +3,6 @@ import { addDays } from '../../../src/core/business-date';
 import { FinanceApi } from '../../../src/modules/finance/public/finance.api';
 import { PgRelay } from '../../support/pg-relay';
 import { QueryCounter, dataStatements, tablesOf } from '../../support/query-count';
-import { OperatingParametersApi } from '../../../src/modules/operating-parameters/public/operating-parameters.api';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
@@ -105,18 +104,16 @@ describe('catalog subscription read model (integration, real PostgreSQL)', () =>
   describe('LD-02: the warning list reads the subscriptions whose milestone is near, not all of them', () => {
     it('lists exactly the plans the rule says need a review, in a fixed number of statements', async () => {
       const day = await today();
-      const days = await h.ctx.app
-        .get(OperatingParametersApi, { strict: false })
-        .getValue('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE');
-      const earliest = Math.max(...(days as number[]));
+      // The window is the point of adjustment of a plan by the year: 30 days before the milestone (FR-8.2, S20-T9a), no longer a parameter.
+      const earliest = 30;
       // The rows' answers are written out from the rule, not computed with the code under test (P28-06): a milestone is
       // the declared deadline, else renewal (or end) minus the notice period, else the end of a plan that does not
-      // renew; it is due when it falls from today to `earliest` days ahead. The answers hold for 10 ≤ earliest ≤ 34.
-      expect(earliest).toBeGreaterThanOrEqual(10);
-      expect(earliest).toBeLessThanOrEqual(34);
+      // renew; it is due when it falls from today to `earliest` days ahead.
       const matrix = [
         { deadline: addDays(day, 5), renewal: null, end: null, period: null, auto: true, due: true },
         { deadline: addDays(day, earliest - 1), renewal: null, end: null, period: null, auto: true, due: true },
+        { deadline: addDays(day, earliest), renewal: null, end: null, period: null, auto: true, due: true },
+        { deadline: addDays(day, earliest + 1), renewal: null, end: null, period: null, auto: true, due: false },
         { deadline: addDays(day, 400), renewal: null, end: null, period: null, auto: true, due: false },
         { deadline: addDays(day, -3), renewal: null, end: null, period: null, auto: true, due: false },
         { deadline: null, renewal: addDays(day, 40), end: null, period: 30, auto: true, due: true },

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { addDays, fromDateColumn, type BusinessDate } from '../../../../core/business-date';
+import { fromDateColumn, type BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
@@ -14,11 +14,7 @@ import type {
   RenewalPeriodFacts,
   SubscriptionPurchaseFacts,
 } from '../../public/subscription-period.types';
-import {
-  adjustmentCommitmentOf,
-  adjustmentPointOf,
-  RED_ALERT_DAYS_ANNUAL,
-} from '../obligation/subscription-obligation.policy';
+import { adjustmentCommitmentOf, adjustmentPointOf, redAlertOf } from '../obligation/subscription-obligation.policy';
 import { assertPoolTerms } from '../pool/subscription-pool.policy';
 import { SubscriptionPoolService } from '../pool/subscription-pool.service';
 import { snapshotOf } from '../subscription.mapper';
@@ -50,7 +46,7 @@ function adjustmentOf(record: SubscriptionRecord, today: BusinessDate): PeriodAd
     deadline: point.deadline,
     point: point.point,
     end: point.end,
-    redAlertOn: commitment === 'ANNUAL' ? addDays(point.deadline, -RED_ALERT_DAYS_ANNUAL) : null,
+    redAlertOn: redAlertOf(point.deadline, commitment),
     commitment,
   };
 }

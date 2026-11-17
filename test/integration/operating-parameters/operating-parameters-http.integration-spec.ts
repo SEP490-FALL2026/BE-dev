@@ -120,7 +120,8 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect(parameters.has('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS')).toBe(false);
       expect(parameters.has('HANDOVER_SHORT_DEADLINE_WORKING_DAYS')).toBe(false);
       expect(parameters.get('DETECTION_THRESHOLD_DAYS')?.value).toEqual([30, 60, 90]);
-      expect(parameters.get('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE')?.value).toEqual([15, 7]);
+      // The alerts of a subscription follow its point of adjustment now (S20-T9a): the list of days is gone.
+      expect(parameters.has('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE')).toBe(false);
       expect(parameters.get('RULE_SCHEDULE_G1_G2')?.value).toBe('DAILY');
       expect(parameters.get('RULE_SCHEDULE_G3_G4')?.value).toBe('WEEKLY');
       for (const parameter of parameters.values()) {
@@ -153,7 +154,6 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'INVITATION_REMINDER_DAYS',
         'INVITATION_WITHDRAW_DAYS',
         'DOCUMENT_MAX_SIZE_MB',
-        'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
         'ACTIVITY_WINDOW_MINUTES',
         'DETECTION_THRESHOLD_DAYS',
         'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
@@ -171,7 +171,6 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'PROVISIONING',
         'ACCOUNT',
         'DOCUMENT',
-        'SUBSCRIPTION',
         'USAGE',
         'AI',
       ]);
@@ -424,8 +423,9 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       // 27 before GH-1/2/3 and the renewal window (REQUEST_OPEN_NEW_LIMIT, PAID_SOFTWARE_FLAG_THRESHOLD, RENEWAL_WINDOW_DAYS), less the
       // threshold of GH-3 that went with it (PAID_SOFTWARE_FLAG_THRESHOLD, QĐ-111h), then the three of MF-2 and MF-3 (DEPARTURE_REVOCATION_WORKING_DAYS, TRANSFER_GRACE_WORKING_DAYS, TRANSFER_GRACE_REMINDER_WORKING_DAYS), less the
       // two of the handover that went (ABRUPT_DEPARTURE_HOLD_WORKING_DAYS, HANDOVER_SHORT_DEADLINE_WORKING_DAYS, QĐ-110g) and the deadline of the
-      // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p).
-      expect(parameters.size).toBe(29);
+      // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p), less the list of alert days before the deadline
+      // (RENEWAL_ALERT_DAYS_BEFORE_DEADLINE, S20-T9a).
+      expect(parameters.size).toBe(28);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { addDays } from '../../../core/business-date';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
-import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RenewalUsageContributions } from '../public/licensing.extension-points';
 import { RenewalAlertsService } from './alerts/renewal-alerts.service';
@@ -14,6 +13,12 @@ import { SubscriptionRenewalRepo } from './subscription-renewal.repo';
  * a late case and records a passed milestone; older periods are left alone rather than given an event long after.
  */
 const LOOKBACK_DAYS = 60;
+
+/**
+ * The days before the milestone the alerts of the old rule fall: the parameter that held them is gone (S20-T9a), and the sweep that read it
+ * is rewritten around the point of adjustment (S20-T6), which drops this constant with the rest of the old rule.
+ */
+const INTERIM_ALERT_DAYS_BEFORE: readonly number[] = [15, 7];
 
 export interface SweepResult {
   told: number;
@@ -33,7 +38,6 @@ export class SubscriptionRenewalSweepService {
     private readonly repo: SubscriptionRenewalRepo,
     private readonly parties: RenewalPartiesService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly parameters: OperatingParametersApi,
     private readonly usage: RenewalUsageContributions,
     private readonly alerts: RenewalAlertsService,
     private readonly deadlines: RenewalDeadlineService,
@@ -44,8 +48,7 @@ export class SubscriptionRenewalSweepService {
     const organization = await this.organizationReads.getOrganization();
     if (!organization) return result;
     const today = await this.organizationReads.businessToday(now);
-    const value = await this.parameters.getValue('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE');
-    const daysBefore = Array.isArray(value) ? value.filter((day): day is number => typeof day === 'number') : [];
+    const daysBefore = INTERIM_ALERT_DAYS_BEFORE;
     // Until the sweep reads the point of adjustment itself (S20-T6): the K2 periods a department owns, whose milestone falls in the
     // window or has no date at all, as the milestone-window read gave before the shared pool's subscriptions came into the facts.
     const from = addDays(today, -LOOKBACK_DAYS);

@@ -2,6 +2,15 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { SubscriptionHttpHarness, type SubscriptionWire, VND_30M } from '../../support/subscription-http-harness';
 
+/** What an annual subscription needs to be active (AC-1): the point of adjustment is only read for one that runs a period. */
+const RUNNING_ANNUAL = {
+  purchasedQuantity: 100,
+  unitPrice: VND_30M,
+  billingCycle: 'ANNUAL',
+  startDate: '2026-01-01',
+  autoRenew: true,
+};
+
 describe('subscriptions and perpetual purchases over HTTP (integration, real PostgreSQL): the owner department and the milestone for a cancellation', () => {
   const h = new SubscriptionHttpHarness();
   const { server, as, unique, dataOf, codeOf, today, plan, create, patch, get, subscription, n, auditOf } = h;
@@ -126,7 +135,7 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
   });
 
   describe('the milestone for a cancellation (US-04-03)', () => {
-    it('AC-1: Figma, 100 seats, renewing 31/12, deadline 01/12, auto renewal: the deadline is used, the alerts count back from it', async () => {
+    it('AC-1: Figma, 100 seats, renewing 31/12, deadline 01/12, auto renewal: the deadline is used, the point of adjustment and the red alert count back from it', async () => {
       const { planId } = await plan({ vendorName: 'Figma Inc' });
       today('2026-09-01');
 
@@ -146,7 +155,7 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
         missing: [],
         purchasedQuantity: 100,
         noticeDeadline: { value: '2026-12-01', source: 'DECLARED' },
-        alerts: { baseDate: '2026-12-01', dates: ['2026-11-16', '2026-11-24'] },
+        alerts: { baseDate: '2026-12-01', dates: ['2026-11-01', '2026-11-24'] },
         warnings: [],
       });
       expect(await auditOf(created.id)).toEqual([
@@ -157,10 +166,16 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
     it('AC-2: no deadline but a notice period of 30 days with renewal on 31/12 infers 01/12, unconfirmed; declaring it confirms and is audited', async () => {
       const { planId } = await plan();
 
-      const created = await subscription(planId, { renewalDate: '2026-12-31', noticePeriodDays: 30 });
+      today('2026-09-01');
+
+      const created = await subscription(planId, {
+        ...RUNNING_ANNUAL,
+        renewalDate: '2026-12-31',
+        noticePeriodDays: 30,
+      });
 
       expect(created.noticeDeadline).toEqual({ value: '2026-12-01', source: 'INFERRED_UNCONFIRMED' });
-      expect(created.alerts.dates).toEqual(['2026-11-16', '2026-11-24']);
+      expect(created.alerts).toEqual({ baseDate: '2026-12-01', dates: ['2026-11-01', '2026-11-24'] });
 
       const confirmed = dataOf<SubscriptionWire>(await patch(created.id, { noticeDeadline: '2026-12-01' }).expect(200));
       expect(confirmed.noticeDeadline).toEqual({ value: '2026-12-01', source: 'DECLARED' });
@@ -182,13 +197,22 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       expect(created.warnings).toEqual(['NO_ALERT_ANCHOR']);
     });
 
-    it('AC-7: Zoom ends 31/12 with no deadline, no notice period and no auto renewal: alerts from the end date, no warning', async () => {
+    it('AC-7: Zoom ends 31/12 with no deadline, no notice period and no auto renewal: the point of adjustment counts from the end date, no warning', async () => {
       const { planId } = await plan({ pricing: 'FLAT_RATE', type: 'K1' });
+      today('2026-09-01');
 
-      const created = await subscription(planId, { endDate: '2026-12-31', autoRenew: false });
+      // A K1 plan is paid by the month (R-E01): 7 days before its last payment day, which is the end day; no red alert for a plan by the month.
+      const created = await subscription(planId, {
+        endDate: '2026-12-31',
+        autoRenew: false,
+        billingCycle: 'MONTHLY',
+        startDate: '2026-01-01',
+        unitPrice: VND_30M,
+      });
 
+      expect(created.status).toBe('ACTIVE');
       expect(created.noticeDeadline).toEqual({ value: null, source: 'BY_END_DATE' });
-      expect(created.alerts).toEqual({ baseDate: '2026-12-31', dates: ['2026-12-16', '2026-12-24'] });
+      expect(created.alerts).toEqual({ baseDate: '2026-12-31', dates: ['2026-12-24'] });
       expect(created.warnings).toEqual([]);
     });
 
@@ -202,15 +226,19 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       expect(created.warnings).toEqual(['NO_ALERT_ANCHOR']);
     });
 
-    it('follows the operating parameter for the alert days, as it is now when the subscription is read', async () => {
+    it('has no alert dates for a subscription that runs no period: a draft, whatever its notice says', async () => {
       const { planId } = await plan();
-      const created = await subscription(planId, { endDate: '2026-12-31' });
-      expect(created.alerts.dates).toEqual(['2026-12-16', '2026-12-24']);
-      jest.spyOn(h.parameters, 'getValue').mockResolvedValue([30, 10, 1]);
+      today('2026-09-01');
 
-      const read = dataOf<SubscriptionWire>(await get(created.id).expect(200));
+      const draft = await subscription(planId, {
+        endDate: '2026-12-31',
+        renewalDate: '2026-12-31',
+        noticePeriodDays: 30,
+      });
 
-      expect(read.alerts).toEqual({ baseDate: '2026-12-31', dates: ['2026-12-01', '2026-12-21', '2026-12-30'] });
+      expect(draft.status).toBe('DRAFT');
+      expect(draft.noticeDeadline).toEqual({ value: '2026-12-01', source: 'INFERRED_UNCONFIRMED' });
+      expect(draft.alerts).toEqual({ baseDate: null, dates: [] });
     });
 
     it('lists exactly the subscriptions that warn about having no anchor, whichever way the data is combined', async () => {
