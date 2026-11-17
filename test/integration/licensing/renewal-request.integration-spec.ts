@@ -460,7 +460,10 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       ]);
 
       expect([byHolder.status, again.status].sort()).toEqual([201, 409]);
-      expect(h.codeOf(byHolder.status === 409 ? byHolder : again)).toBe('RENEWAL_REQUEST.ALREADY_REQUESTED');
+      const refused = byHolder.status === 409 ? byHolder : again;
+      const won = byHolder.status === 409 ? again : byHolder;
+      expect(h.codeOf(refused)).toBe('RENEWAL_REQUEST.ALREADY_REQUESTED');
+      expect(h.detailsOf(refused)).toEqual({ requestId: h.dataOf<{ request: RenewalWire }>(won).request.id });
       expect(
         (await h.ctx.sql.query(`SELECT 1 FROM access_request_renewals WHERE assignment_id = $1`, [assignmentId]))
           .rowCount,
@@ -509,6 +512,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       for (const months of [0, 13]) {
         const refused = await h.renew(body(assignmentId, months), unit.member.account).expect(422);
         expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE');
+        expect(h.detailsOf(refused)).toEqual({ maxMonths: 12, provisioningType: 'K5' });
       }
 
       expect([await h.requestRows(), await h.count('access_request_renewals')]).toEqual(before);
@@ -523,7 +527,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
         reason: 'Done',
       });
       const waiting = await holder({ planId: internalPlan }, 5);
-      await h.renewed(waiting.unit.member.account, body(waiting.assignmentId, 3));
+      const waitingRenewal = await h.renewed(waiting.unit.member.account, body(waiting.assignmentId, 3));
 
       const renewal = await h.renew(body(returning.assignmentId, 3), returning.unit.member.account).expect(409);
       const returned = await h
@@ -533,6 +537,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       expect(h.codeOf(renewal)).toBe('RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE');
       expect(h.detailsOf(renewal)).toEqual({ reason: 'REVOCATION_PENDING' });
       expect(h.codeOf(returned)).toBe('RETURN_REQUEST.RENEWAL_PENDING');
+      expect(h.detailsOf(returned)).toEqual({ requestId: waitingRenewal.request.id });
       expect((await h.returnRow(wire.id)).state).toBe('AWAITING_REVOCATION');
       // The refused return left nothing: the seat has no revocation, and the renewal still waits.
       expect(await h.liveTaskOf(waiting.assignmentId)).toBeNull();

@@ -69,7 +69,11 @@ export class RenewalRequestWriter {
       lockDepartment: true,
     });
     if (assessed.termRefusal !== null) {
-      throw new AccessRequestTermRefusedError(assessed.termRefusal, assessed.contractEndDate);
+      throw new AccessRequestTermRefusedError(
+        assessed.termRefusal,
+        assessed.contractEndDate,
+        assessed.target.provisioningType,
+      );
     }
     const newEnd = assessed.term.end;
     // Counted to the end of the new period, or to the end the right has when it goes on with no end: a stay is never less than a month.

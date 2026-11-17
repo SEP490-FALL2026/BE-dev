@@ -42301,6 +42301,7 @@
                       "error": {
                         "code": "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE",
                         "message": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                        "details": { "maxMonths": 9, "provisioningType": "K1" },
                         "requestId": "req_example"
                       }
                     }
@@ -42918,6 +42919,7 @@
                       "error": {
                         "code": "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE",
                         "message": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                        "details": { "maxMonths": 9, "provisioningType": "K1" },
                         "requestId": "req_example"
                       }
                     }
@@ -45311,6 +45313,7 @@
                       "error": {
                         "code": "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE",
                         "message": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                        "details": { "maxMonths": 9, "provisioningType": "K1" },
                         "requestId": "req_example"
                       }
                     }
@@ -48028,6 +48031,7 @@
                       "error": {
                         "code": "SPEND.NOT_IN_QUEUE",
                         "message": "The request <request-id> is not waiting to be sent on.",
+                        "details": { "requestId": "<request-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -51645,6 +51649,7 @@
                       "error": {
                         "code": "RETURN_REQUEST.ALREADY_REQUESTED",
                         "message": "The return of the seat is refused: ALREADY_REQUESTED.",
+                        "details": { "requestId": "<request-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -51656,6 +51661,7 @@
                       "error": {
                         "code": "RETURN_REQUEST.RENEWAL_PENDING",
                         "message": "The return of the seat is refused: RENEWAL_PENDING.",
+                        "details": { "requestId": "<request-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -52287,6 +52293,7 @@
                       "error": {
                         "code": "RENEWAL_REQUEST.ALREADY_REQUESTED",
                         "message": "The renewal is refused: ALREADY_REQUESTED.",
+                        "details": { "requestId": "<request-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -52448,6 +52455,7 @@
                       "error": {
                         "code": "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE",
                         "message": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                        "details": { "maxMonths": 9, "provisioningType": "K1" },
                         "requestId": "req_example"
                       }
                     }
@@ -56919,6 +56927,7 @@
                       "error": {
                         "code": "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE",
                         "message": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                        "details": { "maxMonths": 9, "provisioningType": "K1" },
                         "requestId": "req_example"
                       }
                     }

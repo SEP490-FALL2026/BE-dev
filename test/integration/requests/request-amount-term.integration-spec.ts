@@ -174,6 +174,7 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
       expect([none.status, h.codeOf(none)]).toEqual([422, 'ACCESS_REQUEST.TERM_REQUIRED']);
       expect([explicitNone.status, h.codeOf(explicitNone)]).toEqual([422, 'ACCESS_REQUEST.TERM_REQUIRED']);
       expect([ten.status, h.codeOf(ten)]).toEqual([422, 'ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE']);
+      expect(h.detailsOf(ten)).toEqual({ maxMonths: 9, provisioningType: 'K1' });
       expect(nine.status).toBe(201);
     });
 

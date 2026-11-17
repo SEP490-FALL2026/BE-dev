@@ -25,6 +25,8 @@ export class RenewalRequestRefusedError extends Error {
     readonly reason: RenewalRefusal,
     /** Why the seat cannot be renewed, for `ASSIGNMENT_NOT_RENEWABLE`. */
     readonly problem: RenewableProblem | null = null,
+    /** The request that already waits for its decision, for `ALREADY_REQUESTED`. */
+    readonly blockingRequestId: string | null = null,
   ) {
     super(`The renewal is refused: ${reason}.`);
     this.name = 'RenewalRequestRefusedError';
