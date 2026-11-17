@@ -1,6 +1,6 @@
 import type { DemoRunContext } from '../demo-run.types';
 import { person } from '../demo-step-kit';
-import { type BuiltFile, bm10Workbook, versionWorkbook } from './file-builders';
+import { type BudgetLine, type BuiltFile, bm10Workbook, versionWorkbook } from './file-builders';
 
 const RESERVE_KEY = 'BUDGET_RESERVE_DEFAULT_PERCENT';
 const reserveOfRun = new WeakMap<DemoRunContext, number>();
@@ -29,6 +29,24 @@ export async function reservePercentOf(ctx: DemoRunContext): Promise<number> {
 const departmentOf = (ctx: DemoRunContext, code: string) =>
   ctx.fixture.departments.find((candidate) => candidate.code === code);
 
+/**
+ * The lines a head can list within the amount asked: the amount is counted from the day of the seed, so it may be smaller than the lines of the
+ * fixture add up to. A line that would go over is cut to the months that fit, one that fits no month is left out; the rest is one balancing line.
+ */
+export function fitLines(lines: readonly BudgetLine[], amount: number): BudgetLine[] {
+  const fitted: BudgetLine[] = [];
+  let left = amount;
+  for (const line of lines) {
+    const month = line.seats * line.monthlyPrice;
+    const months = Math.min(line.months, month > 0 ? Math.floor(left / month) : 0);
+    if (months < 1) continue;
+    fitted.push(months === line.months ? line : { ...line, months });
+    left -= month * months;
+  }
+
+  return fitted;
+}
+
 /** `BM-10` of a department as its head fills it in: the template the head downloads, filled with the lines of the fixture. */
 export async function proposalFile(
   ctx: DemoRunContext,
@@ -41,7 +59,7 @@ export async function proposalFile(
 
   return bm10Workbook(
     template,
-    ctx.fixture.budgetLines[plan.department] ?? [],
+    fitLines(ctx.fixture.budgetLines[plan.department] ?? [], Number(plan.amount)),
     {
       costCenterCode: departmentOf(ctx, plan.department)?.costCenter?.code ?? plan.department,
       year,

@@ -17,7 +17,7 @@ const HEADER = SEAT_BASELINE_COLUMNS.join(',');
  * The day a seat of the baseline was granted: the days of the seat before today, but never before the subscription starts (the annual ones of the
  * dataset start late in the year) nor before the person was hired.
  */
-export function grantedOnOf(ctx: DemoRunContext, seat: DemoSeat): string {
+export function grantedOnOf(ctx: Pick<DemoRunContext, 'fixture' | 'today'>, seat: DemoSeat): string {
   const wanted = dayOffset(ctx.today, -(seat.grantedDaysAgo ?? DEFAULT_GRANTED_DAYS_AGO));
   const subscription = ctx.fixture.subscriptions.find((candidate) => candidate.key === seat.subscription);
   const floors = [

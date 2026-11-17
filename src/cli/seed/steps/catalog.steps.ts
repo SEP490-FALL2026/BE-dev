@@ -212,11 +212,14 @@ export function purchasedQuantityOf(ctx: DemoRunContext, subscription: DemoSubsc
   return subscription.quantity ?? baselineSeatsOf(ctx, subscription.key) + subscription.freeAfterBaseline;
 }
 
+/** What the dates of a subscription are counted from: the day of the seed. */
+type DatedContext = Pick<DemoRunContext, 'today'>;
+
 /** The date fields of a subscription, by the name the API takes. */
 type Dates = Record<string, string>;
 
 /** The days of a monthly plan: the calendar year, and a payment day `renewalInDays` from today that stretches the year when it falls in the next one. */
-function monthlyDates(ctx: DemoRunContext, subscription: DemoSubscription): Dates {
+function monthlyDates(ctx: DatedContext, subscription: DemoSubscription): Dates {
   const { year, lastDay } = yearOf(ctx);
   const dates = { startDate: `${year}-01-01`, endDate: lastDay };
   if (subscription.renewalInDays === undefined) return dates;
@@ -230,7 +233,7 @@ function monthlyDates(ctx: DemoRunContext, subscription: DemoSubscription): Date
 }
 
 /** The days of an annual plan: the 12 months before the renewal day, and the deadline to cancel when the fixture declares one. */
-function annualDates(ctx: DemoRunContext, subscription: DemoSubscription): Dates {
+function annualDates(ctx: DatedContext, subscription: DemoSubscription): Dates {
   const { year } = yearOf(ctx);
   if (subscription.renewalInDays === undefined) return { startDate: `${year}-01-01`, endDate: `${year}-12-31` };
   const renewalDate = dayOffset(ctx.today, subscription.renewalInDays);
@@ -246,7 +249,7 @@ function annualDates(ctx: DemoRunContext, subscription: DemoSubscription): Dates
 }
 
 /** The day a subscription starts: the first day the seats of the pool exist, so no seat of it is granted before. */
-export function subscriptionStartDate(ctx: DemoRunContext, subscription: DemoSubscription): string {
+export function subscriptionStartDate(ctx: DatedContext, subscription: DemoSubscription): string {
   if (subscription.kind === 'PERPETUAL' || subscription.withoutDates) return dayOffset(ctx.today, -200);
 
   return (subscription.billingCycle === 'ANNUAL' ? annualDates(ctx, subscription) : monthlyDates(ctx, subscription))

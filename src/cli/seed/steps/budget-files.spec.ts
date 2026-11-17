@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import type { DemoRunContext } from '../demo-run.types';
 import { SHARED_DEMO_V4 } from '../fixture/shared-demo-v4';
 import { fakeBm10Template } from './bm10-template.fake';
-import { proposalFile, reservePercentOf, versionFile } from './budget-files';
+import { fitLines, proposalFile, reservePercentOf, versionFile } from './budget-files';
 
 /** A client that answers by "METHOD path" and remembers what it was asked. */
 function fakeContext(answers: Record<string, unknown>, bytes?: Uint8Array) {
@@ -97,5 +97,41 @@ describe('the file Finance attaches to a version', () => {
     expect(text).toContain('50000000');
     expect(text).toContain('48000000');
     expect(text).toContain('-2000000');
+  });
+});
+
+/** T9b: the amount of a head is counted from the day of the seed and may be smaller than the lines of the fixture add up to. */
+describe('the lines of BM-10 within the amount asked (T9b)', () => {
+  const line = (months: number, seats = 4, monthlyPrice = 200_000) => ({
+    software: 'Jira',
+    plan: 'Standard',
+    seats,
+    monthlyPrice,
+    months,
+    reason: 'x',
+  });
+
+  it('keeps every line while they fit', () => {
+    expect(fitLines([line(12)], 9_600_000)).toEqual([line(12)]);
+    expect(fitLines([line(12)], 50_000_000)).toEqual([line(12)]);
+  });
+
+  it('cuts a line to the months that fit the amount and leaves out the ones that fit none', () => {
+    expect(fitLines([line(12)], 3_000_000)).toEqual([line(3)]);
+    expect(fitLines([line(12), { ...line(12), software: 'Slack' }], 3_000_000).map((l) => l.software)).toEqual([
+      'Jira',
+    ]);
+    expect(fitLines([line(12)], 500_000)).toEqual([]);
+  });
+
+  it('never adds up to more than the amount, whatever it is', () => {
+    for (const amount of [0, 1, 799_999, 800_000, 3_000_000, 9_599_999]) {
+      const total = fitLines([line(12), line(6, 2, 180_000)], amount).reduce(
+        (sum, l) => sum + l.seats * l.monthlyPrice * l.months,
+        0,
+      );
+
+      expect(total).toBeLessThanOrEqual(amount);
+    }
   });
 });

@@ -62,13 +62,26 @@ export const FINANCE: Pick<
    * `BM-10`: its version from the baseline can only be made after the deadline (D-Z2-2), so it has no budget of the year.
    */
   budgets: [
-    { department: 'ENG', base: '600000000', note: 'Jira, GitHub cho cả phòng; ChatGPT Plus cho nhóm R&D.' },
+    {
+      department: 'ENG',
+      base: '600000000',
+      light: 'UNDER',
+      note: 'Jira, GitHub cho cả phòng; ChatGPT Plus cho nhóm R&D.',
+    },
     { department: 'MKT', base: '240000', note: 'Canva Teams cho nhóm nội dung.' },
     { department: 'SAL', base: '290000', note: 'Mailchimp Standard cho chiến dịch.' },
     { department: 'DES', base: '280000', note: 'Postman Professional cho nhóm kiểm thử giao diện.' },
-    { department: 'BOD', base: '50000000' },
-    { department: 'FIN', base: '50000000' },
-    { department: 'ITO', base: '50000000' },
+    { department: 'BOD', base: '50000000', light: 'GREEN' },
+    {
+      department: 'FIN',
+      base: '50000000',
+      light: 'YELLOW',
+      reserve: {
+        percent: 60,
+        reason: 'Phòng có các khoản phát sinh theo kỳ đối soát, cần dự phòng cao hơn mức mặc định.',
+      },
+    },
+    { department: 'ITO', base: '50000000', light: 'UNDER' },
   ],
   /*
    * Where the next year is left (DEMO-15): Engineering's budget is approved (a Request that runs into the next year shows the spending

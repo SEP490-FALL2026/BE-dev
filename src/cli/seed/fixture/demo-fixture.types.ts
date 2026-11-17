@@ -167,8 +167,15 @@ export interface DemoCycle {
 /** The approved budget of the current year of a department: `BM-10` of its head (one amount, one file), then Finance's version. */
 export interface DemoBudget {
   department: string;
-  /** The amount of `BM-10` and the base of the version; the reserve is the default share of it (10 %) the server works out. */
+  /**
+   * The amount of `BM-10` and the base of the version; the reserve is the default share of it (10 %) the server works out. For a department with
+   * a `light` it is only the value the day does not decide: the base is counted from the day of the seed (`baseFor`, SPEC S24).
+   */
   base: string;
+  /** The light the department shows at the close of the latest month, which the base is counted for; none: the amount above is kept. */
+  light?: 'UNDER' | 'GREEN' | 'YELLOW';
+  /** Finance sets the reserve to this share of the base (default: the server's) and gives the reason, which carries the tag of the dataset. */
+  reserve?: { percent: number; reason: string };
   note?: string;
 }
 
