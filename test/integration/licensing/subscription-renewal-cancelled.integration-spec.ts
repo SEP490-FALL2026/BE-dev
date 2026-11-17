@@ -72,18 +72,16 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
     const subscriptionId = await monthly(await h.plan('K2', 'PER_SEAT'));
     const recorded = await cancel(subscriptionId).expect(201);
     expect(h.dataOf<{ renewal: { state: string } }>(recorded).renewal.state).toBe('OUTCOME_RECORDED');
-    // The next payment day: the case was recorded for the day that was 5 days away, the plan now stands a month on (the day went by).
-    await h.ctx.sql.query(`UPDATE subscriptions SET renewal_date = renewal_date + interval '1 month' WHERE id = $1`, [
+    // The payment day moves off the grid of the recorded case (R-1 rolls it to the first day on the grid from today): the deadline is no
+    // longer the one the case was recorded for, so only the cancellation itself can keep the sweep quiet (V-4).
+    await h.ctx.sql.query(`UPDATE subscriptions SET renewal_date = $2::date WHERE id = $1`, [
       subscriptionId,
+      h.inDays(12),
     ]);
-    const { rows } = await h.ctx.sql.query<{ next: string }>(
-      `SELECT to_char(renewal_date, 'YYYY-MM-DD') AS next FROM subscriptions WHERE id = $1`,
-      [subscriptionId],
-    );
 
-    // 25 days past the day cancelled for is the point of the next period (7 days before it); the next payment day itself keeps seats.
-    await sweepOn(h.inDays(5 + 25));
-    await sweepOn(rows[0].next);
+    // Seven days before that deadline is the point of the adjustment; the deadline itself keeps seats.
+    await sweepOn(h.inDays(5));
+    await sweepOn(h.inDays(12));
 
     expect(await noticesOf(subscriptionId)).toEqual([]);
   });
