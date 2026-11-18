@@ -50,7 +50,12 @@ function inspectInstall() {
   const pnpmDir = path.join(here, 'node_modules', '.pnpm');
   if (!fs.existsSync(pnpmDir)) return out;
   for (const d of fs.readdirSync(pnpmDir)) {
-    if (/^(sharp|onnxruntime-node|onnxruntime-web|onnxruntime-common|@huggingface\+(tokenizers|jinja|transformers)|@img\+)/.test(d)) out.packages.push(d);
+    if (
+      /^(sharp|onnxruntime-node|onnxruntime-web|onnxruntime-common|@huggingface\+(tokenizers|jinja|transformers)|@img\+)/.test(
+        d,
+      )
+    )
+      out.packages.push(d);
   }
   for (const d of out.packages) {
     if (d.startsWith('onnxruntime-node@')) {
@@ -60,7 +65,8 @@ function inspectInstall() {
         for (const e of fs.readdirSync(p, { withFileTypes: true })) {
           const full = path.join(p, e.name);
           if (e.isDirectory()) walk(full, `${rel}${e.name}/`);
-          else if (/\.(node|so[.\d]*|dll|dylib)$/.test(e.name)) out.onnxruntimeNodeBinaries.push({ file: `${rel}${e.name}`, mb: mb(fs.statSync(full).size) });
+          else if (/\.(node|so[.\d]*|dll|dylib)$/.test(e.name))
+            out.onnxruntimeNodeBinaries.push({ file: `${rel}${e.name}`, mb: mb(fs.statSync(full).size) });
         }
       };
       walk(bin);
@@ -70,7 +76,8 @@ function inspectInstall() {
         for (const e of fs.readdirSync(p, { withFileTypes: true })) {
           const full = path.join(p, e.name);
           if (e.isDirectory()) walk(full, `${rel}${e.name}/`);
-          else if (/\.node$/.test(e.name)) out.sharpNative.push({ pkg: d, file: `${rel}${e.name}`, mb: mb(fs.statSync(full).size) });
+          else if (/\.node$/.test(e.name))
+            out.sharpNative.push({ pkg: d, file: `${rel}${e.name}`, mb: mb(fs.statSync(full).size) });
         }
       };
       walk(path.join(pnpmDir, d));
@@ -82,7 +89,10 @@ result.install = inspectInstall();
 
 const SENTENCES = {
   'vi-en': ['Giấy phép phần mềm sẽ hết hạn vào cuối tháng này.', 'Vui lòng liên hệ bộ phận hỗ trợ để gia hạn.'],
-  'en-vi': ['>>vie<< The license will expire at the end of this month.', '>>vie<< Please contact support to renew your subscription.'],
+  'en-vi': [
+    '>>vie<< The license will expire at the end of this month.',
+    '>>vie<< Please contact support to renew your subscription.',
+  ],
 };
 
 try {
@@ -139,7 +149,10 @@ try {
         }
         if (typeof tr.dispose === 'function') await tr.dispose();
       } catch (e) {
-        m.error = String(e?.stack || e).split('\n').slice(0, 5).join('\n');
+        m.error = String(e?.stack || e)
+          .split('\n')
+          .slice(0, 5)
+          .join('\n');
         failures.push(id);
       }
       result.models[dir] = m;
@@ -148,7 +161,10 @@ try {
     if (failures.length) result.failures = failures;
   }
 } catch (e) {
-  result.error = String(e?.stack || e).split('\n').slice(0, 8).join('\n');
+  result.error = String(e?.stack || e)
+    .split('\n')
+    .slice(0, 8)
+    .join('\n');
 }
 
 sample();

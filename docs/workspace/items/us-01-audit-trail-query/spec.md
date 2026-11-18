@@ -1,8 +1,8 @@
 # Spec: tra cứu Audit Trail — chỉ Super Admin
 
-- Phụ trách: chưa phân công.
+- Phụ trách: AI theo giao việc Owner (triển khai 16/10/2026).
 - Thiết kế ban đầu bởi: AI theo giao việc Owner (Task 3, 15/10/2026).
-- Thiết kế: ready (15/10/2026) — đủ đầu vào để code; **không** có nghĩa Owner đã duyệt. Owner review: chưa review.
+- Thiết kế: ready (15/10/2026) — đủ đầu vào để code; **không** có nghĩa Owner đã duyệt. Triển khai: **verified** local 16/10/2026 (cây làm việc chưa commit trên `e833092`; xem [plan](plan.md)). Owner review: chưa review.
 - Nguồn: Docs commit `3341ea0` = snapshot `S-2026-10-14b` ([sources](../../sources.md), hash 49/49 khớp ngày 15/10/2026).
   `US-01-06` AC-1 → AC-6 và _Main flow summary_ (`BE-UserStory/src/EP-01.md`); BRD v3.39 `FR-8.3`, `INV-05`, mục 7.7.2
   dòng 12 (Audit Trail — chỉ Super Admin tra cứu); `OI-08c`; `QĐ-72` (GVHD duyệt hướng đăng nhập nội bộ — không phải duyệt spec này).
@@ -60,7 +60,7 @@ Một cài đặt một tổ chức (ADR-01): truy vấn không nhận `organiza
 Trang vượt quá tổng ⟹ 200 với `items` rỗng, `totalItems` đúng. Không lọc nào ⟹ toàn bộ nhật ký theo trang.
 
 **Dữ liệu.** Không đổi bảng. Thêm một migration chỉ tạo index `audit_events (actor_app_user_id, occurred_at DESC, id DESC)`
-cho lọc theo người; index `(organization_id, occurred_at)` và `(resource_type, resource_id)` của G0 phục vụ hai lọc còn lại.
+cho lọc theo người; index `(resource_type, resource_id)` của G0 phục vụ lọc theo đối tượng; trang không lọc và lọc theo thời gian cần index `(occurred_at DESC, id DESC)` (migration `20261016140000_audit_time_index`), vì truy vấn không có điều kiện tổ chức nên index `(organization_id, occurred_at)` của G0 không dùng được.
 Không ghi. `findMany` + `count` cùng điều kiện chạy trong **một** giao dịch chỉ đọc `RepeatableRead` để trang và tổng
 khớp nhau, sắp với tie-breaker `id` duy nhất — theo [database rules](../../../rules/database-business.md) và tiền lệ
 `AccountRepo` của `appUserList`. Không khóa dòng. Trigger chỉ ghi thêm không đổi.
@@ -70,24 +70,26 @@ Giới hạn tốc độ: throttler toàn cục hiện có (`rate-limit.options.
 
 ## Acceptance và kiểm chứng
 
-| US/AC          | Tình huống                                                                                                        | Cấp test, kết quả mong đợi                                  | Bằng chứng sau implement |
-| -------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------ |
-| Main flow      | Super Admin lọc theo `resourceType`+`resourceId`, theo `actorAppUserId`, theo khoảng thời gian, kết hợp           | HTTP trên PostgreSQL thật: đúng tập, đúng thứ tự, đủ trường | chưa có                  |
-| Main flow      | Phân trang: 25 bản ghi, `pageSize=10` ⟹ 3 trang, `totalItems=25`; trang 4 rỗng                                    | HTTP trên PostgreSQL thật                                   | chưa có                  |
-| AC-5           | Tài khoản chỉ có `EMPLOYEE` gọi tra cứu ⟹ 403, không trả dữ liệu                                                  | e2e + HTTP thật                                             | chưa có                  |
-| AC-6           | `IT_ADMIN`, `FINANCE` ⟹ 403; tài khoản không vai ⟹ 403; vai suy ra không mở quyền (unit guard với `derivedRoles`) | e2e + unit                                                  | chưa có                  |
-| Xác thực       | Không token ⟹ 401 `AUTHENTICATION_REQUIRED`; tài khoản bị khóa sau khi phát token ⟹ 401 ở request kế tiếp         | e2e + HTTP thật                                             | chưa có                  |
-| Validation     | `resourceId` thiếu `resourceType`, khoảng thời gian đảo, `pageSize=101`, UUID sai, tham số lạ ⟹ 422               | e2e                                                         | chưa có                  |
-| Lỗi tạm thời   | CSDL ngừng trả lời sau guard ⟹ 503 `SERVICE_UNAVAILABLE` trong thời hạn cấu hình                                  | integration theo mẫu `me-unavailable` + `PgRelay`           | chưa có                  |
-| AC-2 (hồi quy) | Đọc không mở đường sửa/xóa; test trigger hiện có vẫn PASS                                                         | `audit.integration-spec.ts`                                 | chưa có                  |
+| US/AC          | Tình huống                                                                                                        | Cấp test, kết quả mong đợi                                  | Bằng chứng sau implement                                                                                   |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Main flow      | Super Admin lọc theo `resourceType`+`resourceId`, theo `actorAppUserId`, theo khoảng thời gian, kết hợp           | HTTP trên PostgreSQL thật: đúng tập, đúng thứ tự, đủ trường | PASS: `audit-query-http` (workflow thật + chuẩn đối chiếu SQL; `[from, to)`; kết hợp bộ lọc)               |
+| Main flow      | Phân trang: 25 bản ghi, `pageSize=10` ⟹ 3 trang, `totalItems=25`; trang 4 rỗng                                    | HTTP trên PostgreSQL thật                                   | PASS: `audit-query-http` (10 + 10 + 5, trang 4 rỗng, `totalItems` 25; cùng `occurred_at` qua nhiều trang)  |
+| AC-5           | Tài khoản chỉ có `EMPLOYEE` gọi tra cứu ⟹ 403, không trả dữ liệu                                                  | e2e + HTTP thật                                             | PASS: e2e `audit-events` + `audit-query-http`                                                              |
+| AC-6           | `IT_ADMIN`, `FINANCE` ⟹ 403; tài khoản không vai ⟹ 403; vai suy ra không mở quyền (unit guard với `derivedRoles`) | e2e + unit                                                  | PASS: e2e `audit-events` (kể cả vai suy ra) + `audit-query-http` (IT, Finance, Employee, không vai)        |
+| Xác thực       | Không token ⟹ 401 `AUTHENTICATION_REQUIRED`; tài khoản bị khóa sau khi phát token ⟹ 401 ở request kế tiếp         | e2e + HTTP thật                                             | PASS: e2e `audit-events` + `audit-query-http` (khóa sau khi phát token ⟹ 401)                              |
+| Validation     | `resourceId` thiếu `resourceType`, khoảng thời gian đảo, `pageSize=101`, UUID sai, tham số lạ ⟹ 422               | e2e                                                         | PASS: e2e `audit-events` (10 ca) + `audit-query-http`                                                      |
+| Lỗi tạm thời   | CSDL ngừng trả lời sau guard ⟹ 503 `SERVICE_UNAVAILABLE` trong thời hạn cấu hình                                  | integration theo mẫu `me-unavailable` + `PgRelay`           | PASS: `audit-query-unavailable` (503 trong hạn, không `idle in transaction`, 200 lại sau đó)               |
+| AC-2 (hồi quy) | Đọc không mở đường sửa/xóa; test trigger hiện có vẫn PASS                                                         | `audit.integration-spec.ts`                                 | PASS: `audit.integration-spec` + `audit-query-http` (đọc không thêm bản ghi; UPDATE/DELETE vẫn bị từ chối) |
 
 ## Sẵn sàng bàn giao
 
 - [x] Nguồn cố định, truy cập được: Docs `3341ea0`.
 - [x] Scope/AC/contract/dữ liệu rõ; không còn câu hỏi nghiệp vụ chặn; phụ thuộc lát 1a đã `verified` tại `d60d306`.
 - [x] Plan và spec thống nhất.
-- [ ] Người phụ trách nhận ownership duy trì spec/plan/test design đến hết hạng mục.
+- [x] Người phụ trách nhận ownership duy trì spec/plan/test design đến hết hạng mục (AI theo giao việc Owner, 16/10/2026).
 
 ## Thay đổi và nghiệm thu
 
 15/10/2026: tạo trong Task 3 từ `US-01-06` tại Docs `3341ea0`. Chưa implement, chưa nghiệm thu.
+
+16/10/2026: implement xong bốn bước của plan, kiểm chứng local (chi tiết và các quyết định khi triển khai ở [plan](plan.md)). Khác spec: tag `audit`; phần đọc nằm ở `AuditHttpModule` riêng chứ không trong `AuditModule`; ánh xạ 503 dùng chung chuyển sang `infrastructure`. Chưa review, chưa nghiệm thu.

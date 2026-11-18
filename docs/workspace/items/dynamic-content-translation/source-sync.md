@@ -1,6 +1,7 @@
 # Đề xuất đồng bộ nguồn: yêu cầu dịch EN–VI
 
 - Trạng thái: **đề xuất, chưa áp dụng.** Nhóm Owner/Docs ghi các thay đổi này vào nguồn chính thức theo quy trình của Docs; ai áp dụng thì người đó ghi vào sổ. Trợ lý AI chỉ soạn, không sửa repo Docs.
+- **Stale — trùng số — chờ thẩm quyền (18/10/2026):** mã đề xuất "`QĐ-74`" và `QĐ-74a`–`i` trong hạng mục này là đề xuất cũ, **chưa** từng vào sổ quyết định. Sổ Docs nay dùng `QĐ-74` cho phương pháp thu thập usage (16/10/2026). Đọc mọi chỗ ghi `QĐ-74` ở đây là _đề xuất dịch EN↔VI chưa có số_; không cấp số mới, không coi là Accepted; evidence giữ nguyên. **E-2 = B, Owner 18/10/2026:** giữ `draft`, không giao implement, không cấp số mới trong repo BE; hạng mục bị chặn implement tới khi một quyết định Docs có thẩm quyền cấp số hợp lệ và giải quyết quan hệ với `QĐ-69`/`QĐ-78`. Research và evidence giữ nguyên ([remediation](../baseline-impact-and-remediation-2026-10-17/spec.md)).
 - Lý do không áp dụng ngay: các file đích (sổ quyết định, BRD, `BE-UserStory/src/*`) đang có thay đổi chưa commit của phiên khác, và hash của chúng đã đổi ngay trong ngày 14/10/2026.
 - Trước khi áp dụng: kiểm lại hash, anchor và số quyết định còn trống.
 - Phạm vi: chỉ những thay đổi tối thiểu cho yêu cầu dịch. Không đổi workflow G5, không ghi xác nhận GVHD hay dev approval.

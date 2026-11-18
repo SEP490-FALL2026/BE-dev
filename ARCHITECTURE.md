@@ -1,176 +1,143 @@
 # Kiến trúc backend
 
-Modular monolith: NestJS + Express, TypeScript, PostgreSQL + Prisma.
-API và worker có entry point riêng trong cùng codebase.
+Một **modular monolith** NestJS 11 ([ADR-0001](docs/decisions/0001-modular-monolith.md)): một codebase, một PostgreSQL,
+ba tiến trình chạy từ cùng một image. Ranh giới module, tầng và cửa công khai theo
+[ADR-0019](docs/decisions/0019-module-tiers-and-public-api.md); quy tắc chi tiết ở
+[module structure](docs/rules/module-structure.md). Chi tiết runtime (pipeline HTTP đầy đủ, pool PostgreSQL, xác thực) ở
+[runtime details](docs/guides/runtime-details.md).
 
-## Trạng thái foundation
+## Đọc code từ đâu
 
-| Thành phần     | Đã có                                                                                            | Chưa triển khai                                                     |
-| -------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| HTTP           | Zod DTO, response envelope, exception filter, OpenAPI, rate limit                                | API theo các US còn lại                                             |
-| Health         | Liveness và PostgreSQL readiness                                                                 | Probe queue/storage                                                 |
-| Catalog        | Source list/get/create và tests làm mẫu; không mount HTTP                                        | Nghiệp vụ catalog G3 và quyền theo role/resource                    |
-| Authentication | Argon2id, JWT/refresh session, guards, CLI bootstrap, `/me`, quản trị tài khoản và lời mời       | Đổi/đặt lại mật khẩu, vai suy ra, chuyển giao/khôi phục Super Admin |
-| Database       | Catalog, audit, organization, identity-access, notifications; 5 migration và `TransactionRunner` | Schema cho các lát tiếp theo                                        |
-| Queue/storage  | S3 adapter, BullMQ configuration; worker gửi SMTP từ outbox PostgreSQL                           | BullMQ queue processor và file API                                  |
+| Muốn tìm                        | Mở                                                                                 |
+| ------------------------------- | ---------------------------------------------------------------------------------- |
+| Code của một route              | [docs/generated/routes.md](docs/generated/routes.md): route → controller → service |
+| Module nào phụ thuộc module nào | [docs/generated/module-graph.md](docs/generated/module-graph.md)                   |
+| Một module làm gì, mở cửa gì    | `src/modules/<m>/README.md` (module card)                                          |
+| Ba tiến trình bắt đầu ở đâu     | [src/README.md](src/README.md)                                                     |
+| Một lệnh vận hành               | `src/cli/commands.ts`, [operational commands](docs/rules/operational-commands.md)  |
+| Test của một module             | [test/README.md](test/README.md)                                                   |
 
-G0 và lát 1a/1b đã merge qua PR #4 (`64073c4`), có 16 operation HTTP.
-Gói remediation tại `a0cf5f1` đã vào `origin/dev` qua PR #7 và #8. Spec/plan,
-ADR-0011/0012 (vẫn Proposed) và code chưa được dev review/nghiệm thu.
-Kết quả kiểm chứng và phần còn mở nằm trong [báo cáo review G0/G1](docs/reviews/g0-g1-remediation-2026-10-15/README.md).
-Catalog là mẫu cấu trúc, chưa cung cấp nghiệp vụ G3.
+## Ba tiến trình
 
-## Bản đồ source
+| Tiến trình | Điểm vào (`dist/`)                       | Ghép ở                        | Làm gì                                                                                                       |
+| ---------- | ---------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| API        | `main.js`                                | `src/app/app.module.ts`       | HTTP `/api/v1/*`, các sweeper theo giờ ([ADR-0018](docs/decisions/0018-sweepers-stay-in-the-api-process.md)) |
+| Worker     | `worker.js`                              | `src/worker/worker.module.ts` | Gửi email từ outbox, xử lý bước mở của Request (thăm dò PostgreSQL, không Redis)                             |
+| Lệnh       | `cli.js <lệnh>` (+ alias `<tên>-cli.js`) | `src/cli/commands.ts`         | Cài đặt, khôi phục, kiểm tra, preflight, role DB, seed local/VPS                                             |
+
+Alias `dist/<tên>-cli.js` sinh từ bảng lệnh lúc build. Ngoại lệ OD-S3: alias demo-dataset/dev-seed đã bỏ khi chuyển sang seed và dựng lại VPS demo; alias khác giữ ổn định.
+
+`seed check` dùng graph inspection chỉ đọc; `seed apply` dùng graph seed và có thể mở graph installation hiện có để bootstrap.
+Reset thuộc wrapper local/VPS, không thuộc Nest hay CI/CD; xem [seed](docs/guides/seed.md).
+
+## Tầng source và tầng module
 
 ```text
-src/
-  main.ts, bootstrap.ts       # HTTP, CORS, cookie parser, versioning, Swagger
-  app.module.ts               # ghép module API
-  worker.ts, worker.module.ts # worker application context
-  installation-cli.ts         # lệnh khởi tạo một lần, ngoài HTTP (pnpm ops:bootstrap)
-  core/                       # thuần TypeScript: pagination, email, business-date
-  infrastructure/
-    config/                   # environment validation
-    http/                     # pipe, envelope, serializer, filter
-    security/                 # guard khai báo/xác thực/phân quyền, verifier port, rate limiting
-    database/                 # Prisma service, TransactionRunner
-    queue/                    # BullMQ connection
-    mail/                     # port MailTransport và SMTP adapter (nodemailer)
-    object-storage/           # port và S3-compatible adapter
-    observability/            # request context, request ID, logger
-    health/                   # health controller
-  modules/
-    audit/                    # AuditEvent chỉ ghi thêm (facade record(tx, event))
-    organization/             # tổ chức, Cost Center, phòng, chức vụ, nhân viên + placement
-    identity-access/          # facade, module, types ở gốc; dto/, errors/ dùng chung
-      auth/                   # đăng nhập, refresh/logout, phiên + refresh token + throttle (session.repo), token, mật khẩu
-      accounts/               # truy vấn, tạo/mời/kích hoạt, khóa/vai; account.repo (AppUser, credential, vai, action token)
-      access/                 # /me và verifier access token cho guard
-    notifications/            # EmailOutbox (mã hóa payload), dispatcher gửi thư; không import identity-access
-    installation/             # use case khởi tạo; không sở hữu bảng; import IdentityAccessFacadeModule (không import IdentityAccessModule) và chỉ xác thực biến môi trường DB
-    catalog/                  # module mẫu cấu trúc, KHÔNG đăng ký vào AppModule
-prisma/
-  schema.prisma               # generator, datasource
-  models/                     # audit, organization, identity-access, notifications, catalog
-  migrations/                 # lịch sử SQL cho baseline mới
-scripts/                      # công cụ dev/verification, không phải runtime API
-test/
-  e2e/, integration/          # suite
-  config/, support/           # runner config và helper
+src/core            TypeScript thuần (ngày nghiệp vụ, tiền, extension point) — không phụ thuộc gì
+src/infrastructure  adapter kỹ thuật (config, database, HTTP, bảo mật, mail, storage, queue dự phòng) — chỉ dùng core
+src/modules/*       bounded context nghiệp vụ, xếp theo tầng dưới đây
+src/app, worker, cli  ghép tiến trình; chỉ chạm module qua public/ và *.module.ts
 ```
 
-## Ranh giới phụ thuộc
+`src/infrastructure/queue` (BullMQ/Redis) là **hạ tầng dự phòng, chưa có consumer** (Owner `OD-R5`: giữ cho tương lai). Chưa
+process nào mount `QueueInfrastructureModule`, nên API, worker và lệnh không cần Redis và không kiểm cấu hình Redis; module nào
+mount nó sau này mới có validation chặt (`REDIS_HOST`, `REDIS_PASSWORD` ở production).
 
-- Core không import Nest, Prisma, SDK hoặc business module.
-- Infrastructure cung cấp kỹ thuật; business workflow nằm trong feature module.
-- Controller map HTTP/DTO; service điều phối; repo sở hữu persistence; mapper tạo wire data.
-- Module dùng layout phẳng. Chỉ tạo dto/errors/mappers/policies/services khi có nhu cầu thật; module đã có
-  nhiều capability (như `identity-access`) nhóm theo capability, tối đa hai tầng thư mục.
-- Module khác chỉ import file ở **gốc** module (facade, module, types, errors public); không import repo,
-  `password-hasher.service` hay file trong thư mục con, và không truy cập bảng thuộc module khác.
-- Cross-module atomic write: facade nhận `tx` của người gọi (`DbTx`); `TransactionRunner.run`
-  mở giao dịch Read Committed với `lock_timeout`/`statement_timeout` riêng cho giao dịch.
-  Khóa dòng của module khác chỉ qua facade (ví dụ `organization.lockEmployeeForShare(tx, id)`).
-- Không dùng vòng phụ thuộc, generic base repository hoặc scaffold hàng loạt khi chưa có US.
+| Tầng | Module                                                          | Ý nghĩa                                                                                        |
+| ---- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| T1   | `audit`, `notifications`                                        | Dịch vụ lõi: Audit Trail, email                                                                |
+| T2   | `organization`, `identity-access`                               | Tổ chức, phòng ban, Cost Center, nhân sự; tài khoản, vai                                       |
+| T3   | `finance`, `operating-parameters`, `policies`                   | Tiền, thuế; tham số vận hành; thư viện chính sách, xác nhận đã đọc, checklist, file mẫu import |
+| T4   | `catalog`, `licensing`                                          | Ứng dụng, gói, thuê bao; seat, cấp/thu hồi quyền                                               |
+| T5   | `budgets`, `requests`, `data-import`, `devices`                 | Ngân sách; Request và chi; import; sổ máy công ty và thông báo theo dõi                        |
+| T6   | `personnel`, `onboarding`, `installation`, `ai-assist`, `usage` | Vòng đời nhân sự; onboarding; cài đặt, vận hành; tóm tắt AI hàng đợi duyệt; usage từ collector |
+| T7   | `optimization`                                                  | Khuyến nghị seat lãng phí (G1, G2): bảng tối ưu IT, thu hồi G2, KPI-5                          |
+| T8   | `dashboards`                                                    | Trang tổng quan theo vai (chỉ đọc qua facade)                                                  |
 
-[Architecture tests](src/architecture-boundaries.spec.ts) quét một số boundary;
-không thay thế review dependency và hành vi.
+Module chỉ import tầng thấp hơn (cạnh cùng tầng được phép: `identity-access → organization`,
+`operating-parameters → finance`, `licensing → catalog`, `requests → budgets`). Khi module dưới cần phản ứng của module
+trên, nó **mở extension point** (`Hook`, `Listeners`, `Contributions` ở `src/core/extension/`) và module trên đăng ký
+trong một `*.listener.ts`. `pnpm arch:check` chặn mọi cạnh sai.
 
-## HTTP pipeline
+## Bên trong một module
+
+```text
+src/modules/requests/
+  README.md                  module card
+  requests.module.ts         wiring Nest
+  public/                    cửa duy nhất: requests.api.ts (RequestsApi), types, errors, extension-points
+  access-request/            capability: controller, dto, service, policy, repo, errors, http-errors (+ spec)
+  spend/ …                   capability khác
+```
+
+- Facade công khai tên `<M>Api` trong `public/<m>.api.ts`; module khác chỉ import file trong `public/`. Module có nhiều phương thức tách
+  facade theo việc, mỗi facade một file (`organization`: `OrganizationReadApi` để đọc, `OrganizationApi` để ghi; R10 giữ danh sách).
+- Hậu tố file nói vai trò: `.controller` map HTTP, `.service` một use case, `.policy` quy tắc thuần, `.repo` mọi SQL,
+  `.mapper`, `.dto`, `.types`, `.errors`/`.http-errors`, `.listener` (đăng ký extension point), `.job` (việc định kỳ), `.json` (codec của
+  một cột JSON: đọc qua `decode`, không ép kiểu). Service chỉ đọc mang tên `-query`, `-facts` hoặc `-view`, service vừa đọc vừa ghi một bảng
+  cho nơi khác mang `-record`; Nest module mang tên nói graph (`-http`, `-facade`, `-cli`). Bảng tên đầy đủ và gate `module-layout` ở
+  [module structure](docs/rules/module-structure.md).
+- Tối đa 2 cấp thư mục dưới module, 25 file mỗi thư mục. Thư mục con của capability là nhóm chức năng, gọi qua file
+  mang tên nhóm; phần còn lại của nhóm riêng tư. Capability trong một module import nhau nhưng không theo vòng (R6).
+- `src/core` chỉ giữ primitive ít nhất hai vùng dùng (R7). Một Nest module chỉ export ra ngoài facade và port; export còn lại
+  chỉ module cùng thư mục được inject (R10).
+- Kích thước/độ phức tạp đo bằng ESLint: `complexity` 12, hàm 60 dòng, 8 tham số (cả constructor) là `error`; nợ cũ nằm ở
+  `eslint-suppressions.json` và chỉ giảm (gate TG-2). Mọi luật máy kiểm có một câu và một gate ở
+  [module structure](docs/rules/module-structure.md#luật-máy-kiểm-r1r10-và-luật-review).
+- Mọi graph tiến trình (API, worker, mỗi lệnh có Nest graph) phải có đủ bên đăng ký của extension point nó dùng (R1, gate
+  `extension-wiring`). Comment trong `src` nói lý do, không nói mã finding hay lát (review).
+- Lỗi của sweeper và vòng worker ghi một dòng do `describeForOperator` viết (tên lớp lỗi, mã, `column=` của cột JSON sai hình dạng,
+  `retryable=`; không message, gate `module-layout` L1); cách đọc ở [hướng dẫn dev mới](docs/guides/huong-dan-dev-moi.md#5-gỡ-lỗi-từ-requestid-đến-nguyên-nhân).
+
+## Một request HTTP đi qua đâu
 
 ```text
 RequestIdMiddleware
   → ThrottlerGuard → AccessDeclarationGuard → AuthenticationGuard → AuthorizationGuard
   → ApplicationZodValidationPipe
-  → controller → service → repo
-  → mapper → success envelope → Zod response validation
+  → controller → service (TransactionRunner) → policy / repo / facade module khác
+  → mapper → envelope { success, data, message } → kiểm schema response
+lỗi → HttpExceptionFilter → envelope { success: false, error: { code, message } }
 ```
 
-Exception qua HttpExceptionFilter. Guard chạy trước DTO pipe.
-Mỗi route phải khai báo **đúng một** trong `@Public()`, `@AuthenticatedOnly()`,
-`@RequireRoles(...)`; thiếu hoặc mâu thuẫn thì 500 và log lỗi lập trình
-(`AccessDeclarationGuard`, fail closed). `@Public()` bỏ authentication, không bỏ rate limit.
-Thiếu token: 401 AUTHENTICATION_REQUIRED. Token sai chữ ký/hết hạn, phiên bị thu hồi,
-tài khoản khóa hoặc nhân viên _đã nghỉ việc_: 401 INVALID_ACCESS_TOKEN, kiểm ở **mỗi** request
-nên có hiệu lực ngay request kế tiếp. Vai không nằm trong token. Database không sẵn sàng:
-503 TOKEN_VERIFICATION_UNAVAILABLE (route auth: 503 AUTH.UNAVAILABLE), không lộ thông tin nội bộ.
-Sai vai: 403 AUTHORIZATION.FORBIDDEN.
+- Mỗi route khai đúng một trong `@Public()`, `@AuthenticatedOnly()`, `@RequireRoles(...)`; thiếu là 500 (fail closed).
+- Vai đọc từ PostgreSQL mỗi request, không nằm trong token: khóa tài khoản hay thu hồi vai có hiệu lực ngay.
+- 401 thiếu/sai token, 403 sai vai, 422 sai dữ liệu, 409 xung đột nghiệp vụ, 503 dependency chưa sẵn sàng; lỗi không
+  nhận diện được là 500. FE dựa vào **mã lỗi** ổn định, không vào message ([API contract](docs/rules/api-contract.md)).
+- Hợp đồng HTTP xuất ra `openapi.json` (`pnpm openapi:export`); CI chặn khi file không khớp code.
 
-Lỗi DB tạm thời sau khi guard đã thành công tại `/me` được controller ánh xạ thành
-503 `SERVICE_UNAVAILABLE` (R-15); readiness thất bại cũng trả 503 với mã này (R-12).
-Lỗi không được nhận diện là tạm thời vẫn là 500, không bị che thành lỗi availability.
+## Dữ liệu, transaction và khóa
 
-Rate limit hiện dùng bộ nhớ của từng process, theo **từng route trên mỗi IP**, **không dùng Redis**.
-Owner chốt giữ phạm vi này ngày 14/10/2026 (R-07); `test/e2e/rate-limit.e2e-spec.ts` ghim hành vi này.
-Throttle đăng nhập theo email là cơ chế riêng: chỉ lần sai được tăng bộ đếm thất bại theo spec;
-bộ đếm tăng sau khi kiểm mật khẩu thất bại, trong một câu lệnh nguyên tử (R-06).
-TRUST_PROXY_HOPS chỉ cấu hình khi ingress đáng tin cậy; proxy phải thay header
-request ID do client gửi. Baseline chưa giải quyết rate limit phân tán.
+- PostgreSQL là nguồn sự thật; bất biến nghiệp vụ đặt ở ràng buộc DB
+  ([ADR-0005](docs/decisions/0005-database-constraints-outside-prisma.md)), migration SQL trong `prisma/migrations`.
+  Prisma cho truy vấn thường, raw SQL cho khóa/ràng buộc phức tạp — cả hai chỉ trong `*.repo.ts` của module sở hữu bảng.
+- Ghi xuyên module dùng `TransactionRunner.run(async (tx) => …)` và truyền `DbTx` qua facade; listener của extension
+  point chạy trong cùng `tx` nên có thể từ chối và hoàn tác.
+- Thứ tự khóa cố định cho mỗi luồng ghi (ví dụ ngân sách: đề xuất → phiên bản → khóa năm); ghi trong comment đầu
+  service.
+- Ba role PostgreSQL ở production (H7): bootstrap, deploy (migration), runtime (quyền tối thiểu) — `pnpm ops:db-roles`,
+  [containers](docs/guides/containers.md).
 
-## Persistence và hạ tầng
+## Test
 
-Vùng tổ chức-danh tính dùng ràng buộc ở PostgreSQL (migration SQL, ADR-0005): một Organization,
-múi giờ bất biến, Department gắn Cost Center `UNIT`, placement không chồng lấn (`btree_gist`),
-một grant `SUPER_ADMIN` hiệu lực, audit chỉ ghi thêm. Cột bảng mới snake_case qua `@map`;
-`catalog_applications` giữ camelCase tới khi thiết kế lại. `PrismaService` ghim `TimeZone=UTC`
-cho mỗi kết nối: adapter-pg đọc/ghi `timestamptz` như thể phiên là UTC. Instant truyền vào raw SQL
-dùng chuỗi ISO-8601 (`toISOString()`) kèm `::timestamptz`. Mỗi kết nối gửi hai tham số khởi động ngoài
-chuẩn: `options` (`-c TimeZone=UTC`, ghim múi giờ) và `idle_in_transaction_session_timeout`
-(backstop N-1 bên dưới; `pg` gửi nó như tham số khởi động riêng, không qua `options`). PgBouncer và pooler
-quản lý từ chối tham số không theo dõi (`unsupported startup parameter`) trừ khi liệt kê trong
-`ignore_startup_parameters`, và khi liệt kê thì **âm thầm bỏ** tham số đó: mất ghim UTC và/hoặc backstop idle
-mà không có cảnh báo. Sau pooler, đặt hai giá trị ở phía server (`ALTER ROLE <role> SET timezone = 'UTC'` và
-`ALTER ROLE <role> SET idle_in_transaction_session_timeout = '<ms>'`, hoặc cấu hình theo database) thay vì
-dựa vào tham số khởi động — chưa kiểm chứng với pooler nào.
+| Tầng        | Ở đâu                        | Chứng minh                                          | Lệnh                    |
+| ----------- | ---------------------------- | --------------------------------------------------- | ----------------------- |
+| Unit        | `src/**/*.spec.ts`           | policy, mapper, schema, guard riêng lẻ              | `pnpm test`             |
+| Gate tĩnh   | `test/gates/`                | kiến trúc, OpenAPI, lệnh vận hành, migration        | `pnpm test:gates`       |
+| HTTP        | `test/http/<module>/`        | guard, quyền, validate, mã lỗi, envelope — không DB | `pnpm test:http`        |
+| Integration | `test/integration/<module>/` | ràng buộc DB, SQL, transaction, khóa, role, CLI     | `pnpm test:integration` |
+| E2E smoke   | `test/e2e/`                  | vài hành trình nghiệp vụ đầu-cuối                   | `pnpm test:e2e`         |
 
-`PrismaService` sở hữu pool qua `createPostgresPool`; `PrismaPg` nhận pool ngoài với
-`disposeExternalPool: true` để `$disconnect` đóng pool. `RetireOnTimeoutClient` đóng kết nối ngay
-khi query hết timeout phía client; release guard loại kết nối đang trong transaction khỏi pool.
-Hợp đồng client chỉ hỗ trợ query text/config dạng Promise hoặc callback được quan sát; từ chối
-Submittable (`pg.Query`), config callback, double callback, pipeline và custom Promise trước khi
-gửi query. Đây là client nội bộ cho adapter Prisma, không phải wrapper cho mọi API của pg.
-`DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` bổ sung backstop ở PostgreSQL (mặc định ít nhất 20 s,
-lớn hơn timeout transaction). Khi mất phản hồi COMMIT, dữ liệu có thể đã commit nguyên tử dù
-client nhận 503; không tự retry ghi. Xem [spec remediation](docs/workspace/items/g0-g1-remediation-after-rereview/spec.md).
+Một file trong `test/integration`, `test/http`, `test/e2e` tối đa 800 dòng (gate `test-size`); dài hơn thì tách theo use case và
+đặt phần dựng chung ở `test/support/`. CI: `dev` chạy integration của module bị ảnh hưởng, `main` chạy đủ; deploy chỉ khi mọi
+job test xanh ([test guide](test/README.md)).
 
-Authentication: tài khoản nội bộ, access token JWT HS256 ngắn hạn cộng refresh token xoay vòng trong cookie
-`HttpOnly`/`SameSite=Strict`/`Path=/<prefix>/v1/auth`; phát lại refresh token đã consumed nhưng còn hạn thì thu hồi phiên.
-Token hết hạn trả 401 trước khi xét consumed và không thu hồi phiên/token kế tiếp (quyết định Task 1B, tránh session DoS). Giao thức
-khóa và hợp đồng đăng xuất: [spec nền](docs/workspace/items/foundation-org-identity-boundary/spec.md),
-[spec lát 1a](docs/workspace/items/us-01-bootstrap-login-session/spec.md); ADR-0011 còn **Proposed**.
-Khởi tạo cài đặt: `pnpm build` rồi `pnpm ops:bootstrap --help` (chạy bởi chính người giữ vai Super Admin;
-mật khẩu nhập ở prompt ẩn, không nhận qua tham số hay biến môi trường).
+## Quyết định và tài liệu
 
-CLI dùng `InstallationConfigurationModule` chỉ validate môi trường và DB; API/worker giữ config
-đầy đủ. `IdentityAccessFacadeModule` (DatabaseModule + OrganizationModule) cung cấp facade
-`IdentityAccessService` cùng `AccountRepo`/`PasswordHasher` dùng chung instance cho `IdentityAccessModule`;
-CLI và worker chỉ import module này nên không dựng controller, JWT hay workflow đăng nhập; CLI cũng không kéo
-SMTP/outbox (R-13). [Module graph test](src/module-graph.spec.ts) đọc metadata Nest thật: mỗi provider token chỉ khai
-báo ở một module trong graph API/worker/CLI và các graph không chứa module không dùng.
-
-Catalog dùng unique slug ở PostgreSQL; phân trang sort name/id, transaction
-RepeatableRead để page/count dùng cùng snapshot. Snapshot không cố định giữa các
-request phân trang khác nhau.
-
-Danh sách AppUser cũng dùng RepeatableRead cho page/count cùng snapshot (R-14). Hai giao dịch snapshot
-này (danh sách tài khoản, catalog) gọi thẳng `prisma.$transaction`, nên chạy theo giới hạn interactive mặc
-định của Prisma (timeout 5 s, maxWait 2 s), không theo `DB_TRANSACTION_TIMEOUT_MS`/`DB_TRANSACTION_MAX_WAIT_MS`
-như `TransactionRunner`; chúng chỉ đọc nên quá hạn không làm mất dữ liệu (danh sách tài khoản trả 503).
-Candidates lấy danh sách Employee đã có tài khoản qua repo identity, truyền vào facade organization
-để loại trừ trong query trước sort/limit 20; không còn cửa sổ 200/5 000 nhân viên (R-03).
-Search `%`, `_`, `\` là ký tự nhập literal (N-6). Redeem kiểm dạng token và tra chủ token trước Argon2;
-hash mật khẩu vẫn ở ngoài transaction, rồi kiểm lại trạng thái dưới khóa (R-09).
-
-AppModule chưa dùng queue. WorkerModule cấu hình BullMQ (chưa có job) và chạy `EmailDispatchLoop`
-(`src/email-dispatch.loop.ts`): vòng thăm dò PostgreSQL mỗi `OUTBOX_POLL_INTERVAL_MS` gửi thư trong
-EmailOutbox ([ADR-0012](docs/decisions/0012-account-email-delivery.md), vẫn **Proposed**) — không cần Redis cho việc này.
-Vòng lặp nằm ở gốc ghép vì nối hai module không được import nhau: `notifications` gửi thư,
-facade `IdentityAccessService.isInvitationLinkUsable` trả lời liên kết trong thư còn dùng được không. Quản trị tài khoản (lát 1b): route
-`/app-users`, `/account-candidates` chỉ Super Admin; kích hoạt qua `POST /auth/invitations/redeem`.
-Storage adapter hỗ trợ endpoint S3-compatible; chưa có file ownership/API.
-Readiness chỉ chứng minh PostgreSQL có thể ping, không chứng minh schema/migration,
-Redis, storage hoặc chức năng đăng nhập đã sẵn sàng.
-
-Compose phục vụ local PostgreSQL, Redis, MinIO; Dockerfile build runtime API/worker.
-Migrations chạy riêng trước rollout. Xem [containers](docs/guides/containers.md),
-[database rules](docs/rules/database-business.md) và [tests](test/README.md).
+- ADR: [docs/decisions](docs/decisions/) — 0001 monolith, 0005 ràng buộc DB, 0011 xác thực, 0013
+  catalog/finance/licensing, 0015 requests, 0016 budgets, 0017 personnel, 0018 sweeper, 0019 tầng module và cửa công
+  khai.
+- Quy ước theo chủ đề: [docs/rules](docs/rules/README.md). Tiến độ và trạng thái: [roadmap](docs/roadmap.md). Dev mới đọc
+  [hướng dẫn dev mới](docs/guides/huong-dan-dev-moi.md) trước.
+- Ảnh chụp bản `ARCHITECTURE.md` trước 29/10/2026 (danh sách năng lực, bản đồ source cũ) nằm trong lịch sử git; nội dung
+  kỹ thuật còn hiệu lực đã chuyển sang [runtime details](docs/guides/runtime-details.md).

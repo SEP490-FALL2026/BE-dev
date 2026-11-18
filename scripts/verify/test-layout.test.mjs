@@ -4,10 +4,10 @@ import { RUNNERS } from './runners.mjs';
 import { expectedFor, layoutProblems, listingProblems, missingRequired } from './test-layout.mjs';
 
 const GOOD = [
-  'src/app.module.ts',
+  'src/app/app.module.ts',
   'src/modules/catalog/catalog.service.spec.ts',
-  'test/e2e/app.e2e-spec.ts',
-  'test/e2e/api-inventory.e2e-spec.ts',
+  'test/http/platform/app.http-spec.ts',
+  'test/http/platform/api-inventory.http-spec.ts',
   'test/integration/catalog.repo.integration-spec.ts',
   'test/support/disposable-database.ts',
   'test/config/unused.ts',
@@ -41,16 +41,44 @@ test('a helper inside a runner directory is reported', () => {
   assert.match(layoutProblems([...GOOD, 'test/e2e/helpers.ts']).join('\n'), /non-spec file inside the e2e runner/);
 });
 
+test('a file of test/integration/_serial belongs to the serial runner, never to the parallel one', () => {
+  const serial = 'test/integration/_serial/roles.integration-spec.ts';
+  const integration = RUNNERS.find((runner) => runner.name === 'integration');
+  const serialRunner = RUNNERS.find((runner) => runner.name === 'integration-serial');
+  assert.deepEqual(layoutProblems([...GOOD, serial]), []);
+  assert.deepEqual(expectedFor(integration, [...GOOD, serial]), ['test/integration/catalog.repo.integration-spec.ts']);
+  assert.deepEqual(expectedFor(serialRunner, [...GOOD, serial]), [serial]);
+});
+
+test('a timing spec lives with its module and belongs to the timing runner; another suffix there is still reported', () => {
+  const timing = 'test/integration/identity-access/me-unavailable.timing-spec.ts';
+  const integration = RUNNERS.find((runner) => runner.name === 'integration');
+  const timingRunner = RUNNERS.find((runner) => runner.name === 'integration-timing');
+  assert.deepEqual(layoutProblems([...GOOD, timing]), []);
+  assert.deepEqual(expectedFor(integration, [...GOOD, timing]), ['test/integration/catalog.repo.integration-spec.ts']);
+  assert.deepEqual(expectedFor(timingRunner, [...GOOD, timing]), [timing]);
+  assert.match(
+    layoutProblems([...GOOD, 'test/integration/x/a.e2e-spec.ts']).join('\n'),
+    /wrong suffix for the integration runner/,
+  );
+});
+
 test('listing differences are reported in both directions', () => {
-  const e2e = RUNNERS.find((runner) => runner.name === 'e2e');
-  assert.deepEqual(expectedFor(e2e, GOOD), ['test/e2e/api-inventory.e2e-spec.ts', 'test/e2e/app.e2e-spec.ts']);
-  const problems = listingProblems(e2e, ['test/e2e/app.e2e-spec.ts', 'test/e2e/ghost.e2e-spec.ts'], GOOD);
+  const http = RUNNERS.find((runner) => runner.name === 'http');
+  assert.deepEqual(expectedFor(http, GOOD), [
+    'test/http/platform/api-inventory.http-spec.ts',
+    'test/http/platform/app.http-spec.ts',
+  ]);
+  const problems = listingProblems(http, ['test/http/platform/app.http-spec.ts', 'test/http/ghost.http-spec.ts'], GOOD);
   assert.equal(problems.length, 2);
   assert.match(problems[0], /api-inventory.*does not list it/);
   assert.match(problems[1], /ghost.*does not assign/);
 });
 
 test('a deleted required spec fails', () => {
-  assert.deepEqual(missingRequired(GOOD, ['test/e2e/api-inventory.e2e-spec.ts']), []);
-  assert.equal(missingRequired(['test/e2e/app.e2e-spec.ts'], ['test/e2e/api-inventory.e2e-spec.ts']).length, 1);
+  assert.deepEqual(missingRequired(GOOD, ['test/http/platform/api-inventory.http-spec.ts']), []);
+  assert.equal(
+    missingRequired(['test/http/platform/app.http-spec.ts'], ['test/http/platform/api-inventory.http-spec.ts']).length,
+    1,
+  );
 });

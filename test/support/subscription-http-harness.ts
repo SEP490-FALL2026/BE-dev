@@ -1,0 +1,254 @@
+import { randomUUID } from 'node:crypto';
+import request from 'supertest';
+import { OperatingParametersApi } from '../../src/modules/operating-parameters/public/operating-parameters.api';
+import { ensureVendorAdmins } from './builders/catalog.builder';
+import { pretendBusinessToday } from './pretend-today';
+import { ApiAccount, adminToken, createActivatedAccount } from './api-accounts';
+import {
+  HttpTestApp,
+  SeededInstallation,
+  createHttpTestApp,
+  insertEmployeeFixture,
+  seedInstallation,
+} from './http-test-app';
+import { intakeBodyOf } from './application-body';
+import { pricingOfBody, writeLegacyPricing } from './legacy-pricing';
+
+/** Subscriptions and perpetual purchases over HTTP: the set-up the subscription specs share. */
+export interface SubscriptionWire {
+  id: string;
+  planId: string;
+  ownerDepartmentId: string;
+  vendor: { id: string; name: string };
+  kind: string;
+  status: string;
+  missingFinancialData: boolean;
+  missing: string[];
+  purchasedQuantity: number | null;
+  unitPrice: { amount: string; currency: string } | null;
+  originalPrice: { amount: string; currency: string } | null;
+  billingCycle: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  renewalDate: string | null;
+  noticePeriodDays: number | null;
+  autoRenew: boolean;
+  noticeDeadline: { value: string | null; source: string };
+  alerts: { baseDate: string | null; dates: string[] };
+  warnings: string[];
+  taxProfile: { status: string; group: string | null };
+  taxEstimate: {
+    basis: string;
+    label: string;
+    group: string;
+    taxAmount: string;
+    deductibleTaxAmount: string;
+    nonDeductibleTaxAmount: string;
+    estimatedCost: string;
+  } | null;
+  updatedAt: string;
+}
+
+export const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
+
+/** The unit price of a subscription is entered in dong (`QĐ-111an`); the price a vendor quoted in dollars is `originalPrice`. */
+export const VND_30M = { amount: '30000000', currency: 'VND' };
+export const VND_1_2M = { amount: '1200000', currency: 'VND' };
+export const USD_1200 = { amount: '1200.00', currency: 'USD' };
+
+export interface PlanSetup {
+  kind?: 'SAAS' | 'LICENSED' | 'INTERNAL';
+  type?: string;
+  pricing?: string;
+  vendorName?: string;
+}
+
+/** The set-up the specs of this file share: the application, its accounts and the calls and reads they make. No assertion lives here. */
+export class SubscriptionHttpHarness {
+  ctx!: HttpTestApp;
+
+  seed!: SeededInstallation;
+
+  admin!: string;
+
+  it1!: ApiAccount;
+
+  finance!: ApiAccount;
+
+  employee!: ApiAccount;
+
+  businessOwner!: string;
+
+  parameters!: OperatingParametersApi;
+
+  counter = 0;
+
+  server = () => this.ctx.app.getHttpServer();
+
+  as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
+
+  unique = (prefix: string): string => `${prefix} ${(this.counter += 1)}`;
+
+  dataOf = <T>(response: request.Response): T => (response.body as { data: T }).data;
+
+  codeOf = (response: request.Response): string => (response.body as { error: { code: string } }).error.code;
+
+  detailsOf = (response: request.Response) =>
+    (response.body as { error: { details: Record<string, unknown> } }).error.details;
+
+  /** Pretends the organization's calendar says `day`: the day a price is recorded on. */
+  today = (day: string) => pretendBusinessToday(this.ctx.app, day);
+
+  /**
+   * A stored draft whose data is whole: the price in dong with the snapshot of the same currency, five seats, a year paid by the year, the day
+   * it was recorded and the IT Admin named (none for `responsible: null`). The routes no longer leave such a draft (a price in dong needs no
+   * rate to wait for), so the rows an earlier release stored, which only `complete` or a change of the person can still move, are written by SQL.
+   */
+  wholeDraft = async (
+    planId: string,
+    over: { responsible?: string | null; day?: string; ownerDepartmentId?: string } = {},
+  ): Promise<string> => {
+    const id = randomUUID();
+    const day = over.day ?? '2026-03-15';
+    await this.ctx.sql.query(
+      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity,
+         unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source,
+         price_reporting_minor, price_reporting_currency, billing_cycle, commitment_term_months, start_date, end_date,
+         responsible_it_admin_employee_id)
+       VALUES ($1, $2, $3, $4, 'TERM', 'DRAFT', 5, 250000, 'VND', $5, 1, $5, 'SAME_CURRENCY', 250000, 'VND', 'ANNUAL', 12, $5,
+         '2027-03-14', $6)`,
+      [
+        id,
+        this.seed.organizationId,
+        planId,
+        over.ownerDepartmentId ?? this.seed.departmentId,
+        day,
+        over.responsible === undefined ? this.it1.employeeId : over.responsible,
+      ],
+    );
+
+    return id;
+  };
+
+  /** A vendor, an application and a plan, made the way the catalog makes them. */
+  plan = async (setup: PlanSetup = {}): Promise<{ planId: string; vendorId: string | null; applicationId: string }> => {
+    const kind = setup.kind ?? 'SAAS';
+    const application = this.dataOf<{ id: string; vendor: { id: string } | null }>(
+      await request(this.server())
+        .post('/api/v1/applications')
+        .set(this.as(this.it1))
+        .send(
+          intakeBodyOf({
+            name: this.unique('App'),
+            kind,
+            ...(kind === 'INTERNAL' ? {} : { vendorName: setup.vendorName ?? this.unique('Vendor') }),
+            dataSensitivity: 'LOW',
+            communication: NO,
+          }),
+        )
+        .expect(201),
+    );
+    const type = setup.type ?? (kind === 'INTERNAL' ? 'K5' : 'K2');
+    const created = this.dataOf<{ id: string }>(
+      await request(this.server())
+        .post('/api/v1/plans')
+        .set(this.as(this.it1))
+        .send({
+          applicationId: application.id,
+          name: this.unique('Plan'),
+          provisioningType: type,
+          ...(type === 'K5' ? {} : { ...pricingOfBody(type, setup.pricing ?? 'PER_SEAT'), controlLevel: 'FULL' }),
+        })
+        .expect(201),
+    );
+
+    await writeLegacyPricing(this.ctx.sql, created.id, type, setup.pricing ?? 'PER_SEAT');
+    // A plan that needs admins at the vendor gets the two-person profile an active subscription asks for (X-IT.5); the rule itself is proved in its own suites.
+    await ensureVendorAdmins(this.ctx, created.id, this.it1.employeeId);
+
+    return { planId: created.id, vendorId: application.vendor?.id ?? null, applicationId: application.id };
+  };
+
+  /** Declares a subscription owned by the seeded department unless the body names another (or `undefined`: none, F02). */
+  create = (body: object, account: ApiAccount = this.it1) => {
+    const { kind, billingCycle } = body as { kind?: string; billingCycle?: string };
+    // A subscription that becomes active names the months it commits to and the IT Admin who answers for it (QĐ-103e, QĐ-103v(4)):
+    // the commitment follows the cycle the body names, and the IT Admin of the harness answers unless the body says otherwise.
+    const commitment =
+      kind === 'PERPETUAL' || billingCycle === undefined
+        ? {}
+        : { commitmentTermMonths: billingCycle === 'MONTHLY' ? 1 : 12 };
+
+    return request(this.server())
+      .post('/api/v1/subscriptions')
+      .set(this.as(account))
+      .send({
+        ownerDepartmentId: this.seed.departmentId,
+        responsibleItAdminEmployeeId: this.it1.employeeId,
+        ...commitment,
+        ...body,
+      });
+  };
+
+  patch = (id: string, body: object, account: ApiAccount = this.it1) =>
+    request(this.server()).patch(`/api/v1/subscriptions/${id}`).set(this.as(account)).send(body);
+
+  get = (id: string, account: ApiAccount = this.it1) =>
+    request(this.server()).get(`/api/v1/subscriptions/${id}`).set(this.as(account));
+
+  complete = (id: string, account: ApiAccount = this.it1) =>
+    request(this.server()).post(`/api/v1/subscriptions/${id}/completions`).set(this.as(account));
+
+  subscription = async (planId: string, extra: object = {}): Promise<SubscriptionWire> =>
+    this.dataOf<SubscriptionWire>(await this.create({ planId, kind: 'TERM', ...extra }).expect(201));
+
+  n = async (table: string): Promise<number> =>
+    (await this.ctx.sql.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n;
+
+  auditOf = async (resourceId: string) =>
+    (
+      await this.ctx.sql.query<{ action: string; before: unknown; after: unknown; actor_roles: string[] }>(
+        'SELECT action, before, after, actor_roles FROM audit_events WHERE resource_id = $1 ORDER BY occurred_at, id',
+        [resourceId],
+      )
+    ).rows;
+
+  declareProfile = (vendorId: string, body: object) =>
+    request(this.server()).put(`/api/v1/vendors/${vendorId}/tax-profile`).set(this.as(this.finance)).send(body);
+
+  async start() {
+    this.ctx = await createHttpTestApp();
+    this.seed = await seedInstallation(this.ctx.app);
+    this.admin = await adminToken(this.ctx, this.seed);
+    this.it1 = await createActivatedAccount(this.ctx, this.seed, {
+      code: 'E-IT1',
+      email: 'it1@acme.vn',
+      role: 'IT_ADMIN',
+      admin: this.admin,
+    });
+    this.finance = await createActivatedAccount(this.ctx, this.seed, {
+      code: 'E-FIN',
+      email: 'fin@acme.vn',
+      role: 'FINANCE',
+      admin: this.admin,
+    });
+    this.employee = await createActivatedAccount(this.ctx, this.seed, {
+      code: 'E-EMP',
+      email: 'emp@acme.vn',
+      role: 'EMPLOYEE',
+      admin: this.admin,
+    });
+    this.businessOwner = (
+      await insertEmployeeFixture(this.ctx.app, this.seed, { code: 'E-OWN', email: 'owner@acme.vn' })
+    ).employeeId;
+    this.parameters = this.ctx.app.get(OperatingParametersApi, { strict: false });
+  }
+
+  afterEach() {
+    jest.restoreAllMocks();
+  }
+
+  async stop() {
+    await this.ctx?.close();
+  }
+}

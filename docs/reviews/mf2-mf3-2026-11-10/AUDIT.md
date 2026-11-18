@@ -1,0 +1,124 @@
+# Audit MF-2/MF-3 (prompt 2) — 14/11/2026, đêm
+
+> Chat điều phối Opus (SEP-Start 120), Owner ngủ. Owner cho phép: tự sửa điểm **trái QĐ/BRD/OWNER-REVIEW**, giữ các điểm chỉ là cân
+> nhắc thiết kế (ghi A/B để Owner duyệt sáng), **tự commit BE trên `feat/mf2-mf3`, không push**, chạy lại full test + seed.
+> Phạm vi: diff `06bfa6f9..9580e179` (270 commit, ~560 file `src`), SPEC v2.3, PLAN v2.4, Docs `main @ 5ef039c` (BRD 4.13, Quy trình 1.10).
+
+## 1. Cách làm
+
+1. Đọc báo cáo Sonnet (`PROMPT2-DONE.md`, `OVERNIGHT-DECISIONS.md` — 128 mục D-1…D-129), `HANDOFF-CODE.md`.
+2. Hai agent Opus chỉ đọc rà 128 điểm D-n với QĐ/BRD/OWNER-REVIEW: [AUDIT-DN-1.md](AUDIT-DN-1.md) (D-1…D-55),
+   [AUDIT-DN-2.md](AUDIT-DN-2.md) (D-56…D-109). D-110…D-129 nằm trong vùng review code bên dưới.
+3. Ba agent Opus review code chỉ đọc, chia vùng: [AUDIT-A.md](AUDIT-A.md) (MF-2 personnel/identity/devices/CLI),
+   [AUDIT-B.md](AUDIT-B.md) (MF-3 requests/licensing/budgets), [AUDIT-C.md](AUDIT-C.md) (catalog X-IT, DS, RD, organization, seed).
+4. Tự đọc và sửa các điểm Required/SAI-QĐ, mỗi chỗ sửa có test + mutation (`mutate.py`: thay chuỗi, chạy test, khôi phục).
+5. Full test trước sửa (worktree `be-audit-base` ở `9580e179`) và sau sửa (cây chính), rồi `seed:local`.
+
+## 2. Kết quả full test trước sửa (HEAD `9580e179`, chưa ai chạy toàn bộ)
+
+| Lệnh | Kết quả |
+| --- | --- |
+| `pnpm check` | **đỏ**: `prettier` của `scripts/verify/capability-graph.test.mjs` (CI sẽ đỏ) |
+| `test:http` | 93/93 suite, 2238 test xanh |
+| `test:integration --maxWorkers=4` | 437/437 suite (1 skip), 4923 test xanh |
+| `test:integration:serial` | **1 đỏ**: `database-runtime-role-leave-write` gửi `grounds` cũ thay vì `groundsNote` (QĐ-111bd) |
+| `test:integration:timing` | 7/7 xanh |
+| `test:flows` | **1 đỏ**: `mf5-rightsizing-no-head` ghi nghỉ việc trưởng phòng với `successor: NONE` — nay bị từ chối (`QĐ-110h`) nên phòng vẫn có trưởng phòng |
+
+## 3. Finding và xử lý
+
+Mức: Critical / Required / Optional / Nit. "Đã sửa" = code + test + mutation KILLED (trừ chỗ ghi khác).
+
+### 3.1. Đã sửa
+
+| Mã | Mức | Vấn đề | Sửa | Kiểm |
+| --- | --- | --- | --- | --- |
+| D-2 | SAI-QĐ (TB) | Điều chuyển có hiệu lực không hủy Request case B **đã định giá có chi phí** ở phòng cũ (trái `QĐ-110o`, `QĐ-90b`, `BR-MF3-03`) | `beneficiary-gone-scope.policy.ts`: `NEW_SOFTWARE` ở các trạng thái sau định giá (`AWAITING_SPEND_*`, `AWAITING_EXECUTION`, `EXECUTING`, `AWAITING_IT_CLOSE`) tính là trả phí; case B chưa định giá giữ nguyên | spec +2 ca; 2 mutation KILLED |
+| D-5 | SAI-QĐ (thấp) | CLI `record-super-admin-event` bắt căn cứ 4 phần, danh sách đóng (trái `QĐ-110a`, `QĐ-111bd`: một ô chữ) | Thêm `--basis <text>` (một ô, lưu nguyên văn); 4 cờ `--basis-*` chỉ còn là dạng của `--from-notice`; `EventBasis` = `{ note }` hoặc 4 phần; `documentBasisOf` từ chối ô chữ ở đường từ notice | spec CLI +4 nhóm, policy +2; 2 mutation KILLED. Giữ 4 cờ cho ghi thẳng để không vỡ script cũ (ghi chú) |
+| D-62 | SAI-QĐ | Thẻ checklist K1 đòi "đã khóa hộp thư" khi người nghỉ còn ghế K1 chưa thu hồi (chưa mở tác vụ / tác vụ `CLOSED_FAILED` / rút lý do) — trái `QĐ-111az`, `QĐ-110b` | `provisioning-k1-checklist.service.ts`: "tác vụ K1 cuối" = không còn tác vụ K1 sống khác **và** không còn ghế K1 cá nhân nào khác chưa có thu hồi `COMPLETED` (truy vấn mới `openPersonalSeatsOf`, bảng licensing, đọc tuần tự trên `tx`) | integration K1 cập nhật + ca mới; `departure-closure` D-71 đổi theo; mutation KILLED |
+| D-64 | SAI-QĐ | Cấm `doneAt` trước lúc tạo tác vụ ⟹ IT ghi đúng giờ đặt lại mật khẩu (làm ở mốc chặn, `QĐ-110b/c`) bị 422 | Bỏ cận dưới `openedAt`; giữ luật thứ tự trong danh sách | spec `opened` viết lại; integration "review O2" đổi thành nhận bước trước tác vụ |
+| A-1 | Required | Hồ sơ nghỉ việc có thể tự đóng **trước** lượt quét mốc chặn ⟹ lượt quét bỏ qua hồ sơ đã đóng: Request mở không bị hủy, cam kết không trả, không audit `ACCESS_BLOCKED`, không báo IT/admin nhà cung cấp (trái `QĐ-110d`) | `departure-closure.repo.ts` `closeBySystem` đòi `block_announced_at IS NOT NULL`; hồ sơ đóng ở lượt sau | 5 test closure cập nhật (thêm lượt quét mốc chặn như thực tế, harness `blockPass()`); mutation KILLED |
+| B-4 | Required | `mailboxLockedAmong` đọc mọi tác vụ K1 hoàn tất của người đó, không theo hồ sơ ⟹ hồ sơ nghỉ việc cũ đã hủy có tick khóa hộp thư làm hệ thống tự ghi (1b) cho hồ sơ mới | Chỉ tính tác vụ hoàn tất **sau** `account_lock_at` của hồ sơ đang chờ (`listPeopleWithMailboxLockTicked` nhận `{ employeeId, since }`) | unit spec mới; mutation KILLED |
+| B-2 | Required | Migration `…000900` hủy Request `SERVICE_ACCOUNT` + trả cam kết **không ghi Audit Trail** | Migration mới `20261113002700_requests_scope_removed_audit` (chỉ dữ liệu, chạy lại an toàn) ghi `ACCESS_REQUEST.CANCELLED` + `BUDGET_COMMITMENT.RELEASED`, actor SYSTEM. Không sửa migration cũ (giữ checksum). Không gửi thông báo (thông báo đến từ ghi của ứng dụng) | integration migration: chạy hai lần ⟹ đúng 2 sự kiện |
+| C-1 | Required | `PATCH` gói K4 gửi lại `provisioningType: 'K4'` làm mất cờ `hasAdminConsole` không báo | `plan.service.ts`: giữ cờ khi loại kế tiếp vẫn là K4 | integration +1 ca; mutation KILLED |
+| GATE-1 | Required (CI) | `prettier` đỏ ở `scripts/verify/capability-graph.test.mjs` | `prettier --write` | `pnpm check` |
+| GATE-2 | Required (CI) | Serial `database-runtime-role-leave-write` gửi body cũ | `groundsNote` | serial |
+| FLOW-1 | Required (nightly) | Flow MF-5 không trưởng phòng dựa vào nghỉ việc `successor: NONE` đã bị cấm | Dùng `POST /departments/{id}/head-vacancies` | `test:flows` file đó xanh |
+
+### 3.2. Chưa sửa — cần Owner chốt (khuyến nghị đứng đầu)
+
+| Mã | Câu hỏi | A (khuyến nghị) | B | Hiện code |
+| --- | --- | --- | --- | --- |
+| **D-82/88/92** | Deploy: migration đặt ân hạn cho **mọi** điều chuyển `EFFECTIVE` chưa đóng ⟹ hết ân hạn hệ thống tự mở thu hồi quyền cũ, kể cả dòng review cũ chọn "giữ ghế" | Trước deploy thật: chạy migration trên bản sao DB, đọc `RAISE NOTICE` số dòng; demo/seed không ảnh hưởng | Thêm cờ chỉ áp cho điều chuyển có review `OPEN` | A (theo `QĐ-110p/110r`) |
+| **D-95** | Trong ân hạn điều chuyển có chặn Request **trùng gói đang mở** không? `QĐ-110q` chữ là "không tính GH-1/GH-2" | Giữ chặn trùng (an toàn: tránh hai Request thay cùng một quyền, hai cam kết) và **sửa chữ `QĐ-110q`** thành "bỏ chặn *đang có quyền*, không đếm GH-2" khi Owner nói "đồng bộ" | Theo chữ QĐ: bỏ cả chặn trùng | A (chưa sửa, chờ Owner) |
+| D-78 | Request K5 đang chờ trưởng phòng mà mất trưởng phòng vẫn đứng chờ; `QĐ-110i` cho K5 IT cấp thẳng | Sửa ở prompt 3 (task riêng: kết thúc bước nhu cầu `NOT_REQUIRED` + cờ `NO_NEED_APPROVER`, sang IT) | Giữ chờ (ca hiếm, kế nhiệm bắt buộc) | chờ |
+| C-2 / D-105 | Kích hoạt thuê bao cần admin đếm người **đã ghi** hay người **còn là IT Admin làm việc** (`QĐ-110k`) | Đếm người còn làm việc — nhưng phải sửa harness test + seed (đang ghi "một nhân viên bất kỳ" làm admin): làm ở prompt 3 | Giữ đếm người đã ghi, cờ `vendorAdminsBelowMinimum` báo sau | B. Tôi đã thử A, 4 suite đỏ vì harness/seed ⟹ hoàn lại |
+| C-3 / D-103 | Bản đánh giá case B `adminConsole = true` gắn được vào gói K4 không cờ | 422 khi gắn (luật ≥ 2 admin không bị né) | Chỉ ràng ở `POST/PATCH /plans` | B |
+| B-3 | Gửi lại trong ân hạn nhưng cấp sau ân hạn ⟹ 422 `OVERLAP` dù tác vụ thu hồi `TRANSFER` còn `QUEUED` | Rút lý do `TRANSFER` khi tác vụ chỉ `QUEUED` với lý do đó, kết thúc quyền cũ như R-49 | Giữ, trả 409 `REVOCATION_PENDING` riêng | lỗi `OVERLAP` |
+| A-2 / B-5 / B-7 | Seat "tài khoản máy" của chính IT Admin nghỉ/điều chuyển bị thu hồi như quyền cá nhân, giữ hồ sơ mở; IT tự bật cờ cho seat của mình không ai được báo | Loại seat máy khỏi đếm/thu hồi, chuyển seat máy trong cùng thao tác bàn giao IT (P5) | Thu hồi như thường kèm cảnh báo | B |
+| B-1 / D-36 | Màn xem trước điều chuyển không cộng phần cam kết của quyền cũ trả lại ngày hiệu lực (`QĐ-111bg`) và phần dòng nhóm | Thêm bản xem trước của `releaseForTransfer` vào P23 (prompt 3) | Giữ, FE ghi chú | thiếu |
+| D-88 / B-11 | Tác vụ `TRANSFER` bị IT đóng `CLOSED_FAILED` ⟹ lượt quét mở lại mỗi giờ, báo lại mỗi lần | Không tự mở lại; IT mở tay như MF-2 (`QĐ-110e`) | Giữ | B |
+| D-17, D-35, D-41, D-50, D-55, D-73, D-75, D-81, D-85, D-87, D-104 | Cân nhắc thiết kế khác | Xem bảng A/B ở [AUDIT-DN-1.md](AUDIT-DN-1.md), [AUDIT-DN-2.md](AUDIT-DN-2.md) | | như Sonnet chọn |
+| D-89/97, D-111, D-113/114, D-122, D-127, D-1, D-77 | Sonnet tự ghi "cần Owner" | Xem "Tóm tắt cho Owner" cuối [OVERNIGHT-DECISIONS.md](OVERNIGHT-DECISIONS.md). D-122(a): tự chấp nhận đề xuất của mình chỉ xảy ra khi đổi vai giữa chừng (một tài khoản một vai); `SoD-4` đủ căn cứ thêm một dòng chặn — đưa vào prompt 3 | | |
+
+### 3.3. Optional / Nit để lại (ghi để prompt sau)
+
+A-3…A-6, B-6, B-8 (thứ tự khóa claim/grant với sweeper có thể deadlock 40P01), B-9, B-10, B-12…B-14, C-4…C-12 — chi tiết ở các file AUDIT-A/B/C.
+Ngoài phạm vi MF-2/MF-3: GH-3 còn trong `request-limits`, GH-2 còn đếm "đang mở" (`QĐ-111h`) — thuộc SPEC feedback FE (prompt 3).
+Docs cần chỉnh chữ khi Owner nói "đồng bộ": US-03-06 AC-9/AC-11, US-05-01 AC-5 (lệch `QĐ-111bc`); SPEC P1/P23/P2 mã `OFFBOARDING.*`;
+SPEC §5 MF3-B phạm vi case B đã định giá (D-2); chữ `QĐ-110q` nếu Owner chọn A ở D-95.
+
+## 4. Full test sau sửa
+
+Lượt 1 (cây chính, trước commit): `test:http` 2238 xanh; `serial` 96 xanh; `timing` 28 xanh; `test:flows` 60 xanh (9 skip có từ trước);
+`pnpm check` đỏ 6 lỗi lint của chính phần sửa; `test:integration` 6 suite đỏ — 4 suite là test cũ theo luật trước A-1/D-62 (sửa: chạy lượt
+quét mốc chặn trước khi đóng, K1 không khóa hộp thư khi còn ghế K1), 2 suite tải (`TransientDatabaseError`). Sửa hết, chạy lại 8 suite: xanh.
+
+Lượt 2 (HEAD `67a1abeb`, chat 81 chạy test song song trên cùng Postgres):
+
+| Lệnh | Kết quả |
+| --- | --- |
+| `pnpm check` | unit 465 suite / 6052 test xanh; `test:gates` 1 đỏ: `test/support/ghost-seat-world.ts` 414 dòng > 400 (có từ `fa1d3c2f`, lượt trước bị che vì `check` dừng ở prettier). Sửa = cherry-pick đúng commit chat 81 làm cùng việc (`a3dd4e67`, tránh xung đột khi gộp nhánh); `pnpm test:gates` 331/331 xanh |
+| `test:http` | 93 suite / 2238 xanh |
+| `test:integration --maxWorkers=4` | 16 suite đỏ, 392 dòng `TransientDatabaseError`/timeout (DB chia với chat 81, 2503 s so với 1659 s); chạy lại đúng 16 suite `--maxWorkers=2`: **16/16, 112/112 xanh** |
+| `test:integration:serial` | 13 suite / 96 xanh |
+| `test:integration:timing` | 7 / 28 xanh |
+| `test:flows` | 10 suite / 60 xanh, 9 skip (có từ trước) |
+
+Ghi chú: chạy `npx jest --config test/config/jest.gates.cjs <file>` riêng lẻ cho `extension-wiring` báo 2 đỏ kể cả ở HEAD sạch; chạy qua
+`pnpm test:gates` thì xanh — cách gọi khác môi trường, không phải lỗi code.
+
+## 5. Seed (gói Z của MF-2/MF-3) — commit `b4e638cf`
+
+Theo [AUDIT-C.md](AUDIT-C.md) Phần 2, Z1–Z8, Z10–Z12 (Z9 chờ Owner chốt C-3). Mọi dữ liệu ghi qua route/service; 40 người / 29 tài khoản.
+
+| Ca demo | Người | FE làm gì |
+| --- | --- | --- |
+| K4 có trang quản trị + hồ sơ 2 IT Admin; Canva thiếu email chủ | JetBrains All (ITA1+ITA3), Canva | xem `GET /subscriptions` (cờ), `GET /plans/{id}/workspace-profile` |
+| IT Admin nghỉ việc có bàn giao (P5) | NV-ITA4 (Mailchimp, chủ workspace) | `POST /offboarding-cases/{id}/it-admin-handover` → NV-ITA3; preview P23 |
+| Điều chuyển qua P6 | NV-DEV4 ENG → ITO, hiệu lực ngày mai | từ ngày hiệu lực + job tổ chức: ân hạn P7/P8, xin lại Jira P10 |
+| Danh sách phần mềm phòng + đề xuất | ENG, DES, MKT; NV-DESH (Canva, `PENDING`), NV-ENGH (Mailchimp, `REJECTED`) | `GET /me/department-software-list`, P16/P18 |
+| K5 ở phòng không trưởng phòng | R28 NV-LGL1 `hr-portal-access` | `GET /access-request-audit-flags` |
+| Nghỉ việc chặn ngay theo luồng mới | NV-OFF1 (Figma, Jira, GitHub, Grammarly K1), dừng trước (1a) | ITA1: (1a) → mở thu hồi → hoàn tất (K1 checklist 6 bước) → (1b) tự ghi → đóng sau lượt quét |
+
+Bỏ: ca m-17 (không dựng được qua route). Lưu ý khi demo (từ lượt rà tài liệu demo):
+
+- **Lỗ hổng sản phẩm (cần Owner/prompt sau):** IT Admin nghỉ việc mà không phụ trách phòng nào (NV-ITA4) **không tự tìm được id hồ sơ nghỉ
+  việc của mình** để gọi P5 — danh sách hồ sơ chỉ trả hồ sơ của phòng IT phụ trách, `GET /me/departure-notice` không trả id. Demo: Super Admin
+  đọc id rồi đưa. Đề xuất A: P5 có route `/me/...` hoặc danh sách cho phép người đó thấy hồ sơ của chính mình.
+- Request R22 của NV-DEV4 bị hệ thống hủy khi điều chuyển có hiệu lực (ngày sau ngày seed, `SYSTEM_BENEFICIARY_TRANSFERRED`, đúng luật): bước
+  IT cấp R22 của demo MF-1 chỉ làm được trong ngày seed.
+- Preview P23 cho NV-ITA4 trả 409 `ALREADY_HANDING_OVER` (đã có hồ sơ); demo preview trên người khác.
+
+Tài liệu demo FE đã sửa theo seed: Docs `4fbaf06` (chưa push), gồm tài liệu API theo BE `67a1abeb`. Kiểm: `typecheck`, `format:check`, `rules:check` 0 lỗi; `jest src/cli/seed` 154/154;
+`test:gates` 331/331; `seed:local -- --continue` trên DB sạch `slm_smoke` (cổng 35432) 54 bước exit 0, chạy lại 54 "đã có" exit 2;
+`test:flows` 60 xanh, 9 skip có sẵn; `test:integration:serial` 96 xanh.
+
+## 6. Commit (nhánh `feat/mf2-mf3`, chưa push)
+
+`5767a120` D-2 · `96a47cc0` D-5 · `b3655d42` D-62/D-64 · `a112030b` A-1, B-4 · `4f3af64e` C-1 · `c9305ecc` B-2 (migration
+`20261113002700`) · `e9eba8a1` gate/serial/flow · `dc879586` biên bản + prompt 3 · `67a1abeb` module graph · `a3dd4e67` GhostRow (cherry-pick
+từ `feat/fe-feedback`) · `a54590fa` kết quả test · `b4e638cf` seed Z. Nhánh `feat/fe-feedback` tách từ `dc879586`: khi gộp, lấy
+`feat/mf2-mf3` vào `feat/fe-feedback` (commit `a3dd4e67` trùng nội dung với `2ec03e4f` nên không xung đột).
+
+Sáng Owner: `git -C D:\FPT\FALL2026\Code\BE-dev-software-license-management push origin feat/mf2-mf3`, chờ CI xanh rồi merge; đọc §3.2.

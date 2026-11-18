@@ -7,13 +7,17 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
-import { loadDirection as loadAdapterDirection, countSourceTokens, translateSegment, MODEL_IDS } from './generate-adapter.mjs';
+import {
+  loadDirection as loadAdapterDirection,
+  countSourceTokens,
+  translateSegment,
+  MODEL_IDS,
+} from './generate-adapter.mjs';
 
 export { MODEL_IDS };
 
 export const DEFAULT_DEPS_DIR = 'D:\\FPT\\FALL2026\\Code\\BE-dev-software-license-management';
-export const DEFAULT_MODELS_DIR =
-  'D:\\FPT\\FALL2026\\Code\\BE-dev-software-license-management\\.models\\translation';
+export const DEFAULT_MODELS_DIR = 'D:\\FPT\\FALL2026\\Code\\BE-dev-software-license-management\\.models\\translation';
 
 export function resolveDirs(env = process.env) {
   return {

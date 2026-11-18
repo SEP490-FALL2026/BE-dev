@@ -1,0 +1,128 @@
+/** The shapes of a request for a group of people that more than one file of the capability reads (`US-05-17`). */
+
+/** What became of one person of a request for a group; the database allows only the moves the policies make. */
+export const LINE_STATES = [
+  'AWAITING_NEED',
+  'NEED_CONFIRMED',
+  'NEED_REJECTED',
+  'SPEND_REJECTED',
+  'APPROVED',
+  'EXECUTING',
+  'AWAITING_IT_CLOSE',
+  'COMPLETED',
+  'FAILED',
+  'WITHDRAWN',
+  'DROPPED',
+  'CANCELLED',
+] as const;
+
+export type LineState = (typeof LINE_STATES)[number];
+
+export type LineStage = 'NEED' | 'SPEND';
+
+/**
+ * Why a line was cancelled: the cause of a request cancelled by the IT Admin, which the line shares: the person left, or was
+ * transferred to another department while the part not yet granted was still open (`QĐ-90b`).
+ */
+export type LineCancelCause = 'BENEFICIARY_LEFT' | 'BENEFICIARY_TRANSFERRED';
+
+/**
+ * Why the system closed a request, or a line, because the person it is for is gone (`QĐ-110d`, `QĐ-110o`): they left, or were moved to
+ * another department. Nobody closed it.
+ */
+export type SystemCancelCause = 'SYSTEM_BENEFICIARY_LEFT' | 'SYSTEM_BENEFICIARY_TRANSFERRED';
+
+/**
+ * Why the system closed a request for a service account that was still open when that kind left the scope (`QĐ-110m`): written once, by the
+ * migration that removed it, on a request and never on a line. Nobody closed it.
+ */
+export type ScopeRemovedCancelCause = 'SYSTEM_SCOPE_REMOVED';
+
+/**
+ * What a row can carry as the cause of a closing, as it is read: the two causes of the IT Admin, the two of the system, the one of a kind
+ * that left the scope, and the one the conversion command writes when the spending approver is a party of the request (`QĐ-93k(1)`);
+ * nobody closed those (OD-6).
+ */
+export type ReadableCancelCause =
+  LineCancelCause | SystemCancelCause | ScopeRemovedCancelCause | 'SPENDING_APPROVER_PARTY';
+
+/** Whether the cause is one of the system: nobody closed what carries it. */
+export const isSystemCancelCause = (cause: ReadableCancelCause): cause is SystemCancelCause =>
+  cause === 'SYSTEM_BENEFICIARY_LEFT' || cause === 'SYSTEM_BENEFICIARY_TRANSFERRED';
+
+/** The causes as the wire lists them (a request and a line share them). */
+export const READABLE_CANCEL_CAUSES = [
+  'BENEFICIARY_LEFT',
+  'BENEFICIARY_TRANSFERRED',
+  'SYSTEM_BENEFICIARY_LEFT',
+  'SYSTEM_BENEFICIARY_TRANSFERRED',
+  'SYSTEM_SCOPE_REMOVED',
+  'SPENDING_APPROVER_PARTY',
+] as const satisfies readonly ReadableCancelCause[];
+
+/** The states in which a line has ended: nothing happens to it again. */
+export const ENDED_LINE_STATES: readonly LineState[] = [
+  'NEED_REJECTED',
+  'SPEND_REJECTED',
+  'COMPLETED',
+  'FAILED',
+  'WITHDRAWN',
+  'DROPPED',
+  'CANCELLED',
+];
+
+export const isEnded = (state: LineState): boolean => ENDED_LINE_STATES.includes(state);
+
+/** The states of the line of a person in a request for a group that is still open for them: what they count as open. */
+export const OPEN_LINE_STATES = [
+  'AWAITING_NEED',
+  'NEED_CONFIRMED',
+  'APPROVED',
+  'EXECUTING',
+] as const satisfies readonly LineState[];
+
+/** One person of a request as the services read them. */
+export interface LineRecord {
+  requestId: string;
+  employeeId: string;
+  /** Their place in the request: the order they were named in, which the shares of a commitment follow. */
+  position: number;
+  state: LineState;
+  needStepId: string;
+  expectedEndDate: string | null;
+  endedAt: Date | null;
+  endedByEmployeeId: string | null;
+  endReason: string | null;
+  /** Why the IT Admin closed the line, when its state is `CANCELLED`; null for every other state. */
+  cancelCause: ReadableCancelCause | null;
+  withdrawalRequestedAt: Date | null;
+}
+
+/** The share of a person in the commitment of one year. */
+export interface LineAmountRecord {
+  employeeId: string;
+  budgetYear: number;
+  amountMinor: bigint;
+  currency: string;
+  /** False for the part of the year after, kept at the approval for the commitment of 01/01: no commitment holds it (`QĐ-111k`). */
+  held: boolean;
+  releasedAt: Date | null;
+}
+
+/** The lines that are the people the request is priced for: everyone not refused, withdrawn or left out of the file. */
+export const PRICED_LINE_STATES: readonly LineState[] = [
+  'AWAITING_NEED',
+  'NEED_CONFIRMED',
+  'APPROVED',
+  'EXECUTING',
+  'AWAITING_IT_CLOSE',
+  'COMPLETED',
+  'FAILED',
+];
+
+export const pricedPeople = (lines: readonly LineState[]): number =>
+  lines.filter((state) => PRICED_LINE_STATES.includes(state)).length;
+
+/** The people the request is priced for, in the order of their lines. */
+export const pricedPeopleIds = (lines: readonly { employeeId: string; state: LineState }[]): string[] =>
+  lines.filter((line) => PRICED_LINE_STATES.includes(line.state)).map((line) => line.employeeId);

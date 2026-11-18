@@ -3,3 +3,5 @@ coverage
 node_modules
 src/generated
 pnpm-lock.yaml
+# Written by ESLint (--suppress-all, --prune-suppressions) without a final newline; its bytes belong to ESLint.
+eslint-suppressions.json

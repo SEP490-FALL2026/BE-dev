@@ -44,7 +44,15 @@ const OUTCOME_STATUS = {
 };
 
 export class Coordinator {
-  constructor({ supervisor, cache, identity, timeoutMs = 10_000, queueMax = 4, segmenter = splitSentences, breakerOptions = {} }) {
+  constructor({
+    supervisor,
+    cache,
+    identity,
+    timeoutMs = 10_000,
+    queueMax = 4,
+    segmenter = splitSentences,
+    breakerOptions = {},
+  }) {
     this.sup = supervisor;
     this.cache = cache;
     this.identity = identity;
@@ -104,12 +112,19 @@ export class Coordinator {
   async #translate({ organizationId, scope, text, effectiveSource: source, target, signal, deadlineAt }) {
     const t0 = mono();
     const direction = `${source}-${target}`;
-    const fail = (status, reason, extra = {}) => ({ status, text: null, cacheHit: false, stats: { reason, totalMs: mono() - t0, ...extra } });
+    const fail = (status, reason, extra = {}) => ({
+      status,
+      text: null,
+      cacheHit: false,
+      stats: { reason, totalMs: mono() - t0, ...extra },
+    });
     if (this.shuttingDown) return fail('UNAVAILABLE', 'shutdown');
-    if (source === target) return { status: 'OK', text: String(text), cacheHit: false, stats: { reason: 'same-language', totalMs: 0 } };
+    if (source === target)
+      return { status: 'OK', text: String(text), cacheHit: false, stats: { reason: 'same-language', totalMs: 0 } };
     if (!DIRECTIONS.has(direction)) return fail('UNAVAILABLE', 'unsupported-pair');
     const normalized = normalizeText(text);
-    if (!normalized) return { status: 'OK', text: String(text), cacheHit: false, stats: { reason: 'empty', totalMs: 0 } };
+    if (!normalized)
+      return { status: 'OK', text: String(text), cacheHit: false, stats: { reason: 'empty', totalMs: 0 } };
 
     const key = this.cache.makeKey({ organizationId, scope, ...this.identity, source, target, text });
     const cached = this.cache.get(key);
@@ -160,7 +175,16 @@ export class Coordinator {
 
   #createJob(key, direction, normalizedText, probe) {
     const supJob = this.sup.enqueue({ direction, segments: this.segmenter(normalizedText) });
-    const job = { key, direction, supJob, waiters: new Set(), probe, failed: false, finished: false, createdAt: mono() };
+    const job = {
+      key,
+      direction,
+      supJob,
+      waiters: new Set(),
+      probe,
+      failed: false,
+      finished: false,
+      createdAt: mono(),
+    };
     this.bySup.set(supJob.id, job);
     if (supJob.settledFlag) {
       // settled synchronously (backoff / permanent / shutdown): handled below through the same path
@@ -230,7 +254,8 @@ export class Coordinator {
       waiter.signal?.removeEventListener('abort', waiter.onAbort);
       job.waiters.delete(waiter);
       const totalMs = mono() - waiter.arrivedAt;
-      if (ok) waiter.resolve({ status: 'OK', text, cacheHit: false, stats: { ...stats, joined: waiter.joined, totalMs } });
+      if (ok)
+        waiter.resolve({ status: 'OK', text, cacheHit: false, stats: { ...stats, joined: waiter.joined, totalMs } });
       else {
         const [status] = OUTCOME_STATUS[outcome.reason] ?? ['UNAVAILABLE'];
         waiter.resolve({ status, text: null, cacheHit: false, stats: { ...stats, joined: waiter.joined, totalMs } });

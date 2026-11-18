@@ -25,7 +25,13 @@ export const GLOSSARY = [
     id: 'department-head',
     vi: { match: ['trưởng phòng'], out: 'trưởng phòng' },
     en: {
-      match: ['heads of department', 'head of department', 'head of the department', 'department heads', 'department head'],
+      match: [
+        'heads of department',
+        'head of department',
+        'head of the department',
+        'department heads',
+        'department head',
+      ],
       out: 'department head',
     },
   },
@@ -33,7 +39,12 @@ export const GLOSSARY = [
     id: 'cancellation-deadline',
     vi: { match: ['hạn báo hủy', 'hạn báo huỷ'], out: 'hạn báo hủy' },
     en: {
-      match: ['cancellation notice deadlines', 'cancellation notice deadline', 'cancellation deadlines', 'cancellation deadline'],
+      match: [
+        'cancellation notice deadlines',
+        'cancellation notice deadline',
+        'cancellation deadlines',
+        'cancellation deadline',
+      ],
       out: 'cancellation deadline',
     },
   },

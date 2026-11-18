@@ -23,7 +23,8 @@ const NEG_EN = "(?:not|never|cannot|\\p{L}*n['’]t)";
 const AUX_EN = '(?:\\s+(?:be|been|being|yet|ever|currently|automatically|formally|fully|get|got|to))*';
 // TRIGGER verbs only: the negated-approve compound must not swallow "not allowed" / "doesn't allow" (those are negation;
 // allow/permit/authorise/sanction are approve SATISFIERS only, see the entries below).
-const APPROVE_VERB_EN = '(?:approv(?:e|es|ed|ing|al|als|er|ers)|accept(?:s|ed|ing|ance|able)?|agree(?:s|d|ing)?|endors(?:e|es|ed|ing|ement)|grant(?:s|ed|ing)?)';
+const APPROVE_VERB_EN =
+  '(?:approv(?:e|es|ed|ing|al|als|er|ers)|accept(?:s|ed|ing|ance|able)?|agree(?:s|d|ing)?|endors(?:e|es|ed|ing|ement)|grant(?:s|ed|ing)?)';
 const NEG_VI = '(?:không|chưa|chẳng|chả)';
 const APPROVE_VERB_VI = '(?:(?:phê\\s+)?duyệt|chấp\\s+thuận|chấp\\s+nhận|đồng\\s+ý|tán\\s+thành|phê\\s+chuẩn)';
 
@@ -32,15 +33,39 @@ const EN = [
   [null, 'not\\s+only|whether\\s+or\\s+not', true],
   // compound rejections: negated approve-like verb, or inability / failure to approve
   ['reject', `(?:${NEG_EN}|unable\\s+to|fail(?:s|ed|ing)?\\s+to)${AUX_EN}\\s+${APPROVE_VERB_EN}`, true],
-  ['reject', 'disapprov\\w*|disagree(?:s|d|ing)?|unapproved|reject\\w*|declin(?:e|es|ed|ing)|den(?:y|ies|ied|ying)|refus(?:e|es|ed|ing|al)|turn(?:s|ed|ing)?\\s+down|veto(?:es|ed|ing)?', true],
+  [
+    'reject',
+    'disapprov\\w*|disagree(?:s|d|ing)?|unapproved|reject\\w*|declin(?:e|es|ed|ing)|den(?:y|ies|ied|ying)|refus(?:e|es|ed|ing|al)|turn(?:s|ed|ing)?\\s+down|veto(?:es|ed|ing)?',
+    true,
+  ],
   ['revoke', 'revok(?:e|es|ed|ing)|revocations?|rescind(?:s|ed|ing)?', true],
-  ['revoke', 'withdr(?:aw|aws|awing|ew|awn|awal)\\s+(?:\\p{L}+\\s+){0,2}(?:access|permissions?|rights|privileges?|licen[sc]es?|seats?)', true],
+  [
+    'revoke',
+    'withdr(?:aw|aws|awing|ew|awn|awal)\\s+(?:\\p{L}+\\s+){0,2}(?:access|permissions?|rights|privileges?|licen[sc]es?|seats?)',
+    true,
+  ],
   ['revoke', 'remov(?:e|es|ed|ing|al)\\s+(?:\\p{L}+\\s+){0,2}(?:access|permissions?|rights|privileges?)', true],
-  ['revoke', 'withdr(?:aw|aws|awing|ew|awn|awal)|remov(?:e|es|ed|ing|al)|terminat(?:e|es|ed|ing)|deactivat(?:e|es|ed|ing)|reclaim(?:s|ed|ing)?', false],
-  ['approve', 'approv(?:e|es|ed|ing|al|als|er|ers)|accept(?:s|ed|ing|ance|able)?|agree(?:s|d|ing)?|endors(?:e|es|ed|ing|ement)|grant(?:s|ed|ing)?|sign(?:s|ed|ing)?\\s+off', true],
-  ['approve', 'allow(?:s|ed|ing)?|permit(?:s|ted|ting)?|authori[sz](?:e|es|ed|ing)|sanction(?:s|ed|ing)?|consent(?:s|ed|ing)?|green-?light(?:s|ed|ing)?', false],
+  [
+    'revoke',
+    'withdr(?:aw|aws|awing|ew|awn|awal)|remov(?:e|es|ed|ing|al)|terminat(?:e|es|ed|ing)|deactivat(?:e|es|ed|ing)|reclaim(?:s|ed|ing)?',
+    false,
+  ],
+  [
+    'approve',
+    'approv(?:e|es|ed|ing|al|als|er|ers)|accept(?:s|ed|ing|ance|able)?|agree(?:s|d|ing)?|endors(?:e|es|ed|ing|ement)|grant(?:s|ed|ing)?|sign(?:s|ed|ing)?\\s+off',
+    true,
+  ],
+  [
+    'approve',
+    'allow(?:s|ed|ing)?|permit(?:s|ted|ting)?|authori[sz](?:e|es|ed|ing)|sanction(?:s|ed|ing)?|consent(?:s|ed|ing)?|green-?light(?:s|ed|ing)?',
+    false,
+  ],
   ['negation', "not|never|cannot|\\p{L}*n['’]t|no|none|nobody|nothing|nowhere|neither|nor|without", true],
-  ['negation', 'unable|unavailable|inability|lack(?:s|ed|ing)?|missing|absent|fail(?:s|ed|ing|ure)?|prohibit\\w*|forbid\\w*|forbidden', false],
+  [
+    'negation',
+    'unable|unavailable|inability|lack(?:s|ed|ing)?|missing|absent|fail(?:s|ed|ing|ure)?|prohibit\\w*|forbid\\w*|forbidden',
+    false,
+  ],
 ];
 
 const VI = [
@@ -48,10 +73,24 @@ const VI = [
   [null, 'không\\s+(?:gian|khí|quân|lưu|trung|chỉ)|hàng\\s+không|(?:không|chưa)\\s*\\?', true],
   ['reject', `${NEG_VI}\\s+(?:(?:được|thể|hề|còn)\\s+)*${APPROVE_VERB_VI}`, true],
   ['reject', 'từ\\s+chối|bác\\s+bỏ|bác\\s+đơn|khước\\s+từ|phủ\\s+quyết', true],
-  ['revoke', 'thu\\s+hồi|rút\\s+quyền|hủy\\s+quyền|huỷ\\s+quyền|tước\\s+quyền|thu\\s+lại\\s+quyền|gỡ\\s+quyền|xóa\\s+quyền|xoá\\s+quyền', true],
-  ['revoke', 'gỡ\\s+bỏ|thu\\s+lại|rút\\s+lại|tước|vô\\s+hiệu\\s+hóa|vô\\s+hiệu\\s+hoá|chấm\\s+dứt', false, 'go\\s+bo|thu\\s+lai|rut\\s+lai|vo\\s+hieu\\s+hoa|cham\\s+dut'],
+  [
+    'revoke',
+    'thu\\s+hồi|rút\\s+quyền|hủy\\s+quyền|huỷ\\s+quyền|tước\\s+quyền|thu\\s+lại\\s+quyền|gỡ\\s+quyền|xóa\\s+quyền|xoá\\s+quyền',
+    true,
+  ],
+  [
+    'revoke',
+    'gỡ\\s+bỏ|thu\\s+lại|rút\\s+lại|tước|vô\\s+hiệu\\s+hóa|vô\\s+hiệu\\s+hoá|chấm\\s+dứt',
+    false,
+    'go\\s+bo|thu\\s+lai|rut\\s+lai|vo\\s+hieu\\s+hoa|cham\\s+dut',
+  ],
   ['approve', APPROVE_VERB_VI, true],
-  ['approve', 'cấp\\s+(?:quyền|phép|thêm)|cho\\s+phép|ủy\\s+quyền|uỷ\\s+quyền|cấp', false, 'cap\\s+(?:quyen|phep|them)|cho\\s+phep|uy\\s+quyen'],
+  [
+    'approve',
+    'cấp\\s+(?:quyền|phép|thêm)|cho\\s+phép|ủy\\s+quyền|uỷ\\s+quyền|cấp',
+    false,
+    'cap\\s+(?:quyen|phep|them)|cho\\s+phep|uy\\s+quyen',
+  ],
   // folded đừng/chớ/chẳng/chả would collide with dung/cho/chang/cha: only không/chưa are read when unaccented
   ['negation', `${NEG_VI}(?:\\s+thể)?|đừng|chớ`, true, 'khong(?:\\s+the)?|chua(?:\\s+the)?'],
   ['negation', 'thiếu|cấm|bất\\s+khả', false],
@@ -67,7 +106,10 @@ const compile = (entries, fold) =>
 
 const SETS = { en: compile(EN, false), vi: compile(VI, false), viFolded: compile(VI, true) };
 
-const nfc = (s) => String(s ?? '').normalize('NFC').toLowerCase();
+const nfc = (s) =>
+  String(s ?? '')
+    .normalize('NFC')
+    .toLowerCase();
 
 /** Cues found by class: { negation: ['không'], ... } (only classes that occurred). triggersOnly: source semantics. */
 export function polarityCues(text, lang, { triggersOnly = true } = {}) {

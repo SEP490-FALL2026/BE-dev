@@ -16,27 +16,45 @@ export function pct(sorted, p) {
 export function summarize(values, digits = 1) {
   const v = values.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
   const r = (x) => (x === null ? null : +x.toFixed(digits));
-  return { n: v.length, min: r(v[0] ?? null), p50: r(pct(v, 50)), p95: r(pct(v, 95)), p99: r(pct(v, 99)), max: r(v[v.length - 1] ?? null), mean: v.length ? r(v.reduce((a, b) => a + b, 0) / v.length) : null };
+  return {
+    n: v.length,
+    min: r(v[0] ?? null),
+    p50: r(pct(v, 50)),
+    p95: r(pct(v, 95)),
+    p99: r(pct(v, 99)),
+    max: r(v[v.length - 1] ?? null),
+    mean: v.length ? r(v.reduce((a, b) => a + b, 0) / v.length) : null,
+  };
 }
 
 export function httpJson(port, method, urlPath, body, timeoutMs = 180_000) {
   return new Promise((resolve, reject) => {
     const data = body === undefined ? null : JSON.stringify(body);
     const t0 = performance.now();
-    const req = http.request({ host: '127.0.0.1', port, method, path: urlPath, agent, headers: data ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } : {} }, (res) => {
-      const chunks = [];
-      res.on('data', (c) => chunks.push(c));
-      res.on('end', () => {
-        const txt = Buffer.concat(chunks).toString('utf8');
-        let json = null;
-        try {
-          json = JSON.parse(txt);
-        } catch {
-          /* leave null */
-        }
-        resolve({ status: res.statusCode, json, ms: performance.now() - t0, wall: Date.now() });
-      });
-    });
+    const req = http.request(
+      {
+        host: '127.0.0.1',
+        port,
+        method,
+        path: urlPath,
+        agent,
+        headers: data ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } : {},
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          const txt = Buffer.concat(chunks).toString('utf8');
+          let json = null;
+          try {
+            json = JSON.parse(txt);
+          } catch {
+            /* leave null */
+          }
+          resolve({ status: res.statusCode, json, ms: performance.now() - t0, wall: Date.now() });
+        });
+      },
+    );
     req.setTimeout(timeoutMs, () => req.destroy(new Error('client timeout')));
     req.on('error', reject);
     if (data) req.write(data);
@@ -112,14 +130,19 @@ export function cgroup() {
   const mb = (v) => (v && /^\d+$/.test(v) ? +(Number(v) / 1048576).toFixed(1) : v);
   return {
     memoryPeakMb: mb(read('/sys/fs/cgroup/memory.peak')) ?? mb(read('/sys/fs/cgroup/memory/memory.max_usage_in_bytes')),
-    memoryCurrentMb: mb(read('/sys/fs/cgroup/memory.current')) ?? mb(read('/sys/fs/cgroup/memory/memory.usage_in_bytes')),
+    memoryCurrentMb:
+      mb(read('/sys/fs/cgroup/memory.current')) ?? mb(read('/sys/fs/cgroup/memory/memory.usage_in_bytes')),
     memoryMax: read('/sys/fs/cgroup/memory.max') ?? read('/sys/fs/cgroup/memory/memory.limit_in_bytes'),
     cpuMax: read('/sys/fs/cgroup/cpu.max'),
     cpuStat: (() => {
       const t = read('/sys/fs/cgroup/cpu.stat');
       if (!t) return null;
       const g = (k) => Number((t.match(new RegExp(`^${k} (\\d+)`, 'm')) ?? [])[1] ?? NaN);
-      return { nrPeriods: g('nr_periods'), nrThrottled: g('nr_throttled'), throttledMs: +(g('throttled_usec') / 1000).toFixed(0) };
+      return {
+        nrPeriods: g('nr_periods'),
+        nrThrottled: g('nr_throttled'),
+        throttledMs: +(g('throttled_usec') / 1000).toFixed(0),
+      };
     })(),
   };
 }
@@ -134,7 +157,9 @@ export function startApi(env = {}) {
     let buf = '';
     let stderrBuf = '';
     const api = { child, pid: child.pid, port: null, exit: null, shutdownEvents: null, stderr: () => stderrBuf };
-    const exited = new Promise((r) => child.once('exit', (code, signal) => r((api.exit = { code, signal, at: Date.now() }))));
+    const exited = new Promise((r) =>
+      child.once('exit', (code, signal) => r((api.exit = { code, signal, at: Date.now() }))),
+    );
     api.exited = exited;
     child.stderr.on('data', (c) => (stderrBuf = (stderrBuf + c).slice(-4000)));
     child.stdout.on('data', (c) => {
@@ -158,7 +183,8 @@ export function startApi(env = {}) {
     api.post = (p, b) => httpJson(api.port, 'POST', p, b);
     api.stop = async () => {
       if (api.exit) return api.exit;
-      if (process.platform === 'win32') httpJson(api.port, 'POST', '/control/shutdown', {}).catch(() => {}); // no POSIX signals on Windows
+      if (process.platform === 'win32')
+        httpJson(api.port, 'POST', '/control/shutdown', {}).catch(() => {}); // no POSIX signals on Windows
       else child.kill('SIGTERM');
       const t = setTimeout(() => child.kill('SIGKILL'), 15_000);
       const r = await exited;

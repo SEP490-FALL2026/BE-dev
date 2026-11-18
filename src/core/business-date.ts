@@ -40,3 +40,34 @@ export function toDateColumn(date: BusinessDate): Date {
 export function fromDateColumn(value: Date): BusinessDate {
   return value.toISOString().slice(0, 10);
 }
+
+/** The calendar date `days` after `date` (before it when negative): whole days of the calendar, no time zone involved. */
+export function addDays(date: BusinessDate, days: number): BusinessDate {
+  const shifted = new Date(`${date}T00:00:00.000Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+
+  return shifted.toISOString().slice(0, 10);
+}
+
+/**
+ * The first day of the month `date` is in and of the month after it: "this month" is `[start, nextStart)`, the days of the month up to `date`
+ * included. Whole days of the calendar, no time zone involved.
+ */
+export function monthBoundsOf(date: BusinessDate): { start: BusinessDate; nextStart: BusinessDate } {
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7));
+  const nextStart = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`;
+
+  return { start: `${date.slice(0, 8)}01`, nextStart };
+}
+
+/**
+ * The calendar week `date` is in, Monday to Sunday: `[start, nextStart)`, `start` the Monday on or before `date` and `nextStart` the Monday after it.
+ * Whole days of the calendar, no time zone involved: the caller gives the date as it reads in the zone of the organization.
+ */
+export function weekBoundsOf(date: BusinessDate): { start: BusinessDate; nextStart: BusinessDate } {
+  const sinceMonday = (new Date(`${date}T00:00:00.000Z`).getUTCDay() + 6) % 7;
+  const start = addDays(date, -sinceMonday);
+
+  return { start, nextStart: addDays(start, 7) };
+}

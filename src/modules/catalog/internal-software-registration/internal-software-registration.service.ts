@@ -1,0 +1,53 @@
+import { Injectable } from '@nestjs/common';
+import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { PlanService } from '../plan/plan.service';
+import { ApplicationNameTakenError } from '../catalog-entry/application.errors';
+import { ApplicationService } from '../catalog-entry/application.service';
+
+export type InternalRegistration =
+  { status: 'REGISTERED'; applicationId: string; planId: string } | { status: 'REFUSED'; reason: 'NAME_TAKEN' };
+
+/**
+ * Registering software the company built itself in the catalog on behalf of a request (`US-05-20`): the application, with
+ * the IT Admin who registers it as the one responsible (`QĐ-111g`), in the group Khác (`QĐ-111d`), and one plan of the kind that is granted by hand and has no pricing
+ * model (`K5`). It writes in the transaction of the caller, so it is committed or undone together with the request that
+ * asked for it, and it creates no vendor, contract, subscription, invoice or seat (`US-05-20` AC-5).
+ */
+@Injectable()
+export class InternalSoftwareRegistrationService {
+  constructor(
+    private readonly applications: ApplicationService,
+    private readonly plans: PlanService,
+  ) {}
+
+  /** A refusal is an answer, not an error: the caller rolls its transaction back when it gets one. */
+  async register(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { name: string; dataSensitivity: 'LOW' | 'MEDIUM' | 'HIGH' | null },
+  ): Promise<InternalRegistration> {
+    try {
+      const application = await this.applications.declareRecord(
+        actor,
+        {
+          name: input.name,
+          kind: 'INTERNAL',
+          dataSensitivity: input.dataSensitivity,
+        },
+        tx,
+      );
+      const plan = await this.plans.declare(
+        actor,
+        { applicationId: application.id, name: input.name, provisioningType: 'K5' },
+        tx,
+      );
+
+      return { status: 'REGISTERED', applicationId: application.id, planId: plan.id };
+    } catch (error) {
+      if (error instanceof ApplicationNameTakenError) return { status: 'REFUSED', reason: 'NAME_TAKEN' };
+
+      throw error;
+    }
+  }
+}

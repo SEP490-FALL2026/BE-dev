@@ -14,7 +14,10 @@ export const MUTANTS = [
     after: 'void Promise.resolve(); // mutant: omit timeout connection disposal',
     probes: [
       { file: 'src/infrastructure/database/pg-pool.spec.ts' },
-      { config: 'test/config/jest.integration.cjs', file: 'test/integration/database-stall.integration-spec.ts' },
+      {
+        config: 'test/config/jest.integration-timing.cjs',
+        file: 'test/integration/audit/database-stall.timing-spec.ts',
+      },
     ],
   },
   {
@@ -26,13 +29,13 @@ export const MUTANTS = [
   },
   {
     id: 'invitation-invalidation',
-    file: 'src/modules/identity-access/accounts/account-invitation.service.ts',
+    file: 'src/modules/identity-access/accounts/app-users/account-invitation.service.ts',
     before: "await this.accounts.revokeTokens(tx, hashes, 'SUPERSEDED', now);",
     after: 'void hashes; // mutant: omit superseded invitation revocation',
     probes: [
       {
         config: 'test/config/jest.integration.cjs',
-        file: 'test/integration/account-management-http.integration-spec.ts',
+        file: 'test/integration/identity-access/account-creation-http.integration-spec.ts',
         name: 'resending keeps exactly one usable token',
       },
     ],

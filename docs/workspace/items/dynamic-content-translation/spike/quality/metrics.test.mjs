@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { checkPreservation, checkMeaning, percentile, aggregate, POLARITY_CATEGORIES } from './lib/metrics.mjs';
 
 test('checkPreservation: exact, case-sensitive substring of every protected string', () => {
-  assert.deepEqual(checkPreservation('Approved REQ-2026-0042 for Nguyễn Văn An.', ['REQ-2026-0042', 'Nguyễn Văn An']), { all: true, missing: [] });
+  assert.deepEqual(checkPreservation('Approved REQ-2026-0042 for Nguyễn Văn An.', ['REQ-2026-0042', 'Nguyễn Văn An']), {
+    all: true,
+    missing: [],
+  });
   const r = checkPreservation('Approved req-2026-0042 for Hoffung An.', ['REQ-2026-0042', 'Nguyễn Văn An']);
   assert.equal(r.all, false);
   assert.deepEqual(r.missing, ['REQ-2026-0042', 'Nguyễn Văn An']);
@@ -11,11 +14,17 @@ test('checkPreservation: exact, case-sensitive substring of every protected stri
 });
 
 test('checkMeaning: mustContain supports any-of groups, case-insensitive; mustNotContain is substring', () => {
-  const ok = checkMeaning('The request was NOT approved.', { mustContain: [['not', "n't"], 'approv'], mustNotContain: ['reject'] });
+  const ok = checkMeaning('The request was NOT approved.', {
+    mustContain: [['not', "n't"], 'approv'],
+    mustNotContain: ['reject'],
+  });
   assert.equal(ok.pass, true);
-  const bad = checkMeaning('The request was approved.', { mustContain: [['not', "n't"]], mustNotContain: ['approved'] });
+  const bad = checkMeaning('The request was approved.', {
+    mustContain: [['not', "n't"]],
+    mustNotContain: ['approved'],
+  });
   assert.equal(bad.pass, false);
-  assert.deepEqual(bad.failedContain, ['not | n\'t']);
+  assert.deepEqual(bad.failedContain, ["not | n't"]);
   assert.deepEqual(bad.failedNotContain, ['approved']);
   assert.equal(checkMeaning('x', {}).pass, true);
   assert.equal(checkMeaning('x', {}).hasChecks, false);
@@ -45,14 +54,20 @@ const mk = (id, categories, extra = {}) => ({
 test('aggregate: overall and per-category rates', () => {
   const items = [
     mk('a', ['negation']),
-    mk('b', ['negation', 'name'], { output: 'zzzzzz', meaning: { pass: false, hasChecks: true }, counts: { total: 2, translated: 1, fallback: 1 }, preserved: { all: false, missing: ['X'] }, latencyMs: 300 }),
+    mk('b', ['negation', 'name'], {
+      output: 'zzzzzz',
+      meaning: { pass: false, hasChecks: true },
+      counts: { total: 2, translated: 1, fallback: 1 },
+      preserved: { all: false, missing: ['X'] },
+      latencyMs: 300,
+    }),
     mk('c', ['plain'], { hasProtected: false, meaning: { pass: true, hasChecks: false } }),
   ];
   const agg = aggregate(items);
   assert.equal(agg.items, 3);
   assert.equal(agg.preservedPct, 50, '1 of 2 items that have protected terms');
   assert.equal(agg.meaningPassPct, 50, '1 of 2 items that have checks');
-  assert.equal(agg.fallbackSegmentPct, 16.67, "rounded to 2 decimals");
+  assert.equal(agg.fallbackSegmentPct, 16.67, 'rounded to 2 decimals');
   assert.equal(agg.latency.p50, 100);
   assert.equal(agg.polarity.negation.pct, 50);
   assert.equal(agg.polarity.negation.n, 2);
@@ -65,7 +80,10 @@ test('aggregate: overall and per-category rates', () => {
 test('aggregate: silent failures = failed meaning check on an item with no fallback segment', () => {
   const items = [
     mk('a', ['negation'], { meaning: { pass: false, hasChecks: true } }),
-    mk('b', ['negation'], { meaning: { pass: false, hasChecks: true }, counts: { total: 1, translated: 0, fallback: 1 } }),
+    mk('b', ['negation'], {
+      meaning: { pass: false, hasChecks: true },
+      counts: { total: 1, translated: 0, fallback: 1 },
+    }),
   ];
   const agg = aggregate(items);
   assert.equal(agg.silentMeaningFailures, 1);
@@ -91,7 +109,15 @@ const fm = (id, categories, extra = {}) => ({
   ...extra,
 });
 const failed = (id, reason, extra = {}) =>
-  fm(id, ['plain'], { status: 'NOT_TRANSLATED', reason, counts: { total: 1, translated: 0, fallback: 1 }, output: 'zzzzzz', meaning: { pass: false, hasChecks: true, failedContain: ['x'], failedNotContain: [] }, segmentMs: [], ...extra });
+  fm(id, ['plain'], {
+    status: 'NOT_TRANSLATED',
+    reason,
+    counts: { total: 1, translated: 0, fallback: 1 },
+    output: 'zzzzzz',
+    meaning: { pass: false, hasChecks: true, failedContain: ['x'], failedNotContain: [] },
+    segmentMs: [],
+    ...extra,
+  });
 
 test('reasonBucket maps pipeline reasons to the reported buckets', () => {
   assert.equal(reasonBucket('PLACEHOLDER_GATE'), 'placeholder');
@@ -105,14 +131,23 @@ test('reasonBucket maps pipeline reasons to the reported buckets', () => {
 test('fieldMetrics: translated vs fallback by reason, automatic flags only among translated fields, per-field and per-segment latency', () => {
   const items = [
     fm('a', ['negation']),
-    fm('b', ['approve'], { meaning: { pass: false, hasChecks: true, failedContain: ['approv'], failedNotContain: [] }, segmentMs: [30], latencyMs: 300 }),
+    fm('b', ['approve'], {
+      meaning: { pass: false, hasChecks: true, failedContain: ['approv'], failedNotContain: [] },
+      segmentMs: [30],
+      latencyMs: 300,
+    }),
     fm('p', ['name'], { preserved: { all: false, missing: ['Nguyễn Văn An'] } }),
     failed('c', 'PLACEHOLDER_GATE'),
     failed('d', 'QUALITY_GATE'),
     failed('e', 'TOO_LONG'),
     failed('f', 'MAX_NEW_TOKENS'),
     failed('g', 'ERROR'),
-    fm('h', ['plain'], { status: 'NOT_NEEDED', reason: 'SOURCE_EMPTY', counts: { total: 0, translated: 0, fallback: 0 }, segmentMs: [] }),
+    fm('h', ['plain'], {
+      status: 'NOT_NEEDED',
+      reason: 'SOURCE_EMPTY',
+      counts: { total: 0, translated: 0, fallback: 0 },
+      segmentMs: [],
+    }),
   ];
   const m = fieldMetrics(items);
   assert.equal(m.items, 9);
@@ -138,12 +173,23 @@ test('fieldMetrics: translated vs fallback by reason, automatic flags only among
 test('fieldFlags lists translated fields whose keyword or preservation check failed, never fallbacks', () => {
   const items = [
     fm('ok', ['negation']),
-    fm('flag', ['approve'], { meaning: { pass: false, hasChecks: true, failedContain: ['approv'], failedNotContain: ['reject'] } }),
+    fm('flag', ['approve'], {
+      meaning: { pass: false, hasChecks: true, failedContain: ['approv'], failedNotContain: ['reject'] },
+    }),
     fm('lost', ['name'], { preserved: { all: false, missing: ['Figma'] } }),
     failed('fb', 'QUALITY_GATE'),
   ];
-  const flags = fieldFlags(items, new Map([['flag', { source: 'S', reference: 'R' }], ['lost', { source: 'S2', reference: 'R2' }]]));
-  assert.deepEqual(flags.map((f) => f.id), ['flag', 'lost']);
+  const flags = fieldFlags(
+    items,
+    new Map([
+      ['flag', { source: 'S', reference: 'R' }],
+      ['lost', { source: 'S2', reference: 'R2' }],
+    ]),
+  );
+  assert.deepEqual(
+    flags.map((f) => f.id),
+    ['flag', 'lost'],
+  );
   assert.equal(flags[0].polarityCategory, 'approve');
   assert.equal(flags[0].source, 'S');
   assert.equal(flags[0].reference, 'R');

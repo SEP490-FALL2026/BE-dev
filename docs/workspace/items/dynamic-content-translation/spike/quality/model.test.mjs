@@ -21,16 +21,25 @@ test('pipeline and benchmark runner use translateSegment, not translateBatch', (
   }
 });
 
-test('REAL: loadDirection wraps the adapter for en-vi (countTokens includes the language token)', { skip: process.env.SPIKE_REAL === '1' ? false : 'set SPIKE_REAL=1' }, async () => {
-  const { resolveDirs, loadTransformers, loadDirection } = await import('./lib/model.mjs');
-  const { depsDir, modelsDir } = resolveDirs();
-  const { mod } = await loadTransformers(depsDir);
-  const m = await loadDirection({ direction: 'en-vi', mod, modelsDir, sessionOptions: { intraOpNumThreads: 1, interOpNumThreads: 1 } });
-  assert.ok(m.loadMs > 0);
-  assert.equal(typeof m.handle.langTokenId, 'number');
-  const n = m.countTokens('The license will expire at the end of this month.');
-  assert.equal(n, 13, 'lang token + 11 sentence tokens + </s>');
-  const r = await m.translateSegment('The license will expire at the end of this month.');
-  assert.equal(r.finishReason, 'eos');
-  await m.dispose();
-});
+test(
+  'REAL: loadDirection wraps the adapter for en-vi (countTokens includes the language token)',
+  { skip: process.env.SPIKE_REAL === '1' ? false : 'set SPIKE_REAL=1' },
+  async () => {
+    const { resolveDirs, loadTransformers, loadDirection } = await import('./lib/model.mjs');
+    const { depsDir, modelsDir } = resolveDirs();
+    const { mod } = await loadTransformers(depsDir);
+    const m = await loadDirection({
+      direction: 'en-vi',
+      mod,
+      modelsDir,
+      sessionOptions: { intraOpNumThreads: 1, interOpNumThreads: 1 },
+    });
+    assert.ok(m.loadMs > 0);
+    assert.equal(typeof m.handle.langTokenId, 'number');
+    const n = m.countTokens('The license will expire at the end of this month.');
+    assert.equal(n, 13, 'lang token + 11 sentence tokens + </s>');
+    const r = await m.translateSegment('The license will expire at the end of this month.');
+    assert.equal(r.finishReason, 'eos');
+    await m.dispose();
+  },
+);

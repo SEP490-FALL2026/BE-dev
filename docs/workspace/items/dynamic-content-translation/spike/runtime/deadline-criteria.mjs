@@ -10,7 +10,10 @@ export function computeMaxNewTokens(inputTokens) {
   return Math.min(512, 2 * inputTokens + 16);
 }
 
-export function createDeadlineCriterion(StoppingCriteriaBase, { computeDeadlineEpochMs, isCancelled = () => false, now = Date.now }) {
+export function createDeadlineCriterion(
+  StoppingCriteriaBase,
+  { computeDeadlineEpochMs, isCancelled = () => false, now = Date.now },
+) {
   class DeadlineCriterion extends StoppingCriteriaBase {
     constructor() {
       super();

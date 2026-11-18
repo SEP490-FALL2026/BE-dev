@@ -1,0 +1,162 @@
+export class ApplicationNameInvalidError extends Error {
+  constructor() {
+    super('An application name must be 1 to 200 characters.');
+    this.name = 'ApplicationNameInvalidError';
+  }
+}
+
+export class ApplicationVendorNameInvalidError extends Error {
+  constructor() {
+    super('A vendor name must be 1 to 200 characters.');
+    this.name = 'ApplicationVendorNameInvalidError';
+  }
+}
+
+export class ApplicationDomainInvalidError extends Error {
+  constructor(readonly value: string) {
+    super('A domain must be a host such as figma.com.');
+    this.name = 'ApplicationDomainInvalidError';
+  }
+}
+
+export class ApplicationTooManyDomainsError extends Error {
+  constructor() {
+    super('An application has at most 20 domains.');
+    this.name = 'ApplicationTooManyDomainsError';
+  }
+}
+
+export class ApplicationVendorRequiredError extends Error {
+  constructor() {
+    super('A SaaS or licensed application names its vendor or a dictionary service line.');
+    this.name = 'ApplicationVendorRequiredError';
+  }
+}
+
+export class ApplicationVendorSourceAmbiguousError extends Error {
+  constructor() {
+    super('Name the vendor or a dictionary service line, not both.');
+    this.name = 'ApplicationVendorSourceAmbiguousError';
+  }
+}
+
+export class ApplicationInternalHasNoVendorError extends Error {
+  constructor() {
+    super('An internal application has no vendor and no dictionary line.');
+    this.name = 'ApplicationInternalHasNoVendorError';
+  }
+}
+
+export class ApplicationFunctionalGroupInvalidError extends Error {
+  constructor() {
+    super('The functional group does not exist or is not active.');
+    this.name = 'ApplicationFunctionalGroupInvalidError';
+  }
+}
+
+export class ApplicationDictionaryLineNotFoundError extends Error {
+  constructor() {
+    super('The dictionary service line does not exist.');
+    this.name = 'ApplicationDictionaryLineNotFoundError';
+  }
+}
+
+export class ApplicationDictionaryLineMismatchError extends Error {
+  constructor() {
+    super('The dictionary service line is not in the dictionary group of the vendor of this application.');
+    this.name = 'ApplicationDictionaryLineMismatchError';
+  }
+}
+
+/**
+ * The vendor had no dictionary group and nobody held the group of the line when the declaration or change read them, and
+ * a simultaneous change won before this one could write (`DB-03`): the vendor took another group, or another vendor took
+ * this one. Answered 409 with its own code; sent again, the request meets the state that change left.
+ */
+export class ApplicationVendorGroupChangedError extends Error {
+  constructor() {
+    // At most 160 characters, like every message the API documents.
+    super(
+      'A simultaneous request changed the dictionary group of the vendor or the line. Refresh both, then send the request again.',
+    );
+    this.name = 'ApplicationVendorGroupChangedError';
+  }
+}
+
+export class ApplicationNotFoundError extends Error {
+  constructor() {
+    super('The application does not exist.');
+    this.name = 'ApplicationNotFoundError';
+  }
+}
+
+/** The application is the same software as one the catalog already has (`QĐ-111b`): the same name or a domain they share. `existing` is that entry. */
+export class ApplicationDuplicateError extends Error {
+  constructor(
+    readonly existing: {
+      id: string;
+      name: string;
+      vendorName: string | null;
+      functionalGroup: { id: string; name: string } | null;
+    },
+    readonly by: 'NAME' | 'DOMAIN',
+  ) {
+    super('The catalog already has this software.');
+    this.name = 'ApplicationDuplicateError';
+  }
+}
+
+export class ApplicationNameTakenError extends Error {
+  constructor() {
+    super('The vendor already has an application with this name.');
+    this.name = 'ApplicationNameTakenError';
+  }
+}
+
+export class ApplicationDictionaryLineTakenError extends Error {
+  constructor() {
+    super('This dictionary service line already belongs to another application.');
+    this.name = 'ApplicationDictionaryLineTakenError';
+  }
+}
+
+export class ApplicationUpdateEmptyError extends Error {
+  constructor() {
+    super('The update names no field to change.');
+    this.name = 'ApplicationUpdateEmptyError';
+  }
+}
+
+export class ApplicationAlreadyRetiredError extends Error {
+  constructor() {
+    super('The application is retired already.');
+    this.name = 'ApplicationAlreadyRetiredError';
+  }
+}
+
+export interface RetirementBlockingAssignment {
+  assignmentId: string;
+  employeeId: string;
+  planId: string;
+  subscriptionId: string | null;
+}
+
+export interface RetirementBlockingSubscription {
+  subscriptionId: string;
+  planId: string;
+  endDate: string | null;
+}
+
+/** An assignment or a subscription still holds the application, so it is not retired and nothing is revoked for it. */
+export class ApplicationRetirementBlockedError extends Error {
+  /** `assignments` and `subscriptions` are the first of what holds the application; the totals count them all. */
+  constructor(
+    readonly assignments: RetirementBlockingAssignment[],
+    readonly subscriptions: RetirementBlockingSubscription[],
+    readonly assignmentTotal: number = assignments.length,
+    readonly subscriptionTotal: number = subscriptions.length,
+  ) {
+    super('Assignments or subscriptions still hold the application.');
+    this.name = 'ApplicationRetirementBlockedError';
+  }
+}

@@ -1,9 +1,7 @@
 {
   "schema": 1,
   "source": "Derived from .models/translation/manifest.json (16 files). Hashes equal the Hugging Face published hashes at the pinned revisions (confirmed independently by the coordinator, 2026-10-15).",
-  "allowExtra": [
-    "manifest.json"
-  ],
+  "allowExtra": ["manifest.json"],
   "models": {
     "Xenova/opus-mt-vi-en": {
       "revision": "541dfd72ec07e8f1563795e0224408ad8d729e80",

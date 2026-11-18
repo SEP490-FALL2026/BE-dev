@@ -1,5 +1,5 @@
-import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { createZodDto } from './zod-dto';
 
 export const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)*$/;
 

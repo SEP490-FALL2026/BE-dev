@@ -57,8 +57,17 @@ function onLoad({ direction }) {
   if (env.FAKE_LOAD_HANG) for (;;) busy(1000);
   if (env.FAKE_LOAD_MS) busy(Number(env.FAKE_LOAD_MS));
   loadAttempts++;
-  if (env.FAKE_LOAD_FAIL && (!env.FAKE_LOAD_FAIL_DIR || env.FAKE_LOAD_FAIL_DIR === direction) && (!env.FAKE_LOAD_FAIL_TIMES || loadAttempts <= Number(env.FAKE_LOAD_FAIL_TIMES))) {
-    send({ type: 'loadFailed', direction, permanent: env.FAKE_LOAD_FAIL === 'permanent', ...(env.FAKE_LOAD_CODE ? { code: env.FAKE_LOAD_CODE } : {}) });
+  if (
+    env.FAKE_LOAD_FAIL &&
+    (!env.FAKE_LOAD_FAIL_DIR || env.FAKE_LOAD_FAIL_DIR === direction) &&
+    (!env.FAKE_LOAD_FAIL_TIMES || loadAttempts <= Number(env.FAKE_LOAD_FAIL_TIMES))
+  ) {
+    send({
+      type: 'loadFailed',
+      direction,
+      permanent: env.FAKE_LOAD_FAIL === 'permanent',
+      ...(env.FAKE_LOAD_CODE ? { code: env.FAKE_LOAD_CODE } : {}),
+    });
     return;
   }
   loaded.add(direction);

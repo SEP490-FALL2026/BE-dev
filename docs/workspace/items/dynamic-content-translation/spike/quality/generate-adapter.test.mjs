@@ -25,7 +25,13 @@ const START = { 'vi-en': 900, 'en-vi': 901 };
 const LANG_ID = 7; // deliberately not 3: the adapter must look it up
 
 // One word -> one id (100+), then </s>. Good enough to control token counts.
-function fakeTokenizer({ withVie = true, vieId = LANG_ID, extraLang = [], decodeVie = '>>vie<<', prefixAware = false } = {}) {
+function fakeTokenizer({
+  withVie = true,
+  vieId = LANG_ID,
+  extraLang = [],
+  decodeVie = '>>vie<<',
+  prefixAware = false,
+} = {}) {
   const vocab = new Map([['</s>', EOS]]);
   if (withVie) vocab.set('>>vie<<', vieId);
   for (const [i, t] of extraLang.entries()) vocab.set(t, 2000 + i);
@@ -53,10 +59,18 @@ function writeModelDir({ direction = 'en-vi', config = {}, generation = {} } = {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'adapter-model-'));
   const modelDir = path.join(dir, ...MODEL_IDS[direction].split('/'));
   fs.mkdirSync(modelDir, { recursive: true });
-  fs.writeFileSync(path.join(modelDir, 'config.json'), JSON.stringify({ model_type: 'marian', max_position_embeddings: 512, ...config }));
+  fs.writeFileSync(
+    path.join(modelDir, 'config.json'),
+    JSON.stringify({ model_type: 'marian', max_position_embeddings: 512, ...config }),
+  );
   fs.writeFileSync(
     path.join(modelDir, 'generation_config.json'),
-    JSON.stringify({ eos_token_id: EOS, decoder_start_token_id: START[direction], forced_eos_token_id: EOS, ...generation }),
+    JSON.stringify({
+      eos_token_id: EOS,
+      decoder_start_token_id: START[direction],
+      forced_eos_token_id: EOS,
+      ...generation,
+    }),
   );
   return dir;
 }
@@ -88,7 +102,10 @@ const outTensor = (ids) => ({ data: BigInt64Array.from(ids.map(BigInt)), dims: [
 
 async function loaded(direction, { tokenizer, generate, config, generation } = {}) {
   const modelsDir = writeModelDir({ direction, config, generation });
-  const transformers = fakeTransformers({ tokenizer: tokenizer ?? fakeTokenizer(), generate: generate ?? (() => outTensor([START[direction], 11, EOS])) });
+  const transformers = fakeTransformers({
+    tokenizer: tokenizer ?? fakeTokenizer(),
+    generate: generate ?? (() => outTensor([START[direction], 11, EOS])),
+  });
   const handle = await loadDirection({ transformers, modelsDir, direction, sessionOptions: { intraOpNumThreads: 1 } });
   return { handle, transformers, modelsDir };
 }
@@ -126,7 +143,11 @@ test('loadDirection en-vi looks the language token up in the vocab (no hard-code
   assert.ok(handle.pipe && handle.tokenizer && handle.model);
   assert.equal(transformers.calls.pipeline[0].task, 'translation');
   assert.equal(transformers.calls.pipeline[0].id, 'Xenova/opus-mt-en-vi');
-  assert.deepEqual(transformers.calls.pipeline[0].opts, { dtype: 'q8', device: 'cpu', session_options: { intraOpNumThreads: 1 } });
+  assert.deepEqual(transformers.calls.pipeline[0].opts, {
+    dtype: 'q8',
+    device: 'cpu',
+    session_options: { intraOpNumThreads: 1 },
+  });
 });
 
 test('loadDirection vi-en needs no language token', async () => {
@@ -168,7 +189,11 @@ test('fail closed: a tokenizer that already maps the prefix (probe encoding star
 });
 
 test('fail closed: vi-en vocab exposes a >>xxx<< target token (the model would need a language token)', async () => {
-  await failsClosed('vi-en', { tokenizer: fakeTokenizer({ withVie: false, extraLang: ['>>eng<<'] }) }, 'vi-en needs target token');
+  await failsClosed(
+    'vi-en',
+    { tokenizer: fakeTokenizer({ withVie: false, extraLang: ['>>eng<<'] }) },
+    'vi-en needs target token',
+  );
 });
 
 test('fail closed: encoded input does not end with </s> (source token count would be wrong)', async () => {
@@ -184,7 +209,12 @@ test('fail closed: encoded input does not end with </s> (source token count woul
 
 test('fail closed: unknown direction', async () => {
   await assert.rejects(
-    () => loadDirection({ transformers: fakeTransformers({ tokenizer: fakeTokenizer() }), modelsDir: writeModelDir(), direction: 'fr-en' }),
+    () =>
+      loadDirection({
+        transformers: fakeTransformers({ tokenizer: fakeTokenizer() }),
+        modelsDir: writeModelDir(),
+        direction: 'fr-en',
+      }),
     (e) => e.code === 'ADAPTER_ASSUMPTION_FAILED',
   );
 });
@@ -258,21 +288,30 @@ test('finishReason: a criterion that ends generation early is stopped', async ()
 });
 
 test('finishReason: nothing generated at all is stopped, not eos', async () => {
-  const { handle } = await loaded('vi-en', { tokenizer: fakeTokenizer({ withVie: false }), generate: () => outTensor([START['vi-en']]) });
+  const { handle } = await loaded('vi-en', {
+    tokenizer: fakeTokenizer({ withVie: false }),
+    generate: () => outTensor([START['vi-en']]),
+  });
   const r = await translateSegment(handle, 'a b', { maxNewTokens: 5 });
   assert.equal(r.generatedTokens, 0);
   assert.equal(r.finishReason, 'stopped');
 });
 
 test('finishReason works with a nested-array generate result as well', async () => {
-  const { handle } = await loaded('vi-en', { tokenizer: fakeTokenizer({ withVie: false }), generate: () => [[START['vi-en'], 11, EOS]] });
+  const { handle } = await loaded('vi-en', {
+    tokenizer: fakeTokenizer({ withVie: false }),
+    generate: () => [[START['vi-en'], 11, EOS]],
+  });
   const r = await translateSegment(handle, 'a b', { maxNewTokens: 9 });
   assert.equal(r.finishReason, 'eos');
   assert.equal(r.generatedTokens, 2);
 });
 
 test('inputs longer than the model position limit are refused before generate()', async () => {
-  const { handle, transformers } = await loaded('vi-en', { tokenizer: fakeTokenizer({ withVie: false }), config: { max_position_embeddings: 8 } });
+  const { handle, transformers } = await loaded('vi-en', {
+    tokenizer: fakeTokenizer({ withVie: false }),
+    config: { max_position_embeddings: 8 },
+  });
   await assert.rejects(
     () => translateSegment(handle, 'a b c d e f g h i j', {}),
     (e) => e.code === 'INPUT_TOO_LONG',
@@ -288,21 +327,34 @@ async function realHandle(direction) {
   const { resolveDirs, loadTransformers } = await import('./lib/model.mjs');
   const { depsDir, modelsDir } = resolveDirs();
   const { mod } = await loadTransformers(depsDir);
-  return loadDirection({ transformers: mod, modelsDir, direction, sessionOptions: { intraOpNumThreads: 1, interOpNumThreads: 1 } });
+  return loadDirection({
+    transformers: mod,
+    modelsDir,
+    direction,
+    sessionOptions: { intraOpNumThreads: 1, interOpNumThreads: 1 },
+  });
 }
 
-test('REAL en-vi: normal sentence ends with eos; tiny budget is detected as max_new_tokens; prefix id comes from the vocab', realOpts, async () => {
-  const h = await realHandle('en-vi');
-  assert.equal(typeof h.langTokenId, 'number');
-  const ok = await translateSegment(h, 'The license will expire at the end of this month.', {});
-  assert.equal(ok.finishReason, 'eos');
-  assert.equal(ok.text, 'Giấy phép sẽ hết hạn vào cuối tháng này.');
-  const cut = await translateSegment(h, 'The license will expire at the end of this month.', { maxNewTokens: 3 });
-  assert.equal(cut.generatedTokens, 3);
-  assert.equal(cut.finishReason, 'max_new_tokens', 'forced_eos_token_id must be disabled, otherwise truncation looks like EOS');
-  assert.equal(cut.endedWithEos, false);
-  await h.pipe.dispose?.();
-});
+test(
+  'REAL en-vi: normal sentence ends with eos; tiny budget is detected as max_new_tokens; prefix id comes from the vocab',
+  realOpts,
+  async () => {
+    const h = await realHandle('en-vi');
+    assert.equal(typeof h.langTokenId, 'number');
+    const ok = await translateSegment(h, 'The license will expire at the end of this month.', {});
+    assert.equal(ok.finishReason, 'eos');
+    assert.equal(ok.text, 'Giấy phép sẽ hết hạn vào cuối tháng này.');
+    const cut = await translateSegment(h, 'The license will expire at the end of this month.', { maxNewTokens: 3 });
+    assert.equal(cut.generatedTokens, 3);
+    assert.equal(
+      cut.finishReason,
+      'max_new_tokens',
+      'forced_eos_token_id must be disabled, otherwise truncation looks like EOS',
+    );
+    assert.equal(cut.endedWithEos, false);
+    await h.pipe.dispose?.();
+  },
+);
 
 test('REAL vi-en: normal sentence ends with eos; tiny budget is detected as max_new_tokens', realOpts, async () => {
   const h = await realHandle('vi-en');

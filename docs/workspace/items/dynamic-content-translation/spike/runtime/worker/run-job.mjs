@@ -30,7 +30,15 @@ export async function runJob({
 }) {
   const t0 = now();
   const outputs = [];
-  const agg = { steps: 0, maxStepGapMs: 0, firstStepMs: 0, overrunMs: null, inputTokens: 0, maxNewTokens: 0, generatedTokens: 0 };
+  const agg = {
+    steps: 0,
+    maxStepGapMs: 0,
+    firstStepMs: 0,
+    overrunMs: null,
+    inputTokens: 0,
+    maxNewTokens: 0,
+    generatedTokens: 0,
+  };
   let hit = false;
   let wasCancelled = false;
   let truncatedSegment = null;
@@ -38,7 +46,8 @@ export async function runJob({
   let incomplete = false;
   // Default budget min(512, 2*inputTokens+16) is applied by the adapter (it knows the input token count); a test/bench
   // override is an INTEGER passed through. The reported budget comes from the adapter result.
-  if (maxNewTokensOverride !== null && !(Number.isInteger(maxNewTokensOverride) && maxNewTokensOverride > 0)) throw hasCode('BAD_MAX_NEW_TOKENS');
+  if (maxNewTokensOverride !== null && !(Number.isInteger(maxNewTokensOverride) && maxNewTokensOverride > 0))
+    throw hasCode('BAD_MAX_NEW_TOKENS');
 
   for (let i = 0; i < segments.length; i++) {
     if (isCancelled()) {
@@ -53,7 +62,10 @@ export async function runJob({
     const criterion = createDeadlineCriterion(StoppingCriteria, { computeDeadlineEpochMs, isCancelled, now });
     const tc = now();
     // PLAIN ARRAY, not a StoppingCriteriaList instance (a list instance was not invoked in the measured versions).
-    const r = await translateSegment(handle, segments[i], { ...(maxNewTokensOverride === null ? {} : { maxNewTokens: maxNewTokensOverride }), stoppingCriteria: [criterion] });
+    const r = await translateSegment(handle, segments[i], {
+      ...(maxNewTokensOverride === null ? {} : { maxNewTokens: maxNewTokensOverride }),
+      stoppingCriteria: [criterion],
+    });
     if (criterion.calls === 0) throw hasCode('CRITERION_NOT_INVOKED'); // cannot claim enforcement
     agg.steps += criterion.calls;
     agg.maxStepGapMs = Math.max(agg.maxStepGapMs, criterion.maxStepGapMs);
@@ -87,12 +99,36 @@ export async function runJob({
     break;
   }
 
-  const complete = !hit && !wasCancelled && truncatedSegment === null && !incomplete && outputs.length === segments.length;
-  const reason = complete ? undefined : hit ? 'DEADLINE' : wasCancelled ? 'CANCELLED' : truncatedSegment !== null ? 'TRUNCATED' : 'INCOMPLETE';
-  const stats = { runMs: now() - t0, ...agg, path: 'direct-generate', segments: segments.length, rssMb: rssMb(), ...extraStats };
+  const complete =
+    !hit && !wasCancelled && truncatedSegment === null && !incomplete && outputs.length === segments.length;
+  const reason = complete
+    ? undefined
+    : hit
+      ? 'DEADLINE'
+      : wasCancelled
+        ? 'CANCELLED'
+        : truncatedSegment !== null
+          ? 'TRUNCATED'
+          : 'INCOMPLETE';
+  const stats = {
+    runMs: now() - t0,
+    ...agg,
+    path: 'direct-generate',
+    segments: segments.length,
+    rssMb: rssMb(),
+    ...extraStats,
+  };
   if (truncatedSegment !== null) {
     stats.truncatedSegment = truncatedSegment;
     stats.truncatedFinishReason = truncatedFinishReason;
   }
-  return { jobId, outputs: complete ? outputs : [], complete, deadlineHit: hit, cancelled: wasCancelled, reason, stats };
+  return {
+    jobId,
+    outputs: complete ? outputs : [],
+    complete,
+    deadlineHit: hit,
+    cancelled: wasCancelled,
+    reason,
+    stats,
+  };
 }

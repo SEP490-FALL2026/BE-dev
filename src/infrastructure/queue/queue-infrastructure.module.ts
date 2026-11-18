@@ -1,19 +1,24 @@
 import { BullModule, BullRootModuleOptions } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EnvironmentVariables } from '../config/env-schema';
+import { queueEnvironmentFrom } from './queue.config';
 
-function createQueueConfiguration(config: ConfigService<EnvironmentVariables, true>): BullRootModuleOptions {
-  const username = config.getOrThrow<string>('REDIS_USERNAME');
-  const password = config.getOrThrow<string>('REDIS_PASSWORD');
+/**
+ * The queue's Redis connection, validated when the module is mounted (production requires REDIS_HOST and
+ * REDIS_PASSWORD). Standby infrastructure with no consumer yet (the Owner keeps it for future use): no
+ * process mounts it today, so the API, the worker and the commands neither need Redis nor validate it. The first module that
+ * needs a queue mounts it and gets the strict validation back with it.
+ */
+export function createQueueConfiguration(config: ConfigService): BullRootModuleOptions {
+  const queue = queueEnvironmentFrom(config);
 
   return {
     connection: {
-      host: config.getOrThrow<string>('REDIS_HOST'),
-      port: config.getOrThrow<number>('REDIS_PORT'),
-      username: username || undefined,
-      password: password || undefined,
-      tls: config.getOrThrow<boolean>('REDIS_TLS') ? {} : undefined,
+      host: queue.REDIS_HOST,
+      port: queue.REDIS_PORT,
+      username: queue.REDIS_USERNAME || undefined,
+      password: queue.REDIS_PASSWORD || undefined,
+      tls: queue.REDIS_TLS ? {} : undefined,
     },
     defaultJobOptions: {
       attempts: 3,

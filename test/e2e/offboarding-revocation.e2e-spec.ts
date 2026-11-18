@@ -1,0 +1,97 @@
+import request from 'supertest';
+import { type CaseWire, OffboardingHarness, type RightWire } from '../support/offboarding-harness';
+import type { Department, Person } from '../support/request-harness';
+
+const h = new OffboardingHarness();
+
+/**
+ * E2E smoke of D-3: a person who holds two seats leaves. The Super Admin records the departure and then that they left, the IT
+ * Admin records the lock of the account and opens the revocation of every right, the IT Admin
+ * removes the accounts (no handover is confirmed, QĐ-110g), and the case is closed with the seats free. Real HTTP and PostgreSQL.
+ */
+describe('the departure of a person and the revocation of their seats (e2e, D-3)', () => {
+  let design: Department;
+  let head: Person;
+  let leaver: Person;
+  let subscriptions: string[];
+  let seats: string[];
+  let caseId: string;
+  const LOCK = { note: 'Company account, sessions and device tokens locked' };
+
+  const rightsOf = async () =>
+    h.dataOf<{ items: RightWire[] }>(await h.rightsOf(caseId, '?pageSize=100').expect(200)).items;
+
+  beforeAll(async () => {
+    await h.start();
+    design = await h.departmentWithUnit('P-DES');
+    head = await h.worker(design, 'DES-H1');
+    await h.makeHead(design, head);
+    // Two subscriptions the department owns (a seat sits only on a subscription of its own department, F20).
+    subscriptions = [await h.subscription(20, 'K2', design.id), await h.subscription(20, 'K2', design.id)];
+    // The person holds a seat of each subscription, as the seat baseline recorded them.
+    leaver = await h.worker(design, 'DES-E1');
+    seats = [];
+    for (const subscriptionId of subscriptions) seats.push(await h.seatOf(leaver, { subscriptionId }, 'DES-E1'));
+  }, 180000);
+
+  afterAll(async () => {
+    await h.stop();
+  });
+
+  it('the Super Admin records the departure: the person still works, and no handover is asked of anyone', async () => {
+    const recorded = await h.recordedCase(leaver);
+    caseId = recorded.id;
+
+    expect(recorded).toMatchObject({ state: 'HANDING_OVER', heldRights: 2, lastWorkingDay: h.day(10) });
+    expect(await h.count('handover_duties')).toBe(0);
+    await request(h.server()).get('/api/v1/me').set(h.as(leaver.account)).expect(200);
+  });
+
+  it('the Super Admin records that the person has left: every call of theirs is refused from now on', async () => {
+    const left = h.dataOf<CaseWire>(await h.leaveOnLastDay(caseId).expect(200));
+
+    expect(left).toMatchObject({ state: 'LEFT', left: { leftOn: h.today() }, heldRights: 2 });
+    expect(await h.workState(leaver.employeeId)).toBe('TERMINATED/LEFT');
+    await request(h.server()).get('/api/v1/me').set(h.as(leaver.account)).expect(401);
+    // The hourly pass of the block moment does what the block asks (cancel the open requests, tell IT); the system closes no case before it (audit A-1).
+    await h.blockPass();
+  });
+
+  it('the IT Admin records the lock of the account and opens the revocation of every right', async () => {
+    const opened = h.dataOf<CaseWire>(await h.revokeRights(caseId, { accountLock: LOCK }).expect(200));
+
+    expect(opened.revocations).toEqual({ created: 2, reasonAdded: 0 });
+    expect(opened.checklist).toMatchObject({ accountLock: { state: 'DONE' }, revokeAccess: { state: 'IN_PROGRESS' } });
+    const rights = await rightsOf();
+    expect(rights.map((right) => right.revocation?.source)).toEqual(['DEPARTURE', 'DEPARTURE']);
+  });
+
+  it('the IT Admin removes each account: the seats are given back', async () => {
+    for (const right of await rightsOf()) {
+      const taskId = right.revocation?.taskId ?? '';
+      await h.claim(taskId).expect(200);
+      await h
+        .revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'Account removed from the admin console' })
+        .expect(200);
+    }
+
+    for (const seat of seats) expect((await h.assignmentRow(seat)).valid_until).not.toBeNull();
+    for (const subscriptionId of subscriptions) expect(await h.freeSeats(subscriptionId)).toBe(20);
+    const detail = h.dataOf<CaseWire>(await h.readCase(caseId).expect(200));
+    expect(detail).toMatchObject({ heldRights: 0 });
+    expect(detail.checklist).toMatchObject({
+      dataHandover: { state: 'DONE' },
+      revokeAccess: { state: 'DONE' },
+      seatsReleased: { state: 'DONE', opened: 2, released: 2 },
+    });
+  });
+
+  it('the IT Admin records the lock of the mailbox and the system closes the case (QĐ-110e)', async () => {
+    const closed = h.dataOf<CaseWire>(await h.lockMailbox(caseId, {}).expect(200));
+
+    expect(closed).toMatchObject({ closed: true, blockers: {} });
+    expect(await h.changeKinds(caseId)).toEqual(
+      expect.arrayContaining(['RECORDED', 'MARKED_LEFT', 'REVOCATIONS_OPENED', 'MAILBOX_LOCKED', 'CLOSED_BY_SYSTEM']),
+    );
+  });
+});

@@ -40,7 +40,14 @@ const lockFile = (name, lock) => {
 function loadVia(lockPath, extraEnv = {}) {
   return new Promise((resolve, reject) => {
     const child = fork(MAIN, [], {
-      env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, SPIKE_MODELS_DIR: tmp, SPIKE_MODEL_LOCK: lockPath, SPIKE_DEPS_DIR: path.join(tmp, 'no-deps-here'), ...extraEnv },
+      env: {
+        PATH: process.env.PATH,
+        SystemRoot: process.env.SystemRoot,
+        SPIKE_MODELS_DIR: tmp,
+        SPIKE_MODEL_LOCK: lockPath,
+        SPIKE_DEPS_DIR: path.join(tmp, 'no-deps-here'),
+        ...extraEnv,
+      },
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
       execArgv: [],
     });

@@ -6,101 +6,61 @@
       "input": "The license will expire at the end of this month.",
       "pipelineWithTextPrefix": "Giấy phép sẽ được đánh giá vào cuối tháng này.",
       "manualIdPrefix": "Giấy phép sẽ hết hạn vào cuối tháng này.",
-      "manualIdsFirst3": [
-        3,
-        100,
-        7471
-      ]
+      "manualIdsFirst3": [3, 100, 7471]
     },
     {
       "input": "Please contact support to renew your subscription.",
       "pipelineWithTextPrefix": "Vui lòng liên lạc với bạn để gửi kèm theo lời nhắn.",
       "manualIdPrefix": "Vui lòng liên lạc với bên ngoài để đăng ký lại.",
-      "manualIdsFirst3": [
-        3,
-        876,
-        3225
-      ]
+      "manualIdsFirst3": [3, 876, 3225]
     },
     {
       "input": "New employees must be granted access to the license management system.",
       "pipelineWithTextPrefix": "Các nhân viên mới phải có quyền truy cập vào hệ thống quản lý.",
       "manualIdPrefix": "Nhân viên mới phải được phép truy cập vào hệ thống quản lý bằng lái.",
-      "manualIdsFirst3": [
-        3,
-        993,
-        11605
-      ]
+      "manualIdsFirst3": [3, 993, 11605]
     },
     {
       "input": "The October invoice has been emailed to the customer.",
       "pipelineWithTextPrefix": "Các hóa đơn tháng 10 đã được gửi đến khách hàng.",
       "manualIdPrefix": "Hóa đơn tháng 10 đã được gửi email cho khách hàng.",
-      "manualIdsFirst3": [
-        3,
-        100,
-        8215
-      ]
+      "manualIdsFirst3": [3, 100, 8215]
     },
     {
       "input": "The enterprise plan includes fifty user licenses.",
       "pipelineWithTextPrefix": "Ghi chú xe đạp.",
       "manualIdPrefix": "Kế hoạch kinh doanh bao gồm 50 giấy phép sử dụng.",
-      "manualIdsFirst3": [
-        3,
-        100,
-        20725
-      ]
+      "manualIdsFirst3": [3, 100, 20725]
     },
     {
       "input": "An administrator can revoke the license of an employee who has left.",
       "pipelineWithTextPrefix": "Quản lý có thể hủy bỏ giấy phép nhân viên còn lại.",
       "manualIdPrefix": "Quản lý có thể thu hồi giấy phép của một nhân viên đã bỏ đi.",
-      "manualIdsFirst3": [
-        3,
-        1444,
-        19145
-      ]
+      "manualIdsFirst3": [3, 1444, 19145]
     },
     {
       "input": "Hello, I would like to change my account password.",
       "pipelineWithTextPrefix": "Xin chào, tôi muốn đổi mật khẩu tài khoản.",
       "manualIdPrefix": "Xin chào, tôi muốn đổi mật khẩu tài khoản.",
-      "manualIdsFirst3": [
-        3,
-        1247,
-        4
-      ]
+      "manualIdsFirst3": [3, 1247, 4]
     },
     {
       "input": "The contract renews automatically unless a cancellation notice is given.",
       "pipelineWithTextPrefix": "Cái hợp đồng sẽ được ký trừ khi có thông báo.",
       "manualIdPrefix": "Hợp đồng tự động làm mới lại trừ khi thông báo hủy bỏ được đưa ra.",
-      "manualIdsFirst3": [
-        3,
-        100,
-        7562
-      ]
+      "manualIdsFirst3": [3, 100, 7562]
     },
     {
       "input": "The software usage report is updated every week.",
       "pipelineWithTextPrefix": "Tập tin cập nhật các thông tin về máy chủ được cập nhật mỗi tuần.",
       "manualIdPrefix": "Báo cáo sử dụng phần mềm được cập nhật mỗi tuần.",
-      "manualIdsFirst3": [
-        3,
-        100,
-        7378
-      ]
+      "manualIdsFirst3": [3, 100, 7378]
     },
     {
       "input": "This device has reached the maximum number of activations.",
       "pipelineWithTextPrefix": "Thiết bị này đã đạt đến số tối đa của các số lượng các số người dùng.",
       "manualIdPrefix": "Thiết bị này đã đạt đến số hiệu kích hoạt tối đa.",
-      "manualIdsFirst3": [
-        3,
-        251,
-        5716
-      ]
+      "manualIdsFirst3": [3, 251, 5716]
     }
   ]
 }

@@ -22,7 +22,10 @@ test('cold load slower than computeMaxMs (but inside loadTimeoutMs) does not con
   const sent = first(h, 'runSent');
   assert.ok(loaded.t - disp.t >= 650, 'the load really took longer than computeMaxMs');
   assert.ok(sent.t >= loaded.t, 'run is sent only after the model is READY');
-  assert.ok(sent.computeDeadlineEpochMs - sent.wall >= 245 && sent.computeDeadlineEpochMs - sent.wall <= 255, 'deadline = run-sent + computeMaxMs: ' + (sent.computeDeadlineEpochMs - sent.wall));
+  assert.ok(
+    sent.computeDeadlineEpochMs - sent.wall >= 245 && sent.computeDeadlineEpochMs - sent.wall <= 255,
+    'deadline = run-sent + computeMaxMs: ' + (sent.computeDeadlineEpochMs - sent.wall),
+  );
   assert.equal(h.ofType('killSent').length, 0);
   await h.sup.shutdown();
 });
@@ -76,7 +79,10 @@ test('warm path unchanged: run is sent at dispatch, deadline and kill follow com
   await warm(h);
   h.events.length = 0;
   h.sup.computeMaxMs = 150;
-  const o = await h.sup.enqueue({ direction: 'vi-en', segments: ['n=100000 step=10 ignoreCancel ignoreDeadline stuck'] }).settled;
+  const o = await h.sup.enqueue({
+    direction: 'vi-en',
+    segments: ['n=100000 step=10 ignoreCancel ignoreDeadline stuck'],
+  }).settled;
   assert.equal(o.reason, 'KILLED');
   const disp = first(h, 'dispatch');
   const sent = first(h, 'runSent');
@@ -90,8 +96,16 @@ test('warm path unchanged: run is sent at dispatch, deadline and kill follow com
 
 function makeCoord(supOpts, env, coordOpts = {}) {
   const h = makeSup(supOpts, env);
-  const coord = new Coordinator({ supervisor: h.sup, cache: new TranslationCache(), identity, timeoutMs: 3000, queueMax: 4, ...coordOpts });
-  const tr = (text, o = {}) => coord.translate({ organizationId: 'org1', scope: 's', source: 'vi', target: 'en', text, ...o });
+  const coord = new Coordinator({
+    supervisor: h.sup,
+    cache: new TranslationCache(),
+    identity,
+    timeoutMs: 3000,
+    queueMax: 4,
+    ...coordOpts,
+  });
+  const tr = (text, o = {}) =>
+    coord.translate({ organizationId: 'org1', scope: 's', source: 'vi', target: 'en', text, ...o });
   return { ...h, coord, tr };
 }
 
@@ -122,7 +136,9 @@ test('coordinator: the waiter response deadline fires during a long load; job ca
 });
 
 test('coordinator: queue timeout during a cold load removes only the queued waiter; the loading job completes', async () => {
-  const c = makeCoord({ computeMaxMs: 3000, loadTimeoutMs: 5000 }, () => ({ FAKE_LOAD_MS: '600' }), { timeoutMs: 4000 });
+  const c = makeCoord({ computeMaxMs: 3000, loadTimeoutMs: 5000 }, () => ({ FAKE_LOAD_MS: '600' }), {
+    timeoutMs: 4000,
+  });
   const head = c.tr('n=2 step=10 head');
   await sleep(30);
   const behind = await c.tr('n=1 step=1 behind', { deadlineAt: Date.now() + 150 });

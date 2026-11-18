@@ -22,7 +22,7 @@ describe('TokenService.verifyAccessToken', () => {
   });
 
   // A correctly signed token whose ids are not UUIDs must be refused as a bad token (401), not
-  // passed on to the database, where the malformed id would surface as a 503 and an error log (R-04).
+  // passed on to the database, where the malformed id would surface as a 503 and an error log.
   it.each([
     ['sid is not a UUID', { sid: 'not-a-uuid' }, SUB],
     ['sid is a number', { sid: 42 }, SUB],
@@ -39,21 +39,5 @@ describe('TokenService.verifyAccessToken', () => {
     const other = new JwtService({ secret: 'another-secret-another-secret-another-secret' });
     const forged = await other.signAsync({ sid: SID }, { subject: SUB });
     await expect(tokens.verifyAccessToken(forged)).rejects.toBeInstanceOf(InvalidAccessTokenError);
-  });
-});
-
-describe('TokenService.newInvitationToken', () => {
-  const tokens = new TokenService(
-    new JwtService({ secret: SECRET }),
-    new ConfigService({ AUTH_INVITATION_TTL_SECONDS: 3600 }) as never,
-  );
-
-  it('issues a well-formed token whose hash matches and whose expiry is the configured time to live after now', () => {
-    const now = new Date('2026-10-15T08:00:00.000Z');
-    const issued = tokens.newInvitationToken(now);
-
-    expect(tokens.isWellFormedActionToken(issued.token)).toBe(true);
-    expect(tokens.hashActionToken(issued.token)).toBe(issued.hash);
-    expect(issued.expiresAt).toEqual(new Date('2026-10-15T09:00:00.000Z'));
   });
 });

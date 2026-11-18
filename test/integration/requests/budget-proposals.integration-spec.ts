@@ -1,0 +1,369 @@
+import request from 'supertest';
+import { BudgetHarness, Pageable, ProposalWire } from '../../support/budget-harness';
+import { uploadedProposalFile } from '../../support/budget-files';
+import type { Person } from '../../support/request-harness';
+
+const h = new BudgetHarness();
+
+describe('budgets over HTTP: the proposals of the heads (integration, real PostgreSQL)', () => {
+  let des: Awaited<ReturnType<typeof h.departmentWithHead>>;
+  let eng: Awaited<ReturnType<typeof h.departmentWithHead>>;
+  let headless: Person;
+
+  beforeAll(async () => {
+    await h.start();
+    des = await h.departmentWithHead('P-DES');
+    eng = await h.departmentWithHead('P-ENG');
+    const hr = await h.departmentWithUnit('P-HR');
+    headless = await h.staff(hr, 'HR-E1');
+  }, 240000);
+
+  afterAll(async () => {
+    await h.stop();
+  });
+
+  const propose = (head: Person, costCenterId: string, over: { amount?: number; year?: number } = {}) =>
+    h.submitProposal(h.proposalBody(costCenterId, over.amount, over.year), head.account);
+  const stateOf = async (id: string) =>
+    (await h.ctx.sql.query<{ state: string }>(`SELECT state FROM budget_proposals WHERE id = $1`, [id])).rows[0].state;
+  /** A fresh Cost Center each time: a proposal waits for Finance until it is withdrawn or reviewed. */
+  const fresh = async (code: string) => h.departmentWithHead(code);
+
+  describe('sending a proposal (US-06-10 AC-1, AC-2, AC-3)', () => {
+    it('is sent for the Cost Center of the department as BM-10: its files, the amount asked for and a note, and Finance sees it waiting (QĐ-111ab)', async () => {
+      const { head, department } = await fresh('P-A1');
+      const file = await uploadedProposalFile(h.ctx.sql, head.employeeId);
+
+      const response = await h
+        .submitProposal(
+          { ...h.proposalBody(department.unitId), note: 'Two more designers', attachmentIds: [file] },
+          head.account,
+        )
+        .expect(201);
+
+      const proposal = h.dataOf<{
+        proposal: ProposalWire & { requestedAmount: { amount: string }; note: string | null };
+      }>(response).proposal;
+      expect(proposal).toMatchObject({
+        state: 'SUBMITTED',
+        year: h.next,
+        total: { amount: '70000000', currency: h.reporting },
+        requestedAmount: { amount: '70000000', currency: h.reporting },
+        note: 'Two more designers',
+        costCenter: { id: department.unitId },
+        submittedBy: { employeeId: head.employeeId },
+        previousProposalId: null,
+      });
+      const waiting = h.dataOf<Pageable<ProposalWire>>(
+        await h.proposalList(h.finance, { state: 'SUBMITTED' }).expect(200),
+      );
+      expect(waiting.items.map((item) => item.id)).toContain(proposal.id);
+      const events = await h.auditEvents('BUDGET_PROPOSAL', proposal.id);
+      expect(events.map((event) => event.action)).toEqual(['BUDGET_PROPOSAL.SUBMITTED']);
+      const { rows } = await h.ctx.sql.query<{ status: string; proposal_id: string }>(
+        `SELECT status::text, proposal_id FROM budget_attachments WHERE id = $1`,
+        [file],
+      );
+      expect(rows[0]).toEqual({ status: 'ATTACHED', proposal_id: proposal.id });
+      expect(await h.budgetRows(`budget_proposal_lines WHERE proposal_id = '${proposal.id}'`)).toBe(0);
+    });
+
+    it('wants one file at least and ten at most, and writes nothing without one (QĐ-111ab)', async () => {
+      const { head, department } = await fresh('P-A2');
+      const before = await h.budgetRows('budget_proposals');
+      const files = await Promise.all(
+        Array.from({ length: 11 }, () => uploadedProposalFile(h.ctx.sql, head.employeeId)),
+      );
+      // The route itself, not the harness that adds a file when the body names none.
+      const send = (attachmentIds: string[]) =>
+        request(h.server())
+          .post('/api/v1/budget-proposals')
+          .set(h.as(head.account))
+          .send({ ...h.proposalBody(department.unitId), attachmentIds });
+      const withoutAny = await request(h.server())
+        .post('/api/v1/budget-proposals')
+        .set(h.as(head.account))
+        .send(h.proposalBody(department.unitId));
+
+      for (const refused of [withoutAny, await send([]), await send(files)]) {
+        expect([refused.status, h.codeOf(refused)]).toEqual([422, 'VALIDATION_ERROR']);
+      }
+      expect(await h.budgetRows('budget_proposals')).toBe(before);
+      await send(files.slice(0, 10)).expect(201);
+    });
+
+    it.each([
+      ['lines, which BM-10 no longer has', { lines: [{ description: 'Figma', amount: { amount: '1000' } }] }],
+      ['no amount', { requestedAmount: undefined }],
+      ['an amount in another currency', { requestedAmount: { amount: '5', currency: 'USD' } }],
+      ['a negative amount', { requestedAmount: { amount: '-5' } }],
+      ['a note of 1001 characters', { note: 'n'.repeat(1001) }],
+      ['a blank note', { note: '   ' }],
+    ])('refuses %s', async (_name, over) => {
+      const { head, department } = await fresh(`P-B${Math.random().toString(36).slice(2, 6)}`);
+
+      const response = await h.submitProposal({ ...h.proposalBody(department.unitId), ...over }, head.account);
+
+      expect(response.status).toBe(422);
+    });
+
+    it('is only for the Cost Center of the head of the department, and only by a head (AC-3)', async () => {
+      const { department } = await fresh('P-A3');
+      const before = await h.budgetRows('budget_proposals');
+
+      const employee = await propose(des.member, des.department.unitId).expect(403);
+      const unheaded = await propose(headless, des.department.unitId).expect(403);
+      const finance = await h.submitProposal(h.proposalBody(department.unitId), h.finance).expect(403);
+      const it = await h.submitProposal(h.proposalBody(department.unitId), h.it1).expect(403);
+
+      for (const refused of [employee, unheaded, finance, it])
+        expect(h.codeOf(refused)).toBe('AUTHORIZATION.FORBIDDEN');
+      expect(await h.budgetRows('budget_proposals')).toBe(before);
+    });
+
+    it('is the only one that waits for a Cost Center and a year', async () => {
+      const { head, department } = await fresh('P-A4');
+      const first = h.dataOf<{ proposal: ProposalWire }>(await propose(head, department.unitId).expect(201)).proposal;
+
+      const second = await propose(head, department.unitId).expect(409);
+      const otherYear = await propose(head, department.unitId, { year: h.next + 1 }).expect(201);
+
+      expect(h.codeOf(second)).toBe('BUDGET.PROPOSAL_ALREADY_OPEN');
+      expect(h.detailsOf(second)).toEqual({ proposalId: first.id });
+      expect(h.dataOf<{ proposal: ProposalWire }>(otherYear).proposal.year).toBe(h.next + 1);
+    });
+  });
+
+  describe('which years take a proposal (AC-9)', () => {
+    it('takes the year that is running and a year to come, and refuses a year that has ended', async () => {
+      const { head, department } = await fresh('P-Y1');
+
+      const running = await propose(head, department.unitId, { year: h.year }).expect(201);
+      const ended = await propose(head, department.unitId, { year: h.year - 1 }).expect(422);
+
+      expect(h.dataOf<{ proposal: ProposalWire }>(running).proposal.year).toBe(h.year);
+      expect(h.codeOf(ended)).toBe('BUDGET.YEAR_ENDED');
+      expect(h.detailsOf(ended)).toEqual({ year: h.year - 1 });
+    });
+  });
+
+  describe('taking a proposal back (AC-4)', () => {
+    it('is allowed while Finance has not sent a version made from it, and Finance then has nothing to do', async () => {
+      const { head, department } = await fresh('P-W1');
+      const proposal = await h.budgetProposed(head, department.unitId);
+
+      const response = await h.withdraw(proposal.id, head.account).expect(200);
+
+      expect(h.dataOf<{ proposal: ProposalWire }>(response).proposal).toMatchObject({ state: 'WITHDRAWN' });
+      const waiting = h.dataOf<Pageable<ProposalWire>>(
+        await h.proposalList(h.finance, { state: 'SUBMITTED' }).expect(200),
+      );
+      expect(waiting.items.map((item) => item.id)).not.toContain(proposal.id);
+      await h.budgetProposed(head, department.unitId);
+    });
+
+    it('is refused once Finance has sent a version made from it', async () => {
+      const { head, department } = await fresh('P-W2');
+      const proposal = await h.budgetProposed(head, department.unitId);
+      const version = await h.built(proposal.id);
+      await h.sendVersion(version.id).expect(200);
+
+      const response = await h.withdraw(proposal.id, head.account).expect(409);
+
+      expect(h.codeOf(response)).toBe('BUDGET.PROPOSAL_CANNOT_WITHDRAW');
+      expect(await stateOf(proposal.id)).toBe('REVIEWED');
+    });
+
+    it('is for the head of that Cost Center only: anybody else finds nothing', async () => {
+      const { head, department } = await fresh('P-W3');
+      const proposal = await h.budgetProposed(head, department.unitId);
+
+      await h.withdraw(proposal.id, eng.head.account).expect(404);
+      await h.withdraw(proposal.id, h.finance).expect(403);
+      expect(await stateOf(proposal.id)).toBe('SUBMITTED');
+    });
+  });
+
+  describe('giving a proposal back and sending it again (AC-5, AC-6; US-06-09 AC-15)', () => {
+    it('is given back with a reason, corrected and sent again as a new proposal that keeps the one before', async () => {
+      const { head, department } = await fresh('P-R1');
+      const first = await h.budgetProposed(head, department.unitId);
+
+      const missing = await h.giveBack(first.id, {}, h.finance).expect(422);
+      const blank = await h.giveBack(first.id, { reason: '  ' }, h.finance).expect(422);
+      expect(await stateOf(first.id)).toBe('SUBMITTED');
+      const given = await h.giveBack(first.id, { reason: 'No ground for the Miro line' }, h.finance).expect(200);
+      const again = await h
+        .resubmit(first.id, h.bm10(68_000_000, { note: 'Miro with its quote' }), head.account)
+        .expect(201);
+
+      expect(h.codeOf(missing)).toBe('VALIDATION_ERROR');
+      expect(h.codeOf(blank)).toBe('VALIDATION_ERROR');
+      expect(h.dataOf<{ proposal: ProposalWire }>(given).proposal).toMatchObject({
+        state: 'RETURNED',
+        returned: { reason: 'No ground for the Miro line' },
+      });
+      const second = h.dataOf<{ proposal: ProposalWire }>(again).proposal;
+      expect(second).toMatchObject({
+        state: 'SUBMITTED',
+        previousProposalId: first.id,
+        total: { amount: '68000000' },
+        note: 'Miro with its quote',
+      });
+      expect(await stateOf(first.id)).toBe('RETURNED');
+      const history = h.dataOf<Pageable<ProposalWire>>(
+        await h.proposalList(head.account, { year: h.next }).expect(200),
+      );
+      expect(history.items.map((item) => item.id)).toEqual(expect.arrayContaining([first.id, second.id]));
+      const kept = h.dataOf<{ proposal: ProposalWire }>(
+        await h.proposalOf(first.id, head.account).expect(200),
+      ).proposal;
+      expect(kept.total.amount).toBe('70000000');
+    });
+
+    it('is not edited in place: there is no route to change a proposal, and it is sent again only after it was given back', async () => {
+      const { head, department } = await fresh('P-R2');
+      const proposal = await h.budgetProposed(head, department.unitId);
+
+      for (const method of ['put', 'patch'] as const) {
+        const target = `/api/v1/budget-proposals/${proposal.id}`;
+        const server = h.server();
+        await (
+          await import('supertest')
+        )
+          .default(server)
+          [method](target)
+          .set(h.as(head.account))
+          .send(h.bm10(50_000_000))
+          .expect(404);
+      }
+      const early = await h.resubmit(proposal.id, h.bm10(50_000_000), head.account).expect(409);
+
+      expect(h.codeOf(early)).toBe('BUDGET.PROPOSAL_CANNOT_RESUBMIT');
+    });
+
+    it('is given back only while it waits for Finance, and only by Finance', async () => {
+      const { head, department } = await fresh('P-R3');
+      const proposal = await h.budgetProposed(head, department.unitId);
+
+      await h.giveBack(proposal.id, { reason: 'No' }, head.account).expect(403);
+      await h.withdraw(proposal.id, head.account).expect(200);
+      const late = await h.giveBack(proposal.id, { reason: 'No' }, h.finance).expect(409);
+
+      expect(h.codeOf(late)).toBe('BUDGET.PROPOSAL_CANNOT_RETURN');
+    });
+
+    it('is resubmitted by the head of that Cost Center only, and not into a year that has ended', async () => {
+      const { head, department } = await fresh('P-R4');
+      const proposal = await h.budgetProposed(head, department.unitId);
+      await h.giveBack(proposal.id, { reason: 'Redo' }, h.finance).expect(200);
+
+      await h.resubmit(proposal.id, h.bm10(50_000_000), eng.head.account).expect(404);
+      await h.resubmit(proposal.id, h.bm10(50_000_000), des.member.account).expect(403);
+      await h.resubmit(proposal.id, h.bm10(50_000_000), head.account).expect(201);
+    });
+  });
+
+  describe('what a head reads of the budget (AC-7; US-06-09 AC-5)', () => {
+    it('is the proposal and the total of the current version, with its own figures', async () => {
+      const { head, department } = await fresh('P-V1');
+      const proposal = await h.budgetProposed(head, department.unitId);
+      const version = await h.current(proposal.id);
+
+      const mine = h.dataOf<{ budget: Record<string, unknown> }>(await h.mine(head.account, h.next).expect(200)).budget;
+
+      expect(mine).toMatchObject({
+        status: 'ACTIVE',
+        year: h.next,
+        total: { amount: '80000000' },
+        version: { id: version.id, number: 1 },
+        proposal: { id: proposal.id, total: { amount: '70000000' } },
+      });
+      // MF4-C (BR-MF4-05): the screen of the head also reads the figures of its own budget and the cycle (no ceiling of a department, QĐ-111aa),
+      // and the budget in force with the adjustments (`effectiveBudget`, AD-1.3).
+      expect(Object.keys(mine).sort()).toEqual([
+        'base',
+        'committed',
+        'costCenter',
+        'cycle',
+        'effectiveBudget',
+        'latestRefusal',
+        'overBudget',
+        'pendingSpend',
+        'proposal',
+        'remainingBase',
+        'remainingWithReserve',
+        'reserve',
+        'spent',
+        'status',
+        'total',
+        'version',
+        'year',
+      ]);
+    });
+
+    it('says there is no active budget, and nothing carries over from a year before (US-06-09 AC-16)', async () => {
+      const { head, department } = await fresh('P-V2');
+      const proposal = await h.budgetProposed(head, department.unitId, undefined, h.year);
+      await h.current(proposal.id);
+
+      const next = h.dataOf<{ budget: Record<string, unknown> }>(await h.mine(head.account, h.next).expect(200)).budget;
+
+      expect(next).toMatchObject({ status: 'NO_ACTIVE_BUDGET', total: null, version: null });
+    });
+
+    it('is the department of the head only: another head, a member and a person with no department read nothing of it', async () => {
+      const { head, department } = await fresh('P-V4');
+      const proposal = await h.budgetProposed(head, department.unitId);
+      await h.current(proposal.id);
+
+      const own = h.dataOf<{ budget: { costCenter: { id: string } } }>(
+        await h.mine(head.account, h.next).expect(200),
+      ).budget;
+      const other = h.dataOf<{ budget: { costCenter: { id: string }; status: string } }>(
+        await h.mine(eng.head.account, h.next).expect(200),
+      ).budget;
+      const member = await h.mine(des.member.account, h.next).expect(403);
+      const proposals = h.dataOf<Pageable<ProposalWire>>(
+        await h.proposalList(eng.head.account, { year: h.next }).expect(200),
+      );
+
+      expect(own.costCenter.id).toBe(department.unitId);
+      expect(other.costCenter.id).toBe(eng.department.unitId);
+      expect(other.status).not.toBe('ACTIVE');
+      expect(h.codeOf(member)).toBe('AUTHORIZATION.FORBIDDEN');
+      expect(proposals.items.every((item) => item.costCenter.id === eng.department.unitId)).toBe(true);
+      await h.proposalOf(proposal.id, eng.head.account).expect(404);
+    });
+
+    it('does not include the table of the company: it is Finance only', async () => {
+      const { head, department } = await fresh('P-V5');
+      const proposal = await h.budgetProposed(head, department.unitId);
+      const version = await h.current(proposal.id);
+
+      await h.table(head.account).expect(403);
+      await h.table(h.it1).expect(403);
+      const rows = h.dataOf<Pageable<{ versionId: string; total: { amount: string } }>>(
+        await h.table(h.finance, { year: h.next }).expect(200),
+      );
+
+      expect(rows.items.find((row) => row.versionId === version.id)?.total.amount).toBe('80000000');
+    });
+  });
+
+  describe('the budget is a plan, not a quota (AC-8)', () => {
+    it('does not stop the head confirming the need of a request more than the budget foresaw', async () => {
+      const { head, department, member } = await fresh('P-Q1');
+      const proposal = await h.budgetProposed(head, department.unitId, 4_000_000);
+      await h.current(proposal.id);
+      const miro = await h.planOf(await h.subscription(10));
+
+      const first = await h.sent(member, miro);
+      const second = await h.sent(await h.staff(department, 'P-Q1-E2'), miro);
+      await h.decide(first.id, { decision: 'APPROVE' }, head.account).expect(200);
+      const decided = await h.decide(second.id, { decision: 'APPROVE' }, head.account).expect(200);
+
+      expect(h.dataOf<{ request: { state: string } }>(decided).request.state).toBe('AWAITING_SPEND_SUBMISSION');
+    });
+  });
+});

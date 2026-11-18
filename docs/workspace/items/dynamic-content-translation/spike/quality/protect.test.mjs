@@ -9,7 +9,8 @@ const roundTrip = (text, opts = {}) => {
 };
 
 test('emails, URLs and request codes become placeholders and restore verbatim', () => {
-  const src = 'Gửi cho an.nguyen@acme-demo.example hoặc xem https://portal.acme-demo.example/req/42 theo REQ-2026-0042.';
+  const src =
+    'Gửi cho an.nguyen@acme-demo.example hoặc xem https://portal.acme-demo.example/req/42 theo REQ-2026-0042.';
   const p = P(src);
   assert.equal(p.text, 'Gửi cho <x0> hoặc xem <x1> theo <x2>.');
   assert.deepEqual(
@@ -35,7 +36,10 @@ test('numeric dates and amounts are protected (decimal separators intact)', () =
 
 test('amount with magnitude word and currency is one span', () => {
   assert.equal(P('Ngân sách 5 triệu đồng.', { glossary: [] }).text, 'Ngân sách <x0>.');
-  assert.equal(P('The fee is $1,200.50 per seat.', { direction: 'en-vi', glossary: [] }).text, 'The fee is <x0> per seat.');
+  assert.equal(
+    P('The fee is $1,200.50 per seat.', { direction: 'en-vi', glossary: [] }).text,
+    'The fee is <x0> per seat.',
+  );
   assert.equal(P('Pay 3,000 USD now.', { direction: 'en-vi', glossary: [] }).text, 'Pay <x0> now.');
 });
 
@@ -81,7 +85,10 @@ test('collision: restore is single pass, a restored value is never re-expanded',
 test('glossary vi->en: term replaced by placeholder, restored with English term (capitalisation follows source)', () => {
   const p = P('Trưởng phòng đã duyệt, hạn báo hủy sắp đến.');
   assert.equal(p.text, '<x0> đã duyệt, <x1> sắp đến.');
-  assert.equal(restoreSegment('<x0> approved, <x1> is near.', p.spans, { direction: 'vi-en' }), 'Department head approved, cancellation deadline is near.');
+  assert.equal(
+    restoreSegment('<x0> approved, <x1> is near.', p.spans, { direction: 'vi-en' }),
+    'Department head approved, cancellation deadline is near.',
+  );
 });
 
 test('glossary: unaccented Vietnamese multi-word terms are recognised', () => {
@@ -108,31 +115,60 @@ test('glossary en->vi: inflected English forms map to one Vietnamese term; keep 
 test('english target chooses pp / noun / base form from the preceding word', () => {
   const p = P('Quyền sẽ bị thu hồi. Cần thu hồi ngay. Việc gia hạn.');
   const spans = p.spans;
-  assert.equal(restoreSegment('Rights will be <x0>.', [spans[0]].map((s, i) => ({ ...s, id: 0 })), { direction: 'vi-en' }), 'Rights will be revoked.');
-  assert.equal(restoreSegment('Need to <x0> now.', [{ ...spans[0], id: 0 }], { direction: 'vi-en' }), 'Need to revoke now.');
+  assert.equal(
+    restoreSegment(
+      'Rights will be <x0>.',
+      [spans[0]].map((s, i) => ({ ...s, id: 0 })),
+      { direction: 'vi-en' },
+    ),
+    'Rights will be revoked.',
+  );
+  assert.equal(
+    restoreSegment('Need to <x0> now.', [{ ...spans[0], id: 0 }], { direction: 'vi-en' }),
+    'Need to revoke now.',
+  );
   assert.equal(restoreSegment('The <x0>.', [{ ...spans[0], id: 0 }], { direction: 'vi-en' }), 'The revocation.');
 });
 
 test('textual dates are protected and restored VERBATIM (no date localisation: out of scope)', () => {
   const vi = P('Gia hạn vào ngày 15 tháng 11 năm 2026, hoặc 3 tháng 2.', { glossary: [] });
   assert.equal(vi.text, 'Gia hạn vào <x0>, hoặc <x1>.');
-  assert.deepEqual(vi.spans.map((s) => s.original), ['ngày 15 tháng 11 năm 2026', '3 tháng 2']);
-  assert.equal(restoreSegment(vi.text, vi.spans, { direction: 'vi-en' }), 'Gia hạn vào ngày 15 tháng 11 năm 2026, hoặc 3 tháng 2.');
-  assert.equal(restoreSegment('Renew on <x0> or <x1>.', vi.spans, { direction: 'vi-en' }), 'Renew on ngày 15 tháng 11 năm 2026 or 3 tháng 2.');
+  assert.deepEqual(
+    vi.spans.map((s) => s.original),
+    ['ngày 15 tháng 11 năm 2026', '3 tháng 2'],
+  );
+  assert.equal(
+    restoreSegment(vi.text, vi.spans, { direction: 'vi-en' }),
+    'Gia hạn vào ngày 15 tháng 11 năm 2026, hoặc 3 tháng 2.',
+  );
+  assert.equal(
+    restoreSegment('Renew on <x0> or <x1>.', vi.spans, { direction: 'vi-en' }),
+    'Renew on ngày 15 tháng 11 năm 2026 or 3 tháng 2.',
+  );
 
   const en = protectSegment('Renew by November 15, 2026 or 3 February.', { direction: 'en-vi', glossary: [] });
   assert.equal(en.text, 'Renew by <x0> or <x1>.');
-  assert.deepEqual(en.spans.map((s) => s.original), ['November 15, 2026', '3 February']);
-  assert.equal(restoreSegment('Gia hạn trước <x0> hoặc <x1>.', en.spans, { direction: 'en-vi' }), 'Gia hạn trước November 15, 2026 hoặc 3 February.');
+  assert.deepEqual(
+    en.spans.map((s) => s.original),
+    ['November 15, 2026', '3 February'],
+  );
+  assert.equal(
+    restoreSegment('Gia hạn trước <x0> hoặc <x1>.', en.spans, { direction: 'en-vi' }),
+    'Gia hạn trước November 15, 2026 hoặc 3 February.',
+  );
   for (const s of [...vi.spans, ...en.spans]) assert.equal(s.value, undefined, 'no localised value is stored');
 });
 
 test('the word "May" as a modal verb is not read as a month', () => {
-  assert.equal(protectSegment('May I renew it? You may.', { direction: 'en-vi', glossary: [] }).text, 'May I renew it? You may.');
+  assert.equal(
+    protectSegment('May I renew it? You may.', { direction: 'en-vi', glossary: [] }).text,
+    'May I renew it? You may.',
+  );
 });
 
 test('round trip without model is the identity (source restored verbatim) for plain protected spans', () => {
-  const src = 'Yêu cầu REQ-2026-0042 của Trần Thị Bích, email bich.tran@acme-demo.example, 2.000.000 đồng ngày 20/12/2026.';
+  const src =
+    'Yêu cầu REQ-2026-0042 của Trần Thị Bích, email bich.tran@acme-demo.example, 2.000.000 đồng ngày 20/12/2026.';
   assert.equal(roundTrip(src, { knownTerms: ['Trần Thị Bích'], glossary: [] }), src);
 });
 
@@ -166,8 +202,14 @@ test('isPlaceholderOnly: nothing translatable left', () => {
 });
 
 test('glossary guard: bare "phòng" is a department only before a capital/digit or at a clause end (not "phòng họp", "phòng thí nghiệm")', () => {
-  assert.equal(P('Phòng họp ở tầng 3 và phòng thí nghiệm mới.', { glossary: undefined, protectNumbers: false }).text, 'Phòng họp ở tầng 3 và phòng thí nghiệm mới.');
-  assert.equal(P('Chuyển sang phòng Kỹ thuật, phòng IT và phòng 12.', { protectNumbers: false }).text, 'Chuyển sang <x0> Kỹ thuật, <x1> IT và <x2> 12.');
+  assert.equal(
+    P('Phòng họp ở tầng 3 và phòng thí nghiệm mới.', { glossary: undefined, protectNumbers: false }).text,
+    'Phòng họp ở tầng 3 và phòng thí nghiệm mới.',
+  );
+  assert.equal(
+    P('Chuyển sang phòng Kỹ thuật, phòng IT và phòng 12.', { protectNumbers: false }).text,
+    'Chuyển sang <x0> Kỹ thuật, <x1> IT và <x2> 12.',
+  );
   assert.equal(P('Mọi phòng ban đều phải gia hạn.', { protectNumbers: false }).text, 'Mọi <x0> đều phải <x1>.');
   assert.equal(P('Họ làm ở phòng.', { protectNumbers: false }).text, 'Họ làm ở <x0>.');
 });

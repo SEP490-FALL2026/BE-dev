@@ -19,7 +19,11 @@ function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'spike-lock-'));
   tmpRoots.push(root);
   const files = {
-    'Xenova/m-a': { 'config.json': '{"a":1}', 'onnx/enc.onnx': Buffer.alloc(3 * 1024 * 1024 + 17, 7), 'README.md': 'readme a' },
+    'Xenova/m-a': {
+      'config.json': '{"a":1}',
+      'onnx/enc.onnx': Buffer.alloc(3 * 1024 * 1024 + 17, 7),
+      'README.md': 'readme a',
+    },
     'Xenova/m-b': { 'config.json': '{"b":2}', 'onnx/dec.onnx': Buffer.alloc(1000, 9) },
   };
   const lock = { schema: 1, models: {}, allowExtra: ['manifest.json'] };
@@ -196,7 +200,11 @@ test('malformed lock entries: bad sha256, bad bytes, bad revision, no files, wro
   };
   assert.equal(validateLockShape(f.lock).ok, true);
   assert.equal(mutate((l) => (l.models['Xenova/m-a'].files['config.json'].sha256 = 'ABC')).ok, false);
-  assert.equal(mutate((l) => (l.models['Xenova/m-a'].files['config.json'].sha256 = 'A'.repeat(64))).ok, false, 'upper case hex rejected');
+  assert.equal(
+    mutate((l) => (l.models['Xenova/m-a'].files['config.json'].sha256 = 'A'.repeat(64))).ok,
+    false,
+    'upper case hex rejected',
+  );
   assert.equal(mutate((l) => (l.models['Xenova/m-a'].files['config.json'].bytes = -1)).ok, false);
   assert.equal(mutate((l) => (l.models['Xenova/m-a'].files['config.json'].bytes = 1.5)).ok, false);
   assert.equal(mutate((l) => (l.models['Xenova/m-a'].revision = 'main')).ok, false);

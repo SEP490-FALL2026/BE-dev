@@ -1,0 +1,124 @@
+[
+  {
+    "file": "bao-gia-figma-2027.pdf",
+    "contentType": "application/pdf",
+    "sizeBytes": 626,
+    "sha256": "e5986c9ddbfdc2933625c0559b95e885a2ede2152f446d21d458ac35fc3bbd22",
+    "declare": {
+      "status": 201
+    },
+    "complete": {
+      "status": 200
+    }
+  },
+  {
+    "file": "bang-tinh-ngan-sach-2027.xlsx",
+    "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "sizeBytes": 2615,
+    "sha256": "729a16d510162b42ea2306f35fdd70891b8057f30449665c367eb65dde18f01b",
+    "declare": {
+      "status": 201
+    },
+    "complete": {
+      "status": 200
+    }
+  },
+  {
+    "file": "nhu-cau-2027.csv",
+    "contentType": "text/csv",
+    "sizeBytes": 67,
+    "sha256": "5cfd4bcca89f21f332f6919c9e7275c0b5165ccdc15a27bdaa7d48e719dbaf1c",
+    "declare": {
+      "status": 201
+    },
+    "complete": {
+      "status": 200
+    }
+  },
+  {
+    "file": "bien-ban-hop-ngan-sach.docx",
+    "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "sizeBytes": 1334,
+    "sha256": "ce2caa9308d12e52fa017ac0b21103e12923ef7883138b601233028699139d61",
+    "declare": {
+      "status": 201
+    },
+    "complete": {
+      "status": 200
+    }
+  },
+  {
+    "file": "anh-chup-bao-gia.png",
+    "contentType": "image/png",
+    "sizeBytes": 69,
+    "sha256": "fdf040aaee9270aef6cf03752d51615cf6025c72081820fe0945f0c9c9cbdd9c",
+    "declare": {
+      "status": 201
+    },
+    "complete": {
+      "status": 200
+    }
+  },
+  {
+    "file": "anh-hoa-don.jpg",
+    "contentType": "image/jpeg",
+    "sizeBytes": 149,
+    "sha256": "05e41fc518431259062337160b3db8ae4d4f6a4796ec9b5d83da297a8a101e7b",
+    "declare": {
+      "status": 201
+    },
+    "complete": {
+      "status": 200
+    }
+  },
+  {
+    "file": "gia-mao.pdf",
+    "contentType": "application/pdf",
+    "sizeBytes": 18,
+    "sha256": "80878b79045f691e10f4361cb400f6d366dcef086dd2eb8a7d1f1344510f90ad",
+    "declare": {
+      "status": 201
+    },
+    "complete": {
+      "status": 422,
+      "code": "BUDGET_ATTACHMENT.UPLOAD_MISMATCH"
+    }
+  },
+  {
+    "file": "gia-mao.xlsx",
+    "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "sizeBytes": 19,
+    "sha256": "61f3eebd64b52185a9a3979a7f7c8d36bf1da6d93b980846f6b7a785d3d68bdb",
+    "declare": {
+      "status": 201
+    },
+    "complete": {
+      "status": 422,
+      "code": "BUDGET_ATTACHMENT.UPLOAD_MISMATCH"
+    }
+  },
+  {
+    "file": "nhi-phan.csv",
+    "contentType": "text/csv",
+    "sizeBytes": 69,
+    "sha256": "fdf040aaee9270aef6cf03752d51615cf6025c72081820fe0945f0c9c9cbdd9c",
+    "declare": {
+      "status": 201
+    },
+    "complete": {
+      "status": 422,
+      "code": "BUDGET_ATTACHMENT.UPLOAD_MISMATCH"
+    }
+  },
+  {
+    "file": "ghi-chu.txt",
+    "contentType": "text/plain",
+    "sizeBytes": 34,
+    "sha256": "42e992cbe7934db2af928e49f87cb16c8a25e45526a387d40a121697df1eb16d",
+    "declare": {
+      "status": 422,
+      "code": "BUDGET_ATTACHMENT.TYPE_NOT_ALLOWED"
+    },
+    "complete": null
+  }
+]

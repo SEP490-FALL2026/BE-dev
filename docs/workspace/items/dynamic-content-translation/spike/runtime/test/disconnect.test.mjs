@@ -19,7 +19,13 @@ after(() => {
 
 async function harness(supOpts = {}) {
   const h = makeSup({ computeMaxMs: 5000, ...supOpts });
-  const coord = new Coordinator({ supervisor: h.sup, cache: new TranslationCache(), identity, timeoutMs: 4000, queueMax: 4 });
+  const coord = new Coordinator({
+    supervisor: h.sup,
+    cache: new TranslationCache(),
+    identity,
+    timeoutMs: 4000,
+    queueMax: 4,
+  });
   const probes = [];
   const server = createDisconnectServer({ coord, probe: (p) => probes.push({ ...p, t: Date.now() }) });
   server.on('connection', (s) => {
@@ -51,7 +57,11 @@ test('(a) normal GET whose handler waits for a fake translation: abort NOT fired
   await waitFor(() => c.probeOf('resClose').length === 1, 2000, 'res close');
   assert.equal(c.probeOf('abort').length, 0, 'abort must not fire on a normal request');
   const resp = c.probeOf('responded')[0];
-  assert.equal(resp.listenersAfterDispose, resp.baseline, 'our close listener was removed once the response was written (count back to the baseline)');
+  assert.equal(
+    resp.listenersAfterDispose,
+    resp.baseline,
+    'our close listener was removed once the response was written (count back to the baseline)',
+  );
   assert.equal(c.probeOf('resClose')[0].writableFinished, true);
   await c.shutdown();
 });
@@ -70,13 +80,24 @@ test('characterisation: IncomingMessage "close" DOES fire for a normal GET while
 
 test('(b) client destroys the socket while waiting: abort fired once, that waiter settles, another subscriber on the same key still gets its result', async () => {
   const c = await harness();
-  await c.coord.translate({ organizationId: 'org1', scope: 'bench', storedSource: 'vi', target: 'en', text: 'n=1 step=1 warm' });
+  await c.coord.translate({
+    organizationId: 'org1',
+    scope: 'bench',
+    storedSource: 'vi',
+    target: 'en',
+    text: 'n=1 step=1 warm',
+  });
   c.events.length = 0;
   const text = 'n=12 step=40 shared';
   const stayer = get(c.port, text);
   await sleep(30);
   const leaver = new Promise((resolve) => {
-    const req = http.get({ host: '127.0.0.1', port: c.port, path: '/t?text=' + encodeURIComponent(text), agent: false });
+    const req = http.get({
+      host: '127.0.0.1',
+      port: c.port,
+      path: '/t?text=' + encodeURIComponent(text),
+      agent: false,
+    });
     req.on('error', () => resolve('client-error'));
     setTimeout(() => req.destroy(), 80);
   });
@@ -95,10 +116,21 @@ test('(b) client destroys the socket while waiting: abort fired once, that waite
 
 test('(b2) the only client disconnects while RUNNING: abort once, job cancelled, slot freed after done, next request OK', async () => {
   const c = await harness();
-  await c.coord.translate({ organizationId: 'org1', scope: 'bench', storedSource: 'vi', target: 'en', text: 'n=1 step=1 warm' });
+  await c.coord.translate({
+    organizationId: 'org1',
+    scope: 'bench',
+    storedSource: 'vi',
+    target: 'en',
+    text: 'n=1 step=1 warm',
+  });
   c.events.length = 0;
   const leaver = new Promise((resolve) => {
-    const req = http.get({ host: '127.0.0.1', port: c.port, path: '/t?text=' + encodeURIComponent('n=500 step=20 lonely'), agent: false });
+    const req = http.get({
+      host: '127.0.0.1',
+      port: c.port,
+      path: '/t?text=' + encodeURIComponent('n=500 step=20 lonely'),
+      agent: false,
+    });
     req.on('error', () => resolve());
     setTimeout(() => req.destroy(), 80);
   });
@@ -127,7 +159,9 @@ test('(c) keep-alive: two sequential requests on one socket never trigger the ho
 test('(d) client closes right after reading the response: writableFinished is true, no abort', async () => {
   const c = await harness();
   await new Promise((resolve) => {
-    const sock = net.connect(c.port, '127.0.0.1', () => sock.write('GET /t?text=n%3D2%20step%3D10%20x HTTP/1.1\r\nHost: x\r\nConnection: keep-alive\r\n\r\n'));
+    const sock = net.connect(c.port, '127.0.0.1', () =>
+      sock.write('GET /t?text=n%3D2%20step%3D10%20x HTTP/1.1\r\nHost: x\r\nConnection: keep-alive\r\n\r\n'),
+    );
     sock.on('data', () => {
       sock.destroy();
       resolve();
@@ -141,11 +175,21 @@ test('(d) client closes right after reading the response: writableFinished is tr
 test('(e) POST-like request with a body that is fully sent, then a normal response: no abort (body consumption closes req, not res)', async () => {
   const c = await harness();
   const r = await new Promise((resolve, reject) => {
-    const req = http.request({ host: '127.0.0.1', port: c.port, method: 'POST', path: '/t?text=' + encodeURIComponent('n=4 step=30 post'), agent: false, headers: { 'content-type': 'application/json' } }, (res) => {
-      let b = '';
-      res.on('data', (d) => (b += d));
-      res.on('end', () => resolve(JSON.parse(b)));
-    });
+    const req = http.request(
+      {
+        host: '127.0.0.1',
+        port: c.port,
+        method: 'POST',
+        path: '/t?text=' + encodeURIComponent('n=4 step=30 post'),
+        agent: false,
+        headers: { 'content-type': 'application/json' },
+      },
+      (res) => {
+        let b = '';
+        res.on('data', (d) => (b += d));
+        res.on('end', () => resolve(JSON.parse(b)));
+      },
+    );
     req.on('error', reject);
     req.end(JSON.stringify({ some: 'body'.repeat(1000) }));
   });
@@ -164,12 +208,12 @@ test('unit: the hook fires at most once and dispose() removes it', () => {
   fake.emit('close');
   fake.emit('close');
   assert.equal(calls.length, 1, 'once');
-  const f2 = new (EventEmitter)();
+  const f2 = new EventEmitter();
   f2.writableFinished = true;
   const d2 = onClientDisconnect(f2, () => calls.push(2));
   f2.emit('close');
   assert.equal(calls.length, 1, 'finished response: not an abort');
-  const f3 = new (EventEmitter)();
+  const f3 = new EventEmitter();
   f3.writableFinished = false;
   const d3 = onClientDisconnect(f3, () => calls.push(3));
   d3();

@@ -1,8 +1,10 @@
 # Plan: dịch nội dung động EN–VI
 
+> **Stale — trùng số — chờ thẩm quyền (18/10/2026):** mã đề xuất "`QĐ-74`" và `QĐ-74a`–`i` trong hạng mục này là đề xuất cũ, **chưa** từng vào sổ quyết định. Sổ Docs nay dùng `QĐ-74` cho phương pháp thu thập usage (16/10/2026). Đọc mọi chỗ ghi `QĐ-74` ở đây là _đề xuất dịch EN↔VI chưa có số_; không cấp số mới, không coi là Accepted; evidence giữ nguyên. **E-2 = B, Owner 18/10/2026:** giữ `draft`, không giao implement, không cấp số mới trong repo BE; hạng mục bị chặn implement tới khi một quyết định Docs có thẩm quyền cấp số hợp lệ và giải quyết quan hệ với `QĐ-69`/`QĐ-78`. Research và evidence giữ nguyên ([remediation](../baseline-impact-and-remediation-2026-10-17/spec.md)).
+
 - [Spec](spec.md); revision đã review: chưa review (draft lượt 3, 15/10/2026).
 - Implement: chưa giao. Reviewer: dev khác.
-- Triển khai: not-started. PR: chưa có.
+- Triển khai: **blocked** (E-2 = B, Owner 18/10/2026; điều kiện gỡ: quyết định Docs có thẩm quyền như trên). PR: chưa có.
 - **Trạng thái: research kết thúc với kết quả âm tính.** Spike (bước 0, 0b) đã chạy và tái chạy được ở [spike/](spike/README.md).
   - Chất lượng không đạt ở vi→en và chưa đạt để bật ở en→vi.
   - Đề xuất giữ disabled/pending. Các bước 1–5 chỉ bắt đầu khi Owner/dev chọn hướng và đủ điều kiện ở mục _Trước khi code_.

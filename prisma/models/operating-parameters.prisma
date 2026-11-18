@@ -1,0 +1,27 @@
+// The value of an operating parameter, with history (US-01-04): at any moment a key has at most one current value
+// (validTo null); a key with no row has the default the code defines. Rows are only ever added and closed.
+model ParameterValue {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  key            String
+  value          Json
+  validFrom      DateTime  @default(now()) @map("valid_from") @db.Timestamptz(3)
+  validTo        DateTime? @map("valid_to") @db.Timestamptz(3)
+  changedBy      String?   @map("changed_by") @db.Uuid
+
+  @@index([organizationId, key])
+  @@map("parameter_values")
+}
+
+// A day nobody works, so working-day deadlines skip it (US-01-04 AC-10). Past days are never changed.
+model NonWorkingDate {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  date           DateTime @db.Date
+  reason         String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdBy      String?  @map("created_by") @db.Uuid
+
+  @@unique([organizationId, date])
+  @@map("non_working_dates")
+}

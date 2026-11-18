@@ -5,7 +5,19 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { HERE, sleep, summarize, httpJson, startApi, startHealthPoller, procStatus, childrenOf, pidAlive, cgroup, isLinux } from './lib.mjs';
+import {
+  HERE,
+  sleep,
+  summarize,
+  httpJson,
+  startApi,
+  startHealthPoller,
+  procStatus,
+  childrenOf,
+  pidAlive,
+  cgroup,
+  isLinux,
+} from './lib.mjs';
 import { analyzeEvents } from './analyze.mjs';
 import { makeText } from './corpus.mjs';
 
@@ -14,7 +26,9 @@ const OUT = E.BENCH_OUT ?? path.join(HERE, '..', 'evidence');
 const PROFILE = E.BENCH_PROFILE ?? process.platform;
 const FAST = E.BENCH_FAST === '1';
 // New measurements never overwrite old evidence: file suffix = BENCH_SUFFIX, else the run id, else the date.
-const SUFFIX = E.BENCH_SUFFIX ? E.BENCH_SUFFIX : '-' + (E.BENCH_RUN_ID || new Date().toISOString().slice(0, 10)).replace(/[^A-Za-z0-9._-]/g, '_');
+const SUFFIX = E.BENCH_SUFFIX
+  ? E.BENCH_SUFFIX
+  : '-' + (E.BENCH_RUN_ID || new Date().toISOString().slice(0, 10)).replace(/[^A-Za-z0-9._-]/g, '_');
 fs.mkdirSync(OUT, { recursive: true });
 const baseEnv = { SPIKE_DEPS_DIR: E.SPIKE_DEPS_DIR, SPIKE_MODELS_DIR: E.SPIKE_MODELS_DIR };
 const LONG = { BENCH_COMPUTE_MAX_MS: '120000', BENCH_TIMEOUT_MS: '120000', BENCH_BREAKER_THRESHOLD: '1000000' };
@@ -76,7 +90,11 @@ function startLiveSampler(api, everyMs = 50) {
   }, everyMs);
   return () => {
     clearInterval(timer);
-    return { maxLiveWorkers: max, samples, method: isLinux ? '/proc children of API pid' : 'pids seen via /stats + kill(pid,0)' };
+    return {
+      maxLiveWorkers: max,
+      samples,
+      method: isLinux ? '/proc children of API pid' : 'pids seen via /stats + kill(pid,0)',
+    };
   };
 }
 const tag = (api) => ({ apiPid: api.pid });
@@ -86,11 +104,15 @@ const scenarios = {
   async env() {
     let pkg = {};
     try {
-      pkg = JSON.parse(fs.readFileSync(path.join(E.SPIKE_DEPS_DIR, 'node_modules/@huggingface/transformers/package.json'), 'utf8'));
+      pkg = JSON.parse(
+        fs.readFileSync(path.join(E.SPIKE_DEPS_DIR, 'node_modules/@huggingface/transformers/package.json'), 'utf8'),
+      );
     } catch {
       /* ignore */
     }
-    const ort = fs.existsSync(path.join(E.SPIKE_DEPS_DIR, 'node_modules/.pnpm')) ? fs.readdirSync(path.join(E.SPIKE_DEPS_DIR, 'node_modules/.pnpm')).filter((d) => /^(onnxruntime|sharp@)/.test(d)) : [];
+    const ort = fs.existsSync(path.join(E.SPIKE_DEPS_DIR, 'node_modules/.pnpm'))
+      ? fs.readdirSync(path.join(E.SPIKE_DEPS_DIR, 'node_modules/.pnpm')).filter((d) => /^(onnxruntime|sharp@)/.test(d))
+      : [];
     return {
       node: process.version,
       platform: `${process.platform}-${process.arch}`,
@@ -174,14 +196,23 @@ const scenarios = {
       await stats(api, true);
       const stopHealth2 = startHealthPoller(api.port);
       const t1 = Date.now();
-      const rs = await pool(CLIENTS * PER, CLIENTS, (i) => tr(api, i % 2 ? 'en-vi' : 'vi-en', makeText(i % 2 ? 'en' : 'vi', 400)));
+      const rs = await pool(CLIENTS * PER, CLIENTS, (i) =>
+        tr(api, i % 2 ? 'en-vi' : 'vi-en', makeText(i % 2 ? 'en' : 'vi', 400)),
+      );
       const satMs = Date.now() - t1;
       const health2 = await stopHealth2();
       const s1 = await stats(api);
       const wp = s1.workers?.[0]?.pid;
       out[mode] = {
         cold: { ms: coldMs, statuses: [cold1.status, cold2.status], health: healthCold, apiEld: sCold.eld },
-        saturation: { requests: rs.length, ms: satMs, statuses: rs.reduce((a, r) => ((a[r.status] = (a[r.status] ?? 0) + 1), a), {}), latencyMs: summarize(rs.map((r) => r.ms)), health: health2, apiEld: s1.eld },
+        saturation: {
+          requests: rs.length,
+          ms: satMs,
+          statuses: rs.reduce((a, r) => ((a[r.status] = (a[r.status] ?? 0) + 1), a), {}),
+          latencyMs: summarize(rs.map((r) => r.ms)),
+          health: health2,
+          apiEld: s1.eld,
+        },
         apiRssMb: { start: s0.rssMb, afterCold: sCold.rssMb, afterSaturation: s1.rssMb },
         workerRss: wp ? procStatus(wp) : null,
       };
@@ -198,7 +229,13 @@ const scenarios = {
     const cells = [];
     for (const direction of dirs) {
       for (const conc of concs) {
-        const api = await startApi({ ...baseEnv, ...LONG, BENCH_CONCURRENCY: String(conc), BENCH_QUEUE_MAX: '20', BENCH_INTRA: '1' });
+        const api = await startApi({
+          ...baseEnv,
+          ...LONG,
+          BENCH_CONCURRENCY: String(conc),
+          BENCH_QUEUE_MAX: '20',
+          BENCH_INTRA: '1',
+        });
         const lang = DIRS[direction][0];
         // warm: one request per worker (parallel) loads the direction everywhere
         await Promise.all(Array.from({ length: conc }, () => tr(api, direction, makeText(lang, 100))));
@@ -214,16 +251,43 @@ const scenarios = {
             requests: n,
             ok: ok.length,
             segmentsPerRequest: w[0]?.segments,
-            totalMs: summarize(ok.map((r) => r.ms), 0),
-            workerRunMs: summarize(w.map((x) => x.runMs), 0),
-            maxStepGapMs: summarize(w.map((x) => x.maxStepGapMs), 0),
-            firstStepMs: summarize(w.map((x) => x.firstStepMs), 0),
+            totalMs: summarize(
+              ok.map((r) => r.ms),
+              0,
+            ),
+            workerRunMs: summarize(
+              w.map((x) => x.runMs),
+              0,
+            ),
+            maxStepGapMs: summarize(
+              w.map((x) => x.maxStepGapMs),
+              0,
+            ),
+            firstStepMs: summarize(
+              w.map((x) => x.firstStepMs),
+              0,
+            ),
             fitsIn10s: `${ok.filter((r) => r.ms < 10_000).length}/${n}`,
-            p95Under10s: summarize(ok.map((r) => r.ms), 0).p95 !== null && summarize(ok.map((r) => r.ms), 0).p95 < 10_000,
+            p95Under10s:
+              summarize(
+                ok.map((r) => r.ms),
+                0,
+              ).p95 !== null &&
+              summarize(
+                ok.map((r) => r.ms),
+                0,
+              ).p95 < 10_000,
           });
         }
         const s = await stats(api);
-        cells.push({ direction, concurrency: conc, note: 'api', apiRssMb: s.rssMb, apiEldMaxMs: s.eld.max, workerRss: s.workers.map((x) => procStatus(x.pid)) });
+        cells.push({
+          direction,
+          concurrency: conc,
+          note: 'api',
+          apiRssMb: s.rssMb,
+          apiEldMaxMs: s.eld.max,
+          workerRss: s.workers.map((x) => procStatus(x.pid)),
+        });
         await api.stop();
       }
     }
@@ -231,7 +295,15 @@ const scenarios = {
   },
 
   async saturation() {
-    const api = await startApi({ ...baseEnv, BENCH_CONCURRENCY: '1', BENCH_COMPUTE_MAX_MS: '60000', BENCH_TIMEOUT_MS: '10000', BENCH_QUEUE_MAX: '4', BENCH_BREAKER_THRESHOLD: '1000000', BENCH_INTRA: '1' });
+    const api = await startApi({
+      ...baseEnv,
+      BENCH_CONCURRENCY: '1',
+      BENCH_COMPUTE_MAX_MS: '60000',
+      BENCH_TIMEOUT_MS: '10000',
+      BENCH_QUEUE_MAX: '4',
+      BENCH_BREAKER_THRESHOLD: '1000000',
+      BENCH_INTRA: '1',
+    });
     const warm = await tr(api, 'vi-en', makeText('vi', 100), { timeoutMs: 60_000 });
     await api.post('/config', { computeMaxMs: 200 });
     await stats(api, true);
@@ -245,7 +317,13 @@ const scenarios = {
       while (!(killsDone && requests >= 50) && Date.now() - tStart < 180_000) {
         requests++;
         const r = await tr(api, 'vi-en', makeText('vi', 400));
-        results.push({ status: r.status, reason: r.stats?.reason, ms: r.ms, overrunMs: r.stats?.worker?.overrunMs, runMs: r.stats?.runMs });
+        results.push({
+          status: r.status,
+          reason: r.stats?.reason,
+          ms: r.ms,
+          overrunMs: r.stats?.worker?.overrunMs,
+          runMs: r.stats?.runMs,
+        });
         if (r.status === 'BUSY') await sleep(100); // closed-loop clients with think time on BUSY
       }
     };
@@ -288,7 +366,8 @@ const scenarios = {
     const dl = new Map(events.filter((e) => e.type === 'deadline').map((e) => [e.jobId, e.t]));
     const supOverrun = events.filter((e) => e.type === 'done' && dl.has(e.jobId)).map((e) => e.t - dl.get(e.jobId));
     const byStatus = {};
-    for (const r of results) byStatus[`${r.status}/${r.reason ?? ''}`] = (byStatus[`${r.status}/${r.reason ?? ''}`] ?? 0) + 1;
+    for (const r of results)
+      byStatus[`${r.status}/${r.reason ?? ''}`] = (byStatus[`${r.status}/${r.reason ?? ''}`] ?? 0) + 1;
     const out = {
       warmStatus: warm.status,
       requests: results.length,
@@ -304,7 +383,14 @@ const scenarios = {
       supervisorFailures: failures.reduce((a, f) => ((a[f.kind] = (a[f.kind] ?? 0) + 1), a), {}),
       deadlineToDoneMs_supervisorSide: summarize(supOverrun),
       workerReportedOverrunMs: summarize(results.map((r) => r.overrunMs)),
-      deadlineNotCached: { statusFirst: a.status, reasonFirst: a.stats?.reason, cacheEntriesBefore: before, cacheEntriesAfterDeadlineHit: mid, secondCacheHit: b.cacheHit, secondStatus: b.status },
+      deadlineNotCached: {
+        statusFirst: a.status,
+        reasonFirst: a.stats?.reason,
+        cacheEntriesBefore: before,
+        cacheEntriesAfterDeadlineHit: mid,
+        secondCacheHit: b.cacheHit,
+        secondStatus: b.status,
+      },
       inflightMaxObserved: s.coordinator.maxInflightObserved,
       inflightBound: 4 + 1,
       enqueueCountTotal: enq,
@@ -316,7 +402,15 @@ const scenarios = {
 
   /** Deadline -> done overrun with the supervisor's own cancel disabled: the worker's stopping criterion is the only enforcer. */
   async overrun() {
-    const api = await startApi({ ...baseEnv, BENCH_DEADLINE_CANCEL: '0', BENCH_COMPUTE_MAX_MS: '60000', BENCH_TIMEOUT_MS: '30000', BENCH_BREAKER_THRESHOLD: '1000000', BENCH_KILL_GRACE_MS: '3000', BENCH_INTRA: '1' });
+    const api = await startApi({
+      ...baseEnv,
+      BENCH_DEADLINE_CANCEL: '0',
+      BENCH_COMPUTE_MAX_MS: '60000',
+      BENCH_TIMEOUT_MS: '30000',
+      BENCH_BREAKER_THRESHOLD: '1000000',
+      BENCH_KILL_GRACE_MS: '3000',
+      BENCH_INTRA: '1',
+    });
     await tr(api, 'vi-en', makeText('vi', 100));
     await tr(api, 'en-vi', makeText('en', 100));
     await api.post('/config', { computeMaxMs: 300 });
@@ -325,7 +419,15 @@ const scenarios = {
     for (let i = 0; i < N; i++) {
       const dir = i % 2 ? 'en-vi' : 'vi-en';
       const r = await tr(api, dir, makeText(i % 2 ? 'en' : 'vi', 600));
-      rs.push({ dir, status: r.status, reason: r.stats?.reason, overrunMs: r.stats?.worker?.overrunMs, maxStepGapMs: r.stats?.worker?.maxStepGapMs, firstStepMs: r.stats?.worker?.firstStepMs, ms: r.ms });
+      rs.push({
+        dir,
+        status: r.status,
+        reason: r.stats?.reason,
+        overrunMs: r.stats?.worker?.overrunMs,
+        maxStepGapMs: r.stats?.worker?.maxStepGapMs,
+        firstStepMs: r.stats?.worker?.firstStepMs,
+        ms: r.ms,
+      });
     }
     const { events } = await api.get('/events');
     const dl = new Map(events.filter((e) => e.type === 'deadline').map((e) => [e.jobId, e.t]));
@@ -336,11 +438,29 @@ const scenarios = {
       deadlineHits: hits.length,
       cancelSent: events.filter((e) => e.type === 'cancelSent').length,
       killSent: events.filter((e) => e.type === 'killSent').length,
-      workerReportedOverrunMs: summarize(hits.map((r) => r.overrunMs), 0),
+      workerReportedOverrunMs: summarize(
+        hits.map((r) => r.overrunMs),
+        0,
+      ),
       supervisorDeadlineToDoneMs: summarize(sup, 0),
-      maxStepGapMs: summarize(rs.map((r) => r.maxStepGapMs), 0),
-      firstStepMs: summarize(rs.map((r) => r.firstStepMs), 0),
-      byDirection: { 'vi-en': summarize(hits.filter((r) => r.dir === 'vi-en').map((r) => r.overrunMs), 0), 'en-vi': summarize(hits.filter((r) => r.dir === 'en-vi').map((r) => r.overrunMs), 0) },
+      maxStepGapMs: summarize(
+        rs.map((r) => r.maxStepGapMs),
+        0,
+      ),
+      firstStepMs: summarize(
+        rs.map((r) => r.firstStepMs),
+        0,
+      ),
+      byDirection: {
+        'vi-en': summarize(
+          hits.filter((r) => r.dir === 'vi-en').map((r) => r.overrunMs),
+          0,
+        ),
+        'en-vi': summarize(
+          hits.filter((r) => r.dir === 'en-vi').map((r) => r.overrunMs),
+          0,
+        ),
+      },
       killGraceMs: 3000,
     };
     await api.stop();
@@ -351,7 +471,15 @@ const scenarios = {
   async killexit() {
     const N = FAST ? 4 : 12;
     // kill grace 1 ms + no cooperative cancel at the deadline: the kill timer fires while the worker is inside generate()
-    const api = await startApi({ ...baseEnv, BENCH_DEADLINE_CANCEL: '0', BENCH_COMPUTE_MAX_MS: '60000', BENCH_KILL_GRACE_MS: '1', BENCH_TIMEOUT_MS: '30000', BENCH_BREAKER_THRESHOLD: '1000000', BENCH_INTRA: '1' });
+    const api = await startApi({
+      ...baseEnv,
+      BENCH_DEADLINE_CANCEL: '0',
+      BENCH_COMPUTE_MAX_MS: '60000',
+      BENCH_KILL_GRACE_MS: '1',
+      BENCH_TIMEOUT_MS: '30000',
+      BENCH_BREAKER_THRESHOLD: '1000000',
+      BENCH_INTRA: '1',
+    });
     await tr(api, 'vi-en', makeText('vi', 100));
     const rs = [];
     for (let i = 0; i < N; i++) {
@@ -364,17 +492,36 @@ const scenarios = {
     const { events } = await api.get('/events');
     const an = analyzeEvents(events, 1);
     const kills = events.filter((e) => e.type === 'killSent');
-    const lat = kills.map((k) => events.find((e) => e.type === 'exit' && e.t >= k.t && e.pid === k.pid)).map((x, i) => (x ? x.t - kills[i].t : null));
+    const lat = kills
+      .map((k) => events.find((e) => e.type === 'exit' && e.t >= k.t && e.pid === k.pid))
+      .map((x, i) => (x ? x.t - kills[i].t : null));
     const sp = events.filter((e) => e.type === 'spawn');
     const ex = events.filter((e) => e.type === 'exit');
-    const out = { trials: N, statuses: rs.reduce((a, r) => ((a[`${r.status}/${r.reason}`] = (a[`${r.status}/${r.reason}`] ?? 0) + 1), a), {}), killsSent: kills.length, killReasons: [...new Set(kills.map((k) => k.reason))], killToExitMs: summarize(lat, 1), respawnAfterExitMs: summarize(ex.map((e, i) => (sp[i + 1] ? sp[i + 1].t - e.t : null)), 1), eventAnalysis: an };
+    const out = {
+      trials: N,
+      statuses: rs.reduce((a, r) => ((a[`${r.status}/${r.reason}`] = (a[`${r.status}/${r.reason}`] ?? 0) + 1), a), {}),
+      killsSent: kills.length,
+      killReasons: [...new Set(kills.map((k) => k.reason))],
+      killToExitMs: summarize(lat, 1),
+      respawnAfterExitMs: summarize(
+        ex.map((e, i) => (sp[i + 1] ? sp[i + 1].t - e.t : null)),
+        1,
+      ),
+      eventAnalysis: an,
+    };
     await api.stop();
     return out;
   },
 
   async extkill() {
     const phaseA = [];
-    let api = await startApi({ ...baseEnv, BENCH_COMPUTE_MAX_MS: '120000', BENCH_TIMEOUT_MS: '120000', BENCH_BREAKER_THRESHOLD: '3', BENCH_INTRA: '1' });
+    let api = await startApi({
+      ...baseEnv,
+      BENCH_COMPUTE_MAX_MS: '120000',
+      BENCH_TIMEOUT_MS: '120000',
+      BENCH_BREAKER_THRESHOLD: '3',
+      BENCH_INTRA: '1',
+    });
     await tr(api, 'vi-en', makeText('vi', 100));
     for (let i = 0; i < 3; i++) {
       const p = tr(api, 'vi-en', makeText('vi', 1000));
@@ -384,7 +531,12 @@ const scenarios = {
       process.kill(pid, 'SIGKILL');
       const r = await p;
       const s = await stats(api);
-      phaseA.push({ settleAfterKillMs: r.wall - tKill, status: r.status, reason: r.stats?.reason, breaker: s.coordinator.breakers['vi-en'] });
+      phaseA.push({
+        settleAfterKillMs: r.wall - tKill,
+        status: r.status,
+        reason: r.stats?.reason,
+        breaker: s.coordinator.breakers['vi-en'],
+      });
     }
     const t0 = performance.now();
     const open = await tr(api, 'vi-en', makeText('vi', 100));
@@ -415,7 +567,23 @@ const scenarios = {
       const cg1 = cgroup().cpuStat;
       const st = await stats(api);
       phaseB.push({ settleAfterKillMs: tSettle - tKill, status: r.status, reason: r.stats?.reason });
-      rawTrials.push({ trial: i + 1, workerPid: pid, tKillEpochMs: tKill, tSettleEpochMs: tSettle, settleAfterKillMs: tSettle - tKill, status: r.status, reason: r.stats?.reason, clientMsOfRequest: round(r.ms, 1), cpuStatBefore: cg0, cpuStatAfter: cg1, nrThrottledDelta: cg0 && cg1 ? cg1.nrThrottled - cg0.nrThrottled : null, throttledMsDelta: cg0 && cg1 ? cg1.throttledMs - cg0.throttledMs : null, loadavg: os.loadavg().map((x) => +x.toFixed(2)), apiEldMaxMsDuringTrial: st.eld.max, apiEldP99MsDuringTrial: st.eld.p99 });
+      rawTrials.push({
+        trial: i + 1,
+        workerPid: pid,
+        tKillEpochMs: tKill,
+        tSettleEpochMs: tSettle,
+        settleAfterKillMs: tSettle - tKill,
+        status: r.status,
+        reason: r.stats?.reason,
+        clientMsOfRequest: round(r.ms, 1),
+        cpuStatBefore: cg0,
+        cpuStatAfter: cg1,
+        nrThrottledDelta: cg0 && cg1 ? cg1.nrThrottled - cg0.nrThrottled : null,
+        throttledMsDelta: cg0 && cg1 ? cg1.throttledMs - cg0.throttledMs : null,
+        loadavg: os.loadavg().map((x) => +x.toFixed(2)),
+        apiEldMaxMsDuringTrial: st.eld.max,
+        apiEldP99MsDuringTrial: st.eld.p99,
+      });
     }
     await tr(api, 'vi-en', makeText('vi', 100)); // respawn proof
     const { events, failures } = await api.get('/events');
@@ -431,13 +599,24 @@ const scenarios = {
     const an = analyzeEvents(events, 1);
     const sp = events.filter((e) => e.type === 'spawn');
     const ex = events.filter((e) => e.type === 'exit');
-    const respawnAfterExitMs = ex.map((e, i) => (sp[i + 1] ? round(sp[i + 1].t - e.t, 1) : null)).filter((x) => x !== null);
+    const respawnAfterExitMs = ex
+      .map((e, i) => (sp[i + 1] ? round(sp[i + 1].t - e.t, 1) : null))
+      .filter((x) => x !== null);
     const out = {
-      phaseA_breaker: { trials: phaseA, afterOpen: { status: open.status, reason: open.stats?.reason, ms: round(openMs, 1) } },
-      method: 'tKill/tSettle stamped in the orchestrator process (Date.now) around process.kill and the waiter HTTP response; API-side exit/settled event wall stamps split the interval; cgroup cpu.stat delta per trial; see rawTrials',
+      phaseA_breaker: {
+        trials: phaseA,
+        afterOpen: { status: open.status, reason: open.stats?.reason, ms: round(openMs, 1) },
+      },
+      method:
+        'tKill/tSettle stamped in the orchestrator process (Date.now) around process.kill and the waiter HTTP response; API-side exit/settled event wall stamps split the interval; cgroup cpu.stat delta per trial; see rawTrials',
       rawTrials,
       cgroupAfterPhaseB: cgroup(),
-      phaseB_settle: { trials: phaseB.length, settleAfterKillMs: summarize(phaseB.map((x) => x.settleAfterKillMs)), allUnavailableCrash: phaseB.every((x) => x.status === 'UNAVAILABLE' && x.reason === 'crash'), under100ms: phaseB.filter((x) => x.settleAfterKillMs < 100).length },
+      phaseB_settle: {
+        trials: phaseB.length,
+        settleAfterKillMs: summarize(phaseB.map((x) => x.settleAfterKillMs)),
+        allUnavailableCrash: phaseB.every((x) => x.status === 'UNAVAILABLE' && x.reason === 'crash'),
+        under100ms: phaseB.filter((x) => x.settleAfterKillMs < 100).length,
+      },
       respawnAfterExitMs: summarize(respawnAfterExitMs),
       killToApiExitEventMs: summarize(rawTrials.map((t) => t.killToApiExitEventMs)),
       exitEventToSettledMs: summarize(rawTrials.map((t) => t.exitEventToSettledMs)),
@@ -459,14 +638,30 @@ const scenarios = {
       const r = await tr(api, 'vi-en', makeText('vi', 100)); // (re)loads the model in a fresh worker
       const pid = await workerPid(api);
       workerHwm.push(procStatus(pid)?.vmHwmMb ?? r.stats?.worker?.rssMb);
-      series.push({ cycle: i + 1, status: r.status, apiRssMb: (await stats(api)).rssMb, childrenAlive: isLinux ? childrenOf(api.pid).length : null });
+      series.push({
+        cycle: i + 1,
+        status: r.status,
+        apiRssMb: (await stats(api)).rssMb,
+        childrenAlive: isLinux ? childrenOf(api.pid).length : null,
+      });
       process.kill(pid, 'SIGKILL');
       await sleep(150);
     }
     const s1 = await stats(api);
     const { events } = await api.get('/events');
     const an = analyzeEvents(events, 1);
-    const out = { cycles: N, apiRssStartMb: s0.rssMb, apiRssEndMb: s1.rssMb, apiRssDeltaMb: round(s1.rssMb - s0.rssMb), apiRssSeriesMb: series.map((x) => x.apiRssMb), workerHwmMbPerCycle: workerHwm, allOk: series.every((x) => x.status === 'OK'), maxChildrenAlive: Math.max(...series.map((x) => x.childrenAlive ?? 0)), eventAnalysis: an, spawns: events.filter((e) => e.type === 'spawn').length };
+    const out = {
+      cycles: N,
+      apiRssStartMb: s0.rssMb,
+      apiRssEndMb: s1.rssMb,
+      apiRssDeltaMb: round(s1.rssMb - s0.rssMb),
+      apiRssSeriesMb: series.map((x) => x.apiRssMb),
+      workerHwmMbPerCycle: workerHwm,
+      allOk: series.every((x) => x.status === 'OK'),
+      maxChildrenAlive: Math.max(...series.map((x) => x.childrenAlive ?? 0)),
+      eventAnalysis: an,
+      spawns: events.filter((e) => e.type === 'spawn').length,
+    };
     await api.stop();
     return out;
   },
@@ -484,11 +679,24 @@ const scenarios = {
       lat.push(r.ms);
       if (r.status !== 'OK') throw new Error('non-OK ' + r.status);
       pid ??= await workerPid(api);
-      if (i === 5 || (i + 1) % Math.max(10, Math.floor(N / 10)) === 0) series.push({ job: i + 1, worker: procStatus(pid) ?? { vmRssMb: r.stats?.worker?.rssMb }, apiRssMb: (await stats(api)).rssMb });
+      if (i === 5 || (i + 1) % Math.max(10, Math.floor(N / 10)) === 0)
+        series.push({
+          job: i + 1,
+          worker: procStatus(pid) ?? { vmRssMb: r.stats?.worker?.rssMb },
+          apiRssMb: (await stats(api)).rssMb,
+        });
     }
     const s1 = await stats(api);
     const w = series.map((x) => x.worker.vmRssMb);
-    const out = { jobs: N, latencyMs: summarize(lat), series, workerRssGrowthMbFromJob6: round(w[w.length - 1] - w[0]), apiRssStartMb: s0.rssMb, apiRssEndMb: s1.rssMb, cgroup: cgroup() };
+    const out = {
+      jobs: N,
+      latencyMs: summarize(lat),
+      series,
+      workerRssGrowthMbFromJob6: round(w[w.length - 1] - w[0]),
+      apiRssStartMb: s0.rssMb,
+      apiRssEndMb: s1.rssMb,
+      cgroup: cgroup(),
+    };
     await api.stop();
     return out;
   },
@@ -505,7 +713,13 @@ const scenarios = {
       const lat = [];
       for (let i = 0; i < 4; i++) lat.push((await tr(api, 'vi-en', makeText('vi', 1000))).ms);
       clearInterval(timer);
-      out.push({ intraOpNumThreads: intra, threadsIdleAfterLoad: idle?.threads ?? null, threadsMaxDuringRuns: isLinux ? max : null, latency1000charsMs: summarize(lat, 0), procStatus: procStatus(pid) });
+      out.push({
+        intraOpNumThreads: intra,
+        threadsIdleAfterLoad: idle?.threads ?? null,
+        threadsMaxDuringRuns: isLinux ? max : null,
+        latency1000charsMs: summarize(lat, 0),
+        procStatus: procStatus(pid),
+      });
       await api.stop();
     }
     return { runs: out, cpusVisible: os.availableParallelism() };
@@ -516,7 +730,14 @@ const scenarios = {
     const trials = [];
     for (let i = 0; i < (FAST ? 2 : 5); i++) {
       // cold worker every trial; computeMaxMs deliberately SHORTER than spawn + model load (~1.3 to 2.2 s measured earlier)
-      const api = await startApi({ ...baseEnv, BENCH_COMPUTE_MAX_MS: E.BENCH_CLOCK_COMPUTE_MS || '1500', BENCH_TIMEOUT_MS: '30000', BENCH_KILL_GRACE_MS: '3000', BENCH_BREAKER_THRESHOLD: '1000000', BENCH_INTRA: '1' });
+      const api = await startApi({
+        ...baseEnv,
+        BENCH_COMPUTE_MAX_MS: E.BENCH_CLOCK_COMPUTE_MS || '1500',
+        BENCH_TIMEOUT_MS: '30000',
+        BENCH_KILL_GRACE_MS: '3000',
+        BENCH_BREAKER_THRESHOLD: '1000000',
+        BENCH_INTRA: '1',
+      });
       const r = await tr(api, 'vi-en', 'Giấy phép phần mềm sẽ hết hạn vào cuối tháng này.');
       const { events } = await api.get('/events');
       const d = events.find((e) => e.type === 'dispatch');
@@ -538,7 +759,13 @@ const scenarios = {
       await api.stop();
     }
     // response deadline during a cold load: waiter budget 700 ms < spawn+load; job abandoned during load, model kept
-    const api = await startApi({ ...baseEnv, BENCH_COMPUTE_MAX_MS: '10000', BENCH_TIMEOUT_MS: '700', BENCH_BREAKER_THRESHOLD: '1000000', BENCH_INTRA: '1' });
+    const api = await startApi({
+      ...baseEnv,
+      BENCH_COMPUTE_MAX_MS: '10000',
+      BENCH_TIMEOUT_MS: '700',
+      BENCH_BREAKER_THRESHOLD: '1000000',
+      BENCH_INTRA: '1',
+    });
     const t0 = Date.now();
     const early = await tr(api, 'vi-en', 'Giấy phép phần mềm sẽ hết hạn vào cuối tháng này.');
     const earlyMs = Date.now() - t0;
@@ -551,8 +778,19 @@ const scenarios = {
       allColdOk: trials.every((t) => t.status === 'OK'),
       allKillFree: trials.every((t) => t.killSent === 0 && t.deadlineEvents === 0),
       computeMaxMsUsed: Number(E.BENCH_CLOCK_COMPUTE_MS || 1500),
-      loadLongerThanComputeWindow: trials.filter((t) => t.dispatchToRunSentMs > Number(E.BENCH_CLOCK_COMPUTE_MS || 1500)).length,
-      responseDeadlineDuringLoad: { firstStatus: early.status, firstReason: early.stats?.reason, firstMs: earlyMs, laterStatus: later.status, runSentCount: ev.filter((e) => e.type === 'runSent').length, loadStartCount: ev.filter((e) => e.type === 'loadStart').length, releaseBy: ev.filter((e) => e.type === 'release').map((e) => e.by), spawnCount: ev.filter((e) => e.type === 'spawn').length },
+      loadLongerThanComputeWindow: trials.filter(
+        (t) => t.dispatchToRunSentMs > Number(E.BENCH_CLOCK_COMPUTE_MS || 1500),
+      ).length,
+      responseDeadlineDuringLoad: {
+        firstStatus: early.status,
+        firstReason: early.stats?.reason,
+        firstMs: earlyMs,
+        laterStatus: later.status,
+        runSentCount: ev.filter((e) => e.type === 'runSent').length,
+        loadStartCount: ev.filter((e) => e.type === 'loadStart').length,
+        releaseBy: ev.filter((e) => e.type === 'release').map((e) => e.by),
+        spawnCount: ev.filter((e) => e.type === 'spawn').length,
+      },
     };
     await api.stop();
     return out;
@@ -567,13 +805,28 @@ const scenarios = {
     };
     const out = {};
     for (const [name, extra] of Object.entries(cases)) {
-      const api = await startApi({ ...baseEnv, ...LONG, BENCH_COMPUTE_MAX_MS: '5000', BENCH_TIMEOUT_MS: '8000', BENCH_BREAKER_THRESHOLD: '3', BENCH_SHUTDOWN_GRACE_MS: '2000', BENCH_INTRA: '1', ...extra });
+      const api = await startApi({
+        ...baseEnv,
+        ...LONG,
+        BENCH_COMPUTE_MAX_MS: '5000',
+        BENCH_TIMEOUT_MS: '8000',
+        BENCH_BREAKER_THRESHOLD: '3',
+        BENCH_SHUTDOWN_GRACE_MS: '2000',
+        BENCH_INTRA: '1',
+        ...extra,
+      });
       const results = [];
       for (let i = 0; i < 5; i++) {
         const t0 = performance.now();
         const r = await tr(api, 'vi-en', makeText('vi', 60, i + 1), { timeoutMs: 8000 });
         const s = await stats(api);
-        results.push({ status: r.status, reason: r.stats?.reason, ms: round(performance.now() - t0, 1), liveWorkerPids: s.workers.map((w) => w.pid).filter(Boolean).length, breaker: s.coordinator.breakers['vi-en']?.state });
+        results.push({
+          status: r.status,
+          reason: r.stats?.reason,
+          ms: round(performance.now() - t0, 1),
+          liveWorkerPids: s.workers.map((w) => w.pid).filter(Boolean).length,
+          breaker: s.coordinator.breakers['vi-en']?.state,
+        });
       }
       const { events, failures } = await api.get('/events');
       const an = analyzeEvents(events, 1);
@@ -581,7 +834,9 @@ const scenarios = {
       const exit = await api.stop();
       out[name] = {
         results,
-        spawnFailedEvents: events.filter((e) => e.type === 'spawnFailed').map((e) => ({ phase: e.phase, code: e.code })),
+        spawnFailedEvents: events
+          .filter((e) => e.type === 'spawnFailed')
+          .map((e) => ({ phase: e.phase, code: e.code })),
         failuresByKind: failures.reduce((a, f) => ((a[f.kind] = (a[f.kind] ?? 0) + 1), a), {}),
         eventAnalysis: an,
         apiShutdownMs: Date.now() - tStop,
@@ -615,9 +870,22 @@ const scenarios = {
         else await sleep(10);
       }
       const r = await p.catch(() => ({ status: 'CLIENT_ERROR' }));
-      trials.push({ phase: duringLoad ? 'during-cold-load' : 'during-run', apiExit: { code: exit.code, signal: exit.signal }, apiExitMs, workerGoneMs, orphanAfter: pids.filter(pidAlive), clientStatus: r.status, summary: api.shutdownEvents });
+      trials.push({
+        phase: duringLoad ? 'during-cold-load' : 'during-run',
+        apiExit: { code: exit.code, signal: exit.signal },
+        apiExitMs,
+        workerGoneMs,
+        orphanAfter: pids.filter(pidAlive),
+        clientStatus: r.status,
+        summary: api.shutdownEvents,
+      });
     }
-    return { trials, graceMs: 5000, allWithinGracePlus1s: trials.every((t) => t.apiExitMs <= 6000 && (t.workerGoneMs ?? 1e9) <= 6000), allCodeZero: trials.every((t) => t.apiExit.code === 0) };
+    return {
+      trials,
+      graceMs: 5000,
+      allWithinGracePlus1s: trials.every((t) => t.apiExitMs <= 6000 && (t.workerGoneMs ?? 1e9) <= 6000),
+      allCodeZero: trials.every((t) => t.apiExit.code === 0),
+    };
   },
 };
 
@@ -633,9 +901,23 @@ for (const name of names) {
   try {
     result = await scenarios[name]();
   } catch (e) {
-    result = { error: String(e?.stack ?? e).split('\n').slice(0, 6).join(' | ') };
+    result = {
+      error: String(e?.stack ?? e)
+        .split('\n')
+        .slice(0, 6)
+        .join(' | '),
+    };
   }
-  const doc = { scenario: name, profile: PROFILE, node: process.version, platform: `${process.platform}-${process.arch}`, transformersPath: 'direct-generate', seconds: Math.round((Date.now() - t0) / 1000), cgroupAfter: cgroup(), result };
+  const doc = {
+    scenario: name,
+    profile: PROFILE,
+    node: process.version,
+    platform: `${process.platform}-${process.arch}`,
+    transformersPath: 'direct-generate',
+    seconds: Math.round((Date.now() - t0) / 1000),
+    cgroupAfter: cgroup(),
+    result,
+  };
   fs.writeFileSync(path.join(OUT, `${PROFILE}-${name}${SUFFIX}.json`), JSON.stringify(doc, null, 2) + '\n');
   console.error(`== ${name} done in ${doc.seconds}s${result.error ? ' ERROR ' + result.error : ''}`);
 }

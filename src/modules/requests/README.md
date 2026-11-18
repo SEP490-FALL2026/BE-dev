@@ -1,0 +1,330 @@
+# requests
+
+Mục đích: request xin quyền dùng phần mềm và các bước quyết định nó — nhu cầu, thẩm định phần mềm mới, chi tiêu
+(Finance, spending approver, batch), grant; cùng request nhóm, trả ghế, gia hạn, trạng thái, SLA và
+chuyển bước khi tổ chức đổi (ADR-0015). Story chính: US-05-01 → US-05-04, US-05-06, US-05-08 → US-05-15, US-05-17,
+US-05-18, US-05-20, US-05-21, US-06-01 → US-06-03, US-06-12 → US-06-14; US-03-02 (gửi thay), US-03-04 (nghỉ việc).
+Tầng: T5 (`scripts/arch/tiers.cjs`). Phụ thuộc: budgets, licensing, catalog, organization, identity-access, finance,
+operating-parameters, audit, notifications. Được dùng bởi: personnel, dashboards; gốc `src/app/app.module.ts`,
+`src/worker/worker.module.ts`, `src/worker/request-work.job.ts`. Nest module: `requests.module.ts` (API, mọi
+controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùng chung: chuyển bước, SLA, trạng thái).
+
+## Public API (`public/`)
+
+- `RequestsDashboardApi` ([public/requests-dashboard.api.ts](public/requests-dashboard.api.ts)) — `openRequestsSentBy` (số Request đang mở người đó đã gửi, mọi vai; Super Admin thường 0), `needDecisionsHeldBy` (số bước nhu cầu đang chờ mình quyết), `missingInvoicePeriods` (PI-2: số kỳ quá 5 ngày làm việc sau ngày thanh toán chưa có hóa đơn, theo các phòng IT Admin phụ trách); dashboards gọi (US-12-15 AC-2, AC-3, AC-4).
+- `RequestsApi` ([public/requests.api.ts](public/requests.api.ts)) — `listOpenOfBeneficiary`: request còn mở của một
+  người, hiện cạnh hồ sơ nghỉ việc (US-03-04 AC-24); personnel gọi. Tham số `filter.departmentId` (tùy chọn) chỉ giữ request
+  gửi từ phòng đó — trưởng phòng đọc một thành viên (`personnel/department-member`); không có `filter` thì như cũ.
+  `cancelForBeneficiaryGone(tx, SystemActor, { employeeId, scope })` (X0.7, `QĐ-110d`, `QĐ-110o`): **hệ thống** đóng Request còn mở của người đã
+  nghỉ/chuyển, trong giao dịch của bên gọi. `ALL_OPEN` (MF-2, mốc chặn) = mọi Request mở (trả phí, `K5`, đề xuất case B, Request tiếp tục, dòng nhóm);
+  `PAID_OLD_DEPARTMENT` (MF-3, ngày hiệu lực) = Request trả phí `GRANT`/`RENEWAL`/nhóm gửi từ phòng cũ. Chưa có tác vụ cấp chạy ⟹ `CANCELLED` với
+  nguyên nhân `SYSTEM_BENEFICIARY_LEFT`/`SYSTEM_BENEFICIARY_TRANSFERRED` (không ai đóng, `cancelled_by_employee_id` rỗng), cam kết chưa chi về ngân
+  sách, thông báo `REQUEST_CANCELLED_BENEFICIARY_GONE` (người gửi + Finance); có tác vụ cấp sống (Request `EXECUTING`, hoặc `RENEWAL` đã duyệt chờ tác vụ `EXTEND` ở `AWAITING_EXECUTION`, hoặc Request/dòng đã rút khi cấp lỗi và chờ IT đóng tác vụ ở `AWAITING_IT_CLOSE`) ⟹ không đụng, trả về `needsItCheck` và gửi
+  `REQUEST_BENEFICIARY_GONE_IT_CHECK` cho IT phụ trách để đối chiếu nhà cung cấp rồi đóng tay. Chạy lại không đóng lần hai.
+  `previewBeneficiaryGone(tx, { employeeId, scope })` (MF2-B.3, `P23`): cùng phép xét (`verdictOf`) nhưng **chỉ đọc** — không khóa, không ghi, không báo ai — trả
+  `wouldCancel`, `needsItCheck` và `heldToRelease` (cam kết còn giữ chưa chi của các Request sẽ bị hủy, qua `BudgetsApi.heldByRequests`; phần của một dòng nhóm không
+  tính). Dùng cho xem trước và cho ghi nghỉ việc (`personnel/departure-deadline`).
+- `RequestsAiSourceApi` ([public/requests-ai-source.api.ts](public/requests-ai-source.api.ts)) — `openStepsHeldBy`: bước nhu
+  cầu và bước duyệt chi đang chờ một người (cùng bộ lọc với hai hàng đợi `need-decision-queue` và hàng đợi của người duyệt chi),
+  sớm giao trước, lý do đầy đủ cắt 1000 ký tự; `stillHeldBy`: bước nào còn mở và còn giao người đó. Nguồn của tóm tắt AI (US-15-05).
+- Worker gọi (`src/worker/request-work.job.ts`): `StepRedeterminationSweepApi.sweep` — lưới an toàn chuyển bước
+  (US-05-11, US-05-12); `StepSlaSweepApi.sweep` — nhắc bước trễ, báo tồn đọng (US-05-09, US-05-10);
+  `RequestStatusProjectorApi.project` — chiếu audit event của request thành thông báo inbox (US-05-15). File:
+  `public/step-redetermination-sweep.api.ts`, `public/step-sla-sweep.api.ts`, `public/request-status-projector.api.ts`.
+- `public/requests.types.ts` — `OpenRequestOfBeneficiary`, `AiSourceStep`; `public/requests.extension-points.ts` —
+  `RequestOutcomeListeners`, `RequestOutcomeEvent`, `TransferGraceHoldContributions`, `TransferGraceHoldContribution`, `TransferGraceHolding`.
+
+## Bảng sở hữu
+
+- Request: `access_requests`, `access_request_beneficiaries`, `access_request_steps`, `approval_records`,
+  `access_request_proposals`, `access_request_assessments`, `access_request_service_accounts` (không còn ghi từ `QĐ-110m`; bảng giữ tới đợt dọn),
+  `access_request_renewals`, `return_requests`. Nhóm: `access_request_lines`, `access_request_line_decisions`,
+  `access_request_line_amounts`.
+- Chi tiêu: `request_budget_checks`, `request_budget_check_years`, `request_finance_reviews`, `spend_batches`,
+  `spend_batch_items`, `spend_decisions`, `request_supplements`, `request_supplement_drops`,
+  `budget_information_requests`.
+- Trạng thái/SLA: `controlled_wait_alerts`, `step_sla_reminders`, `step_sla_reminder_recipients`,
+  `congestion_incidents`, `request_status_cursor` (`prisma/models/requests.prisma`).
+- Hóa đơn mua: `purchase_invoices`, `purchase_invoice_documents`. Hồ sơ hóa đơn lệch: `invoice_discrepancy_cases`.
+- Khoản cam kết 01/01: `year_start_commitment_runs` (dấu chạy của tổ chức và năm, `resume_after_id` = Request cuối lô đã xử lý, số đếm cộng dồn
+  theo lô; migration đánh dấu năm trước năm triển khai đã xong, nên lượt đầu là của năm triển khai, kể cả triển khai sau 01/01).
+
+## Extension point
+
+- Mở: `InvoiceDiscrepancyReferralListeners` (`requests.invoice-discrepancy-referral`, Listeners, RC-1, R-29) — phát ở `invoice-discrepancy/invoice-discrepancy-closure.service.ts` khi Finance đóng hồ sơ hóa đơn lệch với `OUT_OF_PROCESS_SUSPECTED`, trong transaction đóng, mang cả hai vế (số lượng, đơn giá gốc: hóa đơn và nơi so khớp) và số chênh VND. Bên đăng ký: `usage` (`SBF-08`, RC-2.1) — **chưa có**, nên lúc này sự kiện chưa tạo mục nào; listener ném lỗi hoàn tác việc đóng.
+- Mở: `RequestOutcomeListeners` (`requests.outcome`, Listeners) — chưa có bên đăng ký (rà soát của trưởng phòng mới, bên đăng ký duy nhất, đã gỡ ở MF3-A);
+  phát qua `outcome/request-outcome.service.ts`.
+- Mở: `TransferGraceHoldContributions` (`requests.transfer-grace-hold`, Contributions 0..n, MF3-C.3, P10) — `personnel` bind ở `personnel/transfer-grace/transfer-grace-hold.listener.ts`:
+  quyền đang giữ có phải quyền cũ của điều chuyển còn ân hạn không. `access-request/request-facts.service.ts` hỏi nó (`Assessment.graceHold`); có ⟹ `request-intake/access-request.service.ts` không ném
+  `ALREADY_HOLDS_ACCESS`, `request-limits` bỏ GH-2 (`limitExemption = TRANSFER_GRACE`; trùng gói GH-1 vẫn chặn) và Request lưu `access_requests.replaces_assignment_id` (nội bộ, R-49);
+  preview trả `limitExemption`, Request trả `limitExemption`. Không `Hook` vì worker nạp requests mà không nạp personnel. Chỉ Request cá nhân (không dòng nhóm, không gia hạn).
+- Đăng ký vào licensing: `licensing.grant-request-gate` ← `grant/access-request-grant.listener.ts`;
+  `licensing.revocation` ← `return-request/return-revocation.listener.ts` và `grant/seat-revocation.listener.ts` (G9-02: hoàn tất
+  thu hồi `K1`/`K2` ⟹ giải phóng theo ngày khoản của Request cấp và Request tiếp tục của chuỗi, `grant/seat-release.*`; cấp `K2` muộn
+  ⟹ giải phóng phần trước ngày cấp trong `grant/access-request-grant.listener.ts`). Request có _Thời gian dùng_ (`term_months`) không ghi ngày kết thúc:
+  ngày cuối nó trả tiền là `expected_end_date` của seat do lệnh cấp của chính nó làm ra (`RevocationCompletedFacts.grantedEndDate`, `RightChain.grantedEndDate`,
+  `GrantOutcomeFacts.expectedEndDate`), các tháng của nó là các tháng đã bắt đầu từ ngày bắt đầu seat (`grantedStartDate`, `effectiveFrom`) và tháng cuối là tháng của
+  ngày tháng cuối bắt đầu (`SeatCoverage.lastMonthBeginsOn`, R-39: 15/03–14/06 là tháng 3, 4, 5); Request tiếp tục lấy `new_expected_end_date` và bắt đầu từ ngày sau hạn cũ;
+  Request cũ có ngày kết thúc tự chọn và quyền _Dùng lâu dài_ đếm theo tháng lịch / tới tháng 12 như trước (`grant/seat-release.repo.ts`, `seat-release.policy.ts`); `licensing.renewal-hold` ←
+  `renewal-request/renewal-hold.listener.ts`.
+- Đăng ký vào organization: `organization.department-use-readers`, `organization.cost-center-use-readers` ←
+  `access-request/open-request/*-open-requests.listener.ts`; `organization.change-listeners` ←
+  `reassignment/organization-change.listener.ts`. Vào identity-access: `identity-access.approval-role-change-listeners`
+  ← `reassignment/approval-role.listener.ts` (hai listener chuyển bước nằm trong `RequestsWorkFacadeModule`). Chỉ còn
+  một vai phê duyệt, `SPENDING_APPROVER` (grant): không approver dự phòng, không người thay thế (QĐ-93c).
+- Đăng ký vào `notifications.name-sources` (`NotificationNameContributions`, tên `requests.names`) ← `my-requests/request-notification-names.listener.ts`, khai ở `requests.module.ts`: REQUEST,
+  tên là `<Ứng dụng> – <Gói>` (gói đọc theo lô qua `CatalogApi.getPlanSummaries`, không đọc bảng catalog) hoặc tên phần mềm đề xuất khi chưa có gói (`MyRequestsRepo.softwareOf`, một truy vấn);
+  Request nhóm không có gói lẫn đề xuất thì vắng ⟹ câu dùng cụm chung.
+- Đăng ký vào budgets: `budgets.pending-spend` (Contributions `PendingSpendContributions`) ← `spend/pending-spend.listener.ts` (định nghĩa duy nhất của _Request đang chờ duyệt chi_, RV-10);
+  `budgets.commitment-release-guard` ← `spend/commitment-release.listener.ts`; `budgets.commitment-request-facts` ←
+  `spend/commitment-request-facts.listener.ts` (request, plan, người gửi, nhà cung cấp của một trang commitment, đọc theo lô).
+
+## Tầng trong module
+
+Đồ thị capability → capability của `requests` **không có vòng** (R6; `pnpm arch:capabilities --module requests`, gate
+`capability-graph`): 46 capability, 141 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. **Cột tầng do lệnh tính** từ
+cùng đồ thị gate dùng, không viết tay, và `scripts/verify/capability-graph.test.mjs` đọc bảng này so với lệnh (lệch thì test đỏ): có
+controller thì L3; còn lại, không import capability nào thì L0, chỉ import L0 thì L1, import ít nhất một L1 hoặc L2 thì L2.
+
+**Sửa bảng ngày 31/10/2026 (Phase 6.2 của `be-readability-debuggability-followup`).** Bảng cũ (duyệt kỹ thuật P09) xếp `spend` và
+`plan-line` vào L1 "lõi nhánh" và `status` riêng một dòng chú thích; đồ thị cho thấy `spend` import `step-routing` và `plan-line`
+import `spend`, nên theo luật tầng chúng là L2, và `status` (không controller, không cạnh) là L0. Sửa bảng, không sửa lệnh. Owner xác nhận bảng này 31/10/2026.
+
+| Tầng | Capability                                                                                                                                                                                                                                                                                                                                                                                                                                              | Quy tắc                                               |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| L0   | `access-request` (lõi: bản ghi, repo, policy, types, errors, định tuyến, giá, `assessment-read.repo`, `withdrawal.policy`), `outcome`, `invoice-discrepancy` (hồ sơ hóa đơn lệch, RC-1); `status` (cô lập: không import, không ai import, không controller; lệnh in `L0 (cô lập)`)                                                                                                                                                                      | không import capability nào của `requests` (gate)     |
+| L1   | lõi nhánh, không controller: `step-routing`, `request-draft`, `renewal-apply`, `repricing`, `request-limits`, `year-start-commitments`                                                                                                                                                                                                                                                                                                                  | chỉ import L0                                         |
+| L2   | dịch vụ dùng chung, không controller: `spend`, `request-intake`, `request-view`, `assessment`, `assessment-decision`, `catalog-link`, `reserve-confirmation`, `spend-effects`, `group-request`, `grant`, `request-end`, `spend-approval-view`, `my-requests`                                                                                                                                                                                            | import ít nhất một L1 hoặc L2, không vòng             |
+| L3   | use case lá, có controller: `proposal-review`, `budget-check`, `group-line-decisions`, `need-decision`, `need-decision-queue`, `request-history`, `assessment-queue`, `withdraw`, `spend-submission`, `spend-approval`, `request-submission`, `cancellation`, `reassignment`, `return-request`, `timing`, `grant-queue`, `renewal-request`, `group-request-submission`, `line-closure`, `draft`, `sla`, `purchase-invoice`, `invoice-discrepancy-queue` | không ai import lên, trừ bốn ngoại lệ dưới đây (gate) |
+
+**Số đo (30/10/2026).** Từ 24 capability, 82 cạnh, một vòng 19 capability → 36 capability, 111 cạnh, không vòng (sau khi tích hợp code dev A ngày 31/10/2026: 39 capability, 118 cạnh, thêm `need-decision-queue`, `my-requests`, `assessment-queue`, cả ba là L3 chỉ đọc, không ai import lên). Cạnh không tính cạnh
+vào `access-request` (29): 82; không tính thêm cạnh vào `outcome` (10): 72; không tính thêm cạnh vào `spend` (15): 57. **Mục tiêu "cạnh ≤ 50"
+của spec không đạt**, và không đạt được nếu giữ giới hạn 25 file mỗi thư mục: mọi use case đọc lõi (29 cạnh), mỗi capability tách ra để
+thư mục không quá 25 file thêm cạnh. Tiêu chí thay thế (Owner 31/10/2026: chấp nhận cho Task 4.3): không vòng; L0 không import capability; không thư mục nào quá 25
+file; capability có controller không bị import trừ danh sách ngoại lệ có lý do. Cả bốn là gate.
+
+**Ngoại lệ** (capability có controller mà capability khác import; danh sách trong gate `capability-graph`, chỉ được ngắn đi):
+
+- `draft`: hub `request-submission/access-requests.controller.ts` đọc bản nháp của người gọi theo id (`request-draft.service`,
+  `request-draft.dto`); `reassignment` xử lý bản nháp khi người rời tổ chức (`request-draft-departure.service`): cả hai là use case của draft.
+- `group-request-submission`: nộp một bản nháp nhóm chạy use case của capability này từ `draft/request-draft-submit.service.ts`.
+- `line-closure`: `cancellation/departure-cancellation.service.ts` đóng các dòng nhóm của người đã nghỉ bằng service và policy của nó.
+- `sla`: hàng đợi chi hiện tuổi của việc đang chờ qua `sla-queue-age.service`, service này đọc repo nhắc và policy SLA của `sla`.
+
+**Một chiều, bằng cách nào.** Cạnh ngược gỡ bằng bốn cách: đưa kiểu/hằng xuống file của tầng thấp nhất cần chúng (`CancellationRefusal`,
+`DelegationRefusal`, `ENDED_STATES`, `SpendStage`, `AskRefusal`/`AnswerRefusal`/`ReviewRefusal` ở `spend.errors.ts`, kiểu bản ghi thẩm định
+`assessment-record.types.ts`); chuyển file về capability sở hữu; tách controller ra capability lá đặt tên theo use case; đưa dịch vụ điều
+phối lên tầng trên. `*.errors.ts` không import policy của capability khác (gate). Không đổi hành vi, route, mã lỗi, thứ tự khóa và
+transaction; thứ tự controller trong `requests.module.ts` giữ để `openapi.json` đúng byte.
+
+**`AccessRequestView` ở `request-view/` (L2).** View ghép trạng thái chi (`spend-status.service`) nên không ở L0 được; mười
+controller dùng nó import `request-view/`. `assessment-read.repo.ts` ở L0 là phần đọc bản ghi thẩm định mà lõi, `spend` và `request-view`
+cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
+
+## Capability → file chính
+
+39 capability ngang hàng (ADR-0019, `OD-A5`), tầng ở bảng trên. **`access-request/` là lõi chung** (`docs/rules/module-structure.md`).
+
+- **Lõi và dùng chung (không controller)**
+  - `access-request/` — `access-request.repo.ts` (writer duy nhất của `access_requests`, `access_request_beneficiaries`,
+    `access_request_steps`), `assessment-read.repo.ts`, `routing.policy.ts` + `routing-facts.service.ts` (định tuyến bước nhu cầu),
+    `pricing.policy.ts` (`requestAmountOf`: giá tháng của thuê bao chính × số tháng **bắt đầu** trong năm của `asOf` (tháng k bắt đầu ở ngày bắt đầu + k − 1 tháng, R-39);
+    số tháng bắt đầu năm sau là `nextYearAmount` (Dùng lâu dài = 12 tháng, R-46); thời gian dùng đi bằng số tháng `termMonths` (`core/term-limit.ts`: `K1` 1–9, `K2`/`K5` 1–12 hoặc không, `K4` không hỏi), người có thời hạn bị **cắt** ở ngày hết hợp đồng (`employees.contract_end_date`), không bị từ chối; `K4` = giá mua;
+    Request tiếp tục có kỳ mới năm sau ⟹ 0 + `nextYearAmount`, QĐ-109b; mốc `asOf` theo QĐ-109e: gửi = tạm tính, mỗi lần `BudgetCheckService.run`
+    tính lại và ghi `ACCESS_REQUEST.REPRICED`), `request-facts.service.ts` (đọc mọi sự kiện mà một request được xét bởi: phòng ban, kế hoạch, giá, người
+    giữ ghế, định tuyến; trước đây `request-assessment.service`), `need-decision.policy.ts`, `withdrawal.policy.ts`. Con:
+    `open-request/`.
+  - `outcome/` — `RequestOutcomeService`: mọi service kết thúc request phát `requests.outcome` qua đây.
+  - `request-view/` — `AccessRequestView`: `access-request-query.service.ts`, `access-request.mapper.ts`, `pricing-view.service.ts`.
+  - `request-intake/` — `AccessRequestService`: gửi một request cá nhân (draft, gia hạn và controller cùng gọi).
+  - Lỗi của checklist khi quyết định (`QĐ-111ap`; `PolicyChecklistApi` của `policies`, ánh xạ ở `policies/public/policy-checklist.http-errors.ts`) thành câu trả lời HTTP: 409 `POLICY.VERSION_CHANGED`, 422 `POLICY.CHECKLIST_INCOMPLETE`, `POLICY.CHECKLIST_HAS_NO`, và lý do thiếu thành `VALIDATION_ERROR`. Bước nhu cầu (`need-decision/`, `group-line-decisions/`) và xác nhận dùng dự phòng (`reserve-confirmation/`) nhận `checklist` trong body; `RETURN` đưa Request về người gửi (`AWAITING_REQUESTER_REVISION`, bản ghi phê duyệt `RETURNED`) và `request-intake/request-resubmission.service.ts` mở lại bước nhu cầu cho trưởng phòng (nhóm: các dòng chuyển sang bước mới) hoặc, cho đề xuất IT Admin trả về ở đánh giá (kể cả Request một bước), một bước đánh giá mới (`AccessRequestRepo.assessmentSentBack`, `reopenAssessmentStep`). Duyệt chi (`spend-approval/`, `group-line-decisions/`, lô), đánh giá (`assessment/`) cũng nhận `checklist`; phiên bản ngân sách (`budgets`), ghost seat và đẩy sớm (`optimization`) có checklist ở README của module đó.
+  - `request-draft/` — kho bản nháp: `request-draft.repo.ts`, `request-draft.policy.ts`.
+  - `request-end/` — `RequestEndService`: kết thúc request, trả cam kết ngân sách (cancellation, withdraw dùng).
+  - `grant/` — `access-request-grant.listener.ts`, `grant.policy.ts`: cổng grant của licensing (`licensing.grant-request-gate`).
+- **Chi tiêu**
+  - `spend/` — lõi chi tiêu: `budget-check.service.ts`, `spend-routing.service.ts`, `spend-entry.service.ts`, `spend-status.service.ts`,
+    `spend-decision.policy.ts`, `line-allocation.policy.ts`, repo của kiểm tra, review, batch, bước và quyết định chi.
+  - `step-routing/` — người nhận bước: `step-target.service.ts`, `reassignment.policy.ts`, `step-reassignment.repo.ts`,
+    `spend-routing.policy.ts`. Request không gắn dòng kế hoạch (QĐ-101n).
+  - `reserve-confirmation/` — xác nhận dùng dự phòng (BR-MF1-06h): `ReserveConfirmationService` (endpoint riêng và trong lô; cả hai đường đều qua checklist bước `1.6`: lô có `reserveConfirmations` kèm MỘT `checklist`, có _Không_ ⟹ 422 cả lô và không xác nhận nào, câu trả lời giữ cho từng Request đã `APPLIED`), repo `request_reserve_confirmations` (bất biến, gắn kiểm tra + bước chi); `spend-effects/` — `SpendEffectsService`: giữ **một** khoản cam kết năm hiện hành (số tiền 0 ⟹ không giữ, audit `NO_CURRENT_YEAR_COMMITMENT`) và trả về trưởng phòng khi kiểm lại lúc duyệt (`SPEND_RETURNED_AT_DECISION`); `budget-check/` — `budgetCheckGet`, `budgetCheckYearList` (chuyển từ `finance-review/`, giữ operationId; D-1). Không còn Finance rà soát / hỏi Finance / override / giá trị cao (QĐ-97c).
+  - Kiểm tra ngân sách ba kết quả (`spend/budget-check.policy.ts`): `WITHIN_BASE` ⟹ bước chi ngay; `USES_RESERVE` ⟹ ở lại hàng đợi trưởng phòng tới khi xác nhận kèm một dòng lý do (1–500 ký tự); `BLOCKED` (`OVER_RESERVE`, `NO_APPROVED_BUDGET`, `PRICE_EXPIRED` — chỉ xét báo giá, mô hình chưa có hạn giá gói) ⟹ báo người yêu cầu + trưởng phòng. Kiểm theo Cost Center hiện hành của phòng; lúc duyệt Cost Center khác lần kiểm trước ⟹ `NO_APPROVED_BUDGET` (M-12/RV-09, khoản cũ ở Cost Center cũ). Request số tiền năm hiện tại 0 không bị chặn vì còn lại âm (A5-2). _Đang chờ duyệt chi_: kết quả trong số cơ sở hoặc dùng dự phòng (kể cả chưa xác nhận), chưa quyết, không tính bị chặn.
+  - `spend-submission/` (hàng đợi chi, batch, bổ sung; US-06-12, US-06-14; bổ sung chia ba:
+    `supplement-pricing`, `supplement-recorder`, `supplement-query`; **Finance chỉ đọc**: `GET /spend-batches` do `spend-batch-list.service.ts` — mỗi lô kèm
+    `approvedCount`, `pendingCount`, `approvedAmounts` theo đồng tiền, tiền lấy từ `BudgetsApi.committedByRequests` một lần cho cả trang —
+    và Finance đọc chi tiết/items mọi lô ở `spend-batch-view.service.ts`), `spend-approval/` (spending approver quyết định; US-06-01;
+    `spend-approvals.controller.ts`, `spend-decision.service.ts` điều phối `spend-decision-recorder.service.ts`),
+    `spend-approval-view/` (thẻ của approver: `spend-approval-queue.service.ts` hàng đợi, `spend-approval-view.service.ts` chi tiết,
+    `spend-approval.mapper.ts` dựng wire, `spend-approval.dto.ts`, dùng cả cho request nhóm; `next-year-budget.service.ts` + `.policy.ts` + `.repo.ts`: `nextYearBudget`
+    của chi tiết và hàng đợi — ngân sách năm sau đã duyệt trừ số năm sau đã lưu của Request đã duyệt chi, cảnh báo mềm `QĐ-111al`, chỉ người giữ bước duyệt chi đọc, S-3).
+    Các route duyệt chi (`spendApprovalDecide`, `spendApprovalLineDecide`) trả 409 `BUDGET.COMMITMENT_NOT_HOLDABLE` hoặc `BUDGET.COMMITMENT_EXISTS` khi không giữ được khoản
+    cam kết của quyết định (lưới an toàn sau lần kiểm ngân sách; chưa quyết gì, `spend/spend.http-errors.ts`); `spendBatchDecide` không ném mà bỏ qua mục đó với lý
+    do `COMMITMENT_NOT_HOLDABLE` và đi tiếp các mục khác.
+- **Request cá nhân**
+  - `request-submission/` — controller `access-requests.controller.ts` (gửi, xem, đọc: US-05-01 → US-05-03) và xem trước
+    (`RequestPreviewService`). Hai route của bước nhu cầu nằm ở `need-decision/` (`need-decision.controller.ts`,
+    `similar-seats.controller.ts`, US-05-04; `NeedDecisionService` quyết định, `NeedDecisionEffects` làm những gì theo sau trong
+    cùng transaction) và route rút ở `withdraw/` (`withdrawal.controller.ts`, US-05-08; `WithdrawalPreconditions` đọc, khóa và kiểm
+    lại, `WithdrawalWriter` ghi, `withdrawal.policy.ts` ở L0); ba controller khai báo
+    ngay sau hub trong `requests.module.ts` để thứ tự path của API không đổi.
+  - `draft/` — bản nháp: lưu, liệt kê, gửi, xóa; `request-drafts.controller.ts`; `RequestDraftService`.
+  - `repricing/` — tính lại số tiền của Request theo ngày (QĐ-109e): `RepricingService` (giá thuê bao chính hoặc báo giá của IT Admin, tính theo `asOf`; Request giữ số tháng thì mỗi người một ngày kết thúc riêng qua `RequestTermEndsService`), `quote-pricing.policy.ts` (số tiền từ báo giá); `spend`, `spend-submission`, `group-request`, `assessment` gọi, không import capability nào ngoài lõi `access-request`.
+  - `assessment/` — thẩm định phần mềm ngoài catalog, đăng ký nội bộ, nối plan (US-05-06, US-05-18, US-05-20); hoàn tất và từ chối ở cổng nhận `checklist` của bước `1.3` (`AssessmentGate.judgeChecklist`, `QĐ-111ap`); `assessment-decision/` — `AssessmentDecisionService` chọn `REJECT` hay `RETURN` của `POST /access-requests/{id}/assessment/rejection`, `AssessmentReturnService` trả đề xuất về người gửi (`AWAITING_REQUESTER_REVISION`, bước đánh giá `CLOSED`, audit `ASSESSMENT_RETURNED`, thông báo `REQUEST_RETURNED` by `IT_ASSESSMENT`; không có bản ghi phê duyệt vì IT Admin chưa có vai ở `approval_records`);
+    `AssessmentQueryService` (đọc), `AssessmentService` (lưu), `AssessmentCompletionService`, `AssessmentRejectionService`, qua cổng chung
+    `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `AssessmentTermFitService` là chỗ duy nhất xét lại số tháng của đề xuất
+    theo kiểu cấp (QĐ-111i; K4 xóa tháng, K1 ngoài 1–9 ⟹ 422 `ASSESSMENT.TERM_NOT_FIT_KIND`): hoàn tất đánh giá dùng kiểu IT kết luận, `catalog-link/`
+    dùng kiểu của gói được gắn khi khác kiểu đã kết luận; `ProposalService`,
+    `need-spend.service.ts`, `internal-registration.service.ts` (đăng ký nội bộ; `internalRegistrationBasis`, `registeredShapeOf`,
+    `actsForAssignee` ở `assessment.policy.ts`); `proposal-review/` — `proposals.controller.ts`. Đề xuất rút gọn (case B) cho gói của ứng dụng nội bộ (`INTERNAL`: mọi gói
+    là `K5`, miễn phí) không hoàn tất được vì kết thúc sẽ là trả phí và đi Người duyệt chi, trái QĐ-111d/QĐ-103p: `judgeCompletion(…, 'PLAN_ONLY', internalApplication)` ra `FREE_PLAN` trước mọi
+    ô thiếu ⟹ 409 `ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN`, hàng đợi `readiness: FREE_PLAN`, `complete: false`; lối ra là IT thêm gói vào danh mục rồi từ chối `NOT_ELIGIBLE` kèm `alternativePlanId`
+    (người xin đi case A, Request nội bộ không phí đi thẳng IT).
+  - `catalog-link/` — nối Request đề xuất đã qua Người duyệt chi vào gói của danh mục (US-05-06 AC-4, AC-8; R-25): `CatalogLinkService` (khóa Request, gói phải có và ứng dụng chưa ngừng,
+    xét lại số tháng theo kiểu của gói qua `AssessmentTermFitService`, một dòng audit `ACCESS_REQUEST.CATALOG_LINKED`); đề xuất rút gọn (case B, QĐ-111a) chỉ nối được vào gói của chính ứng dụng nó
+    nêu, gói của ứng dụng khác ⟹ 422 `ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH` (QĐ-53c: phần mềm mới phải qua cổng mức kiểm soát), đề xuất phần mềm mới nối được vào mọi gói;
+    `CatalogLinkDepartmentListService` là ô tick `addToDepartmentList` (kiểm phạm vi IT Admin của phòng, rồi ghi danh sách phần mềm của phòng qua facade licensing, cùng transaction).
+  - `grant-queue/` — hàng cấp theo người của IT Admin (US-03-02, QĐ-111m): chỉ phòng trong phạm vi `getItAdminScope`, lọc `planId`/`state` (`WAITING`/`EXECUTING`/`DONE`, suy từ trạng thái Request hoặc dòng của người, không đọc bảng licensing), mỗi người có phòng và `execution` (tác vụ cấp qua `LicensingOpenGrantsApi.listGrantExecutionsOfRequests`, hành động theo `grantExecutionActions`); `cancellation/` — IT Admin đóng request của người đã nghỉ (US-03-04) và hệ thống đóng request của người đã nghỉ/chuyển (`beneficiary-gone-*`, X0.7).
+  - Lịch sử Request theo vai, chỉ đọc (L3 `request-history/`, qd103-request-history-by-role): `GET /me/access-requests` (người gửi; `involvement`
+    SENT/FOR_ME/ALL, người thụ hưởng Request nhóm chỉ thấy `myLine` của mình), `GET /departments/{id}/access-requests` (trưởng phòng hôm nay của
+    phòng), `GET /access-requests` (IT Admin toàn tổ chức; Người duyệt chi Request đã mở bước chi; Finance Request đã duyệt chi),
+    `GET /access-requests/{id}/events` (dòng thời gian, allowlist hành động audit), `GET /access-request-audit-flags` (Super Admin, chỉ cờ
+    `NO_NEED_APPROVER`, không số tiền — `SoD-1`). Super Admin không đọc Request nào. Dòng đọc qua `my-requests/` (L2: `my-requests.service.ts`
+    `pageOf` theo `RequestScope`, `my-requests.repo.ts`, `my-requests-facts.repo.ts`). Chi tiết, thời gian, dòng nhóm và dòng thời gian
+    dùng chung vị từ `canReadRequest` (`access-request.policy.ts`) qua `request-view/request-read-access.service.ts`: danh sách trả dòng nào
+    thì chi tiết đọc được dòng đó; không đọc được ⟹ 404.
+  - Hai hàng chờ đọc theo vai, chỉ đọc, không khóa, không ghi (L3): `need-decision-queue/` — `GET /need-decisions`, bước chờ quyết nhu cầu của người đang được giao
+    (`need-decision-queue.service.ts`, `.repo.ts`, `.mapper.ts`); `assessment-queue/` — `GET /assessment-queue` (lọc `departmentId`; phòng ngoài phạm vi ⟹ trang rỗng), việc thẩm định của IT Admin trong phạm vi phụ trách
+    (`assessment-queue.service.ts`, `.repo.ts`, `.mapper.ts`); `GET /assessment-queue/departments` đếm đơn đang chờ theo phòng (`departmentCounts`, cùng định nghĩa "đang chờ" `openAssessmentsIn`);
+    `GET /assessment-decisions` các đơn đã hoàn tất hoặc bị từ chối ở cổng (`assessment-decisions.service.ts`, `.repo.ts`, `.mapper.ts`, `.dto.ts`); phạm vi IT Admin chung ở
+    `assessment-queue-reach.service.ts`. Đơn case B rút gọn (đề xuất nêu `existingApplicationId`) mang `scope: PLAN_ONLY`: chỉ đánh giá gói. `my-requests` và `need-decision-queue` đọc cột `policy` qua `requestPolicyJson` (không ép kiểu).
+- **Request nhóm** (US-05-17)
+  - `group-request/` — lõi nhóm: dòng từng người, phân bổ tiền, quyết định theo dòng, rút dòng, grant nhóm,
+    `beneficiary-eligibility.policy.ts`; `group-line-decisions/` — `group-lines.controller.ts` và các service quyết định theo dòng (bước nhu cầu: `GroupNeedPreconditions`,
+    `GroupNeedVerdictWriter`, `GroupNeedDecisionService`; quyết định chi theo dòng: `GroupSpendHold` giữ cam kết, `GroupSpendReport`
+    báo cáo; `group-line-decision.policy.ts` ở `group-request/`). Rút dòng chia ba: `GroupLineWithdrawer` (ghi), `GroupWithdrawalAftermath` (hệ quả),
+    `GroupResolutionEnding` (kết thúc request khi dòng cuối xong); policy thuần ở `group-withdrawal.policy.ts` và
+    `group-resolution.policy.ts`.
+  - `group-request-submission/` — kiểm tra, gửi, ứng viên; `group-requests.controller.ts`; `GroupRequestWriter` ghi request và dòng,
+    `group-need-routing.policy.ts` chọn người xét nhu cầu; `line-closure/` — đóng dòng của người đã nghỉ (`GroupLineCloser`).
+- **Trả ghế, gia hạn**
+  - `return-request/` (US-05-13; mọi vai trừ Super Admin, `ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST`; `ReturnSeatGate` xét ghế trả, không đòi xác nhận bàn giao (`QĐ-110g`); `return-request.policy.ts`),
+    `renewal-request/` (US-05-14; `renewal-requests.controller.ts`; `RenewalRequestWriter` ghi, `renewal-request-submission.mapper.ts`
+    dựng dòng và audit) với `renewal-apply/`
+    (`renewal-apply.service.ts`, `renewal-request.repo.ts`: duyệt ⟹ mở tác vụ IT `EXTEND` (`requestExtension`), IT hoàn tất ⟹
+    `AccessRequestGrantGate.reportExtended` ⟹ `apply` ghi Assignment kế tiếp, BR-MF1-08d). Không còn Request tài khoản dịch vụ (`QĐ-110m`): loại `SERVICE_ACCOUNT` chỉ còn để đọc lịch sử, Request còn mở lúc bỏ đã bị hệ thống hủy với nguyên nhân `SYSTEM_SCOPE_REMOVED`.
+    Request tiếp tục chỉ gửi trong cửa sổ `RENEWAL_WINDOW_DAYS` ngày trước ngày kết thúc (422 `RENEWAL_REQUEST.WINDOW_NOT_OPEN`;
+    cửa sổ đã ghi giữ số ngày lúc mở, QĐ-108b); body `extensionMonths` (`K1` 1–9, khác 1–12) hoặc `longTerm: true` (`K2`/`K5`, không cho nhân sự có thời hạn),
+    luật `ACCESS_REQUEST.TERM_*` như Request mới (QĐ-111l): kỳ mới bắt đầu ngày sau ngày kết thúc cũ, cắt theo hợp đồng (R-38), tiền theo tháng bắt đầu và
+    số năm sau lưu lúc duyệt chi (R-39, R-46); `renewal.newExpectedEndDate` null khi không có ngày kết thúc.
+- **Hóa đơn mua, hồ sơ lệch** (PI-1, PI-2, RC-1)
+  - `purchase-invoice/` — hóa đơn IT Admin nộp và Finance ký (`purchase-invoice.repo.ts` writer duy nhất của `purchase_invoices`, `purchase_invoice_documents`); ký xong ghi MỘT dòng `invoices` qua `BudgetsApi.recordPurchaseInvoice`. Hóa đơn `PRICE_QUANTITY_EXCEPTION` (lệch số lượng hoặc đơn giá theo tiền gốc, R-44) mở hồ sơ ở `invoice-discrepancy` trong cùng transaction với chữ ký (`confirmation/`). Hóa đơn giữ cả hai vế của so khớp (`expected_quantity`, `expected_unit_price_original_*`).
+  - `invoice-discrepancy/` (L0, không controller) — `invoice_discrepancy_cases`: `invoice-discrepancy.repo.ts` (writer duy nhất), `invoice-discrepancy-opening.service.ts` (mở một lần cho một hóa đơn, gọi từ chữ ký), `invoice-discrepancy-closure.service.ts` + `.policy.ts` (đóng một lần với lý do và số chênh VND; `OUT_OF_PROCESS_SUSPECTED` cần chênh > 0 và phát `InvoiceDiscrepancyReferralListeners` trong cùng transaction để chuyển `SBF-08`). Không có controller vì `purchase-invoice` (có controller) gọi nó và gate không cho capability có controller bị import.
+  - `invoice-discrepancy-queue/` — `GET /invoice-discrepancies`, `GET /invoice-discrepancies/{id}` (Finance, IT Admin theo `getItAdminScope`, D8), `POST /invoice-discrepancies/{id}/closure` (Finance): controller, dto, mapper, `-query.service`.
+- **Trạng thái, SLA, chuyển bước**
+  - `status/` — chiếu audit event của request thành thông báo inbox (US-05-15); nhóm `rules/` là bảng luật sự kiện → thông báo. Luật `STEP_ASSIGNED`
+    (người gây ra sự kiện không được báo): gửi lại sau _Trả về_ (`ACCESS_REQUEST.RESUBMITTED`, `status-rules-progress.policy.ts`) báo người giữ bước vừa mở lại —
+    IT Admin của bước đánh giá hoặc người giữ từng bước nhu cầu — với `cause = RESUBMITTED`; Request một bước gửi lại thì bước chi mở lại do
+    `BUDGET_CHECKED` báo (`cause = SUBMITTED`). Bước chi mở trong lô (`VIA_HEAD`) báo Người duyệt chi bằng **một** `SPEND_BATCH_SUBMITTED` cho mỗi lô và người
+    (`sentCount` = số bước mở cho họ, trừ chính trưởng phòng trình; `spend-submission/spend-batch-recorder.service.ts`, trong transaction gửi lô), không
+    phải một `STEP_ASSIGNED` cho mỗi Request; bước chi mở khi trưởng phòng xác nhận dự phòng **riêng** (không nằm trong lô) báo `STEP_ASSIGNED` `cause = SPEND_SENT`
+    (`ACCESS_REQUEST.RESERVE_CONFIRMED` có `via = CONFIRMATION`, hoặc `BUDGET_CHECKED` kiểm lại mà đủ số cơ sở). Mục của lô không định giá được
+    (`ACCESS_REQUEST.SPEND_NOT_CHECKABLE`, `reason` như `PRICE_MISSING`) dừng tại lô và báo người yêu cầu + IT Admin phụ trách bằng `REQUEST_BUDGET_BLOCKED`; trưởng
+    phòng trình đọc kết quả ở `results[]` nên không được báo. Request một bước: trưởng phòng gửi đề xuất phần mềm mới (`ACCESS_REQUEST.ASSESSMENT_REQUESTED`,
+    `routingMode = ONE_STEP`) báo IT Admin giữ bước đánh giá `STEP_ASSIGNED` `IT_ASSESSMENT`/`SUBMITTED`; `ACCESS_REQUEST.ONE_STEP_PRICE_MISSING` báo
+    người yêu cầu + IT Admin phụ trách.
+  - `timing/` (thời gian từng bước, KPI-2), `sla/` (nhắc bước trễ, tồn đọng, nghẽn; US-05-09, US-05-10),
+    `reassignment/` (chuyển bước khi tổ chức hoặc vai trò đổi, chờ có kiểm soát; US-05-11, US-05-12).
+
+**Tìm X ở đâu**
+
+| Cần tìm                                             | Ở đâu                                                                                                     |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Request được đọc ra thế nào (`AccessRequestView`)   | `request-view/access-request-query.service.ts`                                                            |
+| Request được gửi thế nào                            | `request-intake/access-request.service.ts` (cá nhân), `group-request-submission/` (nhóm)                  |
+| Bước nhu cầu: quyết định, ghế tương tự, rút         | `need-decision/`, `withdraw/` (controller cạnh service)                                                   |
+| Kiểm tra ngân sách của một request                  | `spend/budget-check.service.ts`                                                                           |
+| Giới hạn GH-1 (trùng gói), GH-2 (tuần lịch)         | `request-limits/` (policy thuần + tuần lịch, múi giờ tổ chức; repo đếm `submitted_at` và khóa theo người) |
+| Khoản cam kết tự tạo ngày 01/01 (job, luật số tiền) | `year-start-commitments/` (`*.service.ts` điều phối, `*-batch.service.ts` một lô, `*.policy.ts` số tiền)  |
+| Ai giữ một bước, chuyển bước                        | `access-request/routing.policy.ts`, `step-routing/`, `reassignment/`                                      |
+| Kết thúc request và phát `requests.outcome`         | `outcome/request-outcome.service.ts`, `request-end/request-end.service.ts`                                |
+| Lý do từ chối của spend, hủy, ủy quyền              | `spend/spend.errors.ts`, `access-request/access-request.types.ts` (kiểu lý do)                            |
+| Route của một use case                              | `docs/generated/routes.md` (sinh từ code)                                                                 |
+
+## Bất biến quan trọng
+
+- Nhánh, chuỗi bước và SLA cố định lúc gửi; phòng ban và Unit Cost Center là cái hiệu lực vào ngày gửi (US-05-02
+  AC-3, AC-7; chú thích `prisma/models/requests.prisma`). Quyết định theo dòng không bao giờ sửa hay xóa (INV-05).
+- Bước nhu cầu không bao giờ giao cho chính người xin (`SoD-4`, `INV-08`); không ai chọn tay người giữ bước
+  (`access-request/routing.policy.ts`). Bước nhu cầu chỉ giao cho trưởng phòng hoặc Người duyệt chi (dòng 1, 2, 5, 9); phòng
+  chưa có trưởng phòng thì bước **chờ có kiểm soát** `NO_DEPARTMENT_HEAD` (dòng 4, Super Admin nhận cảnh báo) và được giao khi
+  Super Admin gán trưởng phòng, tuổi bước không đặt lại (`REWAIT`/`ASSIGN` ở `step-routing/reassignment.policy.ts`). Ngoại lệ duy nhất là
+  `K5` miễn phí: bước kết thúc `NOT_REQUIRED` và Request sang IT như Request gửi mới (`END_NOT_REQUIRED`, `QĐ-111bc`).
+- Bước chi chỉ giao cho Người duyệt chi (`step-routing/spend-routing.policy.ts`): không ai thay khi họ là bên của Request
+  (Request đó không tồn tại: hợp đồng D-S21, `REQUEST_PARTY.INELIGIBLE` 422) hay vắng; chưa có người giữ vai thì chờ
+  `NO_SPENDING_APPROVER`. Mở bước chi khóa dòng grant `FOR SHARE` trước khi đọc (M6). Bước cũ do approver dự phòng/người thay thế
+  giữ không còn là trường hợp riêng: không đóng băng, không `STEP_AWAITING_CONVERSION`; migration gỡ `approval_role_holders` dừng
+  `P0001` và nêu dòng nếu DB còn dữ liệu cũ (Request có Người duyệt chi là bên, bước dòng 3/4 hay lý do chờ cũ, bước chi do người
+  chưa từng có grant giữ). Bước chờ đổi lý do (`REWAIT`) chỉ ghi `waiting_reason`, giữ `waiting_since`.
+- Thứ tự khóa: task grant (`LicensingApi.lockGrantOfRequest`) rồi request (`request-end/request-end.service.ts`); hàng request
+  rồi khóa năm ngân sách (`budgets/budget/budget-year-lock.repo.ts`).
+- Khoản 01/01 (`year-start-commitments/`, `BudgetsApi.holdYearStart`): `YearStartCommitmentsSweeper` mỗi giờ trong tiến trình API (ADR-0018); lượt đầu
+  của năm sau 00:00 giờ tổ chức giữ cho mỗi Request trả phí `K1`/`K2` đang chạy hoặc đã duyệt chi chưa cấp một khoản của năm mới (giá tháng của
+  gói hiệu lực ngày 01/01 × 12 tháng cho quyền _Dùng lâu dài_; Request có _Thời gian dùng_ giữ **đúng số năm sau đã lưu lúc duyệt** của từng seat còn hiệu lực sau 31/12 — số của Request cá nhân, hàng `access_request_line_amounts` chưa giữ (`held = false`) của từng người trong Request nhóm, `QĐ-111ak`; seat đóng trước hạn trong năm mới giữ các tháng tới ngày đóng ở **giá lúc duyệt** của Request (đơn giá và chu kỳ của chính Request), không vượt số đã lưu; Request cũ không có số đã lưu thì đếm theo tháng tới ngày kết thúc seat; bằng đồng như giá ghi — không quy đổi, giá còn ở ngoại tệ ⟹ bỏ qua `NO_PRICE`; số đã lưu còn ở ngoại tệ (Request duyệt chi trước khi mọi giá về đồng) không được đọc như đồng: seat tính theo tháng × giá 01/01 và audit `BUDGET_COMMITMENT.YEAR_START_SAVED_AMOUNT_IGNORED` ghi lại), rồi ghi dấu `year_start_commitment_runs`; lượt sau trong năm không đọc gì. Seat đi theo chuỗi
+  `predecessor_id` tới bản ghi đang chạy; Cost Center của phòng sở hữu bản ghi đó (tài khoản dịch vụ bàn giao sang phòng khác ⟹ phòng mới). Request
+  gia hạn (`RENEWAL`) giữ khoản của bản ghi kế tiếp nó tạo; Request cấp ban đầu không giữ phần đã được gia hạn. Mỗi bước (mở, mỗi lô) một
+  transaction, trước hết `pg_try_advisory_xact_lock` theo (tổ chức, năm) — instance khác đang giữ thì bỏ lượt (`BUSY`); trong lô: khóa hàng Request
+  `FOR UPDATE` theo id, đọc grant (không khóa), rồi khóa năm của Cost Center theo id — cùng thứ tự với mọi ghi ngân
+  sách. Lượt lỗi giữa chừng: lượt sau đi tiếp sau `resume_after_id`, không ghi lại audit bỏ qua. Tổ chức chưa có dấu: lượt đầu chỉ đánh dấu khi chưa
+  có Request gửi trước năm đó; có dấu cũ nhưng thiếu năm trước ⟹ log cảnh báo. Chạy tay: `YearStartCommitmentsService.run(now)`. Chỉ Request có
+  khoản; quyền không có Request thì không (QĐ-109a).
+- Số chạy sang năm sau (`year-start-commitments/carried-over.listener.ts`, `YearStartCarriedOverService`; `QĐ-111ac`): `requests` bind
+  `CarriedOverContributions` của `budgets`, trả cho mỗi Cost Center đúng số khoản 01/01 của năm đó sẽ giữ, tính ngay bây giờ bằng cùng một luật
+  (`YearStartCommitmentsBatchService.judgeBatch`, dùng chung với lượt 01/01). Chỉ đọc: không khóa Request (`YearStartCommitmentsRepo.readBatch`),
+  không ghi khoản, không ghi audit; Request đã giữ khoản của năm đó không tính lại. Quét mọi Request trả phí của tổ chức theo lô 100 mỗi lần hỏi.
+- Mọi kết thúc request phát `requests.outcome` trong cùng transaction; listener ném lỗi thì kết thúc bị hoàn tác.
+- Sweep chuyển bước: mỗi request một transaction, khóa theo id, chỉ ghi khi bảng định tuyến chỉ ra người khác người
+  đang giữ; sweep SLA chỉ ghi nhắc, thông báo và audit, không đổi bước hay request (`public/*-sweep.api.ts`).
+
+## Test
+
+- Unit: `src/modules/requests/**/*.spec.ts`; HTTP: `test/http/requests/`; integration: `test/integration/requests/`.
+- Codec của cột JSON (`.json.ts`, [database rules](../../../docs/rules/database-business.md)): `access-request/access-request.json.ts` giữ `policy`
+  (`payment_schedule` không còn ghi hay đọc — một số tiền một năm, QĐ-109; cột còn đó, trigger chặn ghi mới), nên spec của nó nằm trong
+  `access-request/access-request.policy.spec.ts` (thư mục đã đủ 25 file); `request-draft/request-draft-policy.json.ts` (`policy` của bản nháp) có spec cạnh file.
+
+## Request một bước và phòng không có trưởng phòng
+
+Định tuyến chốt lúc gửi (`access-request/routing.policy.ts`, năm ca; `QĐ-110i`, `QĐ-111bc`, R-43). Phòng không có trưởng phòng hiệu lực (kể cả
+khi đã ghi kế nhiệm cho ngày sau) thì: (1) Request trả phí của nhân viên **chờ** ở bước nhu cầu (`NO_DEPARTMENT_HEAD`, Request
+`WAITING_CONTROLLED`, Super Admin nhận cảnh báo), không đi một bước; (2) case B (đề xuất phần mềm ngoài danh mục) của nhân viên chờ như ca 1,
+không sang IT đánh giá vì chưa biết sẽ miễn phí hay trả phí; (3) trưởng phòng gửi cho chính mình đi `ONE_STEP` (`REQUESTER_IS_HEAD`), bước nhu
+cầu `NOT_REQUIRED` không có người giữ/SLA; (4) `K5` miễn phí đã có trong danh mục đi thẳng IT (`ONE_STEP`, `NO_DEPARTMENT_HEAD`), audit
+`ACCESS_REQUEST.NO_NEED_APPROVER` là cờ cho Super Admin; (5) phòng có trưởng phòng: bước nhu cầu giao cho trưởng phòng như cũ. Bảng chỉ cần biết
+chuỗi bước có bước chi hay không (trả phí và case B luôn có, `K5` không có).
+
+Phòng **mất** trưởng phòng khi Request `K5` đang chờ (hết kỳ, trưởng phòng nghỉ việc hay Super Admin ghi trống chức vụ): lượt xét lại bước
+(`StepReassignmentService`) chạy lại bảng trên dữ liệu hôm nay, và với `K5` nó nói "không ai cần quyết nhu cầu" (`needStepTarget`) nên bước nhu cầu
+(đang giữ hoặc đang chờ) kết thúc `NOT_REQUIRED` dòng 4, Request thành `ONE_STEP` lý do `NO_DEPARTMENT_HEAD`, chuỗi bước bỏ `NEED`, sang
+`AWAITING_EXECUTION` qua `SpendRoutingService.start` (audit `ACCESS_REQUEST.NO_NEED_APPROVER` giống Request gửi mới, thêm
+`ACCESS_REQUEST.STEP_NOT_REQUIRED` ở bước). Bước hết mở nên các lượt sau không đụng lại (chạy lại không ghi gì). Request trả phí và case B vẫn chờ
+(`QĐ-110i`). Khi đã ghi kế nhiệm bắt đầu ngày sau (`nextHeadPeriodOf`) thì `K5` đang chờ **chờ tiếp** `NO_DEPARTMENT_HEAD` qua khoảng giữa và chuyển sang
+người kế nhiệm ở `HEAD_PERIOD_START`, không kết thúc (`QĐ-110h`: việc đang chờ chuyển sang kế nhiệm; `StepTargetService`, `needStepTarget(…, { successorRecorded })`). Chỉ
+lượt xét lại đọc kế nhiệm; Request gửi mới vào khoảng giữa vẫn đi thẳng IT theo `routeNeedStep` (Owner chưa chọn đồng bộ, `OVERNIGHT-DECISIONS` D-53). Request `K5` của người xin **vừa trở thành** trưởng phòng (Super Admin đổi trưởng phòng) cũng kết thúc bước nhu cầu như trưởng phòng gửi cho chính mình: `NOT_REQUIRED` dòng 2, `ONE_STEP` lý do `REQUESTER_IS_HEAD`, sang `AWAITING_EXECUTION` với cờ `NO_NEED_APPROVER` (`QĐ-103p`, US-05-24; `needStepTarget(…, { chainHasSpendStep })`); Request trả phí của người đó vẫn chờ `NO_DEPARTMENT_HEAD` (Owner chưa chọn, `OVERNIGHT-DECISIONS` B2A-Q2).
+
+Request một bước trả phí (trưởng phòng gửi cho chính mình) kiểm ngân sách ngay khi gửi bằng `BudgetCheckService`: đủ số cơ sở hoặc dùng dự phòng
+mở bước chi; bị chặn hoặc thiếu giá thì lưu `AWAITING_REQUESTER_REVISION`. Người yêu cầu bổ sung qua `accessRequestSupplementAdd`, gửi lại qua
+`POST /access-requests/{id}/resubmission`, hoặc rút. Người duyệt chi quyết một lần có dự phòng.
+
+Nhóm không chứa trưởng phòng (`HEAD_IN_GROUP`), trần hiện tại giữ 10/100. Nhóm do trưởng phòng gửi vẫn xác nhận nhu cầu và vào lô; nhóm nhân
+viên của phòng không có trưởng phòng chờ như ca 1 (nhóm chỉ xin phần mềm trả phí, không có nhóm `K5`). Không cần định tuyến DIRECT theo người quyết nhu cầu hoặc cờ
+cùng người hai bước.
+
+Mất trưởng phòng: khi kỳ trưởng phòng kết thúc (`HEAD_PERIOD_END`), bước nhu cầu trưởng phòng đang giữ chuyển sang chờ; không còn đánh dấu hay
+chuyển Request nào thành một bước, ở listener lẫn sweep. Nếu phòng không còn trưởng phòng làm việc và chưa ghi kế nhiệm, Super Admin nhận
+thông báo `DEPARTMENT_WITHOUT_HEAD { departmentId, waitingCount }` (`reassignment/department-without-head-notice.service.ts`, một lần cho mỗi
+thay đổi). Trưởng phòng mới bắt đầu (`HEAD_PERIOD_START`) nhận mọi bước chờ của phòng; hạn tính từ ngày tạo bước nên không đặt lại.
+`OneStepConversionService` chỉ còn hoàn tất trong sweep (mỗi Request một transaction, dùng lại kiểm ngân sách chuẩn) những Request mà luật cũ đã
+đánh dấu `ONE_STEP`/`HEAD_LEFT` trước đó. `requests-routing-facade.module.ts` ghép cổng hàm định tuyến/kiểm cho API và worker. Dữ liệu lịch sử giữ
+cột/enum cũ, ngừng ghi hành vi cũ.
+
+Tìm định tuyến: `access-request/routing.policy.ts`; gửi lại: `request-intake/request-resubmission.service.ts`; khi mất trưởng phòng:
+`reassignment/organization-change.listener.ts`; hiển thị kết quả: `spend/spend-status.service.ts`.

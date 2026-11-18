@@ -23,7 +23,13 @@ test('is an instance of the supplied StoppingCriteria base and callable as a fun
   const { c } = mk();
   assert.ok(c instanceof StoppingCriteria);
   assert.equal(typeof c, 'function');
-  assert.deepEqual(c([[1, 2], [3, 4]]), [false, false]);
+  assert.deepEqual(
+    c([
+      [1, 2],
+      [3, 4],
+    ]),
+    [false, false],
+  );
 });
 
 test('returns one boolean per sequence; counts calls (proves it was invoked)', () => {

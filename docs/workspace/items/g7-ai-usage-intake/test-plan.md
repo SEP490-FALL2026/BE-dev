@@ -1,0 +1,62 @@
+# Test plan: g7-ai-usage-intake
+
+Bổ sung `## Test matrix` của [spec](spec.md); task chạy ở [plan](plan.md). Dữ liệu giả: tổ chức TZ `Asia/Ho_Chi_Minh`, thiết bị
+`D-001` của `E1` (đăng ký `R1`, credential `C1`, `C2`), `D-002` của `E2`; phiên bản allowlist v1 = {`CLAUDE_CODE`, `CODEX`} công bố
+01/09 00:00 +07, v2 thêm `ANTIGRAVITY_CLI` công bố 10/09 12:00 +07. `now` cố định `2026-09-15T03:00:00Z`. Integration dùng DB riêng
+theo `test/README.md`; không token thật, không log token. Level A: U-_; level B: H-_, I-*.
+
+## Unit (`pnpm test -- src/modules/usage`)
+
+| Mã  | Test (file · tên)                                                                        | Input                                                                                   | Mong đợi                                                             |
+| --- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| U1  | `ai-usage-day.policy.spec` · rejects every day when generatedAt is more than 5 min ahead | `generatedAt = now + 6 min`, 2 ngày                                                     | 2 × `REJECTED FUTURE_GENERATED_AT`                                   |
+| U2  | · rejects a day before the acknowledgement day                                           | `acceptFromAt = 03/09 10:00 +07`; ngày 02/09                                            | `OUTSIDE_WINDOW` (05 AC-14)                                          |
+| U3  | · accepts the acknowledgement day only as PARTIAL                                        | ngày 03/09 `COVERED` / `PARTIAL`                                                        | `INVALID_COVERAGE` / hợp lệ                                          |
+| U4  | · rejects days after the stop instant and after generatedAt                              | `acceptUntilAt = 12/09 15:00 +07`; ngày 13/09; ngày > ngày của `generatedAt`            | `OUTSIDE_WINDOW` (04 AC-12, 05 AC-9)                                 |
+| U5  | · rejects NOT_OBSERVABLE with counts                                                     | `{NOT_OBSERVABLE, responses: 1}`                                                        | `INVALID_COVERAGE`                                                   |
+| U6  | · rejects a whole day with a tool outside the allowlist of that date                     | ngày 09/09 có `ANTIGRAVITY_CLI`; ngày 10/09 có `ANTIGRAVITY_CLI`                        | 09/09 `NOT_IN_ALLOWLIST`; 10/09 hợp lệ (giao khoảng v2)              |
+| U7  | · keeps the fixed reason order                                                           | ngày vừa ngoài cửa sổ vừa sai coverage                                                  | `OUTSIDE_WINDOW`                                                     |
+| U8  | `allowlist.policy.spec` · effective keys across local midnight and the next version      | v1/v2 như trên; ngày 09/09, 10/09, 11/09                                                | {C,X}, {C,X,A}, {C,X,A}; `applicationId` từ bản muộn nhất            |
+| U9  | · marks only ANTIGRAVITY_CLI experimental                                                | ba khóa                                                                                 | `experimental` true chỉ agy (02 AC-7, 09-09 AC-8)                    |
+| U10 | `tool-status.policy.spec` · checks window codes per tool and OK/windows consistency      | Codex `SESSION`; Claude `OK` + `[]`; agy `FAILED` + 1 cửa sổ; mã trùng                  | 4 × `INVALID_QUOTA`                                                  |
+| U11 | · rejects future and out-of-window observedAt                                            | `now + 6 min`; trước `acceptFromAt`                                                     | `FUTURE_OBSERVED_AT`; `OUTSIDE_WINDOW`                               |
+| U12 | `intake-gate.policy.spec` · maps state to refusal                                        | `AWAITING_ACKNOWLEDGEMENT`, `COLLECTION_STOPPED`, ACTIVE+`toolStatusAcknowledged=false` | `NOT_ACKNOWLEDGED`, `COLLECTION_STOPPED`, `TOOL_STATUS_…` (ảnh chụp) |
+
+## HTTP (`pnpm test:http -- test/http/usage`; DB giả lập/stub facade theo `test/http` hiện có)
+
+| Mã  | Test                                                           | Input                                                                                      | Mong đợi                                                                                                                                                |
+| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H1  | `ai-usage-batch.http-spec` · device routes refuse a user token | Bearer access token của IT                                                                 | 401 `DEVICE.CREDENTIAL_INVALID` (S1b); route `/devices/*` với token thiết bị ⟹ 401 `INVALID_ACCESS_TOKEN`                                               |
+| H2  | · wrong collector kind                                         | credential `BROWSER_EXTENSION`                                                             | 403 `DEVICE.WRONG_COLLECTOR_KIND`                                                                                                                       |
+| H3  | · not acknowledged / collection stopped                        | context `AWAITING_ACKNOWLEDGEMENT` / `COLLECTION_STOPPED`                                  | 403 `DEVICE.NOT_ACKNOWLEDGED` / `DEVICE.COLLECTION_STOPPED`; repo rejection được gọi một lần                                                            |
+| H4  | · strict envelope                                              | thêm `url` ở tool; `days` 15 phần tử; `date` trùng; `sessions` ở ngày                      | 422 `VALIDATION_ERROR` (O-1)                                                                                                                            |
+| H5  | · per-day results in request order                             | 3 ngày: hợp lệ, ngoài cửa sổ, sai coverage                                                 | 200 `AI_USAGE_BATCH.PROCESSED`, `results` đúng thứ tự và mã                                                                                             |
+| H6  | `tool-status.http-spec` · notice without tool-status section   | `toolStatusAcknowledged=false`                                                             | 403 `DEVICE.TOOL_STATUS_NOT_ACKNOWLEDGED` (03 AC-11)                                                                                                    |
+| H7  | `usage-read.http-spec` · roles                                 | MANAGER, FINANCE, EMPLOYEE gọi `/devices/{id}/usage`, `/tool-status`, `/intake-rejections` | 403 `AUTHORIZATION.FORBIDDEN` (07 AC-3)                                                                                                                 |
+| H8  | · `/me` hides other holders                                    | `E2` gọi `/me/devices/{D-001}/usage`                                                       | 404 `DEVICE.NOT_FOUND`                                                                                                                                  |
+| H9  | · no ranking parameters                                        | `?sortBy=totalTokens`, `?pageSize=101`                                                     | 422 (07 AC-2)                                                                                                                                           |
+| H10 | `allowlist.http-spec` · publish rules                          | ứng dụng liên lạc; ứng dụng `INTERNAL`; id lạ; tập y hệt; role FINANCE                     | 422 `…NOT_ELIGIBLE` ×2, 422 `…NOT_FOUND`, 409 `…UNCHANGED`, 403                                                                                         |
+| H12 | `allowlist.http-spec` · session carries the allowlist          | chưa có bản; rồi v1 {`CLAUDE_CODE`, `CODEX`}; `deviceSessionGet`                           | `allowlist = { version: null, entries: [] }`; rồi `{ version: 1, entries: [{AI_TOOL, CLAUDE_CODE}, {AI_TOOL, CODEX}] }`; không key `toolStatusAccepted` |
+| H11 | `usage-field-contract.http-spec` · **field ma**                | đọc `openapi.json` của 9 operation                                                         | tập field request/response = bảng field của spec (danh sách hằng trong test); không key `ip`, `url`, `planLabel`, `sessions`, `toolVersion`             |
+
+## Integration (`pnpm test:integration -- test/integration/usage`; PostgreSQL thật)
+
+| Mã  | Test                                                                    | Thao tác                                                   | Mong đợi                                                                                  |
+| --- | ----------------------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| I1  | `ai-usage-upsert` · resend unchanged                                    | gửi lô `T1` hai lần                                        | lần 2 mọi ngày `UNCHANGED`; số dòng không đổi (05 AC-10)                                  |
+| I2  | · later build wins, late older build ignored                            | `T1` → `T2` sửa 10/09 → `T1` lại                           | 10/09 theo `T2`; lần cuối `UNCHANGED` (05 AC-12)                                          |
+| I3  | · equal generatedAt, different content: last arrival wins               | hai lô cùng `generatedAt`, khác `responses`                | dòng = lô sau                                                                             |
+| I4  | · two credentials of one registration merge                             | `C1` gửi `T1`, `C2` gửi `T2` cùng ngày                     | một dòng, giá trị `T2`, `credential_id = C2` (DESIGN §2.7)                                |
+| I5  | · concurrent batches on the same day                                    | 2 transaction song song, `T1`/`T2`                         | kết quả cuối = `T2` bất kể thứ tự; không deadlock (sắp `tool, usage_date`)                |
+| I6  | · handover the same day keeps both holders                              | `R1` kết thúc 15/09, `R2` bắt đầu 15/09; cả hai gửi 15/09  | hai dòng khác `registration_id` (D-3)                                                     |
+| I7  | · gate refusal is stored                                                | lô khi `AWAITING_ACKNOWLEDGEMENT`                          | 1 dòng `intake_rejections` `NOT_ACKNOWLEDGED`, date NULL; 0 dòng usage                    |
+| I8  | · stop completes while a batch waits                                    | tx A giữ `FOR UPDATE` đăng ký (hoàn tất dừng), tx B gửi lô | B chạy sau A ⟹ 403 `COLLECTION_STOPPED`; trước A ⟹ nhận (04 AC-12 vế đang xử lý vẫn nhận) |
+| I9  | `usage-append-only` · allowlist rows refuse UPDATE/DELETE/TRUNCATE + H7 | SQL trực tiếp với role runtime                             | lỗi `… is append-only`; `ops:db-roles` judgement không finding                            |
+| I10 | `allowlist-effective` · versions under advisory lock                    | hai POST song song                                         | số phiên bản 1 và 2, không trùng                                                          |
+| I11 | `usage-read-query-count` · constant statements                          | 5 GET trên 3 và 30 dòng                                    | số câu lệnh bằng nhau; đếm + trang cùng snapshot                                          |
+| I12 | · snapshot separated from usage                                         | gửi ảnh chụp hợp lệ                                        | `ai_usage_days` không đổi; GET tool-status trả dòng mỗi cửa sổ (07 AC-5, 09-09 AC-10)     |
+
+## Contract với tool (level A, tay)
+
+Fixture JSON do `python -m ai_collector be-upload --dry-run` sinh (T1) gửi vào BE local: 200, mọi ngày `ACCEPTED`; gửi lại ⟹
+`UNCHANGED`. Ghi lệnh, revision và kết quả vào bảng _Verification and handoff_ của plan; không ghi token.

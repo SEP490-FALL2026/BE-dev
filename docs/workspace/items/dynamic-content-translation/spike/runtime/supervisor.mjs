@@ -32,7 +32,18 @@ export class Supervisor extends EventEmitter {
   } = {}) {
     super();
     if (typeof spawn !== 'function') throw new TypeError('spawn(ctx) => ChildProcess is required');
-    Object.assign(this, { spawnFn: spawn, concurrency, computeMaxMs, killGraceMs, loadTimeoutMs, loadBackoffMinMs, loadBackoffMaxMs, shutdownGraceMs, exitWaitMs, deadlineCancel });
+    Object.assign(this, {
+      spawnFn: spawn,
+      concurrency,
+      computeMaxMs,
+      killGraceMs,
+      loadTimeoutMs,
+      loadBackoffMinMs,
+      loadBackoffMaxMs,
+      shutdownGraceMs,
+      exitWaitMs,
+      deadlineCancel,
+    });
     this.slots = Array.from({ length: concurrency }, (_, id) => ({
       id,
       child: null,
@@ -167,7 +178,8 @@ export class Supervisor extends EventEmitter {
     this.shutdownPromise = new Promise((resolve) => {
       this.resolveShutdown = resolve;
     });
-    for (const job of this.queue.splice(0)) this.#settle(job, { state: 'ABANDONED', reason: 'SHUTDOWN', complete: false });
+    for (const job of this.queue.splice(0))
+      this.#settle(job, { state: 'ABANDONED', reason: 'SHUTDOWN', complete: false });
     for (const slot of this.slots) if (slot.job) this.cancel(slot.job);
     this.shutdownHardTimer = setTimeout(() => {
       for (const slot of this.slots) {
@@ -448,7 +460,10 @@ export class Supervisor extends EventEmitter {
   #onExitWatch(slot, child) {
     slot.exitWatchTimer = null;
     if (slot.child !== child) return;
-    const dead = (child.exitCode !== null && child.exitCode !== undefined) || (child.signalCode !== null && child.signalCode !== undefined) || child.pid === undefined;
+    const dead =
+      (child.exitCode !== null && child.exitCode !== undefined) ||
+      (child.signalCode !== null && child.signalCode !== undefined) ||
+      child.pid === undefined;
     if (dead) {
       this.#onExit(slot, child, child.exitCode ?? null, child.signalCode ?? null, true);
       return;
@@ -485,12 +500,24 @@ export class Supervisor extends EventEmitter {
         d.failures = 0;
         d.backoffMs = 0;
         d.backoffUntil = 0;
-        this.#emit('loaded', { slot: slot.id, direction: msg.direction, ms: msg.ms, lockMs: msg.lockMs, rssMb: msg.rssMb });
+        this.#emit('loaded', {
+          slot: slot.id,
+          direction: msg.direction,
+          ms: msg.ms,
+          lockMs: msg.lockMs,
+          rssMb: msg.rssMb,
+        });
         if (job && job.direction === msg.direction && job.phase === 'LOADING') {
           if (job.cancelRequested) {
             // cancelled (by waiters / compute deadline / shutdown) while the blocking load ran: do not start the run
             this.#release(slot, 'cancelled-before-run');
-            this.#settle(job, { state: 'ABANDONED', reason: job.deadlineFlag ? 'DEADLINE' : 'CANCELLED', complete: false, deadlineHit: job.deadlineFlag, cancelled: !job.deadlineFlag });
+            this.#settle(job, {
+              state: 'ABANDONED',
+              reason: job.deadlineFlag ? 'DEADLINE' : 'CANCELLED',
+              complete: false,
+              deadlineHit: job.deadlineFlag,
+              cancelled: !job.deadlineFlag,
+            });
             if (job.deadlineFlag) this.emit('failure', { kind: 'deadline', direction: job.direction, jobId: job.id });
             this.#pump();
             this.#shutdownProgress();
@@ -537,7 +564,15 @@ export class Supervisor extends EventEmitter {
         const truncated = !complete && !deadlineHit && msg.reason === 'TRUNCATED';
         this.#settle(job, {
           state: complete ? 'DONE' : truncated ? 'FAILED' : 'ABANDONED',
-          reason: complete ? undefined : deadlineHit ? 'DEADLINE' : truncated ? 'TRUNCATED' : job.cancelRequested || msg.cancelled === true ? 'CANCELLED' : 'INCOMPLETE',
+          reason: complete
+            ? undefined
+            : deadlineHit
+              ? 'DEADLINE'
+              : truncated
+                ? 'TRUNCATED'
+                : job.cancelRequested || msg.cancelled === true
+                  ? 'CANCELLED'
+                  : 'INCOMPLETE',
           complete,
           outputs: complete ? msg.outputs : undefined,
           deadlineHit,
@@ -593,8 +628,15 @@ export class Supervisor extends EventEmitter {
       } else if (job.killReason === 'load-timeout') {
         this.#settle(job, { state: 'FAILED', reason: 'LOAD_TIMEOUT', complete: false });
       } else if (job.killReason) {
-        if (job.killReason !== 'shutdown-grace') this.emit('failure', { kind: 'kill', direction: job.direction, jobId: job.id });
-        this.#settle(job, { state: 'ABANDONED', reason: 'KILLED', complete: false, killed: true, deadlineHit: job.deadlineFlag });
+        if (job.killReason !== 'shutdown-grace')
+          this.emit('failure', { kind: 'kill', direction: job.direction, jobId: job.id });
+        this.#settle(job, {
+          state: 'ABANDONED',
+          reason: 'KILLED',
+          complete: false,
+          killed: true,
+          deadlineHit: job.deadlineFlag,
+        });
       } else {
         this.emit('failure', { kind: 'crash', direction: job.direction, jobId: job.id });
         this.#settle(job, { state: 'FAILED', reason: 'CRASHED', complete: false });

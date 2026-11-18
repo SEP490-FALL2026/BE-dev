@@ -1,0 +1,98 @@
+import { Body, Controller, HttpStatus, Post } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiErrorResponses,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
+} from '../../../infrastructure/http/decorators/api-error-responses.decorator';
+import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
+import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/access.decorators';
+import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { TERM_ERROR_EXAMPLES } from '../access-request/access-request.http-errors';
+import { AccessRequestQueryService } from '../request-view/access-request-query.service';
+import { toWire } from '../request-view/access-request.mapper';
+import { RenewalBodyDto, RenewalResponseDto } from './renewal-request.dto';
+import { RENEWAL_ERROR_EXAMPLES, toRenewalApiException } from './renewal-request.http-errors';
+import { RenewalRequestService } from './renewal-request.service';
+
+const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
+
+const SUBMIT_ERRORS = [
+  ...AUTH_ERRORS,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'The caller is not the holder of the seat, a head of the department included (RENEWAL_REQUEST.NOT_HOLDER), or is the Super Admin, who sends no request (ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST).',
+    examples: [RENEWAL_ERROR_EXAMPLES.NOT_HOLDER, RENEWAL_ERROR_EXAMPLES.SUPER_ADMIN_CANNOT_REQUEST],
+  },
+  {
+    status: HttpStatus.NOT_FOUND,
+    description: 'The seat does not exist (RENEWAL_REQUEST.ASSIGNMENT_NOT_FOUND).',
+    examples: [RENEWAL_ERROR_EXAMPLES.ASSIGNMENT_NOT_FOUND],
+  },
+  {
+    status: HttpStatus.CONFLICT,
+    description:
+      'The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). After the end the ask is a request for new access, so GH-1 judges it too (ACCESS_REQUEST.OPEN_REQUEST_EXISTS). Nothing is written.',
+    examples: [
+      RENEWAL_ERROR_EXAMPLES.ASSIGNMENT_NOT_RENEWABLE,
+      RENEWAL_ERROR_EXAMPLES.ALREADY_REQUESTED,
+      RENEWAL_ERROR_EXAMPLES.APPLICATION_RETIRED,
+      RENEWAL_ERROR_EXAMPLES.ALREADY_HOLDS_ACCESS,
+      RENEWAL_ERROR_EXAMPLES.NO_DEPARTMENT,
+      RENEWAL_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+      RENEWAL_ERROR_EXAMPLES.OPEN_REQUEST_EXISTS,
+    ],
+  },
+  {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'The form is incomplete or invalid (VALIDATION_ERROR): the seat, the reason and exactly one of the months of use to go on (extensionMonths) and a right with no end (longTerm: true) are required, and nothing else is taken (an end date is not given: the system works it out). The window of the renewal is not open yet (RENEWAL_REQUEST.WINDOW_NOT_OPEN, with details.opensOn and details.windowDays: a renewal is sent from RENEWAL_WINDOW_DAYS days before the approved end, BR-MF1-08a). The months follow the kind of the plan: 1 to 9 for a plan bought by the month (ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE), 1 to 12 for the others; a right with no end is for a plan of seats or internal software only (ACCESS_REQUEST.TERM_REQUIRED for a plan bought by the month) and never for a contractor, a freelancer or an intern (ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED), whose new period is cut at the end of their contract instead; a plan bought once is not renewed (ACCESS_REQUEST.TERM_NOT_ASKED); a contractor, a freelancer or an intern whose contract ends before the new period begins gets no renewal (ACCESS_REQUEST.TERM_CONTRACT_ENDED, details.contractEndDate). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end the ask is a request for new access, so GH-2 judges it too: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). A renewal sent in time is not counted by GH-2. Nothing is written.',
+    examples: [
+      VALIDATION_EXAMPLE,
+      RENEWAL_ERROR_EXAMPLES.WINDOW_NOT_OPEN,
+      ...TERM_ERROR_EXAMPLES,
+      RENEWAL_ERROR_EXAMPLES.REQUEST_PARTY_INELIGIBLE,
+      RENEWAL_ERROR_EXAMPLES.OPEN_LIMIT_REACHED,
+    ],
+  },
+] as const;
+
+/**
+ * The renewal of a right that ends on a day: the holder asks to go on using it. The request is the
+ * same as any other (it is read, withdrawn and decided through the routes of requests); this makes it. Nothing here edits the end
+ * a right has.
+ */
+@ApiTags('access-requests')
+@Controller({ path: 'access-requests', version: '1' })
+export class RenewalRequestsController {
+  constructor(
+    private readonly renewals: RenewalRequestService,
+    private readonly queries: AccessRequestQueryService,
+  ) {}
+
+  @Post('renewals')
+  @AuthenticatedOnly()
+  @ApiOperation({
+    operationId: 'accessRequestRenewalSubmit',
+    summary: 'Ask to renew a right that ends on a day',
+  })
+  @ApiSuccessResponse(RenewalResponseDto, {
+    status: HttpStatus.CREATED,
+    message: 'ACCESS_REQUEST.RENEWAL_SUBMITTED',
+    description:
+      'The holder of a right that has an end date asks to go on using it, for a number of months or with no end (a plan of seats or internal software, not for a person with a term). The end the right has is never edited: a request of its own is made for the same tool and the person, decided like any request (the need step and, for paid software, the spend step), and approval ends the old record at its end and begins a new one that follows it, so the seats taken on any day do not change. Sent up to the end of the right, today included, the right stays as it is until the request is decided, and a refusal or a withdrawal leaves it for the revocation that follows its end. Sent after the end, what is made is a request for the tool like any other (outcome NEW_REQUEST), sent by the person it is for.',
+  })
+  @ApiErrorResponses(...SUBMIT_ERRORS)
+  async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RenewalBodyDto) {
+    try {
+      const { outcome, record } = await this.renewals.submit(actor, body);
+
+      return { outcome, request: toWire(await this.queries.view(record)) };
+    } catch (error) {
+      throw toRenewalApiException(error);
+    }
+  }
+}

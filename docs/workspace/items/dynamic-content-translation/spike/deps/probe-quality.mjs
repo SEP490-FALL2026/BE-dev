@@ -38,7 +38,11 @@ const INPUTS = {
     'This device has reached the maximum number of activations.',
   ],
 };
-const SETTINGS = { default: {}, beams4: { num_beams: 4, do_sample: false }, greedy: { num_beams: 1, do_sample: false } };
+const SETTINGS = {
+  default: {},
+  beams4: { num_beams: 4, do_sample: false },
+  greedy: { num_beams: 1, do_sample: false },
+};
 
 const out = { label: process.env.SPIKE_LABEL || null, version: env.version ?? null, results: {} };
 for (const dir of ['vi-en', 'en-vi']) {

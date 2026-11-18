@@ -1,0 +1,355 @@
+import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
+import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { AuditModule } from '../audit/audit.module';
+import { CatalogModule } from '../catalog/catalog.module';
+import { FinanceModule } from '../finance/finance.module';
+import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
+import { OrganizationModule } from '../organization/organization.module';
+import { AssignmentEndService } from './assignment/assignment-end.service';
+import { AssignmentCarryRepo } from './assignment/assignment-carry.repo';
+import { AssignmentFactsRepo } from './assignment/renewal/assignment-facts.repo';
+import { AssignmentRenewalService } from './assignment/renewal/assignment-renewal.service';
+import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
+import { RevocationCompletedFactsReader } from './provisioning/revocation-completion/revocation-completed-facts.service';
+import { AssignmentChainRepo } from './assignment/assignment-chain.repo';
+import { AssignmentRepo } from './assignment/assignment.repo';
+import { AssignmentRevocationRepo } from './assignment/assignment-revocation.repo';
+import { UsageFactsRepo } from './assignment/usage-facts.repo';
+import { RuleSeatsFactsService } from './assignment/rule-seats-facts.service';
+import { RuleSeatsRepo } from './assignment/rule-seats.repo';
+import { SharedPoolVacancyService } from './shared-pool/shared-pool-vacancy.service';
+import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
+import { AssignmentServiceAccountReader } from './assignment/assignment-service-account.listener';
+import { AssignmentListService } from './assignment/assignment-list.service';
+import { AssignmentService } from './assignment/assignment.service';
+import { AssignmentsController } from './assignment/assignments.controller';
+import { DashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
+import { DashboardFactsService } from './dashboard-facts/dashboard-facts.service';
+import { DepartmentToolsController } from './department-tools/department-tools.controller';
+import { DepartmentSoftwareAccessService } from './department-tools/department-software-access.service';
+import { DepartmentSoftwareChangesService } from './department-tools/department-software-changes.service';
+import { DepartmentSoftwareController } from './department-tools/department-software.controller';
+import { DepartmentSoftwareNotice } from './department-tools/department-software-notice.service';
+import { DepartmentSoftwareProposalService } from './department-tools/department-software-proposal.service';
+import { DepartmentSoftwareProposalsController } from './department-tools/department-software-proposals.controller';
+import { DepartmentSoftwareQueryService } from './department-tools/department-software-query.service';
+import { DepartmentSoftwareRepo } from './department-tools/department-software.repo';
+import { DepartmentSoftwareViewService } from './department-tools/department-software-view.service';
+import { DepartmentToolsService } from './department-tools/department-tools.service';
+import { SubscriptionSeatsController } from './assignment/subscription-seats.controller';
+import { MachineAccountController } from './machine-account/machine-account.controller';
+import { MachineAccountService } from './machine-account/machine-account.service';
+import { ExpiryController } from './expiry/expiry.controller';
+import { ExpiryQueueRepo } from './expiry/expiry-queue.repo';
+import { ExpiryQueueService } from './expiry/expiry-queue.service';
+import { ExpiryReminderRepo } from './expiry/expiry-reminder.repo';
+import { ExpiryReminderService } from './expiry/expiry-reminder.service';
+import { ExpiryReminderSweeper } from './expiry/expiry-reminder.job';
+import { ExpiryRenewalWindowSweeper } from './expiry/expiry-renewal-window.job';
+import { ExpiryRenewalWindowRepo } from './expiry/expiry-renewal-window.repo';
+import { ExpiryRenewalWindowService } from './expiry/expiry-renewal-window.service';
+import { ExpiryRevocationRepo } from './expiry/expiry-revocation.repo';
+import { ExpiryRevocationService } from './expiry/expiry-revocation.service';
+import { ExpiryRevocationSweeper } from './expiry/expiry-revocation.job';
+import { ProvisioningExtensionService } from './provisioning/tasks/provisioning-extension.service';
+import { LicensingAlerts } from './licensing-alerts.service';
+import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-key-cipher.service';
+import { LicenseKeyRepo } from './license-key/license-key.repo';
+import { LicenseKeyAssignmentService } from './license-key/license-key-assignment.service';
+import { LicenseKeyRevealQuotaRepo } from './license-key/license-key-reveal-quota.repo';
+import { LicenseKeyService } from './license-key/license-key.service';
+import { LicenseKeysController } from './license-key/license-keys.controller';
+import { MySoftwareController } from './my-software/my-software.controller';
+import { MySoftwareRepo } from './my-software/my-software.repo';
+import { MySoftwareService } from './my-software/my-software.service';
+import {
+  GrantRequestGateHook,
+  RenewalFinancialContributions,
+  RenewalHoldHook,
+  RenewalUsageContributions,
+  RevocationListeners,
+  SeatBaselineClosedListeners,
+} from './public/licensing.extension-points';
+import { LicensingApi } from './public/licensing.api';
+import { LicensingDashboardApi } from './public/licensing-dashboard.api';
+import { LicensingGhostSeatApi } from './public/licensing-ghost-seat.api';
+import { LicensingUsageApi } from './public/licensing-usage.api';
+import { LicensingDepartmentToolsApi } from './public/licensing-department-tools.api';
+import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
+import { LicensingPoolStockApi } from './public/licensing-pool-stock.api';
+import { LicensingSeatMonthApi } from './public/licensing-seat-month.api';
+import { AssignmentSeatMonthRepo } from './assignment/assignment-seat-month.repo';
+import { LicensingRenewalApi } from './public/licensing-renewal.api';
+import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
+import { ProvisioningCancellationService } from './provisioning/grant-cancellation/provisioning-cancellation.service';
+import { ProvisioningDecisionService } from './provisioning/tasks/provisioning-decision.service';
+import { ProvisioningFailureService } from './provisioning/provisioning-failure.service';
+import { ProvisioningHolderService } from './provisioning/tasks/provisioning-holder.service';
+import { ProvisioningGrantPlanner } from './provisioning/tasks/provisioning-grant-planner.service';
+import { ProvisioningGrantService } from './provisioning/tasks/provisioning-grant.service';
+import { ProvisioningPurchaseRefusal } from './provisioning/tasks/provisioning-purchase-refusal.service';
+import { ProvisioningGrantWriter } from './provisioning/tasks/provisioning-grant-writer.service';
+import { ProvisioningService } from './provisioning/tasks/provisioning.service';
+import { ProvisioningGrantCompletion } from './provisioning/tasks/provisioning-grant-completion.service';
+import { ProvisioningTaskFrame } from './provisioning/provisioning-task-frame.service';
+import { ProvisioningTaskViewService } from './provisioning/provisioning-task-view.service';
+import { ProvisioningTaskRepo } from './provisioning/provisioning-task.repo';
+import { ProvisioningTasksController } from './provisioning/tasks/provisioning-tasks.controller';
+import { RevocationTasksController } from './provisioning/revocation-completion/revocation-tasks.controller';
+import { DepartmentOpenWorkReader } from './provisioning/department-use/department-open-work.listener';
+import { ProvisioningDepartmentUseRepo } from './provisioning/department-use/provisioning-department-use.repo';
+import { ProvisioningK1ChecklistRepo } from './provisioning/k1-checklist/provisioning-k1-checklist.repo';
+import { ProvisioningK1Checklist } from './provisioning/k1-checklist/provisioning-k1-checklist.service';
+import { RevocationCompletionService } from './provisioning/revocation-completion/revocation-completion.service';
+import { RevocationLeaverAlert } from './provisioning/revocation-completion/revocation-leaver-alert.service';
+import { RevocationAftermath } from './provisioning/revocation-completion/revocation-aftermath.service';
+import { OpenGrantTaskRepo } from './provisioning/open-grants/open-grant-task.repo';
+import { OpenGrantTaskService } from './provisioning/open-grants/open-grant-task.service';
+import { RevocationReadRepo } from './provisioning/revocation-read.repo';
+import { RevocationViewService } from './provisioning/revocation-view.service';
+import { RevocationRecorder } from './provisioning/revocation-recorder.service';
+import { RevocationTaskFactory } from './provisioning/revocation-task-factory.service';
+import { RevocationService } from './provisioning/revocation.service';
+import { RevocationWithdrawalService } from './provisioning/revocation-withdrawal/revocation-withdrawal.service';
+import { ProvisioningTaskReasonRepo } from './provisioning/provisioning-task-reason.repo';
+import { SaasIssueCalendar } from './saas-issue/saas-issue-calendar.service';
+import { SaasIssueFactsRepo } from './saas-issue/saas-issue-facts.repo';
+import { SaasIssueHandlingService } from './saas-issue/saas-issue-handling.service';
+import { SaasIssueNotifier } from './saas-issue/saas-issue-notifier.service';
+import { SaasIssueRepo } from './saas-issue/saas-issue.repo';
+import { SaasIssueService } from './saas-issue/saas-issue.service';
+import { SaasIssueSweepService } from './saas-issue/saas-issue-sweep.service';
+import { SaasIssueSweeper } from './saas-issue/saas-issue.job';
+import { SaasIssueViewService } from './saas-issue/saas-issue-view.service';
+import { SaasIssuesController } from './saas-issue/saas-issues.controller';
+import { SeatBaselineController } from './seat-baseline/seat-baseline.controller';
+import { SeatBaselinePhaseListener } from './seat-baseline/seat-baseline-phase.listener';
+import { SharedPoolAvoidedCostRepo } from './shared-pool/shared-pool-avoided-cost.repo';
+import { SharedPoolCapacityRepo } from './shared-pool/shared-pool-capacity.repo';
+import { SharedPoolService } from './shared-pool/shared-pool.service';
+import { SeatBaselineRepo } from './seat-baseline/seat-baseline.repo';
+import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
+import { StockSummaryController } from './stock-summary/stock-summary.controller';
+import { StockSummaryQueryService } from './stock-summary/stock-summary-query.service';
+import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
+import { RenewalDeadlineService } from './subscription-renewal/deadline/renewal-deadline.service';
+import { RenewalOutcomeService } from './subscription-renewal/outcome/renewal-outcome.service';
+import { RenewalRecordService } from './subscription-renewal/record/renewal-record.service';
+import { RenewalRecordTrail } from './subscription-renewal/record/renewal-record-trail.service';
+import { RenewalNotifier } from './subscription-renewal/subscription-renewal-notifier.service';
+import { RenewalSeatsNeededService } from './subscription-renewal/seats-needed/renewal-seats-needed.service';
+import { RenewalPartiesService } from './subscription-renewal/subscription-renewal-parties.service';
+import { RenewalRankingService } from './subscription-renewal/subscription-renewal-ranking.service';
+import { SubscriptionRenewalSeatRepo } from './subscription-renewal/subscription-renewal-seat.repo';
+import { SubscriptionRenewalSweepService } from './subscription-renewal/subscription-renewal-sweep.service';
+import { RenewalViewService } from './subscription-renewal/subscription-renewal-view.service';
+import { SubscriptionRenewalSweeper } from './subscription-renewal/subscription-renewal.job';
+import { SubscriptionRenewalRepo } from './subscription-renewal/subscription-renewal.repo';
+import { SubscriptionRenewalsController } from './subscription-renewal/subscription-renewals.controller';
+import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
+import { LicenseKeyTemplateListener } from './license-key/license-key-template.listener';
+
+/**
+ * The licensing context (C3, ADR-0013): the assignments of seats, the closing of the seat baseline, the queue of
+ * provisioning and the vault of license keys. It reads the
+ * catalog through `CatalogApi` and the organization through its facade; nothing in the catalog reads it back. The
+ * HTTP controllers live in the module itself because no graph other than the API needs it yet: a separate HTTP module is
+ * made when the worker or a command imports `licensing`.
+ */
+@Module({
+  imports: [
+    PoliciesTemplateFacadeModule,
+    DatabaseModule,
+    AuditModule,
+    OrganizationModule,
+    CatalogModule,
+    FinanceModule,
+    IdentityAccessFacadeModule,
+    NotificationsModule,
+    OperatingParametersModule,
+  ],
+  controllers: [
+    AssignmentsController,
+    MachineAccountController,
+    SubscriptionSeatsController,
+    DepartmentToolsController,
+    DepartmentSoftwareController,
+    DepartmentSoftwareProposalsController,
+    SeatBaselineController,
+    ProvisioningTasksController,
+    RevocationTasksController,
+    LicenseKeysController,
+    ExpiryController,
+    SaasIssuesController,
+    MySoftwareController,
+    SubscriptionRenewalsController,
+    StockSummaryController,
+  ],
+  providers: [
+    LicenseKeyTemplateListener,
+    LicensingAlerts,
+    AssignmentRepo,
+    AssignmentRevocationRepo,
+    AssignmentChainRepo,
+    RevocationCompletedFactsReader,
+    AssignmentDepartmentRepo,
+    AssignmentSeatOccupancy,
+    AssignmentServiceAccountReader,
+    DepartmentOpenWorkReader,
+    ProvisioningDepartmentUseRepo,
+    AssignmentService,
+    AssignmentEndService,
+    AssignmentCarryRepo,
+    AssignmentFactsRepo,
+    AssignmentRenewalService,
+    RenewalHoldHook,
+    MachineAccountService,
+    AssignmentListService,
+    DepartmentToolsService,
+    DepartmentSoftwareRepo,
+    DepartmentSoftwareAccessService,
+    DepartmentSoftwareViewService,
+    DepartmentSoftwareQueryService,
+    DepartmentSoftwareChangesService,
+    DepartmentSoftwareNotice,
+    DepartmentSoftwareProposalService,
+    SeatBaselineRepo,
+    SeatBaselineService,
+    SeatBaselinePhaseListener,
+    SeatBaselineClosedListeners,
+    SharedPoolCapacityRepo,
+    SharedPoolAvoidedCostRepo,
+    SharedPoolService,
+    StockSummaryQueryService,
+    ProvisioningTaskRepo,
+    ProvisioningTaskFrame,
+    ProvisioningHolderService,
+    ProvisioningTaskViewService,
+    ProvisioningGrantPlanner,
+    ProvisioningGrantWriter,
+    ProvisioningPurchaseRefusal,
+    ProvisioningGrantService,
+    ProvisioningService,
+    ProvisioningGrantCompletion,
+    ProvisioningDecisionService,
+    ProvisioningCancellationService,
+    ProvisioningFailureService,
+    ProvisioningTaskReasonRepo,
+    RevocationListeners,
+    RevocationTaskFactory,
+    RevocationRecorder,
+    RevocationService,
+    RevocationWithdrawalService,
+    RevocationCompletionService,
+    ProvisioningK1ChecklistRepo,
+    ProvisioningK1Checklist,
+    RevocationLeaverAlert,
+    RevocationAftermath,
+    RevocationReadRepo,
+    RevocationViewService,
+    OpenGrantTaskRepo,
+    OpenGrantTaskService,
+    ExpiryReminderRepo,
+    ExpiryReminderService,
+    ExpiryReminderSweeper,
+    ExpiryRenewalWindowRepo,
+    ExpiryRenewalWindowService,
+    ExpiryRenewalWindowSweeper,
+    ExpiryRevocationRepo,
+    ExpiryRevocationService,
+    ExpiryRevocationSweeper,
+    ProvisioningExtensionService,
+    ExpiryQueueRepo,
+    ExpiryQueueService,
+    SaasIssueRepo,
+    SaasIssueFactsRepo,
+    SaasIssueCalendar,
+    SaasIssueNotifier,
+    SaasIssueService,
+    SaasIssueHandlingService,
+    SaasIssueViewService,
+    SaasIssueSweepService,
+    SaasIssueSweeper,
+    MySoftwareRepo,
+    MySoftwareService,
+    SubscriptionRenewalRepo,
+    SubscriptionRenewalSeatRepo,
+    RenewalPartiesService,
+    RenewalRankingService,
+    RenewalSeatsNeededService,
+    RenewalNotifier,
+    RenewalRecordTrail,
+    RenewalRecordService,
+    RenewalOutcomeService,
+    RenewalAlertsService,
+    RenewalDeadlineService,
+    RenewalViewService,
+    SubscriptionRenewalSweepService,
+    SubscriptionRenewalSweeper,
+    RenewalFinancialContributions,
+    RenewalUsageContributions,
+    DashboardFactsRepo,
+    DashboardFactsService,
+    LicenseKeyRepo,
+    LicenseKeyRevealQuotaRepo,
+    LicenseKeyService,
+    LicenseKeyAssignmentService,
+    {
+      provide: LicenseKeyCipher,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<EnvironmentVariables, true>) => {
+        const currentKeyId = config.get('LICENSE_KEY_VAULT_KEY_ID', { infer: true });
+
+        return new LicenseKeyCipher({
+          currentKeyId,
+          keys: {
+            ...parsePreviousVaultKeys(config.get('LICENSE_KEY_VAULT_PREVIOUS_KEYS', { infer: true })),
+            [currentKeyId]: config.get('LICENSE_KEY_VAULT_KEY', { infer: true }),
+          },
+          fingerprintPepper: config.get('LICENSE_KEY_FINGERPRINT_PEPPER', { infer: true }),
+        });
+      },
+    },
+    // The extension points licensing opens (public/licensing.extension-points.ts): requests binds the gate.
+    GrantRequestGateHook,
+    LicensingApi,
+    LicensingDashboardApi,
+    LicensingGhostSeatApi,
+    LicensingUsageApi,
+    UsageFactsRepo,
+    RuleSeatsFactsService,
+    RuleSeatsRepo,
+    SharedPoolVacancyService,
+    LicensingOpenGrantsApi,
+    LicensingPoolStockApi,
+    AssignmentSeatMonthRepo,
+    LicensingSeatMonthApi,
+    LicensingDepartmentToolsApi,
+    LicensingRenewalApi,
+    LicensingSeatBaselineApi,
+  ],
+  // Other modules read through the facade and bind the extension points; the capability services and the repos stay private.
+  exports: [
+    LicensingApi,
+    LicensingDashboardApi,
+    LicensingGhostSeatApi,
+    LicensingUsageApi,
+    LicensingOpenGrantsApi,
+    LicensingPoolStockApi,
+    LicensingSeatMonthApi,
+    LicensingDepartmentToolsApi,
+    LicensingRenewalApi,
+    LicensingSeatBaselineApi,
+    GrantRequestGateHook,
+    RevocationListeners,
+    RenewalHoldHook,
+    SeatBaselineClosedListeners,
+    RenewalFinancialContributions,
+    RenewalUsageContributions,
+  ],
+})
+export class LicensingModule {}

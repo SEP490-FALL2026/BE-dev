@@ -104,7 +104,7 @@ Các mutation nghiệp vụ dùng `TransactionRunner`; service gọi repository 
 | `DELETE /app-users/{id}/role-grants/{role}` | US-01-01 AC-7/13/14/16/18                                 | AppUsersController → AccountManagementService → IdentityAccessRepo/audit; revoke grant/audit cùng transaction; cho phép 0 vai/0 Finance; 404/409/422                                                                                                         | `account-management-http`; live 200                                                                                                 | PASS       |
 | `POST /auth/invitations/redeem`             | US-01-10 AC-1/2/8/9; US-01-01 AC-11                       | AuthController → AccountManagementService → IdentityAccessRepo/audit + organization facade; kiểm token trước Argon2; AppUser UPDATE → action token UPDATE; credential/activation/consume/audit cùng transaction, không auto-login; lỗi chung 400, policy 422 | `account-management-http`, `account-list-and-redeem`, `account-concurrency`; thư do worker gửi → redeem 200                         | PASS       |
 | Installation CLI                            | US-01-01 AC-19, QĐ-67a/b; FR-9.8; R-13                    | installation-cli → args/hidden-prompt → InstallationService → organization/identity-access/audit facade; advisory lock, toàn bộ bootstrap + audit cùng transaction; chỉ cần DATABASE_URL, exit 0/2/130/1 theo kết quả                                        | `installation*` integration và unit prompt/arguments/input; Docker PTY thật chỉ DATABASE_URL, nhập hai lần không echo, exit 0       | PASS       |
-| Worker email outbox                         | Lát 1b outbox, ADR-0012 Proposed                          | WorkerModule → EmailDispatchLoop → EmailDispatcher → NotificationsRepo/MailTransport; lease/SKIP LOCKED, gửi ngoài transaction, cập nhật đúng lease, retry hữu hạn; lỗi tick không dừng loop                                                                 | `email-outbox`, `worker-mail-loop`, `email-dispatch.loop.spec.ts`; Mailpit nhận lời mời hiện hành, outbox SENT; idle SIGTERM exit 0 | PASS       |
+| Worker email outbox                         | Lát 1b outbox, ADR-0012 Proposed                          | WorkerModule → EmailDispatchLoop → EmailDispatcher → NotificationsRepo/MailTransport; lease/SKIP LOCKED, gửi ngoài transaction, cập nhật đúng lease, retry hữu hạn; lỗi tick không dừng loop                                                                 | `email-outbox`, `worker-mail-loop`, `worker/email-dispatch.job.spec.ts`; Mailpit nhận lời mời hiện hành, outbox SENT; idle SIGTERM exit 0 | PASS       |
 
 Tên test rút gọn trong bảng là `test/integration/<tên>.integration-spec.ts`, trừ các tên có suffix đầy đủ. Test retry/lease/cancel và chờ tick lúc shutdown có trong bộ hiện có; chưa thực hiện signal khi SMTP thật đang gửi trong Docker (xem giới hạn).
 
@@ -322,7 +322,7 @@ Provider/export: `IdentityAccessFacadeModule` khai báo duy nhất `AccountRepo`
 re-export: chứa thật `EmployeeNotFoundError` (lỗi public của facade organization).
 
 Architecture test: `architecture-boundaries.spec.ts` resolve import tương đối thật và chỉ cho module khác import file
-ở gốc module, không `*.repo.ts`/`password-hasher.service.ts`; `src/module-graph.spec.ts` đọc metadata Nest của
+ở gốc module, không `*.repo.ts`/`password-hasher.service.ts`; `test/gates/module-graph.gate-spec.ts` đọc metadata Nest của
 AppModule/WorkerModule/InstallationModule (không khởi tạo, `ConfigModule.forRoot` được stub để không nạp env): không
 token nào khai báo ở hai module, `AccountRepo`/`PasswordHasher`/`IdentityAccessService`/`MailTransport`/`PayloadCipher`
 đúng một lần, worker/CLI không controller, worker không `IdentityAccessModule`/`JwtModule`, CLI không notifications/queue/JWT.
@@ -346,7 +346,7 @@ Không chạy mutation campaign. Container PostgreSQL/Mailpit riêng của Task 
 ### Task 2B — đóng public contract
 
 Lượt đóng ngắn trên cùng working tree, không làm lại refactor. `PasswordPolicyError` (lỗi facade ném cho CLI) chuyển
-định nghĩa thật sang `identity-access/identity-access.errors.ts` ở gốc module; `errors/identity-access.errors.ts` không
+định nghĩa thật sang `identity-access/public/identity-access.errors.ts` ở gốc module; `errors/identity-access.errors.ts` không
 còn sở hữu hay re-export nó. CLI, facade, hai file `accounts/` và integration test installation import từ file gốc.
 Helper audit event (`accountAuditEvent`, hàm thuần) gộp vào `accounts/account-policy.ts` để giữ trần 115 file; không
 public hóa repo, hasher, mapper hay DTO.

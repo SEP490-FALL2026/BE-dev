@@ -12,7 +12,8 @@ export interface AccessTokenClaims {
   sid: string;
 }
 
-const REFRESH_TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
+/** 32 random bytes in base64url: the shape of every refresh token this service issues. */
+const OPAQUE_TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isUuid(value: unknown): value is string {
@@ -43,7 +44,7 @@ export class TokenService {
     }
 
     // Both ids end up in a UUID column. A validly signed token with anything else is still a bad token
-    // (401); letting it reach the database would turn the driver's type error into a 503 (R-04).
+    // (401); letting it reach the database would turn the driver's type error into a 503.
     if (!isUuid(payload.sub) || !isUuid(payload.sid)) throw new InvalidAccessTokenError();
 
     return { sub: payload.sub, sid: payload.sid };
@@ -60,27 +61,8 @@ export class TokenService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  /**
-   * One-time token behind an emailed invitation link: 256 bits of randomness, only its SHA-256 is
-   * stored. It expires AUTH_INVITATION_TTL_SECONDS after `now`.
-   */
-  newInvitationToken(now: Date): { token: string; hash: string; expiresAt: Date } {
-    const ttlMs = this.config.get('AUTH_INVITATION_TTL_SECONDS', { infer: true }) * 1000;
-    const token = randomBytes(32).toString('base64url');
-
-    return { token, hash: this.hashRefreshToken(token), expiresAt: new Date(now.getTime() + ttlMs) };
-  }
-
-  hashActionToken(token: string): string {
-    return this.hashRefreshToken(token);
-  }
-
-  isWellFormedActionToken(token: string): boolean {
-    return REFRESH_TOKEN_SHAPE.test(token);
-  }
-
   isWellFormedRefreshToken(token: string): boolean {
-    return REFRESH_TOKEN_SHAPE.test(token);
+    return OPAQUE_TOKEN_SHAPE.test(token);
   }
 
   /** Throttle key: an HMAC of the normalized email, so unknown emails are throttled without being stored. */

@@ -1,0 +1,47 @@
+import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { AuditModule } from '../audit/audit.module';
+import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
+import { OrganizationModule } from '../organization/organization.module';
+import { RequestsModule } from '../requests/requests.module';
+import { HttpAiServiceClient } from './ai-service/ai-service-client.service';
+import { AiServiceClients } from './ai-service/ai-service-clients.service';
+import { aiServiceSettingsFrom } from './ai-service/ai-service-environment.policy';
+import { SimulatedAiServiceClient } from './ai-service/ai-service-simulated-client.service';
+import { AiServiceClient } from './ai-service/ai-service.types';
+import { InvocationContentQueryService } from './invocation-content/invocation-content-query.service';
+import { AiInvocationContentRepo } from './invocation/invocation-content.repo';
+import { AiInvocationHistoryStore } from './invocation/invocation-history-store.types';
+import { AiInvocationRepo } from './invocation/invocation.repo';
+import { QueueSummaryRunService } from './queue-summary/queue-summary-run.service';
+import { QueueSummaryService } from './queue-summary/queue-summary.service';
+
+/**
+ * The AI summary of the approval queue of a person (`US-15-05`): the client of the AI service, the record of each call and what was
+ * said in it (`ai_invocations`, `ai_invocation_contents`), and the use case. It reads the steps through the facade of `requests`, the
+ * two switches and the mode (`AI_PROVIDER_MODE`) through the operating parameters, and writes the audit trail. Each call is answered
+ * by the source of its mode (`AiServiceClients`): the AI service, or the simulation that calls no model. The settings of the AI
+ * service are checked when the module is mounted: none means the feature answers that it is unavailable in the mode MODEL, an
+ * address without its token stops the start.
+ */
+@Module({
+  imports: [DatabaseModule, AuditModule, OperatingParametersModule, OrganizationModule, RequestsModule],
+  providers: [
+    AiInvocationRepo,
+    AiInvocationContentRepo,
+    { provide: AiInvocationHistoryStore, useExisting: AiInvocationContentRepo },
+    InvocationContentQueryService,
+    QueueSummaryRunService,
+    QueueSummaryService,
+    {
+      provide: AiServiceClient,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => new HttpAiServiceClient(aiServiceSettingsFrom((key) => config.get(key))),
+    },
+    { provide: SimulatedAiServiceClient, useFactory: () => new SimulatedAiServiceClient() },
+    AiServiceClients,
+  ],
+  exports: [QueueSummaryService, InvocationContentQueryService],
+})
+export class AiAssistModule {}

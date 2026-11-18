@@ -1,0 +1,48 @@
+# ==============================================================================
+# CADDYFILE FOR SOFTWARE LICENSE MANAGEMENT (SLM) BACKEND
+# ==============================================================================
+# - Tự động xin & gia hạn SSL Let's Encrypt (HTTPS) khi trỏ domain
+# - Tự động fallback chạy HTTP (:80) khi chưa có domain
+# - Nén phản hồi bằng Gzip và Zstandard (tối ưu tốc độ tải)
+# - Chặn các endpoint nội bộ nhạy cảm (/metrics, .env, .git)
+# - Reverse proxy vào container `api:3000`
+# ==============================================================================
+
+# Biến môi trường DOMAIN được truyền từ docker-compose.prod.yml
+# Nếu không set DOMAIN trong .env, mặc định sẽ chạy cổng :80
+{$DOMAIN::80} {
+    # Nén dữ liệu truyền tải
+    encode zstd gzip
+
+    # Chặn truy cập trực tiếp vào các endpoint giám sát / metrics từ internet
+    # Trả về 404 (thay vì 403) để không để lộ sự tồn tại của endpoint
+    handle /metrics {
+        respond 404
+    }
+
+    # Chặn quét file ẩn và thư mục quản trị (.git, .env...)
+    @hiddenFiles {
+        path */.*
+    }
+    handle @hiddenFiles {
+        respond 404
+    }
+
+    # Thiết lập Headers bảo mật chuẩn OWASP
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # Chuyển tiếp toàn bộ request vào container API NestJS
+    handle {
+        reverse_proxy api:{$PORT:3000} {
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_up Host {host}
+        }
+    }
+}

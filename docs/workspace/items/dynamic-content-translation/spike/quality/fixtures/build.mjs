@@ -10,7 +10,8 @@ import { heldoutEnVi } from './src/heldout-en-vi.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-export const REFERENCE_AUTHOR = 'AI draft by Claude Sonnet — not reviewed by a human; Opus coordinator spot-check pending';
+export const REFERENCE_AUTHOR =
+  'AI draft by Claude Sonnet — not reviewed by a human; Opus coordinator spot-check pending';
 
 export function buildFixtures() {
   const wrap = (direction, items) => ({

@@ -21,7 +21,12 @@ export function buildFlags(runs, fixtures) {
       const groupsFailed = f.failed.meaning?.failedContain ?? [];
       // textual dates are now kept verbatim on purpose, but some older fixture checks expect a localised month name
       const dateNote = groupsFailed.some((g) => /november|tháng/i.test(g));
-      return dateNote ? { ...f, note: 'verbatim-date policy: the keyword group expects a localised month name, dates are intentionally restored as written' } : f;
+      return dateNote
+        ? {
+            ...f,
+            note: 'verbatim-date policy: the keyword group expects a localised month name, dates are intentionally restored as written',
+          }
+        : f;
     });
     groups.push({ set: r.fixtureSet, direction: r.direction, translatedFields: r.fields.translated, flags });
   }
@@ -37,13 +42,18 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const outName = process.argv.includes('--out') ? process.argv[process.argv.indexOf('--out') + 1] : 'flags-4.3.1.json';
   const files = fs
     .readdirSync(resultsDir)
-    .filter((f) => f.includes(`-${tag}-`) && /^\d{4}-\d\d-\d\d-4\.3\.1\w*-(main|heldout)-(vi-en|en-vi)-protected\.json$/.test(f))
+    .filter(
+      (f) =>
+        f.includes(`-${tag}-`) && /^\d{4}-\d\d-\d\d-4\.3\.1\w*-(main|heldout)-(vi-en|en-vi)-protected\.json$/.test(f),
+    )
     .sort();
   const runs = files.map((f) => JSON.parse(fs.readFileSync(path.join(resultsDir, f), 'utf8')));
   const fixtures = {};
   for (const set of ['main', 'heldout']) {
     for (const d of ['vi-en', 'en-vi']) {
-      fixtures[`${set}|${d}`] = JSON.parse(fs.readFileSync(path.join(quality, 'fixtures', set === 'main' ? `${d}.json` : `heldout-${d}.json`), 'utf8'));
+      fixtures[`${set}|${d}`] = JSON.parse(
+        fs.readFileSync(path.join(quality, 'fixtures', set === 'main' ? `${d}.json` : `heldout-${d}.json`), 'utf8'),
+      );
     }
   }
   const out = buildFlags(runs, fixtures);

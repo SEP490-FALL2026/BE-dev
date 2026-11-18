@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted. Refined 2026-08-21: a root facade is created when a caller needs it, not in advance.
+Accepted. Refined 2026-08-21: a root facade is created when a caller needs it, not in advance. Amended 2026-10-19:
+the `catalog` reference-module consequence is superseded (see Consequences); the layout decision itself is unchanged.
+Superseded in part 2026-10-29 by [ADR-0019](0019-module-tiers-and-public-api.md): the module layout (`public/` door,
+capability and use-case folders, depth and size limits) follows ADR-0019; infrastructure responsibilities stay as here.
 
 ## Date
 
@@ -44,6 +47,9 @@ This starts simply but creates god services, high merge-conflict rates and diffi
 - Paths are shorter and match familiar Nest feature-module conventions.
 - Module boundaries depend on explicit exports and automated import checks rather than nested layer names.
 - A module may begin with only a module file and a policy, exporting nothing; no empty folders and no unused facade are committed.
-- `catalog` is the reference module for this layout. Copy its shape rather than re-deriving one.
+- ~~`catalog` is the reference module for this layout. Copy its shape rather than re-deriving one.~~ _Superseded
+  2026-10-19:_ `catalog` is not mounted and does not follow the current rules, so it is no template. Place files by
+  [module structure](../rules/module-structure.md) and the architecture gates; G3 decides the module's future (Owner
+  decision E1 = A, [H4.0 audit](../reviews/be-full-src-architecture-audit-2026-10-19/README.md#quyết-định-owner-09b)).
 - When a root service becomes mostly unrelated methods, workflows must be extracted into `services/` while preserving the facade contract.
 - Existing documentation and AI rules must use this layout and must not regenerate the superseded deep structure.

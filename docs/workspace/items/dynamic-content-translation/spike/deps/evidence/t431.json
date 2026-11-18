@@ -37,40 +37,14 @@
     "bytes": 19771
   },
   "resolved": {
-    "@huggingface/transformers": [
-      "4.3.1",
-      "4.3.1"
-    ],
-    "@huggingface/jinja": [
-      "0.5.10",
-      "0.5.10"
-    ],
-    "@huggingface/tokenizers": [
-      "0.2.0",
-      "0.2.0"
-    ],
-    "sharp": [
-      "0.35.5",
-      "0.35.5"
-    ],
-    "onnxruntime-node": [
-      "1.30.0",
-      "1.30.0"
-    ],
-    "onnxruntime-web": [
-      "1.31.0-dev.20260914-8d85527a0",
-      "1.31.0-dev.20260914-8d85527a0"
-    ],
-    "onnxruntime-common": [
-      "1.30.0",
-      "1.31.0-dev.20260911-2a43ec07e",
-      "1.30.0",
-      "1.31.0-dev.20260911-2a43ec07e"
-    ],
-    "protobufjs": [
-      "7.6.6",
-      "7.6.6"
-    ],
+    "@huggingface/transformers": ["4.3.1", "4.3.1"],
+    "@huggingface/jinja": ["0.5.10", "0.5.10"],
+    "@huggingface/tokenizers": ["0.2.0", "0.2.0"],
+    "sharp": ["0.35.5", "0.35.5"],
+    "onnxruntime-node": ["1.30.0", "1.30.0"],
+    "onnxruntime-web": ["1.31.0-dev.20260914-8d85527a0", "1.31.0-dev.20260914-8d85527a0"],
+    "onnxruntime-common": ["1.30.0", "1.31.0-dev.20260911-2a43ec07e", "1.30.0", "1.31.0-dev.20260911-2a43ec07e"],
+    "protobufjs": ["7.6.6", "7.6.6"],
     "sprintf-js": []
   },
   "sharpPlatformPackagesInLockfile": 52,

@@ -20,9 +20,45 @@ Nếu nguồn mâu thuẫn hoặc cần đổi nghiệp vụ, người phụ tr�
 - items/: một thư mục mỗi lát, tên ổn định như us-xx-yy-short-name hoặc issue-123-short-name; không cần bộ đếm riêng.
 - local/: nháp cá nhân; không chứa đầu vào bàn giao duy nhất.
 - research/: hướng dẫn nghiên cứu; kết quả theo hạng mục đặt cạnh spec.
+- [Đề xuất lịch sử AI dùng MongoDB](proposals/ai-history-mongodb/spec.md): draft ngày 13/11/2026, chưa là work item
+  `ready`; sau duyệt thiết kế mới phân rã và đăng ký theo mẫu bên dưới.
+- [prompts/](prompts/README.md): cách giao một phần G, một G hoặc nhiều G; bộ prompt theo giai đoạn cho dev tự làm hoặc dùng AI.
 - [Roadmap](../roadmap.md): thứ tự dự kiến, phụ thuộc và tiến độ hạng mục.
 
+## Chia hạng mục theo vertical slice
+
+**Chia việc thành hạng mục** theo [work-item sizing](../rules/work-item-sizing.md) — nguồn chuẩn duy nhất: nhóm G chỉ là
+container giao việc; mỗi hạng mục là một outcome kiểm chứng độc lập, ghi `## Sizing decision` (một trong bốn chế độ
+`single-story`, `grouped-stories`, `split-story`, `technical-enabler`), mỗi AC của nhóm G có đúng một chủ trong scope map
+`### Work-item decomposition: Gx` của roadmap (lập trước hạng mục đầu tiên) và Size exception là bằng chứng đủ trường.
+Phần còn lại dưới đây là cấu trúc spec/plan (nguồn: [audit nền tảng
+18/10/2026](../reviews/be-foundation-audit-2026-10-18/README.md)):
+
+- Tách **`Primary Story/AC`** (đã giao, mỗi dòng `full`/`partial`/`n/a` theo rule sizing) khỏi **`Supporting
+references`** (chỉ truy vết, không tính là đã implement) và **`Explicit out of scope`**. Không ghi Story hoàn thành khi
+  còn AC `partial`. Roadmap và items index chép đúng bảng Primary của spec.
+- Spec ghi dependency/blocker, ownership module/data/API, transaction/concurrency/migration/tương thích khi áp dụng,
+  test matrix theo AC (gồm từ chối và edge case) và Definition of Done.
+- Mỗi task của plan có `Files`, `Depends on`, `Acceptance`, `Verify`; hạng mục nhiều phase ghi ranh giới phase/checkpoint.
+  Refactor tách khỏi thay đổi hành vi; migration là task riêng đi trước code phụ thuộc nó. Mỗi lát để hệ thống
+  build/test được và có checkpoint.
+- Implementation làm rõ hoặc đổi contract ⟹ cập nhật spec/plan trong cùng thay đổi; lịch sử giữ bằng Git và nhãn
+  _superseded_, không xóa bằng chứng.
+- Header spec pin Docs `<sha>` và BE `<sha>`; trạng thái chỉ dùng từ vựng của [roadmap](../roadmap.md#trạng-thái).
+
+`pnpm rules:check` enforce phần cấu trúc (mục bắt buộc, pin, từ trạng thái, cột `Coverage`, trường task, đăng ký ở
+items index) và các quy tắc sizing máy kiểm được (liệt kê ở [rule sizing](../rules/work-item-sizing.md#phạm-vi-kiểm-tra-tự-động));
+nó **không** chứng minh nội dung nghiệp vụ đúng. 16 hạng mục có trước 18/10/2026 nằm trong danh sách `legacy` của
+`rules-check.config.json`: chỉ bị kiểm đăng ký, **không** sửa hàng loạt cho khớp mẫu và không coi là đã review lại.
+Hạng mục legacy được chạm lớn thì chuyển sang mẫu mới và xóa khỏi danh sách. 14 hạng mục lập từ 18/10 tới trước GOV.1
+(19/10/2026) nằm trong `sizingGrandfathered`: chỉ miễn mục `Sizing decision`. Cả hai danh sách chỉ co lại.
+
 ## Quy trình
+
+Khi Owner giao một phần G, một G hoặc nhiều G, dùng [hướng dẫn nhận việc và prompt mẫu](prompts/README.md).
+Tin giao việc xác định phạm vi và quyền thao tác; spec/plan, scope map và tiến độ vẫn nằm ở các nguồn hiện hữu bên dưới.
+Nếu dùng AI, thực hiện các bước thiết kế → audit thiết kế → implement/test → audit implementation → validate/regression
+→ commit/bàn giao theo bộ prompt. Dev tự làm cũng theo cùng đầu ra và tiêu chí, không bắt buộc dùng AI.
 
 1. Chọn lát US/AC hoặc technical enabler; kiểm tra roadmap tránh trùng, ghi người phụ trách và người thiết kế ban đầu. Hai vai có thể cùng một người.
 2. Người phụ trách dùng mẫu trong `_template/` để tạo hoặc tiếp quản spec/plan. Ghi [nguồn BRD/US](sources.md) có revision, phạm vi, quyết định và câu hỏi. Chỉ tạo research.md/test-plan.md khi chúng có nội dung riêng cần duy trì.
@@ -33,6 +69,10 @@ Nếu nguồn mâu thuẫn hoặc cần đổi nghiệp vụ, người phụ tr�
 7. Owner review cuối trên revision cụ thể, đối chiếu spec/plan/decision, source, test, AC và bằng chứng. Nếu cần sửa, ghi `changes-requested`; nếu đạt, ghi `accepted` cùng Owner, revision, môi trường và bằng chứng. Chỉ revision `accepted` mới đủ điều kiện đưa lên `main`/production; `released` chỉ ghi sau sự kiện triển khai thật.
 
 Task nhỏ không đổi nghiệp vụ/contract dùng issue/PR với scope, kiểm tra và review. Quyết định kiến trúc lâu dài ghi ADR, liên kết từ spec thay vì sao chép.
+
+Trong luồng giao dev khác, người nhận commit/push nhánh cá nhân theo quyền trong tin giao việc; **Owner** merge vào `dev`
+và review cuối. Sau merge phải kiểm chứng revision `dev` đã kết hợp các thay đổi: kết quả trên nhánh cá nhân không thay
+cho kết quả cây sau merge. Findings trả lại đi qua cùng vòng sửa → audit → kiểm chứng; không tự ghi Owner đã nghiệm thu.
 
 ## Nguồn và bàn giao
 

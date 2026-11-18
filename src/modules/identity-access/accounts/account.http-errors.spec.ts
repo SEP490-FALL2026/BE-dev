@@ -15,7 +15,7 @@ describe('toAccountApiException — database availability', () => {
     expectUnavailable(toAccountApiException(new TransientDatabaseError('57014', new Error('timeout'))));
   });
 
-  // Reads outside TransactionRunner (list, get) surface the driver's own error (R-02).
+  // Reads outside TransactionRunner (list, get) surface the driver's own error.
   it.each(['Query read timeout', 'Connection terminated due to connection timeout'])(
     'answers 503 for the driver error "%s" from a read outside a transaction',
     (message) => {

@@ -48,7 +48,14 @@ export function createDisconnectServer({ coord, probe = () => {}, org = 'org1' }
     });
     // Drain any request body so the request completes (a POST body would otherwise stay unread).
     req.resume();
-    const r = await coord.translate({ organizationId: org, scope: 'bench', storedSource: 'vi', target: 'en', text: url.searchParams.get('text') ?? '', signal: ac.signal });
+    const r = await coord.translate({
+      organizationId: org,
+      scope: 'bench',
+      storedSource: 'vi',
+      target: 'en',
+      text: url.searchParams.get('text') ?? '',
+      signal: ac.signal,
+    });
     dispose();
     probe({ type: 'responded', status: r.status, baseline, listenersAfterDispose: res.listenerCount('close') });
     if (res.destroyed) return;

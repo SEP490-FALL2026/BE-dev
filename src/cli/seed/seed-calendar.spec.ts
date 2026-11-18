@@ -1,0 +1,49 @@
+import { businessYearOf, calendarRefusal, seedCalendar } from './seed-calendar';
+
+const facts = (mode: 'plan' | 'apply', today: string, datasetYear: number | null = null) => ({
+  mode,
+  today,
+  datasetYear,
+});
+
+describe('the calendar of the demo dataset', () => {
+  it('lets apply write from the 1st of January to the 30th of November', () => {
+    expect(calendarRefusal(facts('apply', '2026-01-01'))).toBeNull();
+    expect(calendarRefusal(facts('apply', '2026-11-30'))).toBeNull();
+    expect(calendarRefusal(facts('apply', '2026-10-30', 2026))).toBeNull();
+  });
+
+  it('allows apply throughout December', () => {
+    expect(calendarRefusal(facts('apply', '2026-12-01'))).toBeNull();
+    expect(calendarRefusal(facts('apply', '2026-12-31', 2026))).toBeNull();
+  });
+
+  it('lets plan read any day of the year the dataset was applied in', () => {
+    expect(calendarRefusal(facts('plan', '2026-12-28', 2026))).toBeNull();
+    expect(calendarRefusal(facts('plan', '2026-12-28'))).toBeNull();
+  });
+
+  it('refuses plan and apply once the year has turned: the dataset belongs to the year it was applied in', () => {
+    for (const mode of ['plan', 'apply'] as const) {
+      expect(calendarRefusal(facts(mode, '2027-01-04', 2026))).toMatch(/applied in 2026.*this is 2027/);
+    }
+  });
+
+  it('dates the first apply in the organization time zone, not in UTC', () => {
+    expect(businessYearOf('2026-12-31T18:30:00.000Z', 'Asia/Ho_Chi_Minh')).toBe(2027);
+    expect(businessYearOf('2027-01-01T03:00:00.000Z', 'America/Los_Angeles')).toBe(2026);
+    expect(businessYearOf('2026-10-30T09:00:00.000Z', 'UTC')).toBe(2026);
+  });
+});
+
+describe('shared paid-request budget calendar', () => {
+  it.each([
+    ['2026-01-01', [2026, 2027]],
+    ['2026-06-15', [2026, 2027]],
+    ['2026-11-05', [2026, 2027]],
+    ['2026-12-31', [2026, 2027]],
+    ['2027-12-10', [2027, 2028]],
+  ] as const)('writes the budgets of the year and of the next one on %s', (today, years) => {
+    expect(seedCalendar(today).years).toEqual(years);
+  });
+});

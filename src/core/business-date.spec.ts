@@ -1,4 +1,13 @@
-import { businessDateAt, fromDateColumn, isBusinessDate, isValidTimeZone, toDateColumn } from './business-date';
+import {
+  addDays,
+  businessDateAt,
+  fromDateColumn,
+  isBusinessDate,
+  isValidTimeZone,
+  monthBoundsOf,
+  toDateColumn,
+  weekBoundsOf,
+} from './business-date';
 
 describe('business dates', () => {
   it('moves 23:30 UTC to the next day in UTC+7 (US-02-01 TS-3)', () => {
@@ -24,5 +33,45 @@ describe('business dates', () => {
     expect(isValidTimeZone('UTC')).toBe(true);
     expect(isValidTimeZone('+07:00')).toBe(false);
     expect(isValidTimeZone('Mars/Olympus')).toBe(false);
+  });
+});
+
+describe('addDays', () => {
+  it.each([
+    ['2026-12-31', -30, '2026-12-01'],
+    ['2026-12-31', -15, '2026-12-16'],
+    ['2026-12-31', -7, '2026-12-24'],
+    ['2026-12-01', -15, '2026-11-16'],
+    ['2026-03-01', -1, '2026-02-28'],
+    ['2024-03-01', -1, '2024-02-29'],
+    ['2026-12-31', 1, '2027-01-01'],
+    ['2026-12-31', 0, '2026-12-31'],
+    ['2026-01-01', -1, '2025-12-31'],
+  ])('%s shifted by %d days is %s', (date, days, expected) => {
+    expect(addDays(date, days)).toBe(expected);
+  });
+});
+
+describe('monthBoundsOf (this month up to a day)', () => {
+  it.each<[string, string, string]>([
+    ['2026-11-14', '2026-11-01', '2026-12-01'],
+    ['2026-11-01', '2026-11-01', '2026-12-01'],
+    ['2026-12-31', '2026-12-01', '2027-01-01'],
+    ['2026-02-28', '2026-02-01', '2026-03-01'],
+  ])('%s starts on %s and the next month on %s', (day, start, nextStart) => {
+    expect(monthBoundsOf(day)).toEqual({ start, nextStart });
+  });
+});
+
+describe('weekBoundsOf (the calendar week, Monday to Sunday)', () => {
+  it.each<[string, string, string]>([
+    ['2026-11-09', '2026-11-09', '2026-11-16'],
+    ['2026-11-12', '2026-11-09', '2026-11-16'],
+    ['2026-11-15', '2026-11-09', '2026-11-16'],
+    ['2026-11-16', '2026-11-16', '2026-11-23'],
+    ['2027-01-01', '2026-12-28', '2027-01-04'],
+    ['2026-03-01', '2026-02-23', '2026-03-02'],
+  ])('%s is in the week that starts on %s and ends before %s', (day, start, nextStart) => {
+    expect(weekBoundsOf(day)).toEqual({ start, nextStart });
   });
 });

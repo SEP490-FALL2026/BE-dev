@@ -13,7 +13,14 @@ const identity = { engineId: 'fake@1', modelDigest: 'd1', glossaryVersion: 'g1',
 
 function make(supOpts = {}, coordOpts = {}) {
   const h = makeSup(supOpts);
-  const coord = new Coordinator({ supervisor: h.sup, cache: new TranslationCache(), identity, timeoutMs: 2000, queueMax: 4, ...coordOpts });
+  const coord = new Coordinator({
+    supervisor: h.sup,
+    cache: new TranslationCache(),
+    identity,
+    timeoutMs: 2000,
+    queueMax: 4,
+    ...coordOpts,
+  });
   const tr = (o) => coord.translate({ organizationId: 'o', scope: 's', target: 'en', text: 'n=1 step=1 hello', ...o });
   return { ...h, coord, tr };
 }
@@ -32,7 +39,14 @@ test('no override: effective = stored; direction from stored; OK metadata', asyn
 
 test('override wins: model direction and result metadata follow the override; stored value is reported unchanged', async () => {
   const c = make();
-  const input = Object.freeze({ organizationId: 'o', scope: 's', target: 'vi', text: 'n=1 step=1 hello', storedSource: 'vi', sourceOverride: 'en' });
+  const input = Object.freeze({
+    organizationId: 'o',
+    scope: 's',
+    target: 'vi',
+    text: 'n=1 step=1 hello',
+    storedSource: 'vi',
+    sourceOverride: 'en',
+  });
   const r = await c.coord.translate(input);
   assert.equal(r.status, 'OK');
   assert.equal(c.ofType('enqueue')[0].direction, 'en-vi', 'stored vi, reader says en: en->vi model');
@@ -135,7 +149,13 @@ test('empty text returns the original unchanged with metadata; legacy `source` s
   const e = await c.tr({ storedSource: 'vi', text: '   ' });
   assert.equal(e.status, 'OK');
   assert.equal(e.textLanguage, 'vi');
-  const legacy = await c.coord.translate({ organizationId: 'o', scope: 's', source: 'vi', target: 'en', text: 'n=1 step=1 legacy' });
+  const legacy = await c.coord.translate({
+    organizationId: 'o',
+    scope: 's',
+    source: 'vi',
+    target: 'en',
+    text: 'n=1 step=1 legacy',
+  });
   assert.equal(legacy.status, 'OK');
   assert.equal(legacy.sourceLanguage, 'vi');
   await c.coord.shutdown();
@@ -145,7 +165,14 @@ test('spawn failure at coordinator level: UNAVAILABLE/spawn-failed, counted by t
   const h = makeFakeSup(() => {
     throw new Error('EAGAIN');
   });
-  const coord = new Coordinator({ supervisor: h.sup, cache: new TranslationCache(), identity, timeoutMs: 1000, queueMax: 4, breakerOptions: { baseCooldownMs: 5000 } });
+  const coord = new Coordinator({
+    supervisor: h.sup,
+    cache: new TranslationCache(),
+    identity,
+    timeoutMs: 1000,
+    queueMax: 4,
+    breakerOptions: { baseCooldownMs: 5000 },
+  });
   const tr = (t) => coord.translate({ organizationId: 'o', scope: 's', storedSource: 'vi', target: 'en', text: t });
   for (let i = 0; i < 3; i++) {
     const r = await tr('t' + i);

@@ -31,12 +31,17 @@ const HEX40 = /^[0-9a-f]{40}$/;
 const HEX64 = /^[0-9a-f]{64}$/;
 
 const fail = (reason, detail) => ({ ok: false, reason, detail: clip(detail) });
-const clip = (s) => String(s).replace(/[^\x20-\x7e]/g, '?').slice(0, 240);
+const clip = (s) =>
+  String(s)
+    .replace(/[^\x20-\x7e]/g, '?')
+    .slice(0, 240);
 
 /** Is `p` a safe lock-relative path (or model id)? */
 export function isSafeRel(p) {
   if (typeof p !== 'string' || p.length === 0 || p.length > 240 || !PATH_RE.test(p)) return false;
-  return p.split('/').every((seg) => seg !== '.' && seg !== '..' && !seg.endsWith('.') && !/^\.+$/.test(seg) && !WIN_DEVICE.test(seg));
+  return p
+    .split('/')
+    .every((seg) => seg !== '.' && seg !== '..' && !seg.endsWith('.') && !/^\.+$/.test(seg) && !WIN_DEVICE.test(seg));
 }
 
 export function validateLockShape(lock) {
@@ -53,11 +58,13 @@ export function validateLockShape(lock) {
     if (seenIds.has(lc)) return bad(`case-insensitive duplicate model id ${id}`);
     seenIds.add(lc);
   }
-  for (const a of seenIds) for (const b of seenIds) if (a !== b && b.startsWith(a + '/')) return bad('model ids nest inside each other');
+  for (const a of seenIds)
+    for (const b of seenIds) if (a !== b && b.startsWith(a + '/')) return bad('model ids nest inside each other');
   for (const id of ids) {
     const m = lock.models[id];
     if (!m || typeof m !== 'object') return bad(`model ${id} is not an object`);
-    if (typeof m.revision !== 'string' || !HEX40.test(m.revision)) return bad(`model ${id}: revision must be a 40-hex commit`);
+    if (typeof m.revision !== 'string' || !HEX40.test(m.revision))
+      return bad(`model ${id}: revision must be a 40-hex commit`);
     if (!m.files || typeof m.files !== 'object' || Array.isArray(m.files)) return bad(`model ${id}: files missing`);
     const rels = Object.keys(m.files);
     if (rels.length === 0) return bad(`model ${id}: no files`);
@@ -70,12 +77,16 @@ export function validateLockShape(lock) {
       const e = m.files[rel];
       if (!e || typeof e !== 'object') return bad(`model ${id}: ${rel} entry invalid`);
       if (!Number.isSafeInteger(e.bytes) || e.bytes < 0) return bad(`model ${id}: ${rel} bytes invalid`);
-      if (typeof e.sha256 !== 'string' || !HEX64.test(e.sha256)) return bad(`model ${id}: ${rel} sha256 must be 64 lower-case hex`);
+      if (typeof e.sha256 !== 'string' || !HEX64.test(e.sha256))
+        return bad(`model ${id}: ${rel} sha256 must be 64 lower-case hex`);
     }
-    for (const a of seen) for (const b of seen) if (a !== b && b.startsWith(a + '/')) return bad(`model ${id}: ${a} is both a file and a directory`);
+    for (const a of seen)
+      for (const b of seen)
+        if (a !== b && b.startsWith(a + '/')) return bad(`model ${id}: ${a} is both a file and a directory`);
   }
   if (lock.allowExtra !== undefined) {
-    if (!Array.isArray(lock.allowExtra) || !lock.allowExtra.every((x) => isSafeRel(x) && !x.includes('/'))) return bad('allowExtra must be a list of top-level file names');
+    if (!Array.isArray(lock.allowExtra) || !lock.allowExtra.every((x) => isSafeRel(x) && !x.includes('/')))
+      return bad('allowExtra must be a list of top-level file names');
   }
   return { ok: true };
 }
@@ -124,7 +135,8 @@ export async function verifyLock({ root, lock, models = null }) {
   if (!shape.ok) return shape;
   const allIds = Object.keys(lock.models);
   const selected = models === null ? allIds : models;
-  for (const id of selected) if (!Object.hasOwn(lock.models, id)) return fail('bad-lock', `model ${id} is not in the lock`);
+  for (const id of selected)
+    if (!Object.hasOwn(lock.models, id)) return fail('bad-lock', `model ${id} is not in the lock`);
 
   let realRoot;
   try {
@@ -136,7 +148,8 @@ export async function verifyLock({ root, lock, models = null }) {
 
   // locked relative paths (root-relative, forward slashes)
   const locked = new Map(); // relFromRoot -> { id, rel, bytes, sha256 }
-  for (const id of selected) for (const [rel, e] of Object.entries(lock.models[id].files)) locked.set(`${id}/${rel}`, { id, rel, ...e });
+  for (const id of selected)
+    for (const [rel, e] of Object.entries(lock.models[id].files)) locked.set(`${id}/${rel}`, { id, rel, ...e });
 
   // pass 0: no extra files / symlinks / special entries
   if (models === null) {
@@ -165,11 +178,15 @@ export async function verifyLock({ root, lock, models = null }) {
       try {
         st = await fs.promises.lstat(cur);
       } catch (err) {
-        return fail(err.code === 'ENOENT' || err.code === 'ENOTDIR' ? 'missing' : 'io', `${relRoot}: ${err.code ?? err.name}`);
+        return fail(
+          err.code === 'ENOENT' || err.code === 'ENOTDIR' ? 'missing' : 'io',
+          `${relRoot}: ${err.code ?? err.name}`,
+        );
       }
       if (st.isSymbolicLink()) return fail('symlink', relRoot);
       const last = i === parts.length - 1;
-      if (last ? !st.isFile() : !st.isDirectory()) return fail('missing', `${relRoot} (not a ${last ? 'regular file' : 'directory'})`);
+      if (last ? !st.isFile() : !st.isDirectory())
+        return fail('missing', `${relRoot} (not a ${last ? 'regular file' : 'directory'})`);
       if (last && st.size !== e.bytes) return fail('size', `${relRoot}: ${st.size} != ${e.bytes}`);
     }
     let real;
@@ -178,7 +195,8 @@ export async function verifyLock({ root, lock, models = null }) {
     } catch (err) {
       return fail('io', `${relRoot}: ${err.code ?? err.name}`);
     }
-    if (!sameOrUnder(realRoot, path.resolve(real)) || !sameOrUnder(realRoot, path.resolve(cur))) return fail('escape', relRoot);
+    if (!sameOrUnder(realRoot, path.resolve(real)) || !sameOrUnder(realRoot, path.resolve(cur)))
+      return fail('escape', relRoot);
     resolved.push([relRoot, cur, e]);
   }
 

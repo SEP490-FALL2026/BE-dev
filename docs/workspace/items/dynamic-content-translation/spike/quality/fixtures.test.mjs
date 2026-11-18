@@ -8,11 +8,46 @@ import { checkMeaning, checkPreservation } from './lib/metrics.mjs';
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const load = (name) => JSON.parse(fs.readFileSync(path.join(dir, 'fixtures', name), 'utf8'));
 
-const ALLOWED = ['negation', 'approve', 'reject', 'revoke', 'name', 'number', 'date', 'software', 'email', 'code', 'glossary', 'long', 'collision', 'unaccented', 'mixed', 'plain'];
-const MIN = { negation: 10, approve: 8, reject: 8, revoke: 6, name: 10, number: 8, date: 8, software: 10, email: 3, code: 4, glossary: 6, long: 4, collision: 3, mixed: 3 };
+const ALLOWED = [
+  'negation',
+  'approve',
+  'reject',
+  'revoke',
+  'name',
+  'number',
+  'date',
+  'software',
+  'email',
+  'code',
+  'glossary',
+  'long',
+  'collision',
+  'unaccented',
+  'mixed',
+  'plain',
+];
+const MIN = {
+  negation: 10,
+  approve: 8,
+  reject: 8,
+  revoke: 6,
+  name: 10,
+  number: 8,
+  date: 8,
+  software: 10,
+  email: 3,
+  code: 4,
+  glossary: 6,
+  long: 4,
+  collision: 3,
+  mixed: 3,
+};
 const REF_AUTHOR = 'AI draft by Claude Sonnet — not reviewed by a human; Opus coordinator spot-check pending';
 
-for (const [file, direction] of [['vi-en.json', 'vi-en'], ['en-vi.json', 'en-vi']]) {
+for (const [file, direction] of [
+  ['vi-en.json', 'vi-en'],
+  ['en-vi.json', 'en-vi'],
+]) {
   const fx = load(file);
   const items = fx.items;
 
@@ -31,7 +66,10 @@ for (const [file, direction] of [['vi-en.json', 'vi-en'], ['en-vi.json', 'en-vi'
       assert.ok(it.source.length > 0 && it.reference.length > 0, it.id);
       assert.ok(Array.isArray(it.categories) && it.categories.length > 0, it.id);
       for (const c of it.categories) assert.ok(ALLOWED.includes(c), `${it.id}: unknown category ${c}`);
-      assert.ok(Array.isArray(it.protected) && Array.isArray(it.mustContain) && Array.isArray(it.mustNotContain), it.id);
+      assert.ok(
+        Array.isArray(it.protected) && Array.isArray(it.mustContain) && Array.isArray(it.mustNotContain),
+        it.id,
+      );
     }
   });
 
@@ -86,8 +124,30 @@ test('fixtures are in sync with fixtures/src (run `node fixtures/build.mjs`)', a
 });
 
 // ---- held-out sets (written before the 4.3.1 benchmark run; never used to tune any guard) ---------------------------------
-const HELD_MIN = { negation: 8, approve: 8, reject: 8, revoke: 8, name: 3, number: 3, date: 3, software: 5, email: 2, code: 2, glossary: 6, long: 2, collision: 2, mixed: 2, unaccented: 3 };
-const words = (s) => new Set(String(s).toLowerCase().normalize('NFC').match(/[\p{L}\p{N}]+/gu) ?? []);
+const HELD_MIN = {
+  negation: 8,
+  approve: 8,
+  reject: 8,
+  revoke: 8,
+  name: 3,
+  number: 3,
+  date: 3,
+  software: 5,
+  email: 2,
+  code: 2,
+  glossary: 6,
+  long: 2,
+  collision: 2,
+  mixed: 2,
+  unaccented: 3,
+};
+const words = (s) =>
+  new Set(
+    String(s)
+      .toLowerCase()
+      .normalize('NFC')
+      .match(/[\p{L}\p{N}]+/gu) ?? [],
+  );
 const jaccard = (a, b) => {
   const A = words(a);
   const B = words(b);
@@ -96,7 +156,10 @@ const jaccard = (a, b) => {
   return inter / (A.size + B.size - inter || 1);
 };
 
-for (const [file, direction] of [['heldout-vi-en.json', 'vi-en'], ['heldout-en-vi.json', 'en-vi']]) {
+for (const [file, direction] of [
+  ['heldout-vi-en.json', 'vi-en'],
+  ['heldout-en-vi.json', 'en-vi'],
+]) {
   const fx = load(file);
   const items = fx.items;
   const main = load(`${direction}.json`).items;
@@ -116,13 +179,17 @@ for (const [file, direction] of [['heldout-vi-en.json', 'vi-en'], ['heldout-en-v
       for (const k of ['source', 'reference']) assert.equal(typeof it[k], 'string', `${it.id}.${k}`);
       assert.ok(it.source.length > 0 && it.reference.length > 0, it.id);
       for (const c of it.categories) assert.ok(ALLOWED.includes(c), `${it.id}: unknown category ${c}`);
-      assert.ok(Array.isArray(it.protected) && Array.isArray(it.mustContain) && Array.isArray(it.mustNotContain), it.id);
+      assert.ok(
+        Array.isArray(it.protected) && Array.isArray(it.mustContain) && Array.isArray(it.mustNotContain),
+        it.id,
+      );
     }
   });
 
   test(`${file}: coverage per class (at least 8 items for each polarity class)`, () => {
     const count = (c) => items.filter((i) => i.categories.includes(c)).length;
-    for (const [cat, min] of Object.entries(HELD_MIN)) if (cat !== 'unaccented' || direction === 'vi-en') assert.ok(count(cat) >= min, `${cat}: ${count(cat)} < ${min}`);
+    for (const [cat, min] of Object.entries(HELD_MIN))
+      if (cat !== 'unaccented' || direction === 'vi-en') assert.ok(count(cat) >= min, `${cat}: ${count(cat)} < ${min}`);
   });
 
   test(`${file}: new wordings, not copies or close paraphrases of the main set (word Jaccard < 0.6 against every main source)`, () => {
@@ -144,7 +211,8 @@ for (const [file, direction] of [['heldout-vi-en.json', 'vi-en'], ['heldout-en-v
       const m = checkMeaning(it.reference, it);
       assert.ok(m.pass, `${it.id}: reference fails ${JSON.stringify(m)}`);
       assert.ok(checkPreservation(it.reference, it.protected).all, it.id);
-      for (const text of [it.source, it.reference]) for (const e of text.match(emailRe) || []) assert.ok(/\.example$/.test(e), `${it.id}: ${e}`);
+      for (const text of [it.source, it.reference])
+        for (const e of text.match(emailRe) || []) assert.ok(/\.example$/.test(e), `${it.id}: ${e}`);
     }
     for (const it of items.filter((i) => i.categories.includes('collision'))) assert.match(it.source, /<x\d+>/, it.id);
   });

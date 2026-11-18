@@ -1,0 +1,11 @@
+PROMPT 2 XONG
+1. Commit cuối: `9580e179` (nhánh `feat/mf2-mf3`, chưa push); commit code cuối `fa1d3c2f`, HANDOFF cuối `670a48cb` (AL-G).
+2. Gói xong (mỗi gói: 1 subagent code + 1 review chỉ đọc + sửa Critical/Required): X0, X-H, X-SA, MF2-A…G, K1-CL, MF1-X (+MF1-X-R seed), MF3-A (+A-R), MF3-B (+B-R1..R3), MF3-C (+C-R1..R6), X-IT (+R3..R5, O1..O4, G2/G3), DS (+R1..R3), RD, AUDIT-LEFT (AL.1–AL.5, RD-R1, RD-R2; AL.6 không có registry audit ⟹ không làm, D-126). Bỏ Z theo lệnh. Bị chặn: không còn (hai mục "Bị chặn" của X-IT đã giải quyết ở X-IT-G2).
+3. Gate cuối (AL-G, chạy thật): typecheck, lint, arch:check, prisma:validate sạch; test:gates 16 suite/331 ca; rules:check 561 file/0 lỗi; openapi:export + arch:routes + arch:graph không đổi (379 operation).
+   Test theo nhóm chạm: jest 6 module 151 suite/2055; integration (≤3 worker, từng lượt) organization 35/377, catalog 46/518, licensing 55/618, optimization 14/105, personnel 43/497, dashboards 3/32; test:http platform 12 suite/189.
+   FE API docs (Docs, KHÔNG commit): sinh từ clone sạch tại `fa1d3c2f`, `--check` OK 379 operation/5139 dòng field, tools test 45/45.
+4. D-n mới nhất: D-129 (128 mục D-1…D-129, D-108 không dùng); "Tóm tắt cho Owner" đã ghi cuối `OVERNIGHT-DECISIONS.md`.
+5. Việc còn treo: Z (seed v4 gồm ca m-17 + danh sách phần mềm phòng + đề xuất, `test/flows/mf3-transfer.flow-spec.ts` còn `it.skip`, roadmap, nhãn rollback D-1).
+   Chưa chạy: `pnpm check`, full test:http/test:integration, test:flows, seed:local, `_serial/seed-check-runtime` (cần BOOTSTRAP_URL), các thư mục integration không chạm (audit, devices, finance, identity-access, installation, onboarding, operating-parameters, platform, usage, ai-assist); requests/budgets/notifications/data-import chưa chạy lại sau DS/RD/AL ⟹ để CI.
+   Owner cần chốt luật: D-89/D-97, D-111, D-113/114, D-122, D-127 (xem Tóm tắt); 3 điểm xem kỹ nhất: m-17 tự thu hồi sau deploy (D-82/88/92), cam kết sổ cái + R-49 (D-86/91/93), phòng không trưởng phòng + gia hạn gói cần admin (D-74–76, D-111).
+   Docs lệch QĐ-111bc: US-03-06 AC-9/AC-11, US-05-01 AC-5; SPEC P1/P23/P2 mã `OFFBOARDING.*`. Repo Docs chưa commit (theo lệnh). Có hai lần `docker desktop restart` (K1-CL do subagent; sau X-IT do em, DB đã hồi).

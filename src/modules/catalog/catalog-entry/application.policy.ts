@@ -1,0 +1,82 @@
+import { normalizeDisplayName } from '../../../core/display-name';
+import { normalizeHost } from '../vendor-dictionary/vendor-matcher.policy';
+import {
+  ApplicationDomainInvalidError,
+  ApplicationInternalHasNoVendorError,
+  ApplicationNameInvalidError,
+  ApplicationTooManyDomainsError,
+  ApplicationVendorNameInvalidError,
+  ApplicationVendorRequiredError,
+  ApplicationVendorSourceAmbiguousError,
+} from './application.errors';
+
+export const MAX_NAME_LENGTH = 200;
+export const MAX_DOMAINS = 20;
+
+/** The most similar applications a detail names; the total says how many there are. */
+export const SIMILAR_APPLICATION_LIMIT = 20;
+
+/** A communication service (an application of the group Liên lạc, `QĐ-111e`) is not collected for usage by default (BR-06.2); otherwise nothing is decided here. */
+export function usageCollectionDefault(communicationService: boolean): 'NOT_COLLECTED' | null {
+  return communicationService ? 'NOT_COLLECTED' : null;
+}
+
+function cleanText(raw: string, onInvalid: () => Error): string {
+  const text = normalizeDisplayName(raw);
+  if (text.length < 1 || text.length > MAX_NAME_LENGTH) throw onInvalid();
+
+  return text;
+}
+
+/** An application name as it is shown: trimmed, blanks collapsed, 1 to 200 characters. */
+export function cleanApplicationName(raw: string): string {
+  return cleanText(raw, () => new ApplicationNameInvalidError());
+}
+
+/** Each value reduced to its host; repeats dropped, order kept; at most twenty. */
+export function cleanApplicationDomains(values: readonly string[]): string[] {
+  const hosts = new Set<string>();
+  for (const value of values) {
+    const host = normalizeHost(value);
+    if (host === null) throw new ApplicationDomainInvalidError(value);
+    hosts.add(host);
+  }
+  if (hosts.size > MAX_DOMAINS) throw new ApplicationTooManyDomainsError();
+
+  return [...hosts];
+}
+
+export type VendorSource = { type: 'NONE' } | { type: 'DICTIONARY'; lineId: string } | { type: 'NAME'; name: string };
+
+/**
+ * Where the vendor of a new application comes from. An internal application has no vendor; any other names its vendor either through a dictionary service line (the vendor is
+ * the line's group) or by typing a name for software outside the dictionary — exactly one of the two.
+ */
+export function vendorSourceOf(input: {
+  kind: 'SAAS' | 'LICENSED' | 'INTERNAL';
+  vendorName?: string;
+  dictionaryServiceLineId?: string;
+}): VendorSource {
+  const named = input.vendorName !== undefined;
+  const lined = input.dictionaryServiceLineId !== undefined;
+
+  if (input.kind === 'INTERNAL') {
+    if (named || lined) throw new ApplicationInternalHasNoVendorError();
+
+    return { type: 'NONE' };
+  }
+  if (named && lined) throw new ApplicationVendorSourceAmbiguousError();
+  if (lined) return { type: 'DICTIONARY', lineId: input.dictionaryServiceLineId as string };
+  if (named)
+    return { type: 'NAME', name: cleanText(input.vendorName as string, () => new ApplicationVendorNameInvalidError()) };
+
+  throw new ApplicationVendorRequiredError();
+}
+
+/**
+ * Whether the application needs a responsible IT Admin (`QĐ-111g`, `US-04-06` AC-7, AC-8): nobody is named, or the person named is no longer
+ * a usable IT Admin (left, locked, lost the role). Read when the application is read, never stored; `usableAmong` holds the usable ones.
+ */
+export function needsResponsible(responsible: string | null, usableAmong: ReadonlySet<string>): boolean {
+  return responsible === null || !usableAmong.has(responsible);
+}

@@ -49,7 +49,14 @@ function summarize(items) {
   const segFallback = items.reduce((a, i) => a + i.counts.fallback, 0);
   return {
     items: items.length,
-    corpusChrF: items.length ? round(corpusChrF(items.map((i) => i.output), items.map((i) => i.reference))) : null,
+    corpusChrF: items.length
+      ? round(
+          corpusChrF(
+            items.map((i) => i.output),
+            items.map((i) => i.reference),
+          ),
+        )
+      : null,
     preservedPct: round(pct(withProtected.filter((i) => i.preserved.all).length, withProtected.length)),
     meaningPassPct: round(pct(withChecks.filter((i) => i.meaning.pass).length, withChecks.length)),
     fallbackSegmentPct: round(pct(segFallback, segTotal)),
@@ -129,7 +136,15 @@ export function fieldMetrics(items) {
   const withProt = translated.filter((i) => i.hasProtected);
   const fieldMs = needed.map((i) => i.latencyMs).filter(Number.isFinite);
   const segMs = items.flatMap((i) => i.segmentMs ?? []).filter(Number.isFinite);
-  const chrfOf = (set) => (set.length ? round(corpusChrF(set.map((i) => i.output), set.map((i) => i.reference))) : null);
+  const chrfOf = (set) =>
+    set.length
+      ? round(
+          corpusChrF(
+            set.map((i) => i.output),
+            set.map((i) => i.reference),
+          ),
+        )
+      : null;
 
   return {
     items: items.length,
@@ -145,7 +160,9 @@ export function fieldMetrics(items) {
     automaticFlags: {
       translatedFields: translated.length,
       meaningFlags: translated.filter(isFlagged).length,
-      meaningFlagPct: round(pct(translated.filter(isFlagged).length, translated.filter((i) => i.meaning?.hasChecks).length)),
+      meaningFlagPct: round(
+        pct(translated.filter(isFlagged).length, translated.filter((i) => i.meaning?.hasChecks).length),
+      ),
       preservationFlags: translated.filter(isPreservationFlagged).length,
       polarity,
     },
@@ -163,7 +180,11 @@ export function fieldFlags(items, lookup) {
     if (!meaning && !preservation) continue;
     const fx = lookup.get(i.id) ?? {};
     const failed = {};
-    if (meaning) failed.meaning = { failedContain: i.meaning.failedContain ?? [], failedNotContain: i.meaning.failedNotContain ?? [] };
+    if (meaning)
+      failed.meaning = {
+        failedContain: i.meaning.failedContain ?? [],
+        failedNotContain: i.meaning.failedNotContain ?? [],
+      };
     if (preservation) failed.preservation = { missing: i.preserved.missing ?? [] };
     out.push({
       id: i.id,

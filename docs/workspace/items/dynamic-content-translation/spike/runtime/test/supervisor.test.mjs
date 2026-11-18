@@ -123,7 +123,9 @@ test('backoff doubles 1s -> 60s (scaled) on repeated transient failures', async 
 
 test('loadTimeoutMs kills a stuck loader; slot freed only after exit; respawn serves the next job', async () => {
   // loadTimeoutMs also covers node process boot (the load request is queued on IPC), so it must exceed a cold start under CI load
-  const h = makeSup({ loadTimeoutMs: 800, computeMaxMs: 5000, loadBackoffMinMs: 1500, loadBackoffMaxMs: 3000 }, (i) => (i === 0 ? { FAKE_LOAD_HANG: '1' } : {}));
+  const h = makeSup({ loadTimeoutMs: 800, computeMaxMs: 5000, loadBackoffMinMs: 1500, loadBackoffMaxMs: 3000 }, (i) =>
+    i === 0 ? { FAKE_LOAD_HANG: '1' } : {},
+  );
   const j1 = h.sup.enqueue({ direction: 'vi-en', segments: ['a'] });
   const o1 = await j1.settled;
   assert.equal(o1.state, 'FAILED');

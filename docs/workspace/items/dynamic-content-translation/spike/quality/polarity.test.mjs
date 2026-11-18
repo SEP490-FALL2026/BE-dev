@@ -27,7 +27,11 @@ test('cue classes: vi', () => {
   assert.deepEqual(classesOf('Tôi đã duyệt yêu cầu.', 'vi'), ['approve']);
   assert.deepEqual(classesOf('Ban giám đốc tán thành kế hoạch.', 'vi'), ['approve']);
   assert.deepEqual(classesOf('Yêu cầu bị từ chối.', 'vi'), ['reject']);
-  assert.deepEqual(classesOf('Yêu cầu chưa được duyệt.', 'vi'), ['reject'], 'not-approved is one reject cue, not negation + approve');
+  assert.deepEqual(
+    classesOf('Yêu cầu chưa được duyệt.', 'vi'),
+    ['reject'],
+    'not-approved is one reject cue, not negation + approve',
+  );
   assert.deepEqual(classesOf('Hãy thu hồi quyền truy cập.', 'vi'), ['revoke']);
   assert.deepEqual(classesOf('Đừng chia sẻ mật khẩu.', 'vi'), ['negation']);
   assert.deepEqual(classesOf('Không thu hồi tài khoản.', 'vi'), ['negation', 'revoke']);
@@ -53,8 +57,16 @@ test('word boundaries and neutral compounds do not trigger cues', () => {
   assert.deepEqual(classesOf('Đặt vé hàng không.', 'vi'), []);
   assert.deepEqual(classesOf('Bạn có thể giúp không?', 'vi'), [], 'tag question "... không?" is not a negation');
   assert.deepEqual(classesOf('Đã xong chưa?', 'vi'), []);
-  assert.deepEqual(classesOf('Đã duyệt chưa?', 'vi'), ['approve'], 'the question particle is blanked, the approve cue stays');
-  assert.deepEqual(classesOf('Tôi không giúp được?', 'vi'), ['negation'], 'only a particle directly before the question mark is neutral');
+  assert.deepEqual(
+    classesOf('Đã duyệt chưa?', 'vi'),
+    ['approve'],
+    'the question particle is blanked, the approve cue stays',
+  );
+  assert.deepEqual(
+    classesOf('Tôi không giúp được?', 'vi'),
+    ['negation'],
+    'only a particle directly before the question mark is neutral',
+  );
   assert.deepEqual(classesOf('We know the answer, note the nominee.', 'en'), [], 'no inside know/note/nominee');
   assert.deepEqual(classesOf('Not only the team but also the vendor.', 'en'), []);
 });
@@ -64,7 +76,11 @@ test('unaccented Vietnamese is read with folded cues; ambiguous ones stay off', 
   assert.deepEqual(classesOf('Truong phong tu choi yeu cau.', 'vi'), ['reject']);
   assert.deepEqual(classesOf('Toi khong can cai them.', 'vi'), ['negation']);
   assert.deepEqual(classesOf('Thu hoi quyen truy cap.', 'vi'), ['revoke']);
-  assert.deepEqual(classesOf('Dung chia se mat khau.', 'vi'), [], 'dung is ambiguous (nội dung): not used when unaccented');
+  assert.deepEqual(
+    classesOf('Dung chia se mat khau.', 'vi'),
+    [],
+    'dung is ambiguous (nội dung): not used when unaccented',
+  );
 });
 
 // ---- vi -> en ------------------------------------------------------------------------------------------------------------
@@ -97,12 +113,20 @@ test('vi->en: new phrasings and synonyms', () => {
 test('vi->en: several classes in one segment all have to be covered', () => {
   ok('vi-en', 'Không thu hồi tài khoản trước khi bàn giao.', 'Do not revoke the account before the handover.');
   miss('vi-en', 'Không thu hồi tài khoản trước khi bàn giao.', 'Revoke the account before the handover.', ['negation']);
-  miss('vi-en', 'Không thu hồi tài khoản trước khi bàn giao.', 'Do not keep the account before the handover.', ['revoke']);
+  miss('vi-en', 'Không thu hồi tài khoản trước khi bàn giao.', 'Do not keep the account before the handover.', [
+    'revoke',
+  ]);
 });
 
 test('vi->en: unaccented source', () => {
-  ok('vi-en', 'Yeu cau chua duoc duyet vi thieu ly do.', 'The request has not been approved because the reason is missing.');
-  miss('vi-en', 'Yeu cau chua duoc duyet vi thieu ly do.', 'The sour lemur lecom permort because of the tiet.', ['reject']);
+  ok(
+    'vi-en',
+    'Yeu cau chua duoc duyet vi thieu ly do.',
+    'The request has not been approved because the reason is missing.',
+  );
+  miss('vi-en', 'Yeu cau chua duoc duyet vi thieu ly do.', 'The sour lemur lecom permort because of the tiet.', [
+    'reject',
+  ]);
   miss('vi-en', 'Truong phong tu choi yeu cau.', 'Department head tui yeu suu.', ['reject']);
 });
 
@@ -140,7 +164,12 @@ test('en->vi: rejection wording', () => {
 
 // ---- rule shape --------------------------------------------------------------------------------------------------------
 test('only cues in the SOURCE are required; cues that appear only in the output are not penalised', () => {
-  ok('vi-en', 'Cần cài đặt phần mềm.', 'The software must not be installed.', 'hallucinated negation is out of scope for a cue-presence rule');
+  ok(
+    'vi-en',
+    'Cần cài đặt phần mềm.',
+    'The software must not be installed.',
+    'hallucinated negation is out of scope for a cue-presence rule',
+  );
   ok('vi-en', 'Cần cài đặt phần mềm.', 'Install the software.');
 });
 
@@ -155,7 +184,12 @@ test('documented trade-offs: a valid paraphrase without a lexicon cue is a false
   // false fallback: 'ủng hộ' means support, the model's wording is fine but not in the lexicon
   miss('en-vi', 'We approve the proposal.', 'Chúng tôi ủng hộ đề xuất.', ['approve']);
   // miss: both cues present, polarity attached to the wrong verb
-  ok('vi-en', 'Không thu hồi tài khoản.', 'Revoke the account, do not keep it.', 'known miss: the gate checks presence, not scope');
+  ok(
+    'vi-en',
+    'Không thu hồi tài khoản.',
+    'Revoke the account, do not keep it.',
+    'known miss: the gate checks presence, not scope',
+  );
 });
 
 test('empty and non-string input is safe', () => {

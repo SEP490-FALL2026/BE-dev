@@ -16,10 +16,7 @@
       {
         "firstRequestViEnMs": 2157.9,
         "firstRequestEnViMs": 2514.1,
-        "status": [
-          "OK",
-          "OK"
-        ],
+        "status": ["OK", "OK"],
         "workerLoadMs": {
           "vi-en": 1259,
           "en-vi": 1692
@@ -70,10 +67,7 @@
       {
         "firstRequestViEnMs": 2934.1,
         "firstRequestEnViMs": 1550.7,
-        "status": [
-          "OK",
-          "OK"
-        ],
+        "status": ["OK", "OK"],
         "workerLoadMs": {
           "vi-en": 1889,
           "en-vi": 956
@@ -124,10 +118,7 @@
       {
         "firstRequestViEnMs": 3462.3,
         "firstRequestEnViMs": 3808.7,
-        "status": [
-          "OK",
-          "OK"
-        ],
+        "status": ["OK", "OK"],
         "workerLoadMs": {
           "vi-en": 2140,
           "en-vi": 2899
@@ -178,10 +169,7 @@
       {
         "firstRequestViEnMs": 2755.4,
         "firstRequestEnViMs": 2478.5,
-        "status": [
-          "OK",
-          "OK"
-        ],
+        "status": ["OK", "OK"],
         "workerLoadMs": {
           "vi-en": 1800,
           "en-vi": 1505
@@ -232,10 +220,7 @@
       {
         "firstRequestViEnMs": 2913.6,
         "firstRequestEnViMs": 2365.5,
-        "status": [
-          "OK",
-          "OK"
-        ],
+        "status": ["OK", "OK"],
         "workerLoadMs": {
           "vi-en": 1787,
           "en-vi": 1312

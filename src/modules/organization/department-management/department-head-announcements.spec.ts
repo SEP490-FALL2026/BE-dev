@@ -1,0 +1,205 @@
+import { Test } from '@nestjs/testing';
+import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AuditApi } from '../../audit/public/audit.api';
+import { OrganizationContextService } from '../organization-context.service';
+import { DepartmentRecordService } from '../department/department-record.service';
+import { EmployeeRecordService } from '../employee/employee-record.service';
+import { OrganizationChangeService } from '../change-announcement/organization-change.service';
+import { EmployeeAccountsHook, type EmployeeAccounts } from '../public/organization.extension-points';
+import { DepartmentHeadService } from './department-head.service';
+import { DepartmentRepo } from '../department/department.repo';
+import type { HeadPeriodChanges } from '../department/department.types';
+import type { HeadPeriodRecord } from '../organization-structure.types';
+
+const TODAY = '2026-10-24';
+const TOMORROW = '2026-10-25';
+
+const period = (employeeId: string, validFrom: string, validTo: string | null = null): HeadPeriodRecord => ({
+  employeeId,
+  employeeCode: employeeId.toUpperCase(),
+  fullName: employeeId,
+  validFrom,
+  validTo,
+});
+const room = (changes: Partial<HeadPeriodChanges>): HeadPeriodChanges => ({
+  cancelled: [],
+  ended: [],
+  endedPeriodIds: [],
+  cancelledPeriodIds: [],
+  ...changes,
+});
+
+/**
+ * The head periods a department writes become changes of the organization that its listeners are told of in the same
+ * transaction, but only when they take effect today (`FR-3.16`, `US-05-12` AC-2): a change for another day is the pass of
+ * that day's to announce.
+ */
+describe('DepartmentHeadService announces the head periods that take effect today', () => {
+  const tx = { name: 'tx' };
+  const actor = {
+    subject: 'a',
+    appUserId: 'a',
+    sessionId: 's',
+    employeeId: 'actor',
+    directRoles: ['SUPER_ADMIN'],
+    roles: ['SUPER_ADMIN'],
+  } as AuthenticatedPrincipal;
+  const organization = {
+    getOrganization: jest.fn(),
+    businessToday: jest.fn(),
+    lockEmployeeForShare: jest.fn(),
+    getEmployee: jest.fn(),
+    headHistory: jest.fn(),
+    endHeadPeriodsFrom: jest.fn(),
+    startHeadPeriod: jest.fn(),
+    emitChange: jest.fn(),
+  };
+  const departments = { lock: jest.fn(), placementOn: jest.fn() };
+
+  async function service(): Promise<DepartmentHeadService> {
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        DepartmentHeadService,
+        { provide: DepartmentRepo, useValue: departments },
+        {
+          provide: OrganizationContextService,
+          useValue: { businessToday: organization.businessToday, findOrganization: organization.getOrganization },
+        },
+        {
+          provide: DepartmentRecordService,
+          useValue: {
+            headHistory: organization.headHistory,
+            endHeadPeriodsFrom: organization.endHeadPeriodsFrom,
+            startHeadPeriod: organization.startHeadPeriod,
+          },
+        },
+        {
+          provide: EmployeeRecordService,
+          useValue: {
+            lock: (tx: unknown, id: string) => organization.lockEmployeeForShare(tx, id) as Promise<void>,
+            find: organization.getEmployee,
+          },
+        },
+        { provide: OrganizationChangeService, useValue: { emit: organization.emitChange } },
+        {
+          provide: EmployeeAccountsHook,
+          useFactory: () => {
+            const hook = new EmployeeAccountsHook();
+            hook.bind({
+              inspectEmployeeAccount: jest
+                .fn()
+                .mockResolvedValue({ hasAccount: true, usable: true, roles: ['MANAGER'] }),
+            } as unknown as EmployeeAccounts);
+
+            return hook;
+          },
+        },
+        { provide: AuditApi, useValue: { record: jest.fn() } },
+        {
+          provide: TransactionRunner,
+          useValue: { run: jest.fn((work: (transaction: unknown) => Promise<unknown>) => work(tx)) },
+        },
+      ],
+    }).compile();
+
+    return moduleRef.get(DepartmentHeadService);
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    organization.getOrganization.mockResolvedValue({ id: 'org-1' });
+    organization.businessToday.mockResolvedValue(TODAY);
+    organization.getEmployee.mockResolvedValue({ id: 'new', employeeCode: 'NEW', status: 'ACTIVE' });
+    organization.headHistory.mockResolvedValue([]);
+    organization.startHeadPeriod.mockResolvedValue({ periodId: 'period-new' });
+    departments.lock.mockResolvedValue({ id: 'dep-1', status: 'ACTIVE' });
+    departments.placementOn.mockResolvedValue({ departmentId: 'dep-1', validTo: null });
+  });
+
+  const emitted = () => organization.emitChange.mock.calls.map(([, change]: [unknown, unknown]) => change);
+
+  it('announces the end of the head who goes and the start of the head who comes, in that order, for a change of today', async () => {
+    organization.headHistory.mockResolvedValue([period('old', '2026-01-01')]);
+    organization.endHeadPeriodsFrom.mockResolvedValue(
+      room({ ended: [period('old', '2026-01-01', TODAY)], endedPeriodIds: ['period-old'] }),
+    );
+
+    await (await service()).assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TODAY });
+
+    expect(emitted()).toEqual([
+      {
+        kind: 'HEAD_PERIOD_END',
+        periodId: 'period-old',
+        departmentId: 'dep-1',
+        headEmployeeId: 'old',
+        effectiveOn: TODAY,
+      },
+      {
+        kind: 'HEAD_PERIOD_START',
+        periodId: 'period-new',
+        departmentId: 'dep-1',
+        headEmployeeId: 'new',
+        previousHeadEmployeeId: 'old',
+        effectiveOn: TODAY,
+      },
+    ]);
+    expect(organization.emitChange.mock.calls.every(([given]: [unknown]) => given === tx)).toBe(true);
+  });
+
+  it('counts a period opened today and cancelled today as one that was in force, and not one that was to begin later', async () => {
+    organization.endHeadPeriodsFrom.mockResolvedValue(
+      room({
+        cancelled: [period('today', TODAY), period('later', TOMORROW)],
+        cancelledPeriodIds: ['period-today', 'period-later'],
+      }),
+    );
+
+    await (await service()).vacate(actor, 'dep-1', { effectiveFrom: TODAY });
+
+    expect(emitted()).toEqual([
+      {
+        kind: 'HEAD_PERIOD_END',
+        periodId: 'period-today',
+        departmentId: 'dep-1',
+        headEmployeeId: 'today',
+        effectiveOn: TODAY,
+      },
+    ]);
+  });
+
+  it('announces nothing for a change dated after today, and nothing when there was nobody to end', async () => {
+    organization.endHeadPeriodsFrom.mockResolvedValue(
+      room({ ended: [period('old', '2026-01-01', TOMORROW)], endedPeriodIds: ['period-old'] }),
+    );
+    const heads = await service();
+
+    await heads.assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TOMORROW });
+    await heads.vacate(actor, 'dep-1', { effectiveFrom: TOMORROW });
+    organization.endHeadPeriodsFrom.mockResolvedValue(room({}));
+    await heads.vacate(actor, 'dep-1', { effectiveFrom: TODAY });
+
+    expect(organization.emitChange).not.toHaveBeenCalled();
+  });
+
+  it('lets the error of a listener reach the transaction, so the change is not written without it', async () => {
+    organization.endHeadPeriodsFrom.mockResolvedValue(room({}));
+    organization.emitChange.mockRejectedValue(new Error('listener refused'));
+
+    await expect((await service()).assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TODAY })).rejects.toThrow(
+      'listener refused',
+    );
+  });
+
+  it('hands no kept notice over itself: that is the work of the listener of HEAD_PERIOD_START, when the period starts (T-11)', async () => {
+    organization.endHeadPeriodsFrom.mockResolvedValue(room({}));
+    organization.emitChange.mockResolvedValue(undefined);
+    const heads = await service();
+
+    await heads.assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TOMORROW });
+    await heads.assign(actor, 'dep-1', { employeeId: 'new', effectiveFrom: TODAY });
+
+    // Nothing is told for the day that has not come, and the one of today is the announcement the listener hears.
+    expect(emitted().map((change) => (change as { kind: string }).kind)).toEqual(['HEAD_PERIOD_START']);
+  });
+});

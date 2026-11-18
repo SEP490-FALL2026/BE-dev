@@ -42,11 +42,21 @@ const failures = [];
 let inproc = null;
 
 if (mode === 'worker') {
-  const onnx = ['opus-mt-vi-en', 'opus-mt-en-vi'].map((m) => path.join(modelsDir, 'Xenova', m, 'onnx', 'encoder_model_quantized.onnx'));
+  const onnx = ['opus-mt-vi-en', 'opus-mt-en-vi'].map((m) =>
+    path.join(modelsDir, 'Xenova', m, 'onnx', 'encoder_model_quantized.onnx'),
+  );
   const digest = createHash('sha256');
   for (const f of onnx) digest.update(await sha256File(f)); // identity only (cache key); NOT an integrity gate in the spike
   sup = new Supervisor({
-    spawn: makeSpawn({ depsDir: E.SPIKE_DEPS_DIR, modelsDir, intraThreads: Number(E.BENCH_INTRA ?? 1), workerPath: E.BENCH_WORKER_PATH || undefined, execPath: E.BENCH_EXEC_PATH || undefined, cwd: E.BENCH_SPAWN_CWD || undefined, maxNewTokensOverride: E.BENCH_MAX_NEW_TOKENS ? Number(E.BENCH_MAX_NEW_TOKENS) : null }),
+    spawn: makeSpawn({
+      depsDir: E.SPIKE_DEPS_DIR,
+      modelsDir,
+      intraThreads: Number(E.BENCH_INTRA ?? 1),
+      workerPath: E.BENCH_WORKER_PATH || undefined,
+      execPath: E.BENCH_EXEC_PATH || undefined,
+      cwd: E.BENCH_SPAWN_CWD || undefined,
+      maxNewTokensOverride: E.BENCH_MAX_NEW_TOKENS ? Number(E.BENCH_MAX_NEW_TOKENS) : null,
+    }),
     concurrency: Number(E.BENCH_CONCURRENCY ?? 1),
     computeMaxMs: Number(E.BENCH_COMPUTE_MAX_MS ?? 10_000),
     killGraceMs: Number(E.BENCH_KILL_GRACE_MS ?? 3000),
@@ -62,7 +72,12 @@ if (mode === 'worker') {
   coord = new Coordinator({
     supervisor: sup,
     cache: new TranslationCache(),
-    identity: { engineId: 'opus-mt-q8@transformers-4.3.1', modelDigest: digest.digest('hex').slice(0, 16), glossaryVersion: 'g0', placeholderPolicyVersion: 'p0' },
+    identity: {
+      engineId: 'opus-mt-q8@transformers-4.3.1',
+      modelDigest: digest.digest('hex').slice(0, 16),
+      glossaryVersion: 'g0',
+      placeholderPolicyVersion: 'p0',
+    },
     timeoutMs: Number(E.BENCH_TIMEOUT_MS ?? 10_000),
     queueMax: Number(E.BENCH_QUEUE_MAX ?? 4),
     breakerOptions: { threshold: Number(E.BENCH_BREAKER_THRESHOLD ?? 3) },
@@ -91,7 +106,12 @@ async function shutdown(reason) {
   const t0 = Date.now();
   if (coord) await coord.shutdown();
   const summary = sup
-    ? { reason, ms: Date.now() - t0, exits: events.filter((e) => e.type === 'exit').map((e) => ({ pid: e.pid, code: e.code, signal: e.signal })), killSent: events.filter((e) => e.type === 'killSent').map((e) => e.reason) }
+    ? {
+        reason,
+        ms: Date.now() - t0,
+        exits: events.filter((e) => e.type === 'exit').map((e) => ({ pid: e.pid, code: e.code, signal: e.signal })),
+        killSent: events.filter((e) => e.type === 'killSent').map((e) => e.reason),
+      }
     : { reason, ms: Date.now() - t0 };
   process.stdout.write(`SHUTDOWN_EVENTS ${JSON.stringify(summary)}\n`);
   server.close();
@@ -117,10 +137,22 @@ const server = http.createServer(async (req, res) => {
           target: b.target,
           ...(b.timeoutMs ? { deadlineAt: Date.now() + b.timeoutMs } : {}),
         });
-        return send(res, 200, { ...r, chars: r.text?.length ?? 0, serverMs: performance.now() - t0, ...(b.returnText ? {} : { text: undefined }) });
+        return send(res, 200, {
+          ...r,
+          chars: r.text?.length ?? 0,
+          serverMs: performance.now() - t0,
+          ...(b.returnText ? {} : { text: undefined }),
+        });
       }
       const out = await inproc.translate(`${b.source}-${b.target}`, b.text);
-      return send(res, 200, { status: 'OK', cacheHit: false, chars: out.text.length, serverMs: performance.now() - t0, stats: out.stats, ...(b.returnText ? { text: out.text } : {}) });
+      return send(res, 200, {
+        status: 'OK',
+        cacheHit: false,
+        chars: out.text.length,
+        serverMs: performance.now() - t0,
+        stats: out.stats,
+        ...(b.returnText ? { text: out.text } : {}),
+      });
     }
     if (req.method === 'GET' && url.pathname === '/stats') {
       const ms = (n) => +(n / 1e6).toFixed(2);
@@ -130,11 +162,25 @@ const server = http.createServer(async (req, res) => {
         rssMb: rssMb(),
         rssAtStartMb: rssAtStart,
         heapUsedMb: +(process.memoryUsage().heapUsed / 1048576).toFixed(1),
-        eld: { min: ms(eld.min), mean: ms(eld.mean), p50: ms(eld.percentile(50)), p99: ms(eld.percentile(99)), p999: ms(eld.percentile(99.9)), max: ms(eld.max), count: eld.count, resolutionMs: 10 },
+        eld: {
+          min: ms(eld.min),
+          mean: ms(eld.mean),
+          p50: ms(eld.percentile(50)),
+          p99: ms(eld.percentile(99)),
+          p999: ms(eld.percentile(99.9)),
+          max: ms(eld.max),
+          count: eld.count,
+          resolutionMs: 10,
+        },
       };
       if (coord) {
         snap.coordinator = coord.snapshot();
-        snap.workers = sup.slots.map((s) => ({ slot: s.id, pid: s.pid, job: s.job ? { id: s.job.id, state: s.job.state, phase: s.job.phase } : null, models: Object.fromEntries(s.models) }));
+        snap.workers = sup.slots.map((s) => ({
+          slot: s.id,
+          pid: s.pid,
+          job: s.job ? { id: s.job.id, state: s.job.state, phase: s.job.phase } : null,
+          models: Object.fromEntries(s.models),
+        }));
         snap.failures = failures.length;
         snap.eventCount = events.length;
       }

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { fromDateColumn } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import {
@@ -7,7 +8,7 @@ import {
   SessionRevokedReason,
   SessionSnapshot,
   ThrottleSnapshot,
-} from '../identity-access.types';
+} from '../public/identity-access.types';
 
 /** Owns AuthSession, RefreshToken and LoginThrottle. */
 @Injectable()
@@ -104,6 +105,7 @@ export class SessionRepo {
           select: {
             id: true,
             employeeId: true,
+            employee: { select: { accessBlock: { select: { blockedFrom: true } } } },
             status: true,
             activationState: true,
             roleGrants: { where: { revokedAt: null }, select: { role: true } },
@@ -123,6 +125,9 @@ export class SessionRepo {
       status: row.appUser.status,
       activationState: row.appUser.activationState,
       directRoles: row.appUser.roleGrants.map((grant) => grant.role),
+      accessBlockedFrom: row.appUser.employee.accessBlock
+        ? fromDateColumn(row.appUser.employee.accessBlock.blockedFrom)
+        : null,
     };
   }
 

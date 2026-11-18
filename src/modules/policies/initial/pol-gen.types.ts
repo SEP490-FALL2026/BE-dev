@@ -1,0 +1,41 @@
+import type { InitialPolicy } from './initial-policies.types';
+
+/** POL-GEN: the text of the first version, from the approved set of policies (`QĐ-112b`, `Bộ chính sách khởi tạo.md` 1.0). */
+export const POL_GEN: InitialPolicy = {
+  code: 'POL-GEN',
+  title: 'Quy định chung về sử dụng phần mềm và bảo mật dữ liệu',
+  applicableRoles: ['EMPLOYEE', 'MANAGER', 'IT_ADMIN', 'FINANCE', 'SPENDING_APPROVER'],
+  content: {
+    sections: [
+      {
+        heading: 'Mục đích',
+        body: 'mọi người dùng phần mềm của công ty đúng mục đích công việc, trên tài khoản công ty, không làm lộ dữ liệu và không phát sinh chi phí ngoài quy trình.',
+      },
+      {
+        heading: 'Phạm vi',
+        body: 'mọi tài khoản SaaS-Sentry; SaaS trả phí, phần mềm thương mại có bản quyền, phần mềm nội bộ do công ty cấp. Phần mềm miễn phí bên ngoài không phải đối tượng quản lý chi phí (`C-02`) nhưng vẫn chịu quy định 6.',
+      },
+      {
+        heading: 'Vai trò',
+        body: 'người dùng — tuân thủ, hoàn trả quyền không còn cần; Trưởng phòng — giám sát việc dùng trong phòng; IT Admin — cấp, thu hồi, giữ cấu hình an toàn; Super Admin — ban hành bộ chính sách, ghi sự kiện nhân sự.',
+      },
+      {
+        heading: 'Quy định',
+        body: '1. **Mọi quyền qua Request**, không tự cấp theo phòng, chức vụ hay thuộc tính; danh sách phần mềm của phòng chỉ để hướng dẫn (`C-01`, `QĐ-110s`, `QĐ-111c`). — _Đối chiếu:_ Khớp chuẩn · [NIST AC-2](https://csf.tools/reference/nist-sp-800-53/r5/ac/ac-2/)\n2. **Chỉ tài khoản email công ty**; mỗi người một tài khoản và một seat riêng. **Cấm** dùng chung tài khoản, chia sẻ mật khẩu hay chuyển gói cá nhân cho người khác (`C-01`, `QĐ-103d`; điều khoản nhà cung cấp — R12B §1). — _Đối chiếu:_ Khớp chuẩn · [SANS AUP](https://assets.contentstack.io/v3/assets/blt36c2e63521272fdc/blt207beda4b7c14d22/636f1a30e3836b0c88e8f0a8/Acceptable_Use_Policy.pdf); [UT IT0002](https://policy.tennessee.edu/policy/it0002-acceptable-use-of-information-technology-resources/) (S)\n3. Hệ thống **không lưu mật khẩu**; gói cá nhân `K1` đăng ký trên email công ty của chính người dùng. Email/số điện thoại khôi phục và MFA (nếu phần mềm có) chỉ dùng phương thức do công ty kiểm soát, như hộp thư công ty; không gắn số điện thoại, email hay ứng dụng xác thực cá nhân (`QĐ-111q`, `QĐ-111az`). — _Đối chiếu:_ Tương tự thực tế (đã sửa DX-01) · [Google offboarding](https://knowledge.workspace.google.com/admin/users/maintain-data-security-after-an-employee-leaves); [CIS 6](https://cas8.docs.cisecurity.org/en/latest/source/Controls6/)\n4. **Giới hạn gửi Request:** `GH-1` không xin gói đang có quyền hoặc đang có Request mở; `GH-2` tối đa **10** Request cấp mới mỗi tuần lịch, Request đã rút hoặc bị từ chối vẫn tính (`C-19`, `QĐ-111h`). — _Đối chiếu:_ Nội bộ — QĐ\n5. Phần mềm trả phí dùng cho công việc phải có trong danh mục; tài khoản hoặc khoản chi phát sinh ngoài quy trình bị ghi nhận, báo cáo và có thể bị IT thu hồi khi nằm trên tài sản công ty; muốn dùng chính thức thì gửi Request (`C-15`, `QĐ-103y`, `QĐ-104j`). — _Đối chiếu:_ Khớp chuẩn · [SANS AUP](https://assets.contentstack.io/v3/assets/blt36c2e63521272fdc/blt207beda4b7c14d22/636f1a30e3836b0c88e8f0a8/Acceptable_Use_Policy.pdf); [SMU 8.1](https://www.smu.edu/policy/8-information-technology/8-1-acceptable-use) (S)\n6. **Bảo mật dữ liệu:** không đưa dữ liệu cá nhân hoặc thông tin mật của công ty vào phần mềm chưa qua đánh giá của IT (`SBF-15`) hay vào tài khoản cá nhân; phát hiện lộ lọt báo ngay IT Admin (Luật 91/2025/QH15; `FR-3.19` — loại dữ liệu đưa vào). — _Đối chiếu:_ Khớp chuẩn (đã sửa DX-05) · [SANS AUP 4.1.2](https://assets.contentstack.io/v3/assets/blt36c2e63521272fdc/blt207beda4b7c14d22/636f1a30e3836b0c88e8f0a8/Acceptable_Use_Policy.pdf)\n7. **Thông báo theo dõi:** công ty thu dữ liệu sử dụng từ ba nguồn: (a) agent trên máy công ty một người dùng, sau khi nhân viên ký `BM-06` _đã biết rõ_ và xác nhận chủ động thông báo có phiên bản; (b) thời điểm đăng nhập/hoạt động lấy từ trang quản trị của nhà cung cấp; (c) file usage do IT nạp. Dữ liệu chỉ dùng cho cấp, thu hồi và tối ưu chi phí (quy định 8). Máy cá nhân không thu; ứng dụng nhóm _Liên lạc_ không thu usage (`SBF-05`, `SBF-04a`, `SBF-08`, `INV-17`, `ADR-10`, `QĐ-111e`). — _Đối chiếu:_ Khớp chuẩn (đã sửa DX-04) · [Luật 91 Đ25](https://hethongphapluat.com/luat-bao-ve-du-lieu-ca-nhan-2025/dieu-25) (BT); [ICO](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/employment/monitoring-workers/data-protection-and-monitoring-workers/)\n8. **Dữ liệu usage** chỉ dùng cho cấp, thu hồi và tối ưu chi phí; màn usage không hiện họ tên, ảnh, không xếp hạng người (`QĐ-111aw`, `QĐ-111au`, `OQ-03`). — _Đối chiếu:_ Khớp chuẩn · [ICO](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/employment/monitoring-workers/data-protection-and-monitoring-workers/); [Luật 91 Đ25](https://hethongphapluat.com/luat-bao-ve-du-lieu-ca-nhan-2025/dieu-25) (BT)\n9. **Thời gian dùng:** quyền có thời hạn được nhắc khi mở cửa sổ tiếp tục 30 ngày và 7 ngày trước ngày hết; không còn cần ⟹ người dùng **hoàn trả** (`BM-03`) (`C-10`, `QĐ-111l`). — _Đối chiếu:_ Tương tự thực tế · [Zluri](https://help.zluri.com/docs/access-request-workflows); [NIST AC-2](https://csf.tools/reference/nist-sp-800-53/r5/ac/ac-2/)\n10. **Điều chuyển:** người chuyển phòng tự xin lại phần mềm còn cần ở phòng mới trong **5 ngày làm việc** ân hạn; ân hạn chỉ giữ quyền dùng phần mềm, còn vai admin nhà cung cấp và IT phụ trách thuê bao ở phòng cũ chuyển ngay trong ngày hiệu lực (`POL-MF3` quy định 2, 8); hết ân hạn quyền cũ bị thu hồi (`QĐ-110p`, `QĐ-110q`). — _Đối chiếu:_ Nội bộ — QĐ (đồng bộ DX-09) · [NIST PS-5](https://csf.tools/reference/nist-sp-800-53/r5/ps/ps-5/)\n11. **Dữ liệu cá nhân:** người dùng tự sửa ảnh đại diện và số điện thoại công việc; yêu cầu xuất/sửa dữ liệu khác được xử lý trong thời hạn Luật 91/2025/QH15 và văn bản hướng dẫn quy định; mục tiêu nội bộ là **10 ngày** nếu luật không quy định ngắn hơn (`QĐ-111at`, `FR-10.5`, `SBF-10`). — _Đối chiếu:_ Nội bộ (đã sửa DX-07) · [Luật 91/2025](https://luatvietnam.vn/bai-viet-lien-quan/luat-91-2025-qh15-405135.html) (S)\n12. **Báo lỗi SaaS** qua phiếu; IT phản hồi đầu tiên trong **1 ngày làm việc** (`QĐ-108f`, `QĐ-111s`). — _Đối chiếu:_ Nội bộ — QĐ\n13. **Dấu vết và xác nhận:** mọi quyết định có người, thời điểm, lý do, Audit Trail; vai áp dụng phải xác nhận đã đọc chính sách hiện hành trước khi vào trang tổng quan (`C-05`, `QĐ-111ar`, `QĐ-111bi`). Super Admin rà soát bộ chính sách ít nhất mỗi năm một lần hoặc khi quyết định nội bộ hay luật liên quan thay đổi; kết quả ghi trong `change_note` của phiên bản mới. — _Đối chiếu:_ Khớp chuẩn (bổ sung DX-16) · [ISO A.5.1](https://hightable.io/iso-27001-annex-a-5-1-policies) (TT); [Vanta](https://help.vanta.com/en/articles/11345499-creating-uploading-and-renewing-a-policy)\n14. Vi phạm chính sách này bị xử lý kỷ luật lao động khi hành vi đó đã được quy định trong nội quy lao động của công ty; công ty bổ sung các hành vi vi phạm chính sách này vào nội quy lao động (Bộ luật Lao động 2019 Điều 118). — _Đối chiếu:_ Khớp chuẩn (đã sửa DX-06) · [SANS AUP 5.3](https://assets.contentstack.io/v3/assets/blt36c2e63521272fdc/blt207beda4b7c14d22/636f1a30e3836b0c88e8f0a8/Acceptable_Use_Policy.pdf); [BLLĐ 2019 Đ118](https://thuvienphapluat.vn/hoi-dap-phap-luat/noi-quy-lao-dong-tu-nam-2021-315238.html) (BT)',
+      },
+      {
+        heading: 'Ngoại lệ',
+        body: 'quyền theo vai của Super Admin và Người duyệt chi do IT ghi trực tiếp, có cờ audit (`C-01`, `QĐ-104g`) · seat _tài khoản máy_ là seat thường của một IT Admin có cờ, không phải tài khoản dùng chung của con người (`QĐ-110m`) · nhân viên tự mua bằng tiền của mình cho mình nằm ngoài phạm vi chi phí, nhưng vẫn chịu quy định 6 (`C-15`).',
+      },
+      {
+        heading: 'Căn cứ',
+        body: 'Bộ luật Lao động 2019 (Điều 118 — nội quy lao động); Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15; nội bộ `C-01`, `C-02`, `C-05`, `C-15`, `C-19`, `FR-8.14`. Nhãn _(đề xuất)_ ở quy định 6 và 14 bỏ theo QĐ ban hành bộ chính sách (DX-05, DX-06), đã ghi sổ `QĐ-112c` (Docs `Bộ chính sách khởi tạo.md` 1.0).',
+      },
+      {
+        heading: 'Tham chiếu',
+        body: 'QT A.2, A.3, A.5, A.7; `BM-01`, `BM-03`, `BM-06`; `SBF-05`, `SBF-09`, `SBF-10`.',
+      },
+    ],
+    steps: [],
+  },
+};

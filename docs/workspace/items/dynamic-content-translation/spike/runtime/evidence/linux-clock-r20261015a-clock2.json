@@ -90,10 +90,7 @@
       "laterStatus": "OK",
       "runSentCount": 1,
       "loadStartCount": 1,
-      "releaseBy": [
-        "cancelled-before-run",
-        "done"
-      ],
+      "releaseBy": ["cancelled-before-run", "done"],
       "spawnCount": 1
     }
   }

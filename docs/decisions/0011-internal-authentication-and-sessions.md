@@ -2,9 +2,15 @@
 
 Status: **Proposed** (12/10/2026). Implemented in slice 1a through PR #4 (`64073c4`),
 with remediation `a0cf5f1` incorporated into `origin/dev` through PR #7/#8;
-developer review and acceptance are still pending as of 15/10/2026.
+developer review and acceptance are still pending as of 15/10/2026. Slice 1c (decision 11) is implemented
+in the working tree on 16/10/2026, locally verified only and not reviewed.
 Items marked _lead decision_ were chosen on 12/10/2026; the planned pre-merge review
 gate was not completed. AI research, drafting and testing do not constitute developer approval.
+
+_Update 18/10/2026:_ HEAD `186ad5f` (which contains the body-delivery change `1336bd5`) passed `pnpm check`,
+e2e and isolated integration in the [BE foundation audit](../reviews/be-foundation-audit-2026-10-18/README.md). The
+Owner's technical decisions Q1–Q3 of that audit are recorded under decisions 2 and 3 below. This ADR stays
+**Proposed**: the developer review is still **pending**, and the audit and the decisions do not replace it.
 
 Number 0011 is used because 0006 and 0008–0010 still exist in Git history
 (`1e8d0a1`) for the earlier native-identity design; they are not reused.
@@ -37,13 +43,36 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
    The database stores only its SHA-256 digest (high entropy, so no slow hash).
    Rotated on every refresh. Presenting a consumed token revokes the whole session,
    writes an audit event and **commits** before the 401 is returned.
-3. **Refresh cookie.** `HttpOnly`, `SameSite=Strict`, `Secure` outside development,
-   `Path=/api/v1/auth`, `Max-Age` equal to the session's remaining absolute lifetime.
-   It is cleared with identical attributes, as Express 5 `res.clearCookie` requires.
-   Read with `cookie-parser` 1.4.7, without a signing secret.
-4. **Logout** is a `@Public()` route authenticated by the refresh cookie. It returns
-   204 for every case except 503 (database unavailable; the cookie is kept) and the
-   global throttler's 429. It revokes only the session owning the presented token
+   It is **not** a JWT and is never passed to `jwt.verify`: it is authenticated by its shape, the SHA-256 lookup,
+   row locks and the authoritative session, account, employee, expiry and consumed state in PostgreSQL.
+   PostgreSQL is the only source of truth for sessions and refresh tokens; no raw token is stored, and Redis or any
+   second session store needs its own ADR backed by load, latency or availability measurements. A JWT refresh token
+   is rejected: it does not make a bearer credential safer and it makes revocation, rotation and replay detection
+   harder, while this design still needs durable server state.
+   _Owner decision Q2 (18/10/2026):_ no grace window for concurrent refresh. Web and mobile clients must
+   single-flight refresh; presenting a token that was already consumed is replay and revokes the session, exactly as
+   the code and `auth-concurrency.integration-spec.ts` behave today.
+3. **Refresh token delivery.** _Amended 17/10/2026 at the project lead's request; it replaces the
+   earlier `HttpOnly` cookie design, and developer review of the change is still pending._
+   `POST /auth/login` and `POST /auth/refresh` return the refresh token in the response body next to the
+   access token. `POST /auth/refresh` and `POST /auth/logout` take it in the request body as
+   `{ "refreshToken": "..." }`. The API neither sets nor reads a cookie (`cookie-parser` and
+   `AUTH_COOKIE_SECURE` are gone) and a cookie is ignored. Reason: one contract for the web client and the
+   native mobile app. Consequence: the client stores the token where script can read it, so an XSS flaw
+   exposes it; the token is single-use and rotated, and presenting a spent one revokes the session, which
+   bounds the damage but does not remove it. A body without a refresh token is 422 `VALIDATION_ERROR`;
+   a malformed or unknown token is 401 `AUTH.SESSION_INVALID`.
+   _Owner decision Q1 (18/10/2026):_ keep body delivery so web and mobile share one contract. The web client keeps
+   the refresh token **in memory** and never in `localStorage`; the FE contract states this, and how a reload that
+   loses the token is handled is a later UX design. Developer review of this decision remains a gate before
+   `accepted`.
+   _Owner decision Q3 (18/10/2026):_ login and refresh return `refreshExpiresAt`, the stored expiry of the refresh
+   token in the same response (idle timeout capped at the absolute session expiry), next to `expiresAt`, the
+   access-token expiry. No TTL changes; no other field is added without a source or design. Client handling is in the
+   [security rules](../rules/security-jobs.md#authentication-and-authorization).
+4. **Logout** is a `@Public()` route authenticated by the refresh token in the body. It returns
+   204 for every well-formed request except 503 (database unavailable; the client keeps its token
+   and retries) and the global throttler's 429. It revokes only the session owning the presented token
    and ignores any `Authorization` header.
 5. **Password hashing** (_lead decision_). `@node-rs/argon2` 2.2.2 with explicit
    parameters `Argon2id, memoryCost 19456, timeCost 2, parallelism 1` (OWASP
@@ -94,6 +123,26 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
    foundation spec's order: three in slice 1a, one in slice 1b.
 10. **Platform boundary.** Stay on Nest 11 and CommonJS. Do not add ESM-only packages
     (`@nestjs/jwt` 12.x, `jose` 6.x) until the repository migrates as a separate decision.
+11. **Forgot, reset and change password (slice 1c, `US-01-10` AC-3 → AC-7, AC-12).** Values are the `T-*`
+    table of the [slice 1c spec](../workspace/items/us-01-password-self-service/spec.md); they still need the
+    developer review that `US-01-10` _Business rules_ requires before the slice leaves local verification.
+    A reset link is a one-time token of 32 random bytes, stored as SHA-256 in `account_action_tokens` with
+    purpose `RESET_PASSWORD`, valid `AUTH_PASSWORD_RESET_TTL_SECONDS` (default 1800; 300–86400). An account may
+    be issued `AUTH_PASSWORD_RESET_MAX_PER_HOUR` links in any 60 minutes (default 3; 1–100), counted from the
+    token table under the AppUser row lock; a further request is answered like every other and issues nothing.
+    A new request revokes the previous usable link (`SUPERSEDED`) and cancels its unsent mail, so one link works
+    at a time. Reset or change replaces the hash, revokes every other usable link (`CREDENTIAL_CHANGED`) and every
+    open session (`PASSWORD_RESET` / `PASSWORD_CHANGED`, the current one included), clears the email's
+    `login_throttles` row so the owner is not left blocked, queues a notice mail and writes the audit event in the
+    same transaction (`CredentialChangeService`). A wrong current password counts on the same failure counter as
+    a wrong sign-in (`LoginThrottle`, shared with `LoginService`), answers 422 (not 401, which tells a client its
+    session ended) and never locks the account. The two public routes carry a route throttle of 10 requests a
+    minute per address on top of the global one.
+    _Known residual risk (spec Q-6):_ the answer to a reset request has the same content for every email. An email
+    that cannot get a link (unknown, not activated, locked, employee left) leaves after the same unlocked reads
+    without opening a transaction; only the one case that writes a token and a mail takes a few milliseconds
+    longer, and no artificial delay is added. A caller who can measure that can still tell which emails have an account that may use a
+    link. Accepted for the MVP; the route throttle limits how much of it one address can measure.
 
 ## Alternatives rejected
 
@@ -102,7 +151,9 @@ pnpm 11.1.3 with an explicit `allowBuilds` list, and CI runs
   it remains a fallback.
 - `jose` 6.x and `@nestjs/jwt` 12.x: ESM-only; risky with ts-jest in CommonJS mode.
 - Bearer-authenticated logout: an expired access token or a repeated call is stopped by
-  the guard and the `HttpOnly` cookie cannot be cleared.
+  the guard, so the user could not sign out when they most need to.
+- `HttpOnly` refresh cookie (the original design of decision 3): safer against XSS, but awkward for the
+  native mobile client and a second contract to maintain next to the body-based one.
 - Overlap trigger instead of `btree_gist`: hand-written locking, extra race tests.
 - camelCase columns as in `catalog_applications`: every raw SQL statement would need
   quoted identifiers.

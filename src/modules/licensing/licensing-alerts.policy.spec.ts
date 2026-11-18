@@ -1,0 +1,95 @@
+import {
+  expiryReminderAlert,
+  leaverAccessAlert,
+  leaverKeepsAccess,
+  recipientsOf,
+  usableOrNull,
+  type LicensingAlert,
+} from './licensing-alerts.policy';
+
+const A = '00000000-0000-4000-8000-00000000000a';
+const E = '00000000-0000-4000-8000-00000000000e';
+const P = '00000000-0000-4000-8000-00000000000b';
+const T = '00000000-0000-4000-8000-00000000000c';
+
+describe('who an alert of a right goes to (US-12-15)', () => {
+  it('tells each person once and nobody in the place of a role nobody holds', () => {
+    expect(recipientsOf([E, null, undefined, E, P, ''])).toEqual([E, P]);
+    expect(recipientsOf([null, null])).toEqual([]);
+  });
+
+  it('keeps an IT Admin only while they can act as one: a role that was taken away is told nothing', () => {
+    expect(usableOrNull(E, new Set([E]))).toBe(E);
+    expect(usableOrNull(E, new Set([P]))).toBeNull();
+    expect(usableOrNull(null, new Set([E]))).toBeNull();
+  });
+});
+
+describe('what each alert says and its key (FR-5.14 lines 3, 12, 13, 38)', () => {
+  it('reminds of a right that ends once for the right and the end date, whatever the audience (line 3)', () => {
+    const holder = expiryReminderAlert({
+      assignmentId: A,
+      holderEmployeeId: E,
+      planId: P,
+      expectedEndDate: '2026-09-30',
+      audience: 'EMPLOYEE',
+    });
+    const head = expiryReminderAlert({
+      assignmentId: A,
+      holderEmployeeId: E,
+      planId: P,
+      expectedEndDate: '2026-09-30',
+      audience: 'HEAD',
+    });
+
+    expect(holder).toEqual({
+      code: 'LICENSE_EXPIRY_REMINDER',
+      subject: { type: 'LICENSE_ASSIGNMENT', id: A },
+      params: { assignmentId: A, holderEmployeeId: E, planId: P, expectedEndDate: '2026-09-30', audience: 'EMPLOYEE' },
+      eventKey: `LICENSE_EXPIRY_REMINDER:${A}:2026-09-30`,
+    });
+    // A person who is both the holder and the IT Admin in charge is told once: the key does not name the audience.
+    expect(head.eventKey).toBe(holder.eventKey);
+    // A right renewed to a new end date is a new fact.
+    expect(
+      expiryReminderAlert({ ...holder.params, expectedEndDate: '2026-12-31', audience: 'EMPLOYEE' } as never).eventKey,
+    ).not.toBe(holder.eventKey);
+  });
+
+  it('tells a K1 access that runs on for a person who leaves, and nothing for any other completion (line 38, QĐ-77l)', () => {
+    expect(leaverKeepsAccess({ accessState: 'UNTIL_PAID_END', sources: ['DEPARTURE'] })).toBe(true);
+    expect(leaverKeepsAccess({ accessState: 'UNTIL_PAID_END', sources: ['RETURN', 'ABRUPT_DEPARTURE'] })).toBe(true);
+    expect(leaverKeepsAccess({ accessState: 'UNTIL_PAID_END', sources: ['TIME_LIMITED_EXPIRY'] })).toBe(false);
+    expect(leaverKeepsAccess({ accessState: 'CUT', sources: ['DEPARTURE'] })).toBe(false);
+    expect(leaverKeepsAccess({ accessState: null, sources: ['DEPARTURE'] })).toBe(false);
+    expect(
+      leaverAccessAlert({ taskId: T, assignmentId: A, employeeId: E, planId: P, accessUntil: '2026-11-30' }),
+    ).toEqual({
+      code: 'LEAVER_K1_ACCESS_RUNS_ON',
+      subject: { type: 'PROVISIONING_TASK', id: T },
+      params: { taskId: T, assignmentId: A, employeeId: E, planId: P, accessUntil: '2026-11-30' },
+      eventKey: `LEAVER_K1_ACCESS_RUNS_ON:${T}`,
+    });
+  });
+
+  it('carries only flat ids, codes, days and counts, never a name, an identifier of an account or a note', () => {
+    const alerts: LicensingAlert[] = [
+      expiryReminderAlert({
+        assignmentId: A,
+        holderEmployeeId: E,
+        planId: P,
+        expectedEndDate: '2026-09-30',
+        audience: 'IT_ADMIN',
+      }),
+      leaverAccessAlert({ taskId: T, assignmentId: A, employeeId: E, planId: P, accessUntil: '2026-11-30' }),
+    ];
+
+    for (const alert of alerts) {
+      for (const [key, value] of Object.entries(alert.params)) {
+        expect(key).not.toMatch(/name|email|identifier|note|text|evidence/i);
+        expect(value === null || ['string', 'number'].includes(typeof value)).toBe(true);
+      }
+      expect(alert.eventKey.length).toBeLessThanOrEqual(200);
+    }
+  });
+});

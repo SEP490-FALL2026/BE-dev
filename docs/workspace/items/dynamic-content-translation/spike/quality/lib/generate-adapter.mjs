@@ -90,11 +90,13 @@ export async function loadDirection({ transformers, modelsDir, direction, sessio
   const modelDir = path.join(modelsDir, ...modelId.split('/'));
   const config = readJson(path.join(modelDir, 'config.json'), 'config.json');
   const gen = readJson(path.join(modelDir, 'generation_config.json'), 'generation_config.json');
-  if (config.model_type !== 'marian') throw assumption(`config.model_type is ${JSON.stringify(config.model_type)}, expected "marian"`);
+  if (config.model_type !== 'marian')
+    throw assumption(`config.model_type is ${JSON.stringify(config.model_type)}, expected "marian"`);
   const eosTokenId = gen.eos_token_id;
   const decoderStartTokenId = gen.decoder_start_token_id;
   if (!Number.isInteger(eosTokenId)) throw assumption('generation_config.eos_token_id is not an integer');
-  if (!Number.isInteger(decoderStartTokenId)) throw assumption('generation_config.decoder_start_token_id is not an integer');
+  if (!Number.isInteger(decoderStartTokenId))
+    throw assumption('generation_config.decoder_start_token_id is not an integer');
 
   const { env, pipeline } = transformers;
   env.allowRemoteModels = false;
@@ -128,7 +130,9 @@ export async function loadDirection({ transformers, modelsDir, direction, sessio
   } else if (targetTokens.length > 0) {
     // vi-en is a single-target model (Helsinki-NLP/opus-mt-vi-en has no >>xxx<< target tokens). If the vocab ever
     // contained one, the model would need a language token and this adapter would silently be wrong.
-    return fail(`${direction} vocab contains target-language tokens (${targetTokens.slice(0, 3).join(', ')}), a language token would be required`);
+    return fail(
+      `${direction} vocab contains target-language tokens (${targetTokens.slice(0, 3).join(', ')}), a language token would be required`,
+    );
   }
 
   // Probe: encoding WITHOUT prefix must not already start with the language id (no double prefix) and must end with </s>.
@@ -138,7 +142,8 @@ export async function loadDirection({ transformers, modelsDir, direction, sessio
   } catch (e) {
     return fail(`probe encoding failed: ${e.name}`);
   }
-  if (langTokenId !== null && probeIds[0] === langTokenId) return fail('encoding without prefix already starts with the language token id');
+  if (langTokenId !== null && probeIds[0] === langTokenId)
+    return fail('encoding without prefix already starts with the language token id');
   if (probeIds[probeIds.length - 1] !== eosTokenId) return fail('encoded input does not end with the EOS token');
 
   return {
@@ -150,7 +155,9 @@ export async function loadDirection({ transformers, modelsDir, direction, sessio
     langTokenId,
     eosTokenId,
     decoderStartTokenId,
-    maxInputTokens: Number.isInteger(config.max_position_embeddings) ? config.max_position_embeddings : MAX_NEW_TOKENS_CAP,
+    maxInputTokens: Number.isInteger(config.max_position_embeddings)
+      ? config.max_position_embeddings
+      : MAX_NEW_TOKENS_CAP,
     Tensor: transformers.Tensor,
     info: { transformersVersion: transformers.env?.version ?? 'unknown', modelId },
   };
@@ -171,7 +178,10 @@ export async function translateSegment(handle, text, { maxNewTokens, stoppingCri
   const ids = sourceIds(handle, text);
   const inputTokens = ids.length;
   if (inputTokens > handle.maxInputTokens) {
-    throw new AdapterError('INPUT_TOO_LONG', `${inputTokens} source tokens exceed the model limit ${handle.maxInputTokens}`);
+    throw new AdapterError(
+      'INPUT_TOO_LONG',
+      `${inputTokens} source tokens exceed the model limit ${handle.maxInputTokens}`,
+    );
   }
   const budget = Number.isInteger(maxNewTokens) && maxNewTokens > 0 ? maxNewTokens : defaultMaxNewTokens(inputTokens);
   const T = handle.Tensor;

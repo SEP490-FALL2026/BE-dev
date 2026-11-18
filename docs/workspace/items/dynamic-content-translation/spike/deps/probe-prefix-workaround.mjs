@@ -40,7 +40,10 @@ for (const raw of INPUTS) {
     item.manualIdPrefix = tr.tokenizer.batch_decode(out, { skip_special_tokens: true })[0];
     item.manualIdsFirst3 = withPrefix.slice(0, 3);
   } catch (e) {
-    item.manualIdPrefixError = String(e?.stack || e).split('\n').slice(0, 3).join(' | ');
+    item.manualIdPrefixError = String(e?.stack || e)
+      .split('\n')
+      .slice(0, 3)
+      .join(' | ');
   }
   items.push(item);
 }

@@ -14,7 +14,10 @@ export function createInproc({ depsDir, modelsDir, intraThreads = 1 }) {
     if (tf) return tf;
     const pkgDir = path.join(depsDir, 'node_modules', '@huggingface', 'transformers');
     const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
-    tf = await import(pathToFileURL(path.resolve(pkgDir, (pkg.exports?.['.']?.node?.import?.default ?? pkg.exports.node.import.default))).href);
+    tf = await import(
+      pathToFileURL(path.resolve(pkgDir, pkg.exports?.['.']?.node?.import?.default ?? pkg.exports.node.import.default))
+        .href
+    );
     tf.env.allowRemoteModels = false;
     tf.env.allowLocalModels = true;
     tf.env.useFSCache = false;
@@ -28,7 +31,11 @@ export function createInproc({ depsDir, modelsDir, intraThreads = 1 }) {
         direction,
         (async () => {
           const t = await lib();
-          const p = await t.pipeline('translation', `Xenova/opus-mt-${direction}`, { dtype: 'q8', device: 'cpu', session_options: { intraOpNumThreads: intraThreads, interOpNumThreads: 1 } });
+          const p = await t.pipeline('translation', `Xenova/opus-mt-${direction}`, {
+            dtype: 'q8',
+            device: 'cpu',
+            session_options: { intraOpNumThreads: intraThreads, interOpNumThreads: 1 },
+          });
           pipes.set(direction, p);
           return p;
         })(),

@@ -8,7 +8,13 @@ export class CircuitBreaker {
   #openedAt = 0;
   #probeInFlight = false;
 
-  constructor({ threshold = 3, windowMs = 300_000, baseCooldownMs = 30_000, maxCooldownMs = 300_000, now = Date.now } = {}) {
+  constructor({
+    threshold = 3,
+    windowMs = 300_000,
+    baseCooldownMs = 30_000,
+    maxCooldownMs = 300_000,
+    now = Date.now,
+  } = {}) {
     this.threshold = threshold;
     this.windowMs = windowMs;
     this.baseCooldownMs = baseCooldownMs;

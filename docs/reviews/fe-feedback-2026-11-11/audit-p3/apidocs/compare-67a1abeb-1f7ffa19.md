@@ -1,0 +1,9119 @@
+# Thay đổi contract: BE `67a1abebb775` → `1f7ffa193f88`
+
+- `openapi.json` theo byte: khác (sha256 `6dfcedb7ff03bc55` → `a87fb2a3b83bda5b`).
+- So sánh đầy đủ với tài liệu cũ (C:\Users\Asus\AppData\Local\Temp\old-openapi.json, khớp sha256 của manifest): contract HTTP **đổi** (chi tiết bên dưới).
+- Không chứng minh được bằng so sánh này: phân quyền theo dữ liệu và luật nghiệp vụ trong handler, header không khai trong OpenAPI (`Retry-After`, `x-request-id`), giới hạn ngoài schema (thân 100 KiB, giới hạn tần suất). Contract tương đương không có nghĩa hành vi giống hệt.
+
+## Operation thêm (56)
+- GET `/api/v1/contracts` — [contractList](../reference/catalog-plans-subscriptions.md#contractlist)
+- PATCH `/api/v1/contracts/{id}` — [contractUpdate](../reference/catalog-plans-subscriptions.md#contractupdate)
+- POST `/api/v1/contracts/{id}/subscriptions` — [contractSubscriptionLink](../reference/catalog-plans-subscriptions.md#contractsubscriptionlink)
+- DELETE `/api/v1/contracts/{id}/subscriptions/{subscriptionId}` — [contractSubscriptionUnlink](../reference/catalog-plans-subscriptions.md#contractsubscriptionunlink)
+- GET `/api/v1/stock-summary` — [stockSummaryList](../reference/undefined.md#stocksummarylist)
+- GET `/api/v1/assessment-queue/departments` — [assessmentQueueDepartmentList](../reference/access-requests.md#assessmentqueuedepartmentlist)
+- GET `/api/v1/assessment-decisions` — [assessmentDecisionList](../reference/access-requests.md#assessmentdecisionlist)
+- POST `/api/v1/purchase-invoices/preview` — [purchaseInvoicePreview](../reference/undefined.md#purchaseinvoicepreview)
+- GET `/api/v1/purchase-invoices` — [purchaseInvoiceList](../reference/undefined.md#purchaseinvoicelist)
+- POST `/api/v1/purchase-invoices` — [purchaseInvoiceSubmit](../reference/undefined.md#purchaseinvoicesubmit)
+- POST `/api/v1/purchase-invoices/{id}/resubmission` — [purchaseInvoiceResubmit](../reference/undefined.md#purchaseinvoiceresubmit)
+- GET `/api/v1/purchase-invoices/missing-periods` — [purchaseInvoiceMissingPeriodList](../reference/undefined.md#purchaseinvoicemissingperiodlist)
+- GET `/api/v1/purchase-invoices/{id}` — [purchaseInvoiceGet](../reference/undefined.md#purchaseinvoiceget)
+- POST `/api/v1/purchase-invoices/{id}/confirmation` — [purchaseInvoiceConfirm](../reference/undefined.md#purchaseinvoiceconfirm)
+- POST `/api/v1/purchase-invoices/{id}/return` — [purchaseInvoiceReturn](../reference/undefined.md#purchaseinvoicereturn)
+- GET `/api/v1/invoice-discrepancies` — [invoiceDiscrepancyList](../reference/undefined.md#invoicediscrepancylist)
+- GET `/api/v1/invoice-discrepancies/{id}` — [invoiceDiscrepancyGet](../reference/undefined.md#invoicediscrepancyget)
+- POST `/api/v1/invoice-discrepancies/{id}/closure` — [invoiceDiscrepancyClose](../reference/undefined.md#invoicediscrepancyclose)
+- POST `/api/v1/budget-cycles` — [budgetCycleCreate](../reference/budgets.md#budgetcyclecreate)
+- DELETE `/api/v1/budget-cycles/{year}` — [budgetCycleDelete](../reference/budgets.md#budgetcycledelete)
+- GET `/api/v1/seat-month-charges` — [seatMonthChargeList](../reference/undefined.md#seatmonthchargelist)
+- GET `/api/v1/budget-review-periods` — [budgetReviewPeriodList](../reference/undefined.md#budgetreviewperiodlist)
+- POST `/api/v1/budget-review-periods` — [budgetReviewPeriodClose](../reference/undefined.md#budgetreviewperiodclose)
+- GET `/api/v1/budget-review-periods/{id}` — [budgetReviewPeriodGet](../reference/undefined.md#budgetreviewperiodget)
+- POST `/api/v1/budget-review-periods/{id}/signature` — [budgetReviewPeriodSign](../reference/undefined.md#budgetreviewperiodsign)
+- PUT `/api/v1/budget-review-periods/{id}/lines/{costCenterId}/explanation` — [budgetReviewLineExplain](../reference/undefined.md#budgetreviewlineexplain)
+- GET `/api/v1/budget-adjustments` — [budgetAdjustmentList](../reference/undefined.md#budgetadjustmentlist)
+- POST `/api/v1/budget-adjustments` — [budgetAdjustmentCreate](../reference/undefined.md#budgetadjustmentcreate)
+- POST `/api/v1/budget-adjustments/{id}/decision` — [budgetAdjustmentDecide](../reference/undefined.md#budgetadjustmentdecide)
+- GET `/api/v1/devices/{id}/registrations` — [deviceRegistrationList](../reference/devices-and-ai-usage.md#deviceregistrationlist)
+- GET `/api/v1/contracts/{id}/usage-sources` — [usageSourceListOfContract](../reference/usage-ghost-seats.md#usagesourcelistofcontract)
+- GET `/api/v1/usage-imports` — [usageImportList](../reference/usage-ghost-seats.md#usageimportlist)
+- GET `/api/v1/usage-overview` — [usageOverviewList](../reference/undefined.md#usageoverviewlist)
+- GET `/api/v1/employees/{id}/usage-software` — [usageEmployeeSoftwareList](../reference/undefined.md#usageemployeesoftwarelist)
+- GET `/api/v1/employees/{id}/usage-software/{applicationId}` — [usageEmployeeSoftwareGet](../reference/undefined.md#usageemployeesoftwareget)
+- GET `/api/v1/vendor-account-discrepancies` — [vendorAccountDiscrepancyList](../reference/undefined.md#vendoraccountdiscrepancylist)
+- POST `/api/v1/vendor-account-discrepancies/{id}/decision` — [vendorAccountDiscrepancyDecide](../reference/undefined.md#vendoraccountdiscrepancydecide)
+- GET `/api/v1/out-of-process-cases` — [outOfProcessCaseList](../reference/undefined.md#outofprocesscaselist)
+- POST `/api/v1/out-of-process-cases/{id}/closure` — [outOfProcessCaseClose](../reference/undefined.md#outofprocesscaseclose)
+- GET `/api/v1/policies` — [policyList](../reference/undefined.md#policylist)
+- GET `/api/v1/policies/{code}` — [policyGet](../reference/undefined.md#policyget)
+- GET `/api/v1/policies/{code}/versions` — [policyVersionList](../reference/undefined.md#policyversionlist)
+- GET `/api/v1/policies/{code}/steps/{stepCode}` — [policyStepGet](../reference/undefined.md#policystepget)
+- GET `/api/v1/policies/{code}/draft` — [policyDraftGet](../reference/undefined.md#policydraftget)
+- PUT `/api/v1/policies/{code}/draft` — [policyDraftPut](../reference/undefined.md#policydraftput)
+- DELETE `/api/v1/policies/{code}/draft` — [policyDraftDelete](../reference/undefined.md#policydraftdelete)
+- POST `/api/v1/policies/{code}/draft/publish` — [policyDraftPublish](../reference/undefined.md#policydraftpublish)
+- GET `/api/v1/policies/{code}/acknowledgements` — [policyAcknowledgementReport](../reference/undefined.md#policyacknowledgementreport)
+- POST `/api/v1/policies/{code}/acknowledgements` — [policyAcknowledgementCreate](../reference/undefined.md#policyacknowledgementcreate)
+- GET `/api/v1/import-templates/{kind}` — [importTemplateGet](../reference/undefined.md#importtemplateget)
+- PUT `/api/v1/me/avatar` — [meAvatarPut](../reference/undefined.md#meavatarput)
+- DELETE `/api/v1/me/avatar` — [meAvatarDelete](../reference/undefined.md#meavatardelete)
+- PATCH `/api/v1/me/profile` — [meProfilePatch](../reference/undefined.md#meprofilepatch)
+- POST `/api/v1/employee-profiles/lookup` — [employeeProfileLookup](../reference/undefined.md#employeeprofilelookup)
+- DELETE `/api/v1/app-users/{id}/avatar` — [appUserAvatarDelete](../reference/undefined.md#appuseravatardelete)
+- POST `/api/v1/ghost-seat-recommendations/escalations` — [ghostSeatEscalationCreate](../reference/usage-ghost-seats.md#ghostseatescalationcreate)
+
+## Operation bỏ (12) — breaking
+- GET `/api/v1/budget-proposals/{id}/lines` — budgetProposalLineList
+- GET `/api/v1/budget-versions/{id}/lines` — budgetVersionLineList
+- POST `/api/v1/budget-versions/{id}/lines` — budgetVersionLineAdd
+- PUT `/api/v1/budget-versions/{id}/lines/{position}` — budgetVersionLineUpdate
+- POST `/api/v1/budget-versions/{id}/imports` — budgetVersionImport
+- GET `/api/v1/budgets/mine/lines` — budgetMineLineList
+- POST `/api/v1/budget-commitments/{id}/invoices` — budgetCommitmentInvoiceRecord
+- PUT `/api/v1/budget-cycles/{year}/department-ceilings` — budgetDepartmentCeilingsSet
+- POST `/api/v1/budget-cycles/{year}/publish` — budgetCyclePublish
+- PUT `/api/v1/reporting-currency` — reportingCurrencySet
+- GET `/api/v1/exchange-rates` — exchangeRateList
+- POST `/api/v1/exchange-rates` — exchangeRateRecord
+
+## Operation đổi
+
+### [employeeFirstPlacement](../reference/organization.md#employeefirstplacement)
+- qua schema dùng chung `EmployeeResponseDto` (xem mục Schema dùng chung)
+
+### [employeeCreate](../reference/organization.md#employeecreate)
+- qua schema dùng chung `CreateEmployeeBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `EmployeeResponseDto` (xem mục Schema dùng chung)
+
+### [employeeUpdateOfficialFields](../reference/organization.md#employeeupdateofficialfields)
+- qua schema dùng chung `MaintainedEmployeeResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `UpdateEmployeeBodyDto` (xem mục Schema dùng chung)
+
+### [applicationList](../reference/catalog-vendors-applications.md#applicationlist)
+- qua schema dùng chung `ApplicationPageResponseDto` (xem mục Schema dùng chung)
+
+### [applicationCreate](../reference/catalog-vendors-applications.md#applicationcreate)
+- contract `requestBody.content."application/json".schema."$ref"`: `"#/components/schemas/DeclareApplicationBodyDto"` → `"#/components/schemas/CreateApplicationBodyDto"`
+- mô tả `responses.201.description`: `"The application is in the catalog; proposedToDictionary says it was outside …` → `"The application and its first plan are in the catalog. The application is IN…`
+- mô tả `responses.409.content."application/json".examples."APPLICATION.DUPLICATE".summary`: — → `"The catalog already has this software."`
+- contract `responses.409.content."application/json".examples."APPLICATION.DUPLICATE".value.error.code`: — → `"APPLICATION.DUPLICATE"`
+- contract `responses.409.content."application/json".examples."APPLICATION.DUPLICATE".value.error.details.existing.functionalGroup`: — → `null`
+- contract `responses.409.content."application/json".examples."APPLICATION.DUPLICATE".value.error.details.existing.id`: — → `"<application-id>"`
+- contract `responses.409.content."application/json".examples."APPLICATION.DUPLICATE".value.error.details.existing.name`: — → `"Figma"`
+- contract `responses.409.content."application/json".examples."APPLICATION.DUPLICATE".value.error.details.existing.vendorName`: — → `"Figma Inc"`
+- contract `responses.409.content."application/json".examples."APPLICATION.DUPLICATE".value.error.details.matchedBy`: — → `"NAME"`
+- contract `responses.409.content."application/json".examples."APPLICATION.DUPLICATE".value.error.message`: — → `"The catalog already has this software."`
+- contract `responses.409.content."application/json".examples."APPLICATION.DUPLICATE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."APPLICATION.DUPLICATE".value.success`: — → `false`
+- mô tả `responses.409.description`: `"The vendor already has an application of this name (APPLICATION.NAME_TAKEN),…` → `"The catalog already has this software, by name or by a domain it shares (APP…`
+- mô tả `responses.422.content."application/json".examples."APPLICATION.NOTE_INVALID".summary`: `"The communication note is at most 1000 characters."` → —
+- contract `responses.422.content."application/json".examples."APPLICATION.NOTE_INVALID".value.error.code`: `"APPLICATION.NOTE_INVALID"` → —
+- contract `responses.422.content."application/json".examples."APPLICATION.NOTE_INVALID".value.error.message`: `"The communication note is at most 1000 characters."` → —
+- contract `responses.422.content."application/json".examples."APPLICATION.NOTE_INVALID".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."APPLICATION.NOTE_INVALID".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."PLAN.CONTROL_LEVEL_REQUIRED".summary`: — → `"A plan of kind K1, K2 or K4 names its default control level."`
+- contract `responses.422.content."application/json".examples."PLAN.CONTROL_LEVEL_REQUIRED".value.error.code`: — → `"PLAN.CONTROL_LEVEL_REQUIRED"`
+- contract `responses.422.content."application/json".examples."PLAN.CONTROL_LEVEL_REQUIRED".value.error.message`: — → `"A plan of kind K1, K2 or K4 names its default control level."`
+- contract `responses.422.content."application/json".examples."PLAN.CONTROL_LEVEL_REQUIRED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."PLAN.CONTROL_LEVEL_REQUIRED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."PLAN.PROVISIONING_TYPE_NOT_SUPPORTED".summary`: — → `"The kind K3 (SSO/SCIM) is specified only and cannot be declared yet."`
+- contract `responses.422.content."application/json".examples."PLAN.PROVISIONING_TYPE_NOT_SUPPORTED".value.error.code`: — → `"PLAN.PROVISIONING_TYPE_NOT_SUPPORTED"`
+- contract `responses.422.content."application/json".examples."PLAN.PROVISIONING_TYPE_NOT_SUPPORTED".value.error.message`: — → `"The kind K3 (SSO/SCIM) is specified only and cannot be declared yet."`
+- contract `responses.422.content."application/json".examples."PLAN.PROVISIONING_TYPE_NOT_SUPPORTED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."PLAN.PROVISIONING_TYPE_NOT_SUPPORTED".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID…` → `"The request is invalid (VALIDATION_ERROR) or a rule of the application or of…`
+- qua schema dùng chung `CreateApplicationBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `CreatedApplicationResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `DeclareApplicationBodyDto` (xem mục Schema dùng chung)
+
+### [applicationGet](../reference/catalog-vendors-applications.md#applicationget)
+- qua schema dùng chung `ApplicationDetailResponseDto` (xem mục Schema dùng chung)
+
+### [applicationUpdate](../reference/catalog-vendors-applications.md#applicationupdate)
+- mô tả `responses.422.content."application/json".examples."APPLICATION.INTERNAL_HAS_NO_VENDOR".summary`: `"An internal application has no vendor and no dictionary line."` → —
+- contract `responses.422.content."application/json".examples."APPLICATION.INTERNAL_HAS_NO_VENDOR".value.error.code`: `"APPLICATION.INTERNAL_HAS_NO_VENDOR"` → —
+- contract `responses.422.content."application/json".examples."APPLICATION.INTERNAL_HAS_NO_VENDOR".value.error.message`: `"An internal application has no vendor and no dictionary line."` → —
+- contract `responses.422.content."application/json".examples."APPLICATION.INTERNAL_HAS_NO_VENDOR".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."APPLICATION.INTERNAL_HAS_NO_VENDOR".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."APPLICATION.NOTE_INVALID".summary`: `"The communication note is at most 1000 characters."` → —
+- contract `responses.422.content."application/json".examples."APPLICATION.NOTE_INVALID".value.error.code`: `"APPLICATION.NOTE_INVALID"` → —
+- contract `responses.422.content."application/json".examples."APPLICATION.NOTE_INVALID".value.error.message`: `"The communication note is at most 1000 characters."` → —
+- contract `responses.422.content."application/json".examples."APPLICATION.NOTE_INVALID".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."APPLICATION.NOTE_INVALID".value.success`: `false` → —
+- mô tả `responses.422.description`: `"The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID…` → `"The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID…`
+- qua schema dùng chung `ApplicationResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `UpdateApplicationBodyDto` (xem mục Schema dùng chung)
+
+### [functionalGroupList](../reference/catalog-vendors-applications.md#functionalgrouplist)
+- qua schema dùng chung `FunctionalGroupPageResponseDto` (xem mục Schema dùng chung)
+
+### [functionalGroupCreate](../reference/catalog-vendors-applications.md#functionalgroupcreate)
+- qua schema dùng chung `FunctionalGroupResponseDto` (xem mục Schema dùng chung)
+
+### [functionalGroupUpdate](../reference/catalog-vendors-applications.md#functionalgroupupdate)
+- mô tả `responses.200.description`: `"The group as it is after the change; a change of nothing is answered the sam…` → `"The group as it is after the change; a change of nothing is answered the sam…`
+- mô tả `responses.409.content."application/json".examples."FUNCTIONAL_GROUP.FIXED".summary`: — → `"The groups Liên lạc and Khác are fixed: they are not renamed or switched off."`
+- contract `responses.409.content."application/json".examples."FUNCTIONAL_GROUP.FIXED".value.error.code`: — → `"FUNCTIONAL_GROUP.FIXED"`
+- contract `responses.409.content."application/json".examples."FUNCTIONAL_GROUP.FIXED".value.error.message`: — → `"The groups Liên lạc and Khác are fixed: they are not renamed or switched off."`
+- contract `responses.409.content."application/json".examples."FUNCTIONAL_GROUP.FIXED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."FUNCTIONAL_GROUP.FIXED".value.success`: — → `false`
+- mô tả `responses.409.description`: `"A group with this name exists, ignoring case, accents and spacing (FUNCTIONA…` → `"A group with this name exists, ignoring case, accents and spacing (FUNCTIONA…`
+- qua schema dùng chung `FunctionalGroupResponseDto` (xem mục Schema dùng chung)
+
+### [planList](../reference/catalog-plans-subscriptions.md#planlist)
+- contract `declared.parameters`: `["query:applicationId","query:page","query:pageSize","query:provisioningType"]` → `["query:applicationId","query:functionalGroupId","query:page","query:pageSize…`
+- mô tả `parameters."query:functionalGroupId".description`: — → `"Only the plans of the applications in this functional group."`
+- contract `parameters."query:functionalGroupId".in`: — → `"query"`
+- contract `parameters."query:functionalGroupId".name`: — → `"functionalGroupId"`
+- contract `parameters."query:functionalGroupId".required`: — → `false`
+- contract `parameters."query:functionalGroupId".schema.format`: — → `"uuid"`
+- contract `parameters."query:functionalGroupId".schema.type`: — → `"string"`
+- mô tả `parameters."query:search".description`: — → `"Text in the name of the plan or of its application, ignoring case and accents."`
+- contract `parameters."query:search".in`: — → `"query"`
+- contract `parameters."query:search".name`: — → `"search"`
+- contract `parameters."query:search".required`: — → `false`
+- contract `parameters."query:search".schema.maxLength`: — → `100`
+- contract `parameters."query:search".schema.type`: — → `"string"`
+- mô tả `parameters."query:status".description`: — → `"Only the plans of the applications in this catalog status."`
+- contract `parameters."query:status".in`: — → `"query"`
+- contract `parameters."query:status".name`: — → `"status"`
+- contract `parameters."query:status".required`: — → `false`
+- contract `parameters."query:status".schema.enum`: — → `["APPROVED","RETIRED"]`
+- contract `parameters."query:status".schema.type`: — → `"string"`
+- mô tả `responses.200.description`: `"A page of plans by application then plan name, optionally for one applicatio…` → `"A page of plans by application then plan name, optionally for one applicatio…`
+- qua schema dùng chung `PlanPageResponseDto` (xem mục Schema dùng chung)
+
+### [planCreate](../reference/catalog-plans-subscriptions.md#plancreate)
+- contract `responses.409.content."application/json".examples."PLAN.NAME_TAKEN".value.error.details.existing.id`: — → `"<plan-id>"`
+- contract `responses.409.content."application/json".examples."PLAN.NAME_TAKEN".value.error.details.existing.name`: — → `"Team"`
+- contract `responses.409.content."application/json".examples."PLAN.NAME_TAKEN".value.error.details.existing.provisioningType`: — → `"K2"`
+- mô tả `responses.409.description`: `"The application already has a plan of this name (PLAN.NAME_TAKEN) or the pla…` → `"The application already has a plan of this name (PLAN.NAME_TAKEN) or the pla…`
+- mô tả `responses.422.content."application/json".examples."PLAN.PRICING_MODEL_NOT_DERIVED".summary`: — → `"The pricing model follows the kind of provisioning: leave it out, or send th…`
+- contract `responses.422.content."application/json".examples."PLAN.PRICING_MODEL_NOT_DERIVED".value.error.code`: — → `"PLAN.PRICING_MODEL_NOT_DERIVED"`
+- contract `responses.422.content."application/json".examples."PLAN.PRICING_MODEL_NOT_DERIVED".value.error.details.expected`: — → `"PER_SEAT"`
+- contract `responses.422.content."application/json".examples."PLAN.PRICING_MODEL_NOT_DERIVED".value.error.message`: — → `"The pricing model follows the kind of provisioning: leave it out, or send th…`
+- contract `responses.422.content."application/json".examples."PLAN.PRICING_MODEL_NOT_DERIVED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."PLAN.PRICING_MODEL_NOT_DERIVED".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICA…` → `"The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICA…`
+- qua schema dùng chung `PlanResponseDto` (xem mục Schema dùng chung)
+
+### [planGet](../reference/catalog-plans-subscriptions.md#planget)
+- qua schema dùng chung `PlanDetailResponseDto` (xem mục Schema dùng chung)
+
+### [planUpdate](../reference/catalog-plans-subscriptions.md#planupdate)
+- contract `responses.409.content."application/json".examples."PLAN.NAME_TAKEN".value.error.details.existing.id`: — → `"<plan-id>"`
+- contract `responses.409.content."application/json".examples."PLAN.NAME_TAKEN".value.error.details.existing.name`: — → `"Team"`
+- contract `responses.409.content."application/json".examples."PLAN.NAME_TAKEN".value.error.details.existing.provisioningType`: — → `"K2"`
+- mô tả `responses.409.description`: `"The application already has a plan of this name (PLAN.NAME_TAKEN) or the pla…` → `"The application already has a plan of this name (PLAN.NAME_TAKEN) or the pla…`
+- mô tả `responses.422.content."application/json".examples."PLAN.PRICING_MODEL_NOT_DERIVED".summary`: — → `"The pricing model follows the kind of provisioning: leave it out, or send th…`
+- contract `responses.422.content."application/json".examples."PLAN.PRICING_MODEL_NOT_DERIVED".value.error.code`: — → `"PLAN.PRICING_MODEL_NOT_DERIVED"`
+- contract `responses.422.content."application/json".examples."PLAN.PRICING_MODEL_NOT_DERIVED".value.error.details.expected`: — → `"PER_SEAT"`
+- contract `responses.422.content."application/json".examples."PLAN.PRICING_MODEL_NOT_DERIVED".value.error.message`: — → `"The pricing model follows the kind of provisioning: leave it out, or send th…`
+- contract `responses.422.content."application/json".examples."PLAN.PRICING_MODEL_NOT_DERIVED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."PLAN.PRICING_MODEL_NOT_DERIVED".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICA…` → `"The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICA…`
+- qua schema dùng chung `PlanResponseDto` (xem mục Schema dùng chung)
+
+### [subscriptionList](../reference/catalog-plans-subscriptions.md#subscriptionlist)
+- contract `declared.parameters`: `["query:applicationId","query:kind","query:page","query:pageSize","query:plan…` → `["query:applicationId","query:expiry","query:kind","query:mine","query:page",…`
+- mô tả `parameters."query:expiry".description`: — → `"SOON lists the subscriptions from the point of adjustment to the last day of…`
+- contract `parameters."query:expiry".in`: — → `"query"`
+- contract `parameters."query:expiry".name`: — → `"expiry"`
+- contract `parameters."query:expiry".required`: — → `false`
+- contract `parameters."query:expiry".schema.enum`: — → `["EXPIRED","SOON"]`
+- contract `parameters."query:expiry".schema.type`: — → `"string"`
+- mô tả `parameters."query:mine".description`: — → `"true lists only the subscriptions the caller answers for as their IT Admin; …`
+- contract `parameters."query:mine".in`: — → `"query"`
+- contract `parameters."query:mine".name`: — → `"mine"`
+- contract `parameters."query:mine".required`: — → `false`
+- contract `parameters."query:mine".schema.enum`: — → `["false","true"]`
+- contract `parameters."query:mine".schema.type`: — → `"string"`
+- mô tả `responses.200.description`: `"A page of subscriptions by application, plan and creation, optionally filter…` → `"A page of subscriptions by application, plan and creation, optionally filter…`
+- qua schema dùng chung `SubscriptionPageResponseDto` (xem mục Schema dùng chung)
+
+### [subscriptionCreate](../reference/catalog-plans-subscriptions.md#subscriptioncreate)
+- mô tả `responses.201.description`: `"The subscription is stored: a draft while its data is incomplete, with what …` → `"The subscription is stored: a draft while its data is incomplete, with what …`
+- mô tả `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.summary`: `"The reporting currency XYZ is not in the currency table."` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.error.code`: `"REPORTING_CURRENCY_NOT_SUPPORTED"` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.error.details.currency`: `"XYZ"` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.error.message`: `"The reporting currency XYZ is not in the currency table."` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.success`: `false` → —
+- mô tả `responses.409.description`: `"The plan is a K2 or K4 plan, another subscription of it is live (a draft, or…` → `"The plan is a K2 or K4 plan, another subscription of it is live (a draft, or…`
+- mô tả `responses.422.content."application/json".examples."SUBSCRIPTION.K4_PERPETUAL_ONLY".summary`: — → `"A plan of provisioning type K4 is bought once: its subscription is a perpetu…`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.K4_PERPETUAL_ONLY".value.error.code`: — → `"SUBSCRIPTION.K4_PERPETUAL_ONLY"`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.K4_PERPETUAL_ONLY".value.error.message`: — → `"A plan of provisioning type K4 is bought once: its subscription is a perpetu…`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.K4_PERPETUAL_ONLY".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.K4_PERPETUAL_ONLY".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."SUBSCRIPTION.PRICE_NOT_VND".summary`: — → `"The unit price is entered in dong (VND). Convert it first and keep the price…`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.PRICE_NOT_VND".value.error.code`: — → `"SUBSCRIPTION.PRICE_NOT_VND"`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.PRICE_NOT_VND".value.error.details.currency`: — → `"USD"`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.PRICE_NOT_VND".value.error.message`: — → `"The unit price is entered in dong (VND). Convert it first and keep the price…`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.PRICE_NOT_VND".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.PRICE_NOT_VND".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION…` → `"The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION…`
+- qua schema dùng chung `DeclareSubscriptionBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `SubscriptionResponseDto` (xem mục Schema dùng chung)
+
+### [subscriptionGet](../reference/catalog-plans-subscriptions.md#subscriptionget)
+- qua schema dùng chung `SubscriptionResponseDto` (xem mục Schema dùng chung)
+
+### [subscriptionUpdate](../reference/catalog-plans-subscriptions.md#subscriptionupdate)
+- mô tả `responses.200.description`: `"The subscription as it is after the change; a new unit price is converted ag…` → `"The subscription as it is after the change; a new unit price is in dong and …`
+- mô tả `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.summary`: `"The reporting currency XYZ is not in the currency table."` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.error.code`: `"REPORTING_CURRENCY_NOT_SUPPORTED"` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.error.details.currency`: `"XYZ"` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.error.message`: `"The reporting currency XYZ is not in the currency table."` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.success`: `false` → —
+- mô tả `responses.409.description`: `"The department that owns the subscription has no Cost Center in use yet and …` → `"The department that owns the subscription has no Cost Center in use yet and …`
+- mô tả `responses.422.content."application/json".examples."SUBSCRIPTION.K4_PERPETUAL_ONLY".summary`: — → `"A plan of provisioning type K4 is bought once: its subscription is a perpetu…`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.K4_PERPETUAL_ONLY".value.error.code`: — → `"SUBSCRIPTION.K4_PERPETUAL_ONLY"`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.K4_PERPETUAL_ONLY".value.error.message`: — → `"A plan of provisioning type K4 is bought once: its subscription is a perpetu…`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.K4_PERPETUAL_ONLY".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.K4_PERPETUAL_ONLY".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."SUBSCRIPTION.PRICE_NOT_VND".summary`: — → `"The unit price is entered in dong (VND). Convert it first and keep the price…`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.PRICE_NOT_VND".value.error.code`: — → `"SUBSCRIPTION.PRICE_NOT_VND"`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.PRICE_NOT_VND".value.error.details.currency`: — → `"USD"`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.PRICE_NOT_VND".value.error.message`: — → `"The unit price is entered in dong (VND). Convert it first and keep the price…`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.PRICE_NOT_VND".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.PRICE_NOT_VND".value.success`: — → `false`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.STILL_DRAFT".value.error.details.missing`: `["EXCHANGE_RATE"]` → `["UNIT_PRICE"]`
+- mô tả `responses.422.description`: `"The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION…` → `"The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION…`
+- qua schema dùng chung `SubscriptionResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `UpdateSubscriptionBodyDto` (xem mục Schema dùng chung)
+
+### [subscriptionComplete](../reference/catalog-plans-subscriptions.md#subscriptioncomplete)
+- mô tả `responses.200.description`: `"The draft becomes active once its data is whole; a price with no rate for it…` → `"The draft becomes active once its data is whole; its unit price is in dong a…`
+- mô tả `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.summary`: `"The reporting currency XYZ is not in the currency table."` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.error.code`: `"REPORTING_CURRENCY_NOT_SUPPORTED"` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.error.details.currency`: `"XYZ"` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.error.message`: `"The reporting currency XYZ is not in the currency table."` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples.REPORTING_CURRENCY_NOT_SUPPORTED.value.success`: `false` → —
+- mô tả `responses.409.description`: `"The plan is a K2 or K4 plan, another subscription of it is live (a draft, or…` → `"The plan is a K2 or K4 plan, another subscription of it is live (a draft, or…`
+- contract `responses.422.content."application/json".examples."SUBSCRIPTION.STILL_DRAFT".value.error.details.missing`: `["EXCHANGE_RATE"]` → `["UNIT_PRICE"]`
+- mô tả `responses.422.description`: `"The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or…` → `"The id is invalid (VALIDATION_ERROR) or the subscription still lacks data (S…`
+- qua schema dùng chung `SubscriptionResponseDto` (xem mục Schema dùng chung)
+
+### [contractCreate](../reference/catalog-plans-subscriptions.md#contractcreate)
+- contract `declared.responseContent.409`: — → `["application/json"]`
+- contract `declared.responseHeaders.409`: — → `[]`
+- contract `declared.statuses`: `["201","400","401","403","413","415","422","429","503"]` → `["201","400","401","403","409","413","415","422","429","503"]`
+- mô tả `responses.201.description`: `"The contract, with the name given and who made it, as the signed-in IT Admin."` → `"The contract, with the vendor, the number, the days it is in effect (an empt…`
+- mô tả `responses.403.description`: `"Only an IT Admin makes a contract."` → `"Only an IT Admin makes or changes a contract; Finance only reads."`
+- mô tả `responses.409.content."application/json".examples."CONTRACT.NUMBER_TAKEN".summary`: — → `"Another contract has this number."`
+- contract `responses.409.content."application/json".examples."CONTRACT.NUMBER_TAKEN".value.error.code`: — → `"CONTRACT.NUMBER_TAKEN"`
+- contract `responses.409.content."application/json".examples."CONTRACT.NUMBER_TAKEN".value.error.message`: — → `"Another contract has this number."`
+- contract `responses.409.content."application/json".examples."CONTRACT.NUMBER_TAKEN".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."CONTRACT.NUMBER_TAKEN".value.success`: — → `false`
+- contract `responses.409.content."application/json".schema."$ref"`: — → `"#/components/schemas/ErrorEnvelopeDto"`
+- mô tả `responses.409.description`: — → `"Another contract has this number, compared ignoring case, accents and extra …`
+- mô tả `responses.422.content."application/json".examples."CONTRACT.EFFECTIVE_FROM_REQUIRED".summary`: — → `"A contract needs the day from which it is in effect."`
+- contract `responses.422.content."application/json".examples."CONTRACT.EFFECTIVE_FROM_REQUIRED".value.error.code`: — → `"CONTRACT.EFFECTIVE_FROM_REQUIRED"`
+- contract `responses.422.content."application/json".examples."CONTRACT.EFFECTIVE_FROM_REQUIRED".value.error.message`: — → `"A contract needs the day from which it is in effect."`
+- contract `responses.422.content."application/json".examples."CONTRACT.EFFECTIVE_FROM_REQUIRED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."CONTRACT.EFFECTIVE_FROM_REQUIRED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."CONTRACT.EFFECTIVE_RANGE_INVALID".summary`: — → `"The day a contract ends is before the day it begins."`
+- contract `responses.422.content."application/json".examples."CONTRACT.EFFECTIVE_RANGE_INVALID".value.error.code`: — → `"CONTRACT.EFFECTIVE_RANGE_INVALID"`
+- contract `responses.422.content."application/json".examples."CONTRACT.EFFECTIVE_RANGE_INVALID".value.error.details.problem`: — → `"TO_BEFORE_FROM"`
+- contract `responses.422.content."application/json".examples."CONTRACT.EFFECTIVE_RANGE_INVALID".value.error.message`: — → `"The day a contract ends is before the day it begins."`
+- contract `responses.422.content."application/json".examples."CONTRACT.EFFECTIVE_RANGE_INVALID".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."CONTRACT.EFFECTIVE_RANGE_INVALID".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."CONTRACT.VENDOR_NOT_FOUND".summary`: — → `"The vendor does not exist."`
+- contract `responses.422.content."application/json".examples."CONTRACT.VENDOR_NOT_FOUND".value.error.code`: — → `"CONTRACT.VENDOR_NOT_FOUND"`
+- contract `responses.422.content."application/json".examples."CONTRACT.VENDOR_NOT_FOUND".value.error.message`: — → `"The vendor does not exist."`
+- contract `responses.422.content."application/json".examples."CONTRACT.VENDOR_NOT_FOUND".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."CONTRACT.VENDOR_NOT_FOUND".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."CONTRACT.VENDOR_REQUIRED".summary`: — → `"A contract needs a vendor."`
+- contract `responses.422.content."application/json".examples."CONTRACT.VENDOR_REQUIRED".value.error.code`: — → `"CONTRACT.VENDOR_REQUIRED"`
+- contract `responses.422.content."application/json".examples."CONTRACT.VENDOR_REQUIRED".value.error.message`: — → `"A contract needs a vendor."`
+- contract `responses.422.content."application/json".examples."CONTRACT.VENDOR_REQUIRED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."CONTRACT.VENDOR_REQUIRED".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The request is invalid (VALIDATION_ERROR) or the name is blank (CONTRACT.NAM…` → `"The request is invalid (VALIDATION_ERROR), or the name is blank (CONTRACT.NA…`
+- qua schema dùng chung `ContractResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `CreateContractBodyDto` (xem mục Schema dùng chung)
+
+### [contractGet](../reference/catalog-plans-subscriptions.md#contractget)
+- mô tả `responses.200.description`: `"The contract."` → `"The contract with its note, its status as of today, and a slice of its subsc…`
+- mô tả `responses.422.description`: `"The id is invalid (VALIDATION_ERROR)."` → `"The request is invalid (VALIDATION_ERROR)."`
+- qua schema dùng chung `ContractResponseDto` (xem mục Schema dùng chung)
+
+### [documentCreate](../reference/catalog-plans-subscriptions.md#documentcreate)
+- qua schema dùng chung `CreateDocumentBodyDto` (xem mục Schema dùng chung)
+
+### [requestableApplicationList](../reference/access-requests.md#requestableapplicationlist)
+- qua schema dùng chung `RequestableApplicationPageResponseDto` (xem mục Schema dùng chung)
+
+### [requestableApplicationGet](../reference/access-requests.md#requestableapplicationget)
+- qua schema dùng chung `RequestableApplicationResponseDto` (xem mục Schema dùng chung)
+
+### [requestablePlanList](../reference/access-requests.md#requestableplanlist)
+- qua schema dùng chung `RequestablePlanPageResponseDto` (xem mục Schema dùng chung)
+
+### [requestablePlanGet](../reference/access-requests.md#requestableplanget)
+- qua schema dùng chung `RequestablePlanResponseDto` (xem mục Schema dùng chung)
+
+### [licenseAssignmentList](../reference/licensing-seats.md#licenseassignmentlist)
+- contract `declared.parameters`: `["query:employeeId","query:kind","query:page","query:pageSize","query:planId"…` → `["query:activeOnly","query:employeeId","query:kind","query:page","query:pageS…`
+- mô tả `parameters."query:activeOnly".description`: — → `"true lists only the rights in force today: not ended, not failed and not can…`
+- contract `parameters."query:activeOnly".in`: — → `"query"`
+- contract `parameters."query:activeOnly".name`: — → `"activeOnly"`
+- contract `parameters."query:activeOnly".required`: — → `false`
+- contract `parameters."query:activeOnly".schema.enum`: — → `["false","true"]`
+- contract `parameters."query:activeOnly".schema.type`: — → `"string"`
+- mô tả `responses.200.description`: `"A page of assignments by start date, each with the person, the plan and the …` → `"A page of assignments by start date, each with the person, the plan with the…`
+- qua schema dùng chung `AssignmentPageResponseDto` (xem mục Schema dùng chung)
+
+### [departmentSoftwareList](../reference/licensing-seats.md#departmentsoftwarelist)
+- qua schema dùng chung `DepartmentSoftwareListResponseDto` (xem mục Schema dùng chung)
+
+### [departmentSoftwareListChange](../reference/licensing-seats.md#departmentsoftwarelistchange)
+- qua schema dùng chung `DepartmentSoftwareChangesResponseDto` (xem mục Schema dùng chung)
+
+### [meDepartmentSoftwareList](../reference/licensing-seats.md#medepartmentsoftwarelist)
+- qua schema dùng chung `MyDepartmentSoftwareListResponseDto` (xem mục Schema dùng chung)
+
+### [departmentSoftwareProposalList](../reference/licensing-seats.md#departmentsoftwareproposallist)
+- qua schema dùng chung `DepartmentSoftwareProposalListResponseDto` (xem mục Schema dùng chung)
+
+### [departmentSoftwareProposalCreate](../reference/licensing-seats.md#departmentsoftwareproposalcreate)
+- qua schema dùng chung `DepartmentSoftwareProposalResponseDto` (xem mục Schema dùng chung)
+
+### [departmentSoftwareProposalAccept](../reference/licensing-seats.md#departmentsoftwareproposalaccept)
+- mô tả `responses.200.description`: `"Only an IT Admin in charge of the proposal’s department accepts. The place i…` → `"Only an IT Admin in charge of the proposal’s department accepts. The place i…`
+- mô tả `responses.403.content."application/json".examples."DEPARTMENT_SOFTWARE.OWN_PROPOSAL".summary`: — → `"A proposal is not decided by the person who made it."`
+- contract `responses.403.content."application/json".examples."DEPARTMENT_SOFTWARE.OWN_PROPOSAL".value.error.code`: — → `"DEPARTMENT_SOFTWARE.OWN_PROPOSAL"`
+- contract `responses.403.content."application/json".examples."DEPARTMENT_SOFTWARE.OWN_PROPOSAL".value.error.message`: — → `"A proposal is not decided by the person who made it."`
+- contract `responses.403.content."application/json".examples."DEPARTMENT_SOFTWARE.OWN_PROPOSAL".value.error.requestId`: — → `"req_example"`
+- contract `responses.403.content."application/json".examples."DEPARTMENT_SOFTWARE.OWN_PROPOSAL".value.success`: — → `false`
+- mô tả `responses.403.description`: `"Not an IT Admin (AUTHORIZATION.FORBIDDEN)."` → `"Not an IT Admin (AUTHORIZATION.FORBIDDEN), or the IT Admin made the proposal…`
+- qua schema dùng chung `DepartmentSoftwareAcceptanceResponseDto` (xem mục Schema dùng chung)
+
+### [departmentSoftwareProposalReject](../reference/licensing-seats.md#departmentsoftwareproposalreject)
+- mô tả `responses.200.description`: `"Only an IT Admin in charge of the proposal’s department rejects, and the rea…` → `"Only an IT Admin in charge of the proposal’s department rejects, and the rea…`
+- mô tả `responses.403.content."application/json".examples."DEPARTMENT_SOFTWARE.OWN_PROPOSAL".summary`: — → `"A proposal is not decided by the person who made it."`
+- contract `responses.403.content."application/json".examples."DEPARTMENT_SOFTWARE.OWN_PROPOSAL".value.error.code`: — → `"DEPARTMENT_SOFTWARE.OWN_PROPOSAL"`
+- contract `responses.403.content."application/json".examples."DEPARTMENT_SOFTWARE.OWN_PROPOSAL".value.error.message`: — → `"A proposal is not decided by the person who made it."`
+- contract `responses.403.content."application/json".examples."DEPARTMENT_SOFTWARE.OWN_PROPOSAL".value.error.requestId`: — → `"req_example"`
+- contract `responses.403.content."application/json".examples."DEPARTMENT_SOFTWARE.OWN_PROPOSAL".value.success`: — → `false`
+- mô tả `responses.403.description`: `"Not an IT Admin (AUTHORIZATION.FORBIDDEN)."` → `"Not an IT Admin (AUTHORIZATION.FORBIDDEN), or the IT Admin made the proposal…`
+- qua schema dùng chung `DepartmentSoftwareProposalResponseDto` (xem mục Schema dùng chung)
+
+### [provisioningTaskList](../reference/provisioning-and-saas-issues.md#provisioningtasklist)
+- qua schema dùng chung `TaskPageResponseDto` (xem mục Schema dùng chung)
+
+### [provisioningTaskGrant](../reference/provisioning-and-saas-issues.md#provisioningtaskgrant)
+- mô tả `responses.201.description`: `"The seat is taken from today by an assignment of source REQUEST, and a manua…` → `"The seat is taken from today by an assignment of source REQUEST, and a manua…`
+- mô tả `responses.409.content."application/json".examples."PROVISIONING.CONTRACT_ENDED".summary`: — → `"The contract of the beneficiary ended: no seat is granted beyond it."`
+- contract `responses.409.content."application/json".examples."PROVISIONING.CONTRACT_ENDED".value.error.code`: — → `"PROVISIONING.CONTRACT_ENDED"`
+- contract `responses.409.content."application/json".examples."PROVISIONING.CONTRACT_ENDED".value.error.details.contractEndDate`: — → `"2026-01-01"`
+- contract `responses.409.content."application/json".examples."PROVISIONING.CONTRACT_ENDED".value.error.details.requestId`: — → `"<request-id>"`
+- contract `responses.409.content."application/json".examples."PROVISIONING.CONTRACT_ENDED".value.error.message`: — → `"The contract of the beneficiary ended: no seat is granted beyond it."`
+- contract `responses.409.content."application/json".examples."PROVISIONING.CONTRACT_ENDED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."PROVISIONING.CONTRACT_ENDED".value.success`: — → `false`
+- mô tả `responses.409.description`: `"PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (th…` → `"PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED (the request was refused, w…`
+- mô tả `responses.422.content."application/json".examples."PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS".summary`: — → `"The subscription of the grant is not right: NEXT_PERIOD_SEATS."`
+- contract `responses.422.content."application/json".examples."PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS".value.error.code`: — → `"PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS"`
+- contract `responses.422.content."application/json".examples."PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS".value.error.message`: — → `"The subscription of the grant is not right: NEXT_PERIOD_SEATS."`
+- contract `responses.422.content."application/json".examples."PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_…` → `"The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_…`
+- qua schema dùng chung `GrantResponseDto` (xem mục Schema dùng chung)
+
+### [provisioningTaskGet](../reference/provisioning-and-saas-issues.md#provisioningtaskget)
+- mô tả `responses.200.description`: `"The task with the steps of its kind of provisioning and what ends it. A K1 r…` → `"The task with the steps of its kind of provisioning and what ends it. A K1 t…`
+- qua schema dùng chung `TaskResponseDto` (xem mục Schema dùng chung)
+
+### [provisioningTaskClaim](../reference/provisioning-and-saas-issues.md#provisioningtaskclaim)
+- qua schema dùng chung `TaskResponseDto` (xem mục Schema dùng chung)
+
+### [provisioningTaskComplete](../reference/provisioning-and-saas-issues.md#provisioningtaskcomplete)
+- mô tả `responses.200.description`: `"The task is completed under the name of this IT Admin, whoever is in charge …` → `"The task is completed under the name of this IT Admin, whoever is in charge …`
+- mô tả `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_INCOMPLETE".summary`: — → `"The checklist of the grant is not valid: K1_CHECKLIST_INCOMPLETE."`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_INCOMPLETE".value.error.code`: — → `"PROVISIONING.K1_CHECKLIST_INCOMPLETE"`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_INCOMPLETE".value.error.details.codes`: — → `["COMPANY_EMAIL_REGISTERED","NO_PERSONAL_DEVICE_MFA"]`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_INCOMPLETE".value.error.details.variant`: — → `"GRANT"`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_INCOMPLETE".value.error.message`: — → `"The checklist of the grant is not valid: K1_CHECKLIST_INCOMPLETE."`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_INCOMPLETE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_INCOMPLETE".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_NOT_ALLOWED".summary`: — → `"The checklist of the grant is not valid: K1_CHECKLIST_NOT_ALLOWED."`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_NOT_ALLOWED".value.error.code`: — → `"PROVISIONING.K1_CHECKLIST_NOT_ALLOWED"`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_NOT_ALLOWED".value.error.message`: — → `"The checklist of the grant is not valid: K1_CHECKLIST_NOT_ALLOWED."`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_NOT_ALLOWED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_NOT_ALLOWED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER".summary`: — → `"The checklist of the grant is not valid: K1_CHECKLIST_OUT_OF_ORDER."`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER".value.error.code`: — → `"PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER"`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER".value.error.details.codes`: — → `["COMPANY_EMAIL_REGISTERED","NO_PERSONAL_DEVICE_MFA"]`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER".value.error.details.variant`: — → `"GRANT"`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER".value.error.message`: — → `"The checklist of the grant is not valid: K1_CHECKLIST_OUT_OF_ORDER."`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The request is invalid (VALIDATION_ERROR), has no evidence (PROVISIONING_TAS…` → `"The request is invalid (VALIDATION_ERROR), has no evidence (PROVISIONING_TAS…`
+- qua schema dùng chung `CompleteBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `TaskResponseDto` (xem mục Schema dùng chung)
+
+### [provisioningTaskReportFailure](../reference/provisioning-and-saas-issues.md#provisioningtaskreportfailure)
+- qua schema dùng chung `TaskResponseDto` (xem mục Schema dùng chung)
+
+### [provisioningTaskRetry](../reference/provisioning-and-saas-issues.md#provisioningtaskretry)
+- qua schema dùng chung `TaskResponseDto` (xem mục Schema dùng chung)
+
+### [provisioningTaskHandOff](../reference/provisioning-and-saas-issues.md#provisioningtaskhandoff)
+- qua schema dùng chung `TaskResponseDto` (xem mục Schema dùng chung)
+
+### [provisioningTaskCloseFailed](../reference/provisioning-and-saas-issues.md#provisioningtaskclosefailed)
+- qua schema dùng chung `TaskResponseDto` (xem mục Schema dùng chung)
+
+### [provisioningTaskCancel](../reference/provisioning-and-saas-issues.md#provisioningtaskcancel)
+- qua schema dùng chung `TaskResponseDto` (xem mục Schema dùng chung)
+
+### [provisioningTaskCompleteRevocation](../reference/provisioning-and-saas-issues.md#provisioningtaskcompleterevocation)
+- qua schema dùng chung `RevocationCompletionBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `TaskResponseDto` (xem mục Schema dùng chung)
+
+### [provisioningTaskRecordAccessCut](../reference/provisioning-and-saas-issues.md#provisioningtaskrecordaccesscut)
+- qua schema dùng chung `TaskResponseDto` (xem mục Schema dùng chung)
+
+### [saasIssueFormOptions](../reference/provisioning-and-saas-issues.md#saasissueformoptions)
+- qua schema dùng chung `SaasIssueOptionsResponseDto` (xem mục Schema dùng chung)
+
+### [saasIssueList](../reference/provisioning-and-saas-issues.md#saasissuelist)
+- contract `declared.parameters`: `["query:overdue","query:page","query:pageSize","query:reporterEmployeeId","qu…` → `["query:departmentId","query:overdue","query:page","query:pageSize","query:re…`
+- mô tả `parameters."query:departmentId".description`: — → `"Only the reports of the people placed in this department today. Only an IT A…`
+- contract `parameters."query:departmentId".in`: — → `"query"`
+- contract `parameters."query:departmentId".name`: — → `"departmentId"`
+- contract `parameters."query:departmentId".required`: — → `false`
+- contract `parameters."query:departmentId".schema.format`: — → `"uuid"`
+- contract `parameters."query:departmentId".schema.type`: — → `"string"`
+- qua schema dùng chung `SaasIssuePageResponseDto` (xem mục Schema dùng chung)
+
+### [saasIssueSubmit](../reference/provisioning-and-saas-issues.md#saasissuesubmit)
+- qua schema dùng chung `SaasIssueResponseDto` (xem mục Schema dùng chung)
+
+### [saasIssueGet](../reference/provisioning-and-saas-issues.md#saasissueget)
+- qua schema dùng chung `SaasIssueResponseDto` (xem mục Schema dùng chung)
+
+### [saasIssueAddMessage](../reference/provisioning-and-saas-issues.md#saasissueaddmessage)
+- qua schema dùng chung `SaasIssueResponseDto` (xem mục Schema dùng chung)
+
+### [saasIssueReopen](../reference/provisioning-and-saas-issues.md#saasissuereopen)
+- qua schema dùng chung `SaasIssueResponseDto` (xem mục Schema dùng chung)
+
+### [saasIssueTransition](../reference/provisioning-and-saas-issues.md#saasissuetransition)
+- qua schema dùng chung `SaasIssueResponseDto` (xem mục Schema dùng chung)
+
+### [saasIssueMarkDuplicate](../reference/provisioning-and-saas-issues.md#saasissuemarkduplicate)
+- qua schema dùng chung `SaasIssueResponseDto` (xem mục Schema dùng chung)
+
+### [meSoftwareRightList](../reference/licensing-seats.md#mesoftwarerightlist)
+- qua schema dùng chung `MySoftwarePageResponseDto` (xem mục Schema dùng chung)
+
+### [subscriptionRenewalRecordOutcome](../reference/subscription-renewals.md#subscriptionrenewalrecordoutcome)
+- mô tả `responses.409.description`: `"The case is not waiting for its outcome (SUBSCRIPTION_RENEWAL.NOT_AWAITING_O…` → `"The case is not waiting for its outcome (SUBSCRIPTION_RENEWAL.NOT_AWAITING_O…`
+
+### [accessRequestDraftSave](../reference/access-requests.md#accessrequestdraftsave)
+- qua schema dùng chung `AugmentedZodDto` (xem mục Schema dùng chung)
+
+### [accessRequestDraftSubmit](../reference/access-requests.md#accessrequestdraftsubmit)
+- mô tả `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".summary`: `"The person already has as many requests for new access open as they may."` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.code`: `"ACCESS_REQUEST.OPEN_LIMIT_REACHED"` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.limit`: `3` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.openRequestIds`: `["<request-id>"]` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.message`: `"The person already has as many requests for new access open as they may."` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.success`: `false` → —
+- mô tả `responses.409.description`: `"The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has …` → `"The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has …`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.END_DATE_OUT_OF_RANGE".summary`: `"The end date is before today or more than a year from today. A draft saved w…` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.END_DATE_OUT_OF_RANGE".value.error.code`: `"ACCESS_REQUEST.END_DATE_OUT_OF_RANGE"` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.END_DATE_OUT_OF_RANGE".value.error.details.maxEndDate`: `"2027-11-09"` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.END_DATE_OUT_OF_RANGE".value.error.message`: `"The end date is before today or more than a year from today. A draft saved w…` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.END_DATE_OUT_OF_RANGE".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.END_DATE_OUT_OF_RANGE".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".summary`: `"The person uses many paid applications already: a reason is required to ask …` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.code`: `"ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED"` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.details.count`: `10` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.details.threshold`: `10` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.message`: `"The person uses many paid applications already: a reason is required to ask …` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".summary`: — → `"The person was already named in as many requests for new access this week as…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.code`: — → `"ACCESS_REQUEST.OPEN_LIMIT_REACHED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.limit`: — → `10`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.resetsOn`: — → `"2026-11-16"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.message`: — → `"The person was already named in as many requests for new access this week as…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".summary`: — → `"The contract of the person ended before the time of use begins: no access is…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.code`: — → `"ACCESS_REQUEST.TERM_CONTRACT_ENDED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.details.contractEndDate`: — → `"2026-10-31"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.message`: — → `"The contract of the person ended before the time of use begins: no access is…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".summary`: — → `"A contractor, a freelancer or an intern gets access for a term: give the mon…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.error.code`: — → `"ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.error.message`: — → `"A contractor, a freelancer or an intern gets access for a term: give the mon…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".summary`: — → `"The time of use is a whole number of months: from 1 to 9 for a plan bought b…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.code`: — → `"ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.message`: — → `"The time of use is a whole number of months: from 1 to 9 for a plan bought b…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".summary`: — → `"This plan is bought once: it takes no time of use."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.error.code`: — → `"ACCESS_REQUEST.TERM_NOT_ASKED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.error.message`: — → `"This plan is bought once: it takes no time of use."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".summary`: `"A contractor, a freelancer or an intern gets access for a term: give the end…` → `"Give the time of use in months."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.message`: `"A contractor, a freelancer or an intern gets access for a term: give the end…` → `"Give the time of use in months."`
+- mô tả `responses.422.content."application/json".examples."GROUP_REQUEST.TERM_BEYOND_LIMIT".summary`: `"The end date is before today or more than a year from today."` → —
+- contract `responses.422.content."application/json".examples."GROUP_REQUEST.TERM_BEYOND_LIMIT".value.error.code`: `"GROUP_REQUEST.TERM_BEYOND_LIMIT"` → —
+- contract `responses.422.content."application/json".examples."GROUP_REQUEST.TERM_BEYOND_LIMIT".value.error.details.maxEndDate`: `"2027-11-09"` → —
+- contract `responses.422.content."application/json".examples."GROUP_REQUEST.TERM_BEYOND_LIMIT".value.error.message`: `"The end date is before today or more than a year from today."` → —
+- contract `responses.422.content."application/json".examples."GROUP_REQUEST.TERM_BEYOND_LIMIT".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."GROUP_REQUEST.TERM_BEYOND_LIMIT".value.success`: `false` → —
+- mô tả `responses.422.description`: `"The id is invalid (VALIDATION_ERROR), the sender is the spending approver (R…` → `"The id is invalid (VALIDATION_ERROR), the sender is the spending approver (R…`
+- qua schema dùng chung `DraftSubmitResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestList](../reference/access-requests.md#accessrequestlist)
+- qua schema dùng chung `AccessRequestHistoryPageResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestSubmit](../reference/access-requests.md#accessrequestsubmit)
+- mô tả `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".summary`: `"The person already has as many requests for new access open as they may."` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.code`: `"ACCESS_REQUEST.OPEN_LIMIT_REACHED"` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.limit`: `3` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.openRequestIds`: `["<request-id>"]` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.message`: `"The person already has as many requests for new access open as they may."` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.success`: `false` → —
+- mô tả `responses.409.description`: `"The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED),…` → `"The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED),…`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".summary`: `"The person uses many paid applications already: a reason is required to ask …` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.code`: `"ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED"` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.details.count`: `10` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.details.threshold`: `10` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.message`: `"The person uses many paid applications already: a reason is required to ask …` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".summary`: — → `"The person was already named in as many requests for new access this week as…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.code`: — → `"ACCESS_REQUEST.OPEN_LIMIT_REACHED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.limit`: — → `10`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.resetsOn`: — → `"2026-11-16"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.message`: — → `"The person was already named in as many requests for new access this week as…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".summary`: — → `"The contract of the person ended before the time of use begins: no access is…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.code`: — → `"ACCESS_REQUEST.TERM_CONTRACT_ENDED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.details.contractEndDate`: — → `"2026-10-31"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.message`: — → `"The contract of the person ended before the time of use begins: no access is…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".summary`: — → `"A contractor, a freelancer or an intern gets access for a term: give the mon…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.error.code`: — → `"ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.error.message`: — → `"A contractor, a freelancer or an intern gets access for a term: give the mon…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".summary`: — → `"The time of use is a whole number of months: from 1 to 9 for a plan bought b…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.code`: — → `"ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.message`: — → `"The time of use is a whole number of months: from 1 to 9 for a plan bought b…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".summary`: — → `"This plan is bought once: it takes no time of use."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.error.code`: — → `"ACCESS_REQUEST.TERM_NOT_ASKED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.error.message`: — → `"This plan is bought once: it takes no time of use."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".summary`: — → `"Give the time of use in months."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.code`: — → `"ACCESS_REQUEST.TERM_REQUIRED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.message`: — → `"Give the time of use in months."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The form is incomplete or invalid (VALIDATION_ERROR): the reason and the ter…` → `"The form is incomplete or invalid (VALIDATION_ERROR): the reason and the ter…`
+- qua schema dùng chung `AccessRequestResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `SubmitBodyDto` (xem mục Schema dùng chung)
+
+### [accessRequestPreview](../reference/access-requests.md#accessrequestpreview)
+- qua schema dùng chung `PreviewBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `PreviewResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestResubmit](../reference/access-requests.md#accessrequestresubmit)
+- qua schema dùng chung `AccessRequestResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestGet](../reference/access-requests.md#accessrequestget)
+- qua schema dùng chung `AccessRequestOrDraftResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestNeedDecide](../reference/access-requests.md#accessrequestneeddecide)
+- mô tả `responses.200.description`: `"The person who holds the need step approves or refuses it. A refusal gives i…` → `"The person who holds the need step answers the checklist of the policy in fo…`
+- mô tả `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".summary`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.code`: — → `"POLICY.NOT_IN_FORCE"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.message`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".summary`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.code`: — → `"POLICY.VERSION_CHANGED"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.policyVersionId`: — → `"v3"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.versionNumber`: — → `3`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.message`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.success`: — → `false`
+- mô tả `responses.409.description`: `"The step is not pending: it is decided, or waits for somebody to hold it (AC…` → `"The step is not pending: it is decided, or waits for somebody to hold it (AC…`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".summary`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.code`: — → `"POLICY.CHECKLIST_HAS_NO"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.code`: — → `"1.2-05"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.text`: — → `"The tools they have do not meet the need"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.message`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".summary`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.code`: — → `"POLICY.CHECKLIST_INCOMPLETE"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.missing`: — → `["1.2-05"]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.unexpected`: — → `[]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.message`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The decision is invalid (VALIDATION_ERROR: a refusal without a reason, or a …` → `"The decision is invalid (VALIDATION_ERROR: a refusal or a return with no rea…`
+- qua schema dùng chung `AccessRequestResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `NeedDecisionBodyDto` (xem mục Schema dùng chung)
+
+### [accessRequestWithdraw](../reference/access-requests.md#accessrequestwithdraw)
+- qua schema dùng chung `AccessRequestResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestCancelForDeparture](../reference/access-requests.md#accessrequestcancelfordeparture)
+- qua schema dùng chung `AccessRequestResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestPropose](../reference/requests-new-software-and-service-accounts.md#accessrequestpropose)
+- mô tả `responses.409.content."application/json".examples."ACCESS_REQUEST.APPLICATION_RETIRED".summary`: — → `"The application of the plan is retired: no access is asked for it."`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.APPLICATION_RETIRED".value.error.code`: — → `"ACCESS_REQUEST.APPLICATION_RETIRED"`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.APPLICATION_RETIRED".value.error.message`: — → `"The application of the plan is retired: no access is asked for it."`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.APPLICATION_RETIRED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.APPLICATION_RETIRED".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".summary`: `"The person already has as many requests for new access open as they may."` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.code`: `"ACCESS_REQUEST.OPEN_LIMIT_REACHED"` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.limit`: `3` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.openRequestIds`: `["<request-id>"]` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.message`: `"The person already has as many requests for new access open as they may."` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.success`: `false` → —
+- mô tả `responses.409.content."application/json".examples."ACCESS_REQUEST.SOFTWARE_IN_CATALOG".summary`: — → `"The catalog already has this software: ask for it from the catalog."`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.SOFTWARE_IN_CATALOG".value.error.code`: — → `"ACCESS_REQUEST.SOFTWARE_IN_CATALOG"`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.SOFTWARE_IN_CATALOG".value.error.details.existing.applicationId`: — → `"application-id"`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.SOFTWARE_IN_CATALOG".value.error.details.existing.name`: — → `"ChatGPT"`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.SOFTWARE_IN_CATALOG".value.error.details.existing.plans.0.name`: — → `"Plus"`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.SOFTWARE_IN_CATALOG".value.error.details.existing.plans.0.planId`: — → `"plan-id"`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.SOFTWARE_IN_CATALOG".value.error.details.existing.plans.0.provisioningType`: — → `"K1"`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.SOFTWARE_IN_CATALOG".value.error.details.existing.planTotal`: — → `1`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.SOFTWARE_IN_CATALOG".value.error.details.matchedBy`: — → `"NAME"`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.SOFTWARE_IN_CATALOG".value.error.message`: — → `"The catalog already has this software: ask for it from the catalog."`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.SOFTWARE_IN_CATALOG".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.SOFTWARE_IN_CATALOG".value.success`: — → `false`
+- mô tả `responses.409.description`: `"The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the de…` → `"The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the depa…`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".summary`: `"The person uses many paid applications already: a reason is required to ask …` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.code`: `"ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED"` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.details.count`: `10` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.details.threshold`: `10` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.message`: `"The person uses many paid applications already: a reason is required to ask …` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".summary`: — → `"The person was already named in as many requests for new access this week as…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.code`: — → `"ACCESS_REQUEST.OPEN_LIMIT_REACHED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.limit`: — → `10`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.resetsOn`: — → `"2026-11-16"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.message`: — → `"The person was already named in as many requests for new access this week as…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".summary`: — → `"The contract of the person ended before the time of use begins: no access is…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.code`: — → `"ACCESS_REQUEST.TERM_CONTRACT_ENDED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.details.contractEndDate`: — → `"2026-10-31"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.message`: — → `"The contract of the person ended before the time of use begins: no access is…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".summary`: — → `"A contractor, a freelancer or an intern gets access for a term: give the mon…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.error.code`: — → `"ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.error.message`: — → `"A contractor, a freelancer or an intern gets access for a term: give the mon…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".summary`: — → `"The time of use is a whole number of months: from 1 to 9 for a plan bought b…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.code`: — → `"ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.message`: — → `"The time of use is a whole number of months: from 1 to 9 for a plan bought b…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".summary`: — → `"Give the time of use in months."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.code`: — → `"ACCESS_REQUEST.TERM_REQUIRED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.message`: — → `"Give the time of use in months."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ASSESSMENT.REFERENCE_NOT_FOUND".summary`: — → `"The vendorId of the assessment does not exist."`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.REFERENCE_NOT_FOUND".value.error.code`: — → `"ASSESSMENT.REFERENCE_NOT_FOUND"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.REFERENCE_NOT_FOUND".value.error.details.field`: — → `"vendorId"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.REFERENCE_NOT_FOUND".value.error.message`: — → `"The vendorId of the assessment does not exist."`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.REFERENCE_NOT_FOUND".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.REFERENCE_NOT_FOUND".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage…` → `"The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage…`
+- qua schema dùng chung `AccessRequestResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `ProposalBodyDto` (xem mục Schema dùng chung)
+
+### [accessRequestAssessmentGet](../reference/requests-new-software-and-service-accounts.md#accessrequestassessmentget)
+- qua schema dùng chung `AssessmentResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestAssessmentSave](../reference/requests-new-software-and-service-accounts.md#accessrequestassessmentsave)
+- mô tả `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".summary`: — → `"The quote cannot price the request: QUOTE_PRICE_NOT_VND."`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".value.error.code`: — → `"ASSESSMENT.QUOTE_PRICE_NOT_VND"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".value.error.message`: — → `"The quote cannot price the request: QUOTE_PRICE_NOT_VND."`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".value.success`: — → `false`
+- mô tả `responses.422.description`: `"A field is invalid (VALIDATION_ERROR), a vendor, plan or person it names doe…` → `"A field is invalid (VALIDATION_ERROR), a vendor, plan or person it names doe…`
+- qua schema dùng chung `AssessmentPatchDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `AssessmentResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestAssessmentComplete](../reference/requests-new-software-and-service-accounts.md#accessrequestassessmentcomplete)
+- contract `declared.requestContent`: `[]` → `["application/json"]`
+- contract `declared.responseContent.400`: — → `["application/json"]`
+- contract `declared.responseContent.413`: — → `["application/json"]`
+- contract `declared.responseContent.415`: — → `["application/json"]`
+- contract `declared.responseHeaders.400`: — → `[]`
+- contract `declared.responseHeaders.413`: — → `[]`
+- contract `declared.responseHeaders.415`: — → `[]`
+- contract `declared.statuses`: `["200","401","403","404","409","422","429","503"]` → `["200","400","401","403","404","409","413","415","422","429","503"]`
+- contract `requestBody`: `null` → —
+- contract `requestBody.content."application/json".schema."$ref"`: — → `"#/components/schemas/AssessmentCompletionBodyDto"`
+- contract `requestBody.required`: — → `true`
+- mô tả `responses.400.content."application/json".examples.HTTP_BAD_REQUEST.summary`: — → `"The request could not be processed."`
+- contract `responses.400.content."application/json".examples.HTTP_BAD_REQUEST.value.error.code`: — → `"HTTP_BAD_REQUEST"`
+- contract `responses.400.content."application/json".examples.HTTP_BAD_REQUEST.value.error.message`: — → `"The request could not be processed."`
+- contract `responses.400.content."application/json".examples.HTTP_BAD_REQUEST.value.error.requestId`: — → `"req_example"`
+- contract `responses.400.content."application/json".examples.HTTP_BAD_REQUEST.value.success`: — → `false`
+- contract `responses.400.content."application/json".schema."$ref"`: — → `"#/components/schemas/ErrorEnvelopeDto"`
+- mô tả `responses.400.description`: — → `"The JSON body cannot be read: it is not valid JSON, it does not match its de…`
+- mô tả `responses.409.content."application/json".examples."ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN".summary`: — → `"A plan of internal software is free: add it to the catalog and reject the pr…`
+- contract `responses.409.content."application/json".examples."ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN".value.error.code`: — → `"ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN"`
+- contract `responses.409.content."application/json".examples."ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN".value.error.message`: — → `"A plan of internal software is free: add it to the catalog and reject the pr…`
+- contract `responses.409.content."application/json".examples."ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".summary`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.code`: — → `"POLICY.NOT_IN_FORCE"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.message`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".summary`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.code`: — → `"POLICY.VERSION_CHANGED"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.policyVersionId`: — → `"v3"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.versionNumber`: — → `3`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.message`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.success`: — → `false`
+- mô tả `responses.409.description`: `"The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_A…` → `"The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_A…`
+- mô tả `responses.413.content."application/json".examples.HTTP_PAYLOAD_TOO_LARGE.summary`: — → `"The request could not be processed."`
+- contract `responses.413.content."application/json".examples.HTTP_PAYLOAD_TOO_LARGE.value.error.code`: — → `"HTTP_PAYLOAD_TOO_LARGE"`
+- contract `responses.413.content."application/json".examples.HTTP_PAYLOAD_TOO_LARGE.value.error.message`: — → `"The request could not be processed."`
+- contract `responses.413.content."application/json".examples.HTTP_PAYLOAD_TOO_LARGE.value.error.requestId`: — → `"req_example"`
+- contract `responses.413.content."application/json".examples.HTTP_PAYLOAD_TOO_LARGE.value.success`: — → `false`
+- contract `responses.413.content."application/json".schema."$ref"`: — → `"#/components/schemas/ErrorEnvelopeDto"`
+- mô tả `responses.413.description`: — → `"The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_…`
+- mô tả `responses.415.content."application/json".examples.HTTP_UNSUPPORTED_MEDIA_TYPE.summary`: — → `"The request could not be processed."`
+- contract `responses.415.content."application/json".examples.HTTP_UNSUPPORTED_MEDIA_TYPE.value.error.code`: — → `"HTTP_UNSUPPORTED_MEDIA_TYPE"`
+- contract `responses.415.content."application/json".examples.HTTP_UNSUPPORTED_MEDIA_TYPE.value.error.message`: — → `"The request could not be processed."`
+- contract `responses.415.content."application/json".examples.HTTP_UNSUPPORTED_MEDIA_TYPE.value.error.requestId`: — → `"req_example"`
+- contract `responses.415.content."application/json".examples.HTTP_UNSUPPORTED_MEDIA_TYPE.value.success`: — → `false`
+- contract `responses.415.content."application/json".schema."$ref"`: — → `"#/components/schemas/ErrorEnvelopeDto"`
+- mô tả `responses.415.description`: — → `"The JSON body declares a charset other than UTF, or a Content-Encoding other…`
+- mô tả `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".summary`: — → `"The quote cannot price the request: QUOTE_PRICE_NOT_VND."`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".value.error.code`: — → `"ASSESSMENT.QUOTE_PRICE_NOT_VND"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".value.error.message`: — → `"The quote cannot price the request: QUOTE_PRICE_NOT_VND."`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".summary`: — → `"The time of use the proposal gave does not fit a plan of kind K1: TERM_MONTH…`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.code`: — → `"ASSESSMENT.TERM_NOT_FIT_KIND"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.details.maxMonths`: — → `9`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.details.provisioningType`: — → `"K1"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.details.reason`: — → `"TERM_MONTHS_OUT_OF_RANGE"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.details.termMonths`: — → `12`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.message`: — → `"The time of use the proposal gave does not fit a plan of kind K1: TERM_MONTH…`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".summary`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.code`: — → `"POLICY.CHECKLIST_HAS_NO"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.code`: — → `"1.2-05"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.text`: — → `"The tools they have do not meet the need"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.message`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".summary`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.code`: — → `"POLICY.CHECKLIST_INCOMPLETE"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.missing`: — → `["1.2-05"]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.unexpected`: — → `[]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.message`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The assessment lacks fields, with the names in details.missing (ASSESSMENT.I…` → `"The checklist is missing, lacks an answer or names a question the policy doe…`
+- qua schema dùng chung `AccessRequestResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `AssessmentCompletionBodyDto` (xem mục Schema dùng chung)
+
+### [accessRequestAssessmentReject](../reference/requests-new-software-and-service-accounts.md#accessrequestassessmentreject)
+- mô tả `responses.200.description`: `"The IT Admin concludes that a tool cannot be controlled, or that the softwar…` → `"With decision REJECT the IT Admin concludes that a tool cannot be controlled…`
+- mô tả `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".summary`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.code`: — → `"POLICY.NOT_IN_FORCE"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.message`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".summary`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.code`: — → `"POLICY.VERSION_CHANGED"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.policyVersionId`: — → `"v3"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.versionNumber`: — → `3`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.message`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.success`: — → `false`
+- mô tả `responses.409.description`: `"The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_A…` → `"The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_A…`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".summary`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.code`: — → `"POLICY.CHECKLIST_INCOMPLETE"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.missing`: — → `["1.2-05"]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.unexpected`: — → `[]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.message`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The reason is missing or blank, or the kind is not one of the two (VALIDATIO…` → `"A refusal has no kind, or an uncontrollable tool no alternative, or a refusa…`
+- qua schema dùng chung `AccessRequestResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `AssessmentRejectionBodyDto` (xem mục Schema dùng chung)
+
+### [accessRequestInternalRegister](../reference/requests-new-software-and-service-accounts.md#accessrequestinternalregister)
+- mô tả `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".summary`: — → `"The quote cannot price the request: QUOTE_PRICE_NOT_VND."`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".value.error.code`: — → `"ASSESSMENT.QUOTE_PRICE_NOT_VND"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".value.error.message`: — → `"The quote cannot price the request: QUOTE_PRICE_NOT_VND."`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.QUOTE_PRICE_NOT_VND".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot …` → `"The data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot …`
+- qua schema dùng chung `AccessRequestResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `InternalRegistrationBodyDto` (xem mục Schema dùng chung)
+
+### [accessRequestCatalogLink](../reference/requests-new-software-and-service-accounts.md#accessrequestcataloglink)
+- contract `responses.200.content."application/json".schema.allOf.0."$ref"`: `"#/components/schemas/AccessRequestResponseDto"` → `"#/components/schemas/CatalogLinkResponseDto"`
+- mô tả `responses.200.description`: `"After the spending approver has decided the request, the IT Admin links it t…` → `"After the spending approver has decided the request, the IT Admin links it t…`
+- mô tả `responses.403.content."application/json".examples."DEPARTMENT.OUT_OF_SCOPE".summary`: — → `"The request cannot be linked to the plan: DEPARTMENT_OUT_OF_SCOPE."`
+- contract `responses.403.content."application/json".examples."DEPARTMENT.OUT_OF_SCOPE".value.error.code`: — → `"DEPARTMENT.OUT_OF_SCOPE"`
+- contract `responses.403.content."application/json".examples."DEPARTMENT.OUT_OF_SCOPE".value.error.message`: — → `"The request cannot be linked to the plan: DEPARTMENT_OUT_OF_SCOPE."`
+- contract `responses.403.content."application/json".examples."DEPARTMENT.OUT_OF_SCOPE".value.error.requestId`: — → `"req_example"`
+- contract `responses.403.content."application/json".examples."DEPARTMENT.OUT_OF_SCOPE".value.success`: — → `false`
+- mô tả `responses.403.description`: `"Only an IT Admin does this, and not for a request they asked for or are give…` → `"Only an IT Admin does this, and not for a request they asked for or are give…`
+- mô tả `responses.404.content."application/json".examples."DEPARTMENT.NOT_FOUND".summary`: — → `"The department does not exist."`
+- contract `responses.404.content."application/json".examples."DEPARTMENT.NOT_FOUND".value.error.code`: — → `"DEPARTMENT.NOT_FOUND"`
+- contract `responses.404.content."application/json".examples."DEPARTMENT.NOT_FOUND".value.error.message`: — → `"The department does not exist."`
+- contract `responses.404.content."application/json".examples."DEPARTMENT.NOT_FOUND".value.error.requestId`: — → `"req_example"`
+- contract `responses.404.content."application/json".examples."DEPARTMENT.NOT_FOUND".value.success`: — → `false`
+- mô tả `responses.404.description`: `"The request does not exist, is not a proposal, or the caller has no part in …` → `"The request does not exist, is not a proposal, or the caller has no part in …`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH".summary`: — → `"The proposal names another application than the one the plan belongs to."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH".value.error.code`: — → `"ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH".value.error.details.expectedApplicationId`: — → `"<application-id>"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH".value.error.message`: — → `"The proposal names another application than the one the plan belongs to."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".summary`: — → `"The time of use the proposal gave does not fit a plan of kind K1: TERM_MONTH…`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.code`: — → `"ASSESSMENT.TERM_NOT_FIT_KIND"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.details.maxMonths`: — → `9`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.details.provisioningType`: — → `"K1"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.details.reason`: — → `"TERM_MONTHS_OUT_OF_RANGE"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.details.termMonths`: — → `12`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.message`: — → `"The time of use the proposal gave does not fit a plan of kind K1: TERM_MONTH…`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ASSESSMENT.TERM_NOT_FIT_KIND".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."DEPARTMENT_SOFTWARE.NOT_IN_CATALOG".summary`: — → `"The software is not in the catalog: ask for it as new software."`
+- contract `responses.422.content."application/json".examples."DEPARTMENT_SOFTWARE.NOT_IN_CATALOG".value.error.code`: — → `"DEPARTMENT_SOFTWARE.NOT_IN_CATALOG"`
+- contract `responses.422.content."application/json".examples."DEPARTMENT_SOFTWARE.NOT_IN_CATALOG".value.error.details.places.0.applicationId`: — → `"application-id"`
+- contract `responses.422.content."application/json".examples."DEPARTMENT_SOFTWARE.NOT_IN_CATALOG".value.error.details.places.0.planId`: — → `"plan-id"`
+- contract `responses.422.content."application/json".examples."DEPARTMENT_SOFTWARE.NOT_IN_CATALOG".value.error.message`: — → `"The software is not in the catalog: ask for it as new software."`
+- contract `responses.422.content."application/json".examples."DEPARTMENT_SOFTWARE.NOT_IN_CATALOG".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."DEPARTMENT_SOFTWARE.NOT_IN_CATALOG".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The body is invalid (VALIDATION_ERROR)."` → `"The body is invalid (VALIDATION_ERROR), or the plan is of another kind than …`
+- qua schema dùng chung `AccessRequestResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `CatalogLinkBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `CatalogLinkResponseDto` (xem mục Schema dùng chung)
+
+### [budgetCheckGet](../reference/spend-and-finance-review.md#budgetcheckget)
+- qua schema dùng chung `BudgetCheckResponseDto` (xem mục Schema dùng chung)
+
+### [budgetCheckYearList](../reference/spend-and-finance-review.md#budgetcheckyearlist)
+- qua schema dùng chung `YearListResponseDto` (xem mục Schema dùng chung)
+
+### [spendBatchSubmit](../reference/spend-and-finance-review.md#spendbatchsubmit)
+- mô tả `responses.201.description`: `"Sends the requests chosen, one or more, on in one batch. The amount of each …` → `"Sends the requests chosen, one or more, on in one batch. The amount of each …`
+- mô tả `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".summary`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.code`: — → `"POLICY.NOT_IN_FORCE"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.message`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".summary`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.code`: — → `"POLICY.VERSION_CHANGED"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.policyVersionId`: — → `"v3"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.versionNumber`: — → `3`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.message`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.success`: — → `false`
+- mô tả `responses.409.description`: `"A request chosen is not waiting in the queue: it was sent on, or does not co…` → `"A request chosen is not waiting in the queue: it was sent on, or does not co…`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".summary`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.code`: — → `"POLICY.CHECKLIST_HAS_NO"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.code`: — → `"1.2-05"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.text`: — → `"The tools they have do not meet the need"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.message`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".summary`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.code`: — → `"POLICY.CHECKLIST_INCOMPLETE"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.missing`: — → `["1.2-05"]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.unexpected`: — → `[]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.message`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The body is invalid (VALIDATION_ERROR: a reason that is empty, over 500 char…` → `"The body is invalid (VALIDATION_ERROR: a reason that is empty, over 500 char…`
+- qua schema dùng chung `SubmitBatchBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `SubmitBatchResponseDto` (xem mục Schema dùng chung)
+
+### [spendReserveConfirm](../reference/spend-and-finance-review.md#spendreserveconfirm)
+- mô tả `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".summary`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.code`: — → `"POLICY.NOT_IN_FORCE"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.message`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".summary`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.code`: — → `"POLICY.VERSION_CHANGED"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.policyVersionId`: — → `"v3"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.versionNumber`: — → `3`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.message`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.success`: — → `false`
+- mô tả `responses.409.description`: `"The request does not wait for the confirmation of the reserve: its check is …` → `"The request does not wait for the confirmation of the reserve: its check is …`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".summary`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.code`: — → `"POLICY.CHECKLIST_HAS_NO"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.code`: — → `"1.2-05"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.text`: — → `"The tools they have do not meet the need"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.message`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".summary`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.code`: — → `"POLICY.CHECKLIST_INCOMPLETE"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.missing`: — → `["1.2-05"]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.unexpected`: — → `[]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.message`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The request is invalid (VALIDATION_ERROR)."` → `"The request is invalid (VALIDATION_ERROR), the checklist is not answered in …`
+- qua schema dùng chung `ReserveConfirmationBodyDto` (xem mục Schema dùng chung)
+
+### [spendBatchItemList](../reference/spend-and-finance-review.md#spendbatchitemlist)
+- qua schema dùng chung `BatchItemListResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestSupplementAdd](../reference/spend-and-finance-review.md#accessrequestsupplementadd)
+- mô tả `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE".summary`: `"The supplementary file cannot be made: END_DATE_OUT_OF_RANGE."` → —
+- contract `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE".value.error.code`: `"SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE"` → —
+- contract `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE".value.error.message`: `"The supplementary file cannot be made: END_DATE_OUT_OF_RANGE."` → —
+- contract `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE".value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE".value.success`: `false` → —
+- mô tả `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE".summary`: — → `"The supplementary file cannot be made: TERM_MONTHS_OUT_OF_RANGE."`
+- contract `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE".value.error.code`: — → `"SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE"`
+- contract `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE".value.error.message`: — → `"The supplementary file cannot be made: TERM_MONTHS_OUT_OF_RANGE."`
+- contract `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_TERM_NOT_ASKED".summary`: — → `"The supplementary file cannot be made: TERM_NOT_ASKED."`
+- contract `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_TERM_NOT_ASKED".value.error.code`: — → `"SPEND.SUPPLEMENT_TERM_NOT_ASKED"`
+- contract `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_TERM_NOT_ASKED".value.error.message`: — → `"The supplementary file cannot be made: TERM_NOT_ASKED."`
+- contract `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_TERM_NOT_ASKED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."SPEND.SUPPLEMENT_TERM_NOT_ASKED".value.success`: — → `false`
+- mô tả `responses.409.description`: `"The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no…` → `"The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no…`
+- qua schema dùng chung `SupplementBodyDto` (xem mục Schema dùng chung)
+
+### [spendApprovalList](../reference/spend-and-finance-review.md#spendapprovallist)
+- qua schema dùng chung `ApprovalListResponseDto` (xem mục Schema dùng chung)
+
+### [spendApprovalGet](../reference/spend-and-finance-review.md#spendapprovalget)
+- qua schema dùng chung `ApprovalDetailResponseDto` (xem mục Schema dùng chung)
+
+### [spendApprovalDecide](../reference/spend-and-finance-review.md#spendapprovaldecide)
+- mô tả `responses.200.description`: `"The person the step is given to approves it or refuses it with a reason. The…` → `"The person the step is given to answers the checklist of the policy in force…`
+- mô tả `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".summary`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.code`: — → `"POLICY.NOT_IN_FORCE"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.message`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".summary`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.code`: — → `"POLICY.VERSION_CHANGED"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.policyVersionId`: — → `"v3"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.versionNumber`: — → `3`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.message`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".summary`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.code`: — → `"POLICY.CHECKLIST_HAS_NO"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.code`: — → `"1.2-05"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.text`: — → `"The tools they have do not meet the need"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.message`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".summary`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.code`: — → `"POLICY.CHECKLIST_INCOMPLETE"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.missing`: — → `["1.2-05"]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.unexpected`: — → `[]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.message`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The body is invalid (VALIDATION_ERROR: a refusal without a reason, or a fiel…` → `"The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason …`
+- qua schema dùng chung `ApprovalDetailResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `SpendDecisionBodyDto` (xem mục Schema dùng chung)
+
+### [spendBatchDecide](../reference/spend-and-finance-review.md#spendbatchdecide)
+- contract `declared.responseContent.409`: — → `["application/json"]`
+- contract `declared.responseHeaders.409`: — → `[]`
+- contract `declared.statuses`: `["200","400","401","404","413","415","422","429","503"]` → `["200","400","401","404","409","413","415","422","429","503"]`
+- mô tả `responses.200.description`: `"Approves or refuses the requests chosen of a batch the caller holds, one by …` → `"Answers one checklist for the whole batch and approves or refuses the reques…`
+- mô tả `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".summary`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.code`: — → `"POLICY.NOT_IN_FORCE"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.message`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".summary`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.code`: — → `"POLICY.VERSION_CHANGED"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.policyVersionId`: — → `"v3"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.versionNumber`: — → `3`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.message`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.success`: — → `false`
+- contract `responses.409.content."application/json".schema."$ref"`: — → `"#/components/schemas/ErrorEnvelopeDto"`
+- mô tả `responses.409.description`: — → `"The policy has a newer version in force than the checklist the caller answer…`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".summary`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.code`: — → `"POLICY.CHECKLIST_HAS_NO"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.code`: — → `"1.2-05"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.text`: — → `"The tools they have do not meet the need"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.message`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".summary`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.code`: — → `"POLICY.CHECKLIST_INCOMPLETE"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.missing`: — → `["1.2-05"]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.unexpected`: — → `[]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.message`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The request is invalid (VALIDATION_ERROR)."` → `"The request is invalid (VALIDATION_ERROR), the checklist is not answered in …`
+- qua schema dùng chung `BatchDecisionBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `BatchDecisionResponseDto` (xem mục Schema dùng chung)
+
+### [grantQueueList](../reference/access-requests.md#grantqueuelist)
+- contract `declared.parameters`: `["query:beneficiaryEmployeeId","query:page","query:pageSize"]` → `["query:beneficiaryEmployeeId","query:page","query:pageSize","query:planId","…`
+- mô tả `parameters."query:planId".description`: — → `"Only the people waiting for this plan: what the stock of the plan lists to g…`
+- contract `parameters."query:planId".in`: — → `"query"`
+- contract `parameters."query:planId".name`: — → `"planId"`
+- contract `parameters."query:planId".required`: — → `false`
+- contract `parameters."query:planId".schema.format`: — → `"uuid"`
+- contract `parameters."query:planId".schema.type`: — → `"string"`
+- mô tả `parameters."query:state".description`: — → `"Only the people whose grant stands here: WAITING (no task yet), EXECUTING (a…`
+- contract `parameters."query:state".in`: — → `"query"`
+- contract `parameters."query:state".name`: — → `"state"`
+- contract `parameters."query:state".required`: — → `false`
+- contract `parameters."query:state".schema.enum`: — → `["DONE","EXECUTING","WAITING"]`
+- contract `parameters."query:state".schema.type`: — → `"string"`
+- mô tả `responses.200.description`: `"The requests approved in full that the IT Admin has not carried out yet, kep…` → `"The requests approved in full, one row for each person, of the departments t…`
+- qua schema dùng chung `GrantQueueResponseDto` (xem mục Schema dùng chung)
+
+### [assessmentQueueList](../reference/requests-new-software-and-service-accounts.md#assessmentqueuelist)
+- contract `declared.parameters`: `["query:page","query:pageSize"]` → `["query:departmentId","query:page","query:pageSize"]`
+- mô tả `parameters."query:departmentId".description`: — → `"Only the proposals of this department; a department outside the departments …`
+- contract `parameters."query:departmentId".in`: — → `"query"`
+- contract `parameters."query:departmentId".name`: — → `"departmentId"`
+- contract `parameters."query:departmentId".required`: — → `false`
+- contract `parameters."query:departmentId".schema.format`: — → `"uuid"`
+- contract `parameters."query:departmentId".schema.type`: — → `"string"`
+- qua schema dùng chung `AssessmentQueueResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestRenewalSubmit](../reference/access-requests.md#accessrequestrenewalsubmit)
+- mô tả `responses.201.description`: `"The holder of a right that has an end date, or the head of their department,…` → `"The holder of a right that has an end date asks to go on using it, for a num…`
+- mô tả `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".summary`: `"The person already has as many requests for new access open as they may."` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.code`: `"ACCESS_REQUEST.OPEN_LIMIT_REACHED"` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.limit`: `3` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.openRequestIds`: `["<request-id>"]` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.message`: `"The person already has as many requests for new access open as they may."` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.success`: `false` → —
+- mô tả `responses.409.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".summary`: `"The renewal can be sent only from the day its window opens."` → —
+- contract `responses.409.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".value.error.code`: `"RENEWAL_REQUEST.WINDOW_NOT_OPEN"` → —
+- contract `responses.409.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".value.error.details.opensOn`: `"2026-12-01"` → —
+- contract `responses.409.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".value.error.details.windowDays`: `30` → —
+- contract `responses.409.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".value.error.message`: `"The renewal can be sent only from the day its window opens."` → —
+- contract `responses.409.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".value.success`: `false` → —
+- mô tả `responses.409.description`: `"The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with t…` → `"The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with t…`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".summary`: `"The person uses many paid applications already: a reason is required to ask …` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.code`: `"ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED"` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.details.count`: `10` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.details.threshold`: `10` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.message`: `"The person uses many paid applications already: a reason is required to ask …` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".summary`: — → `"The person was already named in as many requests for new access this week as…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.code`: — → `"ACCESS_REQUEST.OPEN_LIMIT_REACHED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.limit`: — → `10`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.details.resetsOn`: — → `"2026-11-16"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.message`: — → `"The person was already named in as many requests for new access this week as…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.OPEN_LIMIT_REACHED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".summary`: — → `"The contract of the person ended before the time of use begins: no access is…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.code`: — → `"ACCESS_REQUEST.TERM_CONTRACT_ENDED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.details.contractEndDate`: — → `"2026-10-31"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.message`: — → `"The contract of the person ended before the time of use begins: no access is…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_CONTRACT_ENDED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".summary`: — → `"A contractor, a freelancer or an intern gets access for a term: give the mon…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.error.code`: — → `"ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.error.message`: — → `"A contractor, a freelancer or an intern gets access for a term: give the mon…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".summary`: — → `"The time of use is a whole number of months: from 1 to 9 for a plan bought b…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.code`: — → `"ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.message`: — → `"The time of use is a whole number of months: from 1 to 9 for a plan bought b…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".summary`: — → `"This plan is bought once: it takes no time of use."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.error.code`: — → `"ACCESS_REQUEST.TERM_NOT_ASKED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.error.message`: — → `"This plan is bought once: it takes no time of use."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".summary`: — → `"Give the time of use in months."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.code`: — → `"ACCESS_REQUEST.TERM_REQUIRED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.message`: — → `"Give the time of use in months."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE".summary`: `"The new end date must be after the current end date and at most twelve month…` → —
+- contract `responses.422.content."application/json".examples."RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE".value.error.code`: `"RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE"` → —
+- contract `responses.422.content."application/json".examples."RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE".value.error.details.maxEndDate`: `"2027-12-31"` → —
+- contract `responses.422.content."application/json".examples."RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE".value.error.details.previousEndDate`: `"2026-12-31"` → —
+- contract `responses.422.content."application/json".examples."RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE".value.error.message`: `"The new end date must be after the current end date and at most twelve month…` → —
+- contract `responses.422.content."application/json".examples."RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".summary`: — → `"The renewal can be sent only from the day its window opens."`
+- contract `responses.422.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".value.error.code`: — → `"RENEWAL_REQUEST.WINDOW_NOT_OPEN"`
+- contract `responses.422.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".value.error.details.opensOn`: — → `"2026-12-01"`
+- contract `responses.422.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".value.error.details.windowDays`: — → `30`
+- contract `responses.422.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".value.error.message`: — → `"The renewal can be sent only from the day its window opens."`
+- contract `responses.422.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."RENEWAL_REQUEST.WINDOW_NOT_OPEN".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The form is incomplete or invalid (VALIDATION_ERROR): the seat, the new end …` → `"The form is incomplete or invalid (VALIDATION_ERROR): the seat, the reason a…`
+- qua schema dùng chung `RenewalBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `RenewalResponseDto` (xem mục Schema dùng chung)
+
+### [groupRequestCheck](../reference/group-requests.md#grouprequestcheck)
+- qua schema dùng chung `GroupBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `GroupCheckResponseDto` (xem mục Schema dùng chung)
+
+### [groupRequestSubmit](../reference/group-requests.md#grouprequestsubmit)
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".summary`: — → `"The time of use is a whole number of months: from 1 to 9 for a plan bought b…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.code`: — → `"ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.message`: — → `"The time of use is a whole number of months: from 1 to 9 for a plan bought b…`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".summary`: — → `"This plan is bought once: it takes no time of use."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.error.code`: — → `"ACCESS_REQUEST.TERM_NOT_ASKED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.error.message`: — → `"This plan is bought once: it takes no time of use."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_NOT_ASKED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".summary`: — → `"Give the time of use in months."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.code`: — → `"ACCESS_REQUEST.TERM_REQUIRED"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.message`: — → `"Give the time of use in months."`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."ACCESS_REQUEST.TERM_REQUIRED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."GROUP_REQUEST.TERM_BEYOND_LIMIT".summary`: `"The end date is before today or more than a year from today."` → —
+- contract `responses.422.content."application/json".examples."GROUP_REQUEST.TERM_BEYOND_LIMIT".value.error.code`: `"GROUP_REQUEST.TERM_BEYOND_LIMIT"` → —
+- contract `responses.422.content."application/json".examples."GROUP_REQUEST.TERM_BEYOND_LIMIT".value.error.details.maxEndDate`: `"2027-11-09"` → —
+- contract `responses.422.content."application/json".examples."GROUP_REQUEST.TERM_BEYOND_LIMIT".value.error.message`: `"The end date is before today or more than a year from today."` → —
+- contract `responses.422.content."application/json".examples."GROUP_REQUEST.TERM_BEYOND_LIMIT".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."GROUP_REQUEST.TERM_BEYOND_LIMIT".value.success`: `false` → —
+- mô tả `responses.422.description`: `"The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROU…` → `"The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROU…`
+- qua schema dùng chung `GroupBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `GroupResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestLineNeedDecide](../reference/group-requests.md#accessrequestlineneeddecide)
+- mô tả `responses.200.description`: `"The person who holds a need step decides all the people of that step at once…` → `"The person who holds a need step answers one checklist of the policy in forc…`
+- mô tả `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".summary`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.code`: — → `"POLICY.NOT_IN_FORCE"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.message`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".summary`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.code`: — → `"POLICY.VERSION_CHANGED"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.policyVersionId`: — → `"v3"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.versionNumber`: — → `3`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.message`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.success`: — → `false`
+- mô tả `responses.409.description`: `"The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), or a person appro…` → `"The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), a person approved…`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".summary`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.code`: — → `"POLICY.CHECKLIST_HAS_NO"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.code`: — → `"1.2-05"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.text`: — → `"The tools they have do not meet the need"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.message`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".summary`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.code`: — → `"POLICY.CHECKLIST_INCOMPLETE"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.missing`: — → `["1.2-05"]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.unexpected`: — → `[]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.message`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The body is invalid (VALIDATION_ERROR: a refusal without its reason, a perso…` → `"The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason …`
+- qua schema dùng chung `GroupResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `LineNeedDecisionBodyDto` (xem mục Schema dùng chung)
+
+### [spendApprovalLineDecide](../reference/group-requests.md#spendapprovallinedecide)
+- mô tả `responses.200.description`: `"The person the spend step is given to decides all the people whose need is c…` → `"The person the spend step is given to answers one checklist for the group an…`
+- mô tả `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".summary`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.code`: — → `"POLICY.NOT_IN_FORCE"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.message`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".summary`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.code`: — → `"POLICY.VERSION_CHANGED"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.policyVersionId`: — → `"v3"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.versionNumber`: — → `3`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.message`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".summary`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.code`: — → `"POLICY.CHECKLIST_HAS_NO"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.code`: — → `"1.2-05"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.text`: — → `"The tools they have do not meet the need"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.message`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".summary`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.code`: — → `"POLICY.CHECKLIST_INCOMPLETE"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.missing`: — → `["1.2-05"]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.unexpected`: — → `[]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.message`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The body is invalid (VALIDATION_ERROR: a refusal without its reason); the de…` → `"The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason …`
+- qua schema dùng chung `ApprovalDetailResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `LineSpendDecisionBodyDto` (xem mục Schema dùng chung)
+
+### [accessRequestLineWithdraw](../reference/group-requests.md#accessrequestlinewithdraw)
+- qua schema dùng chung `GroupResponseDto` (xem mục Schema dùng chung)
+
+### [accessRequestLineCloseForDeparture](../reference/group-requests.md#accessrequestlineclosefordeparture)
+- qua schema dùng chung `GroupResponseDto` (xem mục Schema dùng chung)
+
+### [departmentAccessRequestList](../reference/access-requests.md#departmentaccessrequestlist)
+- qua schema dùng chung `DepartmentAccessRequestPageResponseDto` (xem mục Schema dùng chung)
+
+### [budgetProposalSubmit](../reference/budgets.md#budgetproposalsubmit)
+- mô tả `responses.201.description`: `"The proposal of the department for a Cost Center and a year that is running …` → `"The proposal of the department for a Cost Center and a year that is running …`
+- mô tả `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".summary`: — → `"The budget cycle of 2027 is locked: its submission deadline has passed."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.code`: — → `"BUDGET_CYCLE.LOCKED"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.details.year`: — → `2027`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.message`: — → `"The budget cycle of 2027 is locked: its submission deadline has passed."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".summary`: — → `"The budget cycle of 2027 is not open yet."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.code`: — → `"BUDGET_CYCLE.NOT_OPEN"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.details.year`: — → `2027`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.message`: — → `"The budget cycle of 2027 is not open yet."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".summary`: `"The budget cycle of 2027 was not published yet."` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.error.code`: `"BUDGET.CYCLE_NOT_PUBLISHED"` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.error.details.year`: `2027` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.error.message`: `"The budget cycle of 2027 was not published yet."` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.success`: `false` → —
+- mô tả `responses.409.description`: `"The department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), a p…` → `"The department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), a p…`
+- mô tả `responses.422.content."application/json".examples."BUDGET.OVER_CEILING_NOTE_REQUIRED".summary`: `"These lines carry the proposal over the ceiling of the department and need a…` → —
+- contract `responses.422.content."application/json".examples."BUDGET.OVER_CEILING_NOTE_REQUIRED".value.error.code`: `"BUDGET.OVER_CEILING_NOTE_REQUIRED"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.OVER_CEILING_NOTE_REQUIRED".value.error.details.positions`: `[2]` → —
+- contract `responses.422.content."application/json".examples."BUDGET.OVER_CEILING_NOTE_REQUIRED".value.error.message`: `"These lines carry the proposal over the ceiling of the department and need a…` → —
+- contract `responses.422.content."application/json".examples."BUDGET.OVER_CEILING_NOTE_REQUIRED".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.OVER_CEILING_NOTE_REQUIRED".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."BUDGET.PLAN_NOT_FOUND".summary`: `"A line names a plan that does not exist."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PLAN_NOT_FOUND".value.error.code`: `"BUDGET.PLAN_NOT_FOUND"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PLAN_NOT_FOUND".value.error.details.planIds`: `["<plan-id>"]` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PLAN_NOT_FOUND".value.error.message`: `"A line names a plan that does not exist."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PLAN_NOT_FOUND".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PLAN_NOT_FOUND".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."BUDGET.PRIORITY_RANK_INVALID".summary`: `"Each line has its own priority rank."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PRIORITY_RANK_INVALID".value.error.code`: `"BUDGET.PRIORITY_RANK_INVALID"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PRIORITY_RANK_INVALID".value.error.details.positions`: `[1,2]` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PRIORITY_RANK_INVALID".value.error.message`: `"Each line has its own priority rank."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PRIORITY_RANK_INVALID".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PRIORITY_RANK_INVALID".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."BUDGET.ZBB_REQUIRED".summary`: `"These lines need the zero-based-budget explanation."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.ZBB_REQUIRED".value.error.code`: `"BUDGET.ZBB_REQUIRED"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.ZBB_REQUIRED".value.error.details.positions`: `[1]` → —
+- contract `responses.422.content."application/json".examples."BUDGET.ZBB_REQUIRED".value.error.message`: `"These lines need the zero-based-budget explanation."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.ZBB_REQUIRED".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.ZBB_REQUIRED".value.success`: `false` → —
+- mô tả `responses.422.description`: `"The form is invalid (VALIDATION_ERROR), two lines share a priority rank (BUD…` → `"The form is invalid (VALIDATION_ERROR: no file, more than ten, a line of the…`
+- qua schema dùng chung `BudgetProposalBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `ProposalResponseDto` (xem mục Schema dùng chung)
+
+### [budgetProposalGet](../reference/budgets.md#budgetproposalget)
+- qua schema dùng chung `ProposalResponseDto` (xem mục Schema dùng chung)
+
+### [budgetProposalWithdraw](../reference/budgets.md#budgetproposalwithdraw)
+- mô tả `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".summary`: — → `"The budget cycle of 2027 is locked: its submission deadline has passed."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.code`: — → `"BUDGET_CYCLE.LOCKED"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.details.year`: — → `2027`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.message`: — → `"The budget cycle of 2027 is locked: its submission deadline has passed."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".summary`: — → `"The budget cycle of 2027 is not open yet."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.code`: — → `"BUDGET_CYCLE.NOT_OPEN"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.details.year`: — → `2027`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.message`: — → `"The budget cycle of 2027 is not open yet."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.success`: — → `false`
+- mô tả `responses.409.description`: `"The proposal is no longer waiting for Finance (BUDGET.PROPOSAL_CANNOT_WITHDR…` → `"The proposal is no longer waiting for Finance (BUDGET.PROPOSAL_CANNOT_WITHDR…`
+- qua schema dùng chung `ProposalResponseDto` (xem mục Schema dùng chung)
+
+### [budgetProposalReturn](../reference/budgets.md#budgetproposalreturn)
+- mô tả `responses.200.description`: `"Finance gives the proposal back with the reason that must go with it; the he…` → `"Finance gives the proposal back with the reason that must go with it, before…`
+- mô tả `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".summary`: — → `"The budget cycle of 2027 is locked: its submission deadline has passed."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.code`: — → `"BUDGET_CYCLE.LOCKED"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.details.year`: — → `2027`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.message`: — → `"The budget cycle of 2027 is locked: its submission deadline has passed."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".summary`: — → `"The budget cycle of 2027 is not open yet."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.code`: — → `"BUDGET_CYCLE.NOT_OPEN"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.details.year`: — → `2027`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.message`: — → `"The budget cycle of 2027 is not open yet."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.success`: — → `false`
+- mô tả `responses.409.description`: `"The proposal is not waiting for Finance (BUDGET.PROPOSAL_CANNOT_RETURN)."` → `"The proposal is not waiting for Finance (BUDGET.PROPOSAL_CANNOT_RETURN), or …`
+- qua schema dùng chung `ProposalResponseDto` (xem mục Schema dùng chung)
+
+### [budgetProposalResubmit](../reference/budgets.md#budgetproposalresubmit)
+- mô tả `responses.201.description`: `"A new proposal with the corrected lines, pointing at the one given back, whi…` → `"A new proposal with the corrected files, amount and note, pointing at the on…`
+- mô tả `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".summary`: — → `"The budget cycle of 2027 is locked: its submission deadline has passed."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.code`: — → `"BUDGET_CYCLE.LOCKED"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.details.year`: — → `2027`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.message`: — → `"The budget cycle of 2027 is locked: its submission deadline has passed."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".summary`: — → `"The budget cycle of 2027 is not open yet."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.code`: — → `"BUDGET_CYCLE.NOT_OPEN"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.details.year`: — → `2027`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.message`: — → `"The budget cycle of 2027 is not open yet."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".summary`: `"The budget cycle of 2027 was not published yet."` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.error.code`: `"BUDGET.CYCLE_NOT_PUBLISHED"` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.error.details.year`: `2027` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.error.message`: `"The budget cycle of 2027 was not published yet."` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.success`: `false` → —
+- mô tả `responses.409.description`: `"The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), another w…` → `"The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), another w…`
+- mô tả `responses.422.content."application/json".examples."BUDGET.OVER_CEILING_NOTE_REQUIRED".summary`: `"These lines carry the proposal over the ceiling of the department and need a…` → —
+- contract `responses.422.content."application/json".examples."BUDGET.OVER_CEILING_NOTE_REQUIRED".value.error.code`: `"BUDGET.OVER_CEILING_NOTE_REQUIRED"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.OVER_CEILING_NOTE_REQUIRED".value.error.details.positions`: `[2]` → —
+- contract `responses.422.content."application/json".examples."BUDGET.OVER_CEILING_NOTE_REQUIRED".value.error.message`: `"These lines carry the proposal over the ceiling of the department and need a…` → —
+- contract `responses.422.content."application/json".examples."BUDGET.OVER_CEILING_NOTE_REQUIRED".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.OVER_CEILING_NOTE_REQUIRED".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."BUDGET.PLAN_NOT_FOUND".summary`: `"A line names a plan that does not exist."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PLAN_NOT_FOUND".value.error.code`: `"BUDGET.PLAN_NOT_FOUND"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PLAN_NOT_FOUND".value.error.details.planIds`: `["<plan-id>"]` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PLAN_NOT_FOUND".value.error.message`: `"A line names a plan that does not exist."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PLAN_NOT_FOUND".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PLAN_NOT_FOUND".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."BUDGET.PRIORITY_RANK_INVALID".summary`: `"Each line has its own priority rank."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PRIORITY_RANK_INVALID".value.error.code`: `"BUDGET.PRIORITY_RANK_INVALID"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PRIORITY_RANK_INVALID".value.error.details.positions`: `[1,2]` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PRIORITY_RANK_INVALID".value.error.message`: `"Each line has its own priority rank."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PRIORITY_RANK_INVALID".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.PRIORITY_RANK_INVALID".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."BUDGET.ZBB_REQUIRED".summary`: `"These lines need the zero-based-budget explanation."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.ZBB_REQUIRED".value.error.code`: `"BUDGET.ZBB_REQUIRED"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.ZBB_REQUIRED".value.error.details.positions`: `[1]` → —
+- contract `responses.422.content."application/json".examples."BUDGET.ZBB_REQUIRED".value.error.message`: `"These lines need the zero-based-budget explanation."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.ZBB_REQUIRED".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.ZBB_REQUIRED".value.success`: `false` → —
+- qua schema dùng chung `ProposalResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `ResubmissionBodyDto` (xem mục Schema dùng chung)
+
+### [budgetVersionCreate](../reference/budgets.md#budgetversioncreate)
+- mô tả `responses.201.description`: `"A draft with the base and the reserve (the default share of the base unless …` → `"A draft with one figure for the year and no line: the base Finance gives, or…`
+- contract `responses.409.content."application/json".examples."BUDGET.BASELINE_VERSION_NOT_ALLOWED".value.error.details.reason`: `"HAS_HEAD"` → `"HAS_PROPOSAL"`
+- mô tả `responses.409.description`: `"The proposal is neither waiting nor reviewed with its latest version refused…` → `"The proposal is neither waiting nor reviewed with its latest version refused…`
+- mô tả `responses.422.content."application/json".examples."BUDGET.QUARTERS_MISMATCH".summary`: `"The four quarters do not add up to the total of the version."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.QUARTERS_MISMATCH".value.error.code`: `"BUDGET.QUARTERS_MISMATCH"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.QUARTERS_MISMATCH".value.error.message`: `"The four quarters do not add up to the total of the version."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.QUARTERS_MISMATCH".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.QUARTERS_MISMATCH".value.success`: `false` → —
+- mô tả `responses.422.description`: `"The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDE…` → `"The body is invalid (VALIDATION_ERROR: the reserve given both as an amount a…`
+- qua schema dùng chung `VersionBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `VersionResponseDto` (xem mục Schema dùng chung)
+
+### [budgetVersionGet](../reference/budgets.md#budgetversionget)
+- mô tả `responses.200.description`: `"The version without its lines, which are a paged list of their own."` → `"One figure for the year: the base, the reserve and their total, what the Cos…`
+- mô tả `responses.404.description`: `"The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LIN…` → `"The version does not exist (BUDGET.VERSION_NOT_FOUND)."`
+- qua schema dùng chung `VersionResponseDto` (xem mục Schema dùng chung)
+
+### [budgetVersionUpdate](../reference/budgets.md#budgetversionupdate)
+- mô tả `responses.200.description`: `"The base, the reserve with its reason, and the forecast by quarter; the tota…` → `"The base, and the reserve as a share (reservePercent) or as an amount with i…`
+- mô tả `responses.404.description`: `"The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LIN…` → `"The version does not exist (BUDGET.VERSION_NOT_FOUND)."`
+- mô tả `responses.422.content."application/json".examples."BUDGET.QUARTERS_MISMATCH".summary`: `"The four quarters do not add up to the total of the version."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.QUARTERS_MISMATCH".value.error.code`: `"BUDGET.QUARTERS_MISMATCH"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.QUARTERS_MISMATCH".value.error.message`: `"The four quarters do not add up to the total of the version."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.QUARTERS_MISMATCH".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.QUARTERS_MISMATCH".value.success`: `false` → —
+- mô tả `responses.422.description`: `"The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDE…` → `"The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDE…`
+- qua schema dùng chung `VersionPatchDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `VersionResponseDto` (xem mục Schema dùng chung)
+
+### [budgetVersionSend](../reference/budgets.md#budgetversionsend)
+- mô tả `responses.200.description`: `"The version waits for the spending approver. A reserve that is not the defau…` → `"The version waits for the spending approver. It is sent with one file at lea…`
+- mô tả `responses.404.description`: `"The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LIN…` → `"The version does not exist (BUDGET.VERSION_NOT_FOUND)."`
+- mô tả `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".summary`: — → `"The budget cycle of 2027 is not open yet."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.code`: — → `"BUDGET_CYCLE.NOT_OPEN"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.details.year`: — → `2027`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.message`: — → `"The budget cycle of 2027 is not open yet."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.NOT_OPEN".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".summary`: — → `"The versions of the year add up to more than the annual ceiling less the sha…`
+- contract `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".value.error.code`: — → `"BUDGET_VERSION.OVER_CEILING"`
+- contract `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".value.error.details.availableMinor`: — → `"100"`
+- contract `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".value.error.details.overBy`: — → `"1"`
+- contract `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".value.error.message`: — → `"The versions of the year add up to more than the annual ceiling less the sha…`
+- contract `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".summary`: `"The budget cycle of 2027 was not published yet."` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.error.code`: `"BUDGET.CYCLE_NOT_PUBLISHED"` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.error.details.year`: `2027` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.error.message`: `"The budget cycle of 2027 was not published yet."` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_NOT_PUBLISHED".value.success`: `false` → —
+- mô tả `responses.409.content."application/json".examples."BUDGET.OVER_ANNUAL_CEILING".summary`: `"The versions of the year add up to more than the annual ceiling less the sha…` → —
+- contract `responses.409.content."application/json".examples."BUDGET.OVER_ANNUAL_CEILING".value.error.code`: `"BUDGET.OVER_ANNUAL_CEILING"` → —
+- contract `responses.409.content."application/json".examples."BUDGET.OVER_ANNUAL_CEILING".value.error.details.availableMinor`: `"100"` → —
+- contract `responses.409.content."application/json".examples."BUDGET.OVER_ANNUAL_CEILING".value.error.details.gapMinor`: `"1"` → —
+- contract `responses.409.content."application/json".examples."BUDGET.OVER_ANNUAL_CEILING".value.error.message`: `"The versions of the year add up to more than the annual ceiling less the sha…` → —
+- contract `responses.409.content."application/json".examples."BUDGET.OVER_ANNUAL_CEILING".value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples."BUDGET.OVER_ANNUAL_CEILING".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples."BUDGET_VERSION.ATTACHMENT_REQUIRED".summary`: — → `"A version is sent with one file at least that explains it."`
+- contract `responses.422.content."application/json".examples."BUDGET_VERSION.ATTACHMENT_REQUIRED".value.error.code`: — → `"BUDGET_VERSION.ATTACHMENT_REQUIRED"`
+- contract `responses.422.content."application/json".examples."BUDGET_VERSION.ATTACHMENT_REQUIRED".value.error.message`: — → `"A version is sent with one file at least that explains it."`
+- contract `responses.422.content."application/json".examples."BUDGET_VERSION.ATTACHMENT_REQUIRED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."BUDGET_VERSION.ATTACHMENT_REQUIRED".value.success`: — → `false`
+- mô tả `responses.422.description`: `"A reserve that is not the default share of the base has no reason (BUDGET.RE…` → `"The version has no file that explains it (BUDGET_VERSION.ATTACHMENT_REQUIRED…`
+- qua schema dùng chung `VersionResponseDto` (xem mục Schema dùng chung)
+
+### [budgetVersionDecide](../reference/budgets.md#budgetversiondecide)
+- mô tả `responses.200.description`: `"The spending approver approves a version that was sent (it becomes the curre…` → `"The spending approver approves a version that was sent (it becomes the curre…`
+- mô tả `responses.404.description`: `"The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LIN…` → `"The version does not exist (BUDGET.VERSION_NOT_FOUND)."`
+- mô tả `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".summary`: — → `"The versions of the year add up to more than the annual ceiling less the sha…`
+- contract `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".value.error.code`: — → `"BUDGET_VERSION.OVER_CEILING"`
+- contract `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".value.error.details.availableMinor`: — → `"100"`
+- contract `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".value.error.details.overBy`: — → `"1"`
+- contract `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".value.error.message`: — → `"The versions of the year add up to more than the annual ceiling less the sha…`
+- contract `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_VERSION.OVER_CEILING".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."BUDGET.CYCLE_CURRENCY_MISMATCH".summary`: — → `"A version of the year is not in the currency of the budget cycle."`
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_CURRENCY_MISMATCH".value.error.code`: — → `"BUDGET.CYCLE_CURRENCY_MISMATCH"`
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_CURRENCY_MISMATCH".value.error.details.cycleCurrency`: — → `"VND"`
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_CURRENCY_MISMATCH".value.error.details.versionCurrency`: — → `"USD"`
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_CURRENCY_MISMATCH".value.error.message`: — → `"A version of the year is not in the currency of the budget cycle."`
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_CURRENCY_MISMATCH".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_CURRENCY_MISMATCH".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".summary`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.code`: — → `"POLICY.NOT_IN_FORCE"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.message`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".summary`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.code`: — → `"POLICY.VERSION_CHANGED"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.policyVersionId`: — → `"v3"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.versionNumber`: — → `3`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.message`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.success`: — → `false`
+- mô tả `responses.409.description`: `"The version was not sent, or was already decided (BUDGET.VERSION_NOT_SENT)."` → `"The version was not sent, or was already decided (BUDGET.VERSION_NOT_SENT); …`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".summary`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.code`: — → `"POLICY.CHECKLIST_HAS_NO"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.code`: — → `"1.2-05"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.text`: — → `"The tools they have do not meet the need"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.message`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".summary`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.code`: — → `"POLICY.CHECKLIST_INCOMPLETE"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.missing`: — → `["1.2-05"]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.unexpected`: — → `[]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.message`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The decision is invalid (VALIDATION_ERROR): a refusal or a request to look a…` → `"The decision is invalid (VALIDATION_ERROR): REJECT or REQUEST_CHANGES, which…`
+- qua schema dùng chung `DecisionBodyDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `VersionResponseDto` (xem mục Schema dùng chung)
+
+### [budgetMine](../reference/budgets.md#budgetmine)
+- qua schema dùng chung `MineResponseDto` (xem mục Schema dùng chung)
+
+### [budgetSummary](../reference/budgets.md#budgetsummary)
+- qua schema dùng chung `BudgetSummaryResponseDto` (xem mục Schema dùng chung)
+
+### [budgetTable](../reference/budgets.md#budgettable)
+- qua schema dùng chung `BudgetTablePageResponseDto` (xem mục Schema dùng chung)
+
+### [budgetCommitmentList](../reference/budgets.md#budgetcommitmentlist)
+- quyền khai ở controller roles:FINANCE → roles:FINANCE,MANAGER
+- contract `declared.parameters`: `["query:attached","query:costCenterId","query:page","query:pageSize","query:r…` → `["query:attached","query:costCenterId","query:longTerm","query:page","query:p…`
+- mô tả `parameters."query:longTerm".description`: — → `"true lists the long-term commitments of the quarterly review: every commitme…`
+- contract `parameters."query:longTerm".in`: — → `"query"`
+- contract `parameters."query:longTerm".name`: — → `"longTerm"`
+- contract `parameters."query:longTerm".required`: — → `false`
+- contract `parameters."query:longTerm".schema.enum`: — → `["false","true"]`
+- contract `parameters."query:longTerm".schema.type`: — → `"string"`
+- mô tả `responses.403.description`: `"Only Finance reads the commitments."` → `"Only Finance, and the head of a department for the Cost Centers they head, r…`
+
+### [budgetCommitmentReleases](../reference/budgets.md#budgetcommitmentreleases)
+- mô tả `responses.403.description`: `"Only Finance reads the commitments."` → `"Only Finance, and the head of a department for the Cost Centers they head, r…`
+
+### [budgetCommitmentInvoiceList](../reference/budgets.md#budgetcommitmentinvoicelist)
+- qua schema dùng chung `InvoiceListResponseDto` (xem mục Schema dùng chung)
+
+### [budgetCycleList](../reference/budgets.md#budgetcyclelist)
+- mô tả `responses.200.description`: `"A page of the budget cycles of the organization, the latest year first, each…` → `"A page of the budget cycles of the organization, the latest year first, each…`
+- qua schema dùng chung `CycleListResponseDto` (xem mục Schema dùng chung)
+
+### [budgetCycleGet](../reference/budgets.md#budgetcycleget)
+- mô tả `responses.200.description`: `"The cycle of the year: deadlines, annual ceiling, shared-pool reserve, ceili…` → `"The cycle of the year: deadlines, annual ceiling, shared-pool reserve, what …`
+- qua schema dùng chung `CycleResponseDto` (xem mục Schema dùng chung)
+
+### [budgetCycleUpdate](../reference/budgets.md#budgetcycleupdate)
+- contract `declared.responseContent.409`: — → `["application/json"]`
+- contract `declared.responseHeaders.409`: — → `[]`
+- contract `declared.statuses`: `["200","400","401","403","404","413","415","422","429","503"]` → `["200","400","401","403","404","409","413","415","422","429","503"]`
+- mô tả `responses.200.description`: `"The cycle after the change. A new annual ceiling needs the reason and takes …` → `"The cycle after the change. A draft takes any change. An open cycle moves th…`
+- mô tả `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".summary`: — → `"The budget cycle of 2027 is locked: its submission deadline has passed."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.code`: — → `"BUDGET_CYCLE.LOCKED"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.details.year`: — → `2027`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.message`: — → `"The budget cycle of 2027 is locked: its submission deadline has passed."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.success`: — → `false`
+- contract `responses.409.content."application/json".schema."$ref"`: — → `"#/components/schemas/ErrorEnvelopeDto"`
+- mô tả `responses.409.description`: — → `"The submission deadline has passed: the cycle is locked and never opens agai…`
+- mô tả `responses.422.content."application/json".examples."BUDGET_CYCLE.DEADLINE_PASSED".summary`: — → `"The submission deadline is before today."`
+- contract `responses.422.content."application/json".examples."BUDGET_CYCLE.DEADLINE_PASSED".value.error.code`: — → `"BUDGET_CYCLE.DEADLINE_PASSED"`
+- contract `responses.422.content."application/json".examples."BUDGET_CYCLE.DEADLINE_PASSED".value.error.message`: — → `"The submission deadline is before today."`
+- contract `responses.422.content."application/json".examples."BUDGET_CYCLE.DEADLINE_PASSED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."BUDGET_CYCLE.DEADLINE_PASSED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."BUDGET.CYCLE_REASON_REQUIRED".summary`: `"Changing the annual ceiling needs the reason."` → `"Moving the submission deadline, or changing the annual ceiling or the shared…`
+- contract `responses.422.content."application/json".examples."BUDGET.CYCLE_REASON_REQUIRED".value.error.message`: `"Changing the annual ceiling needs the reason."` → `"Moving the submission deadline, or changing the annual ceiling or the shared…`
+- mô tả `responses.422.description`: `"The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YE…` → `"The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YE…`
+- qua schema dùng chung `CycleResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `UpdateCycleBodyDto` (xem mục Schema dùng chung)
+
+### [budgetCycleOpen](../reference/budgets.md#budgetcycleopen)
+- contract `declared.parameters`: `[]` → `["path:year"]`
+- contract `declared.requestContent`: `["application/json"]` → `[]`
+- contract `declared.responseContent.400`: `["application/json"]` → —
+- contract `declared.responseContent.404`: — → `["application/json"]`
+- contract `declared.responseContent.413`: `["application/json"]` → —
+- contract `declared.responseContent.415`: `["application/json"]` → —
+- contract `declared.responseHeaders.400`: `[]` → —
+- contract `declared.responseHeaders.404`: — → `[]`
+- contract `declared.responseHeaders.413`: `[]` → —
+- contract `declared.responseHeaders.415`: `[]` → —
+- contract `declared.statuses`: `["201","400","401","403","409","413","415","422","429","503"]` → `["201","401","403","404","409","422","429","503"]`
+- contract `parameters`: `{}` → —
+- contract `parameters."path:year".in`: — → `"path"`
+- contract `parameters."path:year".name`: — → `"year"`
+- contract `parameters."path:year".required`: — → `true`
+- contract `parameters."path:year".schema.maximum`: — → `2999`
+- contract `parameters."path:year".schema.minimum`: — → `2000`
+- contract `parameters."path:year".schema.type`: — → `"integer"`
+- contract `path`: `"/api/v1/budget-cycles"` → `"/api/v1/budget-cycles/{year}/opening"`
+- contract `requestBody`: — → `null`
+- contract `requestBody.content."application/json".schema."$ref"`: `"#/components/schemas/OpenCycleBodyDto"` → —
+- contract `requestBody.required`: `true` → —
+- mô tả `responses.201.description`: `"The cycle of the year is opened with its deadlines, the annual ceiling of th…` → `"The draft becomes open: the head of each department of the year is told the …`
+- mô tả `responses.400.content."application/json".examples.HTTP_BAD_REQUEST.summary`: `"The request could not be processed."` → —
+- contract `responses.400.content."application/json".examples.HTTP_BAD_REQUEST.value.error.code`: `"HTTP_BAD_REQUEST"` → —
+- contract `responses.400.content."application/json".examples.HTTP_BAD_REQUEST.value.error.message`: `"The request could not be processed."` → —
+- contract `responses.400.content."application/json".examples.HTTP_BAD_REQUEST.value.error.requestId`: `"req_example"` → —
+- contract `responses.400.content."application/json".examples.HTTP_BAD_REQUEST.value.success`: `false` → —
+- contract `responses.400.content."application/json".schema."$ref"`: `"#/components/schemas/ErrorEnvelopeDto"` → —
+- mô tả `responses.400.description`: `"The JSON body cannot be read: it is not valid JSON, it does not match its de…` → —
+- mô tả `responses.404.content."application/json".examples."BUDGET.CYCLE_NOT_FOUND".summary`: — → `"The budget cycle of that year does not exist."`
+- contract `responses.404.content."application/json".examples."BUDGET.CYCLE_NOT_FOUND".value.error.code`: — → `"BUDGET.CYCLE_NOT_FOUND"`
+- contract `responses.404.content."application/json".examples."BUDGET.CYCLE_NOT_FOUND".value.error.message`: — → `"The budget cycle of that year does not exist."`
+- contract `responses.404.content."application/json".examples."BUDGET.CYCLE_NOT_FOUND".value.error.requestId`: — → `"req_example"`
+- contract `responses.404.content."application/json".examples."BUDGET.CYCLE_NOT_FOUND".value.success`: — → `false`
+- contract `responses.404.content."application/json".schema."$ref"`: — → `"#/components/schemas/ErrorEnvelopeDto"`
+- mô tả `responses.404.description`: — → `"The budget cycle of the year does not exist (BUDGET.CYCLE_NOT_FOUND)."`
+- mô tả `responses.409.content."application/json".examples."BUDGET_CYCLE.ALREADY_OPEN".summary`: — → `"The budget cycle of 2027 is open already."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.ALREADY_OPEN".value.error.code`: — → `"BUDGET_CYCLE.ALREADY_OPEN"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.ALREADY_OPEN".value.error.details.year`: — → `2027`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.ALREADY_OPEN".value.error.message`: — → `"The budget cycle of 2027 is open already."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.ALREADY_OPEN".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.ALREADY_OPEN".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".summary`: — → `"The budget cycle of 2027 is locked: its submission deadline has passed."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.code`: — → `"BUDGET_CYCLE.LOCKED"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.details.year`: — → `2027`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.message`: — → `"The budget cycle of 2027 is locked: its submission deadline has passed."`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."BUDGET_CYCLE.LOCKED".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."BUDGET.CYCLE_EXISTS".summary`: `"The budget cycle of that year is already open."` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_EXISTS".value.error.code`: `"BUDGET.CYCLE_EXISTS"` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_EXISTS".value.error.message`: `"The budget cycle of that year is already open."` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_EXISTS".value.error.requestId`: `"req_example"` → —
+- contract `responses.409.content."application/json".examples."BUDGET.CYCLE_EXISTS".value.success`: `false` → —
+- mô tả `responses.409.description`: `"The cycle of that year is already open (BUDGET.CYCLE_EXISTS)."` → `"The cycle is open already (BUDGET_CYCLE.ALREADY_OPEN) or locked, which is ne…`
+- mô tả `responses.413.content."application/json".examples.HTTP_PAYLOAD_TOO_LARGE.summary`: `"The request could not be processed."` → —
+- contract `responses.413.content."application/json".examples.HTTP_PAYLOAD_TOO_LARGE.value.error.code`: `"HTTP_PAYLOAD_TOO_LARGE"` → —
+- contract `responses.413.content."application/json".examples.HTTP_PAYLOAD_TOO_LARGE.value.error.message`: `"The request could not be processed."` → —
+- contract `responses.413.content."application/json".examples.HTTP_PAYLOAD_TOO_LARGE.value.error.requestId`: `"req_example"` → —
+- contract `responses.413.content."application/json".examples.HTTP_PAYLOAD_TOO_LARGE.value.success`: `false` → —
+- contract `responses.413.content."application/json".schema."$ref"`: `"#/components/schemas/ErrorEnvelopeDto"` → —
+- mô tả `responses.413.description`: `"The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_…` → —
+- mô tả `responses.415.content."application/json".examples.HTTP_UNSUPPORTED_MEDIA_TYPE.summary`: `"The request could not be processed."` → —
+- contract `responses.415.content."application/json".examples.HTTP_UNSUPPORTED_MEDIA_TYPE.value.error.code`: `"HTTP_UNSUPPORTED_MEDIA_TYPE"` → —
+- contract `responses.415.content."application/json".examples.HTTP_UNSUPPORTED_MEDIA_TYPE.value.error.message`: `"The request could not be processed."` → —
+- contract `responses.415.content."application/json".examples.HTTP_UNSUPPORTED_MEDIA_TYPE.value.error.requestId`: `"req_example"` → —
+- contract `responses.415.content."application/json".examples.HTTP_UNSUPPORTED_MEDIA_TYPE.value.success`: `false` → —
+- contract `responses.415.content."application/json".schema."$ref"`: `"#/components/schemas/ErrorEnvelopeDto"` → —
+- mô tả `responses.415.description`: `"The JSON body declares a charset other than UTF, or a Content-Encoding other…` → —
+- mô tả `responses.422.content."application/json".examples."BUDGET_CYCLE.DEADLINE_PASSED".summary`: — → `"The submission deadline is before today."`
+- contract `responses.422.content."application/json".examples."BUDGET_CYCLE.DEADLINE_PASSED".value.error.code`: — → `"BUDGET_CYCLE.DEADLINE_PASSED"`
+- contract `responses.422.content."application/json".examples."BUDGET_CYCLE.DEADLINE_PASSED".value.error.message`: — → `"The submission deadline is before today."`
+- contract `responses.422.content."application/json".examples."BUDGET_CYCLE.DEADLINE_PASSED".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."BUDGET_CYCLE.DEADLINE_PASSED".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."BUDGET.CYCLE_DEADLINES_INVALID".summary`: `"The decision deadline cannot be before the submission deadline."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.CYCLE_DEADLINES_INVALID".value.error.code`: `"BUDGET.CYCLE_DEADLINES_INVALID"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.CYCLE_DEADLINES_INVALID".value.error.message`: `"The decision deadline cannot be before the submission deadline."` → —
+- contract `responses.422.content."application/json".examples."BUDGET.CYCLE_DEADLINES_INVALID".value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples."BUDGET.CYCLE_DEADLINES_INVALID".value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples.MONEY_OUT_OF_RANGE.summary`: `"The amount is outside the range a money value may hold."` → —
+- contract `responses.422.content."application/json".examples.MONEY_OUT_OF_RANGE.value.error.code`: `"MONEY_OUT_OF_RANGE"` → —
+- contract `responses.422.content."application/json".examples.MONEY_OUT_OF_RANGE.value.error.message`: `"The amount is outside the range a money value may hold."` → —
+- contract `responses.422.content."application/json".examples.MONEY_OUT_OF_RANGE.value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples.MONEY_OUT_OF_RANGE.value.success`: `false` → —
+- mô tả `responses.422.content."application/json".examples.MONEY_SCALE_EXCEEDED.summary`: `"This currency allows at most 2 decimal digit(s)."` → —
+- contract `responses.422.content."application/json".examples.MONEY_SCALE_EXCEEDED.value.error.code`: `"MONEY_SCALE_EXCEEDED"` → —
+- contract `responses.422.content."application/json".examples.MONEY_SCALE_EXCEEDED.value.error.details.allowedDecimals`: `2` → —
+- contract `responses.422.content."application/json".examples.MONEY_SCALE_EXCEEDED.value.error.message`: `"This currency allows at most 2 decimal digit(s)."` → —
+- contract `responses.422.content."application/json".examples.MONEY_SCALE_EXCEEDED.value.error.requestId`: `"req_example"` → —
+- contract `responses.422.content."application/json".examples.MONEY_SCALE_EXCEEDED.value.success`: `false` → —
+- mô tả `responses.422.description`: `"The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YE…` → `"The year is not a year (VALIDATION_ERROR), it has passed (BUDGET.CYCLE_YEAR_…`
+- qua schema dùng chung `CycleResponseDto` (xem mục Schema dùng chung)
+- qua schema dùng chung `OpenCycleBodyDto` (xem mục Schema dùng chung)
+
+### [budgetCycleBaseline](../reference/budgets.md#budgetcyclebaseline)
+- qua schema dùng chung `BaselineResponseDto` (xem mục Schema dùng chung)
+
+### [budgetCyclePackage](../reference/budgets.md#budgetcyclepackage)
+- mô tả `responses.200.description`: `"The year against its annual ceiling: the annual ceiling, the shared-pool res…` → `"The year against its annual ceiling: the annual ceiling, the shared-pool res…`
+- qua schema dùng chung `PackageResponseDto` (xem mục Schema dùng chung)
+
+### [deviceList](../reference/devices-and-ai-usage.md#devicelist)
+- mô tả `responses.200.description`: `"A page of machines ordered by asset code, each with its holder and the state…` → `"A page of machines ordered by asset code, each with its holder, the state of…`
+- qua schema dùng chung `DevicePageResponseDto` (xem mục Schema dùng chung)
+
+### [deviceCreate](../reference/devices-and-ai-usage.md#devicecreate)
+- qua schema dùng chung `DeviceDetailResponseDto` (xem mục Schema dùng chung)
+
+### [deviceGet](../reference/devices-and-ai-usage.md#deviceget)
+- qua schema dùng chung `DeviceDetailResponseDto` (xem mục Schema dùng chung)
+
+### [deviceHolderChange](../reference/devices-and-ai-usage.md#deviceholderchange)
+- qua schema dùng chung `DeviceDetailResponseDto` (xem mục Schema dùng chung)
+
+### [deviceRetire](../reference/devices-and-ai-usage.md#deviceretire)
+- qua schema dùng chung `DeviceDetailResponseDto` (xem mục Schema dùng chung)
+
+### [reportingCurrencyGet](../reference/settings-and-money.md#reportingcurrencyget)
+- mô tả `responses.200.description`: `"The currency every converted value is kept in."` → `"The reporting currency: the one currency every amount is entered and kept in."`
+- mô tả `responses.403.description`: `"Only the Super Admin reads or sets the reporting currency."` → `"Only the Super Admin reads the reporting currency."`
+
+### [usageImportUpload](../reference/usage-ghost-seats.md#usageimportupload)
+- mô tả `responses.201.description`: `"The report was read and every row judged against the people and the seats as…` → `"The report was read and every row judged against the people and the seats as…`
+- qua schema dùng chung `UsageImportResponseDto` (xem mục Schema dùng chung)
+
+### [usageImportGet](../reference/usage-ghost-seats.md#usageimportget)
+- qua schema dùng chung `UsageImportResponseDto` (xem mục Schema dùng chung)
+
+### [usageImportRowList](../reference/usage-ghost-seats.md#usageimportrowlist)
+- mô tả `responses.200.description`: `"A page of the rows in the order of the file, each with its days, who it was …` → `"A page of the rows in the order of the file, each with its days, how it was …`
+
+### [usageImportConfirm](../reference/usage-ghost-seats.md#usageimportconfirm)
+- qua schema dùng chung `UsageImportConfirmationResponseDto` (xem mục Schema dùng chung)
+
+### [usageImportCancel](../reference/usage-ghost-seats.md#usageimportcancel)
+- qua schema dùng chung `UsageImportResponseDto` (xem mục Schema dùng chung)
+
+### [usageUnmatchedIdentityList](../reference/usage-ghost-seats.md#usageunmatchedidentitylist)
+- contract `declared.parameters`: `["query:applicationId","query:page","query:pageSize","query:status"]` → `["query:applicationId","query:importId","query:page","query:pageSize","query:…`
+- contract `parameters."query:importId".in`: — → `"query"`
+- contract `parameters."query:importId".name`: — → `"importId"`
+- contract `parameters."query:importId".required`: — → `false`
+- contract `parameters."query:importId".schema.format`: — → `"uuid"`
+- contract `parameters."query:importId".schema.type`: — → `"string"`
+- mô tả `responses.200.description`: `"The queue: the open identifiers and the dismissed ones (dismissing keeps the…` → `"The queue: the open identifiers and the dismissed ones (dismissing keeps the…`
+
+### [meGet](../reference/auth-session.md#meget)
+- qua schema dùng chung `MeResponseDto` (xem mục Schema dùng chung)
+
+### [ghostSeatDecisionCreate](../reference/usage-ghost-seats.md#ghostseatdecisioncreate)
+- mô tả `responses.201.description`: `"The choice was saved for every recommendation of the batch: kept or exempted…` → `"The choice was saved for every recommendation of the batch: kept or exempted…`
+- mô tả `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".summary`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.code`: — → `"POLICY.NOT_IN_FORCE"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.message`: — → `"The policy of the step has no version in force."`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.NOT_IN_FORCE".value.success`: — → `false`
+- mô tả `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".summary`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.code`: — → `"POLICY.VERSION_CHANGED"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.policyVersionId`: — → `"v3"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.details.versionNumber`: — → `3`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.message`: — → `"The policy of the step has a new version in force since the checklist was sh…`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.error.requestId`: — → `"req_example"`
+- contract `responses.409.content."application/json".examples."POLICY.VERSION_CHANGED".value.success`: — → `false`
+- mô tả `responses.409.description`: `"A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (…` → `"A recommendation is paused (GHOST_SEAT.PAUSED), not waiting for a decision (…`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".summary`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.code`: — → `"POLICY.CHECKLIST_HAS_NO"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.code`: — → `"1.2-05"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.items.0.text`: — → `"The tools they have do not meet the need"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.message`: — → `"An answer of the checklist is No, so the decision cannot go on."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_HAS_NO".value.success`: — → `false`
+- mô tả `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".summary`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.code`: — → `"POLICY.CHECKLIST_INCOMPLETE"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.missing`: — → `["1.2-05"]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.stepCode`: — → `"1.2"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.details.unexpected`: — → `[]`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.message`: — → `"The checklist of the step is not answered in full."`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.error.requestId`: — → `"req_example"`
+- contract `responses.422.content."application/json".examples."POLICY.CHECKLIST_INCOMPLETE".value.success`: — → `false`
+- mô tả `responses.422.description`: `"The body is invalid (VALIDATION_ERROR) or an exemption has no end day (EXEMP…` → `"The body is invalid (VALIDATION_ERROR), an exemption has no end day (EXEMPTI…`
+- qua schema dùng chung `GhostSeatDecisionBodyDto` (xem mục Schema dùng chung)
+
+### [managerDashboardGet](../reference/dashboards.md#managerdashboardget)
+- qua schema dùng chung `ManagerDashboardResponseDto` (xem mục Schema dùng chung)
+
+### [itAdminDashboardGet](../reference/dashboards.md#itadmindashboardget)
+- qua schema dùng chung `ItAdminDashboardResponseDto` (xem mục Schema dùng chung)
+
+## Schema dùng chung đổi
+
+### `EmployeeResponseDto`
+- contract `properties.data.properties.contractEndDate.nullable`: — → `true`
+- contract `properties.data.properties.contractEndDate.type`: — → `"string"`
+- contract `properties.data.required`: `["department","employeeCode","employmentType","fullName","hireDate","id","job…` → `["contractEndDate","department","employeeCode","employmentType","fullName","h…`
+
+### `CreateEmployeeBodyDto`
+- mô tả `properties.contractEndDate.description`: — → `"A date that must exist, as YYYY-MM-DD: the last day of the contract of a con…`
+- contract `properties.contractEndDate.format`: — → `"date"`
+- contract `properties.contractEndDate.nullable`: — → `true`
+- contract `properties.contractEndDate.type`: — → `"string"`
+
+### `UpdateEmployeeBodyDto`
+- mô tả `properties.contractEndDate.description`: — → `"A date that must exist, as YYYY-MM-DD: the last day of the contract of a con…`
+- contract `properties.contractEndDate.format`: — → `"date"`
+- contract `properties.contractEndDate.nullable`: — → `true`
+- contract `properties.contractEndDate.type`: — → `"string"`
+
+### `MaintainedEmployeeResponseDto`
+- contract `properties.data.properties.contractEndDate.nullable`: — → `true`
+- contract `properties.data.properties.contractEndDate.type`: — → `"string"`
+- contract `properties.data.required`: `["employeeCode","employmentType","fullName","hireDate","id","jobTitle","statu…` → `["contractEndDate","employeeCode","employmentType","fullName","hireDate","id"…`
+
+### `ApplicationPageResponseDto`
+- contract `properties.data.properties.items.items.properties.dataSensitivity.enum`: `["HIGH","LOW","MEDIUM"]` → `["HIGH","LOW","MEDIUM",null]`
+- contract `properties.data.properties.items.items.properties.dataSensitivity.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.functionalGroup.nullable`: `true` → —
+- mô tả `properties.data.properties.items.items.properties.isCommunicationService.description`: — → `"True when the application stands in the group Liên lạc (email, chat, meeting…`
+- mô tả `properties.data.properties.items.items.properties.logoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.items.items.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: `["dataSensitivity","functionalGroup","id","isCommunicationService","kind","na…` → `["dataSensitivity","functionalGroup","id","isCommunicationService","kind","lo…`
+
+### `DeclareApplicationBodyDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.communication.additionalProperties`: `false` → —
+- contract `properties.communication.properties.callsOrMeetings.type`: `"boolean"` → —
+- contract `properties.communication.properties.mailbox.type`: `"boolean"` → —
+- contract `properties.communication.properties.note.maxLength`: `5000` → —
+- contract `properties.communication.properties.note.type`: `"string"` → —
+- contract `properties.communication.properties.personToPersonMessaging.type`: `"boolean"` → —
+- contract `properties.communication.required`: `["callsOrMeetings","mailbox","personToPersonMessaging"]` → —
+- contract `properties.communication.type`: `"object"` → —
+- contract `properties.dataSensitivity.enum`: `["HIGH","LOW","MEDIUM"]` → —
+- contract `properties.dataSensitivity.type`: `"string"` → —
+- contract `properties.dictionaryServiceLineId.format`: `"uuid"` → —
+- contract `properties.dictionaryServiceLineId.type`: `"string"` → —
+- contract `properties.domains.items.maxLength`: `1000` → —
+- contract `properties.domains.items.type`: `"string"` → —
+- contract `properties.domains.maxItems`: `100` → —
+- contract `properties.domains.type`: `"array"` → —
+- contract `properties.functionalGroupId.format`: `"uuid"` → —
+- contract `properties.functionalGroupId.type`: `"string"` → —
+- contract `properties.kind.enum`: `["INTERNAL","LICENSED","SAAS"]` → —
+- contract `properties.kind.type`: `"string"` → —
+- contract `properties.name.maxLength`: `1000` → —
+- contract `properties.name.type`: `"string"` → —
+- contract `properties.vendorName.maxLength`: `1000` → —
+- contract `properties.vendorName.type`: `"string"` → —
+- contract `required`: `["communication","dataSensitivity","kind","name"]` → —
+- contract `type`: `"object"` → —
+
+### `CreatedApplicationResponseDto`
+- contract `properties.data.properties.communication.additionalProperties`: `false` → —
+- contract `properties.data.properties.communication.properties.callsOrMeetings.type`: `"boolean"` → —
+- contract `properties.data.properties.communication.properties.isCommunicationService.type`: `"boolean"` → —
+- contract `properties.data.properties.communication.properties.mailbox.type`: `"boolean"` → —
+- contract `properties.data.properties.communication.properties.note.nullable`: `true` → —
+- contract `properties.data.properties.communication.properties.note.type`: `"string"` → —
+- contract `properties.data.properties.communication.properties.personToPersonMessaging.type`: `"boolean"` → —
+- contract `properties.data.properties.communication.required`: `["callsOrMeetings","isCommunicationService","mailbox","note","personToPersonM…` → —
+- contract `properties.data.properties.communication.type`: `"object"` → —
+- contract `properties.data.properties.dataSensitivity.enum`: `["HIGH","LOW","MEDIUM"]` → `["HIGH","LOW","MEDIUM",null]`
+- contract `properties.data.properties.dataSensitivity.nullable`: — → `true`
+- contract `properties.data.properties.functionalGroup.nullable`: `true` → —
+- mô tả `properties.data.properties.isCommunicationService.description`: — → `"True when the application stands in the group Liên lạc (email, chat, meeting…`
+- mô tả `properties.data.properties.logoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.plan.additionalProperties`: — → `false`
+- contract `properties.data.properties.plan.properties.applicationId.format`: — → `"uuid"`
+- contract `properties.data.properties.plan.properties.applicationId.type`: — → `"string"`
+- mô tả `properties.data.properties.plan.properties.applicationLogoUrl.description`: — → `"The https link to the logo image of the application, or null. It may be brok…`
+- contract `properties.data.properties.plan.properties.applicationLogoUrl.nullable`: — → `true`
+- contract `properties.data.properties.plan.properties.applicationLogoUrl.type`: — → `"string"`
+- contract `properties.data.properties.plan.properties.applicationName.type`: — → `"string"`
+- contract `properties.data.properties.plan.properties.controlLevel.enum`: — → `["FULL","PARTIAL","UNCONTROLLABLE",null]`
+- contract `properties.data.properties.plan.properties.controlLevel.nullable`: — → `true`
+- contract `properties.data.properties.plan.properties.controlLevel.type`: — → `"string"`
+- contract `properties.data.properties.plan.properties.createdAt.format`: — → `"date-time"`
+- contract `properties.data.properties.plan.properties.createdAt.type`: — → `"string"`
+- contract `properties.data.properties.plan.properties.dataLossOnRemoval.type`: — → `"boolean"`
+- contract `properties.data.properties.plan.properties.hasAdminConsole.type`: — → `"boolean"`
+- contract `properties.data.properties.plan.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.plan.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.plan.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.plan.properties.pricingModel.enum`: — → `["CONCURRENT","CONSUMPTION","FLAT_RATE","PER_HOST","PER_SEAT",null]`
+- contract `properties.data.properties.plan.properties.pricingModel.nullable`: — → `true`
+- contract `properties.data.properties.plan.properties.pricingModel.type`: — → `"string"`
+- contract `properties.data.properties.plan.properties.provisioningType.enum`: — → `["K1","K2","K3","K4","K5"]`
+- contract `properties.data.properties.plan.properties.provisioningType.type`: — → `"string"`
+- contract `properties.data.properties.plan.properties.revocationNote.nullable`: — → `true`
+- contract `properties.data.properties.plan.properties.revocationNote.type`: — → `"string"`
+- contract `properties.data.properties.plan.properties.seatTracking.enum`: — → `["APPLICABLE","NOT_APPLICABLE"]`
+- contract `properties.data.properties.plan.properties.seatTracking.type`: — → `"string"`
+- contract `properties.data.properties.plan.properties.sharingPolicy.enum`: — → `["ALLOWED","NOT_ALLOWED",null]`
+- contract `properties.data.properties.plan.properties.sharingPolicy.nullable`: — → `true`
+- contract `properties.data.properties.plan.properties.sharingPolicy.type`: — → `"string"`
+- contract `properties.data.properties.plan.properties.updatedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.plan.properties.updatedAt.type`: — → `"string"`
+- contract `properties.data.properties.plan.required`: — → `["applicationId","applicationLogoUrl","applicationName","controlLevel","creat…`
+- contract `properties.data.properties.plan.type`: — → `"object"`
+- contract `properties.data.required`: `["communication","createdAt","dataSensitivity","dictionaryServiceLineId","dom…` → `["createdAt","dataSensitivity","dictionaryServiceLineId","domains","functiona…`
+
+### `ApplicationDetailResponseDto`
+- contract `properties.data.properties.communication.additionalProperties`: `false` → —
+- contract `properties.data.properties.communication.properties.callsOrMeetings.type`: `"boolean"` → —
+- contract `properties.data.properties.communication.properties.isCommunicationService.type`: `"boolean"` → —
+- contract `properties.data.properties.communication.properties.mailbox.type`: `"boolean"` → —
+- contract `properties.data.properties.communication.properties.note.nullable`: `true` → —
+- contract `properties.data.properties.communication.properties.note.type`: `"string"` → —
+- contract `properties.data.properties.communication.properties.personToPersonMessaging.type`: `"boolean"` → —
+- contract `properties.data.properties.communication.required`: `["callsOrMeetings","isCommunicationService","mailbox","note","personToPersonM…` → —
+- contract `properties.data.properties.communication.type`: `"object"` → —
+- contract `properties.data.properties.dataSensitivity.enum`: `["HIGH","LOW","MEDIUM"]` → `["HIGH","LOW","MEDIUM",null]`
+- contract `properties.data.properties.dataSensitivity.nullable`: — → `true`
+- contract `properties.data.properties.functionalGroup.nullable`: `true` → —
+- mô tả `properties.data.properties.isCommunicationService.description`: — → `"True when the application stands in the group Liên lạc (email, chat, meeting…`
+- mô tả `properties.data.properties.logoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.required`: `["communication","createdAt","dataSensitivity","dictionaryServiceLineId","dom…` → `["createdAt","dataSensitivity","dictionaryServiceLineId","domains","functiona…`
+
+### `UpdateApplicationBodyDto`
+- contract `properties.communication.additionalProperties`: `false` → —
+- contract `properties.communication.properties.callsOrMeetings.type`: `"boolean"` → —
+- contract `properties.communication.properties.mailbox.type`: `"boolean"` → —
+- contract `properties.communication.properties.note.maxLength`: `5000` → —
+- contract `properties.communication.properties.note.nullable`: `true` → —
+- contract `properties.communication.properties.note.type`: `"string"` → —
+- contract `properties.communication.properties.personToPersonMessaging.type`: `"boolean"` → —
+- contract `properties.communication.type`: `"object"` → —
+- contract `properties.dataSensitivity.enum`: `["HIGH","LOW","MEDIUM"]` → `["HIGH","LOW","MEDIUM",null]`
+- contract `properties.dataSensitivity.nullable`: — → `true`
+- contract `properties.functionalGroupId.nullable`: `true` → —
+- mô tả `properties.logoUrl.description`: — → `"A link to the logo image, https only; left out it stays, null removes it."`
+- contract `properties.logoUrl.maxLength`: — → `500`
+- contract `properties.logoUrl.nullable`: — → `true`
+- contract `properties.logoUrl.pattern`: — → `"^https:\\/\\/\\S+$"`
+- contract `properties.logoUrl.type`: — → `"string"`
+
+### `ApplicationResponseDto`
+- contract `properties.data.properties.communication.additionalProperties`: `false` → —
+- contract `properties.data.properties.communication.properties.callsOrMeetings.type`: `"boolean"` → —
+- contract `properties.data.properties.communication.properties.isCommunicationService.type`: `"boolean"` → —
+- contract `properties.data.properties.communication.properties.mailbox.type`: `"boolean"` → —
+- contract `properties.data.properties.communication.properties.note.nullable`: `true` → —
+- contract `properties.data.properties.communication.properties.note.type`: `"string"` → —
+- contract `properties.data.properties.communication.properties.personToPersonMessaging.type`: `"boolean"` → —
+- contract `properties.data.properties.communication.required`: `["callsOrMeetings","isCommunicationService","mailbox","note","personToPersonM…` → —
+- contract `properties.data.properties.communication.type`: `"object"` → —
+- contract `properties.data.properties.dataSensitivity.enum`: `["HIGH","LOW","MEDIUM"]` → `["HIGH","LOW","MEDIUM",null]`
+- contract `properties.data.properties.dataSensitivity.nullable`: — → `true`
+- contract `properties.data.properties.functionalGroup.nullable`: `true` → —
+- mô tả `properties.data.properties.isCommunicationService.description`: — → `"True when the application stands in the group Liên lạc (email, chat, meeting…`
+- mô tả `properties.data.properties.logoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.required`: `["communication","createdAt","dataSensitivity","dictionaryServiceLineId","dom…` → `["createdAt","dataSensitivity","dictionaryServiceLineId","domains","functiona…`
+
+### `FunctionalGroupPageResponseDto`
+- mô tả `properties.data.properties.items.items.properties.systemKey.description`: — → `"COMMUNICATION (Liên lạc) or OTHER (Khác) for the two fixed groups, which are…`
+- contract `properties.data.properties.items.items.properties.systemKey.enum`: — → `["COMMUNICATION","OTHER",null]`
+- contract `properties.data.properties.items.items.properties.systemKey.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.systemKey.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: `["createdAt","id","name","status","updatedAt"]` → `["createdAt","id","name","status","systemKey","updatedAt"]`
+
+### `FunctionalGroupResponseDto`
+- mô tả `properties.data.properties.systemKey.description`: — → `"COMMUNICATION (Liên lạc) or OTHER (Khác) for the two fixed groups, which are…`
+- contract `properties.data.properties.systemKey.enum`: — → `["COMMUNICATION","OTHER",null]`
+- contract `properties.data.properties.systemKey.nullable`: — → `true`
+- contract `properties.data.properties.systemKey.type`: — → `"string"`
+- contract `properties.data.required`: `["createdAt","id","name","status","updatedAt"]` → `["createdAt","id","name","status","systemKey","updatedAt"]`
+
+### `PlanPageResponseDto`
+- mô tả `properties.data.properties.items.items.properties.applicationLogoUrl.description`: — → `"The https link to the logo image of the application, or null. It may be brok…`
+- contract `properties.data.properties.items.items.properties.applicationLogoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.applicationLogoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: `["applicationId","applicationName","controlLevel","createdAt","dataLossOnRemo…` → `["applicationId","applicationLogoUrl","applicationName","controlLevel","creat…`
+
+### `PlanResponseDto`
+- mô tả `properties.data.properties.applicationLogoUrl.description`: — → `"The https link to the logo image of the application, or null. It may be brok…`
+- contract `properties.data.properties.applicationLogoUrl.nullable`: — → `true`
+- contract `properties.data.properties.applicationLogoUrl.type`: — → `"string"`
+- contract `properties.data.required`: `["applicationId","applicationName","controlLevel","createdAt","dataLossOnRemo…` → `["applicationId","applicationLogoUrl","applicationName","controlLevel","creat…`
+
+### `PlanDetailResponseDto`
+- mô tả `properties.data.properties.applicationLogoUrl.description`: — → `"The https link to the logo image of the application, or null. It may be brok…`
+- contract `properties.data.properties.applicationLogoUrl.nullable`: — → `true`
+- contract `properties.data.properties.applicationLogoUrl.type`: — → `"string"`
+- contract `properties.data.required`: `["applicationId","applicationName","controlLevel","createdAt","dataLossOnRemo…` → `["applicationId","applicationLogoUrl","applicationName","controlLevel","creat…`
+
+### `SubscriptionPageResponseDto`
+- mô tả `properties.data.properties.items.items.properties.daysLeft.description`: — → `"The days from today to the deadline the point counts to; negative once it is…`
+- contract `properties.data.properties.items.items.properties.daysLeft.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.daysLeft.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.daysLeft.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.daysLeft.type`: — → `"integer"`
+- mô tả `properties.data.properties.items.items.properties.deadlineKind.description`: — → `"What daysLeft counts to: the next payment day of a plan by the month; by the…`
+- contract `properties.data.properties.items.items.properties.deadlineKind.enum`: — → `["END_DATE","NOTICE_DEADLINE","PAYMENT_DATE","RENEWAL_DATE",null]`
+- contract `properties.data.properties.items.items.properties.deadlineKind.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.deadlineKind.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.expiry.description`: — → `"SOON from the point of adjustment to the last day of the period (a plan by t…`
+- contract `properties.data.properties.items.items.properties.expiry.enum`: — → `["EXPIRED","SOON",null]`
+- contract `properties.data.properties.items.items.properties.expiry.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.expiry.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.logoUrl.description`: — → `"The https link to the logo image of the application that the IT Admin pasted…`
+- contract `properties.data.properties.items.items.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.missing.items.enum`: `["BILLING_CYCLE","EXCHANGE_RATE","QUANTITY","START_DATE","UNIT_PRICE"]` → `["BILLING_CYCLE","QUANTITY","START_DATE","UNIT_PRICE"]`
+- contract `properties.data.properties.items.items.properties.originalPrice.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.originalPrice.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.originalPrice.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.originalPrice.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.originalPrice.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.originalPrice.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.priceSnapshot.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.properties.exchangeRateId.format`: `"uuid"` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.properties.exchangeRateId.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.properties.exchangeRateId.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.properties.rate.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.properties.rateDate.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.properties.rateSource.enum`: `["MANUAL","SAME_CURRENCY"]` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.properties.rateSource.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.properties.recordedOn.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.properties.reportingAmount.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.properties.reportingCurrency.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.required`: `["exchangeRateId","rate","rateDate","rateSource","recordedOn","reportingAmoun…` → —
+- contract `properties.data.properties.items.items.properties.priceSnapshot.type`: `"object"` → —
+- contract `properties.data.properties.items.items.properties.responsibleItAdmin.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.responsibleItAdmin.description`: — → `"The IT Admin who answers for the subscription, by name; null when none is na…`
+- contract `properties.data.properties.items.items.properties.responsibleItAdmin.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.responsibleItAdmin.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.responsibleItAdmin.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.responsibleItAdmin.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.responsibleItAdmin.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.responsibleItAdmin.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.items.items.properties.responsibleItAdmin.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.seats.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.seats.description`: — → `"The seats of the shared pool of a K2 plan: bought, taken by an assignment fr…`
+- contract `properties.data.properties.items.items.properties.seats.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.seats.properties.assigned.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.seats.properties.assigned.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.seats.properties.assigned.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.seats.properties.free.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.seats.properties.free.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.seats.properties.free.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.seats.properties.free.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.seats.properties.inRevocation.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.seats.properties.inRevocation.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.seats.properties.inRevocation.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.seats.properties.purchased.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.seats.properties.purchased.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.seats.properties.purchased.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.seats.properties.purchased.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.seats.required`: — → `["assigned","free","inRevocation","purchased"]`
+- contract `properties.data.properties.items.items.properties.seats.type`: — → `"object"`
+- contract `properties.data.properties.items.items.required`: `["adminNote","alerts","allowsMidTermReduction","applicationId","applicationNa…` → `["adminNote","alerts","allowsMidTermReduction","applicationId","applicationNa…`
+
+### `DeclareSubscriptionBodyDto`
+- contract `properties.originalPrice.additionalProperties`: — → `false`
+- mô tả `properties.originalPrice.description`: — → `"The price the vendor quoted in another currency, kept beside the price in do…`
+- contract `properties.originalPrice.properties.amount.maxLength`: — → `40`
+- contract `properties.originalPrice.properties.amount.type`: — → `"string"`
+- contract `properties.originalPrice.properties.currency.pattern`: — → `"^[A-Z]{3}$"`
+- contract `properties.originalPrice.properties.currency.type`: — → `"string"`
+- contract `properties.originalPrice.required`: — → `["amount","currency"]`
+- contract `properties.originalPrice.type`: — → `"object"`
+- mô tả `properties.unitPrice.description`: — → `"The unit price in dong: a decimal string in major units, currency VND. Anoth…`
+
+### `SubscriptionResponseDto`
+- mô tả `properties.data.properties.daysLeft.description`: — → `"The days from today to the deadline the point counts to; negative once it is…`
+- contract `properties.data.properties.daysLeft.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.daysLeft.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.daysLeft.nullable`: — → `true`
+- contract `properties.data.properties.daysLeft.type`: — → `"integer"`
+- mô tả `properties.data.properties.deadlineKind.description`: — → `"What daysLeft counts to: the next payment day of a plan by the month; by the…`
+- contract `properties.data.properties.deadlineKind.enum`: — → `["END_DATE","NOTICE_DEADLINE","PAYMENT_DATE","RENEWAL_DATE",null]`
+- contract `properties.data.properties.deadlineKind.nullable`: — → `true`
+- contract `properties.data.properties.deadlineKind.type`: — → `"string"`
+- mô tả `properties.data.properties.expiry.description`: — → `"SOON from the point of adjustment to the last day of the period (a plan by t…`
+- contract `properties.data.properties.expiry.enum`: — → `["EXPIRED","SOON",null]`
+- contract `properties.data.properties.expiry.nullable`: — → `true`
+- contract `properties.data.properties.expiry.type`: — → `"string"`
+- mô tả `properties.data.properties.logoUrl.description`: — → `"The https link to the logo image of the application that the IT Admin pasted…`
+- contract `properties.data.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.missing.items.enum`: `["BILLING_CYCLE","EXCHANGE_RATE","QUANTITY","START_DATE","UNIT_PRICE"]` → `["BILLING_CYCLE","QUANTITY","START_DATE","UNIT_PRICE"]`
+- contract `properties.data.properties.originalPrice.additionalProperties`: — → `false`
+- contract `properties.data.properties.originalPrice.nullable`: — → `true`
+- contract `properties.data.properties.originalPrice.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.originalPrice.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.originalPrice.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.originalPrice.type`: — → `"object"`
+- contract `properties.data.properties.priceSnapshot.additionalProperties`: `false` → —
+- contract `properties.data.properties.priceSnapshot.nullable`: `true` → —
+- contract `properties.data.properties.priceSnapshot.properties.exchangeRateId.format`: `"uuid"` → —
+- contract `properties.data.properties.priceSnapshot.properties.exchangeRateId.nullable`: `true` → —
+- contract `properties.data.properties.priceSnapshot.properties.exchangeRateId.type`: `"string"` → —
+- contract `properties.data.properties.priceSnapshot.properties.rate.type`: `"string"` → —
+- contract `properties.data.properties.priceSnapshot.properties.rateDate.type`: `"string"` → —
+- contract `properties.data.properties.priceSnapshot.properties.rateSource.enum`: `["MANUAL","SAME_CURRENCY"]` → —
+- contract `properties.data.properties.priceSnapshot.properties.rateSource.type`: `"string"` → —
+- contract `properties.data.properties.priceSnapshot.properties.recordedOn.type`: `"string"` → —
+- contract `properties.data.properties.priceSnapshot.properties.reportingAmount.type`: `"string"` → —
+- contract `properties.data.properties.priceSnapshot.properties.reportingCurrency.type`: `"string"` → —
+- contract `properties.data.properties.priceSnapshot.required`: `["exchangeRateId","rate","rateDate","rateSource","recordedOn","reportingAmoun…` → —
+- contract `properties.data.properties.priceSnapshot.type`: `"object"` → —
+- contract `properties.data.properties.responsibleItAdmin.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.responsibleItAdmin.description`: — → `"The IT Admin who answers for the subscription, by name; null when none is na…`
+- contract `properties.data.properties.responsibleItAdmin.nullable`: — → `true`
+- contract `properties.data.properties.responsibleItAdmin.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.responsibleItAdmin.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.responsibleItAdmin.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.responsibleItAdmin.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.responsibleItAdmin.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.responsibleItAdmin.type`: — → `"object"`
+- contract `properties.data.properties.seats.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.seats.description`: — → `"The seats of the shared pool of a K2 plan: bought, taken by an assignment fr…`
+- contract `properties.data.properties.seats.nullable`: — → `true`
+- contract `properties.data.properties.seats.properties.assigned.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.seats.properties.assigned.minimum`: — → `0`
+- contract `properties.data.properties.seats.properties.assigned.type`: — → `"integer"`
+- contract `properties.data.properties.seats.properties.free.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.seats.properties.free.minimum`: — → `0`
+- contract `properties.data.properties.seats.properties.free.nullable`: — → `true`
+- contract `properties.data.properties.seats.properties.free.type`: — → `"integer"`
+- contract `properties.data.properties.seats.properties.inRevocation.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.seats.properties.inRevocation.minimum`: — → `0`
+- contract `properties.data.properties.seats.properties.inRevocation.type`: — → `"integer"`
+- contract `properties.data.properties.seats.properties.purchased.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.seats.properties.purchased.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.seats.properties.purchased.nullable`: — → `true`
+- contract `properties.data.properties.seats.properties.purchased.type`: — → `"integer"`
+- contract `properties.data.properties.seats.required`: — → `["assigned","free","inRevocation","purchased"]`
+- contract `properties.data.properties.seats.type`: — → `"object"`
+- contract `properties.data.required`: `["adminNote","alerts","allowsMidTermReduction","applicationId","applicationNa…` → `["adminNote","alerts","allowsMidTermReduction","applicationId","applicationNa…`
+
+### `UpdateSubscriptionBodyDto`
+- contract `properties.originalPrice.additionalProperties`: — → `false`
+- mô tả `properties.originalPrice.description`: — → `"The original price the vendor quoted; null takes the recorded one away."`
+- contract `properties.originalPrice.nullable`: — → `true`
+- contract `properties.originalPrice.properties.amount.maxLength`: — → `40`
+- contract `properties.originalPrice.properties.amount.type`: — → `"string"`
+- contract `properties.originalPrice.properties.currency.pattern`: — → `"^[A-Z]{3}$"`
+- contract `properties.originalPrice.properties.currency.type`: — → `"string"`
+- contract `properties.originalPrice.required`: — → `["amount","currency"]`
+- contract `properties.originalPrice.type`: — → `"object"`
+- mô tả `properties.unitPrice.description`: — → `"The unit price in dong: a decimal string in major units, currency VND. Anoth…`
+
+### `CreateContractBodyDto`
+- mô tả `properties.effectiveFrom.description`: — → `"The day the contract begins. Needed to make one. A calendar date as YYYY-MM-…`
+- contract `properties.effectiveFrom.format`: — → `"date"`
+- contract `properties.effectiveFrom.type`: — → `"string"`
+- mô tả `properties.effectiveTo.description`: — → `"The day the contract ends; empty when it never ends (a purchase for good). A…`
+- contract `properties.effectiveTo.format`: — → `"date"`
+- contract `properties.effectiveTo.nullable`: — → `true`
+- contract `properties.effectiveTo.type`: — → `"string"`
+- contract `properties.note.maxLength`: — → `2000`
+- contract `properties.note.nullable`: — → `true`
+- contract `properties.note.type`: — → `"string"`
+- mô tả `properties.number.description`: — → `"The number of the contract, if it has one: unique in the company, compared i…`
+- contract `properties.number.maxLength`: — → `100`
+- contract `properties.number.nullable`: — → `true`
+- contract `properties.number.type`: — → `"string"`
+- mô tả `properties.vendorId.description`: — → `"The vendor of the contract, from the catalog. Needed to make one."`
+- contract `properties.vendorId.format`: — → `"uuid"`
+- contract `properties.vendorId.type`: — → `"string"`
+
+### `ContractResponseDto`
+- mô tả `properties.data.properties.contract.properties.applicationIds.description`: — → `"The applications of the linked subscriptions, each once. Read their usage so…`
+- contract `properties.data.properties.contract.properties.applicationIds.items.format`: — → `"uuid"`
+- contract `properties.data.properties.contract.properties.applicationIds.items.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.applicationIds.maxItems`: — → `100`
+- contract `properties.data.properties.contract.properties.applicationIds.type`: — → `"array"`
+- mô tả `properties.data.properties.contract.properties.documents.description`: — → `"The files attached to the contract that are ready, the last attached first. …`
+- contract `properties.data.properties.contract.properties.documents.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.contract.properties.documents.items.properties.attachedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.contract.properties.documents.items.properties.attachedAt.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.documents.items.properties.contentType.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.documents.items.properties.fileName.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.documents.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.contract.properties.documents.items.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.documents.items.properties.purpose.enum`: — → `["CONTRACT_ATTACHMENT","COST_STATEMENT","IMPORT_SOURCE","PURCHASE_DOCUMENT","…`
+- contract `properties.data.properties.contract.properties.documents.items.properties.purpose.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.documents.items.properties.sizeBytes.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.contract.properties.documents.items.properties.sizeBytes.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.contract.properties.documents.items.properties.sizeBytes.minimum`: — → `0`
+- contract `properties.data.properties.contract.properties.documents.items.properties.sizeBytes.type`: — → `"integer"`
+- contract `properties.data.properties.contract.properties.documents.items.required`: — → `["attachedAt","contentType","fileName","id","purpose","sizeBytes"]`
+- contract `properties.data.properties.contract.properties.documents.items.type`: — → `"object"`
+- contract `properties.data.properties.contract.properties.documents.maxItems`: — → `100`
+- contract `properties.data.properties.contract.properties.documents.type`: — → `"array"`
+- mô tả `properties.data.properties.contract.properties.effectiveFrom.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.contract.properties.effectiveFrom.format`: — → `"date"`
+- contract `properties.data.properties.contract.properties.effectiveFrom.nullable`: — → `true`
+- contract `properties.data.properties.contract.properties.effectiveFrom.type`: — → `"string"`
+- mô tả `properties.data.properties.contract.properties.effectiveTo.description`: — → `"Null: the contract never ends."`
+- contract `properties.data.properties.contract.properties.effectiveTo.format`: — → `"date"`
+- contract `properties.data.properties.contract.properties.effectiveTo.nullable`: — → `true`
+- contract `properties.data.properties.contract.properties.effectiveTo.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.note.nullable`: — → `true`
+- contract `properties.data.properties.contract.properties.note.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.number.nullable`: — → `true`
+- contract `properties.data.properties.contract.properties.number.type`: — → `"string"`
+- mô tả `properties.data.properties.contract.properties.status.description`: — → `"Read from the vendor and the days as of today: INCOMPLETE (no vendor or no b…`
+- contract `properties.data.properties.contract.properties.status.enum`: — → `["ACTIVE","EXPIRED","INCOMPLETE","NOT_YET_EFFECTIVE"]`
+- contract `properties.data.properties.contract.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.subscriptionCount.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.contract.properties.subscriptionCount.minimum`: — → `0`
+- contract `properties.data.properties.contract.properties.subscriptionCount.type`: — → `"integer"`
+- mô tả `properties.data.properties.contract.properties.subscriptions.description`: — → `"The subscriptions linked to the contract, the last linked first. Only subscr…`
+- contract `properties.data.properties.contract.properties.subscriptions.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.applicationId.format`: — → `"uuid"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.applicationId.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.applicationName.type`: — → `"string"`
+- mô tả `properties.data.properties.contract.properties.subscriptions.items.properties.endDate.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.endDate.format`: — → `"date"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.endDate.nullable`: — → `true`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.endDate.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.kind.enum`: — → `["PERPETUAL","TERM"]`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.kind.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.linkedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.linkedAt.type`: — → `"string"`
+- mô tả `properties.data.properties.contract.properties.subscriptions.items.properties.logoUrl.description`: — → `"The https link to the logo image of the application that the IT Admin pasted…`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.planId.format`: — → `"uuid"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.planId.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.planName.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.provisioningType.enum`: — → `["K1","K2","K3","K4","K5"]`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.provisioningType.type`: — → `"string"`
+- mô tả `properties.data.properties.contract.properties.subscriptions.items.properties.startDate.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.startDate.format`: — → `"date"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.startDate.nullable`: — → `true`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.startDate.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.status.enum`: — → `["ACTIVE","DRAFT"]`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.subscriptionId.format`: — → `"uuid"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.properties.subscriptionId.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.subscriptions.items.required`: — → `["applicationId","applicationName","endDate","kind","linkedAt","logoUrl","pla…`
+- contract `properties.data.properties.contract.properties.subscriptions.items.type`: — → `"object"`
+- contract `properties.data.properties.contract.properties.subscriptions.maxItems`: — → `100`
+- contract `properties.data.properties.contract.properties.subscriptions.type`: — → `"array"`
+- contract `properties.data.properties.contract.properties.truncated.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.contract.properties.truncated.description`: — → `"True for an array above that holds only the first of more than it lists."`
+- contract `properties.data.properties.contract.properties.truncated.properties.applicationIds.type`: — → `"boolean"`
+- contract `properties.data.properties.contract.properties.truncated.properties.documents.type`: — → `"boolean"`
+- contract `properties.data.properties.contract.properties.truncated.properties.subscriptions.type`: — → `"boolean"`
+- contract `properties.data.properties.contract.properties.truncated.required`: — → `["applicationIds","documents","subscriptions"]`
+- contract `properties.data.properties.contract.properties.truncated.type`: — → `"object"`
+- contract `properties.data.properties.contract.properties.updatedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.contract.properties.updatedAt.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.vendor.additionalProperties`: — → `false`
+- contract `properties.data.properties.contract.properties.vendor.nullable`: — → `true`
+- contract `properties.data.properties.contract.properties.vendor.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.contract.properties.vendor.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.vendor.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.contract.properties.vendor.required`: — → `["id","name"]`
+- contract `properties.data.properties.contract.properties.vendor.type`: — → `"object"`
+- contract `properties.data.properties.contract.required`: `["createdAt","createdBy","id","name"]` → `["applicationIds","createdAt","createdBy","documents","effectiveFrom","effect…`
+
+### `CreateDocumentBodyDto`
+- contract `properties.purpose.enum`: `["CONTRACT_ATTACHMENT","COST_STATEMENT","IMPORT_SOURCE","PURCHASE_DOCUMENT","…` → `["CONTRACT_ATTACHMENT","IMPORT_SOURCE","PURCHASE_DOCUMENT","SIGNATURE_RECORD"…`
+
+### `RequestableApplicationPageResponseDto`
+- contract `properties.data.properties.items.items.properties.functionalGroup.nullable`: `true` → —
+- mô tả `properties.data.properties.items.items.properties.logoUrl.description`: — → `"The https link to the logo image, or null. It may be broken: show the first …`
+- contract `properties.data.properties.items.items.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: `["canSubmit","costsMoney","functionalGroup","id","kind","name","planCount","s…` → `["canSubmit","costsMoney","functionalGroup","id","kind","logoUrl","name","pla…`
+
+### `RequestableApplicationResponseDto`
+- contract `properties.data.properties.dataSensitivity.enum`: `["HIGH","LOW","MEDIUM"]` → `["HIGH","LOW","MEDIUM",null]`
+- contract `properties.data.properties.dataSensitivity.nullable`: — → `true`
+- contract `properties.data.properties.functionalGroup.nullable`: `true` → —
+- mô tả `properties.data.properties.logoUrl.description`: — → `"The https link to the logo image, or null. It may be broken: show the first …`
+- contract `properties.data.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.required`: `["canSubmit","costsMoney","dataSensitivity","functionalGroup","id","kind","na…` → `["canSubmit","costsMoney","dataSensitivity","functionalGroup","id","kind","lo…`
+
+### `RequestablePlanPageResponseDto`
+- mô tả `properties.data.properties.items.items.properties.application.properties.logoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.items.items.properties.application.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.application.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.required`: `["id","kind","name"]` → `["id","kind","logoUrl","name"]`
+
+### `RequestablePlanResponseDto`
+- mô tả `properties.data.properties.application.properties.logoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.application.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.application.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.application.required`: `["id","kind","name"]` → `["id","kind","logoUrl","name"]`
+
+### `AssignmentPageResponseDto`
+- mô tả `properties.data.properties.items.items.properties.plan.properties.logoUrl.description`: — → `"The https link to the logo image of the application that the IT Admin pasted…`
+- contract `properties.data.properties.items.items.properties.plan.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.plan.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.plan.required`: `["applicationName","planId","planName"]` → `["applicationName","logoUrl","planId","planName"]`
+- contract `properties.data.properties.items.items.properties.revocation.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.revocation.description`: — → `"The revocation task that is open for this seat (the task of the provisioning…`
+- contract `properties.data.properties.items.items.properties.revocation.nullable`: — → `true`
+- mô tả `properties.data.properties.items.items.properties.revocation.properties.claimableNow.description`: — → `"False while a reason asks for a day not before that has not come: the task c…`
+- contract `properties.data.properties.items.items.properties.revocation.properties.claimableNow.type`: — → `"boolean"`
+- contract `properties.data.properties.items.items.properties.revocation.properties.status.enum`: — → `["CANCELLED","CLOSED_FAILED","COMPLETED","FAILED","IN_PROGRESS","QUEUED","RET…`
+- contract `properties.data.properties.items.items.properties.revocation.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.revocation.properties.taskId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.revocation.properties.taskId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.revocation.required`: — → `["claimableNow","status","taskId"]`
+- contract `properties.data.properties.items.items.properties.revocation.type`: — → `"object"`
+- contract `properties.data.properties.items.items.required`: `["accountIdentifier","cancelledAt","costCenter","costCenterId","createdAt","e…` → `["accountIdentifier","cancelledAt","costCenter","costCenterId","createdAt","e…`
+
+### `DepartmentSoftwareListResponseDto`
+- mô tả `properties.data.properties.items.items.properties.applicationLogoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.items.items.properties.applicationLogoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.applicationLogoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: `["addedAt","applicationId","applicationName","entryId","note","planId","planN…` → `["addedAt","applicationId","applicationLogoUrl","applicationName","entryId","…`
+
+### `DepartmentSoftwareChangesResponseDto`
+- mô tả `properties.data.properties.added.items.properties.applicationLogoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.added.items.properties.applicationLogoUrl.nullable`: — → `true`
+- contract `properties.data.properties.added.items.properties.applicationLogoUrl.type`: — → `"string"`
+- contract `properties.data.properties.added.items.required`: `["addedAt","applicationId","applicationName","entryId","note","planId","planN…` → `["addedAt","applicationId","applicationLogoUrl","applicationName","entryId","…`
+
+### `MyDepartmentSoftwareListResponseDto`
+- mô tả `properties.data.properties.items.items.properties.applicationLogoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.items.items.properties.applicationLogoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.applicationLogoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: `["addedAt","applicationId","applicationName","entryId","note","planId","planN…` → `["addedAt","applicationId","applicationLogoUrl","applicationName","entryId","…`
+
+### `DepartmentSoftwareProposalResponseDto`
+- mô tả `properties.data.properties.proposal.properties.applicationLogoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.proposal.properties.applicationLogoUrl.nullable`: — → `true`
+- contract `properties.data.properties.proposal.properties.applicationLogoUrl.type`: — → `"string"`
+- contract `properties.data.properties.proposal.required`: `["applicationId","applicationName","decidedAt","decisionReason","department",…` → `["applicationId","applicationLogoUrl","applicationName","decidedAt","decision…`
+
+### `DepartmentSoftwareProposalListResponseDto`
+- mô tả `properties.data.properties.items.items.properties.applicationLogoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.items.items.properties.applicationLogoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.applicationLogoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: `["applicationId","applicationName","decidedAt","decisionReason","department",…` → `["applicationId","applicationLogoUrl","applicationName","decidedAt","decision…`
+
+### `DepartmentSoftwareAcceptanceResponseDto`
+- mô tả `properties.data.properties.proposal.properties.applicationLogoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.proposal.properties.applicationLogoUrl.nullable`: — → `true`
+- contract `properties.data.properties.proposal.properties.applicationLogoUrl.type`: — → `"string"`
+- contract `properties.data.properties.proposal.required`: `["applicationId","applicationName","decidedAt","decisionReason","department",…` → `["applicationId","applicationLogoUrl","applicationName","decidedAt","decision…`
+
+### `GrantResponseDto`
+- mô tả `properties.data.properties.task.properties.k1Checklist.description`: `"Present on a K1 revocation that can still be completed (the steps to tick) a…` → `"Present on a K1 task that can still be completed (the steps to tick) and on …`
+- contract `properties.data.properties.task.properties.k1Checklist.properties.items.items.properties.code.enum`: `["EVIDENCE_RECORDED","MAILBOX_LOCKED","MAILBOX_PASSWORD_RESET","RENEWAL_DISAB…` → `["COMPANY_EMAIL_REGISTERED","EVIDENCE_RECORDED","MAILBOX_LOCKED","MAILBOX_PAS…`
+- contract `properties.data.properties.task.properties.k1Checklist.properties.variant.enum`: `["DEPARTURE","STILL_EMPLOYED"]` → `["DEPARTURE","GRANT","STILL_EMPLOYED"]`
+- mô tả `properties.data.properties.task.properties.termCutAt.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.task.properties.termCutAt.format`: — → `"date"`
+- contract `properties.data.properties.task.properties.termCutAt.nullable`: — → `true`
+- contract `properties.data.properties.task.properties.termCutAt.type`: — → `"string"`
+- contract `properties.data.properties.task.required`: `["accountIdentifier","assignmentId","attempts","availableDecisions","benefici…` → `["accountIdentifier","assignmentId","attempts","availableDecisions","benefici…`
+
+### `TaskPageResponseDto`
+- mô tả `properties.data.properties.items.items.properties.termCutAt.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.items.items.properties.termCutAt.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.termCutAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.termCutAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: `["accountIdentifier","assignmentId","attempts","availableDecisions","benefici…` → `["accountIdentifier","assignmentId","attempts","availableDecisions","benefici…`
+
+### `TaskResponseDto`
+- mô tả `properties.data.properties.task.properties.k1Checklist.description`: `"Present on a K1 revocation that can still be completed (the steps to tick) a…` → `"Present on a K1 task that can still be completed (the steps to tick) and on …`
+- contract `properties.data.properties.task.properties.k1Checklist.properties.items.items.properties.code.enum`: `["EVIDENCE_RECORDED","MAILBOX_LOCKED","MAILBOX_PASSWORD_RESET","RENEWAL_DISAB…` → `["COMPANY_EMAIL_REGISTERED","EVIDENCE_RECORDED","MAILBOX_LOCKED","MAILBOX_PAS…`
+- contract `properties.data.properties.task.properties.k1Checklist.properties.variant.enum`: `["DEPARTURE","STILL_EMPLOYED"]` → `["DEPARTURE","GRANT","STILL_EMPLOYED"]`
+- mô tả `properties.data.properties.task.properties.termCutAt.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.task.properties.termCutAt.format`: — → `"date"`
+- contract `properties.data.properties.task.properties.termCutAt.nullable`: — → `true`
+- contract `properties.data.properties.task.properties.termCutAt.type`: — → `"string"`
+- contract `properties.data.properties.task.required`: `["accountIdentifier","assignmentId","attempts","availableDecisions","benefici…` → `["accountIdentifier","assignmentId","attempts","availableDecisions","benefici…`
+
+### `CompleteBodyDto`
+- contract `properties.k1Checklist.additionalProperties`: — → `false`
+- contract `properties.k1Checklist.properties.evidence.maxLength`: — → `2000`
+- contract `properties.k1Checklist.properties.evidence.type`: — → `"string"`
+- contract `properties.k1Checklist.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.k1Checklist.properties.items.items.properties.code.enum`: — → `["COMPANY_EMAIL_REGISTERED","EVIDENCE_RECORDED","MAILBOX_LOCKED","MAILBOX_PAS…`
+- contract `properties.k1Checklist.properties.items.items.properties.code.type`: — → `"string"`
+- contract `properties.k1Checklist.properties.items.items.properties.done.type`: — → `"boolean"`
+- contract `properties.k1Checklist.properties.items.items.properties.doneAt.format`: — → `"date-time"`
+- contract `properties.k1Checklist.properties.items.items.properties.doneAt.type`: — → `"string"`
+- contract `properties.k1Checklist.properties.items.items.required`: — → `["code","done"]`
+- contract `properties.k1Checklist.properties.items.items.type`: — → `"object"`
+- contract `properties.k1Checklist.properties.items.maxItems`: — → `10`
+- contract `properties.k1Checklist.properties.items.type`: — → `"array"`
+- contract `properties.k1Checklist.required`: — → `["items"]`
+- contract `properties.k1Checklist.type`: — → `"object"`
+
+### `RevocationCompletionBodyDto`
+- contract `properties.k1Checklist.properties.items.items.properties.code.enum`: `["EVIDENCE_RECORDED","MAILBOX_LOCKED","MAILBOX_PASSWORD_RESET","RENEWAL_DISAB…` → `["COMPANY_EMAIL_REGISTERED","EVIDENCE_RECORDED","MAILBOX_LOCKED","MAILBOX_PAS…`
+
+### `SaasIssueOptionsResponseDto`
+- mô tả `properties.data.properties.items.items.properties.plan.properties.logoUrl.description`: — → `"The https link to the logo image of the application that the IT Admin pasted…`
+- contract `properties.data.properties.items.items.properties.plan.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.plan.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.plan.required`: `["applicationName","planId","planName"]` → `["applicationName","logoUrl","planId","planName"]`
+
+### `SaasIssueResponseDto`
+- contract `properties.data.properties.department.additionalProperties`: — → `false`
+- contract `properties.data.properties.department.nullable`: — → `true`
+- contract `properties.data.properties.department.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.department.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.department.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.department.required`: — → `["id","name"]`
+- contract `properties.data.properties.department.type`: — → `"object"`
+- mô tả `properties.data.properties.plan.properties.logoUrl.description`: — → `"The https link to the logo image of the application that the IT Admin pasted…`
+- contract `properties.data.properties.plan.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.plan.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.plan.required`: `["applicationName","planId","planName"]` → `["applicationName","logoUrl","planId","planName"]`
+- contract `properties.data.properties.title.maxLength`: — → `120`
+- contract `properties.data.properties.title.type`: — → `"string"`
+- contract `properties.data.required`: `["assignedByFallback","assignedItAdmin","assignmentId","category","closedAt",…` → `["assignedByFallback","assignedItAdmin","assignmentId","category","closedAt",…`
+
+### `SaasIssuePageResponseDto`
+- contract `properties.data.properties.items.items.properties.department.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.department.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.department.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.department.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.required`: — → `["id","name"]`
+- contract `properties.data.properties.items.items.properties.department.type`: — → `"object"`
+- mô tả `properties.data.properties.items.items.properties.plan.properties.logoUrl.description`: — → `"The https link to the logo image of the application that the IT Admin pasted…`
+- contract `properties.data.properties.items.items.properties.plan.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.plan.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.plan.required`: `["applicationName","planId","planName"]` → `["applicationName","logoUrl","planId","planName"]`
+- contract `properties.data.properties.items.items.properties.title.maxLength`: — → `120`
+- contract `properties.data.properties.items.items.properties.title.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: `["assignedItAdmin","assignmentId","category","code","createdAt","id","impact"…` → `["assignedItAdmin","assignmentId","category","code","createdAt","department",…`
+
+### `MySoftwarePageResponseDto`
+- mô tả `properties.data.properties.items.items.properties.application.properties.logoUrl.description`: — → `"The https link to the logo image that the IT Admin pasted, or null. The serv…`
+- contract `properties.data.properties.items.items.properties.application.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.application.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.required`: `["id","name"]` → `["id","logoUrl","name"]`
+
+### `AugmentedZodDto`
+- mô tả `oneOf.0.properties.expectedEndDate.description`: `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."` → —
+- contract `oneOf.0.properties.expectedEndDate.format`: `"date"` → —
+- contract `oneOf.0.properties.expectedEndDate.type`: `"string"` → —
+- contract `oneOf.0.properties.lines.items.properties.manyPaidSoftwareReason.maxLength`: `1000` → —
+- contract `oneOf.0.properties.lines.items.properties.manyPaidSoftwareReason.minLength`: `1` → —
+- contract `oneOf.0.properties.lines.items.properties.manyPaidSoftwareReason.type`: `"string"` → —
+- mô tả `oneOf.0.properties.termMonths.description`: — → `"The time of use in whole months: required for a plan bought by the month (1 …`
+- contract `oneOf.0.properties.termMonths.maximum`: — → `9007199254740991`
+- contract `oneOf.0.properties.termMonths.minimum`: — → `-9007199254740991`
+- contract `oneOf.0.properties.termMonths.nullable`: — → `true`
+- contract `oneOf.0.properties.termMonths.type`: — → `"integer"`
+- mô tả `oneOf.1.properties.expectedEndDate.description`: `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."` → —
+- contract `oneOf.1.properties.expectedEndDate.format`: `"date"` → —
+- contract `oneOf.1.properties.expectedEndDate.type`: `"string"` → —
+- contract `oneOf.1.properties.manyPaidSoftwareReason.maxLength`: `1000` → —
+- contract `oneOf.1.properties.manyPaidSoftwareReason.minLength`: `1` → —
+- contract `oneOf.1.properties.manyPaidSoftwareReason.type`: `"string"` → —
+- mô tả `oneOf.1.properties.termMonths.description`: — → `"The time of use in whole months: required for a plan bought by the month (1 …`
+- contract `oneOf.1.properties.termMonths.maximum`: — → `9007199254740991`
+- contract `oneOf.1.properties.termMonths.minimum`: — → `-9007199254740991`
+- contract `oneOf.1.properties.termMonths.nullable`: — → `true`
+- contract `oneOf.1.properties.termMonths.type`: — → `"integer"`
+
+### `DraftSubmitResponseDto`
+- contract `properties.data.properties.request.properties.cost.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.required`: — → `["amount","months","year"]`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.type`: — → `"object"`
+- mô tả `properties.data.properties.request.properties.cost.properties.months.description`: — → `"The months that have begun by the end of the term, each counted whole; null …`
+- contract `properties.data.properties.request.properties.cost.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.estimate.enum`: — → `[true]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.estimate.type`: — → `"boolean"`
+- mô tả `properties.data.properties.request.properties.cost.properties.nextYear.properties.from.description`: — → `"The first day of the year after, YYYY-MM-DD."`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.from.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.required`: — → `["amount","estimate","from","months"]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.type`: — → `"object"`
+- mô tả `properties.data.properties.request.properties.cost.properties.termCutAt.description`: — → `"The last day of the contract of a person with a term, when it cut the time o…`
+- contract `properties.data.properties.request.properties.cost.properties.termCutAt.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.termCutAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.required`: — → `["currentYear","months","nextYear","termCutAt"]`
+- contract `properties.data.properties.request.properties.cost.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.flags.additionalProperties`: `false` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.additionalProperties`: `false` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.nullable`: `true` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.minimum`: `0` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.type`: `"integer"` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.reason.type`: `"string"` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.required`: `["count","reason"]` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.type`: `"object"` → —
+- contract `properties.data.properties.request.properties.flags.required`: `["manyPaidSoftware"]` → —
+- contract `properties.data.properties.request.properties.flags.type`: `"object"` → —
+- contract `properties.data.properties.request.properties.needDecision.properties.decision.enum`: `["APPROVED","REJECTED"]` → `["APPROVED","REJECTED","RETURNED"]`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.proposal.required`: `["dataDescription","expectedUsers","homepageUrl","purpose","softwareName"]` → `["dataDescription","existingApplicationId","expectedUsers","homepageUrl","pur…`
+- contract `properties.data.properties.request.properties.renewal.properties.newExpectedEndDate.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.spend.properties.blockedReasons.items.enum`: `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING","RATE_MI…` → `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING"]`
+- contract `properties.data.properties.request.required`: `["beneficiary","branch","budgetYear","businessReason","cancellation","costCen…` → `["beneficiary","branch","budgetYear","businessReason","cancellation","cost","…`
+
+### `SubmitBodyDto`
+- mô tả `properties.expectedEndDate.description`: `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."` → —
+- contract `properties.expectedEndDate.format`: `"date"` → —
+- contract `properties.expectedEndDate.type`: `"string"` → —
+- contract `properties.manyPaidSoftwareReason.maxLength`: `1000` → —
+- contract `properties.manyPaidSoftwareReason.minLength`: `1` → —
+- contract `properties.manyPaidSoftwareReason.type`: `"string"` → —
+- mô tả `properties.termMonths.description`: — → `"The time of use in whole months: required for a plan bought by the month (1 …`
+- contract `properties.termMonths.maximum`: — → `9007199254740991`
+- contract `properties.termMonths.minimum`: — → `-9007199254740991`
+- contract `properties.termMonths.nullable`: — → `true`
+- contract `properties.termMonths.type`: — → `"integer"`
+
+### `AccessRequestResponseDto`
+- contract `properties.data.properties.request.properties.cost.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.required`: — → `["amount","months","year"]`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.type`: — → `"object"`
+- mô tả `properties.data.properties.request.properties.cost.properties.months.description`: — → `"The months that have begun by the end of the term, each counted whole; null …`
+- contract `properties.data.properties.request.properties.cost.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.estimate.enum`: — → `[true]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.estimate.type`: — → `"boolean"`
+- mô tả `properties.data.properties.request.properties.cost.properties.nextYear.properties.from.description`: — → `"The first day of the year after, YYYY-MM-DD."`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.from.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.required`: — → `["amount","estimate","from","months"]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.type`: — → `"object"`
+- mô tả `properties.data.properties.request.properties.cost.properties.termCutAt.description`: — → `"The last day of the contract of a person with a term, when it cut the time o…`
+- contract `properties.data.properties.request.properties.cost.properties.termCutAt.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.termCutAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.required`: — → `["currentYear","months","nextYear","termCutAt"]`
+- contract `properties.data.properties.request.properties.cost.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.flags.additionalProperties`: `false` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.additionalProperties`: `false` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.nullable`: `true` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.minimum`: `0` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.type`: `"integer"` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.reason.type`: `"string"` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.required`: `["count","reason"]` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.type`: `"object"` → —
+- contract `properties.data.properties.request.properties.flags.required`: `["manyPaidSoftware"]` → —
+- contract `properties.data.properties.request.properties.flags.type`: `"object"` → —
+- contract `properties.data.properties.request.properties.needDecision.properties.decision.enum`: `["APPROVED","REJECTED"]` → `["APPROVED","REJECTED","RETURNED"]`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.proposal.required`: `["dataDescription","expectedUsers","homepageUrl","purpose","softwareName"]` → `["dataDescription","existingApplicationId","expectedUsers","homepageUrl","pur…`
+- contract `properties.data.properties.request.properties.renewal.properties.newExpectedEndDate.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.spend.properties.blockedReasons.items.enum`: `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING","RATE_MI…` → `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING"]`
+- contract `properties.data.properties.request.required`: `["beneficiary","branch","budgetYear","businessReason","cancellation","costCen…` → `["beneficiary","branch","budgetYear","businessReason","cancellation","cost","…`
+
+### `PreviewBodyDto`
+- mô tả `properties.expectedEndDate.description`: `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."` → —
+- contract `properties.expectedEndDate.format`: `"date"` → —
+- contract `properties.expectedEndDate.type`: `"string"` → —
+- mô tả `properties.termMonths.description`: — → `"The time of use in whole months: required for a plan bought by the month (1 …`
+- contract `properties.termMonths.maximum`: — → `9007199254740991`
+- contract `properties.termMonths.minimum`: — → `-9007199254740991`
+- contract `properties.termMonths.nullable`: — → `true`
+- contract `properties.termMonths.type`: — → `"integer"`
+
+### `PreviewResponseDto`
+- contract `properties.data.properties.preview.properties.cost.additionalProperties`: — → `false`
+- contract `properties.data.properties.preview.properties.cost.nullable`: — → `true`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.required`: — → `["amount","months","year"]`
+- contract `properties.data.properties.preview.properties.cost.properties.currentYear.type`: — → `"object"`
+- mô tả `properties.data.properties.preview.properties.cost.properties.months.description`: — → `"The months that have begun by the end of the term, each counted whole; null …`
+- contract `properties.data.properties.preview.properties.cost.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.preview.properties.cost.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.preview.properties.cost.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.preview.properties.cost.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.nullable`: — → `true`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.properties.estimate.enum`: — → `[true]`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.properties.estimate.type`: — → `"boolean"`
+- mô tả `properties.data.properties.preview.properties.cost.properties.nextYear.properties.from.description`: — → `"The first day of the year after, YYYY-MM-DD."`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.properties.from.type`: — → `"string"`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.required`: — → `["amount","estimate","from","months"]`
+- contract `properties.data.properties.preview.properties.cost.properties.nextYear.type`: — → `"object"`
+- mô tả `properties.data.properties.preview.properties.cost.properties.termCutAt.description`: — → `"The last day of the contract of a person with a term, when it cut the time o…`
+- contract `properties.data.properties.preview.properties.cost.properties.termCutAt.nullable`: — → `true`
+- contract `properties.data.properties.preview.properties.cost.properties.termCutAt.type`: — → `"string"`
+- contract `properties.data.properties.preview.properties.cost.required`: — → `["currentYear","months","nextYear","termCutAt"]`
+- contract `properties.data.properties.preview.properties.cost.type`: — → `"object"`
+- contract `properties.data.properties.preview.properties.expectedEndDate.nullable`: `true` → —
+- contract `properties.data.properties.preview.properties.expectedEndDate.type`: `"string"` → —
+- contract `properties.data.properties.preview.properties.limits.properties.paidSoftwareCount.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.preview.properties.limits.properties.paidSoftwareCount.minimum`: `0` → —
+- contract `properties.data.properties.preview.properties.limits.properties.paidSoftwareCount.type`: `"integer"` → —
+- contract `properties.data.properties.preview.properties.limits.properties.paidSoftwareThreshold.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.preview.properties.limits.properties.paidSoftwareThreshold.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.preview.properties.limits.properties.paidSoftwareThreshold.minimum`: `0` → —
+- contract `properties.data.properties.preview.properties.limits.properties.paidSoftwareThreshold.type`: `"integer"` → —
+- contract `properties.data.properties.preview.properties.limits.properties.reasonRequired.type`: `"boolean"` → —
+- contract `properties.data.properties.preview.properties.limits.properties.resetsOn.type`: — → `"string"`
+- contract `properties.data.properties.preview.properties.limits.required`: `["openNewCount","openNewMax","openRequestId","paidSoftwareCount","paidSoftwar…` → `["openNewCount","openNewMax","openRequestId","refusal","resetsOn"]`
+- contract `properties.data.properties.preview.properties.maxEndDate.type`: `"string"` → —
+- contract `properties.data.properties.preview.properties.termMonths.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.preview.properties.termMonths.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.preview.properties.termMonths.nullable`: — → `true`
+- contract `properties.data.properties.preview.properties.termMonths.type`: — → `"integer"`
+- contract `properties.data.properties.preview.properties.termRefusal.enum`: — → `["TERM_CONTRACT_ENDED","TERM_LONG_TERM_NOT_ALLOWED","TERM_MONTHS_OUT_OF_RANGE…`
+- contract `properties.data.properties.preview.properties.termRefusal.nullable`: — → `true`
+- contract `properties.data.properties.preview.properties.termRefusal.type`: — → `"string"`
+- contract `properties.data.properties.preview.properties.termRequired.type`: `"boolean"` → —
+- contract `properties.data.properties.preview.required`: `["annualVendorAmount","blockedBy","branch","budgetYear","canSubmit","chain","…` → `["annualVendorAmount","blockedBy","branch","budgetYear","canSubmit","chain","…`
+
+### `AccessRequestOrDraftResponseDto`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.additionalProperties`: — → `false`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.nullable`: — → `true`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.additionalProperties`: — → `false`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.properties.months.nullable`: — → `true`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.properties.year.type`: — → `"integer"`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.required`: — → `["amount","months","year"]`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.currentYear.type`: — → `"object"`
+- mô tả `properties.data.anyOf.1.properties.request.properties.cost.properties.months.description`: — → `"The months that have begun by the end of the term, each counted whole; null …`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.months.nullable`: — → `true`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.months.type`: — → `"integer"`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.additionalProperties`: — → `false`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.nullable`: — → `true`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.estimate.enum`: — → `[true]`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.estimate.type`: — → `"boolean"`
+- mô tả `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.from.description`: — → `"The first day of the year after, YYYY-MM-DD."`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.from.type`: — → `"string"`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.months.nullable`: — → `true`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.required`: — → `["amount","estimate","from","months"]`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.nextYear.type`: — → `"object"`
+- mô tả `properties.data.anyOf.1.properties.request.properties.cost.properties.termCutAt.description`: — → `"The last day of the contract of a person with a term, when it cut the time o…`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.termCutAt.nullable`: — → `true`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.properties.termCutAt.type`: — → `"string"`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.required`: — → `["currentYear","months","nextYear","termCutAt"]`
+- contract `properties.data.anyOf.1.properties.request.properties.cost.type`: — → `"object"`
+- contract `properties.data.anyOf.1.properties.request.properties.flags.additionalProperties`: `false` → —
+- contract `properties.data.anyOf.1.properties.request.properties.flags.properties.manyPaidSoftware.additionalProperties`: `false` → —
+- contract `properties.data.anyOf.1.properties.request.properties.flags.properties.manyPaidSoftware.nullable`: `true` → —
+- contract `properties.data.anyOf.1.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.maximum`: `9007199254740991` → —
+- contract `properties.data.anyOf.1.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.minimum`: `0` → —
+- contract `properties.data.anyOf.1.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.type`: `"integer"` → —
+- contract `properties.data.anyOf.1.properties.request.properties.flags.properties.manyPaidSoftware.properties.reason.type`: `"string"` → —
+- contract `properties.data.anyOf.1.properties.request.properties.flags.properties.manyPaidSoftware.required`: `["count","reason"]` → —
+- contract `properties.data.anyOf.1.properties.request.properties.flags.properties.manyPaidSoftware.type`: `"object"` → —
+- contract `properties.data.anyOf.1.properties.request.properties.flags.required`: `["manyPaidSoftware"]` → —
+- contract `properties.data.anyOf.1.properties.request.properties.flags.type`: `"object"` → —
+- contract `properties.data.anyOf.1.properties.request.properties.needDecision.properties.decision.enum`: `["APPROVED","REJECTED"]` → `["APPROVED","REJECTED","RETURNED"]`
+- contract `properties.data.anyOf.1.properties.request.properties.proposal.properties.existingApplicationId.format`: — → `"uuid"`
+- contract `properties.data.anyOf.1.properties.request.properties.proposal.properties.existingApplicationId.nullable`: — → `true`
+- contract `properties.data.anyOf.1.properties.request.properties.proposal.properties.existingApplicationId.type`: — → `"string"`
+- contract `properties.data.anyOf.1.properties.request.properties.proposal.required`: `["dataDescription","expectedUsers","homepageUrl","purpose","softwareName"]` → `["dataDescription","existingApplicationId","expectedUsers","homepageUrl","pur…`
+- contract `properties.data.anyOf.1.properties.request.properties.renewal.properties.newExpectedEndDate.nullable`: — → `true`
+- contract `properties.data.anyOf.1.properties.request.properties.spend.properties.blockedReasons.items.enum`: `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING","RATE_MI…` → `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING"]`
+- contract `properties.data.anyOf.1.properties.request.required`: `["beneficiary","branch","budgetYear","businessReason","cancellation","costCen…` → `["beneficiary","branch","budgetYear","businessReason","cancellation","cost","…`
+
+### `NeedDecisionBodyDto`
+- mô tả `description`: `"A refusal (REJECT) gives its reason. An approval (APPROVE) gives none."` → `"The checklist of the policy in force at this step, and the decision: approve…`
+- contract `properties.checklist.additionalProperties`: — → `false`
+- mô tả `properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `properties.checklist.type`: — → `"object"`
+- contract `properties.decision.enum`: `["APPROVE","REJECT"]` → `["APPROVE","REJECT","RETURN"]`
+- contract `required`: `["decision"]` → `["checklist","decision"]`
+
+### `ProposalBodyDto`
+- mô tả `properties.existingApplicationId.description`: — → `"Case B, short: the application of the catalog the software is already in, wh…`
+- contract `properties.existingApplicationId.format`: — → `"uuid"`
+- contract `properties.existingApplicationId.type`: — → `"string"`
+- mô tả `properties.expectedEndDate.description`: `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."` → —
+- contract `properties.expectedEndDate.format`: `"date"` → —
+- contract `properties.expectedEndDate.type`: `"string"` → —
+- contract `properties.manyPaidSoftwareReason.maxLength`: `1000` → —
+- contract `properties.manyPaidSoftwareReason.minLength`: `1` → —
+- contract `properties.manyPaidSoftwareReason.type`: `"string"` → —
+- mô tả `properties.plannedPlanName.description`: — → `"Case B, short: the name of the plan asked for, which the application does no…`
+- contract `properties.plannedPlanName.maxLength`: — → `200`
+- contract `properties.plannedPlanName.minLength`: — → `1`
+- contract `properties.plannedPlanName.type`: — → `"string"`
+- mô tả `properties.termMonths.description`: — → `"The time of use in whole months: required for a plan bought by the month (1 …`
+- contract `properties.termMonths.maximum`: — → `9007199254740991`
+- contract `properties.termMonths.minimum`: — → `-9007199254740991`
+- contract `properties.termMonths.nullable`: — → `true`
+- contract `properties.termMonths.type`: — → `"integer"`
+
+### `AssessmentResponseDto`
+- contract `properties.data.properties.assessment.properties.proposal.properties.existingApplication.additionalProperties`: — → `false`
+- contract `properties.data.properties.assessment.properties.proposal.properties.existingApplication.nullable`: — → `true`
+- contract `properties.data.properties.assessment.properties.proposal.properties.existingApplication.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.assessment.properties.proposal.properties.existingApplication.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.assessment.properties.proposal.properties.existingApplication.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.assessment.properties.proposal.properties.existingApplication.required`: — → `["id","name"]`
+- contract `properties.data.properties.assessment.properties.proposal.properties.existingApplication.type`: — → `"object"`
+- contract `properties.data.properties.assessment.properties.proposal.properties.existingApplicationId.format`: — → `"uuid"`
+- contract `properties.data.properties.assessment.properties.proposal.properties.existingApplicationId.nullable`: — → `true`
+- contract `properties.data.properties.assessment.properties.proposal.properties.existingApplicationId.type`: — → `"string"`
+- contract `properties.data.properties.assessment.properties.proposal.required`: `["dataDescription","expectedUsers","homepageUrl","purpose","softwareName"]` → `["dataDescription","existingApplication","existingApplicationId","expectedUse…`
+- contract `properties.data.properties.assessment.properties.quote.properties.originalPrice.additionalProperties`: — → `false`
+- contract `properties.data.properties.assessment.properties.quote.properties.originalPrice.nullable`: — → `true`
+- contract `properties.data.properties.assessment.properties.quote.properties.originalPrice.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.assessment.properties.quote.properties.originalPrice.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.assessment.properties.quote.properties.originalPrice.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.assessment.properties.quote.properties.originalPrice.type`: — → `"object"`
+- contract `properties.data.properties.assessment.properties.quote.required`: `["billingCycle","unitPrice","validFrom","validUntil"]` → `["billingCycle","originalPrice","unitPrice","validFrom","validUntil"]`
+- contract `properties.data.properties.assessment.properties.scope.enum`: — → `["FULL","PLAN_ONLY"]`
+- contract `properties.data.properties.assessment.properties.scope.type`: — → `"string"`
+- contract `properties.data.properties.assessment.required`: `["adminConsole","classification","complete","completedAt","completedBy","cont…` → `["adminConsole","classification","complete","completedAt","completedBy","cont…`
+
+### `AssessmentPatchDto`
+- contract `properties.quote.properties.originalPrice.additionalProperties`: — → `false`
+- mô tả `properties.quote.properties.originalPrice.description`: — → `"The price the vendor quoted in another currency, kept beside the quote in do…`
+- contract `properties.quote.properties.originalPrice.properties.amount.maxLength`: — → `40`
+- contract `properties.quote.properties.originalPrice.properties.amount.type`: — → `"string"`
+- contract `properties.quote.properties.originalPrice.properties.currency.pattern`: — → `"^[A-Z]{3}$"`
+- contract `properties.quote.properties.originalPrice.properties.currency.type`: — → `"string"`
+- contract `properties.quote.properties.originalPrice.required`: — → `["amount","currency"]`
+- contract `properties.quote.properties.originalPrice.type`: — → `"object"`
+- mô tả `properties.quote.properties.unitPrice.description`: — → `"What one person costs for one billing cycle, in dong: a decimal string in ma…`
+
+### `AssessmentRejectionBodyDto`
+- contract `additionalProperties`: `false` → —
+- mô tả `description`: `"UNCONTROLLABLE requires alternativePlanId or alternativeNote."` → `"REJECT ends the request as refused by IT and needs the kind of the refusal; …`
+- contract `oneOf.0.additionalProperties`: — → `false`
+- mô tả `oneOf.0.description`: — → `"UNCONTROLLABLE requires alternativePlanId or alternativeNote."`
+- contract `oneOf.0.properties.alternativeNote.maxLength`: — → `1000`
+- contract `oneOf.0.properties.alternativeNote.minLength`: — → `1`
+- contract `oneOf.0.properties.alternativeNote.type`: — → `"string"`
+- contract `oneOf.0.properties.alternativePlanId.format`: — → `"uuid"`
+- contract `oneOf.0.properties.alternativePlanId.type`: — → `"string"`
+- contract `oneOf.0.properties.checklist.additionalProperties`: — → `false`
+- mô tả `oneOf.0.properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `oneOf.0.properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `oneOf.0.properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `oneOf.0.properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `oneOf.0.properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `oneOf.0.properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `oneOf.0.properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `oneOf.0.properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `oneOf.0.properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `oneOf.0.properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `oneOf.0.properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `oneOf.0.properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `oneOf.0.properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `oneOf.0.properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `oneOf.0.properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `oneOf.0.properties.checklist.type`: — → `"object"`
+- contract `oneOf.0.properties.decision.enum`: — → `["REJECT"]`
+- contract `oneOf.0.properties.decision.type`: — → `"string"`
+- contract `oneOf.0.properties.kind.enum`: — → `["NOT_ELIGIBLE","UNCONTROLLABLE"]`
+- contract `oneOf.0.properties.kind.type`: — → `"string"`
+- contract `oneOf.0.properties.reason.maxLength`: — → `1000`
+- contract `oneOf.0.properties.reason.minLength`: — → `1`
+- contract `oneOf.0.properties.reason.type`: — → `"string"`
+- contract `oneOf.0.required`: — → `["checklist","decision","kind"]`
+- contract `oneOf.0.type`: — → `"object"`
+- contract `oneOf.1.additionalProperties`: — → `false`
+- contract `oneOf.1.properties.checklist.additionalProperties`: — → `false`
+- mô tả `oneOf.1.properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `oneOf.1.properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `oneOf.1.properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `oneOf.1.properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `oneOf.1.properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `oneOf.1.properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `oneOf.1.properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `oneOf.1.properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `oneOf.1.properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `oneOf.1.properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `oneOf.1.properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `oneOf.1.properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `oneOf.1.properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `oneOf.1.properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `oneOf.1.properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `oneOf.1.properties.checklist.type`: — → `"object"`
+- contract `oneOf.1.properties.decision.enum`: — → `["RETURN"]`
+- contract `oneOf.1.properties.decision.type`: — → `"string"`
+- contract `oneOf.1.properties.reason.maxLength`: — → `1000`
+- contract `oneOf.1.properties.reason.minLength`: — → `1`
+- contract `oneOf.1.properties.reason.type`: — → `"string"`
+- contract `oneOf.1.required`: — → `["checklist","decision"]`
+- contract `oneOf.1.type`: — → `"object"`
+- contract `properties.alternativeNote.maxLength`: `1000` → —
+- contract `properties.alternativeNote.minLength`: `1` → —
+- contract `properties.alternativeNote.type`: `"string"` → —
+- contract `properties.alternativePlanId.format`: `"uuid"` → —
+- contract `properties.alternativePlanId.type`: `"string"` → —
+- contract `properties.kind.enum`: `["NOT_ELIGIBLE","UNCONTROLLABLE"]` → —
+- contract `properties.kind.type`: `"string"` → —
+- contract `properties.reason.maxLength`: `1000` → —
+- contract `properties.reason.minLength`: `1` → —
+- contract `properties.reason.type`: `"string"` → —
+- contract `required`: `["kind","reason"]` → —
+- contract `type`: `"object"` → —
+
+### `InternalRegistrationBodyDto`
+- contract `properties.spend.properties.quote.properties.originalPrice.additionalProperties`: — → `false`
+- mô tả `properties.spend.properties.quote.properties.originalPrice.description`: — → `"The price the vendor quoted in another currency, kept beside the quote in do…`
+- contract `properties.spend.properties.quote.properties.originalPrice.properties.amount.maxLength`: — → `40`
+- contract `properties.spend.properties.quote.properties.originalPrice.properties.amount.type`: — → `"string"`
+- contract `properties.spend.properties.quote.properties.originalPrice.properties.currency.pattern`: — → `"^[A-Z]{3}$"`
+- contract `properties.spend.properties.quote.properties.originalPrice.properties.currency.type`: — → `"string"`
+- contract `properties.spend.properties.quote.properties.originalPrice.required`: — → `["amount","currency"]`
+- contract `properties.spend.properties.quote.properties.originalPrice.type`: — → `"object"`
+- mô tả `properties.spend.properties.quote.properties.unitPrice.description`: — → `"What one person costs for one billing cycle, in dong: a decimal string in ma…`
+
+### `CatalogLinkBodyDto`
+- mô tả `properties.addToDepartmentList.description`: — → `"True puts the application and the plan in the list of software of the depart…`
+- contract `properties.addToDepartmentList.type`: — → `"boolean"`
+
+### `BudgetCheckResponseDto`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.additionalProperties`: — → `false`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.nullable`: — → `true`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.approved.additionalProperties`: — → `false`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.approved.nullable`: — → `true`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.approved.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.approved.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.approved.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.approved.type`: — → `"object"`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.remaining.additionalProperties`: — → `false`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.remaining.nullable`: — → `true`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.remaining.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.remaining.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.remaining.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.remaining.type`: — → `"object"`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.remainingAfter.additionalProperties`: — → `false`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.remainingAfter.nullable`: — → `true`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.remainingAfter.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.remainingAfter.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.remainingAfter.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.remainingAfter.type`: — → `"object"`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.warning.type`: — → `"boolean"`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.required`: — → `["approved","remaining","remainingAfter","warning","year"]`
+- contract `properties.data.properties.budgetCheck.properties.nextYearBudget.type`: — → `"object"`
+- contract `properties.data.properties.budgetCheck.required`: `["bindingTotal","blockedReasons","id","number","outcome","overBaseBy","overBy…` → `["bindingTotal","blockedReasons","id","nextYearBudget","number","outcome","ov…`
+
+### `YearListResponseDto`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.base.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.base.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.base.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.base.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.base.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.reserve.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.reserve.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.reserve.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.reserve.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.reserve.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.total.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.total.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.total.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.total.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.total.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.required`: — → `["base","reserve","total"]`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.type`: — → `"object"`
+- contract `properties.data.properties.items.items.required`: `["base","budget","code","cost","held","pending","remaining","remainingBase","…` → `["base","budget","code","cost","effectiveBudget","held","pending","remaining"…`
+
+### `SubmitBatchBodyDto`
+- contract `properties.checklist.additionalProperties`: — → `false`
+- mô tả `properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `properties.checklist.type`: — → `"object"`
+
+### `SubmitBatchResponseDto`
+- contract `properties.data.properties.results.items.properties.stopReason.enum`: `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING","RATE_MI…` → `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING",null]`
+
+### `ReserveConfirmationBodyDto`
+- contract `properties.checklist.additionalProperties`: — → `false`
+- mô tả `properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `properties.checklist.type`: — → `"object"`
+- contract `required`: `["reason"]` → `["checklist","reason"]`
+
+### `BatchItemListResponseDto`
+- contract `properties.data.properties.items.items.properties.stopReason.enum`: `["CLOSED_OR_EXPIRED_BUDGET_PERIOD","NO_APPROVED_BUDGET","OVER_RESERVE","PRICE…` → `["CLOSED_OR_EXPIRED_BUDGET_PERIOD","NO_APPROVED_BUDGET","OVER_RESERVE","PRICE…`
+
+### `SupplementBodyDto`
+- mô tả `description`: `"The people of the group the head leaves out and/or an earlier end date, and …` → `"The people of the group the head leaves out and/or a shorter time of use in …`
+- mô tả `properties.expectedEndDate.description`: `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."` → —
+- contract `properties.expectedEndDate.format`: `"date"` → —
+- contract `properties.expectedEndDate.type`: `"string"` → —
+- contract `properties.termMonths.maximum`: — → `9007199254740991`
+- contract `properties.termMonths.minimum`: — → `-9007199254740991`
+- contract `properties.termMonths.type`: — → `"integer"`
+
+### `ApprovalListResponseDto`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.approved.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.approved.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.approved.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.approved.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.approved.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.approved.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.remaining.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.remaining.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.remaining.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.remaining.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.remaining.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.remaining.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.remainingAfter.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.remainingAfter.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.remainingAfter.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.remainingAfter.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.remainingAfter.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.remainingAfter.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.warning.type`: — → `"boolean"`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.required`: — → `["approved","remaining","remainingAfter","warning","year"]`
+- contract `properties.data.properties.items.items.properties.nextYearBudget.type`: — → `"object"`
+- contract `properties.data.properties.items.items.required`: `["amount","batchId","beneficiary","costCenter","dueOn","lineCount","openedAt"…` → `["amount","batchId","beneficiary","costCenter","dueOn","lineCount","nextYearB…`
+
+### `ApprovalDetailResponseDto`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.additionalProperties`: — → `false`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.nullable`: — → `true`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.approved.additionalProperties`: — → `false`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.approved.nullable`: — → `true`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.approved.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.approved.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.approved.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.approved.type`: — → `"object"`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.remaining.additionalProperties`: — → `false`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.remaining.nullable`: — → `true`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.remaining.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.remaining.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.remaining.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.remaining.type`: — → `"object"`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.remainingAfter.additionalProperties`: — → `false`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.remainingAfter.nullable`: — → `true`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.remainingAfter.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.remainingAfter.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.remainingAfter.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.remainingAfter.type`: — → `"object"`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.warning.type`: — → `"boolean"`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.required`: — → `["approved","remaining","remainingAfter","warning","year"]`
+- contract `properties.data.properties.spendApproval.properties.nextYearBudget.type`: — → `"object"`
+- contract `properties.data.properties.spendApproval.properties.termCost.additionalProperties`: — → `false`
+- contract `properties.data.properties.spendApproval.properties.termCost.nullable`: — → `true`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.required`: — → `["amount","months","year"]`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.currentYear.type`: — → `"object"`
+- mô tả `properties.data.properties.spendApproval.properties.termCost.properties.months.description`: — → `"The months that have begun by the end of the term, each counted whole; null …`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.nullable`: — → `true`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.estimate.enum`: — → `[true]`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.estimate.type`: — → `"boolean"`
+- mô tả `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.from.description`: — → `"The first day of the year after, YYYY-MM-DD."`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.from.type`: — → `"string"`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.required`: — → `["amount","estimate","from","months"]`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.nextYear.type`: — → `"object"`
+- mô tả `properties.data.properties.spendApproval.properties.termCost.properties.termCutAt.description`: — → `"The last day of the contract of a person with a term, when it cut the time o…`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.termCutAt.nullable`: — → `true`
+- contract `properties.data.properties.spendApproval.properties.termCost.properties.termCutAt.type`: — → `"string"`
+- contract `properties.data.properties.spendApproval.properties.termCost.required`: — → `["currentYear","months","nextYear","termCutAt"]`
+- contract `properties.data.properties.spendApproval.properties.termCost.type`: — → `"object"`
+- contract `properties.data.properties.spendApproval.required`: `["annualVendorAmount","assessment","budgetSnapshot","cost","decision","need",…` → `["annualVendorAmount","assessment","budgetSnapshot","cost","decision","need",…`
+
+### `SpendDecisionBodyDto`
+- mô tả `description`: `"A refusal (REJECT) gives its reason. An approval (APPROVE) gives no reason."` → `"The checklist of the policy in force at this step, and the decision. A refus…`
+- contract `properties.checklist.additionalProperties`: — → `false`
+- mô tả `properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `properties.checklist.type`: — → `"object"`
+- contract `properties.decision.enum`: `["APPROVE","REJECT"]` → `["APPROVE","REJECT","RETURN"]`
+- contract `required`: `["decision"]` → `["checklist","decision"]`
+
+### `BatchDecisionBodyDto`
+- mô tả `description`: `"A refusal (REJECT) gives its reason; an approval (APPROVE) gives none. A req…` → `"One checklist for the whole batch, written for each request decided. A refus…`
+- contract `properties.checklist.additionalProperties`: — → `false`
+- mô tả `properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `properties.checklist.type`: — → `"object"`
+- contract `properties.decision.enum`: `["APPROVE","REJECT"]` → `["APPROVE","REJECT","RETURN"]`
+- contract `required`: `["decision","requestIds"]` → `["checklist","decision"]`
+
+### `BatchDecisionResponseDto`
+- contract `properties.data.properties.results.items.properties.outcome.enum`: `["APPROVED","REJECTED","SKIPPED"]` → `["APPROVED","REJECTED","RETURNED","SKIPPED"]`
+
+### `GrantQueueResponseDto`
+- contract `properties.data.properties.items.items.properties.department.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.department.description`: — → `"The department the request was sent for: the IT Admin works the departments …`
+- contract `properties.data.properties.items.items.properties.department.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.department.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.required`: — → `["id","name"]`
+- contract `properties.data.properties.items.items.properties.department.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.execution.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.execution.nullable`: — → `true`
+- mô tả `properties.data.properties.items.items.properties.execution.properties.availableActions.description`: — → `"What the IT Admin may do next on the task, each one a route of the provision…`
+- contract `properties.data.properties.items.items.properties.execution.properties.availableActions.items.enum`: — → `["CANCEL","CLAIM","CLOSE_FAILED","COMPLETE","HAND_OFF","REPORT_FAILURE","RETRY"]`
+- contract `properties.data.properties.items.items.properties.execution.properties.availableActions.items.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.execution.properties.availableActions.maxItems`: — → `7`
+- contract `properties.data.properties.items.items.properties.execution.properties.availableActions.type`: — → `"array"`
+- mô tả `properties.data.properties.items.items.properties.execution.properties.claimedBy.description`: — → `"The account of the IT Admin who took the task, the same value as claimedBy o…`
+- contract `properties.data.properties.items.items.properties.execution.properties.claimedBy.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.execution.properties.claimedBy.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.execution.properties.claimedBy.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.execution.properties.failureReason.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.execution.properties.failureReason.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.execution.properties.status.enum`: — → `["CANCELLED","CLOSED_FAILED","COMPLETED","FAILED","IN_PROGRESS","QUEUED","RET…`
+- contract `properties.data.properties.items.items.properties.execution.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.execution.properties.taskId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.execution.properties.taskId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.execution.required`: — → `["availableActions","claimedBy","failureReason","status","taskId"]`
+- contract `properties.data.properties.items.items.properties.execution.type`: — → `"object"`
+- mô tả `properties.data.properties.items.items.properties.plan.properties.logoUrl.description`: — → `"The https link to the logo image of the application that the IT Admin pasted…`
+- contract `properties.data.properties.items.items.properties.plan.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.plan.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.plan.required`: `["applicationName","planId","planName"]` → `["applicationName","logoUrl","planId","planName"]`
+- contract `properties.data.properties.items.items.properties.state.enum`: — → `["DONE","EXECUTING","WAITING"]`
+- contract `properties.data.properties.items.items.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: `["beneficiary","boundaryState","expectedEndDate","lineCount","plan","requeste…` → `["beneficiary","boundaryState","department","execution","expectedEndDate","li…`
+
+### `AssessmentQueueResponseDto`
+- contract `properties.data.properties.items.items.properties.readiness.enum`: `["COMPLETABLE","INCOMPLETE","INTERNAL_BY_REGISTRATION","UNCONTROLLABLE"]` → `["COMPLETABLE","FREE_PLAN","INCOMPLETE","INTERNAL_BY_REGISTRATION","UNCONTROL…`
+- contract `properties.data.properties.items.items.properties.scope.enum`: — → `["FULL","PLAN_ONLY"]`
+- contract `properties.data.properties.items.items.properties.scope.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: `["assignee","canAct","classification","department","holder","missingCount","q…` → `["assignee","canAct","classification","department","holder","missingCount","q…`
+
+### `RenewalBodyDto`
+- contract `properties.extensionMonths.maximum`: `12` → `9007199254740991`
+- contract `properties.extensionMonths.minimum`: `1` → `-9007199254740991`
+- contract `properties.longTerm.enum`: — → `[true]`
+- contract `properties.longTerm.type`: — → `"boolean"`
+- contract `properties.manyPaidSoftwareReason.maxLength`: `1000` → —
+- contract `properties.manyPaidSoftwareReason.minLength`: `1` → —
+- contract `properties.manyPaidSoftwareReason.type`: `"string"` → —
+- mô tả `properties.newEndDate.description`: `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."` → —
+- contract `properties.newEndDate.format`: `"date"` → —
+- contract `properties.newEndDate.type`: `"string"` → —
+
+### `RenewalResponseDto`
+- contract `properties.data.properties.request.properties.cost.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.required`: — → `["amount","months","year"]`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.type`: — → `"object"`
+- mô tả `properties.data.properties.request.properties.cost.properties.months.description`: — → `"The months that have begun by the end of the term, each counted whole; null …`
+- contract `properties.data.properties.request.properties.cost.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.estimate.enum`: — → `[true]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.estimate.type`: — → `"boolean"`
+- mô tả `properties.data.properties.request.properties.cost.properties.nextYear.properties.from.description`: — → `"The first day of the year after, YYYY-MM-DD."`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.from.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.required`: — → `["amount","estimate","from","months"]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.type`: — → `"object"`
+- mô tả `properties.data.properties.request.properties.cost.properties.termCutAt.description`: — → `"The last day of the contract of a person with a term, when it cut the time o…`
+- contract `properties.data.properties.request.properties.cost.properties.termCutAt.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.termCutAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.required`: — → `["currentYear","months","nextYear","termCutAt"]`
+- contract `properties.data.properties.request.properties.cost.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.flags.additionalProperties`: `false` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.additionalProperties`: `false` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.nullable`: `true` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.minimum`: `0` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.type`: `"integer"` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.reason.type`: `"string"` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.required`: `["count","reason"]` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.type`: `"object"` → —
+- contract `properties.data.properties.request.properties.flags.required`: `["manyPaidSoftware"]` → —
+- contract `properties.data.properties.request.properties.flags.type`: `"object"` → —
+- contract `properties.data.properties.request.properties.needDecision.properties.decision.enum`: `["APPROVED","REJECTED"]` → `["APPROVED","REJECTED","RETURNED"]`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.proposal.required`: `["dataDescription","expectedUsers","homepageUrl","purpose","softwareName"]` → `["dataDescription","existingApplicationId","expectedUsers","homepageUrl","pur…`
+- contract `properties.data.properties.request.properties.renewal.properties.newExpectedEndDate.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.spend.properties.blockedReasons.items.enum`: `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING","RATE_MI…` → `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING"]`
+- contract `properties.data.properties.request.required`: `["beneficiary","branch","budgetYear","businessReason","cancellation","costCen…` → `["beneficiary","branch","budgetYear","businessReason","cancellation","cost","…`
+
+### `GroupBodyDto`
+- mô tả `properties.expectedEndDate.description`: `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."` → —
+- contract `properties.expectedEndDate.format`: `"date"` → —
+- contract `properties.expectedEndDate.type`: `"string"` → —
+- contract `properties.lines.items.properties.manyPaidSoftwareReason.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.manyPaidSoftwareReason.minLength`: `1` → —
+- contract `properties.lines.items.properties.manyPaidSoftwareReason.type`: `"string"` → —
+- mô tả `properties.termMonths.description`: — → `"The time of use in whole months: required for a plan bought by the month (1 …`
+- contract `properties.termMonths.maximum`: — → `9007199254740991`
+- contract `properties.termMonths.minimum`: — → `-9007199254740991`
+- contract `properties.termMonths.nullable`: — → `true`
+- contract `properties.termMonths.type`: — → `"integer"`
+
+### `GroupCheckResponseDto`
+- contract `properties.data.properties.endDateOutOfRange.type`: `"boolean"` → —
+- contract `properties.data.properties.lines.items.properties.manyPaidSoftware.additionalProperties`: `false` → —
+- contract `properties.data.properties.lines.items.properties.manyPaidSoftware.nullable`: `true` → —
+- contract `properties.data.properties.lines.items.properties.manyPaidSoftware.properties.count.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.lines.items.properties.manyPaidSoftware.properties.count.minimum`: `0` → —
+- contract `properties.data.properties.lines.items.properties.manyPaidSoftware.properties.count.type`: `"integer"` → —
+- contract `properties.data.properties.lines.items.properties.manyPaidSoftware.properties.threshold.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.lines.items.properties.manyPaidSoftware.properties.threshold.minimum`: `-9007199254740991` → —
+- contract `properties.data.properties.lines.items.properties.manyPaidSoftware.properties.threshold.type`: `"integer"` → —
+- contract `properties.data.properties.lines.items.properties.manyPaidSoftware.required`: `["count","threshold"]` → —
+- contract `properties.data.properties.lines.items.properties.manyPaidSoftware.type`: `"object"` → —
+- contract `properties.data.properties.lines.items.properties.reason.enum`: `["DUPLICATE_LINE","EMAIL_REQUIRED","HAS_ACCESS","HAS_OPEN_REQUEST","HEAD_IN_G…` → `["DUPLICATE_LINE","EMAIL_REQUIRED","HAS_ACCESS","HAS_OPEN_REQUEST","HEAD_IN_G…`
+- contract `properties.data.properties.lines.items.required`: `["employeeId","manyPaidSoftware","ok","reason"]` → `["employeeId","ok","reason"]`
+- contract `properties.data.properties.maxEndDate.type`: `"string"` → —
+- contract `properties.data.properties.termRefusal.enum`: — → `["TERM_LONG_TERM_NOT_ALLOWED","TERM_MONTHS_OUT_OF_RANGE","TERM_NOT_ASKED","TE…`
+- contract `properties.data.properties.termRefusal.nullable`: — → `true`
+- contract `properties.data.properties.termRefusal.type`: — → `"string"`
+- contract `properties.data.required`: `["amountPerPerson","endDateOutOfRange","hasSpendStep","lineCount","lines","ma…` → `["amountPerPerson","hasSpendStep","lineCount","lines","plan","pricing","termR…`
+
+### `GroupResponseDto`
+- contract `properties.data.properties.request.properties.cost.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.required`: — → `["amount","months","year"]`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.type`: — → `"object"`
+- mô tả `properties.data.properties.request.properties.cost.properties.months.description`: — → `"The months that have begun by the end of the term, each counted whole; null …`
+- contract `properties.data.properties.request.properties.cost.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.estimate.enum`: — → `[true]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.estimate.type`: — → `"boolean"`
+- mô tả `properties.data.properties.request.properties.cost.properties.nextYear.properties.from.description`: — → `"The first day of the year after, YYYY-MM-DD."`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.from.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.required`: — → `["amount","estimate","from","months"]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.type`: — → `"object"`
+- mô tả `properties.data.properties.request.properties.cost.properties.termCutAt.description`: — → `"The last day of the contract of a person with a term, when it cut the time o…`
+- contract `properties.data.properties.request.properties.cost.properties.termCutAt.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.termCutAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.required`: — → `["currentYear","months","nextYear","termCutAt"]`
+- contract `properties.data.properties.request.properties.cost.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.flags.additionalProperties`: `false` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.additionalProperties`: `false` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.nullable`: `true` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.minimum`: `0` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.count.type`: `"integer"` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.properties.reason.type`: `"string"` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.required`: `["count","reason"]` → —
+- contract `properties.data.properties.request.properties.flags.properties.manyPaidSoftware.type`: `"object"` → —
+- contract `properties.data.properties.request.properties.flags.required`: `["manyPaidSoftware"]` → —
+- contract `properties.data.properties.request.properties.flags.type`: `"object"` → —
+- contract `properties.data.properties.request.properties.needDecision.properties.decision.enum`: `["APPROVED","REJECTED"]` → `["APPROVED","REJECTED","RETURNED"]`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.proposal.required`: `["dataDescription","expectedUsers","homepageUrl","purpose","softwareName"]` → `["dataDescription","existingApplicationId","expectedUsers","homepageUrl","pur…`
+- contract `properties.data.properties.request.properties.renewal.properties.newExpectedEndDate.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.spend.properties.blockedReasons.items.enum`: `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING","RATE_MI…` → `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING"]`
+- contract `properties.data.properties.request.required`: `["beneficiary","branch","budgetYear","businessReason","cancellation","costCen…` → `["beneficiary","branch","budgetYear","businessReason","cancellation","cost","…`
+
+### `LineNeedDecisionBodyDto`
+- mô tả `description`: `"Each person of the step is decided once. A choice of line of the plan (spend…` → `"Each person of the step is decided once, with one checklist for the group. A…`
+- contract `properties.checklist.additionalProperties`: — → `false`
+- mô tả `properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `properties.checklist.type`: — → `"object"`
+- mô tả `properties.lines.items.description`: `"A refusal (REJECT) gives its reason; an approval (APPROVE) gives none."` → `"A refusal (REJECT) and a return (RETURN) give a reason or leave it to the ch…`
+- contract `properties.lines.items.properties.decision.enum`: `["APPROVE","REJECT"]` → `["APPROVE","REJECT","RETURN"]`
+- contract `required`: `["lines"]` → `["checklist","lines"]`
+
+### `LineSpendDecisionBodyDto`
+- mô tả `description`: `"Each person is decided once."` → `"Each person is decided once, with one checklist for the group. A group is se…`
+- contract `properties.checklist.additionalProperties`: — → `false`
+- mô tả `properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `properties.checklist.type`: — → `"object"`
+- mô tả `properties.lines.items.description`: `"A refusal (REJECT) gives its reason; an approval (APPROVE) gives none."` → `"A refusal (REJECT) and a return (RETURN) give a reason or leave it to the ch…`
+- contract `properties.lines.items.properties.decision.enum`: `["APPROVE","REJECT"]` → `["APPROVE","REJECT","RETURN"]`
+- contract `required`: `["lines"]` → `["checklist","lines"]`
+
+### `DepartmentAccessRequestPageResponseDto`
+- contract `properties.data.properties.items.items.properties.flags.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.properties.count.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.properties.count.minimum`: `0` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.properties.count.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.properties.reason.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.required`: `["count","reason"]` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.type`: `"object"` → —
+- contract `properties.data.properties.items.items.properties.flags.required`: `["manyPaidSoftware"]` → —
+- contract `properties.data.properties.items.items.properties.flags.type`: `"object"` → —
+- contract `properties.data.properties.items.items.required`: `["awaitingMe","beneficiary","branch","department","expectedEndDate","flags","…` → `["awaitingMe","beneficiary","branch","department","expectedEndDate","id","lin…`
+
+### `AccessRequestHistoryPageResponseDto`
+- contract `properties.data.properties.items.items.properties.flags.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.properties.count.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.properties.count.minimum`: `0` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.properties.count.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.properties.reason.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.required`: `["count","reason"]` → —
+- contract `properties.data.properties.items.items.properties.flags.properties.manyPaidSoftware.type`: `"object"` → —
+- contract `properties.data.properties.items.items.properties.flags.required`: `["manyPaidSoftware"]` → —
+- contract `properties.data.properties.items.items.properties.flags.type`: `"object"` → —
+- contract `properties.data.properties.items.items.required`: `["beneficiary","branch","department","expectedEndDate","flags","id","lineCoun…` → `["beneficiary","branch","department","expectedEndDate","id","lineCount","need…`
+
+### `BudgetProposalBodyDto`
+- mô tả `properties.attachmentIds.description`: — → `"The files of the proposal (the template of BM-10 filled in, and anything tha…`
+- contract `properties.attachmentIds.maxItems`: `20` → `10`
+- contract `properties.attachmentIds.minItems`: — → `1`
+- contract `properties.lines.items.additionalProperties`: `false` → —
+- mô tả `properties.lines.items.description`: `"A line is a plan or a description, the seats, the amount of the year, its ki…` → —
+- contract `properties.lines.items.properties.amount.additionalProperties`: `false` → —
+- contract `properties.lines.items.properties.amount.properties.amount.maxLength`: `40` → —
+- contract `properties.lines.items.properties.amount.properties.amount.type`: `"string"` → —
+- contract `properties.lines.items.properties.amount.required`: `["amount"]` → —
+- contract `properties.lines.items.properties.amount.type`: `"object"` → —
+- contract `properties.lines.items.properties.description.maxLength`: `200` → —
+- contract `properties.lines.items.properties.description.minLength`: `1` → —
+- contract `properties.lines.items.properties.description.type`: `"string"` → —
+- mô tả `properties.lines.items.properties.lineType.description`: `"RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL…` → —
+- contract `properties.lines.items.properties.lineType.enum`: `["CANCEL","CHANGE","NEW","RENEW"]` → —
+- contract `properties.lines.items.properties.lineType.type`: `"string"` → —
+- contract `properties.lines.items.properties.note.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.note.minLength`: `1` → —
+- contract `properties.lines.items.properties.note.type`: `"string"` → —
+- contract `properties.lines.items.properties.planId.format`: `"uuid"` → —
+- contract `properties.lines.items.properties.planId.type`: `"string"` → —
+- contract `properties.lines.items.properties.priorityRank.maximum`: `100000` → —
+- contract `properties.lines.items.properties.priorityRank.minimum`: `1` → —
+- contract `properties.lines.items.properties.priorityRank.type`: `"integer"` → —
+- contract `properties.lines.items.properties.seats.maximum`: `100000` → —
+- contract `properties.lines.items.properties.seats.minimum`: `1` → —
+- contract `properties.lines.items.properties.seats.type`: `"integer"` → —
+- contract `properties.lines.items.properties.zbb.additionalProperties`: `false` → —
+- contract `properties.lines.items.properties.zbb.properties.alternatives.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.zbb.properties.alternatives.minLength`: `1` → —
+- contract `properties.lines.items.properties.zbb.properties.alternatives.type`: `"string"` → —
+- contract `properties.lines.items.properties.zbb.properties.consequenceIfNot.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.zbb.properties.consequenceIfNot.minLength`: `1` → —
+- contract `properties.lines.items.properties.zbb.properties.consequenceIfNot.type`: `"string"` → —
+- contract `properties.lines.items.properties.zbb.properties.purpose.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.zbb.properties.purpose.minLength`: `1` → —
+- contract `properties.lines.items.properties.zbb.properties.purpose.type`: `"string"` → —
+- contract `properties.lines.items.properties.zbb.properties.usageIndicator.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.zbb.properties.usageIndicator.minLength`: `1` → —
+- contract `properties.lines.items.properties.zbb.properties.usageIndicator.type`: `"string"` → —
+- contract `properties.lines.items.properties.zbb.required`: `["alternatives","consequenceIfNot","purpose","usageIndicator"]` → —
+- contract `properties.lines.items.properties.zbb.type`: `"object"` → —
+- contract `properties.lines.items.required`: `["amount","lineType","priorityRank"]` → —
+- contract `properties.lines.items.type`: `"object"` → —
+- contract `properties.lines.maxItems`: `200` → —
+- contract `properties.lines.minItems`: `1` → —
+- contract `properties.lines.type`: `"array"` → —
+- mô tả `properties.note.description`: — → `"What the head says beside the amount, if anything."`
+- contract `properties.note.maxLength`: — → `1000`
+- contract `properties.note.minLength`: — → `1`
+- contract `properties.note.type`: — → `"string"`
+- contract `properties.requestedAmount.additionalProperties`: — → `false`
+- mô tả `properties.requestedAmount.description`: — → `"The amount the head asks for the whole year, in the reporting currency."`
+- contract `properties.requestedAmount.properties.amount.maxLength`: — → `40`
+- contract `properties.requestedAmount.properties.amount.type`: — → `"string"`
+- contract `properties.requestedAmount.required`: — → `["amount"]`
+- contract `properties.requestedAmount.type`: — → `"object"`
+- contract `required`: `["lines","year"]` → `["attachmentIds","requestedAmount","year"]`
+
+### `ProposalResponseDto`
+- mô tả `properties.data.properties.proposal.properties.note.description`: — → `"What the head wrote beside the amount; null when nothing."`
+- contract `properties.data.properties.proposal.properties.note.nullable`: — → `true`
+- contract `properties.data.properties.proposal.properties.note.type`: — → `"string"`
+- contract `properties.data.properties.proposal.properties.requestedAmount.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.proposal.properties.requestedAmount.description`: — → `"The amount the head asked for the whole year (BM-10)."`
+- contract `properties.data.properties.proposal.properties.requestedAmount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.proposal.properties.requestedAmount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.proposal.properties.requestedAmount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.proposal.properties.requestedAmount.type`: — → `"object"`
+- mô tả `properties.data.properties.proposal.properties.total.description`: — → `"The amount asked for: the same as requestedAmount."`
+- contract `properties.data.properties.proposal.required`: `["closedAt","costCenter","id","previousProposalId","returned","state","submit…` → `["closedAt","costCenter","id","note","previousProposalId","requestedAmount","…`
+
+### `ProposalLinePageResponseDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.data.additionalProperties`: `false` → —
+- contract `properties.data.nullable`: `true` → —
+- contract `properties.data.properties.items.items.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.amount.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.amount.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.amount.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.amount.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.items.items.properties.amount.type`: `"object"` → —
+- contract `properties.data.properties.items.items.properties.description.type`: `"string"` → —
+- mô tả `properties.data.properties.items.items.properties.lineType.description`: `"RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL…` → —
+- contract `properties.data.properties.items.items.properties.lineType.enum`: `["CANCEL","CHANGE","NEW","RENEW"]` → —
+- contract `properties.data.properties.items.items.properties.lineType.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.note.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.note.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.type`: `"object"` → —
+- contract `properties.data.properties.items.items.properties.planId.format`: `"uuid"` → —
+- contract `properties.data.properties.items.items.properties.planId.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.planId.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.position.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.items.items.properties.position.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.position.minimum`: `0` → —
+- contract `properties.data.properties.items.items.properties.position.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.minimum`: `0` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.seats.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.seats.minimum`: `-9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.seats.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.seats.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.zbb.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.zbb.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.zbb.properties.alternatives.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.zbb.properties.consequenceIfNot.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.zbb.properties.purpose.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.zbb.properties.usageIndicator.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.zbb.required`: `["alternatives","consequenceIfNot","purpose","usageIndicator"]` → —
+- contract `properties.data.properties.items.items.properties.zbb.type`: `"object"` → —
+- contract `properties.data.properties.items.items.required`: `["amount","description","lineType","note","overCeiling","planId","position","…` → —
+- contract `properties.data.properties.items.items.type`: `"object"` → —
+- contract `properties.data.properties.items.type`: `"array"` → —
+- contract `properties.data.properties.pagination.additionalProperties`: `false` → —
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.pagination.properties.page.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.page.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.page.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.pageSize.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.totalItems.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.totalPages.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.required`: `["page","pageSize","totalItems","totalPages"]` → —
+- contract `properties.data.properties.pagination.type`: `"object"` → —
+- contract `properties.data.required`: `["items","pagination"]` → —
+- contract `properties.data.type`: `"object"` → —
+- contract `properties.message.pattern`: `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"` → —
+- contract `properties.message.type`: `"string"` → —
+- contract `properties.success.enum`: `[true]` → —
+- contract `properties.success.type`: `"boolean"` → —
+- contract `required`: `["data","message","success"]` → —
+- contract `type`: `"object"` → —
+
+### `ResubmissionBodyDto`
+- mô tả `properties.attachmentIds.description`: — → `"The files of the proposal (the template of BM-10 filled in, and anything tha…`
+- contract `properties.attachmentIds.maxItems`: `20` → `10`
+- contract `properties.attachmentIds.minItems`: — → `1`
+- contract `properties.lines.items.additionalProperties`: `false` → —
+- mô tả `properties.lines.items.description`: `"A line is a plan or a description, the seats, the amount of the year, its ki…` → —
+- contract `properties.lines.items.properties.amount.additionalProperties`: `false` → —
+- contract `properties.lines.items.properties.amount.properties.amount.maxLength`: `40` → —
+- contract `properties.lines.items.properties.amount.properties.amount.type`: `"string"` → —
+- contract `properties.lines.items.properties.amount.required`: `["amount"]` → —
+- contract `properties.lines.items.properties.amount.type`: `"object"` → —
+- contract `properties.lines.items.properties.description.maxLength`: `200` → —
+- contract `properties.lines.items.properties.description.minLength`: `1` → —
+- contract `properties.lines.items.properties.description.type`: `"string"` → —
+- mô tả `properties.lines.items.properties.lineType.description`: `"RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL…` → —
+- contract `properties.lines.items.properties.lineType.enum`: `["CANCEL","CHANGE","NEW","RENEW"]` → —
+- contract `properties.lines.items.properties.lineType.type`: `"string"` → —
+- contract `properties.lines.items.properties.note.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.note.minLength`: `1` → —
+- contract `properties.lines.items.properties.note.type`: `"string"` → —
+- contract `properties.lines.items.properties.planId.format`: `"uuid"` → —
+- contract `properties.lines.items.properties.planId.type`: `"string"` → —
+- contract `properties.lines.items.properties.priorityRank.maximum`: `100000` → —
+- contract `properties.lines.items.properties.priorityRank.minimum`: `1` → —
+- contract `properties.lines.items.properties.priorityRank.type`: `"integer"` → —
+- contract `properties.lines.items.properties.seats.maximum`: `100000` → —
+- contract `properties.lines.items.properties.seats.minimum`: `1` → —
+- contract `properties.lines.items.properties.seats.type`: `"integer"` → —
+- contract `properties.lines.items.properties.zbb.additionalProperties`: `false` → —
+- contract `properties.lines.items.properties.zbb.properties.alternatives.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.zbb.properties.alternatives.minLength`: `1` → —
+- contract `properties.lines.items.properties.zbb.properties.alternatives.type`: `"string"` → —
+- contract `properties.lines.items.properties.zbb.properties.consequenceIfNot.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.zbb.properties.consequenceIfNot.minLength`: `1` → —
+- contract `properties.lines.items.properties.zbb.properties.consequenceIfNot.type`: `"string"` → —
+- contract `properties.lines.items.properties.zbb.properties.purpose.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.zbb.properties.purpose.minLength`: `1` → —
+- contract `properties.lines.items.properties.zbb.properties.purpose.type`: `"string"` → —
+- contract `properties.lines.items.properties.zbb.properties.usageIndicator.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.zbb.properties.usageIndicator.minLength`: `1` → —
+- contract `properties.lines.items.properties.zbb.properties.usageIndicator.type`: `"string"` → —
+- contract `properties.lines.items.properties.zbb.required`: `["alternatives","consequenceIfNot","purpose","usageIndicator"]` → —
+- contract `properties.lines.items.properties.zbb.type`: `"object"` → —
+- contract `properties.lines.items.required`: `["amount","lineType","priorityRank"]` → —
+- contract `properties.lines.items.type`: `"object"` → —
+- contract `properties.lines.maxItems`: `200` → —
+- contract `properties.lines.minItems`: `1` → —
+- contract `properties.lines.type`: `"array"` → —
+- mô tả `properties.note.description`: — → `"What the head says beside the amount, if anything."`
+- contract `properties.note.maxLength`: — → `1000`
+- contract `properties.note.minLength`: — → `1`
+- contract `properties.note.type`: — → `"string"`
+- contract `properties.requestedAmount.additionalProperties`: — → `false`
+- mô tả `properties.requestedAmount.description`: — → `"The amount the head asks for the whole year, in the reporting currency."`
+- contract `properties.requestedAmount.properties.amount.maxLength`: — → `40`
+- contract `properties.requestedAmount.properties.amount.type`: — → `"string"`
+- contract `properties.requestedAmount.required`: — → `["amount"]`
+- contract `properties.requestedAmount.type`: — → `"object"`
+- contract `required`: `["lines"]` → `["attachmentIds","requestedAmount"]`
+
+### `VersionBodyDto`
+- mô tả `oneOf.0.properties.base.description`: — → `"The base of the year. Left out, it is filled in with what the Cost Center ca…`
+- contract `oneOf.0.properties.costCenterId.format`: — → `"uuid"`
+- contract `oneOf.0.properties.costCenterId.type`: — → `"string"`
+- contract `oneOf.0.properties.proposalId.format`: `"uuid"` → —
+- contract `oneOf.0.properties.proposalId.type`: `"string"` → —
+- contract `oneOf.0.properties.quarters.additionalProperties`: `false` → —
+- contract `oneOf.0.properties.quarters.nullable`: `true` → —
+- contract `oneOf.0.properties.quarters.properties.q1.additionalProperties`: `false` → —
+- contract `oneOf.0.properties.quarters.properties.q1.properties.amount.maxLength`: `40` → —
+- contract `oneOf.0.properties.quarters.properties.q1.properties.amount.type`: `"string"` → —
+- contract `oneOf.0.properties.quarters.properties.q1.required`: `["amount"]` → —
+- contract `oneOf.0.properties.quarters.properties.q1.type`: `"object"` → —
+- contract `oneOf.0.properties.quarters.properties.q2.additionalProperties`: `false` → —
+- contract `oneOf.0.properties.quarters.properties.q2.properties.amount.maxLength`: `40` → —
+- contract `oneOf.0.properties.quarters.properties.q2.properties.amount.type`: `"string"` → —
+- contract `oneOf.0.properties.quarters.properties.q2.required`: `["amount"]` → —
+- contract `oneOf.0.properties.quarters.properties.q2.type`: `"object"` → —
+- contract `oneOf.0.properties.quarters.properties.q3.additionalProperties`: `false` → —
+- contract `oneOf.0.properties.quarters.properties.q3.properties.amount.maxLength`: `40` → —
+- contract `oneOf.0.properties.quarters.properties.q3.properties.amount.type`: `"string"` → —
+- contract `oneOf.0.properties.quarters.properties.q3.required`: `["amount"]` → —
+- contract `oneOf.0.properties.quarters.properties.q3.type`: `"object"` → —
+- contract `oneOf.0.properties.quarters.properties.q4.additionalProperties`: `false` → —
+- contract `oneOf.0.properties.quarters.properties.q4.properties.amount.maxLength`: `40` → —
+- contract `oneOf.0.properties.quarters.properties.q4.properties.amount.type`: `"string"` → —
+- contract `oneOf.0.properties.quarters.properties.q4.required`: `["amount"]` → —
+- contract `oneOf.0.properties.quarters.properties.q4.type`: `"object"` → —
+- contract `oneOf.0.properties.quarters.required`: `["q1","q2","q3","q4"]` → —
+- contract `oneOf.0.properties.quarters.type`: `"object"` → —
+- mô tả `oneOf.0.properties.reserve.description`: — → `"The reserve as an amount; not with reservePercent. An amount that is not the…`
+- mô tả `oneOf.0.properties.reservePercent.description`: — → `"The reserve as a share of the base, in whole percent; not with reserve. The …`
+- contract `oneOf.0.properties.reservePercent.maximum`: — → `100`
+- contract `oneOf.0.properties.reservePercent.minimum`: — → `0`
+- contract `oneOf.0.properties.reservePercent.type`: — → `"integer"`
+- contract `oneOf.0.properties.source.enum`: `["PROPOSAL"]` → `["BASELINE"]`
+- contract `oneOf.0.properties.year.maximum`: — → `2200`
+- contract `oneOf.0.properties.year.minimum`: — → `2000`
+- contract `oneOf.0.properties.year.type`: — → `"integer"`
+- contract `oneOf.0.required`: `["base","proposalId"]` → `["costCenterId","source","year"]`
+- contract `oneOf.1.properties.base.additionalProperties`: — → `false`
+- mô tả `oneOf.1.properties.base.description`: — → `"The base of the year. Left out, it is filled in with what the Cost Center ca…`
+- contract `oneOf.1.properties.base.properties.amount.maxLength`: — → `40`
+- contract `oneOf.1.properties.base.properties.amount.type`: — → `"string"`
+- contract `oneOf.1.properties.base.required`: — → `["amount"]`
+- contract `oneOf.1.properties.base.type`: — → `"object"`
+- contract `oneOf.1.properties.costCenterId.format`: `"uuid"` → —
+- contract `oneOf.1.properties.costCenterId.type`: `"string"` → —
+- contract `oneOf.1.properties.proposalId.format`: — → `"uuid"`
+- contract `oneOf.1.properties.proposalId.type`: — → `"string"`
+- contract `oneOf.1.properties.reserve.additionalProperties`: — → `false`
+- mô tả `oneOf.1.properties.reserve.description`: — → `"The reserve as an amount; not with reservePercent. An amount that is not the…`
+- contract `oneOf.1.properties.reserve.properties.amount.maxLength`: — → `40`
+- contract `oneOf.1.properties.reserve.properties.amount.type`: — → `"string"`
+- contract `oneOf.1.properties.reserve.required`: — → `["amount"]`
+- contract `oneOf.1.properties.reserve.type`: — → `"object"`
+- mô tả `oneOf.1.properties.reservePercent.description`: — → `"The reserve as a share of the base, in whole percent; not with reserve. The …`
+- contract `oneOf.1.properties.reservePercent.maximum`: — → `100`
+- contract `oneOf.1.properties.reservePercent.minimum`: — → `0`
+- contract `oneOf.1.properties.reservePercent.type`: — → `"integer"`
+- contract `oneOf.1.properties.reserveReason.maxLength`: — → `1000`
+- contract `oneOf.1.properties.reserveReason.minLength`: — → `1`
+- contract `oneOf.1.properties.reserveReason.type`: — → `"string"`
+- contract `oneOf.1.properties.source.enum`: `["BASELINE"]` → `["PROPOSAL"]`
+- contract `oneOf.1.properties.year.maximum`: `2200` → —
+- contract `oneOf.1.properties.year.minimum`: `2000` → —
+- contract `oneOf.1.properties.year.type`: `"integer"` → —
+- contract `oneOf.1.required`: `["costCenterId","source","year"]` → `["proposalId"]`
+
+### `VersionResponseDto`
+- mô tả `properties.data.properties.version.properties.belowCarriedOver.description`: — → `"The red flag: the budget of the department, the base and the reserve togethe…`
+- contract `properties.data.properties.version.properties.belowCarriedOver.type`: — → `"boolean"`
+- contract `properties.data.properties.version.properties.carriedOverNextYear.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.version.properties.carriedOverNextYear.description`: — → `"What the Cost Center carries into the year of the version: the amount the re…`
+- contract `properties.data.properties.version.properties.carriedOverNextYear.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.version.properties.carriedOverNextYear.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.version.properties.carriedOverNextYear.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.version.properties.carriedOverNextYear.type`: — → `"object"`
+- contract `properties.data.properties.version.properties.carriedOverShortfall.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.version.properties.carriedOverShortfall.description`: — → `"What the base and the reserve lack of carriedOverNextYear: zero when they co…`
+- contract `properties.data.properties.version.properties.carriedOverShortfall.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.version.properties.carriedOverShortfall.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.version.properties.carriedOverShortfall.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.version.properties.carriedOverShortfall.type`: — → `"object"`
+- mô tả `properties.data.properties.version.properties.noProposalSubmitted.description`: — → `"Finance built the version from the baseline because the department had no pr…`
+- contract `properties.data.properties.version.properties.noProposalSubmitted.type`: — → `"boolean"`
+- contract `properties.data.properties.version.properties.origin.enum`: `["BASELINE_NO_HEAD","PROPOSAL"]` → `["ADJUSTMENT","BASELINE_NO_HEAD","BASELINE_NO_PROPOSAL","PROPOSAL"]`
+- contract `properties.data.properties.version.properties.quarters.additionalProperties`: `false` → —
+- contract `properties.data.properties.version.properties.quarters.nullable`: `true` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q1.additionalProperties`: `false` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q1.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q1.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q1.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q1.type`: `"object"` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q2.additionalProperties`: `false` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q2.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q2.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q2.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q2.type`: `"object"` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q3.additionalProperties`: `false` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q3.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q3.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q3.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q3.type`: `"object"` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q4.additionalProperties`: `false` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q4.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q4.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q4.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.version.properties.quarters.properties.q4.type`: `"object"` → —
+- contract `properties.data.properties.version.properties.quarters.required`: `["q1","q2","q3","q4"]` → —
+- contract `properties.data.properties.version.properties.quarters.type`: `"object"` → —
+- contract `properties.data.properties.version.required`: `["base","baseReason","costCenter","createdAt","createdBy","decision","default…` → `["base","baseReason","belowCarriedOver","carriedOverNextYear","carriedOverSho…`
+
+### `VersionPatchDto`
+- mô tả `properties.base.description`: — → `"The base of the year. Left out, it is filled in with what the Cost Center ca…`
+- contract `properties.quarters.additionalProperties`: `false` → —
+- contract `properties.quarters.nullable`: `true` → —
+- contract `properties.quarters.properties.q1.additionalProperties`: `false` → —
+- contract `properties.quarters.properties.q1.properties.amount.maxLength`: `40` → —
+- contract `properties.quarters.properties.q1.properties.amount.type`: `"string"` → —
+- contract `properties.quarters.properties.q1.required`: `["amount"]` → —
+- contract `properties.quarters.properties.q1.type`: `"object"` → —
+- contract `properties.quarters.properties.q2.additionalProperties`: `false` → —
+- contract `properties.quarters.properties.q2.properties.amount.maxLength`: `40` → —
+- contract `properties.quarters.properties.q2.properties.amount.type`: `"string"` → —
+- contract `properties.quarters.properties.q2.required`: `["amount"]` → —
+- contract `properties.quarters.properties.q2.type`: `"object"` → —
+- contract `properties.quarters.properties.q3.additionalProperties`: `false` → —
+- contract `properties.quarters.properties.q3.properties.amount.maxLength`: `40` → —
+- contract `properties.quarters.properties.q3.properties.amount.type`: `"string"` → —
+- contract `properties.quarters.properties.q3.required`: `["amount"]` → —
+- contract `properties.quarters.properties.q3.type`: `"object"` → —
+- contract `properties.quarters.properties.q4.additionalProperties`: `false` → —
+- contract `properties.quarters.properties.q4.properties.amount.maxLength`: `40` → —
+- contract `properties.quarters.properties.q4.properties.amount.type`: `"string"` → —
+- contract `properties.quarters.properties.q4.required`: `["amount"]` → —
+- contract `properties.quarters.properties.q4.type`: `"object"` → —
+- contract `properties.quarters.required`: `["q1","q2","q3","q4"]` → —
+- contract `properties.quarters.type`: `"object"` → —
+- mô tả `properties.reserve.description`: — → `"The reserve as an amount; not with reservePercent. An amount that is not the…`
+- mô tả `properties.reservePercent.description`: — → `"The reserve as a share of the base, in whole percent; not with reserve. The …`
+- contract `properties.reservePercent.maximum`: — → `100`
+- contract `properties.reservePercent.minimum`: — → `0`
+- contract `properties.reservePercent.type`: — → `"integer"`
+
+### `DecisionBodyDto`
+- mô tả `description`: `"A refusal (REJECT) or a request to look again (REQUEST_CHANGES) gives its re…` → `"The checklist of the policy in force at this step, and the decision: APPROVE…`
+- contract `properties.checklist.additionalProperties`: — → `false`
+- mô tả `properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `properties.checklist.type`: — → `"object"`
+- contract `properties.decision.enum`: `["APPROVE","REJECT","REQUEST_CHANGES"]` → `["APPROVE","RETURN"]`
+- contract `required`: `["decision"]` → `["checklist","decision"]`
+
+### `VersionLinePageResponseDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.data.additionalProperties`: `false` → —
+- contract `properties.data.nullable`: `true` → —
+- contract `properties.data.properties.items.items.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.adjustmentReason.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.adjustmentReason.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.amount.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.amount.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.amount.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.amount.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.items.items.properties.amount.type`: `"object"` → —
+- contract `properties.data.properties.items.items.properties.description.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.financeComment.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.financeComment.type`: `"string"` → —
+- mô tả `properties.data.properties.items.items.properties.lineType.description`: `"RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL…` → —
+- contract `properties.data.properties.items.items.properties.lineType.enum`: `["CANCEL","CHANGE","NEW","RENEW"]` → —
+- contract `properties.data.properties.items.items.properties.lineType.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.type`: `"object"` → —
+- contract `properties.data.properties.items.items.properties.planId.format`: `"uuid"` → —
+- contract `properties.data.properties.items.items.properties.planId.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.planId.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.position.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.items.items.properties.position.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.position.minimum`: `0` → —
+- contract `properties.data.properties.items.items.properties.position.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.minimum`: `0` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.proposalPosition.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.items.items.properties.proposalPosition.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.proposalPosition.minimum`: `0` → —
+- contract `properties.data.properties.items.items.properties.proposalPosition.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.proposalPosition.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.seats.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.seats.minimum`: `-9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.seats.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.seats.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.zbb.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.zbb.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.zbb.properties.alternatives.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.zbb.properties.consequenceIfNot.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.zbb.properties.purpose.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.zbb.properties.usageIndicator.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.zbb.required`: `["alternatives","consequenceIfNot","purpose","usageIndicator"]` → —
+- contract `properties.data.properties.items.items.properties.zbb.type`: `"object"` → —
+- contract `properties.data.properties.items.items.required`: `["adjustmentReason","amount","description","financeComment","lineType","overC…` → —
+- contract `properties.data.properties.items.items.type`: `"object"` → —
+- contract `properties.data.properties.items.type`: `"array"` → —
+- contract `properties.data.properties.pagination.additionalProperties`: `false` → —
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.pagination.properties.page.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.page.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.page.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.pageSize.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.totalItems.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.totalPages.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.required`: `["page","pageSize","totalItems","totalPages"]` → —
+- contract `properties.data.properties.pagination.type`: `"object"` → —
+- contract `properties.data.required`: `["items","pagination"]` → —
+- contract `properties.data.type`: `"object"` → —
+- contract `properties.message.pattern`: `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"` → —
+- contract `properties.message.type`: `"string"` → —
+- contract `properties.success.enum`: `[true]` → —
+- contract `properties.success.type`: `"boolean"` → —
+- contract `required`: `["data","message","success"]` → —
+- contract `type`: `"object"` → —
+
+### `LinePatchDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- mô tả `description`: `"Give at least one field."` → —
+- contract `minProperties`: `1` → —
+- contract `properties.adjustmentReason.maxLength`: `1000` → —
+- contract `properties.adjustmentReason.minLength`: `1` → —
+- contract `properties.adjustmentReason.nullable`: `true` → —
+- contract `properties.adjustmentReason.type`: `"string"` → —
+- contract `properties.amount.additionalProperties`: `false` → —
+- contract `properties.amount.properties.amount.maxLength`: `40` → —
+- contract `properties.amount.properties.amount.type`: `"string"` → —
+- contract `properties.amount.required`: `["amount"]` → —
+- contract `properties.amount.type`: `"object"` → —
+- contract `properties.description.maxLength`: `200` → —
+- contract `properties.description.minLength`: `1` → —
+- contract `properties.description.type`: `"string"` → —
+- contract `properties.financeComment.maxLength`: `1000` → —
+- contract `properties.financeComment.minLength`: `1` → —
+- contract `properties.financeComment.nullable`: `true` → —
+- contract `properties.financeComment.type`: `"string"` → —
+- mô tả `properties.lineType.description`: `"RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL…` → —
+- contract `properties.lineType.enum`: `["CANCEL","CHANGE","NEW","RENEW"]` → —
+- contract `properties.lineType.type`: `"string"` → —
+- contract `properties.planId.format`: `"uuid"` → —
+- contract `properties.planId.nullable`: `true` → —
+- contract `properties.planId.type`: `"string"` → —
+- contract `properties.priorityRank.maximum`: `100000` → —
+- contract `properties.priorityRank.minimum`: `1` → —
+- contract `properties.priorityRank.nullable`: `true` → —
+- contract `properties.priorityRank.type`: `"integer"` → —
+- contract `properties.seats.maximum`: `100000` → —
+- contract `properties.seats.minimum`: `1` → —
+- contract `properties.seats.nullable`: `true` → —
+- contract `properties.seats.type`: `"integer"` → —
+- contract `properties.zbb.additionalProperties`: `false` → —
+- contract `properties.zbb.nullable`: `true` → —
+- contract `properties.zbb.properties.alternatives.maxLength`: `1000` → —
+- contract `properties.zbb.properties.alternatives.minLength`: `1` → —
+- contract `properties.zbb.properties.alternatives.type`: `"string"` → —
+- contract `properties.zbb.properties.consequenceIfNot.maxLength`: `1000` → —
+- contract `properties.zbb.properties.consequenceIfNot.minLength`: `1` → —
+- contract `properties.zbb.properties.consequenceIfNot.type`: `"string"` → —
+- contract `properties.zbb.properties.purpose.maxLength`: `1000` → —
+- contract `properties.zbb.properties.purpose.minLength`: `1` → —
+- contract `properties.zbb.properties.purpose.type`: `"string"` → —
+- contract `properties.zbb.properties.usageIndicator.maxLength`: `1000` → —
+- contract `properties.zbb.properties.usageIndicator.minLength`: `1` → —
+- contract `properties.zbb.properties.usageIndicator.type`: `"string"` → —
+- contract `properties.zbb.required`: `["alternatives","consequenceIfNot","purpose","usageIndicator"]` → —
+- contract `properties.zbb.type`: `"object"` → —
+- contract `type`: `"object"` → —
+
+### `LineResponseDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.data.additionalProperties`: `false` → —
+- contract `properties.data.nullable`: `true` → —
+- contract `properties.data.properties.line.additionalProperties`: `false` → —
+- contract `properties.data.properties.line.properties.adjustmentReason.nullable`: `true` → —
+- contract `properties.data.properties.line.properties.adjustmentReason.type`: `"string"` → —
+- contract `properties.data.properties.line.properties.amount.additionalProperties`: `false` → —
+- contract `properties.data.properties.line.properties.amount.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.line.properties.amount.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.line.properties.amount.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.line.properties.amount.type`: `"object"` → —
+- contract `properties.data.properties.line.properties.description.type`: `"string"` → —
+- contract `properties.data.properties.line.properties.financeComment.nullable`: `true` → —
+- contract `properties.data.properties.line.properties.financeComment.type`: `"string"` → —
+- mô tả `properties.data.properties.line.properties.lineType.description`: `"RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL…` → —
+- contract `properties.data.properties.line.properties.lineType.enum`: `["CANCEL","CHANGE","NEW","RENEW"]` → —
+- contract `properties.data.properties.line.properties.lineType.type`: `"string"` → —
+- contract `properties.data.properties.line.properties.overCeiling.additionalProperties`: `false` → —
+- contract `properties.data.properties.line.properties.overCeiling.nullable`: `true` → —
+- contract `properties.data.properties.line.properties.overCeiling.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.line.properties.overCeiling.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.line.properties.overCeiling.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.line.properties.overCeiling.type`: `"object"` → —
+- contract `properties.data.properties.line.properties.planId.format`: `"uuid"` → —
+- contract `properties.data.properties.line.properties.planId.nullable`: `true` → —
+- contract `properties.data.properties.line.properties.planId.type`: `"string"` → —
+- contract `properties.data.properties.line.properties.position.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.line.properties.position.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.line.properties.position.minimum`: `0` → —
+- contract `properties.data.properties.line.properties.position.type`: `"integer"` → —
+- contract `properties.data.properties.line.properties.priorityRank.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.line.properties.priorityRank.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.line.properties.priorityRank.minimum`: `0` → —
+- contract `properties.data.properties.line.properties.priorityRank.nullable`: `true` → —
+- contract `properties.data.properties.line.properties.priorityRank.type`: `"integer"` → —
+- contract `properties.data.properties.line.properties.proposalPosition.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.line.properties.proposalPosition.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.line.properties.proposalPosition.minimum`: `0` → —
+- contract `properties.data.properties.line.properties.proposalPosition.nullable`: `true` → —
+- contract `properties.data.properties.line.properties.proposalPosition.type`: `"integer"` → —
+- contract `properties.data.properties.line.properties.seats.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.line.properties.seats.minimum`: `-9007199254740991` → —
+- contract `properties.data.properties.line.properties.seats.nullable`: `true` → —
+- contract `properties.data.properties.line.properties.seats.type`: `"integer"` → —
+- contract `properties.data.properties.line.properties.zbb.additionalProperties`: `false` → —
+- contract `properties.data.properties.line.properties.zbb.nullable`: `true` → —
+- contract `properties.data.properties.line.properties.zbb.properties.alternatives.type`: `"string"` → —
+- contract `properties.data.properties.line.properties.zbb.properties.consequenceIfNot.type`: `"string"` → —
+- contract `properties.data.properties.line.properties.zbb.properties.purpose.type`: `"string"` → —
+- contract `properties.data.properties.line.properties.zbb.properties.usageIndicator.type`: `"string"` → —
+- contract `properties.data.properties.line.properties.zbb.required`: `["alternatives","consequenceIfNot","purpose","usageIndicator"]` → —
+- contract `properties.data.properties.line.properties.zbb.type`: `"object"` → —
+- contract `properties.data.properties.line.required`: `["adjustmentReason","amount","description","financeComment","lineType","overC…` → —
+- contract `properties.data.properties.line.type`: `"object"` → —
+- contract `properties.data.required`: `["line"]` → —
+- contract `properties.data.type`: `"object"` → —
+- contract `properties.message.pattern`: `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"` → —
+- contract `properties.message.type`: `"string"` → —
+- contract `properties.success.enum`: `[true]` → —
+- contract `properties.success.type`: `"boolean"` → —
+- contract `required`: `["data","message","success"]` → —
+- contract `type`: `"object"` → —
+
+### `AddLinesBodyDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.lines.items.additionalProperties`: `false` → —
+- mô tả `properties.lines.items.description`: `"A line Finance adds: a plan or a description, the seats, the amount of the y…` → —
+- contract `properties.lines.items.properties.amount.additionalProperties`: `false` → —
+- contract `properties.lines.items.properties.amount.properties.amount.maxLength`: `40` → —
+- contract `properties.lines.items.properties.amount.properties.amount.type`: `"string"` → —
+- contract `properties.lines.items.properties.amount.required`: `["amount"]` → —
+- contract `properties.lines.items.properties.amount.type`: `"object"` → —
+- contract `properties.lines.items.properties.description.maxLength`: `200` → —
+- contract `properties.lines.items.properties.description.minLength`: `1` → —
+- contract `properties.lines.items.properties.description.type`: `"string"` → —
+- mô tả `properties.lines.items.properties.lineType.description`: `"RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL…` → —
+- contract `properties.lines.items.properties.lineType.enum`: `["CANCEL","CHANGE","NEW","RENEW"]` → —
+- contract `properties.lines.items.properties.lineType.type`: `"string"` → —
+- contract `properties.lines.items.properties.note.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.note.minLength`: `1` → —
+- contract `properties.lines.items.properties.note.type`: `"string"` → —
+- contract `properties.lines.items.properties.planId.format`: `"uuid"` → —
+- contract `properties.lines.items.properties.planId.type`: `"string"` → —
+- contract `properties.lines.items.properties.priorityRank.maximum`: `100000` → —
+- contract `properties.lines.items.properties.priorityRank.minimum`: `1` → —
+- contract `properties.lines.items.properties.priorityRank.type`: `"integer"` → —
+- contract `properties.lines.items.properties.seats.maximum`: `100000` → —
+- contract `properties.lines.items.properties.seats.minimum`: `1` → —
+- contract `properties.lines.items.properties.seats.type`: `"integer"` → —
+- contract `properties.lines.items.properties.zbb.additionalProperties`: `false` → —
+- contract `properties.lines.items.properties.zbb.properties.alternatives.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.zbb.properties.alternatives.minLength`: `1` → —
+- contract `properties.lines.items.properties.zbb.properties.alternatives.type`: `"string"` → —
+- contract `properties.lines.items.properties.zbb.properties.consequenceIfNot.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.zbb.properties.consequenceIfNot.minLength`: `1` → —
+- contract `properties.lines.items.properties.zbb.properties.consequenceIfNot.type`: `"string"` → —
+- contract `properties.lines.items.properties.zbb.properties.purpose.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.zbb.properties.purpose.minLength`: `1` → —
+- contract `properties.lines.items.properties.zbb.properties.purpose.type`: `"string"` → —
+- contract `properties.lines.items.properties.zbb.properties.usageIndicator.maxLength`: `1000` → —
+- contract `properties.lines.items.properties.zbb.properties.usageIndicator.minLength`: `1` → —
+- contract `properties.lines.items.properties.zbb.properties.usageIndicator.type`: `"string"` → —
+- contract `properties.lines.items.properties.zbb.required`: `["alternatives","consequenceIfNot","purpose","usageIndicator"]` → —
+- contract `properties.lines.items.properties.zbb.type`: `"object"` → —
+- contract `properties.lines.items.required`: `["amount","lineType"]` → —
+- contract `properties.lines.items.type`: `"object"` → —
+- contract `properties.lines.maxItems`: `200` → —
+- contract `properties.lines.minItems`: `1` → —
+- contract `properties.lines.type`: `"array"` → —
+- contract `required`: `["lines"]` → —
+- contract `type`: `"object"` → —
+
+### `BudgetLineImportResponseDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.data.additionalProperties`: `false` → —
+- contract `properties.data.nullable`: `true` → —
+- contract `properties.data.properties.result.additionalProperties`: `false` → —
+- contract `properties.data.properties.result.properties.added.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.result.properties.added.minimum`: `0` → —
+- contract `properties.data.properties.result.properties.added.type`: `"integer"` → —
+- contract `properties.data.properties.result.properties.errors.items.additionalProperties`: `false` → —
+- contract `properties.data.properties.result.properties.errors.items.properties.code.type`: `"string"` → —
+- contract `properties.data.properties.result.properties.errors.items.properties.row.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.result.properties.errors.items.properties.row.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.result.properties.errors.items.properties.row.minimum`: `0` → —
+- contract `properties.data.properties.result.properties.errors.items.properties.row.type`: `"integer"` → —
+- contract `properties.data.properties.result.properties.errors.items.required`: `["code","row"]` → —
+- contract `properties.data.properties.result.properties.errors.items.type`: `"object"` → —
+- contract `properties.data.properties.result.properties.errors.type`: `"array"` → —
+- contract `properties.data.properties.result.properties.rejected.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.result.properties.rejected.minimum`: `0` → —
+- contract `properties.data.properties.result.properties.rejected.type`: `"integer"` → —
+- contract `properties.data.properties.result.required`: `["added","errors","rejected"]` → —
+- contract `properties.data.properties.result.type`: `"object"` → —
+- contract `properties.data.required`: `["result"]` → —
+- contract `properties.data.type`: `"object"` → —
+- contract `properties.message.pattern`: `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"` → —
+- contract `properties.message.type`: `"string"` → —
+- contract `properties.success.enum`: `[true]` → —
+- contract `properties.success.type`: `"boolean"` → —
+- contract `required`: `["data","message","success"]` → —
+- contract `type`: `"object"` → —
+
+### `MineResponseDto`
+- mô tả `properties.data.properties.budget.properties.base.description`: — → `"The base of the approved version, before the adjustments (the base with them…`
+- contract `properties.data.properties.budget.properties.cycle.properties.published.type`: `"boolean"` → —
+- contract `properties.data.properties.budget.properties.cycle.properties.status.enum`: — → `["DRAFT","LOCKED","OPEN"]`
+- contract `properties.data.properties.budget.properties.cycle.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.budget.properties.cycle.required`: `["decisionDeadline","published","submissionDeadline"]` → `["decisionDeadline","status","submissionDeadline"]`
+- contract `properties.data.properties.budget.properties.departmentCeiling.additionalProperties`: `false` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.nullable`: `true` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.plannedSeats.additionalProperties`: `false` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.plannedSeats.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.plannedSeats.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.plannedSeats.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.plannedSeats.type`: `"object"` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.priority.additionalProperties`: `false` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.priority.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.priority.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.priority.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.priority.type`: `"object"` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.signedCommitments.additionalProperties`: `false` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.signedCommitments.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.signedCommitments.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.signedCommitments.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.signedCommitments.type`: `"object"` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.total.additionalProperties`: `false` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.total.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.total.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.total.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.properties.total.type`: `"object"` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.required`: `["plannedSeats","priority","signedCommitments","total"]` → —
+- contract `properties.data.properties.budget.properties.departmentCeiling.type`: `"object"` → —
+- contract `properties.data.properties.budget.properties.effectiveBudget.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.budget.properties.effectiveBudget.description`: — → `"Null when the Cost Center has no budget of the year. What is left below is w…`
+- contract `properties.data.properties.budget.properties.effectiveBudget.nullable`: — → `true`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.adjustment.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.budget.properties.effectiveBudget.properties.adjustment.description`: — → `"What the approved adjustments added to the base of the version; negative whe…`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.adjustment.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.adjustment.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.adjustment.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.adjustment.type`: — → `"object"`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.base.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.budget.properties.effectiveBudget.properties.base.description`: — → `"The base of the approved version plus the adjustments approved for the year …`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.base.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.base.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.base.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.base.type`: — → `"object"`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.reserve.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.budget.properties.effectiveBudget.properties.reserve.description`: — → `"The reserve of the approved version; an adjustment never changes it."`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.reserve.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.reserve.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.reserve.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.reserve.type`: — → `"object"`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.total.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.budget.properties.effectiveBudget.properties.total.description`: — → `"The effective base and the reserve together: what a request is checked again…`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.total.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.total.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.total.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.budget.properties.effectiveBudget.properties.total.type`: — → `"object"`
+- contract `properties.data.properties.budget.properties.effectiveBudget.required`: — → `["adjustment","base","reserve","total"]`
+- contract `properties.data.properties.budget.properties.effectiveBudget.type`: — → `"object"`
+- mô tả `properties.data.properties.budget.properties.total.description`: — → `"The base and the reserve of the approved version, before the adjustments."`
+- contract `properties.data.properties.budget.required`: `["base","committed","costCenter","cycle","departmentCeiling","latestRefusal",…` → `["base","committed","costCenter","cycle","effectiveBudget","latestRefusal","o…`
+
+### `MineLinePageResponseDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.data.additionalProperties`: `false` → —
+- contract `properties.data.nullable`: `true` → —
+- contract `properties.data.properties.items.items.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.adjustmentReason.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.adjustmentReason.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.amount.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.amount.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.amount.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.amount.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.items.items.properties.amount.type`: `"object"` → —
+- contract `properties.data.properties.items.items.properties.description.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.financeComment.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.financeComment.type`: `"string"` → —
+- mô tả `properties.data.properties.items.items.properties.lineType.description`: `"RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL…` → —
+- contract `properties.data.properties.items.items.properties.lineType.enum`: `["CANCEL","CHANGE","NEW","RENEW"]` → —
+- contract `properties.data.properties.items.items.properties.lineType.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.items.items.properties.overCeiling.type`: `"object"` → —
+- contract `properties.data.properties.items.items.properties.planId.format`: `"uuid"` → —
+- contract `properties.data.properties.items.items.properties.planId.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.planId.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.position.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.items.items.properties.position.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.position.minimum`: `0` → —
+- contract `properties.data.properties.items.items.properties.position.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.minimum`: `0` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.priorityRank.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.proposalPosition.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.items.items.properties.proposalPosition.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.proposalPosition.minimum`: `0` → —
+- contract `properties.data.properties.items.items.properties.proposalPosition.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.proposalPosition.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.seats.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.seats.minimum`: `-9007199254740991` → —
+- contract `properties.data.properties.items.items.properties.seats.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.seats.type`: `"integer"` → —
+- contract `properties.data.properties.items.items.properties.zbb.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.zbb.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.zbb.properties.alternatives.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.zbb.properties.consequenceIfNot.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.zbb.properties.purpose.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.zbb.properties.usageIndicator.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.zbb.required`: `["alternatives","consequenceIfNot","purpose","usageIndicator"]` → —
+- contract `properties.data.properties.items.items.properties.zbb.type`: `"object"` → —
+- contract `properties.data.properties.items.items.required`: `["adjustmentReason","amount","description","financeComment","lineType","overC…` → —
+- contract `properties.data.properties.items.items.type`: `"object"` → —
+- contract `properties.data.properties.items.type`: `"array"` → —
+- contract `properties.data.properties.pagination.additionalProperties`: `false` → —
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.pagination.properties.page.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.page.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.page.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.pageSize.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.totalItems.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.totalPages.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.required`: `["page","pageSize","totalItems","totalPages"]` → —
+- contract `properties.data.properties.pagination.type`: `"object"` → —
+- contract `properties.data.required`: `["items","pagination"]` → —
+- contract `properties.data.type`: `"object"` → —
+- contract `properties.message.pattern`: `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"` → —
+- contract `properties.message.type`: `"string"` → —
+- contract `properties.success.enum`: `[true]` → —
+- contract `properties.success.type`: `"boolean"` → —
+- contract `required`: `["data","message","success"]` → —
+- contract `type`: `"object"` → —
+
+### `BudgetSummaryResponseDto`
+- contract `properties.data.properties.companySpent.additionalProperties`: — → `false`
+- contract `properties.data.properties.companySpent.nullable`: — → `true`
+- contract `properties.data.properties.companySpent.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.companySpent.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.companySpent.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.companySpent.type`: — → `"object"`
+- contract `properties.data.properties.seatMonthsWithoutCostCenter.additionalProperties`: — → `false`
+- contract `properties.data.properties.seatMonthsWithoutCostCenter.nullable`: — → `true`
+- contract `properties.data.properties.seatMonthsWithoutCostCenter.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.seatMonthsWithoutCostCenter.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.seatMonthsWithoutCostCenter.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.seatMonthsWithoutCostCenter.type`: — → `"object"`
+- contract `properties.data.properties.sharedPoolOverReserve.nullable`: — → `true`
+- contract `properties.data.properties.sharedPoolOverReserve.type`: — → `"boolean"`
+- contract `properties.data.properties.sharedPoolUnallocated.additionalProperties`: — → `false`
+- contract `properties.data.properties.sharedPoolUnallocated.nullable`: — → `true`
+- contract `properties.data.properties.sharedPoolUnallocated.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.sharedPoolUnallocated.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.sharedPoolUnallocated.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.sharedPoolUnallocated.type`: — → `"object"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.additionalProperties`: — → `false`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.adjustment.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.adjustment.description`: — → `"What the approved adjustments added to the base of the version; negative whe…`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.adjustment.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.adjustment.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.adjustment.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.adjustment.type`: — → `"object"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.base.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.base.description`: — → `"The base of the approved version plus the adjustments approved for the year …`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.base.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.base.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.base.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.base.type`: — → `"object"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.reserve.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.reserve.description`: — → `"The reserve of the approved version; an adjustment never changes it."`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.reserve.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.reserve.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.reserve.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.reserve.type`: — → `"object"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.total.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.total.description`: — → `"The effective base and the reserve together: what a request is checked again…`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.total.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.total.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.total.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.properties.total.type`: — → `"object"`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.required`: — → `["adjustment","base","reserve","total"]`
+- contract `properties.data.properties.totals.additionalProperties.properties.effectiveBudget.type`: — → `"object"`
+- contract `properties.data.properties.totals.additionalProperties.required`: `["base","committed","costCenterCount","currency","overBudgetCount","pendingSp…` → `["base","committed","costCenterCount","currency","effectiveBudget","overBudge…`
+- contract `properties.data.required`: `["annualCeiling","lastInvoiceRecordedAt","sharedPoolReserve","totals","year"]` → `["annualCeiling","companySpent","lastInvoiceRecordedAt","seatMonthsWithoutCos…`
+
+### `BudgetTablePageResponseDto`
+- mô tả `properties.data.properties.items.items.properties.base.description`: — → `"The base of the approved version, before the adjustments (the base with them…`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.effectiveBudget.description`: — → `"Null when the Cost Center has no budget of the year. What is left below is w…`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.adjustment.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.effectiveBudget.properties.adjustment.description`: — → `"What the approved adjustments added to the base of the version; negative whe…`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.adjustment.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.adjustment.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.adjustment.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.adjustment.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.base.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.effectiveBudget.properties.base.description`: — → `"The base of the approved version plus the adjustments approved for the year …`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.base.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.base.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.base.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.base.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.reserve.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.effectiveBudget.properties.reserve.description`: — → `"The reserve of the approved version; an adjustment never changes it."`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.reserve.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.reserve.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.reserve.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.reserve.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.total.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.effectiveBudget.properties.total.description`: — → `"The effective base and the reserve together: what a request is checked again…`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.total.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.total.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.total.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.properties.total.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.required`: — → `["adjustment","base","reserve","total"]`
+- contract `properties.data.properties.items.items.properties.effectiveBudget.type`: — → `"object"`
+- mô tả `properties.data.properties.items.items.properties.total.description`: — → `"The base and the reserve of the approved version, before the adjustments."`
+- contract `properties.data.properties.items.items.required`: `["base","committed","costCenter","number","overBudget","overCommitted","pendi…` → `["base","committed","costCenter","effectiveBudget","number","overBudget","ove…`
+
+### `InvoiceBodyDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.deductibleTax.additionalProperties`: `false` → —
+- mô tả `properties.deductibleTax.description`: `"Tax that can be deducted: shown apart and not an expense. Nothing when left …` → —
+- contract `properties.deductibleTax.properties.amount.maxLength`: `40` → —
+- contract `properties.deductibleTax.properties.amount.type`: `"string"` → —
+- contract `properties.deductibleTax.required`: `["amount"]` → —
+- contract `properties.deductibleTax.type`: `"object"` → —
+- mô tả `properties.issuedOn.description`: `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."` → —
+- contract `properties.issuedOn.format`: `"date"` → —
+- contract `properties.issuedOn.type`: `"string"` → —
+- contract `properties.netAmount.additionalProperties`: `false` → —
+- mô tả `properties.netAmount.description`: `"The price on the invoice before tax, more than nothing."` → —
+- contract `properties.netAmount.properties.amount.maxLength`: `40` → —
+- contract `properties.netAmount.properties.amount.type`: `"string"` → —
+- contract `properties.netAmount.required`: `["amount"]` → —
+- contract `properties.netAmount.type`: `"object"` → —
+- contract `properties.nonDeductibleTax.additionalProperties`: `false` → —
+- mô tả `properties.nonDeductibleTax.description`: `"Tax that cannot be deducted: an expense. Nothing when left out."` → —
+- contract `properties.nonDeductibleTax.properties.amount.maxLength`: `40` → —
+- contract `properties.nonDeductibleTax.properties.amount.type`: `"string"` → —
+- contract `properties.nonDeductibleTax.required`: `["amount"]` → —
+- contract `properties.nonDeductibleTax.type`: `"object"` → —
+- contract `properties.note.maxLength`: `1000` → —
+- contract `properties.note.minLength`: `1` → —
+- contract `properties.note.type`: `"string"` → —
+- mô tả `properties.number.description`: `"The number on the invoice; recorded once for the vendor."` → —
+- contract `properties.number.maxLength`: `64` → —
+- contract `properties.number.minLength`: `1` → —
+- contract `properties.number.type`: `"string"` → —
+- contract `required`: `["issuedOn","netAmount","number"]` → —
+- contract `type`: `"object"` → —
+
+### `InvoiceRecordedResponseDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.data.additionalProperties`: `false` → —
+- contract `properties.data.nullable`: `true` → —
+- contract `properties.data.properties.commitment.additionalProperties`: `false` → —
+- contract `properties.data.properties.commitment.properties.amount.additionalProperties`: `false` → —
+- contract `properties.data.properties.commitment.properties.amount.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.amount.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.amount.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.commitment.properties.amount.type`: `"object"` → —
+- contract `properties.data.properties.commitment.properties.attached.type`: `"boolean"` → —
+- contract `properties.data.properties.commitment.properties.attachedAt.format`: `"date-time"` → —
+- contract `properties.data.properties.commitment.properties.attachedAt.nullable`: `true` → —
+- contract `properties.data.properties.commitment.properties.attachedAt.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.costCenter.additionalProperties`: `false` → —
+- contract `properties.data.properties.commitment.properties.costCenter.properties.code.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.costCenter.properties.id.format`: `"uuid"` → —
+- contract `properties.data.properties.commitment.properties.costCenter.properties.id.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.costCenter.properties.name.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.costCenter.required`: `["code","id","name"]` → —
+- contract `properties.data.properties.commitment.properties.costCenter.type`: `"object"` → —
+- contract `properties.data.properties.commitment.properties.createdAt.format`: `"date-time"` → —
+- contract `properties.data.properties.commitment.properties.createdAt.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.hasDiscrepancy.type`: `"boolean"` → —
+- contract `properties.data.properties.commitment.properties.held.additionalProperties`: `false` → —
+- contract `properties.data.properties.commitment.properties.held.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.held.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.held.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.commitment.properties.held.type`: `"object"` → —
+- contract `properties.data.properties.commitment.properties.id.format`: `"uuid"` → —
+- contract `properties.data.properties.commitment.properties.id.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.invoiceCount.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.commitment.properties.invoiceCount.minimum`: `0` → —
+- contract `properties.data.properties.commitment.properties.invoiceCount.type`: `"integer"` → —
+- contract `properties.data.properties.commitment.properties.invoiced.additionalProperties`: `false` → —
+- contract `properties.data.properties.commitment.properties.invoiced.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.invoiced.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.invoiced.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.commitment.properties.invoiced.type`: `"object"` → —
+- contract `properties.data.properties.commitment.properties.released.additionalProperties`: `false` → —
+- contract `properties.data.properties.commitment.properties.released.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.released.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.released.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.commitment.properties.released.type`: `"object"` → —
+- contract `properties.data.properties.commitment.properties.request.additionalProperties`: `false` → —
+- contract `properties.data.properties.commitment.properties.request.nullable`: `true` → —
+- contract `properties.data.properties.commitment.properties.request.properties.beneficiaryCount.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.commitment.properties.request.properties.beneficiaryCount.minimum`: `0` → —
+- contract `properties.data.properties.commitment.properties.request.properties.beneficiaryCount.type`: `"integer"` → —
+- contract `properties.data.properties.commitment.properties.request.properties.id.format`: `"uuid"` → —
+- contract `properties.data.properties.commitment.properties.request.properties.id.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.request.properties.plan.additionalProperties`: `false` → —
+- contract `properties.data.properties.commitment.properties.request.properties.plan.nullable`: `true` → —
+- contract `properties.data.properties.commitment.properties.request.properties.plan.properties.name.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.request.properties.plan.required`: `["name"]` → —
+- contract `properties.data.properties.commitment.properties.request.properties.plan.type`: `"object"` → —
+- contract `properties.data.properties.commitment.properties.request.properties.requester.additionalProperties`: `false` → —
+- contract `properties.data.properties.commitment.properties.request.properties.requester.properties.employeeCode.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.request.properties.requester.properties.fullName.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.request.properties.requester.required`: `["employeeCode","fullName"]` → —
+- contract `properties.data.properties.commitment.properties.request.properties.requester.type`: `"object"` → —
+- contract `properties.data.properties.commitment.properties.request.properties.software.additionalProperties`: `false` → —
+- contract `properties.data.properties.commitment.properties.request.properties.software.properties.name.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.request.properties.software.required`: `["name"]` → —
+- contract `properties.data.properties.commitment.properties.request.properties.software.type`: `"object"` → —
+- contract `properties.data.properties.commitment.properties.request.properties.spendApprovedAt.format`: `"date-time"` → —
+- contract `properties.data.properties.commitment.properties.request.properties.spendApprovedAt.nullable`: `true` → —
+- contract `properties.data.properties.commitment.properties.request.properties.spendApprovedAt.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.request.required`: `["beneficiaryCount","id","plan","requester","software","spendApprovedAt"]` → —
+- contract `properties.data.properties.commitment.properties.request.type`: `"object"` → —
+- contract `properties.data.properties.commitment.properties.requestId.format`: `"uuid"` → —
+- contract `properties.data.properties.commitment.properties.requestId.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.state.enum`: `["EXPENSED","HELD","RELEASED"]` → —
+- contract `properties.data.properties.commitment.properties.state.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.unattachedReason.enum`: `["NO_BUDGET",null]` → —
+- contract `properties.data.properties.commitment.properties.unattachedReason.nullable`: `true` → —
+- contract `properties.data.properties.commitment.properties.unattachedReason.type`: `"string"` → —
+- contract `properties.data.properties.commitment.properties.year.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.commitment.properties.year.minimum`: `-9007199254740991` → —
+- contract `properties.data.properties.commitment.properties.year.type`: `"integer"` → —
+- contract `properties.data.properties.commitment.required`: `["amount","attached","attachedAt","costCenter","createdAt","hasDiscrepancy","…` → —
+- contract `properties.data.properties.commitment.type`: `"object"` → —
+- contract `properties.data.properties.invoice.additionalProperties`: `false` → —
+- contract `properties.data.properties.invoice.properties.actualCost.additionalProperties`: `false` → —
+- contract `properties.data.properties.invoice.properties.actualCost.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.actualCost.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.actualCost.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.invoice.properties.actualCost.type`: `"object"` → —
+- contract `properties.data.properties.invoice.properties.deductibleTax.additionalProperties`: `false` → —
+- contract `properties.data.properties.invoice.properties.deductibleTax.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.deductibleTax.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.deductibleTax.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.invoice.properties.deductibleTax.type`: `"object"` → —
+- contract `properties.data.properties.invoice.properties.id.format`: `"uuid"` → —
+- contract `properties.data.properties.invoice.properties.id.type`: `"string"` → —
+- mô tả `properties.data.properties.invoice.properties.issuedOn.description`: `"A calendar date as YYYY-MM-DD."` → —
+- contract `properties.data.properties.invoice.properties.issuedOn.format`: `"date"` → —
+- contract `properties.data.properties.invoice.properties.issuedOn.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.matchResult.enum`: `["MATCHED","PRICE_QUANTITY_EXCEPTION","TAX_ONLY"]` → —
+- contract `properties.data.properties.invoice.properties.matchResult.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.netAmount.additionalProperties`: `false` → —
+- contract `properties.data.properties.invoice.properties.netAmount.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.netAmount.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.netAmount.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.invoice.properties.netAmount.type`: `"object"` → —
+- contract `properties.data.properties.invoice.properties.nonDeductibleTax.additionalProperties`: `false` → —
+- contract `properties.data.properties.invoice.properties.nonDeductibleTax.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.nonDeductibleTax.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.nonDeductibleTax.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.invoice.properties.nonDeductibleTax.type`: `"object"` → —
+- contract `properties.data.properties.invoice.properties.note.nullable`: `true` → —
+- contract `properties.data.properties.invoice.properties.note.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.number.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.recordedAt.format`: `"date-time"` → —
+- contract `properties.data.properties.invoice.properties.recordedAt.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.recordedBy.additionalProperties`: `false` → —
+- contract `properties.data.properties.invoice.properties.recordedBy.nullable`: `true` → —
+- contract `properties.data.properties.invoice.properties.recordedBy.properties.employeeCode.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.recordedBy.properties.employeeId.format`: `"uuid"` → —
+- contract `properties.data.properties.invoice.properties.recordedBy.properties.employeeId.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.recordedBy.properties.fullName.type`: `"string"` → —
+- contract `properties.data.properties.invoice.properties.recordedBy.required`: `["employeeCode","employeeId","fullName"]` → —
+- contract `properties.data.properties.invoice.properties.recordedBy.type`: `"object"` → —
+- contract `properties.data.properties.invoice.required`: `["actualCost","deductibleTax","id","issuedOn","matchResult","netAmount","nonD…` → —
+- contract `properties.data.properties.invoice.type`: `"object"` → —
+- contract `properties.data.required`: `["commitment","invoice"]` → —
+- contract `properties.data.type`: `"object"` → —
+- contract `properties.message.pattern`: `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"` → —
+- contract `properties.message.type`: `"string"` → —
+- contract `properties.success.enum`: `[true]` → —
+- contract `properties.success.type`: `"boolean"` → —
+- contract `required`: `["data","message","success"]` → —
+- contract `type`: `"object"` → —
+
+### `InvoiceListResponseDto`
+- mô tả `properties.data.properties.items.items.properties.label.description`: — → `"What the purchase was: a new purchase, a later period of one, or a renewal; …`
+- contract `properties.data.properties.items.items.properties.label.enum`: — → `["NEW_PURCHASE","PERIOD","RENEWAL",null]`
+- contract `properties.data.properties.items.items.properties.label.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.label.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.paymentSource.description`: — → `"How the purchase was paid; empty for an invoice that is not of a purchase in…`
+- contract `properties.data.properties.items.items.properties.paymentSource.enum`: — → `["COMPANY_CARD","IT_ADVANCE",null]`
+- contract `properties.data.properties.items.items.properties.paymentSource.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.paymentSource.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.servicePeriodMonth.description`: — → `"The month the invoice pays for, as YYYY-MM; empty for an invoice booked befo…`
+- contract `properties.data.properties.items.items.properties.servicePeriodMonth.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.servicePeriodMonth.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: `["actualCost","deductibleTax","id","issuedOn","matchResult","netAmount","nonD…` → `["actualCost","deductibleTax","id","issuedOn","label","matchResult","netAmoun…`
+
+### `OpenCycleBodyDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.annualCeiling.additionalProperties`: `false` → —
+- mô tả `properties.annualCeiling.description`: `"The annual ceiling of the software budget."` → —
+- contract `properties.annualCeiling.properties.amount.maxLength`: `40` → —
+- contract `properties.annualCeiling.properties.amount.type`: `"string"` → —
+- contract `properties.annualCeiling.required`: `["amount"]` → —
+- contract `properties.annualCeiling.type`: `"object"` → —
+- mô tả `properties.decisionDeadline.description`: `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."` → —
+- contract `properties.decisionDeadline.format`: `"date"` → —
+- contract `properties.decisionDeadline.type`: `"string"` → —
+- contract `properties.priorities.maxLength`: `2000` → —
+- contract `properties.priorities.minLength`: `1` → —
+- contract `properties.priorities.type`: `"string"` → —
+- mô tả `properties.submissionDeadline.description`: `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."` → —
+- contract `properties.submissionDeadline.format`: `"date"` → —
+- contract `properties.submissionDeadline.type`: `"string"` → —
+- contract `properties.year.maximum`: `2999` → —
+- contract `properties.year.minimum`: `2000` → —
+- contract `properties.year.type`: `"integer"` → —
+- contract `required`: `["annualCeiling","decisionDeadline","submissionDeadline","year"]` → —
+- contract `type`: `"object"` → —
+
+### `CycleResponseDto`
+- contract `properties.data.properties.allocated.additionalProperties`: `false` → —
+- mô tả `properties.data.properties.allocated.description`: `"The ceilings of the departments and the reserve, added."` → —
+- contract `properties.data.properties.allocated.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.allocated.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.allocated.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.allocated.type`: `"object"` → —
+- contract `properties.data.properties.available.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.available.description`: — → `"The annual ceiling less the shared-pool reserve: what the budgets of the dep…`
+- contract `properties.data.properties.available.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.available.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.available.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.available.type`: — → `"object"`
+- contract `properties.data.properties.ceilings.additionalProperties.additionalProperties`: `false` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.explanation.nullable`: `true` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.explanation.type`: `"string"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.plannedSeats.additionalProperties`: `false` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.plannedSeats.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.plannedSeats.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.plannedSeats.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.plannedSeats.type`: `"object"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.priority.additionalProperties`: `false` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.priority.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.priority.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.priority.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.priority.type`: `"object"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.signedCommitments.additionalProperties`: `false` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.signedCommitments.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.signedCommitments.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.signedCommitments.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.signedCommitments.type`: `"object"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.total.additionalProperties`: `false` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.total.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.total.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.total.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.ceilings.additionalProperties.properties.total.type`: `"object"` → —
+- contract `properties.data.properties.ceilings.additionalProperties.required`: `["explanation","plannedSeats","priority","signedCommitments","total"]` → —
+- contract `properties.data.properties.ceilings.additionalProperties.type`: `"object"` → —
+- mô tả `properties.data.properties.ceilings.description`: `"The ceiling of each department, by department id: at most 500, the bound of …` → —
+- contract `properties.data.properties.ceilings.type`: `"object"` → —
+- contract `properties.data.properties.firstPublishedAt.format`: `"date-time"` → —
+- contract `properties.data.properties.firstPublishedAt.nullable`: `true` → —
+- contract `properties.data.properties.firstPublishedAt.type`: `"string"` → —
+- mô tả `properties.data.properties.openedAt.description`: — → `"When Finance opened the cycle; null while it is a draft."`
+- contract `properties.data.properties.openedAt.nullable`: — → `true`
+- contract `properties.data.properties.publishedAt.format`: `"date-time"` → —
+- contract `properties.data.properties.publishedAt.nullable`: `true` → —
+- contract `properties.data.properties.publishedAt.type`: `"string"` → —
+- contract `properties.data.properties.status.enum`: `["CHANGED_AFTER_PUBLISH","NOT_PUBLISHED","PUBLISHED"]` → `["DRAFT","LOCKED","OPEN"]`
+- contract `properties.data.properties.unallocated.additionalProperties`: `false` → —
+- mô tả `properties.data.properties.unallocated.description`: `"The annual ceiling less what is allocated; below nothing is shown as zero."` → —
+- contract `properties.data.properties.unallocated.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.unallocated.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.unallocated.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.unallocated.type`: `"object"` → —
+- contract `properties.data.required`: `["allocated","annualCeiling","ceilings","decisionDeadline","firstPublishedAt"…` → `["annualCeiling","available","decisionDeadline","openedAt","priorities","shar…`
+
+### `CycleListResponseDto`
+- contract `properties.data.properties.items.items.properties.allocated.additionalProperties`: `false` → —
+- mô tả `properties.data.properties.items.items.properties.allocated.description`: `"The ceilings of the departments and the reserve, added."` → —
+- contract `properties.data.properties.items.items.properties.allocated.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.allocated.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.allocated.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.items.items.properties.allocated.type`: `"object"` → —
+- contract `properties.data.properties.items.items.properties.available.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.available.description`: — → `"The annual ceiling less the shared-pool reserve: what the budgets of the dep…`
+- contract `properties.data.properties.items.items.properties.available.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.available.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.available.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.available.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.firstPublishedAt.format`: `"date-time"` → —
+- contract `properties.data.properties.items.items.properties.firstPublishedAt.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.firstPublishedAt.type`: `"string"` → —
+- mô tả `properties.data.properties.items.items.properties.openedAt.description`: — → `"When Finance opened the cycle; null while it is a draft."`
+- contract `properties.data.properties.items.items.properties.openedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.priorities.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.priorities.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.publishedAt.format`: `"date-time"` → —
+- contract `properties.data.properties.items.items.properties.publishedAt.nullable`: `true` → —
+- contract `properties.data.properties.items.items.properties.publishedAt.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.status.enum`: `["CHANGED_AFTER_PUBLISH","NOT_PUBLISHED","PUBLISHED"]` → `["DRAFT","LOCKED","OPEN"]`
+- contract `properties.data.properties.items.items.properties.unallocated.additionalProperties`: `false` → —
+- mô tả `properties.data.properties.items.items.properties.unallocated.description`: `"The annual ceiling less what is allocated; below nothing is shown as zero."` → —
+- contract `properties.data.properties.items.items.properties.unallocated.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.unallocated.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.unallocated.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.items.items.properties.unallocated.type`: `"object"` → —
+- contract `properties.data.properties.items.items.required`: `["allocated","annualCeiling","decisionDeadline","firstPublishedAt","openedAt"…` → `["annualCeiling","available","decisionDeadline","openedAt","sharedPoolReserve…`
+
+### `UpdateCycleBodyDto`
+- mô tả `properties.reason.description`: `"Needed when the annual ceiling changes."` → `"Needed once the cycle is open, when the submission deadline moves or the ann…`
+- contract `properties.sharedPoolReserve.additionalProperties`: — → `false`
+- contract `properties.sharedPoolReserve.properties.amount.maxLength`: — → `40`
+- contract `properties.sharedPoolReserve.properties.amount.type`: — → `"string"`
+- contract `properties.sharedPoolReserve.required`: — → `["amount"]`
+- contract `properties.sharedPoolReserve.type`: — → `"object"`
+
+### `SetCeilingsBodyDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.departments.items.additionalProperties`: `false` → —
+- contract `properties.departments.items.properties.departmentId.format`: `"uuid"` → —
+- contract `properties.departments.items.properties.departmentId.type`: `"string"` → —
+- contract `properties.departments.items.properties.explanation.maxLength`: `2000` → —
+- contract `properties.departments.items.properties.explanation.minLength`: `1` → —
+- contract `properties.departments.items.properties.explanation.type`: `"string"` → —
+- contract `properties.departments.items.properties.plannedSeats.additionalProperties`: `false` → —
+- contract `properties.departments.items.properties.plannedSeats.properties.amount.maxLength`: `40` → —
+- contract `properties.departments.items.properties.plannedSeats.properties.amount.type`: `"string"` → —
+- contract `properties.departments.items.properties.plannedSeats.required`: `["amount"]` → —
+- contract `properties.departments.items.properties.plannedSeats.type`: `"object"` → —
+- contract `properties.departments.items.properties.priority.additionalProperties`: `false` → —
+- contract `properties.departments.items.properties.priority.properties.amount.maxLength`: `40` → —
+- contract `properties.departments.items.properties.priority.properties.amount.type`: `"string"` → —
+- contract `properties.departments.items.properties.priority.required`: `["amount"]` → —
+- contract `properties.departments.items.properties.priority.type`: `"object"` → —
+- contract `properties.departments.items.properties.signedCommitments.additionalProperties`: `false` → —
+- contract `properties.departments.items.properties.signedCommitments.properties.amount.maxLength`: `40` → —
+- contract `properties.departments.items.properties.signedCommitments.properties.amount.type`: `"string"` → —
+- contract `properties.departments.items.properties.signedCommitments.required`: `["amount"]` → —
+- contract `properties.departments.items.properties.signedCommitments.type`: `"object"` → —
+- contract `properties.departments.items.required`: `["departmentId","plannedSeats","priority","signedCommitments"]` → —
+- contract `properties.departments.items.type`: `"object"` → —
+- contract `properties.departments.maxItems`: `500` → —
+- contract `properties.departments.type`: `"array"` → —
+- contract `properties.sharedPoolReserve.additionalProperties`: `false` → —
+- mô tả `properties.sharedPoolReserve.description`: `"The reserve of the shared pool; zero is a value."` → —
+- contract `properties.sharedPoolReserve.properties.amount.maxLength`: `40` → —
+- contract `properties.sharedPoolReserve.properties.amount.type`: `"string"` → —
+- contract `properties.sharedPoolReserve.required`: `["amount"]` → —
+- contract `properties.sharedPoolReserve.type`: `"object"` → —
+- contract `required`: `["departments","sharedPoolReserve"]` → —
+- contract `type`: `"object"` → —
+
+### `BaselineResponseDto`
+- mô tả `properties.data.properties.departments.items.properties.belowCarriedOver.description`: — → `"The red flag: the newest version of the Cost Center for the year has a base …`
+- contract `properties.data.properties.departments.items.properties.belowCarriedOver.type`: — → `"boolean"`
+- contract `properties.data.properties.departments.items.properties.carriedOverNextYear.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.departments.items.properties.carriedOverNextYear.description`: — → `"What the Cost Center carries into the year of the cycle: the amount already …`
+- contract `properties.data.properties.departments.items.properties.carriedOverNextYear.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.departments.items.properties.carriedOverNextYear.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.departments.items.properties.carriedOverNextYear.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.departments.items.properties.carriedOverNextYear.type`: — → `"object"`
+- contract `properties.data.properties.departments.items.properties.carriedOverShortfall.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.departments.items.properties.carriedOverShortfall.description`: — → `"What the base and the reserve of that version lack of carriedOverNextYear: z…`
+- contract `properties.data.properties.departments.items.properties.carriedOverShortfall.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.departments.items.properties.carriedOverShortfall.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.departments.items.properties.carriedOverShortfall.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.departments.items.properties.carriedOverShortfall.type`: — → `"object"`
+- mô tả `properties.data.properties.departments.items.properties.noProposalSubmitted.description`: — → `"The submission deadline has passed and the department has no proposal: Finan…`
+- contract `properties.data.properties.departments.items.properties.noProposalSubmitted.type`: — → `"boolean"`
+- contract `properties.data.properties.departments.items.required`: `["costCenterId","departmentCode","departmentId","departmentName","estimatedAn…` → `["belowCarriedOver","carriedOverNextYear","carriedOverShortfall","costCenterI…`
+
+### `PackageResponseDto`
+- contract `properties.data.properties.departments.items.properties.baselineRefusal.enum`: `["BEFORE_DEADLINE","CYCLE_NOT_PUBLISHED","DEPARTMENT_NOT_IN_CYCLE","HAS_HEAD"…` → `["BEFORE_DEADLINE","CYCLE_NOT_OPEN","DEPARTMENT_NOT_IN_CYCLE","HAS_PROPOSAL",…`
+- contract `properties.data.properties.departments.items.properties.ceiling.additionalProperties`: `false` → —
+- mô tả `properties.data.properties.departments.items.properties.ceiling.description`: `"The ceiling as it stands now, which Finance may still be editing."` → —
+- contract `properties.data.properties.departments.items.properties.ceiling.nullable`: `true` → —
+- contract `properties.data.properties.departments.items.properties.ceiling.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.departments.items.properties.ceiling.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.departments.items.properties.ceiling.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.departments.items.properties.ceiling.type`: `"object"` → —
+- mô tả `properties.data.properties.departments.items.properties.proposal.properties.lines.description`: `"The lines of the proposal by priority rank, with the flag over the published…` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.additionalProperties`: `false` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.amount.additionalProperties`: `false` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.amount.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.amount.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.amount.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.amount.type`: `"object"` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.lineType.enum`: `["CANCEL","CHANGE","NEW","RENEW"]` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.lineType.type`: `"string"` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.overCeiling.additionalProperties`: `false` → —
+- mô tả `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.overCeiling.description`: `"The part of the line that carries the proposal over the published ceiling; n…` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.overCeiling.nullable`: `true` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.overCeiling.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.overCeiling.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.overCeiling.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.overCeiling.type`: `"object"` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.position.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.position.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.position.minimum`: `0` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.position.type`: `"integer"` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.priorityRank.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.priorityRank.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.priorityRank.minimum`: `0` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.properties.priorityRank.type`: `"integer"` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.required`: `["amount","lineType","overCeiling","position","priorityRank"]` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.items.type`: `"object"` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.maxItems`: `200` → —
+- contract `properties.data.properties.departments.items.properties.proposal.properties.lines.type`: `"array"` → —
+- mô tả `properties.data.properties.departments.items.properties.proposal.properties.total.description`: `"The lines counted: a CANCEL line is shown and not added."` → `"The amount the head asked for."`
+- contract `properties.data.properties.departments.items.properties.proposal.required`: `["id","lines","state","total"]` → `["id","state","total"]`
+- contract `properties.data.properties.departments.items.properties.publishedCeiling.additionalProperties`: `false` → —
+- mô tả `properties.data.properties.departments.items.properties.publishedCeiling.description`: `"The ceiling the head was told when the cycle was published; null before the …` → —
+- contract `properties.data.properties.departments.items.properties.publishedCeiling.nullable`: `true` → —
+- contract `properties.data.properties.departments.items.properties.publishedCeiling.properties.amount.type`: `"string"` → —
+- contract `properties.data.properties.departments.items.properties.publishedCeiling.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.departments.items.properties.publishedCeiling.required`: `["amount","currency"]` → —
+- contract `properties.data.properties.departments.items.properties.publishedCeiling.type`: `"object"` → —
+- contract `properties.data.properties.departments.items.properties.version.properties.origin.enum`: `["BASELINE_NO_HEAD","PROPOSAL"]` → `["ADJUSTMENT","BASELINE_NO_HEAD","BASELINE_NO_PROPOSAL","PROPOSAL"]`
+- contract `properties.data.properties.departments.items.required`: `["baselineAllowed","baselineRefusal","ceiling","departmentCode","departmentId…` → `["baselineAllowed","baselineRefusal","departmentCode","departmentId","departm…`
+- contract `properties.data.properties.unallocated.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.unallocated.description`: — → `"`available` less versionsTotal, never below nothing: what is not allocated, …`
+- contract `properties.data.properties.unallocated.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.unallocated.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.unallocated.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.unallocated.type`: — → `"object"`
+- contract `properties.data.properties.versionsAdjustment.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.versionsAdjustment.description`: — → `"Of versionsTotal, what the adjustments approved in the year gave to (positiv…`
+- contract `properties.data.properties.versionsAdjustment.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.versionsAdjustment.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.versionsAdjustment.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.versionsAdjustment.type`: — → `"object"`
+- mô tả `properties.data.properties.versionsTotal.description`: `"The versions counted at the annual check, in the currency of the cycle, whet…` → `"The versions counted at the annual check, in the currency of the cycle, whet…`
+- contract `properties.data.required`: `["annualCeiling","available","departments","departmentsTotal","overBy","propo…` → `["annualCeiling","available","departments","departmentsTotal","overBy","propo…`
+
+### `DeviceDetailResponseDto`
+- contract `properties.data.properties.collection.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.collection.properties.lastAcceptedAt.description`: — → `"The latest instant any credential of the open registration was accepted (usa…`
+- contract `properties.data.properties.collection.properties.lastAcceptedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.collection.properties.lastAcceptedAt.nullable`: — → `true`
+- contract `properties.data.properties.collection.properties.lastAcceptedAt.type`: — → `"string"`
+- contract `properties.data.properties.collection.properties.state.enum`: — → `["ACTIVE","AWAITING_ACKNOWLEDGEMENT","COLLECTION_STOPPED","RETIRED","UNREGIST…`
+- contract `properties.data.properties.collection.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.collection.required`: — → `["lastAcceptedAt","state"]`
+- contract `properties.data.properties.collection.type`: — → `"object"`
+- contract `properties.data.required`: `["acknowledgedFrom","assetCode","holder","hostname","id","lastEnd","latestAck…` → `["acknowledgedFrom","assetCode","collection","holder","hostname","id","lastEn…`
+
+### `DevicePageResponseDto`
+- contract `properties.data.properties.items.items.properties.collection.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.collection.properties.lastAcceptedAt.description`: — → `"The latest instant any credential of the open registration was accepted (usa…`
+- contract `properties.data.properties.items.items.properties.collection.properties.lastAcceptedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.collection.properties.lastAcceptedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.collection.properties.lastAcceptedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.collection.properties.state.enum`: — → `["ACTIVE","AWAITING_ACKNOWLEDGEMENT","COLLECTION_STOPPED","RETIRED","UNREGIST…`
+- contract `properties.data.properties.items.items.properties.collection.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.collection.required`: — → `["lastAcceptedAt","state"]`
+- contract `properties.data.properties.items.items.properties.collection.type`: — → `"object"`
+- contract `properties.data.properties.items.items.required`: `["assetCode","holder","hostname","id","os","registeredFrom","registrationId",…` → `["assetCode","collection","holder","hostname","id","os","registeredFrom","reg…`
+
+### `SetReportingCurrencyBodyDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.currency.pattern`: `"^[A-Z]{3}$"` → —
+- contract `properties.currency.type`: `"string"` → —
+- contract `required`: `["currency"]` → —
+- contract `type`: `"object"` → —
+
+### `ReportingCurrencySetResponseDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.data.additionalProperties`: `false` → —
+- contract `properties.data.nullable`: `true` → —
+- contract `properties.data.properties.changed.type`: `"boolean"` → —
+- contract `properties.data.properties.currency.type`: `"string"` → —
+- contract `properties.data.required`: `["changed","currency"]` → —
+- contract `properties.data.type`: `"object"` → —
+- contract `properties.message.pattern`: `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"` → —
+- contract `properties.message.type`: `"string"` → —
+- contract `properties.success.enum`: `[true]` → —
+- contract `properties.success.type`: `"boolean"` → —
+- contract `required`: `["data","message","success"]` → —
+- contract `type`: `"object"` → —
+
+### `ExchangeRatePageResponseDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.data.additionalProperties`: `false` → —
+- contract `properties.data.nullable`: `true` → —
+- contract `properties.data.properties.items.items.additionalProperties`: `false` → —
+- contract `properties.data.properties.items.items.properties.createdAt.format`: `"date-time"` → —
+- contract `properties.data.properties.items.items.properties.createdAt.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.id.format`: `"uuid"` → —
+- contract `properties.data.properties.items.items.properties.id.type`: `"string"` → —
+- mô tả `properties.data.properties.items.items.properties.rate.description`: `"Decimal string: units of the reporting currency for one unit of `currency`."` → —
+- contract `properties.data.properties.items.items.properties.rate.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.rateDate.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.reportingCurrency.type`: `"string"` → —
+- contract `properties.data.properties.items.items.properties.source.enum`: `["MANUAL"]` → —
+- contract `properties.data.properties.items.items.properties.source.type`: `"string"` → —
+- contract `properties.data.properties.items.items.required`: `["createdAt","currency","id","rate","rateDate","reportingCurrency","source"]` → —
+- contract `properties.data.properties.items.items.type`: `"object"` → —
+- contract `properties.data.properties.items.type`: `"array"` → —
+- contract `properties.data.properties.pagination.additionalProperties`: `false` → —
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.pagination.properties.page.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.page.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.page.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: `true` → —
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.pageSize.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.totalItems.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: `9007199254740991` → —
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: `0` → —
+- contract `properties.data.properties.pagination.properties.totalPages.type`: `"integer"` → —
+- contract `properties.data.properties.pagination.required`: `["page","pageSize","totalItems","totalPages"]` → —
+- contract `properties.data.properties.pagination.type`: `"object"` → —
+- contract `properties.data.required`: `["items","pagination"]` → —
+- contract `properties.data.type`: `"object"` → —
+- contract `properties.message.pattern`: `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"` → —
+- contract `properties.message.type`: `"string"` → —
+- contract `properties.success.enum`: `[true]` → —
+- contract `properties.success.type`: `"boolean"` → —
+- contract `required`: `["data","message","success"]` → —
+- contract `type`: `"object"` → —
+
+### `RecordExchangeRateBodyDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.currency.pattern`: `"^[A-Z]{3}$"` → —
+- contract `properties.currency.type`: `"string"` → —
+- contract `properties.rate.maxLength`: `40` → —
+- contract `properties.rate.type`: `"string"` → —
+- mô tả `properties.rateDate.description`: `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."` → —
+- contract `properties.rateDate.format`: `"date"` → —
+- contract `properties.rateDate.type`: `"string"` → —
+- contract `required`: `["currency","rate","rateDate"]` → —
+- contract `type`: `"object"` → —
+
+### `ExchangeRateResponseDto`
+- contract ``: — → `{}`
+- contract `additionalProperties`: `false` → —
+- contract `properties.data.additionalProperties`: `false` → —
+- contract `properties.data.nullable`: `true` → —
+- contract `properties.data.properties.createdAt.format`: `"date-time"` → —
+- contract `properties.data.properties.createdAt.type`: `"string"` → —
+- contract `properties.data.properties.currency.type`: `"string"` → —
+- contract `properties.data.properties.id.format`: `"uuid"` → —
+- contract `properties.data.properties.id.type`: `"string"` → —
+- mô tả `properties.data.properties.rate.description`: `"Decimal string: units of the reporting currency for one unit of `currency`."` → —
+- contract `properties.data.properties.rate.type`: `"string"` → —
+- contract `properties.data.properties.rateDate.type`: `"string"` → —
+- contract `properties.data.properties.reportingCurrency.type`: `"string"` → —
+- contract `properties.data.properties.source.enum`: `["MANUAL"]` → —
+- contract `properties.data.properties.source.type`: `"string"` → —
+- contract `properties.data.required`: `["createdAt","currency","id","rate","rateDate","reportingCurrency","source"]` → —
+- contract `properties.data.type`: `"object"` → —
+- contract `properties.message.pattern`: `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"` → —
+- contract `properties.message.type`: `"string"` → —
+- contract `properties.success.enum`: `[true]` → —
+- contract `properties.success.type`: `"boolean"` → —
+- contract `required`: `["data","message","success"]` → —
+- contract `type`: `"object"` → —
+
+### `UsageImportResponseDto`
+- contract `properties.data.properties.summary.properties.duplicateOfImportId.format`: — → `"uuid"`
+- contract `properties.data.properties.summary.properties.duplicateOfImportId.type`: — → `"string"`
+
+### `UsageImportConfirmationResponseDto`
+- contract `properties.data.properties.import.properties.summary.properties.duplicateOfImportId.format`: — → `"uuid"`
+- contract `properties.data.properties.import.properties.summary.properties.duplicateOfImportId.type`: — → `"string"`
+
+### `MeResponseDto`
+- contract `properties.data.properties.avatar.additionalProperties`: — → `false`
+- contract `properties.data.properties.avatar.nullable`: — → `true`
+- contract `properties.data.properties.avatar.properties.expiresAt.format`: — → `"date-time"`
+- contract `properties.data.properties.avatar.properties.expiresAt.type`: — → `"string"`
+- mô tả `properties.data.properties.avatar.properties.url.description`: — → `"A link to the picture that stops working at expiresAt; ask again for a new o…`
+- contract `properties.data.properties.avatar.properties.url.format`: — → `"uri"`
+- contract `properties.data.properties.avatar.properties.url.type`: — → `"string"`
+- contract `properties.data.properties.avatar.required`: — → `["expiresAt","url"]`
+- contract `properties.data.properties.avatar.type`: — → `"object"`
+- contract `properties.data.properties.pendingPolicyAcknowledgements.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.pendingPolicyAcknowledgements.items.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.pendingPolicyAcknowledgements.items.properties.title.type`: — → `"string"`
+- contract `properties.data.properties.pendingPolicyAcknowledgements.items.properties.versionNumber.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pendingPolicyAcknowledgements.items.properties.versionNumber.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pendingPolicyAcknowledgements.items.properties.versionNumber.minimum`: — → `0`
+- contract `properties.data.properties.pendingPolicyAcknowledgements.items.properties.versionNumber.type`: — → `"integer"`
+- contract `properties.data.properties.pendingPolicyAcknowledgements.items.required`: — → `["code","title","versionNumber"]`
+- contract `properties.data.properties.pendingPolicyAcknowledgements.items.type`: — → `"object"`
+- contract `properties.data.properties.pendingPolicyAcknowledgements.maxItems`: — → `20`
+- contract `properties.data.properties.pendingPolicyAcknowledgements.type`: — → `"array"`
+- contract `properties.data.properties.workPhone.nullable`: — → `true`
+- contract `properties.data.properties.workPhone.type`: — → `"string"`
+- contract `properties.data.required`: `["appUserId","employee","loginEmail","managerScope","roles","upcomingUnits"]` → `["appUserId","avatar","employee","loginEmail","managerScope","pendingPolicyAc…`
+
+### `GhostSeatDecisionBodyDto`
+- contract `properties.checklist.additionalProperties`: — → `false`
+- mô tả `properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `properties.checklist.type`: — → `"object"`
+- contract `required`: `["choice","items","reason"]` → `["checklist","choice","items","reason"]`
+
+### `ManagerDashboardResponseDto`
+- mô tả `properties.data.properties.sections.properties.approvedBudgetLines.description`: `"The lines of the approved budget version of the department."` → `"The approved budget of the department: one figure for the year, read at its …`
+
+### `ItAdminDashboardResponseDto`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.sections.properties.missingInvoicePeriods.description`: — → `"The periods of a right paid by the month or the year whose invoice has not b…`
+- mô tả `properties.data.properties.sections.properties.missingInvoicePeriods.properties.count.description`: — → `"Set only when state is COUNTED."`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.properties.count.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.properties.count.minimum`: — → `0`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.properties.count.nullable`: — → `true`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.properties.count.type`: — → `"integer"`
+- mô tả `properties.data.properties.sections.properties.missingInvoicePeriods.properties.reason.description`: — → `"Set only when state is NOT_AVAILABLE: the source of the data that is not del…`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.properties.reason.enum`: — → `["FINANCE_FIGURES_NOT_DELIVERED","NO_DATA_SOURCE","USAGE_DATA_NOT_DELIVERED",…`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.properties.reason.nullable`: — → `true`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.properties.reason.type`: — → `"string"`
+- mô tả `properties.data.properties.sections.properties.missingInvoicePeriods.properties.sourceOperationId.description`: — → `"The operation that lists the rows of the section; null when there is none yet."`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.properties.sourceOperationId.nullable`: — → `true`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.properties.sourceOperationId.type`: — → `"string"`
+- mô tả `properties.data.properties.sections.properties.missingInvoicePeriods.properties.state.description`: — → `"COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows …`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.properties.state.enum`: — → `["AT_SOURCE","COUNTED","NOT_AVAILABLE"]`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.required`: — → `["count","reason","sourceOperationId","state"]`
+- contract `properties.data.properties.sections.properties.missingInvoicePeriods.type`: — → `"object"`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.sections.properties.outOfProcessRevocationsDue.description`: — → `"The open cases outside the process on a company asset whose revocation is du…`
+- mô tả `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.count.description`: — → `"Set only when state is COUNTED."`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.count.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.count.minimum`: — → `0`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.count.nullable`: — → `true`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.count.type`: — → `"integer"`
+- mô tả `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.reason.description`: — → `"Set only when state is NOT_AVAILABLE: the source of the data that is not del…`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.reason.enum`: — → `["FINANCE_FIGURES_NOT_DELIVERED","NO_DATA_SOURCE","USAGE_DATA_NOT_DELIVERED",…`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.reason.nullable`: — → `true`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.reason.type`: — → `"string"`
+- mô tả `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.sourceOperationId.description`: — → `"The operation that lists the rows of the section; null when there is none yet."`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.sourceOperationId.nullable`: — → `true`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.sourceOperationId.type`: — → `"string"`
+- mô tả `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.state.description`: — → `"COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows …`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.state.enum`: — → `["AT_SOURCE","COUNTED","NOT_AVAILABLE"]`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.required`: — → `["count","reason","sourceOperationId","state"]`
+- contract `properties.data.properties.sections.properties.outOfProcessRevocationsDue.type`: — → `"object"`
+- contract `properties.data.properties.sections.required`: `["cancellationDeadlines","departures","discrepancies","ghostSeats","grantTask…` → `["cancellationDeadlines","departures","discrepancies","ghostSeats","grantTask…`
+
+### `CreateApplicationBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.dataSensitivity.enum`: — → `["HIGH","LOW","MEDIUM",null]`
+- contract `properties.dataSensitivity.nullable`: — → `true`
+- contract `properties.dataSensitivity.type`: — → `"string"`
+- contract `properties.dictionaryServiceLineId.format`: — → `"uuid"`
+- contract `properties.dictionaryServiceLineId.type`: — → `"string"`
+- contract `properties.domains.items.maxLength`: — → `1000`
+- contract `properties.domains.items.type`: — → `"string"`
+- contract `properties.domains.maxItems`: — → `100`
+- contract `properties.domains.type`: — → `"array"`
+- mô tả `properties.functionalGroupId.description`: — → `"The group the application is classed under; left out, it stands in Khác."`
+- contract `properties.functionalGroupId.format`: — → `"uuid"`
+- contract `properties.functionalGroupId.type`: — → `"string"`
+- mô tả `properties.homepageUrl.description`: — → `"The web page of the software: its host is kept among the domains, and a cata…`
+- contract `properties.homepageUrl.maxLength`: — → `1000`
+- contract `properties.homepageUrl.type`: — → `"string"`
+- mô tả `properties.logoUrl.description`: — → `"A link to the logo image, https only; nothing is uploaded."`
+- contract `properties.logoUrl.maxLength`: — → `500`
+- contract `properties.logoUrl.pattern`: — → `"^https:\\/\\/\\S+$"`
+- contract `properties.logoUrl.type`: — → `"string"`
+- contract `properties.name.maxLength`: — → `1000`
+- contract `properties.name.type`: — → `"string"`
+- contract `properties.plan.additionalProperties`: — → `false`
+- contract `properties.plan.properties.controlLevel.enum`: — → `["FULL","PARTIAL","UNCONTROLLABLE"]`
+- contract `properties.plan.properties.controlLevel.type`: — → `"string"`
+- contract `properties.plan.properties.dataLossOnRemoval.type`: — → `"boolean"`
+- contract `properties.plan.properties.hasAdminConsole.type`: — → `"boolean"`
+- contract `properties.plan.properties.name.maxLength`: — → `1000`
+- contract `properties.plan.properties.name.type`: — → `"string"`
+- contract `properties.plan.properties.provisioningType.enum`: — → `["K1","K2","K3","K4","K5"]`
+- contract `properties.plan.properties.provisioningType.type`: — → `"string"`
+- contract `properties.plan.properties.revocationNote.maxLength`: — → `5000`
+- contract `properties.plan.properties.revocationNote.nullable`: — → `true`
+- contract `properties.plan.properties.revocationNote.type`: — → `"string"`
+- contract `properties.plan.properties.sharingPolicy.enum`: — → `["ALLOWED","NOT_ALLOWED"]`
+- contract `properties.plan.properties.sharingPolicy.type`: — → `"string"`
+- contract `properties.plan.required`: — → `["name","provisioningType"]`
+- contract `properties.plan.type`: — → `"object"`
+- contract `properties.vendorName.maxLength`: — → `1000`
+- contract `properties.vendorName.type`: — → `"string"`
+- contract `required`: — → `["name","plan"]`
+- contract `type`: — → `"object"`
+
+### `ContractPageResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.createdAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.createdAt.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.effectiveFrom.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.items.items.properties.effectiveFrom.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.effectiveFrom.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.effectiveFrom.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.effectiveTo.description`: — → `"Null: the contract never ends."`
+- contract `properties.data.properties.items.items.properties.effectiveTo.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.effectiveTo.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.effectiveTo.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.number.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.number.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.status.description`: — → `"Read from the vendor and the days as of today: INCOMPLETE (no vendor or no b…`
+- contract `properties.data.properties.items.items.properties.status.enum`: — → `["ACTIVE","EXPIRED","INCOMPLETE","NOT_YET_EFFECTIVE"]`
+- contract `properties.data.properties.items.items.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.subscriptionCount.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.subscriptionCount.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.subscriptionCount.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.updatedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.updatedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.vendor.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.vendor.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.vendor.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.vendor.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.vendor.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.vendor.required`: — → `["id","name"]`
+- contract `properties.data.properties.items.items.properties.vendor.type`: — → `"object"`
+- contract `properties.data.properties.items.items.required`: — → `["createdAt","effectiveFrom","effectiveTo","id","name","number","status","sub…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `UpdateContractBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- mô tả `properties.effectiveFrom.description`: — → `"The day the contract begins. A calendar date as YYYY-MM-DD; it must exist (2…`
+- contract `properties.effectiveFrom.format`: — → `"date"`
+- contract `properties.effectiveFrom.type`: — → `"string"`
+- mô tả `properties.effectiveTo.description`: — → `"The day the contract ends; null says the contract never ends. A calendar dat…`
+- contract `properties.effectiveTo.format`: — → `"date"`
+- contract `properties.effectiveTo.nullable`: — → `true`
+- contract `properties.effectiveTo.type`: — → `"string"`
+- contract `properties.name.maxLength`: — → `200`
+- contract `properties.name.type`: — → `"string"`
+- mô tả `properties.note.description`: — → `"null takes the note away."`
+- contract `properties.note.maxLength`: — → `2000`
+- contract `properties.note.nullable`: — → `true`
+- contract `properties.note.type`: — → `"string"`
+- mô tả `properties.number.description`: — → `"null takes the number away."`
+- contract `properties.number.maxLength`: — → `100`
+- contract `properties.number.nullable`: — → `true`
+- contract `properties.number.type`: — → `"string"`
+- contract `properties.reason.default`: — → `""`
+- mô tả `properties.reason.description`: — → `"Why the contract is changed. Kept in the Audit Trail."`
+- contract `properties.reason.maxLength`: — → `1000`
+- contract `properties.reason.type`: — → `"string"`
+- mô tả `properties.vendorId.description`: — → `"Refused while a subscription is linked to the contract."`
+- contract `properties.vendorId.format`: — → `"uuid"`
+- contract `properties.vendorId.type`: — → `"string"`
+- contract `type`: — → `"object"`
+
+### `LinkSubscriptionBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.subscriptionId.format`: — → `"uuid"`
+- contract `properties.subscriptionId.type`: — → `"string"`
+- contract `required`: — → `["subscriptionId"]`
+- contract `type`: — → `"object"`
+
+### `ContractSubscriptionResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.subscription.additionalProperties`: — → `false`
+- contract `properties.data.properties.subscription.properties.applicationId.format`: — → `"uuid"`
+- contract `properties.data.properties.subscription.properties.applicationId.type`: — → `"string"`
+- contract `properties.data.properties.subscription.properties.applicationName.type`: — → `"string"`
+- mô tả `properties.data.properties.subscription.properties.endDate.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.subscription.properties.endDate.format`: — → `"date"`
+- contract `properties.data.properties.subscription.properties.endDate.nullable`: — → `true`
+- contract `properties.data.properties.subscription.properties.endDate.type`: — → `"string"`
+- contract `properties.data.properties.subscription.properties.kind.enum`: — → `["PERPETUAL","TERM"]`
+- contract `properties.data.properties.subscription.properties.kind.type`: — → `"string"`
+- contract `properties.data.properties.subscription.properties.linkedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.subscription.properties.linkedAt.type`: — → `"string"`
+- mô tả `properties.data.properties.subscription.properties.logoUrl.description`: — → `"The https link to the logo image of the application that the IT Admin pasted…`
+- contract `properties.data.properties.subscription.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.subscription.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.subscription.properties.planId.format`: — → `"uuid"`
+- contract `properties.data.properties.subscription.properties.planId.type`: — → `"string"`
+- contract `properties.data.properties.subscription.properties.planName.type`: — → `"string"`
+- contract `properties.data.properties.subscription.properties.provisioningType.enum`: — → `["K1","K2","K3","K4","K5"]`
+- contract `properties.data.properties.subscription.properties.provisioningType.type`: — → `"string"`
+- mô tả `properties.data.properties.subscription.properties.startDate.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.subscription.properties.startDate.format`: — → `"date"`
+- contract `properties.data.properties.subscription.properties.startDate.nullable`: — → `true`
+- contract `properties.data.properties.subscription.properties.startDate.type`: — → `"string"`
+- contract `properties.data.properties.subscription.properties.status.enum`: — → `["ACTIVE","DRAFT"]`
+- contract `properties.data.properties.subscription.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.subscription.properties.subscriptionId.format`: — → `"uuid"`
+- contract `properties.data.properties.subscription.properties.subscriptionId.type`: — → `"string"`
+- contract `properties.data.properties.subscription.required`: — → `["applicationId","applicationName","endDate","kind","linkedAt","logoUrl","pla…`
+- contract `properties.data.properties.subscription.type`: — → `"object"`
+- contract `properties.data.required`: — → `["subscription"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `StockSummaryResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.plan.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.plan.properties.applicationId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.plan.properties.applicationId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.plan.properties.applicationName.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.plan.properties.logoUrl.description`: — → `"The https link to the logo image of the application that the IT Admin pasted…`
+- contract `properties.data.properties.items.items.properties.plan.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.plan.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.plan.properties.planId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.plan.properties.planId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.plan.properties.planName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.plan.properties.provisioningType.enum`: — → `["K1","K2","K4"]`
+- contract `properties.data.properties.items.items.properties.plan.properties.provisioningType.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.plan.required`: — → `["applicationId","applicationName","logoUrl","planId","planName","provisionin…`
+- contract `properties.data.properties.items.items.properties.plan.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.stock.oneOf.0.properties.assigned.description`: — → `"The keys given to a seat."`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.properties.assigned.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.properties.assigned.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.properties.assigned.type`: — → `"integer"`
+- mô tả `properties.data.properties.items.items.properties.stock.oneOf.0.properties.inStore.description`: — → `"The keys in the store that were not withdrawn. A grant still in progress has…`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.properties.inStore.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.properties.inStore.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.properties.inStore.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.properties.kind.enum`: — → `["KEYS"]`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.properties.kind.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.stock.oneOf.0.properties.withdrawn.description`: — → `"The keys taken out of the store and never given out again."`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.properties.withdrawn.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.properties.withdrawn.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.properties.withdrawn.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.required`: — → `["assigned","inStore","kind","withdrawn"]`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.0.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.stock.oneOf.1.properties.assigned.description`: — → `"The seats held from today on: the most held on any day, so a seat promised f…`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.assigned.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.assigned.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.assigned.type`: — → `"integer"`
+- mô tả `properties.data.properties.items.items.properties.stock.oneOf.1.properties.free.description`: — → `"The seats a grant can take without buying, the seats of each subscription le…`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.free.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.free.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.free.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.free.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.kind.enum`: — → `["SEATS"]`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.kind.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.stock.oneOf.1.properties.purchased.description`: — → `"The seats bought; null while a subscription of the plan has no quantity (a f…`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.purchased.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.purchased.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.purchased.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.purchased.type`: — → `"integer"`
+- mô tả `properties.data.properties.items.items.properties.stock.oneOf.1.properties.revoking.description`: — → `"Of the assigned seats, those held by a right whose revocation is still open:…`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.revoking.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.revoking.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.properties.revoking.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.required`: — → `["assigned","free","kind","purchased","revoking"]`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.1.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.2.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.stock.oneOf.2.properties.holders.description`: — → `"The personal accounts held today (a right each), a plan that has no free sea…`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.2.properties.holders.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.2.properties.holders.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.2.properties.holders.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.2.properties.kind.enum`: — → `["HOLDERS"]`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.2.properties.kind.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.2.required`: — → `["holders","kind"]`
+- contract `properties.data.properties.items.items.properties.stock.oneOf.2.type`: — → `"object"`
+- contract `properties.data.properties.items.items.required`: — → `["plan","stock"]`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `AssessmentCompletionBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- mô tả `description`: — → `"The checklist of the policy in force at the step of the assessment. The asse…`
+- contract `properties.checklist.additionalProperties`: — → `false`
+- mô tả `properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `properties.checklist.type`: — → `"object"`
+- contract `required`: — → `["checklist"]`
+- contract `type`: — → `"object"`
+
+### `CatalogLinkResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.departmentList.additionalProperties`: — → `false`
+- contract `properties.data.properties.departmentList.nullable`: — → `true`
+- contract `properties.data.properties.departmentList.properties.added.type`: — → `"boolean"`
+- contract `properties.data.properties.departmentList.properties.entryId.format`: — → `"uuid"`
+- contract `properties.data.properties.departmentList.properties.entryId.type`: — → `"string"`
+- contract `properties.data.properties.departmentList.required`: — → `["added","entryId"]`
+- contract `properties.data.properties.departmentList.type`: — → `"object"`
+- contract `properties.data.properties.request.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.beneficiary.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.beneficiary.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.beneficiary.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.beneficiary.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.beneficiary.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.beneficiary.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.beneficiary.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.request.properties.beneficiary.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.branch.enum`: — → `["INTERNAL_FREE","NEW_SOFTWARE","PAID_IN_CATALOG"]`
+- contract `properties.data.properties.request.properties.branch.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.budgetYear.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.budgetYear.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.budgetYear.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.budgetYear.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.businessReason.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cancellation.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cancellation.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cancellation.properties.cancelledAt.format`: — → `"date-time"`
+- contract `properties.data.properties.request.properties.cancellation.properties.cancelledAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cancellation.properties.cancelledBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cancellation.properties.cancelledBy.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cancellation.properties.cancelledBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cancellation.properties.cancelledBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.cancellation.properties.cancelledBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cancellation.properties.cancelledBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cancellation.properties.cancelledBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.request.properties.cancellation.properties.cancelledBy.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.cancellation.properties.cause.enum`: — → `["BENEFICIARY_LEFT","BENEFICIARY_TRANSFERRED","SPENDING_APPROVER_PARTY","SYST…`
+- contract `properties.data.properties.request.properties.cancellation.properties.cause.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cancellation.properties.note.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cancellation.properties.note.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cancellation.required`: — → `["cancelledAt","cancelledBy","cause","note"]`
+- contract `properties.data.properties.request.properties.cancellation.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.cost.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.required`: — → `["amount","months","year"]`
+- contract `properties.data.properties.request.properties.cost.properties.currentYear.type`: — → `"object"`
+- mô tả `properties.data.properties.request.properties.cost.properties.months.description`: — → `"The months that have begun by the end of the term, each counted whole; null …`
+- contract `properties.data.properties.request.properties.cost.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.estimate.enum`: — → `[true]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.estimate.type`: — → `"boolean"`
+- mô tả `properties.data.properties.request.properties.cost.properties.nextYear.properties.from.description`: — → `"The first day of the year after, YYYY-MM-DD."`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.from.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.required`: — → `["amount","estimate","from","months"]`
+- contract `properties.data.properties.request.properties.cost.properties.nextYear.type`: — → `"object"`
+- mô tả `properties.data.properties.request.properties.cost.properties.termCutAt.description`: — → `"The last day of the contract of a person with a term, when it cut the time o…`
+- contract `properties.data.properties.request.properties.cost.properties.termCutAt.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.cost.properties.termCutAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.cost.required`: — → `["currentYear","months","nextYear","termCutAt"]`
+- contract `properties.data.properties.request.properties.cost.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.costCenter.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.costCenter.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.costCenter.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.costCenter.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.costCenter.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.costCenter.required`: — → `["code","id"]`
+- contract `properties.data.properties.request.properties.costCenter.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.department.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.department.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.department.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.department.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.department.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.department.required`: — → `["code","id","name"]`
+- contract `properties.data.properties.request.properties.department.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.expectedEndDate.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.expectedEndDate.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.limitExemption.enum`: — → `["ROLE_ENDED","TRANSFER_GRACE",null]`
+- contract `properties.data.properties.request.properties.limitExemption.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.limitExemption.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.lineCount.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.request.properties.lineCount.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.lineCount.minimum`: — → `0`
+- contract `properties.data.properties.request.properties.lineCount.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.needDecision.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.needDecision.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.needDecision.properties.decidedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.request.properties.needDecision.properties.decidedAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needDecision.properties.decidedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.needDecision.properties.decidedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needDecision.properties.decidedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.needDecision.properties.decidedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needDecision.properties.decidedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needDecision.properties.decidedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.request.properties.needDecision.properties.decidedBy.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.needDecision.properties.deciderRole.enum`: — → `["MANAGER","SPENDING_APPROVER"]`
+- contract `properties.data.properties.request.properties.needDecision.properties.deciderRole.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needDecision.properties.decision.enum`: — → `["APPROVED","REJECTED","RETURNED"]`
+- contract `properties.data.properties.request.properties.needDecision.properties.decision.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needDecision.properties.reason.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.needDecision.properties.reason.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needDecision.required`: — → `["decidedAt","decidedBy","deciderRole","decision","reason"]`
+- contract `properties.data.properties.request.properties.needDecision.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.needStep.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.needStep.properties.assignedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.request.properties.needStep.properties.assignedAt.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.needStep.properties.assignedAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needStep.properties.assignee.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.needStep.properties.assignee.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.needStep.properties.assignee.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needStep.properties.assignee.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.needStep.properties.assignee.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needStep.properties.assignee.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needStep.properties.assignee.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.request.properties.needStep.properties.assignee.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.needStep.properties.createdAt.format`: — → `"date-time"`
+- contract `properties.data.properties.request.properties.needStep.properties.createdAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needStep.properties.decidedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.request.properties.needStep.properties.decidedAt.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.needStep.properties.decidedAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needStep.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.needStep.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needStep.properties.routingRow.maximum`: — → `9`
+- contract `properties.data.properties.request.properties.needStep.properties.routingRow.minimum`: — → `1`
+- contract `properties.data.properties.request.properties.needStep.properties.routingRow.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.needStep.properties.slaWorkingDays.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.request.properties.needStep.properties.slaWorkingDays.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.needStep.properties.slaWorkingDays.minimum`: — → `0`
+- contract `properties.data.properties.request.properties.needStep.properties.slaWorkingDays.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.needStep.properties.slaWorkingDays.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.needStep.properties.state.enum`: — → `["APPROVED","CLOSED","NOT_REQUIRED","PENDING","REJECTED","WAITING"]`
+- contract `properties.data.properties.request.properties.needStep.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needStep.properties.waitingReason.enum`: — → `["NO_DEPARTMENT_HEAD","NO_SPENDING_APPROVER",null]`
+- contract `properties.data.properties.request.properties.needStep.properties.waitingReason.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.needStep.properties.waitingReason.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.needStep.required`: — → `["assignedAt","assignee","createdAt","decidedAt","id","routingRow","slaWorkin…`
+- contract `properties.data.properties.request.properties.needStep.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.plan.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.plan.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.plan.properties.applicationId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.plan.properties.applicationId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.plan.properties.applicationName.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.plan.properties.planId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.plan.properties.planId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.plan.properties.planName.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.plan.required`: — → `["applicationId","applicationName","planId","planName"]`
+- contract `properties.data.properties.request.properties.plan.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.policy.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.policy.properties.hasSpendStep.type`: — → `"boolean"`
+- contract `properties.data.properties.request.properties.policy.properties.slaWorkingDays.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.request.properties.policy.properties.slaWorkingDays.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.policy.properties.slaWorkingDays.minimum`: — → `0`
+- contract `properties.data.properties.request.properties.policy.properties.slaWorkingDays.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.policy.properties.version.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.request.properties.policy.properties.version.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.policy.properties.version.minimum`: — → `0`
+- contract `properties.data.properties.request.properties.policy.properties.version.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.policy.required`: — → `["hasSpendStep","slaWorkingDays","version"]`
+- contract `properties.data.properties.request.properties.policy.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.pricing.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.pricing.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.pricing.properties.amount.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.pricing.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.pricing.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.pricing.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.pricing.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.pricing.properties.billingCycle.enum`: — → `["ANNUAL","MONTHLY","OTHER","QUARTERLY",null]`
+- contract `properties.data.properties.request.properties.pricing.properties.billingCycle.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.pricing.properties.billingCycle.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.pricing.properties.kind.enum`: — → `["ONE_TIME","RECURRING",null]`
+- contract `properties.data.properties.request.properties.pricing.properties.kind.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.pricing.properties.kind.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.pricing.properties.missingReason.enum`: — → `["AMOUNT_TOO_LARGE","AWAITING_QUOTE","CYCLE_UNKNOWN","NO_PRICED_SUBSCRIPTION"…`
+- contract `properties.data.properties.request.properties.pricing.properties.missingReason.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.pricing.properties.missingReason.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.pricing.properties.monthlyPrice.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.pricing.properties.monthlyPrice.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.pricing.properties.monthlyPrice.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.pricing.properties.monthlyPrice.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.pricing.properties.monthlyPrice.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.pricing.properties.monthlyPrice.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.pricing.properties.months.maximum`: — → `12`
+- contract `properties.data.properties.request.properties.pricing.properties.months.minimum`: — → `0`
+- contract `properties.data.properties.request.properties.pricing.properties.months.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.pricing.properties.months.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.pricing.properties.nextYearAmount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.pricing.properties.nextYearAmount.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.pricing.properties.nextYearAmount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.pricing.properties.nextYearAmount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.pricing.properties.nextYearAmount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.pricing.properties.nextYearAmount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.pricing.properties.status.enum`: — → `["MISSING","NOT_APPLICABLE","PRICED"]`
+- contract `properties.data.properties.request.properties.pricing.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.pricing.properties.unitPrice.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.pricing.properties.unitPrice.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.pricing.properties.unitPrice.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.pricing.properties.unitPrice.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.pricing.properties.unitPrice.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.pricing.properties.unitPrice.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.pricing.required`: — → `["amount","billingCycle","kind","missingReason","monthlyPrice","months","next…`
+- contract `properties.data.properties.request.properties.pricing.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.proposal.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.proposal.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.proposal.properties.dataDescription.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.proposal.properties.existingApplicationId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.proposal.properties.expectedUsers.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.request.properties.proposal.properties.expectedUsers.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.proposal.properties.expectedUsers.minimum`: — → `0`
+- contract `properties.data.properties.request.properties.proposal.properties.expectedUsers.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.proposal.properties.homepageUrl.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.proposal.properties.purpose.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.proposal.properties.softwareName.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.proposal.required`: — → `["dataDescription","existingApplicationId","expectedUsers","homepageUrl","pur…`
+- contract `properties.data.properties.request.properties.proposal.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.renewal.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.renewal.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.renewal.properties.applied.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.renewal.properties.applied.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.renewal.properties.applied.properties.appliedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.request.properties.renewal.properties.applied.properties.appliedAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.renewal.properties.applied.properties.successorAssignmentId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.renewal.properties.applied.properties.successorAssignmentId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.renewal.properties.applied.required`: — → `["appliedAt","successorAssignmentId"]`
+- contract `properties.data.properties.request.properties.renewal.properties.applied.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.renewal.properties.assignmentId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.renewal.properties.assignmentId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.renewal.properties.consecutiveMonths.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.request.properties.renewal.properties.consecutiveMonths.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.renewal.properties.consecutiveMonths.minimum`: — → `0`
+- contract `properties.data.properties.request.properties.renewal.properties.consecutiveMonths.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.renewal.properties.newExpectedEndDate.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.renewal.properties.newExpectedEndDate.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.renewal.properties.previousExpectedEndDate.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.renewal.required`: — → `["applied","assignmentId","consecutiveMonths","newExpectedEndDate","previousE…`
+- contract `properties.data.properties.request.properties.renewal.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.requester.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.requester.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.requester.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.requester.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.requester.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.requester.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.request.properties.requester.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.routing.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.routing.properties.mode.enum`: — → `["ONE_STEP","VIA_HEAD"]`
+- contract `properties.data.properties.request.properties.routing.properties.mode.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.routing.properties.oneStepReason.enum`: — → `["HEAD_LEFT","NO_DEPARTMENT_HEAD","REQUESTER_IS_HEAD",null]`
+- contract `properties.data.properties.request.properties.routing.properties.oneStepReason.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.routing.properties.oneStepReason.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.routing.required`: — → `["mode","oneStepReason"]`
+- contract `properties.data.properties.request.properties.routing.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.serviceAccount.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.serviceAccount.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.decidedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.decidedAt.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.decidedAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.decidedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.decidedBy.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.decidedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.decidedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.decidedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.decidedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.decidedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.decidedBy.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.reason.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.reason.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.selfExecuted.type`: — → `"boolean"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.state.enum`: — → `["ACCEPTED","PENDING","REJECTED"]`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.required`: — → `["decidedAt","decidedBy","reason","selfExecuted","state"]`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.boundary.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.expectedIdentifier.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.purpose.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.responsible.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.responsible.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.responsible.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.responsible.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.responsible.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.responsible.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.request.properties.serviceAccount.properties.responsible.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.serviceAccount.required`: — → `["boundary","expectedIdentifier","purpose","responsible"]`
+- contract `properties.data.properties.request.properties.serviceAccount.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.spend.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.spend.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.spend.properties.blockedReasons.items.enum`: — → `["NO_APPROVED_BUDGET","OVER_RESERVE","PRICE_EXPIRED","PRICE_MISSING"]`
+- contract `properties.data.properties.request.properties.spend.properties.blockedReasons.items.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.spend.properties.blockedReasons.maxItems`: — → `3`
+- contract `properties.data.properties.request.properties.spend.properties.blockedReasons.type`: — → `"array"`
+- contract `properties.data.properties.request.properties.spend.properties.overBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.spend.properties.overBy.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.spend.properties.overBy.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.spend.properties.overBy.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.spend.properties.overBy.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.request.properties.spend.properties.overBy.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.spend.properties.refusalReason.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.spend.properties.refusalReason.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.spend.properties.stage.enum`: — → `["BLOCKED","NOT_SUBMITTED","REFUSED","RESERVE_CONFIRMATION","RETURNED_TO_REQU…`
+- contract `properties.data.properties.request.properties.spend.properties.stage.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.spend.required`: — → `["blockedReasons","overBy","refusalReason","stage"]`
+- contract `properties.data.properties.request.properties.spend.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.state.enum`: — → `["AWAITING_EXECUTION","AWAITING_IT_ASSESSMENT","AWAITING_IT_CLOSE","AWAITING_…`
+- contract `properties.data.properties.request.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.submittedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.request.properties.submittedAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.termMonths.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.request.properties.termMonths.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.request.properties.termMonths.minimum`: — → `0`
+- contract `properties.data.properties.request.properties.termMonths.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.termMonths.type`: — → `"integer"`
+- contract `properties.data.properties.request.properties.type.enum`: — → `["GRANT","GROUP_GRANT","RENEWAL","SERVICE_ACCOUNT"]`
+- contract `properties.data.properties.request.properties.type.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.withdrawal.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.withdrawal.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.withdrawal.properties.reason.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.withdrawal.properties.reason.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.withdrawal.properties.requestedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.request.properties.withdrawal.properties.requestedAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.withdrawal.properties.requestedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.request.properties.withdrawal.properties.requestedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.withdrawal.properties.requestedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.request.properties.withdrawal.properties.requestedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.withdrawal.properties.requestedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.withdrawal.properties.requestedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.request.properties.withdrawal.properties.requestedBy.type`: — → `"object"`
+- contract `properties.data.properties.request.properties.withdrawal.properties.withdrawnAt.format`: — → `"date-time"`
+- contract `properties.data.properties.request.properties.withdrawal.properties.withdrawnAt.nullable`: — → `true`
+- contract `properties.data.properties.request.properties.withdrawal.properties.withdrawnAt.type`: — → `"string"`
+- contract `properties.data.properties.request.properties.withdrawal.required`: — → `["reason","requestedAt","requestedBy","withdrawnAt"]`
+- contract `properties.data.properties.request.properties.withdrawal.type`: — → `"object"`
+- contract `properties.data.properties.request.required`: — → `["beneficiary","branch","budgetYear","businessReason","cancellation","cost","…`
+- contract `properties.data.properties.request.type`: — → `"object"`
+- contract `properties.data.required`: — → `["departmentList","request"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `AssessmentQueueDepartmentsResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.department.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.department.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.department.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.required`: — → `["id","name"]`
+- contract `properties.data.properties.items.items.properties.department.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.waiting.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.items.items.properties.waiting.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.waiting.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.waiting.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.required`: — → `["department","waiting"]`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `AssessmentDecisionsResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.decidedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.decidedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.decidedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.decidedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.decidedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.decidedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.decidedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.decidedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.items.items.properties.decidedBy.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.department.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.department.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.department.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.required`: — → `["id","name"]`
+- contract `properties.data.properties.items.items.properties.department.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.reason.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.reason.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.rejectionKind.enum`: — → `["NOT_ELIGIBLE","UNCONTROLLABLE",null]`
+- contract `properties.data.properties.items.items.properties.rejectionKind.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.rejectionKind.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.requester.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.requester.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.requester.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.requester.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.requester.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.requester.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.items.items.properties.requester.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.requestId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.requestId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.result.enum`: — → `["COMPLETED","REJECTED"]`
+- contract `properties.data.properties.items.items.properties.result.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.scope.enum`: — → `["FULL","PLAN_ONLY"]`
+- contract `properties.data.properties.items.items.properties.scope.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.software.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.software.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.software.required`: — → `["name"]`
+- contract `properties.data.properties.items.items.properties.software.type`: — → `"object"`
+- contract `properties.data.properties.items.items.required`: — → `["decidedAt","decidedBy","department","reason","rejectionKind","requester","r…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `PurchaseInvoicePreviewBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.deductibleTax.additionalProperties`: — → `false`
+- mô tả `properties.deductibleTax.description`: — → `"Tax that can be deducted: shown apart, not an expense. Nothing when left out."`
+- contract `properties.deductibleTax.properties.amount.maxLength`: — → `40`
+- contract `properties.deductibleTax.properties.amount.type`: — → `"string"`
+- contract `properties.deductibleTax.required`: — → `["amount"]`
+- contract `properties.deductibleTax.type`: — → `"object"`
+- mô tả `properties.issuedOn.description`: — → `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."`
+- contract `properties.issuedOn.format`: — → `"date"`
+- contract `properties.issuedOn.type`: — → `"string"`
+- contract `properties.link.additionalProperties`: — → `false`
+- mô tả `properties.link.properties.provisioningTaskId.description`: — → `"The task of the grant the purchase belongs to; only with a request."`
+- contract `properties.link.properties.provisioningTaskId.format`: — → `"uuid"`
+- contract `properties.link.properties.provisioningTaskId.type`: — → `"string"`
+- mô tả `properties.link.properties.requestId.description`: — → `"The request the purchase was approved for."`
+- contract `properties.link.properties.requestId.format`: — → `"uuid"`
+- contract `properties.link.properties.requestId.type`: — → `"string"`
+- mô tả `properties.link.properties.subscriptionId.description`: — → `"The subscription the invoice renews; instead of a request."`
+- contract `properties.link.properties.subscriptionId.format`: — → `"uuid"`
+- contract `properties.link.properties.subscriptionId.type`: — → `"string"`
+- contract `properties.link.type`: — → `"object"`
+- contract `properties.netAmount.additionalProperties`: — → `false`
+- mô tả `properties.netAmount.description`: — → `"What was taken out of the company in dong for the goods, before tax."`
+- contract `properties.netAmount.properties.amount.maxLength`: — → `40`
+- contract `properties.netAmount.properties.amount.type`: — → `"string"`
+- contract `properties.netAmount.required`: — → `["amount"]`
+- contract `properties.netAmount.type`: — → `"object"`
+- contract `properties.nonDeductibleTax.additionalProperties`: — → `false`
+- mô tả `properties.nonDeductibleTax.description`: — → `"Tax that cannot be deducted: an expense. Nothing when left out."`
+- contract `properties.nonDeductibleTax.properties.amount.maxLength`: — → `40`
+- contract `properties.nonDeductibleTax.properties.amount.type`: — → `"string"`
+- contract `properties.nonDeductibleTax.required`: — → `["amount"]`
+- contract `properties.nonDeductibleTax.type`: — → `"object"`
+- contract `properties.paymentSource.enum`: — → `["COMPANY_CARD","IT_ADVANCE"]`
+- contract `properties.paymentSource.type`: — → `"string"`
+- mô tả `properties.quantity.description`: — → `"The seats or keys the invoice says."`
+- contract `properties.quantity.maximum`: — → `1000000`
+- contract `properties.quantity.minimum`: — → `1`
+- contract `properties.quantity.type`: — → `"integer"`
+- mô tả `properties.servicePeriodMonth.description`: — → `"The month the invoice pays for. The expense belongs to the month and the yea…`
+- contract `properties.servicePeriodMonth.type`: — → `"string"`
+- contract `properties.unitPriceOriginal.additionalProperties`: — → `false`
+- mô tả `properties.unitPriceOriginal.description`: — → `"The price of one on the invoice, in the currency it states: what the plan is…`
+- contract `properties.unitPriceOriginal.properties.amount.maxLength`: — → `40`
+- contract `properties.unitPriceOriginal.properties.amount.type`: — → `"string"`
+- contract `properties.unitPriceOriginal.properties.currency.maxLength`: — → `3`
+- contract `properties.unitPriceOriginal.properties.currency.minLength`: — → `3`
+- contract `properties.unitPriceOriginal.properties.currency.type`: — → `"string"`
+- contract `properties.unitPriceOriginal.required`: — → `["amount","currency"]`
+- contract `properties.unitPriceOriginal.type`: — → `"object"`
+- mô tả `properties.vendorInvoiceNumber.description`: — → `"The number on the invoice; one vendor has it once until the invoice is retur…`
+- contract `properties.vendorInvoiceNumber.maxLength`: — → `64`
+- contract `properties.vendorInvoiceNumber.minLength`: — → `1`
+- contract `properties.vendorInvoiceNumber.type`: — → `"string"`
+- contract `required`: — → `["issuedOn","link","netAmount","paymentSource","quantity","servicePeriodMonth…`
+- contract `type`: — → `"object"`
+
+### `PurchaseInvoicePreviewResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.chargedCostCenter.additionalProperties`: — → `false`
+- contract `properties.data.properties.chargedCostCenter.nullable`: — → `true`
+- contract `properties.data.properties.chargedCostCenter.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.chargedCostCenter.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.chargedCostCenter.required`: — → `["id"]`
+- contract `properties.data.properties.chargedCostCenter.type`: — → `"object"`
+- contract `properties.data.properties.commitment.additionalProperties`: — → `false`
+- contract `properties.data.properties.commitment.nullable`: — → `true`
+- contract `properties.data.properties.commitment.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.commitment.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.commitment.properties.remaining.additionalProperties`: — → `false`
+- contract `properties.data.properties.commitment.properties.remaining.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.commitment.properties.remaining.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.commitment.properties.remaining.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.commitment.properties.remaining.type`: — → `"object"`
+- contract `properties.data.properties.commitment.required`: — → `["id","remaining"]`
+- contract `properties.data.properties.commitment.type`: — → `"object"`
+- contract `properties.data.properties.flags.items.enum`: — → `["OUTSIDE_TERM","OVER_APPROVED"]`
+- contract `properties.data.properties.flags.items.type`: — → `"string"`
+- contract `properties.data.properties.flags.maxItems`: — → `2`
+- contract `properties.data.properties.flags.type`: — → `"array"`
+- contract `properties.data.properties.label.enum`: — → `["NEW_PURCHASE","PERIOD","RENEWAL"]`
+- contract `properties.data.properties.label.type`: — → `"string"`
+- contract `properties.data.properties.matchResult.enum`: — → `["MATCHED","PRICE_QUANTITY_EXCEPTION"]`
+- contract `properties.data.properties.matchResult.type`: — → `"string"`
+- contract `properties.data.properties.periodCount.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.periodCount.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.periodCount.minimum`: — → `0`
+- contract `properties.data.properties.periodCount.nullable`: — → `true`
+- contract `properties.data.properties.periodCount.type`: — → `"integer"`
+- contract `properties.data.properties.periodIndex.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.periodIndex.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.periodIndex.minimum`: — → `0`
+- contract `properties.data.properties.periodIndex.nullable`: — → `true`
+- contract `properties.data.properties.periodIndex.type`: — → `"integer"`
+- mô tả `properties.data.properties.servicePeriodMonth.description`: — → `"A calendar month as YYYY-MM."`
+- contract `properties.data.properties.servicePeriodMonth.type`: — → `"string"`
+- contract `properties.data.required`: — → `["chargedCostCenter","commitment","flags","label","matchResult","periodCount"…`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `PurchaseInvoiceSubmitBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.deductibleTax.additionalProperties`: — → `false`
+- mô tả `properties.deductibleTax.description`: — → `"Tax that can be deducted: shown apart, not an expense. Nothing when left out."`
+- contract `properties.deductibleTax.properties.amount.maxLength`: — → `40`
+- contract `properties.deductibleTax.properties.amount.type`: — → `"string"`
+- contract `properties.deductibleTax.required`: — → `["amount"]`
+- contract `properties.deductibleTax.type`: — → `"object"`
+- contract `properties.documentIds.items.format`: — → `"uuid"`
+- contract `properties.documentIds.items.type`: — → `"string"`
+- contract `properties.documentIds.maxItems`: — → `20`
+- contract `properties.documentIds.minItems`: — → `1`
+- contract `properties.documentIds.type`: — → `"array"`
+- mô tả `properties.issuedOn.description`: — → `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."`
+- contract `properties.issuedOn.format`: — → `"date"`
+- contract `properties.issuedOn.type`: — → `"string"`
+- contract `properties.link.additionalProperties`: — → `false`
+- mô tả `properties.link.properties.provisioningTaskId.description`: — → `"The task of the grant the purchase belongs to; only with a request."`
+- contract `properties.link.properties.provisioningTaskId.format`: — → `"uuid"`
+- contract `properties.link.properties.provisioningTaskId.type`: — → `"string"`
+- mô tả `properties.link.properties.requestId.description`: — → `"The request the purchase was approved for."`
+- contract `properties.link.properties.requestId.format`: — → `"uuid"`
+- contract `properties.link.properties.requestId.type`: — → `"string"`
+- mô tả `properties.link.properties.subscriptionId.description`: — → `"The subscription the invoice renews; instead of a request."`
+- contract `properties.link.properties.subscriptionId.format`: — → `"uuid"`
+- contract `properties.link.properties.subscriptionId.type`: — → `"string"`
+- contract `properties.link.type`: — → `"object"`
+- contract `properties.netAmount.additionalProperties`: — → `false`
+- mô tả `properties.netAmount.description`: — → `"What was taken out of the company in dong for the goods, before tax."`
+- contract `properties.netAmount.properties.amount.maxLength`: — → `40`
+- contract `properties.netAmount.properties.amount.type`: — → `"string"`
+- contract `properties.netAmount.required`: — → `["amount"]`
+- contract `properties.netAmount.type`: — → `"object"`
+- contract `properties.nonDeductibleTax.additionalProperties`: — → `false`
+- mô tả `properties.nonDeductibleTax.description`: — → `"Tax that cannot be deducted: an expense. Nothing when left out."`
+- contract `properties.nonDeductibleTax.properties.amount.maxLength`: — → `40`
+- contract `properties.nonDeductibleTax.properties.amount.type`: — → `"string"`
+- contract `properties.nonDeductibleTax.required`: — → `["amount"]`
+- contract `properties.nonDeductibleTax.type`: — → `"object"`
+- contract `properties.paymentSource.enum`: — → `["COMPANY_CARD","IT_ADVANCE"]`
+- contract `properties.paymentSource.type`: — → `"string"`
+- mô tả `properties.quantity.description`: — → `"The seats or keys the invoice says."`
+- contract `properties.quantity.maximum`: — → `1000000`
+- contract `properties.quantity.minimum`: — → `1`
+- contract `properties.quantity.type`: — → `"integer"`
+- mô tả `properties.servicePeriodMonth.description`: — → `"The month the invoice pays for. The expense belongs to the month and the yea…`
+- contract `properties.servicePeriodMonth.type`: — → `"string"`
+- contract `properties.unitPriceOriginal.additionalProperties`: — → `false`
+- mô tả `properties.unitPriceOriginal.description`: — → `"The price of one on the invoice, in the currency it states: what the plan is…`
+- contract `properties.unitPriceOriginal.properties.amount.maxLength`: — → `40`
+- contract `properties.unitPriceOriginal.properties.amount.type`: — → `"string"`
+- contract `properties.unitPriceOriginal.properties.currency.maxLength`: — → `3`
+- contract `properties.unitPriceOriginal.properties.currency.minLength`: — → `3`
+- contract `properties.unitPriceOriginal.properties.currency.type`: — → `"string"`
+- contract `properties.unitPriceOriginal.required`: — → `["amount","currency"]`
+- contract `properties.unitPriceOriginal.type`: — → `"object"`
+- mô tả `properties.vendorInvoiceNumber.description`: — → `"The number on the invoice; one vendor has it once until the invoice is retur…`
+- contract `properties.vendorInvoiceNumber.maxLength`: — → `64`
+- contract `properties.vendorInvoiceNumber.minLength`: — → `1`
+- contract `properties.vendorInvoiceNumber.type`: — → `"string"`
+- contract `required`: — → `["documentIds","issuedOn","link","netAmount","paymentSource","quantity","serv…`
+- contract `type`: — → `"object"`
+
+### `PurchaseInvoiceResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- mô tả `properties.data.properties.chargedCostCenterId.description`: — → `"The Cost Center that bears the expense: the department that held the right i…`
+- contract `properties.data.properties.chargedCostCenterId.format`: — → `"uuid"`
+- contract `properties.data.properties.chargedCostCenterId.nullable`: — → `true`
+- contract `properties.data.properties.chargedCostCenterId.type`: — → `"string"`
+- contract `properties.data.properties.decidedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.decidedAt.nullable`: — → `true`
+- contract `properties.data.properties.decidedAt.type`: — → `"string"`
+- contract `properties.data.properties.decidedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.decidedBy.nullable`: — → `true`
+- contract `properties.data.properties.decidedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.decidedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.decidedBy.required`: — → `["employeeId"]`
+- contract `properties.data.properties.decidedBy.type`: — → `"object"`
+- contract `properties.data.properties.deductibleTax.additionalProperties`: — → `false`
+- contract `properties.data.properties.deductibleTax.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.deductibleTax.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.deductibleTax.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.deductibleTax.type`: — → `"object"`
+- contract `properties.data.properties.documents.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.documents.items.properties.documentId.format`: — → `"uuid"`
+- contract `properties.data.properties.documents.items.properties.documentId.type`: — → `"string"`
+- contract `properties.data.properties.documents.items.properties.position.maximum`: — → `20`
+- contract `properties.data.properties.documents.items.properties.position.minimum`: — → `1`
+- contract `properties.data.properties.documents.items.properties.position.type`: — → `"integer"`
+- contract `properties.data.properties.documents.items.required`: — → `["documentId","position"]`
+- contract `properties.data.properties.documents.items.type`: — → `"object"`
+- contract `properties.data.properties.documents.maxItems`: — → `20`
+- contract `properties.data.properties.documents.type`: — → `"array"`
+- contract `properties.data.properties.flags.items.enum`: — → `["OUTSIDE_TERM","OVER_APPROVED"]`
+- contract `properties.data.properties.flags.items.type`: — → `"string"`
+- contract `properties.data.properties.flags.maxItems`: — → `2`
+- contract `properties.data.properties.flags.type`: — → `"array"`
+- contract `properties.data.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.id.type`: — → `"string"`
+- mô tả `properties.data.properties.invoiceId.description`: — → `"The invoice written when Finance signed; null before."`
+- contract `properties.data.properties.invoiceId.format`: — → `"uuid"`
+- contract `properties.data.properties.invoiceId.nullable`: — → `true`
+- contract `properties.data.properties.invoiceId.type`: — → `"string"`
+- mô tả `properties.data.properties.issuedOn.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.issuedOn.format`: — → `"date"`
+- contract `properties.data.properties.issuedOn.type`: — → `"string"`
+- contract `properties.data.properties.label.enum`: — → `["NEW_PURCHASE","PERIOD","RENEWAL"]`
+- contract `properties.data.properties.label.type`: — → `"string"`
+- contract `properties.data.properties.linkKind.enum`: — → `["REQUEST","SUBSCRIPTION"]`
+- contract `properties.data.properties.linkKind.type`: — → `"string"`
+- contract `properties.data.properties.matchResult.enum`: — → `["MATCHED","PRICE_QUANTITY_EXCEPTION"]`
+- contract `properties.data.properties.matchResult.type`: — → `"string"`
+- contract `properties.data.properties.netAmount.additionalProperties`: — → `false`
+- contract `properties.data.properties.netAmount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.netAmount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.netAmount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.netAmount.type`: — → `"object"`
+- contract `properties.data.properties.nonDeductibleTax.additionalProperties`: — → `false`
+- contract `properties.data.properties.nonDeductibleTax.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.nonDeductibleTax.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.nonDeductibleTax.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.nonDeductibleTax.type`: — → `"object"`
+- contract `properties.data.properties.paymentSource.enum`: — → `["COMPANY_CARD","IT_ADVANCE"]`
+- contract `properties.data.properties.paymentSource.type`: — → `"string"`
+- contract `properties.data.properties.periodCount.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.periodCount.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.periodCount.minimum`: — → `0`
+- contract `properties.data.properties.periodCount.nullable`: — → `true`
+- contract `properties.data.properties.periodCount.type`: — → `"integer"`
+- contract `properties.data.properties.periodIndex.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.periodIndex.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.periodIndex.minimum`: — → `0`
+- contract `properties.data.properties.periodIndex.nullable`: — → `true`
+- contract `properties.data.properties.periodIndex.type`: — → `"integer"`
+- contract `properties.data.properties.provisioningTaskId.format`: — → `"uuid"`
+- contract `properties.data.properties.provisioningTaskId.nullable`: — → `true`
+- contract `properties.data.properties.provisioningTaskId.type`: — → `"string"`
+- contract `properties.data.properties.quantity.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.quantity.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.quantity.minimum`: — → `0`
+- contract `properties.data.properties.quantity.type`: — → `"integer"`
+- contract `properties.data.properties.requestId.format`: — → `"uuid"`
+- contract `properties.data.properties.requestId.nullable`: — → `true`
+- contract `properties.data.properties.requestId.type`: — → `"string"`
+- contract `properties.data.properties.resubmissionOfId.format`: — → `"uuid"`
+- contract `properties.data.properties.resubmissionOfId.nullable`: — → `true`
+- contract `properties.data.properties.resubmissionOfId.type`: — → `"string"`
+- contract `properties.data.properties.resubmittedAsId.format`: — → `"uuid"`
+- contract `properties.data.properties.resubmittedAsId.nullable`: — → `true`
+- contract `properties.data.properties.resubmittedAsId.type`: — → `"string"`
+- contract `properties.data.properties.returnReason.nullable`: — → `true`
+- contract `properties.data.properties.returnReason.type`: — → `"string"`
+- mô tả `properties.data.properties.servicePeriodMonth.description`: — → `"A calendar month as YYYY-MM."`
+- contract `properties.data.properties.servicePeriodMonth.type`: — → `"string"`
+- contract `properties.data.properties.state.enum`: — → `["CONFIRMED","RETURNED","SUBMITTED"]`
+- contract `properties.data.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.submittedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.submittedAt.type`: — → `"string"`
+- contract `properties.data.properties.submittedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.submittedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.submittedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.submittedBy.required`: — → `["employeeId"]`
+- contract `properties.data.properties.submittedBy.type`: — → `"object"`
+- contract `properties.data.properties.subscriptionId.format`: — → `"uuid"`
+- contract `properties.data.properties.subscriptionId.nullable`: — → `true`
+- contract `properties.data.properties.subscriptionId.type`: — → `"string"`
+- contract `properties.data.properties.unitPriceOriginal.additionalProperties`: — → `false`
+- contract `properties.data.properties.unitPriceOriginal.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.unitPriceOriginal.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.unitPriceOriginal.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.unitPriceOriginal.type`: — → `"object"`
+- contract `properties.data.properties.vendorId.format`: — → `"uuid"`
+- contract `properties.data.properties.vendorId.type`: — → `"string"`
+- contract `properties.data.properties.vendorInvoiceNumber.type`: — → `"string"`
+- contract `properties.data.required`: — → `["chargedCostCenterId","decidedAt","decidedBy","deductibleTax","documents","f…`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `PurchaseInvoiceResubmitBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.deductibleTax.additionalProperties`: — → `false`
+- mô tả `properties.deductibleTax.description`: — → `"Tax that can be deducted: shown apart, not an expense. Nothing when left out."`
+- contract `properties.deductibleTax.properties.amount.maxLength`: — → `40`
+- contract `properties.deductibleTax.properties.amount.type`: — → `"string"`
+- contract `properties.deductibleTax.required`: — → `["amount"]`
+- contract `properties.deductibleTax.type`: — → `"object"`
+- contract `properties.documentIds.items.format`: — → `"uuid"`
+- contract `properties.documentIds.items.type`: — → `"string"`
+- contract `properties.documentIds.maxItems`: — → `20`
+- contract `properties.documentIds.minItems`: — → `1`
+- contract `properties.documentIds.type`: — → `"array"`
+- mô tả `properties.issuedOn.description`: — → `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."`
+- contract `properties.issuedOn.format`: — → `"date"`
+- contract `properties.issuedOn.type`: — → `"string"`
+- contract `properties.netAmount.additionalProperties`: — → `false`
+- mô tả `properties.netAmount.description`: — → `"What was taken out of the company in dong for the goods, before tax."`
+- contract `properties.netAmount.properties.amount.maxLength`: — → `40`
+- contract `properties.netAmount.properties.amount.type`: — → `"string"`
+- contract `properties.netAmount.required`: — → `["amount"]`
+- contract `properties.netAmount.type`: — → `"object"`
+- contract `properties.nonDeductibleTax.additionalProperties`: — → `false`
+- mô tả `properties.nonDeductibleTax.description`: — → `"Tax that cannot be deducted: an expense. Nothing when left out."`
+- contract `properties.nonDeductibleTax.properties.amount.maxLength`: — → `40`
+- contract `properties.nonDeductibleTax.properties.amount.type`: — → `"string"`
+- contract `properties.nonDeductibleTax.required`: — → `["amount"]`
+- contract `properties.nonDeductibleTax.type`: — → `"object"`
+- contract `properties.paymentSource.enum`: — → `["COMPANY_CARD","IT_ADVANCE"]`
+- contract `properties.paymentSource.type`: — → `"string"`
+- mô tả `properties.quantity.description`: — → `"The seats or keys the invoice says."`
+- contract `properties.quantity.maximum`: — → `1000000`
+- contract `properties.quantity.minimum`: — → `1`
+- contract `properties.quantity.type`: — → `"integer"`
+- mô tả `properties.servicePeriodMonth.description`: — → `"The month the invoice pays for. The expense belongs to the month and the yea…`
+- contract `properties.servicePeriodMonth.type`: — → `"string"`
+- contract `properties.unitPriceOriginal.additionalProperties`: — → `false`
+- mô tả `properties.unitPriceOriginal.description`: — → `"The price of one on the invoice, in the currency it states: what the plan is…`
+- contract `properties.unitPriceOriginal.properties.amount.maxLength`: — → `40`
+- contract `properties.unitPriceOriginal.properties.amount.type`: — → `"string"`
+- contract `properties.unitPriceOriginal.properties.currency.maxLength`: — → `3`
+- contract `properties.unitPriceOriginal.properties.currency.minLength`: — → `3`
+- contract `properties.unitPriceOriginal.properties.currency.type`: — → `"string"`
+- contract `properties.unitPriceOriginal.required`: — → `["amount","currency"]`
+- contract `properties.unitPriceOriginal.type`: — → `"object"`
+- mô tả `properties.vendorInvoiceNumber.description`: — → `"The number on the invoice; one vendor has it once until the invoice is retur…`
+- contract `properties.vendorInvoiceNumber.maxLength`: — → `64`
+- contract `properties.vendorInvoiceNumber.minLength`: — → `1`
+- contract `properties.vendorInvoiceNumber.type`: — → `"string"`
+- contract `required`: — → `["documentIds","issuedOn","netAmount","paymentSource","quantity","servicePeri…`
+- contract `type`: — → `"object"`
+
+### `PurchaseInvoiceListResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.decidedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.decidedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.decidedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.flags.items.enum`: — → `["OUTSIDE_TERM","OVER_APPROVED"]`
+- contract `properties.data.properties.items.items.properties.flags.items.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.flags.maxItems`: — → `2`
+- contract `properties.data.properties.items.items.properties.flags.type`: — → `"array"`
+- contract `properties.data.properties.items.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.id.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.issuedOn.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.items.items.properties.issuedOn.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.issuedOn.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.label.enum`: — → `["NEW_PURCHASE","PERIOD","RENEWAL"]`
+- contract `properties.data.properties.items.items.properties.label.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.linkKind.enum`: — → `["REQUEST","SUBSCRIPTION"]`
+- contract `properties.data.properties.items.items.properties.linkKind.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.matchResult.enum`: — → `["MATCHED","PRICE_QUANTITY_EXCEPTION"]`
+- contract `properties.data.properties.items.items.properties.matchResult.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.netAmount.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.netAmount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.netAmount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.netAmount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.netAmount.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.paymentSource.enum`: — → `["COMPANY_CARD","IT_ADVANCE"]`
+- contract `properties.data.properties.items.items.properties.paymentSource.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.periodCount.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.items.items.properties.periodCount.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.periodCount.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.periodCount.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.periodCount.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.periodIndex.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.items.items.properties.periodIndex.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.periodIndex.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.periodIndex.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.periodIndex.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.quantity.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.items.items.properties.quantity.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.quantity.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.quantity.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.requestId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.requestId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.requestId.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.servicePeriodMonth.description`: — → `"A calendar month as YYYY-MM."`
+- contract `properties.data.properties.items.items.properties.servicePeriodMonth.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.state.enum`: — → `["CONFIRMED","RETURNED","SUBMITTED"]`
+- contract `properties.data.properties.items.items.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.submittedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.submittedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.submittedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.submittedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.submittedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.submittedBy.required`: — → `["employeeId"]`
+- contract `properties.data.properties.items.items.properties.submittedBy.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.subscriptionId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.subscriptionId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.subscriptionId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.vendorId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.vendorId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.vendorInvoiceNumber.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: — → `["decidedAt","flags","id","issuedOn","label","linkKind","matchResult","netAmo…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `PurchaseInvoiceMissingPeriodListResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.department.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.department.description`: — → `"The department of the request, or the one that owns the subscription; null f…`
+- contract `properties.data.properties.items.items.properties.department.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.department.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.department.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.required`: — → `["id","name"]`
+- contract `properties.data.properties.items.items.properties.department.type`: — → `"object"`
+- mô tả `properties.data.properties.items.items.properties.dueDate.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.items.items.properties.dueDate.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.dueDate.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.label.enum`: — → `["NEW_PURCHASE","PERIOD","RENEWAL"]`
+- contract `properties.data.properties.items.items.properties.label.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.linkKind.enum`: — → `["REQUEST","SUBSCRIPTION"]`
+- contract `properties.data.properties.items.items.properties.linkKind.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.paymentDate.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.items.items.properties.paymentDate.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.paymentDate.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.periodCount.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.items.items.properties.periodCount.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.periodCount.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.periodCount.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.periodCount.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.periodIndex.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.items.items.properties.periodIndex.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.periodIndex.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.periodIndex.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.periodIndex.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.plan.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.plan.properties.applicationName.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.plan.properties.logoUrl.description`: — → `"The https link to the logo image of the application that the IT Admin pasted…`
+- contract `properties.data.properties.items.items.properties.plan.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.plan.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.plan.properties.planId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.plan.properties.planId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.plan.properties.planName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.plan.required`: — → `["applicationName","logoUrl","planId","planName"]`
+- contract `properties.data.properties.items.items.properties.plan.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.requestId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.requestId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.requestId.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.servicePeriodMonth.description`: — → `"A calendar month as YYYY-MM."`
+- contract `properties.data.properties.items.items.properties.servicePeriodMonth.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.subscriptionId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.subscriptionId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.subscriptionId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: — → `["department","dueDate","label","linkKind","paymentDate","periodCount","perio…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `PurchaseInvoiceReturnBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- mô tả `properties.reason.description`: — → `"Why the invoice is returned. Required; the IT Admin reads it."`
+- contract `properties.reason.maxLength`: — → `1000`
+- contract `properties.reason.minLength`: — → `1`
+- contract `properties.reason.type`: — → `"string"`
+- contract `required`: — → `["reason"]`
+- contract `type`: — → `"object"`
+
+### `InvoiceDiscrepancyListResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.mismatches.items.enum`: — → `["QUANTITY","UNIT_PRICE"]`
+- contract `properties.data.properties.items.items.properties.mismatches.items.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.mismatches.maxItems`: — → `2`
+- contract `properties.data.properties.items.items.properties.mismatches.type`: — → `"array"`
+- contract `properties.data.properties.items.items.properties.openedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.openedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.outcome.enum`: — → `["EXPLAINED","OUT_OF_PROCESS_SUSPECTED",null]`
+- contract `properties.data.properties.items.items.properties.outcome.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.outcome.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.linkKind.enum`: — → `["REQUEST","SUBSCRIPTION"]`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.linkKind.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.netAmount.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.purchaseInvoice.properties.netAmount.description`: — → `"What was taken out of the company in dong, before tax."`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.netAmount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.netAmount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.netAmount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.netAmount.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.requestId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.requestId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.requestId.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.purchaseInvoice.properties.servicePeriodMonth.description`: — → `"The month the invoice pays for, as YYYY-MM."`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.servicePeriodMonth.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.subscriptionId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.subscriptionId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.subscriptionId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.vendorId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.vendorId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.properties.vendorInvoiceNumber.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.required`: — → `["id","linkKind","netAmount","requestId","servicePeriodMonth","subscriptionId…`
+- contract `properties.data.properties.items.items.properties.purchaseInvoice.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.quantity.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.quantity.properties.expected.description`: — → `"The seats approved or bought; null when nobody knew."`
+- contract `properties.data.properties.items.items.properties.quantity.properties.expected.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.quantity.properties.expected.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.quantity.properties.expected.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.quantity.properties.expected.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.quantity.properties.invoice.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.quantity.properties.invoice.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.quantity.properties.invoice.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.quantity.required`: — → `["expected","invoice"]`
+- contract `properties.data.properties.items.items.properties.quantity.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.state.enum`: — → `["CLOSED","OPEN"]`
+- contract `properties.data.properties.items.items.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.unitPrice.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.unitPrice.properties.expected.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.unitPrice.properties.expected.description`: — → `"The price of one of the plan or subscription, in its original currency; null…`
+- contract `properties.data.properties.items.items.properties.unitPrice.properties.expected.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.unitPrice.properties.expected.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.unitPrice.properties.expected.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.unitPrice.properties.expected.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.unitPrice.properties.expected.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.unitPrice.properties.invoice.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.unitPrice.properties.invoice.description`: — → `"The price of one the invoice states, in the currency it states."`
+- contract `properties.data.properties.items.items.properties.unitPrice.properties.invoice.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.unitPrice.properties.invoice.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.unitPrice.properties.invoice.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.unitPrice.properties.invoice.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.unitPrice.required`: — → `["expected","invoice"]`
+- contract `properties.data.properties.items.items.properties.unitPrice.type`: — → `"object"`
+- contract `properties.data.properties.items.items.required`: — → `["id","mismatches","openedAt","outcome","purchaseInvoice","quantity","state",…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `InvoiceDiscrepancyResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.closure.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.closure.description`: — → `"How the case was closed; null while it is open."`
+- contract `properties.data.properties.closure.nullable`: — → `true`
+- contract `properties.data.properties.closure.properties.closedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.closure.properties.closedAt.type`: — → `"string"`
+- contract `properties.data.properties.closure.properties.closedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.closure.properties.closedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.closure.properties.closedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.closure.properties.closedBy.required`: — → `["employeeId"]`
+- contract `properties.data.properties.closure.properties.closedBy.type`: — → `"object"`
+- contract `properties.data.properties.closure.properties.differenceAmount.additionalProperties`: — → `false`
+- contract `properties.data.properties.closure.properties.differenceAmount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.closure.properties.differenceAmount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.closure.properties.differenceAmount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.closure.properties.differenceAmount.type`: — → `"object"`
+- contract `properties.data.properties.closure.properties.outcome.enum`: — → `["EXPLAINED","OUT_OF_PROCESS_SUSPECTED"]`
+- contract `properties.data.properties.closure.properties.outcome.type`: — → `"string"`
+- contract `properties.data.properties.closure.properties.reason.type`: — → `"string"`
+- contract `properties.data.properties.closure.required`: — → `["closedAt","closedBy","differenceAmount","outcome","reason"]`
+- contract `properties.data.properties.closure.type`: — → `"object"`
+- contract `properties.data.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.mismatches.items.enum`: — → `["QUANTITY","UNIT_PRICE"]`
+- contract `properties.data.properties.mismatches.items.type`: — → `"string"`
+- contract `properties.data.properties.mismatches.maxItems`: — → `2`
+- contract `properties.data.properties.mismatches.type`: — → `"array"`
+- contract `properties.data.properties.openedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.openedAt.type`: — → `"string"`
+- contract `properties.data.properties.outcome.enum`: — → `["EXPLAINED","OUT_OF_PROCESS_SUSPECTED",null]`
+- contract `properties.data.properties.outcome.nullable`: — → `true`
+- contract `properties.data.properties.outcome.type`: — → `"string"`
+- contract `properties.data.properties.purchaseInvoice.additionalProperties`: — → `false`
+- contract `properties.data.properties.purchaseInvoice.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.purchaseInvoice.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.purchaseInvoice.properties.linkKind.enum`: — → `["REQUEST","SUBSCRIPTION"]`
+- contract `properties.data.properties.purchaseInvoice.properties.linkKind.type`: — → `"string"`
+- contract `properties.data.properties.purchaseInvoice.properties.netAmount.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.purchaseInvoice.properties.netAmount.description`: — → `"What was taken out of the company in dong, before tax."`
+- contract `properties.data.properties.purchaseInvoice.properties.netAmount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.purchaseInvoice.properties.netAmount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.purchaseInvoice.properties.netAmount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.purchaseInvoice.properties.netAmount.type`: — → `"object"`
+- contract `properties.data.properties.purchaseInvoice.properties.requestId.format`: — → `"uuid"`
+- contract `properties.data.properties.purchaseInvoice.properties.requestId.nullable`: — → `true`
+- contract `properties.data.properties.purchaseInvoice.properties.requestId.type`: — → `"string"`
+- mô tả `properties.data.properties.purchaseInvoice.properties.servicePeriodMonth.description`: — → `"The month the invoice pays for, as YYYY-MM."`
+- contract `properties.data.properties.purchaseInvoice.properties.servicePeriodMonth.type`: — → `"string"`
+- contract `properties.data.properties.purchaseInvoice.properties.subscriptionId.format`: — → `"uuid"`
+- contract `properties.data.properties.purchaseInvoice.properties.subscriptionId.nullable`: — → `true`
+- contract `properties.data.properties.purchaseInvoice.properties.subscriptionId.type`: — → `"string"`
+- contract `properties.data.properties.purchaseInvoice.properties.vendorId.format`: — → `"uuid"`
+- contract `properties.data.properties.purchaseInvoice.properties.vendorId.type`: — → `"string"`
+- contract `properties.data.properties.purchaseInvoice.properties.vendorInvoiceNumber.type`: — → `"string"`
+- contract `properties.data.properties.purchaseInvoice.required`: — → `["id","linkKind","netAmount","requestId","servicePeriodMonth","subscriptionId…`
+- contract `properties.data.properties.purchaseInvoice.type`: — → `"object"`
+- contract `properties.data.properties.quantity.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.quantity.properties.expected.description`: — → `"The seats approved or bought; null when nobody knew."`
+- contract `properties.data.properties.quantity.properties.expected.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.quantity.properties.expected.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.quantity.properties.expected.nullable`: — → `true`
+- contract `properties.data.properties.quantity.properties.expected.type`: — → `"integer"`
+- contract `properties.data.properties.quantity.properties.invoice.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.quantity.properties.invoice.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.quantity.properties.invoice.type`: — → `"integer"`
+- contract `properties.data.properties.quantity.required`: — → `["expected","invoice"]`
+- contract `properties.data.properties.quantity.type`: — → `"object"`
+- contract `properties.data.properties.state.enum`: — → `["CLOSED","OPEN"]`
+- contract `properties.data.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.unitPrice.additionalProperties`: — → `false`
+- contract `properties.data.properties.unitPrice.properties.expected.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.unitPrice.properties.expected.description`: — → `"The price of one of the plan or subscription, in its original currency; null…`
+- contract `properties.data.properties.unitPrice.properties.expected.nullable`: — → `true`
+- contract `properties.data.properties.unitPrice.properties.expected.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.unitPrice.properties.expected.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.unitPrice.properties.expected.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.unitPrice.properties.expected.type`: — → `"object"`
+- contract `properties.data.properties.unitPrice.properties.invoice.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.unitPrice.properties.invoice.description`: — → `"The price of one the invoice states, in the currency it states."`
+- contract `properties.data.properties.unitPrice.properties.invoice.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.unitPrice.properties.invoice.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.unitPrice.properties.invoice.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.unitPrice.properties.invoice.type`: — → `"object"`
+- contract `properties.data.properties.unitPrice.required`: — → `["expected","invoice"]`
+- contract `properties.data.properties.unitPrice.type`: — → `"object"`
+- contract `properties.data.required`: — → `["closure","id","mismatches","openedAt","outcome","purchaseInvoice","quantity…`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `InvoiceDiscrepancyClosureBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.differenceAmount.additionalProperties`: — → `false`
+- mô tả `properties.differenceAmount.description`: — → `"What the invoice cost beyond what was approved or bought, in dong (nothing i…`
+- contract `properties.differenceAmount.properties.amount.maxLength`: — → `40`
+- contract `properties.differenceAmount.properties.amount.type`: — → `"string"`
+- contract `properties.differenceAmount.required`: — → `["amount"]`
+- contract `properties.differenceAmount.type`: — → `"object"`
+- mô tả `properties.outcome.description`: — → `"EXPLAINED when the difference has a reason; OUT_OF_PROCESS_SUSPECTED when so…`
+- contract `properties.outcome.enum`: — → `["EXPLAINED","OUT_OF_PROCESS_SUSPECTED"]`
+- contract `properties.outcome.type`: — → `"string"`
+- mô tả `properties.reason.description`: — → `"Why the case is closed this way. Required; it stays with the case."`
+- contract `properties.reason.maxLength`: — → `1000`
+- contract `properties.reason.minLength`: — → `1`
+- contract `properties.reason.type`: — → `"string"`
+- contract `required`: — → `["differenceAmount","outcome","reason"]`
+- contract `type`: — → `"object"`
+
+### `CreateCycleBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.annualCeiling.additionalProperties`: — → `false`
+- mô tả `properties.annualCeiling.description`: — → `"The annual ceiling of the software budget."`
+- contract `properties.annualCeiling.properties.amount.maxLength`: — → `40`
+- contract `properties.annualCeiling.properties.amount.type`: — → `"string"`
+- contract `properties.annualCeiling.required`: — → `["amount"]`
+- contract `properties.annualCeiling.type`: — → `"object"`
+- mô tả `properties.decisionDeadline.description`: — → `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."`
+- contract `properties.decisionDeadline.format`: — → `"date"`
+- contract `properties.decisionDeadline.type`: — → `"string"`
+- contract `properties.priorities.maxLength`: — → `2000`
+- contract `properties.priorities.minLength`: — → `1`
+- contract `properties.priorities.type`: — → `"string"`
+- contract `properties.sharedPoolReserve.additionalProperties`: — → `false`
+- mô tả `properties.sharedPoolReserve.description`: — → `"The reserve of the shared pool, kept out of what the departments share; zero…`
+- contract `properties.sharedPoolReserve.properties.amount.maxLength`: — → `40`
+- contract `properties.sharedPoolReserve.properties.amount.type`: — → `"string"`
+- contract `properties.sharedPoolReserve.required`: — → `["amount"]`
+- contract `properties.sharedPoolReserve.type`: — → `"object"`
+- mô tả `properties.submissionDeadline.description`: — → `"A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."`
+- contract `properties.submissionDeadline.format`: — → `"date"`
+- contract `properties.submissionDeadline.type`: — → `"string"`
+- contract `properties.year.maximum`: — → `2999`
+- contract `properties.year.minimum`: — → `2000`
+- contract `properties.year.type`: — → `"integer"`
+- contract `required`: — → `["annualCeiling","decisionDeadline","sharedPoolReserve","submissionDeadline",…`
+- contract `type`: — → `"object"`
+
+### `CycleDeletedResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.year.type`: — → `"integer"`
+- contract `properties.data.required`: — → `["year"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `SeatMonthChargesResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.amount.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.amount.description`: — → `"What the days cost the department."`
+- contract `properties.data.properties.items.items.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.appliedToCommitment.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.appliedToCommitment.description`: — → `"What of the amount took the commitment of the seat down."`
+- contract `properties.data.properties.items.items.properties.appliedToCommitment.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.appliedToCommitment.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.appliedToCommitment.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.appliedToCommitment.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.assignmentId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.assignmentId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.costCenter.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.costCenter.description`: — → `"The Cost Center that bears it; empty when the department has none yet (not a…`
+- contract `properties.data.properties.items.items.properties.costCenter.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.costCenter.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.costCenter.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.costCenter.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.costCenter.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.costCenter.required`: — → `["code","id","name"]`
+- contract `properties.data.properties.items.items.properties.costCenter.type`: — → `"object"`
+- mô tả `properties.data.properties.items.items.properties.days.description`: — → `"The days the seat was held in the department in the month."`
+- contract `properties.data.properties.items.items.properties.days.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.items.items.properties.days.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.days.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.days.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.daysInMonth.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.items.items.properties.daysInMonth.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.daysInMonth.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.daysInMonth.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.department.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.department.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.department.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.department.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.required`: — → `["code","id","name"]`
+- contract `properties.data.properties.items.items.properties.department.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.employee.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.employee.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.employee.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.employee.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.employee.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.employee.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.employee.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.items.items.properties.employee.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.monthlyPrice.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.monthlyPrice.description`: — → `"The price of a month of the seat the days are counted against."`
+- contract `properties.data.properties.items.items.properties.monthlyPrice.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.monthlyPrice.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.monthlyPrice.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.monthlyPrice.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.subscriptionId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.subscriptionId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: — → `["amount","appliedToCommitment","assignmentId","costCenter","days","daysInMon…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- mô tả `properties.data.properties.poolLines.description`: — → `"The line of the shared pool of each subscription with an invoice or a seat-m…`
+- contract `properties.data.properties.poolLines.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.poolLines.items.properties.allocated.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.poolLines.items.properties.allocated.description`: — → `"What the seat-months of the month took of it."`
+- contract `properties.data.properties.poolLines.items.properties.allocated.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.poolLines.items.properties.allocated.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.poolLines.items.properties.allocated.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.poolLines.items.properties.allocated.type`: — → `"object"`
+- contract `properties.data.properties.poolLines.items.properties.invoiced.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.poolLines.items.properties.invoiced.description`: — → `"What the invoices of the pool booked to the month cost: the proof of what wa…`
+- contract `properties.data.properties.poolLines.items.properties.invoiced.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.poolLines.items.properties.invoiced.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.poolLines.items.properties.invoiced.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.poolLines.items.properties.invoiced.type`: — → `"object"`
+- contract `properties.data.properties.poolLines.items.properties.paid.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.poolLines.items.properties.paid.description`: — → `"The seats paid for at the price of a month: the seats bought times the price…`
+- contract `properties.data.properties.poolLines.items.properties.paid.nullable`: — → `true`
+- contract `properties.data.properties.poolLines.items.properties.paid.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.poolLines.items.properties.paid.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.poolLines.items.properties.paid.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.poolLines.items.properties.paid.type`: — → `"object"`
+- contract `properties.data.properties.poolLines.items.properties.subscriptionId.format`: — → `"uuid"`
+- contract `properties.data.properties.poolLines.items.properties.subscriptionId.type`: — → `"string"`
+- contract `properties.data.properties.poolLines.items.properties.unallocated.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.poolLines.items.properties.unallocated.description`: — → `"The line \"not allocated, shared pool\": the seats paid for at the price of …`
+- contract `properties.data.properties.poolLines.items.properties.unallocated.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.poolLines.items.properties.unallocated.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.poolLines.items.properties.unallocated.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.poolLines.items.properties.unallocated.type`: — → `"object"`
+- contract `properties.data.properties.poolLines.items.properties.withoutCostCenter.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.poolLines.items.properties.withoutCostCenter.description`: — → `"The line \"not allocated to a Cost Center\": the part of the seat-months tha…`
+- contract `properties.data.properties.poolLines.items.properties.withoutCostCenter.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.poolLines.items.properties.withoutCostCenter.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.poolLines.items.properties.withoutCostCenter.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.poolLines.items.properties.withoutCostCenter.type`: — → `"object"`
+- contract `properties.data.properties.poolLines.items.required`: — → `["allocated","invoiced","paid","subscriptionId","unallocated","withoutCostCen…`
+- contract `properties.data.properties.poolLines.items.type`: — → `"object"`
+- contract `properties.data.properties.poolLines.maxItems`: — → `100`
+- contract `properties.data.properties.poolLines.type`: — → `"array"`
+- contract `properties.data.required`: — → `["items","pagination","poolLines"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `CreateReviewPeriodBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- mô tả `properties.month.description`: — → `"The month to close, 1 to 12. It must have ended: a month is closed from the …`
+- contract `properties.month.maximum`: — → `12`
+- contract `properties.month.minimum`: — → `1`
+- contract `properties.month.type`: — → `"integer"`
+- mô tả `properties.year.description`: — → `"The fiscal year of the month to close, as YYYY."`
+- contract `properties.year.maximum`: — → `2100`
+- contract `properties.year.minimum`: — → `2000`
+- contract `properties.year.type`: — → `"integer"`
+- contract `required`: — → `["month","year"]`
+- contract `type`: — → `"object"`
+
+### `ReviewPeriodResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.closedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.closedAt.type`: — → `"string"`
+- contract `properties.data.properties.closedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.closedBy.nullable`: — → `true`
+- contract `properties.data.properties.closedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.closedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.closedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.closedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.closedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.closedBy.type`: — → `"object"`
+- contract `properties.data.properties.company.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.company.description`: — → `"The figures of the company; Finance and the spending approver only, null for…`
+- contract `properties.data.properties.company.nullable`: — → `true`
+- contract `properties.data.properties.company.properties.annualCeiling.additionalProperties`: — → `false`
+- contract `properties.data.properties.company.properties.annualCeiling.nullable`: — → `true`
+- contract `properties.data.properties.company.properties.annualCeiling.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.company.properties.annualCeiling.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.company.properties.annualCeiling.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.company.properties.annualCeiling.type`: — → `"object"`
+- mô tả `properties.data.properties.company.properties.sharedPoolOverReserve.description`: — → `"Whether the line of the pool is above the reserve; null when there is no res…`
+- contract `properties.data.properties.company.properties.sharedPoolOverReserve.nullable`: — → `true`
+- contract `properties.data.properties.company.properties.sharedPoolOverReserve.type`: — → `"boolean"`
+- contract `properties.data.properties.company.properties.sharedPoolReserve.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.company.properties.sharedPoolReserve.description`: — → `"The reserve of the shared pool of the budget cycle of the year, null when th…`
+- contract `properties.data.properties.company.properties.sharedPoolReserve.nullable`: — → `true`
+- contract `properties.data.properties.company.properties.sharedPoolReserve.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.company.properties.sharedPoolReserve.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.company.properties.sharedPoolReserve.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.company.properties.sharedPoolReserve.type`: — → `"object"`
+- contract `properties.data.properties.company.properties.sharedPoolUnallocated.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.company.properties.sharedPoolUnallocated.description`: — → `"The line \"not allocated, shared pool\" of the year up to the close: the sea…`
+- contract `properties.data.properties.company.properties.sharedPoolUnallocated.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.company.properties.sharedPoolUnallocated.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.company.properties.sharedPoolUnallocated.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.company.properties.sharedPoolUnallocated.type`: — → `"object"`
+- contract `properties.data.properties.company.properties.spent.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.company.properties.spent.description`: — → `"What the company spent in the year up to the close, the invoices of the shar…`
+- contract `properties.data.properties.company.properties.spent.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.company.properties.spent.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.company.properties.spent.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.company.properties.spent.type`: — → `"object"`
+- contract `properties.data.properties.company.required`: — → `["annualCeiling","sharedPoolOverReserve","sharedPoolReserve","sharedPoolUnall…`
+- contract `properties.data.properties.company.type`: — → `"object"`
+- contract `properties.data.properties.currency.type`: — → `"string"`
+- mô tả `properties.data.properties.explanationsDueOn.description`: — → `"For a quarter, the last day the heads of departments are asked to explain by…`
+- contract `properties.data.properties.explanationsDueOn.format`: — → `"date"`
+- contract `properties.data.properties.explanationsDueOn.nullable`: — → `true`
+- contract `properties.data.properties.explanationsDueOn.type`: — → `"string"`
+- contract `properties.data.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.id.type`: — → `"string"`
+- mô tả `properties.data.properties.kind.description`: — → `"QUARTER for March, June and September, the quarterly review; MONTH for the o…`
+- contract `properties.data.properties.kind.enum`: — → `["MONTH","QUARTER"]`
+- contract `properties.data.properties.kind.type`: — → `"string"`
+- contract `properties.data.properties.lightCounts.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.lightCounts.description`: — → `"How many Cost Centers of the period have each light (for a manager, only the…`
+- contract `properties.data.properties.lightCounts.properties.GREEN.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.lightCounts.properties.GREEN.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.lightCounts.properties.GREEN.type`: — → `"integer"`
+- contract `properties.data.properties.lightCounts.properties.RED.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.lightCounts.properties.RED.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.lightCounts.properties.RED.type`: — → `"integer"`
+- contract `properties.data.properties.lightCounts.properties.UNDER.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.lightCounts.properties.UNDER.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.lightCounts.properties.UNDER.type`: — → `"integer"`
+- contract `properties.data.properties.lightCounts.properties.YELLOW.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.lightCounts.properties.YELLOW.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.lightCounts.properties.YELLOW.type`: — → `"integer"`
+- contract `properties.data.properties.lightCounts.required`: — → `["GREEN","RED","UNDER","YELLOW"]`
+- contract `properties.data.properties.lightCounts.type`: — → `"object"`
+- contract `properties.data.properties.month.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.month.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.month.type`: — → `"integer"`
+- contract `properties.data.properties.note.nullable`: — → `true`
+- contract `properties.data.properties.note.type`: — → `"string"`
+- contract `properties.data.properties.signedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.signedAt.nullable`: — → `true`
+- contract `properties.data.properties.signedAt.type`: — → `"string"`
+- contract `properties.data.properties.signedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.signedBy.nullable`: — → `true`
+- contract `properties.data.properties.signedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.signedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.signedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.signedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.signedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.signedBy.type`: — → `"object"`
+- mô tả `properties.data.properties.state.description`: — → `"SNAPSHOT: closed on its figures. AWAITING_EXPLANATIONS: a quarter waiting fo…`
+- contract `properties.data.properties.state.enum`: — → `["AWAITING_EXPLANATIONS","SIGNED","SNAPSHOT"]`
+- contract `properties.data.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.year.type`: — → `"integer"`
+- contract `properties.data.required`: — → `["closedAt","closedBy","company","currency","explanationsDueOn","id","kind","…`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `ReviewPeriodListResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.closedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.closedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.closedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.closedBy.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.closedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.closedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.closedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.closedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.closedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.items.items.properties.closedBy.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.company.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.company.description`: — → `"The figures of the company; Finance and the spending approver only, null for…`
+- contract `properties.data.properties.items.items.properties.company.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.company.properties.annualCeiling.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.company.properties.annualCeiling.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.company.properties.annualCeiling.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.company.properties.annualCeiling.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.company.properties.annualCeiling.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.company.properties.annualCeiling.type`: — → `"object"`
+- mô tả `properties.data.properties.items.items.properties.company.properties.sharedPoolOverReserve.description`: — → `"Whether the line of the pool is above the reserve; null when there is no res…`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolOverReserve.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolOverReserve.type`: — → `"boolean"`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolReserve.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.company.properties.sharedPoolReserve.description`: — → `"The reserve of the shared pool of the budget cycle of the year, null when th…`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolReserve.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolReserve.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolReserve.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolReserve.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolReserve.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolUnallocated.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.company.properties.sharedPoolUnallocated.description`: — → `"The line \"not allocated, shared pool\" of the year up to the close: the sea…`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolUnallocated.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolUnallocated.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolUnallocated.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.company.properties.sharedPoolUnallocated.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.company.properties.spent.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.company.properties.spent.description`: — → `"What the company spent in the year up to the close, the invoices of the shar…`
+- contract `properties.data.properties.items.items.properties.company.properties.spent.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.company.properties.spent.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.company.properties.spent.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.company.properties.spent.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.company.required`: — → `["annualCeiling","sharedPoolOverReserve","sharedPoolReserve","sharedPoolUnall…`
+- contract `properties.data.properties.items.items.properties.company.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.currency.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.explanationsDueOn.description`: — → `"For a quarter, the last day the heads of departments are asked to explain by…`
+- contract `properties.data.properties.items.items.properties.explanationsDueOn.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.explanationsDueOn.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.explanationsDueOn.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.id.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.kind.description`: — → `"QUARTER for March, June and September, the quarterly review; MONTH for the o…`
+- contract `properties.data.properties.items.items.properties.kind.enum`: — → `["MONTH","QUARTER"]`
+- contract `properties.data.properties.items.items.properties.kind.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.lightCounts.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.lightCounts.description`: — → `"How many Cost Centers of the period have each light (for a manager, only the…`
+- contract `properties.data.properties.items.items.properties.lightCounts.properties.GREEN.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.lightCounts.properties.GREEN.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.lightCounts.properties.GREEN.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.lightCounts.properties.RED.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.lightCounts.properties.RED.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.lightCounts.properties.RED.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.lightCounts.properties.UNDER.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.lightCounts.properties.UNDER.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.lightCounts.properties.UNDER.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.lightCounts.properties.YELLOW.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.lightCounts.properties.YELLOW.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.lightCounts.properties.YELLOW.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.lightCounts.required`: — → `["GREEN","RED","UNDER","YELLOW"]`
+- contract `properties.data.properties.items.items.properties.lightCounts.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.month.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.month.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.month.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.note.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.note.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.signedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.signedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.signedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.signedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.signedBy.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.signedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.signedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.signedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.signedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.signedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.items.items.properties.signedBy.type`: — → `"object"`
+- mô tả `properties.data.properties.items.items.properties.state.description`: — → `"SNAPSHOT: closed on its figures. AWAITING_EXPLANATIONS: a quarter waiting fo…`
+- contract `properties.data.properties.items.items.properties.state.enum`: — → `["AWAITING_EXPLANATIONS","SIGNED","SNAPSHOT"]`
+- contract `properties.data.properties.items.items.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.required`: — → `["closedAt","closedBy","company","currency","explanationsDueOn","id","kind","…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `ReviewPeriodDetailResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- mô tả `properties.data.properties.items.description`: — → `"A page of the lines, the Cost Centers that need the eye first: red, yellow, …`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.base.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.base.description`: — → `"The effective base of the year at the close."`
+- contract `properties.data.properties.items.items.properties.base.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.base.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.base.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.base.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.changedAfterSnapshot.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.changedAfterSnapshot.description`: — → `"What the spent of the month closed is now over what the picture kept: an inv…`
+- contract `properties.data.properties.items.items.properties.changedAfterSnapshot.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.changedAfterSnapshot.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.changedAfterSnapshot.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.changedAfterSnapshot.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.committed.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.committed.description`: — → `"What its commitments still hold."`
+- contract `properties.data.properties.items.items.properties.committed.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.committed.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.committed.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.committed.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.costCenter.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.costCenter.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.costCenter.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.costCenter.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.costCenter.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.costCenter.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.costCenter.required`: — → `["code","id","name"]`
+- contract `properties.data.properties.items.items.properties.costCenter.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.explanation.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.explanation.description`: — → `"What the head of the department explained of the line; null until they do."`
+- contract `properties.data.properties.items.items.properties.explanation.nullable`: — → `true`
+- mô tả `properties.data.properties.items.items.properties.explanation.properties.action.description`: — → `"What the department does about it."`
+- contract `properties.data.properties.items.items.properties.explanation.properties.action.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.cause.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.explainedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.explainedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.explainedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.explanation.properties.explainedBy.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.explanation.properties.explainedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.explainedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.explainedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.explainedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.explainedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.items.items.properties.explanation.properties.explainedBy.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.knownNeedsToYearEnd.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.description`: — → `"What the department already knows it will need to the end of the year (nothi…`
+- contract `properties.data.properties.items.items.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.knownNeedsToYearEnd.properties.note.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.explanation.properties.knownNeedsToYearEnd.required`: — → `["amount","note"]`
+- contract `properties.data.properties.items.items.properties.explanation.properties.knownNeedsToYearEnd.type`: — → `"object"`
+- mô tả `properties.data.properties.items.items.properties.explanation.properties.persistence.description`: — → `"ONE_OFF: it happened once. ONGOING: it goes on and will weigh on the months …`
+- contract `properties.data.properties.items.items.properties.explanation.properties.persistence.enum`: — → `["ONE_OFF","ONGOING"]`
+- contract `properties.data.properties.items.items.properties.explanation.properties.persistence.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.explanation.required`: — → `["action","cause","explainedAt","explainedBy","knownNeedsToYearEnd","persiste…`
+- contract `properties.data.properties.items.items.properties.explanation.type`: — → `"object"`
+- mô tả `properties.data.properties.items.items.properties.explanationStatus.description`: — → `"NOT_REQUIRED: a month, or a Cost Center that is green, is not asked. PENDING…`
+- contract `properties.data.properties.items.items.properties.explanationStatus.enum`: — → `["EXPLAINED","NO_HEAD","NOT_REQUIRED","PENDING","UNEXPLAINED"]`
+- contract `properties.data.properties.items.items.properties.explanationStatus.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.forecast.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.forecast.description`: — → `"The forecast of the end of the year: spent + spent after the month + (held +…`
+- contract `properties.data.properties.items.items.properties.forecast.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.forecast.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.forecast.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.forecast.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.id.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.light.description`: — → `"The light of the Cost Center at the close: RED when the forecast is above th…`
+- contract `properties.data.properties.items.items.properties.light.enum`: — → `["GREEN","RED","UNDER","YELLOW"]`
+- contract `properties.data.properties.items.items.properties.light.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.paceBasisPoints.description`: — → `"The spent through the end of the month over the base of the months gone, in …`
+- contract `properties.data.properties.items.items.properties.paceBasisPoints.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.paceBasisPoints.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.paceBasisPoints.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.paceBasisPoints.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.pendingSpend.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.pendingSpend.description`: — → `"What its requests that wait for the spend decision would cost."`
+- contract `properties.data.properties.items.items.properties.pendingSpend.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.pendingSpend.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.pendingSpend.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.pendingSpend.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.priceIncrease.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.priceIncrease.description`: — → `"The price increase already known: the rise of the price of a seat over what …`
+- contract `properties.data.properties.items.items.properties.priceIncrease.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.priceIncrease.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.priceIncrease.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.priceIncrease.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.remaining.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.remaining.description`: — → `"The budget (base and reserve) less spent, spent after the month, held and wa…`
+- contract `properties.data.properties.items.items.properties.remaining.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.remaining.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.remaining.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.remaining.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.reserve.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.reserve.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.reserve.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.reserve.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.reserve.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.spent.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.spent.description`: — → `"What the Cost Center spent through the end of the month closed, by the month…`
+- contract `properties.data.properties.items.items.properties.spent.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.spent.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.spent.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.spent.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.spentAfterMonth.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.spentAfterMonth.description`: — → `"What was already recorded for the months after the one closed when it was cl…`
+- contract `properties.data.properties.items.items.properties.spentAfterMonth.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.spentAfterMonth.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.spentAfterMonth.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.spentAfterMonth.type`: — → `"object"`
+- mô tả `properties.data.properties.items.items.properties.variancePpm.description`: — → `"The difference k of the invoices of the commitments since 01/01, in milliont…`
+- contract `properties.data.properties.items.items.properties.variancePpm.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.variancePpm.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.variancePpm.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.required`: — → `["base","changedAfterSnapshot","committed","costCenter","explanation","explan…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.properties.period.additionalProperties`: — → `false`
+- contract `properties.data.properties.period.properties.closedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.period.properties.closedAt.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.closedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.period.properties.closedBy.nullable`: — → `true`
+- contract `properties.data.properties.period.properties.closedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.closedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.period.properties.closedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.closedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.closedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.period.properties.closedBy.type`: — → `"object"`
+- contract `properties.data.properties.period.properties.company.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.period.properties.company.description`: — → `"The figures of the company; Finance and the spending approver only, null for…`
+- contract `properties.data.properties.period.properties.company.nullable`: — → `true`
+- contract `properties.data.properties.period.properties.company.properties.annualCeiling.additionalProperties`: — → `false`
+- contract `properties.data.properties.period.properties.company.properties.annualCeiling.nullable`: — → `true`
+- contract `properties.data.properties.period.properties.company.properties.annualCeiling.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.company.properties.annualCeiling.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.company.properties.annualCeiling.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.period.properties.company.properties.annualCeiling.type`: — → `"object"`
+- mô tả `properties.data.properties.period.properties.company.properties.sharedPoolOverReserve.description`: — → `"Whether the line of the pool is above the reserve; null when there is no res…`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolOverReserve.nullable`: — → `true`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolOverReserve.type`: — → `"boolean"`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolReserve.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.period.properties.company.properties.sharedPoolReserve.description`: — → `"The reserve of the shared pool of the budget cycle of the year, null when th…`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolReserve.nullable`: — → `true`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolReserve.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolReserve.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolReserve.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolReserve.type`: — → `"object"`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolUnallocated.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.period.properties.company.properties.sharedPoolUnallocated.description`: — → `"The line \"not allocated, shared pool\" of the year up to the close: the sea…`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolUnallocated.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolUnallocated.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolUnallocated.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.period.properties.company.properties.sharedPoolUnallocated.type`: — → `"object"`
+- contract `properties.data.properties.period.properties.company.properties.spent.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.period.properties.company.properties.spent.description`: — → `"What the company spent in the year up to the close, the invoices of the shar…`
+- contract `properties.data.properties.period.properties.company.properties.spent.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.company.properties.spent.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.company.properties.spent.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.period.properties.company.properties.spent.type`: — → `"object"`
+- contract `properties.data.properties.period.properties.company.required`: — → `["annualCeiling","sharedPoolOverReserve","sharedPoolReserve","sharedPoolUnall…`
+- contract `properties.data.properties.period.properties.company.type`: — → `"object"`
+- contract `properties.data.properties.period.properties.currency.type`: — → `"string"`
+- mô tả `properties.data.properties.period.properties.explanationsDueOn.description`: — → `"For a quarter, the last day the heads of departments are asked to explain by…`
+- contract `properties.data.properties.period.properties.explanationsDueOn.format`: — → `"date"`
+- contract `properties.data.properties.period.properties.explanationsDueOn.nullable`: — → `true`
+- contract `properties.data.properties.period.properties.explanationsDueOn.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.period.properties.id.type`: — → `"string"`
+- mô tả `properties.data.properties.period.properties.kind.description`: — → `"QUARTER for March, June and September, the quarterly review; MONTH for the o…`
+- contract `properties.data.properties.period.properties.kind.enum`: — → `["MONTH","QUARTER"]`
+- contract `properties.data.properties.period.properties.kind.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.lightCounts.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.period.properties.lightCounts.description`: — → `"How many Cost Centers of the period have each light (for a manager, only the…`
+- contract `properties.data.properties.period.properties.lightCounts.properties.GREEN.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.period.properties.lightCounts.properties.GREEN.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.period.properties.lightCounts.properties.GREEN.type`: — → `"integer"`
+- contract `properties.data.properties.period.properties.lightCounts.properties.RED.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.period.properties.lightCounts.properties.RED.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.period.properties.lightCounts.properties.RED.type`: — → `"integer"`
+- contract `properties.data.properties.period.properties.lightCounts.properties.UNDER.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.period.properties.lightCounts.properties.UNDER.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.period.properties.lightCounts.properties.UNDER.type`: — → `"integer"`
+- contract `properties.data.properties.period.properties.lightCounts.properties.YELLOW.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.period.properties.lightCounts.properties.YELLOW.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.period.properties.lightCounts.properties.YELLOW.type`: — → `"integer"`
+- contract `properties.data.properties.period.properties.lightCounts.required`: — → `["GREEN","RED","UNDER","YELLOW"]`
+- contract `properties.data.properties.period.properties.lightCounts.type`: — → `"object"`
+- contract `properties.data.properties.period.properties.month.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.period.properties.month.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.period.properties.month.type`: — → `"integer"`
+- contract `properties.data.properties.period.properties.note.nullable`: — → `true`
+- contract `properties.data.properties.period.properties.note.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.signedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.period.properties.signedAt.nullable`: — → `true`
+- contract `properties.data.properties.period.properties.signedAt.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.signedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.period.properties.signedBy.nullable`: — → `true`
+- contract `properties.data.properties.period.properties.signedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.signedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.period.properties.signedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.signedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.signedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.period.properties.signedBy.type`: — → `"object"`
+- mô tả `properties.data.properties.period.properties.state.description`: — → `"SNAPSHOT: closed on its figures. AWAITING_EXPLANATIONS: a quarter waiting fo…`
+- contract `properties.data.properties.period.properties.state.enum`: — → `["AWAITING_EXPLANATIONS","SIGNED","SNAPSHOT"]`
+- contract `properties.data.properties.period.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.period.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.period.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.period.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.period.required`: — → `["closedAt","closedBy","company","currency","explanationsDueOn","id","kind","…`
+- contract `properties.data.properties.period.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination","period"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `SignReviewPeriodBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- mô tả `properties.note.description`: — → `"What Finance writes on the minutes when it signs; optional."`
+- contract `properties.note.maxLength`: — → `2000`
+- contract `properties.note.minLength`: — → `1`
+- contract `properties.note.type`: — → `"string"`
+- contract `type`: — → `"object"`
+
+### `ExplainLineBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- mô tả `properties.action.description`: — → `"What the department does about it."`
+- contract `properties.action.maxLength`: — → `2000`
+- contract `properties.action.minLength`: — → `1`
+- contract `properties.action.type`: — → `"string"`
+- mô tả `properties.cause.description`: — → `"Why the Cost Center is yellow, red or under what it should have used."`
+- contract `properties.cause.maxLength`: — → `2000`
+- contract `properties.cause.minLength`: — → `1`
+- contract `properties.cause.type`: — → `"string"`
+- contract `properties.knownNeedsToYearEnd.additionalProperties`: — → `false`
+- mô tả `properties.knownNeedsToYearEnd.description`: — → `"What the department already knows it will need to the end of the year."`
+- contract `properties.knownNeedsToYearEnd.properties.amount.additionalProperties`: — → `false`
+- mô tả `properties.knownNeedsToYearEnd.properties.amount.description`: — → `"What the department already knows it will need to the end of the year, in th…`
+- contract `properties.knownNeedsToYearEnd.properties.amount.properties.amount.maxLength`: — → `40`
+- contract `properties.knownNeedsToYearEnd.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.knownNeedsToYearEnd.properties.amount.required`: — → `["amount"]`
+- contract `properties.knownNeedsToYearEnd.properties.amount.type`: — → `"object"`
+- mô tả `properties.knownNeedsToYearEnd.properties.note.description`: — → `"What is known of the need to the end of the year, in words."`
+- contract `properties.knownNeedsToYearEnd.properties.note.maxLength`: — → `1000`
+- contract `properties.knownNeedsToYearEnd.properties.note.minLength`: — → `1`
+- contract `properties.knownNeedsToYearEnd.properties.note.type`: — → `"string"`
+- contract `properties.knownNeedsToYearEnd.required`: — → `["amount","note"]`
+- contract `properties.knownNeedsToYearEnd.type`: — → `"object"`
+- mô tả `properties.persistence.description`: — → `"Whether the cause happened once or goes on."`
+- contract `properties.persistence.enum`: — → `["ONE_OFF","ONGOING"]`
+- contract `properties.persistence.type`: — → `"string"`
+- contract `required`: — → `["action","cause","knownNeedsToYearEnd","persistence"]`
+- contract `type`: — → `"object"`
+
+### `ExplainedLineResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.costCenterId.format`: — → `"uuid"`
+- contract `properties.data.properties.costCenterId.type`: — → `"string"`
+- contract `properties.data.properties.explanation.additionalProperties`: — → `false`
+- contract `properties.data.properties.explanation.nullable`: — → `true`
+- mô tả `properties.data.properties.explanation.properties.action.description`: — → `"What the department does about it."`
+- contract `properties.data.properties.explanation.properties.action.type`: — → `"string"`
+- contract `properties.data.properties.explanation.properties.cause.type`: — → `"string"`
+- contract `properties.data.properties.explanation.properties.explainedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.explanation.properties.explainedAt.type`: — → `"string"`
+- contract `properties.data.properties.explanation.properties.explainedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.explanation.properties.explainedBy.nullable`: — → `true`
+- contract `properties.data.properties.explanation.properties.explainedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.explanation.properties.explainedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.explanation.properties.explainedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.explanation.properties.explainedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.explanation.properties.explainedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.explanation.properties.explainedBy.type`: — → `"object"`
+- contract `properties.data.properties.explanation.properties.knownNeedsToYearEnd.additionalProperties`: — → `false`
+- contract `properties.data.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.description`: — → `"What the department already knows it will need to the end of the year (nothi…`
+- contract `properties.data.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.nullable`: — → `true`
+- contract `properties.data.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.explanation.properties.knownNeedsToYearEnd.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.explanation.properties.knownNeedsToYearEnd.properties.note.type`: — → `"string"`
+- contract `properties.data.properties.explanation.properties.knownNeedsToYearEnd.required`: — → `["amount","note"]`
+- contract `properties.data.properties.explanation.properties.knownNeedsToYearEnd.type`: — → `"object"`
+- mô tả `properties.data.properties.explanation.properties.persistence.description`: — → `"ONE_OFF: it happened once. ONGOING: it goes on and will weigh on the months …`
+- contract `properties.data.properties.explanation.properties.persistence.enum`: — → `["ONE_OFF","ONGOING"]`
+- contract `properties.data.properties.explanation.properties.persistence.type`: — → `"string"`
+- contract `properties.data.properties.explanation.required`: — → `["action","cause","explainedAt","explainedBy","knownNeedsToYearEnd","persiste…`
+- contract `properties.data.properties.explanation.type`: — → `"object"`
+- mô tả `properties.data.properties.explanationStatus.description`: — → `"NOT_REQUIRED: a month, or a Cost Center that is green, is not asked. PENDING…`
+- contract `properties.data.properties.explanationStatus.enum`: — → `["EXPLAINED","NO_HEAD","NOT_REQUIRED","PENDING","UNEXPLAINED"]`
+- contract `properties.data.properties.explanationStatus.type`: — → `"string"`
+- contract `properties.data.properties.periodId.format`: — → `"uuid"`
+- contract `properties.data.properties.periodId.type`: — → `"string"`
+- contract `properties.data.required`: — → `["costCenterId","explanation","explanationStatus","periodId"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `CreateAdjustmentBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.amount.additionalProperties`: — → `false`
+- mô tả `properties.amount.description`: — → `"The amount, above nothing, in the reporting currency of the organization."`
+- contract `properties.amount.properties.amount.maxLength`: — → `40`
+- contract `properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.amount.required`: — → `["amount"]`
+- contract `properties.amount.type`: — → `"object"`
+- mô tả `properties.fromCostCenterId.description`: — → `"The Cost Center that gives: required for TRANSFER and RETURN, not allowed fo…`
+- contract `properties.fromCostCenterId.format`: — → `"uuid"`
+- contract `properties.fromCostCenterId.type`: — → `"string"`
+- mô tả `properties.kind.description`: — → `"SUPPLEMENT: a Cost Center is given money from what is not allocated under th…`
+- contract `properties.kind.enum`: — → `["CEILING_REDUCTION","RETURN","SUPPLEMENT","TRANSFER"]`
+- contract `properties.kind.type`: — → `"string"`
+- contract `properties.reason.maxLength`: — → `1000`
+- contract `properties.reason.minLength`: — → `1`
+- contract `properties.reason.type`: — → `"string"`
+- mô tả `properties.toCostCenterId.description`: — → `"The Cost Center that receives: required for SUPPLEMENT and TRANSFER, not all…`
+- contract `properties.toCostCenterId.format`: — → `"uuid"`
+- contract `properties.toCostCenterId.type`: — → `"string"`
+- mô tả `properties.transferReason.description`: — → `"Only for TRANSFER: the department changed its Cost Center in the year and wh…`
+- contract `properties.transferReason.enum`: — → `["COST_CENTER_CHANGE"]`
+- contract `properties.transferReason.type`: — → `"string"`
+- mô tả `properties.year.description`: — → `"The fiscal year whose budget is adjusted, as YYYY."`
+- contract `properties.year.maximum`: — → `2999`
+- contract `properties.year.minimum`: — → `2000`
+- contract `properties.year.type`: — → `"integer"`
+- contract `required`: — → `["amount","kind","reason","year"]`
+- contract `type`: — → `"object"`
+
+### `AdjustmentResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.createdAt.format`: — → `"date-time"`
+- contract `properties.data.properties.createdAt.type`: — → `"string"`
+- contract `properties.data.properties.createdBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.createdBy.nullable`: — → `true`
+- contract `properties.data.properties.createdBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.createdBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.createdBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.createdBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.createdBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.createdBy.type`: — → `"object"`
+- mô tả `properties.data.properties.createdVersionId.description`: — → `"The version of the budget made for the Cost Center that received money when …`
+- contract `properties.data.properties.createdVersionId.format`: — → `"uuid"`
+- contract `properties.data.properties.createdVersionId.nullable`: — → `true`
+- contract `properties.data.properties.createdVersionId.type`: — → `"string"`
+- contract `properties.data.properties.decidedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.decidedAt.nullable`: — → `true`
+- contract `properties.data.properties.decidedAt.type`: — → `"string"`
+- contract `properties.data.properties.decidedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.decidedBy.nullable`: — → `true`
+- contract `properties.data.properties.decidedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.decidedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.decidedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.decidedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.decidedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.decidedBy.type`: — → `"object"`
+- contract `properties.data.properties.decisionReason.nullable`: — → `true`
+- contract `properties.data.properties.decisionReason.type`: — → `"string"`
+- contract `properties.data.properties.from.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.from.description`: — → `"The Cost Center that gives; null for a supplement and for a reduction of the…`
+- contract `properties.data.properties.from.nullable`: — → `true`
+- contract `properties.data.properties.from.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.from.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.from.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.from.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.from.required`: — → `["code","id","name"]`
+- contract `properties.data.properties.from.type`: — → `"object"`
+- contract `properties.data.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.id.type`: — → `"string"`
+- mô tả `properties.data.properties.kind.description`: — → `"SUPPLEMENT: a Cost Center is given money from what is not allocated under th…`
+- contract `properties.data.properties.kind.enum`: — → `["CEILING_REDUCTION","RETURN","SUPPLEMENT","TRANSFER"]`
+- contract `properties.data.properties.kind.type`: — → `"string"`
+- contract `properties.data.properties.reason.type`: — → `"string"`
+- contract `properties.data.properties.state.enum`: — → `["APPROVED","PENDING","REJECTED"]`
+- contract `properties.data.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.to.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.to.description`: — → `"The Cost Center that receives; null for a return and for a reduction of the …`
+- contract `properties.data.properties.to.nullable`: — → `true`
+- contract `properties.data.properties.to.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.to.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.to.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.to.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.to.required`: — → `["code","id","name"]`
+- contract `properties.data.properties.to.type`: — → `"object"`
+- contract `properties.data.properties.transferReason.enum`: — → `["COST_CENTER_CHANGE",null]`
+- contract `properties.data.properties.transferReason.nullable`: — → `true`
+- contract `properties.data.properties.transferReason.type`: — → `"string"`
+- contract `properties.data.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.year.type`: — → `"integer"`
+- contract `properties.data.required`: — → `["amount","createdAt","createdBy","createdVersionId","decidedAt","decidedBy",…`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `AdjustmentListResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.amount.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.createdAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.createdAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.createdBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.createdBy.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.createdBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.createdBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.createdBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.createdBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.createdBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.items.items.properties.createdBy.type`: — → `"object"`
+- mô tả `properties.data.properties.items.items.properties.createdVersionId.description`: — → `"The version of the budget made for the Cost Center that received money when …`
+- contract `properties.data.properties.items.items.properties.createdVersionId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.createdVersionId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.createdVersionId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.decidedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.decidedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.decidedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.decidedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.decidedBy.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.decidedBy.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.decidedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.decidedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.decidedBy.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.decidedBy.required`: — → `["employeeCode","employeeId","fullName"]`
+- contract `properties.data.properties.items.items.properties.decidedBy.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.decisionReason.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.decisionReason.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.from.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.from.description`: — → `"The Cost Center that gives; null for a supplement and for a reduction of the…`
+- contract `properties.data.properties.items.items.properties.from.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.from.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.from.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.from.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.from.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.from.required`: — → `["code","id","name"]`
+- contract `properties.data.properties.items.items.properties.from.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.id.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.kind.description`: — → `"SUPPLEMENT: a Cost Center is given money from what is not allocated under th…`
+- contract `properties.data.properties.items.items.properties.kind.enum`: — → `["CEILING_REDUCTION","RETURN","SUPPLEMENT","TRANSFER"]`
+- contract `properties.data.properties.items.items.properties.kind.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.reason.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.state.enum`: — → `["APPROVED","PENDING","REJECTED"]`
+- contract `properties.data.properties.items.items.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.to.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.to.description`: — → `"The Cost Center that receives; null for a return and for a reduction of the …`
+- contract `properties.data.properties.items.items.properties.to.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.to.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.to.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.to.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.to.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.to.required`: — → `["code","id","name"]`
+- contract `properties.data.properties.items.items.properties.to.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.transferReason.enum`: — → `["COST_CENTER_CHANGE",null]`
+- contract `properties.data.properties.items.items.properties.transferReason.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.transferReason.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.year.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.year.minimum`: — → `-9007199254740991`
+- contract `properties.data.properties.items.items.properties.year.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.required`: — → `["amount","createdAt","createdBy","createdVersionId","decidedAt","decidedBy",…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `DecideAdjustmentBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.decision.enum`: — → `["APPROVE","REJECT"]`
+- contract `properties.decision.type`: — → `"string"`
+- mô tả `properties.reason.description`: — → `"Required when the decision is REJECT."`
+- contract `properties.reason.maxLength`: — → `1000`
+- contract `properties.reason.minLength`: — → `1`
+- contract `properties.reason.type`: — → `"string"`
+- contract `required`: — → `["decision"]`
+- contract `type`: — → `"object"`
+
+### `DeviceRegistrationPageResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.acknowledgedFrom.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.acknowledgedFrom.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.acknowledgedFrom.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.collectionStoppedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.collectionStoppedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.collectionStoppedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.endCause.enum`: — → `["DEPARTURE_BLOCKED","DEPARTURE","DEVICE_RETIRED","EMPLOYEE_LEFT","HOLDER_CHA…`
+- contract `properties.data.properties.items.items.properties.endCause.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.endCause.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.endedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.endedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.endedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.holder.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.holder.description`: — → `"Null only when the person record can no longer be read."`
+- contract `properties.data.properties.items.items.properties.holder.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.holder.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.holder.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.holder.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.holder.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.holder.required`: — → `["employeeCode","fullName","id"]`
+- contract `properties.data.properties.items.items.properties.holder.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.id.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.lastAcceptedAt.description`: — → `"The latest instant any credential of this registration was accepted."`
+- contract `properties.data.properties.items.items.properties.lastAcceptedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.lastAcceptedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.lastAcceptedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.signatureRecorded.type`: — → `"boolean"`
+- mô tả `properties.data.properties.items.items.properties.validFrom.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.items.items.properties.validFrom.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.validFrom.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.validUntil.description`: — → `"The last day of the registration; null while it is open."`
+- contract `properties.data.properties.items.items.properties.validUntil.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.validUntil.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.validUntil.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: — → `["acknowledgedFrom","collectionStoppedAt","endCause","endedAt","holder","id",…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `UsageSourceContractPageResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.application.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.application.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.application.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.required`: — → `["id","name"]`
+- contract `properties.data.properties.items.items.properties.application.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.status.enum`: — → `["ACTIVE","RETIRED"]`
+- contract `properties.data.properties.items.items.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: — → `["application","id","name","status"]`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `UsageImportListResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.ambiguous.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.ambiguous.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.ambiguous.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.application.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.application.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.application.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.application.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.required`: — → `["id","logoUrl","name"]`
+- contract `properties.data.properties.items.items.properties.application.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.confirmedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.confirmedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.confirmedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.coverage.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.coverage.properties.from.pattern`: — → `"^\\d{4}-\\d{2}-\\d{2}$"`
+- contract `properties.data.properties.items.items.properties.coverage.properties.from.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.coverage.properties.to.pattern`: — → `"^\\d{4}-\\d{2}-\\d{2}$"`
+- contract `properties.data.properties.items.items.properties.coverage.properties.to.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.coverage.required`: — → `["from","to"]`
+- contract `properties.data.properties.items.items.properties.coverage.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.createdAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.createdAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.duplicateOfImportId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.duplicateOfImportId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.duplicateOfImportId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.format.enum`: — → `["CSV","JSON"]`
+- contract `properties.data.properties.items.items.properties.format.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.matched.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.matched.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.matched.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.source.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.source.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.source.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.source.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.source.required`: — → `["id","name"]`
+- contract `properties.data.properties.items.items.properties.source.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.status.enum`: — → `["CANCELLED","COMPLETED","PREVIEW"]`
+- contract `properties.data.properties.items.items.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.totalRows.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.totalRows.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.totalRows.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.unmatched.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.unmatched.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.unmatched.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.required`: — → `["ambiguous","application","confirmedAt","coverage","createdAt","duplicateOfI…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `UsageOverviewPageResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.activeDays.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.activeDays.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.activeDays.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.application.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.application.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.application.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.application.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.application.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.required`: — → `["id","logoUrl","name"]`
+- contract `properties.data.properties.items.items.properties.application.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.coveredDays.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.coveredDays.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.coveredDays.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.department.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.department.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.department.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.department.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.department.required`: — → `["code","id","name"]`
+- contract `properties.data.properties.items.items.properties.department.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.period.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.period.properties.days.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.items.items.properties.period.properties.days.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.period.properties.days.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.period.properties.days.type`: — → `"integer"`
+- mô tả `properties.data.properties.items.items.properties.period.properties.end.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.items.items.properties.period.properties.end.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.period.properties.end.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.period.properties.start.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.items.items.properties.period.properties.start.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.period.properties.start.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.period.required`: — → `["days","end","start"]`
+- contract `properties.data.properties.items.items.properties.period.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.source.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.source.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.source.properties.application.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.source.properties.application.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.source.properties.application.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.source.properties.application.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.source.properties.application.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.source.properties.application.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.source.properties.application.required`: — → `["id","logoUrl","name"]`
+- contract `properties.data.properties.items.items.properties.source.properties.application.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.source.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.source.properties.id.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.source.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.source.properties.kind.enum`: — → `["COLLECTOR","VENDOR"]`
+- contract `properties.data.properties.items.items.properties.source.properties.kind.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.source.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.source.required`: — → `["application","id","kind","name"]`
+- contract `properties.data.properties.items.items.properties.source.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.status.enum`: — → `["HAS_DATA","NO_DATA","PARTIAL"]`
+- contract `properties.data.properties.items.items.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.updatedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.updatedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.updatedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: — → `["activeDays","application","coveredDays","department","period","source","sta…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `UsageSoftwareListResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.employee.additionalProperties`: — → `false`
+- contract `properties.data.properties.employee.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.employee.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.employee.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.employee.required`: — → `["employeeCode","id"]`
+- contract `properties.data.properties.employee.type`: — → `"object"`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.activeDays.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.activeDays.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.activeDays.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.application.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.application.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.application.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.application.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.required`: — → `["id","logoUrl","name"]`
+- contract `properties.data.properties.items.items.properties.application.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.coveredDays.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.coveredDays.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.coveredDays.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.properties.hasSeat.type`: — → `"boolean"`
+- contract `properties.data.properties.items.items.properties.status.enum`: — → `["HAS_DATA","NO_DATA","PARTIAL"]`
+- contract `properties.data.properties.items.items.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.updatedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.updatedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.updatedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: — → `["activeDays","application","coveredDays","hasSeat","status","updatedAt"]`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.properties.range.additionalProperties`: — → `false`
+- contract `properties.data.properties.range.properties.days.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.range.properties.days.minimum`: — → `0`
+- contract `properties.data.properties.range.properties.days.type`: — → `"integer"`
+- mô tả `properties.data.properties.range.properties.from.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.range.properties.from.format`: — → `"date"`
+- contract `properties.data.properties.range.properties.from.type`: — → `"string"`
+- mô tả `properties.data.properties.range.properties.to.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.range.properties.to.format`: — → `"date"`
+- contract `properties.data.properties.range.properties.to.type`: — → `"string"`
+- contract `properties.data.properties.range.required`: — → `["days","from","to"]`
+- contract `properties.data.properties.range.type`: — → `"object"`
+- contract `properties.data.required`: — → `["employee","items","pagination","range"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `UsageSoftwareDetailResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.activeDays.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.activeDays.minimum`: — → `0`
+- contract `properties.data.properties.activeDays.type`: — → `"integer"`
+- contract `properties.data.properties.application.additionalProperties`: — → `false`
+- contract `properties.data.properties.application.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.application.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.application.properties.logoUrl.nullable`: — → `true`
+- contract `properties.data.properties.application.properties.logoUrl.type`: — → `"string"`
+- contract `properties.data.properties.application.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.application.required`: — → `["id","logoUrl","name"]`
+- contract `properties.data.properties.application.type`: — → `"object"`
+- contract `properties.data.properties.collector.additionalProperties`: — → `false`
+- contract `properties.data.properties.collector.nullable`: — → `true`
+- contract `properties.data.properties.collector.properties.activeDays.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.collector.properties.activeDays.minimum`: — → `0`
+- contract `properties.data.properties.collector.properties.activeDays.type`: — → `"integer"`
+- contract `properties.data.properties.collector.properties.coveredDays.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.collector.properties.coveredDays.minimum`: — → `0`
+- contract `properties.data.properties.collector.properties.coveredDays.type`: — → `"integer"`
+- contract `properties.data.properties.collector.properties.days.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.collector.properties.days.items.properties.active.type`: — → `"boolean"`
+- contract `properties.data.properties.collector.properties.days.items.properties.coverage.enum`: — → `["COVERED","PARTIAL"]`
+- contract `properties.data.properties.collector.properties.days.items.properties.coverage.type`: — → `"string"`
+- mô tả `properties.data.properties.collector.properties.days.items.properties.date.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.collector.properties.days.items.properties.date.format`: — → `"date"`
+- contract `properties.data.properties.collector.properties.days.items.properties.date.type`: — → `"string"`
+- contract `properties.data.properties.collector.properties.days.items.properties.responses.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.collector.properties.days.items.properties.responses.minimum`: — → `0`
+- contract `properties.data.properties.collector.properties.days.items.properties.responses.type`: — → `"integer"`
+- contract `properties.data.properties.collector.properties.days.items.properties.totalTokens.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.collector.properties.days.items.properties.totalTokens.minimum`: — → `0`
+- contract `properties.data.properties.collector.properties.days.items.properties.totalTokens.type`: — → `"integer"`
+- contract `properties.data.properties.collector.properties.days.items.required`: — → `["active","coverage","date","responses","totalTokens"]`
+- contract `properties.data.properties.collector.properties.days.items.type`: — → `"object"`
+- contract `properties.data.properties.collector.properties.days.maxItems`: — → `366`
+- contract `properties.data.properties.collector.properties.days.type`: — → `"array"`
+- contract `properties.data.properties.collector.properties.status.enum`: — → `["HAS_DATA","NO_DATA","PARTIAL"]`
+- contract `properties.data.properties.collector.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.collector.properties.tool.type`: — → `"string"`
+- contract `properties.data.properties.collector.properties.updatedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.collector.properties.updatedAt.nullable`: — → `true`
+- contract `properties.data.properties.collector.properties.updatedAt.type`: — → `"string"`
+- contract `properties.data.properties.collector.required`: — → `["activeDays","coveredDays","days","status","tool","updatedAt"]`
+- contract `properties.data.properties.collector.type`: — → `"object"`
+- contract `properties.data.properties.coveredDays.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.coveredDays.minimum`: — → `0`
+- contract `properties.data.properties.coveredDays.type`: — → `"integer"`
+- contract `properties.data.properties.employee.additionalProperties`: — → `false`
+- contract `properties.data.properties.employee.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.employee.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.employee.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.employee.required`: — → `["employeeCode","id"]`
+- contract `properties.data.properties.employee.type`: — → `"object"`
+- contract `properties.data.properties.hasSeat.type`: — → `"boolean"`
+- contract `properties.data.properties.range.additionalProperties`: — → `false`
+- contract `properties.data.properties.range.properties.days.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.range.properties.days.minimum`: — → `0`
+- contract `properties.data.properties.range.properties.days.type`: — → `"integer"`
+- mô tả `properties.data.properties.range.properties.from.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.range.properties.from.format`: — → `"date"`
+- contract `properties.data.properties.range.properties.from.type`: — → `"string"`
+- mô tả `properties.data.properties.range.properties.to.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.range.properties.to.format`: — → `"date"`
+- contract `properties.data.properties.range.properties.to.type`: — → `"string"`
+- contract `properties.data.properties.range.required`: — → `["days","from","to"]`
+- contract `properties.data.properties.range.type`: — → `"object"`
+- contract `properties.data.properties.sourcesTruncated.type`: — → `"boolean"`
+- contract `properties.data.properties.status.enum`: — → `["HAS_DATA","NO_DATA","PARTIAL"]`
+- contract `properties.data.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.updatedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.updatedAt.nullable`: — → `true`
+- contract `properties.data.properties.updatedAt.type`: — → `"string"`
+- contract `properties.data.properties.vendorSources.items.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.vendorSources.items.properties.activeDates.items.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.vendorSources.items.properties.activeDates.items.format`: — → `"date"`
+- contract `properties.data.properties.vendorSources.items.properties.activeDates.items.type`: — → `"string"`
+- contract `properties.data.properties.vendorSources.items.properties.activeDates.maxItems`: — → `366`
+- contract `properties.data.properties.vendorSources.items.properties.activeDates.type`: — → `"array"`
+- contract `properties.data.properties.vendorSources.items.properties.activeDays.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.vendorSources.items.properties.activeDays.minimum`: — → `0`
+- contract `properties.data.properties.vendorSources.items.properties.activeDays.type`: — → `"integer"`
+- contract `properties.data.properties.vendorSources.items.properties.coveredDays.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.vendorSources.items.properties.coveredDays.minimum`: — → `0`
+- contract `properties.data.properties.vendorSources.items.properties.coveredDays.type`: — → `"integer"`
+- contract `properties.data.properties.vendorSources.items.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.vendorSources.items.properties.sourceId.format`: — → `"uuid"`
+- contract `properties.data.properties.vendorSources.items.properties.sourceId.type`: — → `"string"`
+- contract `properties.data.properties.vendorSources.items.properties.status.enum`: — → `["HAS_DATA","NO_DATA","PARTIAL"]`
+- contract `properties.data.properties.vendorSources.items.properties.status.type`: — → `"string"`
+- contract `properties.data.properties.vendorSources.items.properties.updatedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.vendorSources.items.properties.updatedAt.nullable`: — → `true`
+- contract `properties.data.properties.vendorSources.items.properties.updatedAt.type`: — → `"string"`
+- contract `properties.data.properties.vendorSources.items.required`: — → `["activeDates","activeDays","coveredDays","name","sourceId","status","updated…`
+- contract `properties.data.properties.vendorSources.items.type`: — → `"object"`
+- contract `properties.data.properties.vendorSources.maxItems`: — → `50`
+- contract `properties.data.properties.vendorSources.type`: — → `"array"`
+- contract `properties.data.required`: — → `["activeDays","application","collector","coveredDays","employee","hasSeat","r…`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `VendorAccountListResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.application.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.application.description`: — → `"The application the difference is about; null for an invoice or a tool."`
+- contract `properties.data.properties.items.items.properties.application.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.application.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.application.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.required`: — → `["id","name"]`
+- contract `properties.data.properties.items.items.properties.application.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.decidedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.decidedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.decidedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.decidedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.decidedBy.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.decidedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.decidedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.decidedBy.required`: — → `["employeeId"]`
+- contract `properties.data.properties.items.items.properties.decidedBy.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.decision.enum`: — → `["FALSE_ALARM","LEGALIZE_VIA_REQUEST","OUT_OF_PROCESS","REVOKE",null]`
+- contract `properties.data.properties.items.items.properties.decision.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.decision.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.decisionNote.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.decisionNote.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.employeeId.description`: — → `"The person with activity and no seat, by id only; never a name."`
+- contract `properties.data.properties.items.items.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.employeeId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.employeeId.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.evidenceOn.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.items.items.properties.evidenceOn.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.evidenceOn.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.firstSeenAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.firstSeenAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.id.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.identity.description`: — → `"The account as the vendor wrote it, or the key of the tool."`
+- contract `properties.data.properties.items.items.properties.identity.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.identity.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.internalValue.description`: — → `"What the company has on record."`
+- contract `properties.data.properties.items.items.properties.internalValue.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.lastSeenAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.lastSeenAt.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.outOfProcessCaseId.description`: — → `"The case an OUT_OF_PROCESS decision opened, or the one already open for the …`
+- contract `properties.data.properties.items.items.properties.outOfProcessCaseId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.outOfProcessCaseId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.outOfProcessCaseId.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.reopenedFromId.description`: — → `"The decided difference of the same thing this one follows, when it was seen …`
+- contract `properties.data.properties.items.items.properties.reopenedFromId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.reopenedFromId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.reopenedFromId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.source.enum`: — → `["COLLECTOR_UNLISTED","INVOICE_DIFFERENCE","NO_ASSIGNMENT","UNMATCHED_IDENTITY"]`
+- contract `properties.data.properties.items.items.properties.source.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.state.enum`: — → `["DECIDED","OPEN"]`
+- contract `properties.data.properties.items.items.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.vendorId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.vendorId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.vendorId.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.vendorValue.description`: — → `"What the vendor shows."`
+- contract `properties.data.properties.items.items.properties.vendorValue.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: — → `["application","decidedAt","decidedBy","decision","decisionNote","employeeId"…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `VendorAccountDecisionBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- mô tả `properties.companyAsset.description`: — → `"Required with OUT_OF_PROCESS: true when the account is on a company asset (r…`
+- contract `properties.companyAsset.type`: — → `"boolean"`
+- mô tả `properties.decision.description`: — → `"FALSE_ALARM when there is nothing wrong; OUT_OF_PROCESS when money or access…`
+- contract `properties.decision.enum`: — → `["FALSE_ALARM","OUT_OF_PROCESS"]`
+- contract `properties.decision.type`: — → `"string"`
+- mô tả `properties.note.description`: — → `"Why. Required; it stays with the difference."`
+- contract `properties.note.maxLength`: — → `1000`
+- contract `properties.note.minLength`: — → `1`
+- contract `properties.note.type`: — → `"string"`
+- contract `required`: — → `["decision","note"]`
+- contract `type`: — → `"object"`
+
+### `VendorAccountResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.application.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.application.description`: — → `"The application the difference is about; null for an invoice or a tool."`
+- contract `properties.data.properties.application.nullable`: — → `true`
+- contract `properties.data.properties.application.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.application.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.application.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.application.required`: — → `["id","name"]`
+- contract `properties.data.properties.application.type`: — → `"object"`
+- contract `properties.data.properties.decidedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.decidedAt.nullable`: — → `true`
+- contract `properties.data.properties.decidedAt.type`: — → `"string"`
+- contract `properties.data.properties.decidedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.decidedBy.nullable`: — → `true`
+- contract `properties.data.properties.decidedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.decidedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.decidedBy.required`: — → `["employeeId"]`
+- contract `properties.data.properties.decidedBy.type`: — → `"object"`
+- contract `properties.data.properties.decision.enum`: — → `["FALSE_ALARM","LEGALIZE_VIA_REQUEST","OUT_OF_PROCESS","REVOKE",null]`
+- contract `properties.data.properties.decision.nullable`: — → `true`
+- contract `properties.data.properties.decision.type`: — → `"string"`
+- contract `properties.data.properties.decisionNote.nullable`: — → `true`
+- contract `properties.data.properties.decisionNote.type`: — → `"string"`
+- mô tả `properties.data.properties.employeeId.description`: — → `"The person with activity and no seat, by id only; never a name."`
+- contract `properties.data.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.employeeId.nullable`: — → `true`
+- contract `properties.data.properties.employeeId.type`: — → `"string"`
+- mô tả `properties.data.properties.evidenceOn.description`: — → `"A calendar date as YYYY-MM-DD."`
+- contract `properties.data.properties.evidenceOn.format`: — → `"date"`
+- contract `properties.data.properties.evidenceOn.type`: — → `"string"`
+- contract `properties.data.properties.firstSeenAt.format`: — → `"date-time"`
+- contract `properties.data.properties.firstSeenAt.type`: — → `"string"`
+- contract `properties.data.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.id.type`: — → `"string"`
+- mô tả `properties.data.properties.identity.description`: — → `"The account as the vendor wrote it, or the key of the tool."`
+- contract `properties.data.properties.identity.nullable`: — → `true`
+- contract `properties.data.properties.identity.type`: — → `"string"`
+- mô tả `properties.data.properties.internalValue.description`: — → `"What the company has on record."`
+- contract `properties.data.properties.internalValue.type`: — → `"string"`
+- contract `properties.data.properties.lastSeenAt.format`: — → `"date-time"`
+- contract `properties.data.properties.lastSeenAt.type`: — → `"string"`
+- mô tả `properties.data.properties.outOfProcessCaseId.description`: — → `"The case an OUT_OF_PROCESS decision opened, or the one already open for the …`
+- contract `properties.data.properties.outOfProcessCaseId.format`: — → `"uuid"`
+- contract `properties.data.properties.outOfProcessCaseId.nullable`: — → `true`
+- contract `properties.data.properties.outOfProcessCaseId.type`: — → `"string"`
+- mô tả `properties.data.properties.reopenedFromId.description`: — → `"The decided difference of the same thing this one follows, when it was seen …`
+- contract `properties.data.properties.reopenedFromId.format`: — → `"uuid"`
+- contract `properties.data.properties.reopenedFromId.nullable`: — → `true`
+- contract `properties.data.properties.reopenedFromId.type`: — → `"string"`
+- contract `properties.data.properties.source.enum`: — → `["COLLECTOR_UNLISTED","INVOICE_DIFFERENCE","NO_ASSIGNMENT","UNMATCHED_IDENTITY"]`
+- contract `properties.data.properties.source.type`: — → `"string"`
+- contract `properties.data.properties.state.enum`: — → `["DECIDED","OPEN"]`
+- contract `properties.data.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.vendorId.format`: — → `"uuid"`
+- contract `properties.data.properties.vendorId.nullable`: — → `true`
+- contract `properties.data.properties.vendorId.type`: — → `"string"`
+- mô tả `properties.data.properties.vendorValue.description`: — → `"What the vendor shows."`
+- contract `properties.data.properties.vendorValue.type`: — → `"string"`
+- contract `properties.data.required`: — → `["application","decidedAt","decidedBy","decision","decisionNote","employeeId"…`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `OutOfProcessListResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.amount.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.amount.description`: — → `"What was recorded as spent, in dong; only for RECORD_SPENT."`
+- contract `properties.data.properties.items.items.properties.amount.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.items.items.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.application.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.application.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.application.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.application.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.application.required`: — → `["id","name"]`
+- contract `properties.data.properties.items.items.properties.application.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.closedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.closedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.closedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.closedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.closedBy.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.closedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.closedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.closedBy.required`: — → `["employeeId"]`
+- contract `properties.data.properties.items.items.properties.closedBy.type`: — → `"object"`
+- mô tả `properties.data.properties.items.items.properties.companyAsset.description`: — → `"Concluded on a company asset (registered with the company email or in the co…`
+- contract `properties.data.properties.items.items.properties.companyAsset.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.companyAsset.type`: — → `"boolean"`
+- mô tả `properties.data.properties.items.items.properties.concludedOn.description`: — → `"The day the difference was concluded to be outside the process; null for a c…`
+- contract `properties.data.properties.items.items.properties.concludedOn.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.concludedOn.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.concludedOn.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.costCenterId.description`: — → `"The Cost Center that bears it; null with an amount means not allocated yet."`
+- contract `properties.data.properties.items.items.properties.costCenterId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.costCenterId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.costCenterId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.discrepancyId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.discrepancyId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.documentIds.items.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.documentIds.items.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.documentIds.maxItems`: — → `20`
+- contract `properties.data.properties.items.items.properties.documentIds.type`: — → `"array"`
+- contract `properties.data.properties.items.items.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.note.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.note.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.openedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.openedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.outcome.enum`: — → `["FALSE_ALARM","RECORD_SPENT","REPORT_ONLY","REVOKED",null]`
+- contract `properties.data.properties.items.items.properties.outcome.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.outcome.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.renewalCancelled.description`: — → `"The renewal or payment was cancelled; true only for REVOKED."`
+- contract `properties.data.properties.items.items.properties.renewalCancelled.type`: — → `"boolean"`
+- contract `properties.data.properties.items.items.properties.revocation.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.items.items.properties.revocation.description`: — → `"What the case asks of the IT Admin by way of revocation, worked out when it …`
+- mô tả `properties.data.properties.items.items.properties.revocation.properties.due.description`: — → `"The IT Admin has the revocation to do now: nothing to wait for, the ceiling …`
+- contract `properties.data.properties.items.items.properties.revocation.properties.due.type`: — → `"boolean"`
+- mô tả `properties.data.properties.items.items.properties.revocation.properties.required.description`: — → `"The IT Admin has an account to revoke for this case: it is open and on a com…`
+- contract `properties.data.properties.items.items.properties.revocation.properties.required.type`: — → `"boolean"`
+- mô tả `properties.data.properties.items.items.properties.revocation.properties.waitingRequestId.description`: — → `"The Request of the person for the same software that is still on its way, wh…`
+- contract `properties.data.properties.items.items.properties.revocation.properties.waitingRequestId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.revocation.properties.waitingRequestId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.revocation.properties.waitingRequestId.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.revocation.properties.waitUntil.description`: — → `"The last day of the wait for that Request while it counts: the tenth working…`
+- contract `properties.data.properties.items.items.properties.revocation.properties.waitUntil.format`: — → `"date"`
+- contract `properties.data.properties.items.items.properties.revocation.properties.waitUntil.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.revocation.properties.waitUntil.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.revocation.required`: — → `["due","required","waitingRequestId","waitUntil"]`
+- contract `properties.data.properties.items.items.properties.revocation.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.state.enum`: — → `["CLOSED","OPEN"]`
+- contract `properties.data.properties.items.items.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.vendorId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.vendorId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.vendorId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: — → `["amount","application","closedAt","closedBy","companyAsset","concludedOn","c…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `OutOfProcessClosureBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.amount.additionalProperties`: — → `false`
+- mô tả `properties.amount.description`: — → `"What was spent, in dong. Only for RECORD_SPENT, and then above nothing."`
+- contract `properties.amount.properties.amount.maxLength`: — → `40`
+- contract `properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.amount.required`: — → `["amount"]`
+- contract `properties.amount.type`: — → `"object"`
+- contract `properties.costCenterId.anyOf.0.enum`: — → `["UNALLOCATED"]`
+- contract `properties.costCenterId.anyOf.0.type`: — → `"string"`
+- contract `properties.costCenterId.anyOf.1.format`: — → `"uuid"`
+- contract `properties.costCenterId.anyOf.1.type`: — → `"string"`
+- mô tả `properties.costCenterId.description`: — → `"The Cost Center that bears the money, or UNALLOCATED when no department can …`
+- mô tả `properties.documentIds.description`: — → `"The proofs of payment of the company (RECORD_SPENT) or of the cancellation o…`
+- contract `properties.documentIds.items.format`: — → `"uuid"`
+- contract `properties.documentIds.items.type`: — → `"string"`
+- contract `properties.documentIds.maxItems`: — → `20`
+- contract `properties.documentIds.minItems`: — → `1`
+- contract `properties.documentIds.type`: — → `"array"`
+- mô tả `properties.note.description`: — → `"Why the case is closed this way. Required; it stays with the case."`
+- contract `properties.note.maxLength`: — → `1000`
+- contract `properties.note.minLength`: — → `1`
+- contract `properties.note.type`: — → `"string"`
+- mô tả `properties.outcome.description`: — → `"FALSE_ALARM when nothing was spent; REPORT_ONLY to report it with the reason…`
+- contract `properties.outcome.enum`: — → `["FALSE_ALARM","RECORD_SPENT","REPORT_ONLY","REVOKED"]`
+- contract `properties.outcome.type`: — → `"string"`
+- mô tả `properties.renewalCancelled.description`: — → `"Only for REVOKED, and then true: the renewal or payment with the vendor was …`
+- contract `properties.renewalCancelled.type`: — → `"boolean"`
+- contract `required`: — → `["note","outcome"]`
+- contract `type`: — → `"object"`
+
+### `OutOfProcessResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.amount.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.amount.description`: — → `"What was recorded as spent, in dong; only for RECORD_SPENT."`
+- contract `properties.data.properties.amount.nullable`: — → `true`
+- contract `properties.data.properties.amount.properties.amount.type`: — → `"string"`
+- contract `properties.data.properties.amount.properties.currency.type`: — → `"string"`
+- contract `properties.data.properties.amount.required`: — → `["amount","currency"]`
+- contract `properties.data.properties.amount.type`: — → `"object"`
+- contract `properties.data.properties.application.additionalProperties`: — → `false`
+- contract `properties.data.properties.application.nullable`: — → `true`
+- contract `properties.data.properties.application.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.application.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.application.properties.name.type`: — → `"string"`
+- contract `properties.data.properties.application.required`: — → `["id","name"]`
+- contract `properties.data.properties.application.type`: — → `"object"`
+- contract `properties.data.properties.closedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.closedAt.nullable`: — → `true`
+- contract `properties.data.properties.closedAt.type`: — → `"string"`
+- contract `properties.data.properties.closedBy.additionalProperties`: — → `false`
+- contract `properties.data.properties.closedBy.nullable`: — → `true`
+- contract `properties.data.properties.closedBy.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.closedBy.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.closedBy.required`: — → `["employeeId"]`
+- contract `properties.data.properties.closedBy.type`: — → `"object"`
+- mô tả `properties.data.properties.companyAsset.description`: — → `"Concluded on a company asset (registered with the company email or in the co…`
+- contract `properties.data.properties.companyAsset.nullable`: — → `true`
+- contract `properties.data.properties.companyAsset.type`: — → `"boolean"`
+- mô tả `properties.data.properties.concludedOn.description`: — → `"The day the difference was concluded to be outside the process; null for a c…`
+- contract `properties.data.properties.concludedOn.format`: — → `"date"`
+- contract `properties.data.properties.concludedOn.nullable`: — → `true`
+- contract `properties.data.properties.concludedOn.type`: — → `"string"`
+- mô tả `properties.data.properties.costCenterId.description`: — → `"The Cost Center that bears it; null with an amount means not allocated yet."`
+- contract `properties.data.properties.costCenterId.format`: — → `"uuid"`
+- contract `properties.data.properties.costCenterId.nullable`: — → `true`
+- contract `properties.data.properties.costCenterId.type`: — → `"string"`
+- contract `properties.data.properties.discrepancyId.format`: — → `"uuid"`
+- contract `properties.data.properties.discrepancyId.type`: — → `"string"`
+- contract `properties.data.properties.documentIds.items.format`: — → `"uuid"`
+- contract `properties.data.properties.documentIds.items.type`: — → `"string"`
+- contract `properties.data.properties.documentIds.maxItems`: — → `20`
+- contract `properties.data.properties.documentIds.type`: — → `"array"`
+- contract `properties.data.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.note.nullable`: — → `true`
+- contract `properties.data.properties.note.type`: — → `"string"`
+- contract `properties.data.properties.openedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.openedAt.type`: — → `"string"`
+- contract `properties.data.properties.outcome.enum`: — → `["FALSE_ALARM","RECORD_SPENT","REPORT_ONLY","REVOKED",null]`
+- contract `properties.data.properties.outcome.nullable`: — → `true`
+- contract `properties.data.properties.outcome.type`: — → `"string"`
+- mô tả `properties.data.properties.renewalCancelled.description`: — → `"The renewal or payment was cancelled; true only for REVOKED."`
+- contract `properties.data.properties.renewalCancelled.type`: — → `"boolean"`
+- contract `properties.data.properties.revocation.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.revocation.description`: — → `"What the case asks of the IT Admin by way of revocation, worked out when it …`
+- mô tả `properties.data.properties.revocation.properties.due.description`: — → `"The IT Admin has the revocation to do now: nothing to wait for, the ceiling …`
+- contract `properties.data.properties.revocation.properties.due.type`: — → `"boolean"`
+- mô tả `properties.data.properties.revocation.properties.required.description`: — → `"The IT Admin has an account to revoke for this case: it is open and on a com…`
+- contract `properties.data.properties.revocation.properties.required.type`: — → `"boolean"`
+- mô tả `properties.data.properties.revocation.properties.waitingRequestId.description`: — → `"The Request of the person for the same software that is still on its way, wh…`
+- contract `properties.data.properties.revocation.properties.waitingRequestId.format`: — → `"uuid"`
+- contract `properties.data.properties.revocation.properties.waitingRequestId.nullable`: — → `true`
+- contract `properties.data.properties.revocation.properties.waitingRequestId.type`: — → `"string"`
+- mô tả `properties.data.properties.revocation.properties.waitUntil.description`: — → `"The last day of the wait for that Request while it counts: the tenth working…`
+- contract `properties.data.properties.revocation.properties.waitUntil.format`: — → `"date"`
+- contract `properties.data.properties.revocation.properties.waitUntil.nullable`: — → `true`
+- contract `properties.data.properties.revocation.properties.waitUntil.type`: — → `"string"`
+- contract `properties.data.properties.revocation.required`: — → `["due","required","waitingRequestId","waitUntil"]`
+- contract `properties.data.properties.revocation.type`: — → `"object"`
+- contract `properties.data.properties.state.enum`: — → `["CLOSED","OPEN"]`
+- contract `properties.data.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.vendorId.format`: — → `"uuid"`
+- contract `properties.data.properties.vendorId.nullable`: — → `true`
+- contract `properties.data.properties.vendorId.type`: — → `"string"`
+- contract `properties.data.required`: — → `["amount","application","closedAt","closedBy","companyAsset","concludedOn","c…`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `PolicyPageResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.applicableRoles.items.enum`: — → `["EMPLOYEE","FINANCE","IT_ADMIN","MANAGER","SPENDING_APPROVER","SUPER_ADMIN"]`
+- contract `properties.data.properties.items.items.properties.applicableRoles.items.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.applicableRoles.maxItems`: — → `6`
+- contract `properties.data.properties.items.items.properties.applicableRoles.type`: — → `"array"`
+- contract `properties.data.properties.items.items.properties.code.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.hasDraft.description`: — → `"Whether a draft is open; only the Super Admin is told, everyone else reads n…`
+- contract `properties.data.properties.items.items.properties.hasDraft.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.hasDraft.type`: — → `"boolean"`
+- contract `properties.data.properties.items.items.properties.myAcknowledgement.enum`: — → `["DONE","NOT_REQUIRED","PENDING"]`
+- contract `properties.data.properties.items.items.properties.myAcknowledgement.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.publishedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.publishedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.requiresReacknowledgement.type`: — → `"boolean"`
+- contract `properties.data.properties.items.items.properties.title.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.versionNumber.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.items.items.properties.versionNumber.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.versionNumber.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.versionNumber.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.required`: — → `["applicableRoles","code","hasDraft","myAcknowledgement","publishedAt","requi…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `PolicyDetailResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.applicableRoles.items.enum`: — → `["EMPLOYEE","FINANCE","IT_ADMIN","MANAGER","SPENDING_APPROVER","SUPER_ADMIN"]`
+- contract `properties.data.properties.applicableRoles.items.type`: — → `"string"`
+- contract `properties.data.properties.applicableRoles.maxItems`: — → `6`
+- contract `properties.data.properties.applicableRoles.type`: — → `"array"`
+- contract `properties.data.properties.changeNote.type`: — → `"string"`
+- contract `properties.data.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.content.additionalProperties`: — → `false`
+- contract `properties.data.properties.content.properties.sections.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.content.properties.sections.items.properties.body.maxLength`: — → `20000`
+- contract `properties.data.properties.content.properties.sections.items.properties.body.minLength`: — → `1`
+- contract `properties.data.properties.content.properties.sections.items.properties.body.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.sections.items.properties.heading.maxLength`: — → `200`
+- contract `properties.data.properties.content.properties.sections.items.properties.heading.minLength`: — → `1`
+- contract `properties.data.properties.content.properties.sections.items.properties.heading.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.sections.items.required`: — → `["body","heading"]`
+- contract `properties.data.properties.content.properties.sections.items.type`: — → `"object"`
+- contract `properties.data.properties.content.properties.sections.maxItems`: — → `30`
+- contract `properties.data.properties.content.properties.sections.type`: — → `"array"`
+- contract `properties.data.properties.content.properties.steps.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.check.enum`: — → `["PERSON","SYSTEM"]`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.check.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.code.maxLength`: — → `30`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.code.minLength`: — → `1`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.text.maxLength`: — → `1000`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.text.minLength`: — → `1`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.text.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.required`: — → `["check","code","text"]`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.type`: — → `"object"`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.maxItems`: — → `30`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.minItems`: — → `1`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.type`: — → `"array"`
+- contract `properties.data.properties.content.properties.steps.items.properties.code.maxLength`: — → `30`
+- contract `properties.data.properties.content.properties.steps.items.properties.code.minLength`: — → `1`
+- contract `properties.data.properties.content.properties.steps.items.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.steps.items.properties.title.maxLength`: — → `300`
+- contract `properties.data.properties.content.properties.steps.items.properties.title.minLength`: — → `1`
+- contract `properties.data.properties.content.properties.steps.items.properties.title.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.steps.items.required`: — → `["checklist","code","title"]`
+- contract `properties.data.properties.content.properties.steps.items.type`: — → `"object"`
+- contract `properties.data.properties.content.properties.steps.maxItems`: — → `10`
+- contract `properties.data.properties.content.properties.steps.type`: — → `"array"`
+- contract `properties.data.properties.content.required`: — → `["sections","steps"]`
+- contract `properties.data.properties.content.type`: — → `"object"`
+- mô tả `properties.data.properties.id.description`: — → `"The id of the version: what a decision names when it answers the checklist o…`
+- contract `properties.data.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.id.type`: — → `"string"`
+- contract `properties.data.properties.isCurrent.type`: — → `"boolean"`
+- contract `properties.data.properties.myAcknowledgement.enum`: — → `["DONE","NOT_REQUIRED","PENDING",null]`
+- contract `properties.data.properties.myAcknowledgement.nullable`: — → `true`
+- contract `properties.data.properties.myAcknowledgement.type`: — → `"string"`
+- contract `properties.data.properties.publishedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.publishedAt.type`: — → `"string"`
+- mô tả `properties.data.properties.publishedByAppUserId.description`: — → `"The account that published the version; null for a version the installation …`
+- contract `properties.data.properties.publishedByAppUserId.format`: — → `"uuid"`
+- contract `properties.data.properties.publishedByAppUserId.nullable`: — → `true`
+- contract `properties.data.properties.publishedByAppUserId.type`: — → `"string"`
+- contract `properties.data.properties.requiresReacknowledgement.type`: — → `"boolean"`
+- contract `properties.data.properties.title.type`: — → `"string"`
+- contract `properties.data.properties.versionNumber.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.versionNumber.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.versionNumber.minimum`: — → `0`
+- contract `properties.data.properties.versionNumber.type`: — → `"integer"`
+- contract `properties.data.required`: — → `["applicableRoles","changeNote","code","content","id","isCurrent","myAcknowle…`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `PolicyVersionPageResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.applicableRoles.items.enum`: — → `["EMPLOYEE","FINANCE","IT_ADMIN","MANAGER","SPENDING_APPROVER","SUPER_ADMIN"]`
+- contract `properties.data.properties.items.items.properties.applicableRoles.items.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.applicableRoles.maxItems`: — → `6`
+- contract `properties.data.properties.items.items.properties.applicableRoles.type`: — → `"array"`
+- contract `properties.data.properties.items.items.properties.changeNote.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.publishedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.publishedAt.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.publishedByAppUserId.description`: — → `"The account that published the version; null for a version the installation …`
+- contract `properties.data.properties.items.items.properties.publishedByAppUserId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.publishedByAppUserId.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.publishedByAppUserId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.requiresReacknowledgement.type`: — → `"boolean"`
+- contract `properties.data.properties.items.items.properties.versionNumber.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.items.items.properties.versionNumber.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.versionNumber.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.versionNumber.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.required`: — → `["applicableRoles","changeNote","publishedAt","publishedByAppUserId","require…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.required`: — → `["items","pagination"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `PolicyStepResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.policyCode.type`: — → `"string"`
+- contract `properties.data.properties.policyVersionId.format`: — → `"uuid"`
+- contract `properties.data.properties.policyVersionId.type`: — → `"string"`
+- contract `properties.data.properties.step.additionalProperties`: — → `false`
+- contract `properties.data.properties.step.properties.checklist.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.step.properties.checklist.items.properties.check.enum`: — → `["PERSON","SYSTEM"]`
+- contract `properties.data.properties.step.properties.checklist.items.properties.check.type`: — → `"string"`
+- contract `properties.data.properties.step.properties.checklist.items.properties.code.maxLength`: — → `30`
+- contract `properties.data.properties.step.properties.checklist.items.properties.code.minLength`: — → `1`
+- contract `properties.data.properties.step.properties.checklist.items.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.step.properties.checklist.items.properties.text.maxLength`: — → `1000`
+- contract `properties.data.properties.step.properties.checklist.items.properties.text.minLength`: — → `1`
+- contract `properties.data.properties.step.properties.checklist.items.properties.text.type`: — → `"string"`
+- contract `properties.data.properties.step.properties.checklist.items.required`: — → `["check","code","text"]`
+- contract `properties.data.properties.step.properties.checklist.items.type`: — → `"object"`
+- contract `properties.data.properties.step.properties.checklist.maxItems`: — → `30`
+- contract `properties.data.properties.step.properties.checklist.minItems`: — → `1`
+- contract `properties.data.properties.step.properties.checklist.type`: — → `"array"`
+- contract `properties.data.properties.step.properties.code.maxLength`: — → `30`
+- contract `properties.data.properties.step.properties.code.minLength`: — → `1`
+- contract `properties.data.properties.step.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.step.properties.title.maxLength`: — → `300`
+- contract `properties.data.properties.step.properties.title.minLength`: — → `1`
+- contract `properties.data.properties.step.properties.title.type`: — → `"string"`
+- contract `properties.data.properties.step.required`: — → `["checklist","code","title"]`
+- contract `properties.data.properties.step.type`: — → `"object"`
+- contract `properties.data.properties.versionNumber.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.versionNumber.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.versionNumber.minimum`: — → `0`
+- contract `properties.data.properties.versionNumber.type`: — → `"integer"`
+- contract `properties.data.required`: — → `["policyCode","policyVersionId","step","versionNumber"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `PolicyDraftResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.applicableRoles.items.enum`: — → `["EMPLOYEE","FINANCE","IT_ADMIN","MANAGER","SPENDING_APPROVER","SUPER_ADMIN"]`
+- contract `properties.data.properties.applicableRoles.items.type`: — → `"string"`
+- contract `properties.data.properties.applicableRoles.maxItems`: — → `6`
+- contract `properties.data.properties.applicableRoles.type`: — → `"array"`
+- contract `properties.data.properties.content.additionalProperties`: — → `false`
+- contract `properties.data.properties.content.properties.sections.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.content.properties.sections.items.properties.body.maxLength`: — → `20000`
+- contract `properties.data.properties.content.properties.sections.items.properties.body.minLength`: — → `1`
+- contract `properties.data.properties.content.properties.sections.items.properties.body.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.sections.items.properties.heading.maxLength`: — → `200`
+- contract `properties.data.properties.content.properties.sections.items.properties.heading.minLength`: — → `1`
+- contract `properties.data.properties.content.properties.sections.items.properties.heading.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.sections.items.required`: — → `["body","heading"]`
+- contract `properties.data.properties.content.properties.sections.items.type`: — → `"object"`
+- contract `properties.data.properties.content.properties.sections.maxItems`: — → `30`
+- contract `properties.data.properties.content.properties.sections.type`: — → `"array"`
+- contract `properties.data.properties.content.properties.steps.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.check.enum`: — → `["PERSON","SYSTEM"]`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.check.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.code.maxLength`: — → `30`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.code.minLength`: — → `1`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.text.maxLength`: — → `1000`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.text.minLength`: — → `1`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.properties.text.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.required`: — → `["check","code","text"]`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.items.type`: — → `"object"`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.maxItems`: — → `30`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.minItems`: — → `1`
+- contract `properties.data.properties.content.properties.steps.items.properties.checklist.type`: — → `"array"`
+- contract `properties.data.properties.content.properties.steps.items.properties.code.maxLength`: — → `30`
+- contract `properties.data.properties.content.properties.steps.items.properties.code.minLength`: — → `1`
+- contract `properties.data.properties.content.properties.steps.items.properties.code.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.steps.items.properties.title.maxLength`: — → `300`
+- contract `properties.data.properties.content.properties.steps.items.properties.title.minLength`: — → `1`
+- contract `properties.data.properties.content.properties.steps.items.properties.title.type`: — → `"string"`
+- contract `properties.data.properties.content.properties.steps.items.required`: — → `["checklist","code","title"]`
+- contract `properties.data.properties.content.properties.steps.items.type`: — → `"object"`
+- contract `properties.data.properties.content.properties.steps.maxItems`: — → `10`
+- contract `properties.data.properties.content.properties.steps.type`: — → `"array"`
+- contract `properties.data.properties.content.required`: — → `["sections","steps"]`
+- contract `properties.data.properties.content.type`: — → `"object"`
+- contract `properties.data.properties.policyCode.type`: — → `"string"`
+- contract `properties.data.properties.title.type`: — → `"string"`
+- contract `properties.data.properties.updatedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.updatedAt.type`: — → `"string"`
+- contract `properties.data.required`: — → `["applicableRoles","content","policyCode","title","updatedAt"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `DraftWriteBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.content.additionalProperties`: — → `false`
+- contract `properties.content.properties.sections.items.additionalProperties`: — → `false`
+- contract `properties.content.properties.sections.items.properties.body.maxLength`: — → `20000`
+- contract `properties.content.properties.sections.items.properties.body.minLength`: — → `1`
+- contract `properties.content.properties.sections.items.properties.body.type`: — → `"string"`
+- contract `properties.content.properties.sections.items.properties.heading.maxLength`: — → `200`
+- contract `properties.content.properties.sections.items.properties.heading.minLength`: — → `1`
+- contract `properties.content.properties.sections.items.properties.heading.type`: — → `"string"`
+- contract `properties.content.properties.sections.items.required`: — → `["body","heading"]`
+- contract `properties.content.properties.sections.items.type`: — → `"object"`
+- contract `properties.content.properties.sections.maxItems`: — → `30`
+- contract `properties.content.properties.sections.type`: — → `"array"`
+- contract `properties.content.properties.steps.items.additionalProperties`: — → `false`
+- contract `properties.content.properties.steps.items.properties.checklist.items.additionalProperties`: — → `false`
+- contract `properties.content.properties.steps.items.properties.checklist.items.properties.check.enum`: — → `["PERSON","SYSTEM"]`
+- contract `properties.content.properties.steps.items.properties.checklist.items.properties.check.type`: — → `"string"`
+- contract `properties.content.properties.steps.items.properties.checklist.items.properties.code.maxLength`: — → `30`
+- contract `properties.content.properties.steps.items.properties.checklist.items.properties.code.minLength`: — → `1`
+- contract `properties.content.properties.steps.items.properties.checklist.items.properties.code.type`: — → `"string"`
+- contract `properties.content.properties.steps.items.properties.checklist.items.properties.text.maxLength`: — → `1000`
+- contract `properties.content.properties.steps.items.properties.checklist.items.properties.text.minLength`: — → `1`
+- contract `properties.content.properties.steps.items.properties.checklist.items.properties.text.type`: — → `"string"`
+- contract `properties.content.properties.steps.items.properties.checklist.items.required`: — → `["check","code","text"]`
+- contract `properties.content.properties.steps.items.properties.checklist.items.type`: — → `"object"`
+- contract `properties.content.properties.steps.items.properties.checklist.maxItems`: — → `30`
+- contract `properties.content.properties.steps.items.properties.checklist.minItems`: — → `1`
+- contract `properties.content.properties.steps.items.properties.checklist.type`: — → `"array"`
+- contract `properties.content.properties.steps.items.properties.code.maxLength`: — → `30`
+- contract `properties.content.properties.steps.items.properties.code.minLength`: — → `1`
+- contract `properties.content.properties.steps.items.properties.code.type`: — → `"string"`
+- contract `properties.content.properties.steps.items.properties.title.maxLength`: — → `300`
+- contract `properties.content.properties.steps.items.properties.title.minLength`: — → `1`
+- contract `properties.content.properties.steps.items.properties.title.type`: — → `"string"`
+- contract `properties.content.properties.steps.items.required`: — → `["checklist","code","title"]`
+- contract `properties.content.properties.steps.items.type`: — → `"object"`
+- contract `properties.content.properties.steps.maxItems`: — → `10`
+- contract `properties.content.properties.steps.type`: — → `"array"`
+- contract `properties.content.required`: — → `["sections","steps"]`
+- contract `properties.content.type`: — → `"object"`
+- contract `properties.title.maxLength`: — → `300`
+- contract `properties.title.minLength`: — → `1`
+- contract `properties.title.type`: — → `"string"`
+- contract `type`: — → `"object"`
+
+### `PolicyDraftDiscardedResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.discarded.enum`: — → `[true]`
+- contract `properties.data.properties.discarded.type`: — → `"boolean"`
+- contract `properties.data.properties.policyCode.type`: — → `"string"`
+- contract `properties.data.required`: — → `["discarded","policyCode"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `PublishBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- mô tả `properties.applicableRoles.description`: — → `"The roles that must acknowledge the version; a person of none of them is nev…`
+- contract `properties.applicableRoles.items.enum`: — → `["EMPLOYEE","FINANCE","IT_ADMIN","MANAGER","SPENDING_APPROVER"]`
+- contract `properties.applicableRoles.items.type`: — → `"string"`
+- contract `properties.applicableRoles.maxItems`: — → `5`
+- contract `properties.applicableRoles.minItems`: — → `1`
+- contract `properties.applicableRoles.type`: — → `"array"`
+- mô tả `properties.changeNote.description`: — → `"The ground of the issue: the decision, its number and date, who issued it. K…`
+- contract `properties.changeNote.maxLength`: — → `1000`
+- contract `properties.changeNote.minLength`: — → `1`
+- contract `properties.changeNote.type`: — → `"string"`
+- contract `properties.requiresReacknowledgement.default`: — → `true`
+- mô tả `properties.requiresReacknowledgement.description`: — → `"Whether those who acknowledged an earlier version are asked again. The first…`
+- contract `properties.requiresReacknowledgement.type`: — → `"boolean"`
+- contract `required`: — → `["applicableRoles","changeNote"]`
+- contract `type`: — → `"object"`
+
+### `PolicyPublishedResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.applicableRoles.items.enum`: — → `["EMPLOYEE","FINANCE","IT_ADMIN","MANAGER","SPENDING_APPROVER","SUPER_ADMIN"]`
+- contract `properties.data.properties.applicableRoles.items.type`: — → `"string"`
+- contract `properties.data.properties.applicableRoles.maxItems`: — → `6`
+- contract `properties.data.properties.applicableRoles.type`: — → `"array"`
+- contract `properties.data.properties.notified.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.notified.minimum`: — → `0`
+- contract `properties.data.properties.notified.type`: — → `"integer"`
+- contract `properties.data.properties.policyCode.type`: — → `"string"`
+- contract `properties.data.properties.publishedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.publishedAt.type`: — → `"string"`
+- contract `properties.data.properties.requiresReacknowledgement.type`: — → `"boolean"`
+- contract `properties.data.properties.versionNumber.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.versionNumber.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.versionNumber.minimum`: — → `0`
+- contract `properties.data.properties.versionNumber.type`: — → `"integer"`
+- contract `properties.data.required`: — → `["applicableRoles","notified","policyCode","publishedAt","requiresReacknowled…`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `PolicyAcknowledgementResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- mô tả `properties.data.properties.acknowledgedAt.description`: — → `"When it was written now; null when the account had acknowledged the policy a…`
+- contract `properties.data.properties.acknowledgedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.acknowledgedAt.nullable`: — → `true`
+- contract `properties.data.properties.acknowledgedAt.type`: — → `"string"`
+- contract `properties.data.properties.alreadyAcknowledged.type`: — → `"boolean"`
+- contract `properties.data.properties.policyCode.type`: — → `"string"`
+- contract `properties.data.properties.versionNumber.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.versionNumber.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.versionNumber.minimum`: — → `0`
+- contract `properties.data.properties.versionNumber.type`: — → `"integer"`
+- contract `properties.data.required`: — → `["acknowledgedAt","alreadyAcknowledged","policyCode","versionNumber"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `AcknowledgementReportResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.currentVersionNumber.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.currentVersionNumber.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.currentVersionNumber.minimum`: — → `0`
+- contract `properties.data.properties.currentVersionNumber.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.acknowledgedAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.acknowledgedAt.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.acknowledgedAt.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.employeeCode.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.fullName.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.state.enum`: — → `["DONE","PENDING"]`
+- contract `properties.data.properties.items.items.properties.state.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.versionNumber.description`: — → `"The latest version this person acknowledged, if any."`
+- contract `properties.data.properties.items.items.properties.versionNumber.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.items.items.properties.versionNumber.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.items.items.properties.versionNumber.minimum`: — → `0`
+- contract `properties.data.properties.items.items.properties.versionNumber.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.versionNumber.type`: — → `"integer"`
+- contract `properties.data.properties.items.items.required`: — → `["acknowledgedAt","employeeCode","employeeId","fullName","state","versionNumb…`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.properties.pagination.additionalProperties`: — → `false`
+- contract `properties.data.properties.pagination.properties.page.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.page.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.page.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.page.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.pageSize.exclusiveMinimum`: — → `true`
+- contract `properties.data.properties.pagination.properties.pageSize.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.pageSize.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.pageSize.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalItems.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalItems.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalItems.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.properties.totalPages.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.pagination.properties.totalPages.minimum`: — → `0`
+- contract `properties.data.properties.pagination.properties.totalPages.type`: — → `"integer"`
+- contract `properties.data.properties.pagination.required`: — → `["page","pageSize","totalItems","totalPages"]`
+- contract `properties.data.properties.pagination.type`: — → `"object"`
+- contract `properties.data.properties.policyCode.type`: — → `"string"`
+- contract `properties.data.required`: — → `["currentVersionNumber","items","pagination","policyCode"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `AvatarResultResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.avatar.additionalProperties`: — → `false`
+- contract `properties.data.properties.avatar.nullable`: — → `true`
+- contract `properties.data.properties.avatar.properties.expiresAt.format`: — → `"date-time"`
+- contract `properties.data.properties.avatar.properties.expiresAt.type`: — → `"string"`
+- mô tả `properties.data.properties.avatar.properties.url.description`: — → `"A link to the picture that stops working at expiresAt; ask again for a new o…`
+- contract `properties.data.properties.avatar.properties.url.format`: — → `"uri"`
+- contract `properties.data.properties.avatar.properties.url.type`: — → `"string"`
+- contract `properties.data.properties.avatar.required`: — → `["expiresAt","url"]`
+- contract `properties.data.properties.avatar.type`: — → `"object"`
+- contract `properties.data.required`: — → `["avatar"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `WorkPhoneBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- mô tả `properties.workPhone.description`: — → `"8 to 15 digits with an optional leading +; spaces, dots and dashes are ignor…`
+- contract `properties.workPhone.maxLength`: — → `40`
+- contract `properties.workPhone.nullable`: — → `true`
+- contract `properties.workPhone.type`: — → `"string"`
+- contract `required`: — → `["workPhone"]`
+- contract `type`: — → `"object"`
+
+### `WorkPhoneResultResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.workPhone.nullable`: — → `true`
+- contract `properties.data.properties.workPhone.type`: — → `"string"`
+- contract `properties.data.required`: — → `["workPhone"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `EmployeeProfileLookupBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.employeeIds.items.format`: — → `"uuid"`
+- contract `properties.employeeIds.items.type`: — → `"string"`
+- contract `properties.employeeIds.maxItems`: — → `100`
+- contract `properties.employeeIds.minItems`: — → `1`
+- contract `properties.employeeIds.type`: — → `"array"`
+- contract `required`: — → `["employeeIds"]`
+- contract `type`: — → `"object"`
+
+### `EmployeeProfileLookupResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.items.items.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.avatar.additionalProperties`: — → `false`
+- contract `properties.data.properties.items.items.properties.avatar.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.avatar.properties.expiresAt.format`: — → `"date-time"`
+- contract `properties.data.properties.items.items.properties.avatar.properties.expiresAt.type`: — → `"string"`
+- mô tả `properties.data.properties.items.items.properties.avatar.properties.url.description`: — → `"A link to the picture that stops working at expiresAt; ask again for a new o…`
+- contract `properties.data.properties.items.items.properties.avatar.properties.url.format`: — → `"uri"`
+- contract `properties.data.properties.items.items.properties.avatar.properties.url.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.avatar.required`: — → `["expiresAt","url"]`
+- contract `properties.data.properties.items.items.properties.avatar.type`: — → `"object"`
+- contract `properties.data.properties.items.items.properties.employeeId.format`: — → `"uuid"`
+- contract `properties.data.properties.items.items.properties.employeeId.type`: — → `"string"`
+- contract `properties.data.properties.items.items.properties.workPhone.nullable`: — → `true`
+- contract `properties.data.properties.items.items.properties.workPhone.type`: — → `"string"`
+- contract `properties.data.properties.items.items.required`: — → `["avatar","employeeId","workPhone"]`
+- contract `properties.data.properties.items.items.type`: — → `"object"`
+- contract `properties.data.properties.items.maxItems`: — → `100`
+- contract `properties.data.properties.items.type`: — → `"array"`
+- contract `properties.data.required`: — → `["items"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`
+
+### `RemoveAvatarBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- mô tả `properties.reason.description`: — → `"Why the Super Admin removes the picture; kept in the audit trail."`
+- contract `properties.reason.maxLength`: — → `500`
+- contract `properties.reason.minLength`: — → `1`
+- contract `properties.reason.type`: — → `"string"`
+- contract `required`: — → `["reason"]`
+- contract `type`: — → `"object"`
+
+### `EscalationBodyDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.checklist.additionalProperties`: — → `false`
+- mô tả `properties.checklist.description`: — → `"The answers to the questions of the policy in force at this step. Every ques…`
+- contract `properties.checklist.properties.answers.items.additionalProperties`: — → `false`
+- contract `properties.checklist.properties.answers.items.properties.answer.enum`: — → `["NO","YES"]`
+- contract `properties.checklist.properties.answers.items.properties.answer.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.maxLength`: — → `30`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.minLength`: — → `1`
+- contract `properties.checklist.properties.answers.items.properties.itemCode.type`: — → `"string"`
+- contract `properties.checklist.properties.answers.items.required`: — → `["answer","itemCode"]`
+- contract `properties.checklist.properties.answers.items.type`: — → `"object"`
+- contract `properties.checklist.properties.answers.maxItems`: — → `30`
+- contract `properties.checklist.properties.answers.type`: — → `"array"`
+- mô tả `properties.checklist.properties.policyVersionId.description`: — → `"The version of the policy whose questions were shown (from the step of the p…`
+- contract `properties.checklist.properties.policyVersionId.format`: — → `"uuid"`
+- contract `properties.checklist.properties.policyVersionId.type`: — → `"string"`
+- contract `properties.checklist.required`: — → `["answers","policyVersionId"]`
+- contract `properties.checklist.type`: — → `"object"`
+- mô tả `properties.note.description`: — → `"A word of the IT Admin for the batch, kept with it; the head does not read it."`
+- contract `properties.note.maxLength`: — → `500`
+- contract `properties.note.minLength`: — → `1`
+- contract `properties.note.type`: — → `"string"`
+- mô tả `properties.recommendationIds.description`: — → `"The recommendations to push, at most 100; one named twice counts once."`
+- contract `properties.recommendationIds.items.format`: — → `"uuid"`
+- contract `properties.recommendationIds.items.type`: — → `"string"`
+- contract `properties.recommendationIds.maxItems`: — → `100`
+- contract `properties.recommendationIds.minItems`: — → `1`
+- contract `properties.recommendationIds.type`: — → `"array"`
+- contract `required`: — → `["checklist","recommendationIds"]`
+- contract `type`: — → `"object"`
+
+### `EscalationResponseDto`
+- contract ``: `{}` → —
+- contract `additionalProperties`: — → `false`
+- contract `properties.data.additionalProperties`: — → `false`
+- contract `properties.data.nullable`: — → `true`
+- contract `properties.data.properties.escalated.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.escalated.minimum`: — → `0`
+- contract `properties.data.properties.escalated.type`: — → `"integer"`
+- contract `properties.data.properties.id.format`: — → `"uuid"`
+- contract `properties.data.properties.id.type`: — → `"string"`
+- mô tả `properties.data.properties.replayed.description`: — → `"The same Idempotency-Key was answered before: nothing was done again."`
+- contract `properties.data.properties.replayed.type`: — → `"boolean"`
+- contract `properties.data.properties.results.items.additionalProperties`: — → `false`
+- mô tả `properties.data.properties.results.items.properties.departmentId.description`: — → `"The department whose head is asked; null when it was not pushed."`
+- contract `properties.data.properties.results.items.properties.departmentId.format`: — → `"uuid"`
+- contract `properties.data.properties.results.items.properties.departmentId.nullable`: — → `true`
+- contract `properties.data.properties.results.items.properties.departmentId.type`: — → `"string"`
+- contract `properties.data.properties.results.items.properties.outcome.enum`: — → `["ESCALATED","SKIPPED"]`
+- contract `properties.data.properties.results.items.properties.outcome.type`: — → `"string"`
+- mô tả `properties.data.properties.results.items.properties.reason.description`: — → `"Why it was not pushed; null when it was."`
+- contract `properties.data.properties.results.items.properties.reason.enum`: — → `["LEAVE_OR_HANDOVER","MACHINE_ACCOUNT","NO_DEPARTMENT","NOT_FOUND","NOT_WATCH…`
+- contract `properties.data.properties.results.items.properties.reason.nullable`: — → `true`
+- contract `properties.data.properties.results.items.properties.reason.type`: — → `"string"`
+- contract `properties.data.properties.results.items.properties.recommendationId.format`: — → `"uuid"`
+- contract `properties.data.properties.results.items.properties.recommendationId.type`: — → `"string"`
+- mô tả `properties.data.properties.results.items.properties.state.description`: — → `"Where it went: the queue of the head, or waiting for one; null when it was n…`
+- contract `properties.data.properties.results.items.properties.state.enum`: — → `["AWAITING_DECISION","WAITING_FOR_HEAD",null]`
+- contract `properties.data.properties.results.items.properties.state.nullable`: — → `true`
+- contract `properties.data.properties.results.items.properties.state.type`: — → `"string"`
+- contract `properties.data.properties.results.items.required`: — → `["departmentId","outcome","reason","recommendationId","state"]`
+- contract `properties.data.properties.results.items.type`: — → `"object"`
+- contract `properties.data.properties.results.maxItems`: — → `100`
+- contract `properties.data.properties.results.type`: — → `"array"`
+- contract `properties.data.properties.skipped.maximum`: — → `9007199254740991`
+- contract `properties.data.properties.skipped.minimum`: — → `0`
+- contract `properties.data.properties.skipped.type`: — → `"integer"`
+- contract `properties.data.required`: — → `["escalated","id","replayed","results","skipped"]`
+- contract `properties.data.type`: — → `"object"`
+- contract `properties.message.pattern`: — → `"^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$"`
+- contract `properties.message.type`: — → `"string"`
+- contract `properties.success.enum`: — → `[true]`
+- contract `properties.success.type`: — → `"boolean"`
+- contract `required`: — → `["data","message","success"]`
+- contract `type`: — → `"object"`

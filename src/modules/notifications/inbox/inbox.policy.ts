@@ -1,0 +1,277 @@
+import {
+  IN_APP_NOTIFICATION_CODES,
+  type InAppNotificationCode,
+  type InAppNotificationInput,
+  type InAppNotificationRefusal,
+} from '../public/notifications.types';
+
+/**
+ * Keys that never reach an inbox: the secrets the Audit Trail refuses, whatever the code says (`FR-3.11`, `INF-06`). A key that
+ * matches is refused even if a table below allowed it, so one slip in the table cannot put a secret in front of a reader.
+ */
+export const FORBIDDEN_PARAM_KEY = /password|hash|token|secret|cookie|credential|authorization|pepper/i;
+
+/** The words that say a figure of money or a finding of the budget; no key of any code carries one (`INF-06`, `US-05-18` AC-3). */
+export const FIGURE_WORDS = /amount|budget|remaining|override|evidence|lastError|opinion/i;
+
+export const MAX_PARAMS_BYTES = 4096;
+export const MAX_EVENT_KEY_LENGTH = 200;
+
+const STEP = ['requestId', 'stepKind'] as const;
+const REMINDER_NUMBERS = ['reminderNumber', 'ageWorkingDays', 'overdueWorkingDays'] as const;
+const HANDOVER = ['dutyId', 'assignmentId', 'employeeId', 'role', 'dueOn'] as const;
+
+/**
+ * The parameter keys each code may carry: the whole of what a notice says besides its code and its subject. A notice with a
+ * key that is not in the list of its code is refused, so what an inbox shows is decided here and nowhere else. Values are
+ * ids, codes and the reasons the people concerned already read on the request; the interface turns them into words.
+ */
+export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly string[]>> = {
+  REQUEST_SUBMITTED: ['requestId', 'stage'],
+  REQUEST_NEED_APPROVED: ['requestId', 'next'],
+  REQUEST_REJECTED: ['requestId', 'by', 'reason', 'suggestedPlanId'],
+  REQUEST_RETURNED: ['requestId', 'by', 'reason'],
+  REQUEST_IT_REJECTED: ['requestId', 'kind', 'reason', 'alternativePlanId', 'alternativeNote', 'noAlternative'],
+  REQUEST_SPEND_APPROVED: ['requestId'],
+  REQUEST_GRANTED: ['requestId', 'accessGuide', 'homepageUrl'],
+  REQUEST_FAILED: ['requestId', 'contact'],
+  REQUEST_WITHDRAWN: ['requestId', 'byRequester', 'reason'],
+  REQUEST_WITHDRAWAL_PENDING: ['requestId'],
+  REQUEST_CANCELLED: ['requestId', 'reasonKind'],
+  REQUEST_WAITING_CONTROLLED: STEP,
+  REQUEST_WAITING_ENDED: STEP,
+  STEP_ASSIGNED: ['requestId', 'stepKind', 'cause'],
+  STEP_CLOSED_BY_WITHDRAWAL: STEP,
+  WITHDRAWAL_AWAITING_IT_CLOSE: ['requestId', 'taskId'],
+  COMMITMENT_RELEASED_BY_WITHDRAWAL: ['requestId'],
+  GRANT_TASK_CANCELLED: ['requestId', 'taskId'],
+  // The reminders of a late step and of the queue of the head, and the alert of a backlog (`g5-step-sla-and-alerts`): ids, the kind
+  // of step, how many reminders, how old and how late in working days, and the cause when the Super Admin is told. No figure of money.
+  STEP_SLA_REMINDER: [...STEP, ...REMINDER_NUMBERS, 'recipientRole'],
+  STEP_SLA_ESCALATION: [...STEP, ...REMINDER_NUMBERS, 'holderEmployeeId'],
+  STEP_SLA_NO_SUPERIOR: [...STEP, ...REMINDER_NUMBERS, 'holderEmployeeId', 'cause'],
+  SPEND_QUEUE_REMINDER: ['requestId', ...REMINDER_NUMBERS, 'cause'],
+  FINANCE_QUESTION_REMINDER: [...STEP, 'questionId', ...REMINDER_NUMBERS],
+  STEP_BACKLOG_ALERT: ['holderEmployeeId', 'openCount', 'threshold', 'oldestAgeWorkingDays'],
+  // A step of a request, or a budget version or a renewal that waits for the spending approver (`D-S16`): ids and the year only.
+  CONTROLLED_WAIT_ALERT: [
+    'requestId',
+    'stepKind',
+    'versionId',
+    'costCenterId',
+    'year',
+    'renewalId',
+    'subscriptionId',
+    'waitingReason',
+    'configurationHint',
+  ],
+  SERVICE_ACCOUNT_BOUNDARY_ACCEPTED: ['requestId'],
+  RETURN_REQUESTED: ['returnRequestId', 'planId', 'source', 'handoverRequired', 'handoverDueOn'],
+  RETURN_COMPLETED: ['returnRequestId', 'handoverFlagged'],
+  RETURN_FAILED: ['returnRequestId'],
+  REQUEST_RENEWAL_APPLIED: ['requestId', 'newExpectedEndDate'],
+  REQUEST_RENEWAL_NOT_APPLIED: ['requestId', 'problem'],
+  // Organization and personnel: who it is about, where, what kind of event and from when; the ids of the notice or task.
+  EMPLOYEE_PROFILE_CREATED: ['employeeId', 'departmentId'],
+  EMPLOYEE_PROFILE_UPDATED: ['employeeId', 'departmentId'],
+  PERSONNEL_EVENT_RECORDED: ['employeeId', 'departmentId', 'eventKind', 'effectiveOn'],
+  PERSONNEL_NOTICE_RECEIVED: ['noticeId', 'employeeId', 'departmentId', 'eventKind'],
+  PERSONNEL_NOTICE_OVERDUE: ['noticeId', 'employeeId', 'departmentId', 'eventKind'],
+  ABRUPT_DEPARTURE_RECORDED: ['employeeId', 'departmentId', 'effectiveOn'],
+  ROLE_HOLDER_LEAVING: ['employeeId', 'departmentId', 'roleFlag', 'effectiveOn'],
+  TRANSFER_REVIEW_DUE: ['employeeId', 'departmentId', 'dueOn'],
+  IT_ADMIN_SELF_EXECUTED: ['taskId', 'employeeId'],
+  // The budget loops: ids, the fiscal year, the decision and the reason already shown on the version or the request.
+  // No key says a figure (the words of FIGURE_WORDS are refused for every code).
+  BUDGET_VERSION_AWAITING_DECISION: ['versionId', 'costCenterId', 'year'],
+  BUDGET_PROPOSAL_SUBMITTED: ['proposalId', 'costCenterId', 'year'],
+  BUDGET_PROPOSAL_RETURNED: ['proposalId', 'costCenterId', 'year', 'reason'],
+  BUDGET_VERSION_DECIDED: ['versionId', 'costCenterId', 'year', 'decision', 'reason'],
+  REQUEST_FINANCE_REVIEW_OPENED: ['requestId', 'stepKind'],
+  REQUEST_RETURNED_BY_FINANCE: ['requestId', 'reason'],
+  REQUEST_AWAITING_BUDGET: ['requestId', 'costCenterId', 'year'],
+  REQUEST_BUDGET_VERSION_ENDED: ['requestId', 'versionId', 'costCenterId', 'year', 'decision'],
+  // The check of the budget of a request: the codes of why, never how far over (a figure is read on the request).
+  REQUEST_RESERVE_CONFIRMATION_NEEDED: ['requestId'],
+  REQUEST_BUDGET_BLOCKED: ['requestId', 'reasons'],
+  REQUEST_RETURNED_AT_DECISION: ['requestId', 'reasons'],
+  BUDGET_VERSION_CLOSED_UNAPPROVED: ['versionId', 'costCenterId', 'year'],
+  BUDGET_PROPOSAL_CLOSED_YEAR_END: ['proposalId', 'costCenterId', 'year'],
+  BUDGET_PROPOSAL_TASK_ASSIGNED: ['costCenterId', 'departmentId', 'year'],
+  BUDGET_PROPOSAL_TASK_WAITING: ['proposalId', 'costCenterId', 'year'],
+  // The cycle of a year opened (with the kind of the form to download, `templateKind`) and its submission deadline moved: the year and the days, never a figure (FIGURE_WORDS).
+  // A department ceiling published is no longer sent (QĐ-111aa); the notices written before stay readable.
+  BUDGET_CYCLE_OPENED: ['cycleId', 'year', 'submissionDeadline', 'templateKind'],
+  BUDGET_CYCLE_DEADLINE_MOVED: ['cycleId', 'year', 'submissionDeadline', 'previousSubmissionDeadline'],
+  BUDGET_DEPARTMENT_CEILING_PUBLISHED: ['cycleId', 'year', 'departmentId'],
+  // The deadlines of the cycle: the year, the day, and how many departments or versions (a count, never a figure of money).
+  BUDGET_PROPOSAL_DEADLINE_REMINDER: ['cycleId', 'year', 'costCenterId', 'submissionDeadline'],
+  BUDGET_NO_HEAD_AT_DEADLINE: ['cycleId', 'year', 'departmentId', 'submissionDeadline'],
+  BUDGET_SUBMISSION_DEADLINE_PASSED: ['cycleId', 'year', 'departmentCount', 'submissionDeadline'],
+  BUDGET_DECISION_DEADLINE_REMINDER: ['cycleId', 'year', 'versionCount', 'decisionDeadline'],
+  BUDGET_COST_CENTER_SETUP_DUE: ['cycleId', 'year', 'departmentId'],
+  BUDGET_BASELINE_VERSION_HEAD_ASSIGNED: ['versionId', 'costCenterId', 'year'],
+  // The budget of the year after is not approved yet for a Cost Center: the Cost Center and the year, never a figure.
+  BUDGET_NEXT_YEAR_MISSING: ['costCenterId', 'year'],
+  // The close of a month (`QĐ-111ae`, `QĐ-104i`): the year and month, and for the summary the period and how many Cost Centers have each light; never a figure.
+  BUDGET_REVIEW_DUE: ['year', 'month'],
+  BUDGET_REVIEW_SUMMARY: ['periodId', 'year', 'month', 'kind', 'greenCount', 'yellowCount', 'redCount', 'underCount'],
+  BUDGET_SHARED_POOL_OVER_RESERVE: ['year', 'month'],
+  // The use of the budget of a Cost Center reached 80 or 100 percent of its base (`QĐ-111af`, RV-2): the Cost Center, the year and the threshold, never a figure.
+  BUDGET_THRESHOLD_REACHED: ['costCenterId', 'year', 'threshold'],
+  // The head of a department is reminded to explain a Cost Center of a quarterly review (`QĐ-111ah`, B-7): on the due day and every Monday until they explain or Finance signs.
+  BUDGET_REVIEW_EXPLANATION_DUE: ['periodId', 'costCenterId', 'year', 'month', 'dueOn'],
+  // The head of a department is asked to explain a Cost Center of a quarterly review the day the quarter opens (`QĐ-111ah`, US-12-21 AC-4): the due day and the light, never a figure.
+  BUDGET_REVIEW_EXPLANATION_REQUESTED: ['periodId', 'costCenterId', 'year', 'month', 'dueOn', 'light'],
+  // An adjustment of the budget in the year (`QĐ-111ag`): asked of the spending approver, and decided for Finance and the head of a Cost Center it concerns; the id, the year, the kind and the decision, never a figure.
+  BUDGET_ADJUSTMENT_REQUESTED: ['adjustmentId', 'year', 'kind'],
+  BUDGET_ADJUSTMENT_DECIDED: ['adjustmentId', 'year', 'kind', 'decision', 'costCenterId'],
+  // The alerts of the rights (`a03-license-inbox-alerts`): the right, the person, the day and the role asked; never a key, an
+  // account identifier, a price or the text of a note.
+  LICENSE_EXPIRY_REMINDER: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'audience'],
+  RENEWAL_WINDOW_OPENED: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'opensOn', 'audience'],
+  HANDOVER_CONFIRMATION_DUE: HANDOVER,
+  HANDOVER_CONFIRMATION_OVERDUE: HANDOVER,
+  SERVICE_ACCOUNT_RESPONSIBLE_DUE: ['employeeId', 'fileKind', 'fileId', 'dueOn', 'accountCount'],
+  SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE: [
+    'assignmentId',
+    'employeeId',
+    'owningDepartmentId',
+    'fileKind',
+    'fileId',
+    'dueOn',
+  ],
+  LEAVER_K1_ACCESS_RUNS_ON: ['taskId', 'assignmentId', 'employeeId', 'planId', 'accessUntil'],
+  GHOST_SEAT_G2_DETECTED: ['recommendationId', 'employeeId', 'applicationId'],
+  // Ids and a day only (the interface turns ids into names): the week key makes the notice one a week for each recipient.
+  GHOST_SEAT_NEW: ['recommendationId', 'departmentId', 'weekKey'],
+  GHOST_SEAT_ACTION_TIER: ['recommendationId', 'departmentId', 'weekKey'],
+  GHOST_SEAT_DECISION_OVERDUE: ['recommendationId', 'employeeId', 'applicationId', 'decisionDueOn'],
+  GHOST_SEAT_WAITING_FOR_HEAD: ['recommendationId', 'departmentId'],
+  GHOST_SEAT_RETURNED: ['recommendationId', 'employeeId', 'applicationId'],
+  GHOST_SEAT_EXEMPTION_ENDING: ['recommendationId', 'employeeId', 'applicationId', 'exemptUntil'],
+  REVOCATION_UPCOMING: ['taskId', 'planId', 'applicationId', 'source', 'notBefore'],
+  REVOCATION_CANCELLED: ['planId', 'applicationId', 'source'],
+  // The renewal of a subscription: ids, the milestone and where it comes from, the choice and when it is carried out. The
+  // usage of the seats is only said to be available or not; no figure of money, no person but the recipient.
+  // The point of adjustment (`SBF-20` §4.5): `baseDate` is the deadline of the period, `renewalOn` the day the next one begins, `commitment` MONTHLY or ANNUAL;
+  // `renewalId` is null. The keys from `milestoneDays` on belong to the old milestones, kept so a notice already stored is still read.
+  SUBSCRIPTION_RENEWAL_ALERT: [
+    'subscriptionId',
+    'renewalId',
+    'baseDate',
+    'renewalOn',
+    'seatsNeeded',
+    'commitment',
+    'milestoneDays',
+    'noticeBasis',
+    'audience',
+    'decisionRecorded',
+    'outcomeRecorded',
+    'usageData',
+  ],
+  // The red alert of a plan by the year with no outcome near its deadline, and the seats a plan by the month keeps when nothing was recorded before its payment day (`QĐ-103e`).
+  SUBSCRIPTION_RENEWAL_RED_ALERT: ['subscriptionId', 'baseDate', 'renewalOn', 'seatsNeeded'],
+  SUBSCRIPTION_RENEWAL_KEPT: ['subscriptionId', 'renewalOn', 'purchasedQuantity', 'seatsNeeded'],
+  SUBSCRIPTION_RENEWAL_DATA_QUALITY: ['subscriptionId', 'problem'],
+  SUBSCRIPTION_RENEWAL_PROPOSED: ['renewalId', 'subscriptionId', 'choice'],
+  SUBSCRIPTION_RENEWAL_DECIDED: ['renewalId', 'subscriptionId', 'choice', 'executionPoint'],
+  SUBSCRIPTION_RENEWAL_LATE: ['renewalId', 'subscriptionId', 'baseDate'],
+  // The result of the adjustment of a subscription (`SBF-20` §13): what the IT Admin chose and the vendor did, the seats and the new period; no figure of money.
+  SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED: [
+    'renewalId',
+    'subscriptionId',
+    'choice',
+    'quantity',
+    'outcome',
+    'nextSubscriptionId',
+    'substitute',
+  ],
+  // `renewalId` is the case that chose a smaller period when the vendor renewed more (`QĐ-106i`(4)); null when the sweep found it.
+  SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate', 'renewalId'],
+  SUBSCRIPTION_EXPIRY_MARKED: ['subscriptionId', 'baseDate', 'endDate'],
+  // What the person is told before the usage of an application they hold is written (`US-08-05` AC-2): the application by id (the interface turns it into a name), what counts as activity,
+  // the kinds of data, why, how long the usage is kept, and where to read it. Words and one number; never a name or a figure of money.
+  USAGE_TRACKING_NOTICE: ['applicationId', 'activityDefinition', 'dataKinds', 'purpose', 'retentionMonths', 'viewPath'],
+  // The application by id (the interface turns it into a name: no key may be a name), the source by its label, the last day the source covers and how old it is: words and days, no person.
+  USAGE_SOURCE_STALE: ['applicationId', 'source', 'coverageTo', 'freshnessDays'],
+  // MF-2 (`QĐ-110b`–`QĐ-110e`): the people and the days of a departure, how many rights wait. `DEPARTURE_ACCESS_BLOCKED` is told at the block moment, once for
+  // each `audience`: `SUPER_ADMIN` to mark the person as left; `IT_ADMIN` to **block** the company account (item 1a of `BM-08`: reset the password of the
+  // mailbox and sign out every session; the mailbox is not locked yet, that is item 1b) and to open the revocation by `revocationDueOn`. `blockedOn` is the
+  // first day the person is refused. `ACCOUNT_LOCK_OVERDUE` says item 1a of a departure blocked now was still not recorded at the end of the day `blockedOn`.
+  REVOCATION_OVERDUE: ['caseId', 'employeeId', 'dueOn', 'rightCount'],
+  DEPARTURE_ACCESS_BLOCKED: ['caseId', 'employeeId', 'departmentId', 'blockedOn', 'revocationDueOn', 'audience'],
+  ACCOUNT_LOCK_OVERDUE: ['caseId', 'employeeId', 'blockedOn'],
+  // MF-3 (`QĐ-110p`): the grace of a transfer; `audience` is the mover, a head or an IT Admin of one of the two departments.
+  TRANSFER_GRACE_STARTED: ['transferId', 'employeeId', 'fromDepartmentId', 'toDepartmentId', 'graceEndsOn', 'audience'],
+  TRANSFER_GRACE_ENDING: ['transferId', 'employeeId', 'graceEndsOn'],
+  TRANSFER_RIGHTS_REVOKING: ['transferId', 'employeeId', 'toDepartmentId', 'rightCount'],
+  // A request closed because its beneficiary left or moved (`QĐ-110d`, `QĐ-110o`): `reasonKind` is DEPARTURE or TRANSFER.
+  REQUEST_CANCELLED_BENEFICIARY_GONE: ['requestId', 'beneficiaryEmployeeId', 'reasonKind'],
+  // The same, for the request the system left to the IT Admin because its grant is being carried out (`QĐ-110d`).
+  REQUEST_BENEFICIARY_GONE_IT_CHECK: ['requestId', 'beneficiaryEmployeeId', 'reasonKind'],
+  // The purchase invoices of PI-1: the invoice is the subject; the request or subscription it is for tells where to read it.
+  PURCHASE_INVOICE_SUBMITTED: ['purchaseInvoiceId', 'linkKind', 'servicePeriodMonth'],
+  PURCHASE_INVOICE_CONFIRMED: ['purchaseInvoiceId', 'linkKind', 'servicePeriodMonth'],
+  PURCHASE_INVOICE_RETURNED: ['purchaseInvoiceId', 'linkKind', 'servicePeriodMonth'],
+  // The list of software of a department (`QĐ-110s`, `QĐ-110t`).
+  DEPARTMENT_SOFTWARE_PROPOSED: ['proposalId', 'departmentId', 'applicationId', 'planId'],
+  DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED: ['proposalId', 'departmentId', 'applicationId', 'planId', 'decision', 'reason'],
+  // The admins a plan keeps at the vendor (`QĐ-110k`): how many are left; and a subscription that gained seats (`QĐ-110v`).
+  VENDOR_ADMINS_BELOW_MINIMUM: ['planId', 'applicationId', 'adminCount'],
+  DEPARTMENT_WITHOUT_HEAD: ['departmentId', 'waitingCount'],
+  SUBSCRIPTION_SEATS_INCREASED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'requestId', 'changedByEmployeeId'],
+  // What an IT Admin who leaves still answers for, once the day has come and the handover is not done (`QĐ-110j`, `R-26`).
+  IT_ADMIN_HANDOVER_PENDING: ['sourceKind', 'sourceId', 'employeeId', 'dueOn'],
+  // The same, told to the IT Admin who took it all: from whom, and how many of each (`QĐ-110j`, SPEC P5).
+  IT_ADMIN_HANDOVER_RECEIVED: ['sourceKind', 'sourceId', 'fromEmployeeId', 'subscriptions', 'applications'],
+  // A departure cancelled after the last working day: how many revocation tasks in progress the IT Admin closes by hand (`QĐ-110c`).
+  DEPARTURE_REVOCATION_IT_CLOSE: ['caseId', 'employeeId', 'taskCount'],
+  // A new version of a policy: which policy, which version, and whether the reader is asked to acknowledge it (`QĐ-111bi`).
+  POLICY_PUBLISHED: ['policyCode', 'versionNumber', 'requiresReacknowledgement'],
+  // A batch of spend requests sent to the spending approver: which batch, from which department, and how many steps it opened for them (`FR-3.21`).
+  SPEND_BATCH_SUBMITTED: ['batchId', 'departmentId', 'sentCount'],
+  // The reports of errors in SaaS rights (`FR-2.15`): ids, the code of the report and the words of its kind and states. Never what the reporter or the IT Admin wrote, because the head of the department does not read it.
+  SAAS_ISSUE_SUBMITTED: ['issueId', 'issueCode', 'category', 'impact', 'applicationId'],
+  SAAS_ISSUE_RESPONSE_OVERDUE: ['issueId', 'issueCode', 'responseDueOn'],
+  SAAS_ISSUE_STATE_CHANGED: ['issueId', 'issueCode', 'fromState', 'toState', 'trigger'],
+  // A case outside the process closed as a report only, and a difference with a vendor opened (`SBF-07a`, `SBF-08`): ids and the source, never the account's identifier or what it did.
+  OUT_OF_PROCESS_CASE_REPORTED: ['caseId', 'applicationId', 'vendorId', 'employeeId'],
+  VENDOR_ACCOUNT_DISCREPANCY_OPENED: ['applicationId', 'vendorId', 'source', 'newCount'],
+  // A holder asked to stop the collection of a machine (`US-09-04`, E1): ids, the deadline and its day in the time of the company; never what the machine collected.
+  DEVICE_STOP_REQUESTED: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
+  DEVICE_STOP_REQUEST_OVERDUE: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
+};
+
+/** Whether the code is one of the closed table. */
+export function isKnownCode(code: string): code is InAppNotificationCode {
+  return (IN_APP_NOTIFICATION_CODES as readonly string[]).includes(code);
+}
+
+/**
+ * Judges a notice before it is written: a code of the table, a key of one to two hundred characters, a subject with both its
+ * type and its id or neither, and parameters that are flat (a string, a finite number, a boolean or empty), that only use the
+ * keys of the code, that carry no key of the forbidden words and that fit in 4 096 bytes. The first fault found is returned.
+ */
+export function refuseInAppNotification(input: InAppNotificationInput): InAppNotificationRefusal | null {
+  if (!isKnownCode(input.code)) return { reason: 'UNKNOWN_CODE' };
+  if (input.eventKey.length < 1 || input.eventKey.length > MAX_EVENT_KEY_LENGTH) return { reason: 'EVENT_KEY_INVALID' };
+  if (input.subject !== null && (input.subject.type.trim() === '' || input.subject.id === '')) {
+    return { reason: 'SUBJECT_INVALID' };
+  }
+
+  const allowed = PARAM_KEYS_BY_CODE[input.code];
+  for (const [key, value] of Object.entries(input.params)) {
+    if (FORBIDDEN_PARAM_KEY.test(key)) return { reason: 'PARAM_KEY_FORBIDDEN', key };
+    if (!allowed.includes(key)) return { reason: 'PARAM_KEY_NOT_ALLOWED', key };
+    const flat =
+      value === null ||
+      typeof value === 'string' ||
+      typeof value === 'boolean' ||
+      (typeof value === 'number' && Number.isFinite(value));
+    if (!flat) return { reason: 'PARAM_VALUE_INVALID', key };
+  }
+  if (Buffer.byteLength(JSON.stringify(input.params), 'utf8') > MAX_PARAMS_BYTES) return { reason: 'PARAMS_TOO_LARGE' };
+
+  return null;
+}

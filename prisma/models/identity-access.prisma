@@ -11,6 +11,8 @@ enum ActivationState {
 enum EmailVerificationSource {
   BOOTSTRAP_ASSERTED
   INVITATION_REDEEMED
+  // The address was confirmed by opening a recovery link the operator procedure sent to it (US-01-09 AC-10).
+  RECOVERY_VERIFIED
 }
 
 enum AppRole {
@@ -18,12 +20,16 @@ enum AppRole {
   IT_ADMIN
   FINANCE
   EMPLOYEE
+  MANAGER
+  SPENDING_APPROVER
 }
 
 enum SessionRevokedReason {
   LOGOUT
   REPLAY_DETECTED
   ACCOUNT_LOCKED
+  PASSWORD_CHANGED
+  PASSWORD_RESET
 }
 
 // A login account, separate from the HR record (ADR-08). employee_id is a plain foreign key
@@ -38,6 +44,14 @@ model AppUser {
   activationState         ActivationState          @default(INVITED) @map("activation_state")
   emailVerificationSource EmailVerificationSource? @map("email_verification_source")
   emailVerifiedAt         DateTime?                @map("email_verified_at") @db.Timestamptz(3)
+  // The day the person behind the account left (set once, by the record of a departure); the account itself is locked by the Super Admin.
+  employeeLeftOn          DateTime?                @map("employee_left_on") @db.Date
+  // The two things a person edits on their own account (`QĐ-111at`): the key of the picture in the object storage and its type and time, and the work
+  // phone. All three picture columns are set together or none; both are cleared when the person is recorded as having left (`QĐ-111av`).
+  avatarObjectKey         String?                  @map("avatar_object_key")
+  avatarContentType       String?                  @map("avatar_content_type")
+  avatarUpdatedAt         DateTime?                @map("avatar_updated_at") @db.Timestamptz(3)
+  workPhone               String?                  @map("work_phone")
   createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -62,7 +76,9 @@ model PasswordCredential {
   @@map("password_credentials")
 }
 
-// Direct role grants with history. MANAGER and the spending approver are derived, never stored here.
+// Direct role grants with history, all six roles (QĐ-93a). MANAGER only counts while the holder heads a department today;
+// SPENDING_APPROVER is held by at most one person (role_grants_one_spending_approver).
+// SQL-only partial unique index role_grants_one_role_per_account: one effective grant per app_user_id (QĐ-95).
 model RoleGrant {
   id             String    @id @default(uuid()) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
@@ -125,29 +141,113 @@ model LoginThrottle {
 
 enum AccountActionPurpose {
   INVITE
+  RESET_PASSWORD
 }
 
 enum AccountActionTokenRevokedReason {
   SUPERSEDED
   ACCOUNT_LOCKED
+  CREDENTIAL_CHANGED
 }
 
 // One-time token behind an emailed link. Only the SHA-256 of the token is stored. "Usable" is
 // the stored state (not consumed, not revoked); expiry is checked at redemption because a
 // partial-index predicate cannot use now().
 model AccountActionToken {
-  tokenHash     String                           @id @map("token_hash")
-  appUserId     String                           @map("app_user_id") @db.Uuid
-  purpose       AccountActionPurpose
-  expiresAt     DateTime                         @map("expires_at") @db.Timestamptz(3)
-  consumedAt    DateTime?                        @map("consumed_at") @db.Timestamptz(3)
-  revokedAt     DateTime?                        @map("revoked_at") @db.Timestamptz(3)
-  revokedReason AccountActionTokenRevokedReason? @map("revoked_reason")
-  createdBy     String?                          @map("created_by") @db.Uuid
-  createdAt     DateTime                         @default(now()) @map("created_at") @db.Timestamptz(3)
+  tokenHash               String                           @id @map("token_hash")
+  appUserId               String                           @map("app_user_id") @db.Uuid
+  purpose                 AccountActionPurpose
+  expiresAt               DateTime                         @map("expires_at") @db.Timestamptz(3)
+  consumedAt              DateTime?                        @map("consumed_at") @db.Timestamptz(3)
+  revokedAt               DateTime?                        @map("revoked_at") @db.Timestamptz(3)
+  revokedReason           AccountActionTokenRevokedReason? @map("revoked_reason")
+  createdBy               String?                          @map("created_by") @db.Uuid
+  createdAt               DateTime                         @default(now()) @map("created_at") @db.Timestamptz(3)
+  // Set only on a link the recovery procedure sent (US-01-09): the ticket it belongs to and, when the ticket moves the
+  // login email, the address the account takes once the link is opened (never before).
+  recoveryTicketId        String?                          @map("recovery_ticket_id") @db.Uuid
+  newLoginEmail           String?                          @map("new_login_email")
+  newNormalizedLoginEmail String?                          @map("new_normalized_login_email")
 
-  appUser AppUser @relation(fields: [appUserId], references: [id])
+  appUser        AppUser         @relation(fields: [appUserId], references: [id])
+  recoveryTicket RecoveryTicket? @relation(fields: [recoveryTicketId], references: [id], onDelete: Restrict)
 
   @@index([appUserId])
+  @@index([appUserId, purpose, createdAt])
+  @@index([recoveryTicketId])
   @@map("account_action_tokens")
+}
+
+
+enum RecoveryMode {
+  RESET_CREDENTIALS
+  UNLOCK
+  TRANSFER_ROLE
+}
+
+enum RecoveryStatus {
+  PENDING
+  AWAITING_ACTIVATION
+  COMPLETED
+  SUPERSEDED
+}
+
+// One approved ticket of the out-of-application procedure that recovers the Super Admin role (US-01-09 AC-9 to
+// AC-14). The ticket reference is the idempotency key: running the same ticket again never acts twice.
+model RecoveryTicket {
+  id                  String         @id @default(uuid()) @db.Uuid
+  organizationId      String         @map("organization_id") @db.Uuid
+  ticketRef           String         @map("ticket_ref")
+  mode                RecoveryMode
+  status              RecoveryStatus @default(PENDING)
+  // The account the ticket acts on (reset, unlock) or the holder it replaces (transfer; null when nobody holds the role).
+  targetAppUserId     String?        @map("target_app_user_id") @db.Uuid
+  successorEmployeeId String?        @map("successor_employee_id") @db.Uuid
+  // Where the link goes, and the login email the account takes once the link is opened (null: it does not change).
+  recipientEmail      String?        @map("recipient_email")
+  newLoginEmail       String?        @map("new_login_email")
+  approverRef         String         @map("approver_ref")
+  operatorRef         String         @map("operator_ref")
+  identityCheckRef    String?        @map("identity_check_ref")
+  environment         String
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  completedAt         DateTime?      @map("completed_at") @db.Timestamptz(3)
+
+  tokens AccountActionToken[]
+
+  @@unique([organizationId, ticketRef])
+  @@index([targetAppUserId])
+  @@map("recovery_tickets")
+}
+
+// The day the access of an employee stops, from their departure case (QĐ-100q): from `blockedFrom` the account is refused at login,
+// refresh and on every request, whatever the state of the case. One row for each employee. `releasable` is set when the departure
+// is cancelled after the block took effect: only an unlock with a reason by the Super Admin removes it.
+model EmployeeAccessBlock {
+  employeeId     String                   @id @map("employee_id") @db.Uuid
+  organizationId String                   @map("organization_id") @db.Uuid
+  blockedFrom    DateTime                 @map("blocked_from") @db.Date
+  cause          String                   // DEPARTURE_LAST_DAY | DEPARTURE_BLOCK_NOW (CHECK in the database)
+  sourceCaseId   String?                  @map("source_case_id") @db.Uuid
+  releasable     Boolean                  @default(false)
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                 @default(now()) @map("updated_at") @db.Timestamptz(3)
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([organizationId])
+  @@map("employee_access_blocks")
+}
+
+// The objects of the picture storage that nobody points to any more and that a sweeper of the API process deletes after the transaction that
+// stopped pointing at them committed (an object is never deleted inside a transaction: the transaction can still roll back). `purged_at` null = still to do.
+model AvatarPurge {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  objectKey      String    @map("object_key")
+  requestedAt    DateTime  @default(now()) @map("requested_at") @db.Timestamptz(3)
+  purgedAt       DateTime? @map("purged_at") @db.Timestamptz(3)
+
+  @@map("avatar_purges")
 }

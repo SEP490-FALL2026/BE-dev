@@ -1,0 +1,49 @@
+name: Provision the test database role
+description: >-
+  Creates the ordinary integration role (LOGIN CREATEDB, no superuser) in the job's PostgreSQL service container and
+  proves its attributes, as test/README.md requires before any integration suite runs.
+inputs:
+  container:
+    description: The service container id (`job.services.postgres.id`).
+    required: true
+runs:
+  using: composite
+  steps:
+    # A disposable server: durability across a crash is worth nothing here, and every integration file copies and drops
+    # a database, so writing each page to disk only slows the run. SQL behaviour is unchanged.
+    - name: Tune the disposable server for tests
+      shell: bash
+      run: |
+        docker exec -i "${{ inputs.container }}" psql -X -U ci_bootstrap -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+        ALTER SYSTEM SET fsync = off;
+        ALTER SYSTEM SET synchronous_commit = off;
+        ALTER SYSTEM SET full_page_writes = off;
+        SELECT pg_reload_conf();
+        SQL
+
+    - name: Provision ordinary integration role
+      shell: bash
+      run: |
+        docker exec -i "${{ inputs.container }}" psql -X -U ci_bootstrap -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+        CREATE ROLE ci_integration LOGIN NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD 'ci-integration-only';
+        SQL
+
+    - name: Assert ordinary integration role
+      shell: bash
+      env:
+        PGPASSWORD: ci-integration-only
+      run: |
+        docker exec -i -e PGPASSWORD "${{ inputs.container }}" psql -X -h 127.0.0.1 -U ci_integration -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_roles
+            WHERE rolname = current_user
+              AND rolcanlogin AND rolcreatedb AND NOT rolsuper
+              AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls
+          ) THEN
+            RAISE EXCEPTION 'Integration requires an ordinary LOGIN CREATEDB role';
+          END IF;
+        END;
+        $$;
+        SQL

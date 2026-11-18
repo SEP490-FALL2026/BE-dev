@@ -1,0 +1,1766 @@
+# Inventory: response, mã lỗi với tới được và ví dụ (`OPENAPI-EXAMPLE.1`)
+
+Sinh từ `openapi.json` cuối của hạng mục (exporter) và bảng truy vết 25/10/2026 trên BE `ea73c2f` — không sửa tay; sinh lại
+bằng script của phiên khi đổi. [Spec](spec.md) · [Plan](plan.md).
+
+**Trước hạng mục** (document `ea73c2f`, sha256 `a6c849cd…`): 146 operation; 145 response thành công JSON để Swagger tự sinh
+`message` từ regex; 1 033 response lỗi JSON để Swagger tự sinh `error.code` (regex) và `error.message`; một response không
+body (`authLogout 204`, `@RawResponse`). Không response nào có ví dụ media type.
+
+**Sau hạng mục:** mỗi operation một mục: truy cập (`public`, `authenticated`, `roles`), rồi từng status — `message` ví dụ
+(2xx) hoặc tên các ví dụ lỗi (= mã), sau dấu `—` là mô tả giữ nguyên chữ (lệch code ghi ở mục cuối).
+
+- `accountCandidatesList` — `GET /api/v1/account-candidates` (roles)
+  - 200: `APP_USER.CANDIDATES_LISTED` — Employees who have not left and have no account yet (at most 20).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin may call this route.
+  - 422: `VALIDATION_ERROR` — The query is invalid.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `applicationBusinessOwnerHistory` — `GET /api/v1/applications/{id}/business-owners` (roles)
+  - 200: `APPLICATION.BUSINESS_OWNERS_LISTED` — A page of the periods of the Business Owner, the latest first: the person, from when to when, and who made the change.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read the history.
+  - 404: `APPLICATION.NOT_FOUND` — The application does not exist (APPLICATION.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is not a UUID or the query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `applicationCreate` — `POST /api/v1/applications` (roles)
+  - 201: `APPLICATION.CREATED` — The application is in the catalog; proposedToDictionary says it was outside the dictionary and proposed to it.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin changes the application catalog.
+  - 409: `APPLICATION.NAME_TAKEN`, `APPLICATION.DICTIONARY_LINE_TAKEN`, `APPLICATION.DICTIONARY_GROUP_CHANGED` — The vendor already has an application of this name (APPLICATION.NAME_TAKEN), the dictionary line belongs to another application (APPLICATION.DICTIONARY_LINE_TAKEN), or a simultaneous request changed the dictionary group of the vendor or of the line first (APPLICATION.DICTIONARY_GROUP_CHANGED): refresh the application and the line, then send the request again.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `APPLICATION.NAME_INVALID`, `APPLICATION.DOMAIN_INVALID`, `APPLICATION.TOO_MANY_DOMAINS`, `APPLICATION.NOTE_INVALID`, `APPLICATION.INTERNAL_HAS_NO_VENDOR`, `APPLICATION.BUSINESS_OWNER_INVALID`, `APPLICATION.FUNCTIONAL_GROUP_INVALID`, `APPLICATION.DICTIONARY_LINE_NOT_FOUND`, `APPLICATION.DICTIONARY_LINE_MISMATCH`, `APPLICATION.VENDOR_NAME_INVALID`, `APPLICATION.VENDOR_REQUIRED`, `APPLICATION.VENDOR_SOURCE_AMBIGUOUS` — The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `applicationGet` — `GET /api/v1/applications/{id}` (roles)
+  - 200: `APPLICATION.FETCHED` — The application and, in similarApplications, the first 20 other approved applications of its functional group and, in similarTotal, how many there are; recommendations says, without blocking anything, when a K2 plan is worth considering (three different people on K1 plans).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read the application catalog.
+  - 404: `APPLICATION.NOT_FOUND` — The application does not exist (APPLICATION.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is not a UUID (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `applicationList` — `GET /api/v1/applications` (roles)
+  - 200: `APPLICATION.LISTED` — A page of applications by name, optionally searched by application or vendor name and filtered by kind, status and functional group.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read the application catalog.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `applicationRetire` — `POST /api/v1/applications/{id}/retire` (roles)
+  - 200: `APPLICATION.RETIRED` — The application is retired for good, on the confirmation of its Business Owner. Nothing is revoked or cancelled for it: an application that something still holds is refused instead.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin retires an application.
+  - 404: `APPLICATION.NOT_FOUND` — The application does not exist (APPLICATION.NOT_FOUND).
+  - 409: `APPLICATION.ALREADY_RETIRED`, `APPLICATION.RETIREMENT_BLOCKED` — The application is retired already (APPLICATION.ALREADY_RETIRED), or assignments or running term subscriptions hold it (APPLICATION.RETIREMENT_BLOCKED, details.assignments and details.subscriptions list the first 50 of them, details.assignmentTotal and details.subscriptionTotal count them all).
+  - 422: `VALIDATION_ERROR`, `APPLICATION.RETIREMENT_NEEDS_CONFIRMATION` — The id is invalid (VALIDATION_ERROR), or the Business Owner of today has not confirmed (APPLICATION.RETIREMENT_NEEDS_CONFIRMATION).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `applicationRetirementConfirm` — `POST /api/v1/applications/{id}/retirement-confirmations` (roles)
+  - 201: `APPLICATION.RETIREMENT_CONFIRMED` — The confirmation of the Business Owner of today, with its content and who recorded it, kept for good. The audit trail names the person who recorded it, the Business Owner and the content.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin records the confirmation.
+  - 404: `APPLICATION.NOT_FOUND` — The application does not exist (APPLICATION.NOT_FOUND).
+  - 409: `APPLICATION.ALREADY_RETIRED` — The application is retired already (APPLICATION.ALREADY_RETIRED).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER`, `APPLICATION.RETIREMENT_NOTE_REQUIRED` — The request is invalid (VALIDATION_ERROR), the person is not the Business Owner of today or has left (APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER), or the note is blank (APPLICATION.RETIREMENT_NOTE_REQUIRED).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `applicationRetirementGet` — `GET /api/v1/applications/{id}/retirement` (roles)
+  - 200: `APPLICATION.RETIREMENT_FETCHED` — The newest 50 confirmations recorded and how many there are, whether the Business Owner of today has confirmed, the first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read it.
+  - 404: `APPLICATION.NOT_FOUND` — The application does not exist (APPLICATION.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `applicationUpdate` — `PATCH /api/v1/applications/{id}` (roles)
+  - 200: `APPLICATION.UPDATED` — The application as it is after the change; a change of nothing is answered the same and not audited. The kind and the vendor cannot change.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin changes the application catalog.
+  - 404: `APPLICATION.NOT_FOUND` — The application does not exist (APPLICATION.NOT_FOUND).
+  - 409: `APPLICATION.NAME_TAKEN`, `APPLICATION.DICTIONARY_LINE_TAKEN`, `APPLICATION.DICTIONARY_GROUP_CHANGED` — The vendor already has an application of this name (APPLICATION.NAME_TAKEN), the dictionary line belongs to another application (APPLICATION.DICTIONARY_LINE_TAKEN), or a simultaneous request changed the dictionary group of the vendor or of the line first (APPLICATION.DICTIONARY_GROUP_CHANGED): refresh the application and the line, then send the request again.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `APPLICATION.NAME_INVALID`, `APPLICATION.DOMAIN_INVALID`, `APPLICATION.TOO_MANY_DOMAINS`, `APPLICATION.NOTE_INVALID`, `APPLICATION.INTERNAL_HAS_NO_VENDOR`, `APPLICATION.BUSINESS_OWNER_INVALID`, `APPLICATION.FUNCTIONAL_GROUP_INVALID`, `APPLICATION.DICTIONARY_LINE_NOT_FOUND`, `APPLICATION.DICTIONARY_LINE_MISMATCH`, `APPLICATION.UPDATE_EMPTY` — The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `approvalRoleList` — `GET /api/v1/approval-roles` (roles)
+  - 200: `APPROVAL_ROLE.LISTED` — The three approval roles, who holds each now (or nobody) and who held it before.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin configures the approval roles.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `approvalRoleSet` — `PUT /api/v1/approval-roles/{role}` (roles)
+  - 200: `APPROVAL_ROLE.SET` — The person holds the role from now on; whoever held it before stops. Naming the person who already holds it changes nothing.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin configures the approval roles.
+  - 404: `ORGANIZATION.EMPLOYEE_NOT_FOUND` — The employee does not exist (ORGANIZATION.EMPLOYEE_NOT_FOUND).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `APPROVAL_ROLE.EMPLOYEE_NOT_ACTIVE`, `APPROVAL_ROLE.NO_USABLE_ACCOUNT`, `APPROVAL_ROLE.SUPER_ADMIN_CANNOT_HOLD`, `APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER` — The request is invalid (VALIDATION_ERROR), the person has left or has no account that can sign in (APPROVAL_ROLE.EMPLOYEE_NOT_ACTIVE, APPROVAL_ROLE.NO_USABLE_ACCOUNT), holds the Super Admin role (APPROVAL_ROLE.SUPER_ADMIN_CANNOT_HOLD), or the substitute would be the spending approver (APPROVAL_ROLE.SUBSTITUTE_MUST_DIFFER).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `appUserCreate` — `POST /api/v1/app-users` (roles)
+  - 201: `APP_USER.CREATED` — The account was created (invited) and its invitation queued.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin may call this route.
+  - 404: `ORGANIZATION.EMPLOYEE_NOT_FOUND` — The employee does not exist.
+  - 409: `APP_USER.EMPLOYEE_TERMINATED`, `APP_USER.ALREADY_EXISTS_FOR_EMPLOYEE`, `APP_USER.LOGIN_EMAIL_TAKEN`, `APP_USER.FINANCE_ALREADY_ASSIGNED` — The employee left, already has an account, or the email or Finance seat is taken.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `APP_USER.ROLE_DERIVED`, `APP_USER.SUPER_ADMIN_TRANSFER_ONLY`, `APP_USER.LOGIN_EMAIL_REQUIRED`, `APP_USER.LOGIN_EMAIL_INVALID` — The body is invalid or a requested role cannot be granted by hand.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `appUserGet` — `GET /api/v1/app-users/{id}` (roles)
+  - 200: `APP_USER.RETRIEVED` — The account with its role history and invitation state.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin may call this route.
+  - 404: `APP_USER.NOT_FOUND` — No account has this identifier.
+  - 422: `VALIDATION_ERROR` — The identifier is not a UUID.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `appUserGrantRole` — `POST /api/v1/app-users/{id}/role-grants` (roles)
+  - 201: `ROLE.GRANTED` — The role is granted and takes effect at the account next request.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin may call this route.
+  - 404: `APP_USER.NOT_FOUND` — No account has this identifier.
+  - 409: `APP_USER.SELF_CHANGE_FORBIDDEN`, `APP_USER.ROLE_ALREADY_GRANTED`, `APP_USER.ROLE_COMBINATION_FORBIDDEN`, `APP_USER.FINANCE_ALREADY_ASSIGNED` — Already granted, forbidden combination, Finance seat taken, or the caller.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `APP_USER.ROLE_DERIVED`, `APP_USER.SUPER_ADMIN_TRANSFER_ONLY` — The role is derived or moves only by transfer.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `appUserList` — `GET /api/v1/app-users` (roles)
+  - 200: `APP_USER.LISTED` — A page of accounts.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin may call this route.
+  - 422: `VALIDATION_ERROR` — The query is invalid.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `appUserLock` — `POST /api/v1/app-users/{id}/lock` (roles)
+  - 200: `APP_USER.LOCKED` — The account is locked; its sessions and unused invitation are ended.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin may call this route.
+  - 404: `APP_USER.NOT_FOUND` — No account has this identifier.
+  - 409: `APP_USER.SELF_CHANGE_FORBIDDEN`, `APP_USER.SUPER_ADMIN_HOLDER_NOT_LOCKABLE` — The caller, or the holder of SUPER_ADMIN, cannot be locked.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR` — The identifier is not a UUID, or the reason is missing, blank, longer than 1000 characters or sent with other fields (VALIDATION_ERROR). Nothing changes.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `appUserResendInvitation` — `POST /api/v1/app-users/{id}/invitations` (roles)
+  - 202: `APP_USER.INVITATION_SENT` — A new invitation was queued; the previous one no longer works.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin may call this route.
+  - 404: `APP_USER.NOT_FOUND` — No account has this identifier.
+  - 409: `APP_USER.SELF_CHANGE_FORBIDDEN`, `APP_USER.ALREADY_ACTIVATED`, `APP_USER.ACCOUNT_LOCKED`, `APP_USER.EMPLOYEE_TERMINATED` — The account is activated, locked, belongs to a departed employee, or is the caller.
+  - 422: `VALIDATION_ERROR` — The identifier is not a UUID (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `appUserRevokeRole` — `DELETE /api/v1/app-users/{id}/role-grants/{role}` (roles)
+  - 200: `ROLE.REVOKED` — The role is revoked (the last role may be revoked); it stops at the next request.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin may call this route.
+  - 404: `APP_USER.NOT_FOUND`, `APP_USER.ROLE_NOT_GRANTED` — No such account, or it does not hold this role.
+  - 409: `APP_USER.SELF_CHANGE_FORBIDDEN` — The caller cannot change their own account.
+  - 422: `VALIDATION_ERROR`, `APP_USER.ROLE_DERIVED`, `APP_USER.SUPER_ADMIN_TRANSFER_ONLY` — The role is derived or moves only by transfer.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `appUserUnlock` — `POST /api/v1/app-users/{id}/unlock` (roles)
+  - 200: `APP_USER.UNLOCKED` — The account is active again.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin may call this route.
+  - 404: `APP_USER.NOT_FOUND` — No account has this identifier.
+  - 409: `APP_USER.SELF_CHANGE_FORBIDDEN` — The caller cannot change their own account.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR` — The identifier is not a UUID, or the reason is missing, blank, longer than 1000 characters or sent with other fields (VALIDATION_ERROR). Nothing changes.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `auditEventList` — `GET /api/v1/audit-events` (roles)
+  - 200: `AUDIT.EVENTS_LISTED` — A page of the Audit Trail, newest first, optionally narrowed by resource, actor, action and time window [occurredFrom, occurredTo).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin may read the Audit Trail.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `authLogin` — `POST /api/v1/auth/login` (public)
+  - 200: `AUTH.LOGGED_IN` — Signed in. The body carries the access token and the refresh token.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTH.INVALID_CREDENTIALS` — The email or password is not valid (one answer for every reason).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR` — The request body is invalid.
+  - 429: `AUTH.LOGIN_TEMPORARILY_BLOCKED`, `HTTP_TOO_MANY_REQUESTS` — Too many failed sign-in attempts for this email; see retryAfterSeconds (AUTH.LOGIN_TEMPORARILY_BLOCKED). Too many requests to this route from this address also answer 429 (HTTP_TOO_MANY_REQUESTS).
+  - 503: `AUTH.UNAVAILABLE` — The database is temporarily unavailable. Retry shortly.
+- `authLogout` — `POST /api/v1/auth/logout` (public)
+  - 204: — (không body) — Signed out (or there was nothing to sign out).
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR` — The body has no refresh token (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `AUTH.UNAVAILABLE` — The database is temporarily unavailable. Retry shortly.
+- `authRedeemInvitation` — `POST /api/v1/auth/invitations/redeem` (public)
+  - 200: `AUTH.ACCOUNT_ACTIVATED` — The account is activated. The user signs in with the login route.
+  - 400: `AUTH.INVITATION_INVALID`, `HTTP_BAD_REQUEST` — The link is not valid (unknown, used, replaced, expired, or the account cannot be activated). The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `AUTH.PASSWORD_POLICY_VIOLATION` — The body is invalid or the password does not meet the policy.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `SERVICE_UNAVAILABLE` — The database is temporarily unavailable. Retry shortly.
+- `authRefresh` — `POST /api/v1/auth/refresh` (public)
+  - 200: `AUTH.SESSION_REFRESHED` — A new access token and a new refresh token; the presented refresh token is spent.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTH.SESSION_INVALID` — The refresh token is unknown, malformed, expired, spent or its session ended.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR` — The body has no refresh token (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `AUTH.UNAVAILABLE` — The database is temporarily unavailable. Retry shortly.
+- `authRequestPasswordReset` — `POST /api/v1/auth/password-reset-requests` (public)
+  - 202: `AUTH.PASSWORD_RESET_REQUESTED` — The request was accepted. The same answer is given for every email.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR` — The body is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests from this address: this route allows 10 a minute (HTTP_TOO_MANY_REQUESTS).
+  - 503: `AUTH.UNAVAILABLE` — The database is temporarily unavailable. Retry shortly.
+- `authResetPassword` — `POST /api/v1/auth/password-resets` (public)
+  - 200: `AUTH.PASSWORD_RESET` — The password was replaced and every session ended. The user signs in with the new one.
+  - 400: `AUTH.PASSWORD_RESET_INVALID`, `HTTP_BAD_REQUEST` — The link is not valid (unknown, used, replaced, expired, or the account cannot use it). One answer for all. The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `AUTH.PASSWORD_POLICY_VIOLATION` — The body is invalid or the password does not meet the policy.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests from this address: this route allows 10 a minute (HTTP_TOO_MANY_REQUESTS).
+  - 503: `AUTH.UNAVAILABLE` — The database is temporarily unavailable. Retry shortly.
+- `businessOwnerWarningList` — `GET /api/v1/business-owner-warnings` (roles)
+  - 200: `BUSINESS_OWNER_WARNING.LISTED` — A page of the applications, of every kind, whose Business Owner has left, by name. The application keeps that owner until a working one is named.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin reads the alerts.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `contractCreate` — `POST /api/v1/contracts` (roles)
+  - 201: `CONTRACT.CREATED` — The contract, with the name given and who made it, as the signed-in IT Admin.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin makes a contract.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `CONTRACT.NAME_REQUIRED` — The request is invalid (VALIDATION_ERROR) or the name is blank (CONTRACT.NAME_REQUIRED).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `contractGet` — `GET /api/v1/contracts/{id}` (roles)
+  - 200: `CONTRACT.FETCHED` — The contract.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read a contract.
+  - 404: `CONTRACT.NOT_FOUND` — The contract does not exist (CONTRACT.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `costCenterCreate` — `POST /api/v1/cost-centers` (roles)
+  - 201: `COST_CENTER.CREATED` — The cost center is in the catalogue, in use, with no department yet.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only Finance maintains the Cost Center catalogue.
+  - 409: `COST_CENTER.CODE_TAKEN` — The code is already taken (COST_CENTER.CODE_TAKEN).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `COST_CENTER.KIND_NOT_SUPPORTED`, `COST_CENTER.NAME_INVALID`, `COST_CENTER.NAME_RESERVED` — The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `costCenterDeactivate` — `POST /api/v1/cost-centers/{id}/deactivate` (roles)
+  - 200: `COST_CENTER.DEACTIVATED` — The cost center is no longer in use. If it is already retired, the answer is the same.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only Finance maintains the Cost Center catalogue.
+  - 404: `COST_CENTER.NOT_FOUND` — The cost center does not exist.
+  - 409: `COST_CENTER.IN_USE` — The department charged to it still has people (COST_CENTER.IN_USE; details lists the department and the people).
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `costCenterEmployeeList` — `GET /api/v1/cost-centers/{id}/employees` (roles)
+  - 200: `COST_CENTER.EMPLOYEES_LISTED` — The people in the cost center today, reduced to code, name and that they are working: no email, contract, dates or manager.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only Finance maintains the Cost Center catalogue.
+  - 404: `COST_CENTER.NOT_FOUND` — The cost center does not exist.
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `costCenterList` — `GET /api/v1/cost-centers` (roles)
+  - 200: `COST_CENTER.LISTED` — A page of cost centers in code order, with the department charged to each.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only Finance and the IT Admin read the Cost Center catalogue.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `costCenterRename` — `PATCH /api/v1/cost-centers/{id}` (roles)
+  - 200: `COST_CENTER.RENAMED` — The cost center has its new name; its code, department and history do not change.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only Finance maintains the Cost Center catalogue.
+  - 404: `COST_CENTER.NOT_FOUND` — The cost center does not exist.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `COST_CENTER.NAME_INVALID`, `COST_CENTER.NAME_RESERVED` — The request is invalid (VALIDATION_ERROR), the kind is not UNIT (COST_CENTER.KIND_NOT_SUPPORTED), or the name is empty, too long (COST_CENTER.NAME_INVALID) or reserved (COST_CENTER.NAME_RESERVED).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `currencyList` — `GET /api/v1/currencies` (roles)
+  - 200: `CURRENCY.LISTED` — Every currency an amount can be entered in, by code.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only Finance and the IT Admin read the currency list.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `departmentCreate` — `POST /api/v1/departments` (roles)
+  - 201: `DEPARTMENT.CREATED` — The department exists, charged to the UNIT Cost Center chosen, with nobody heading it yet. warnings says what is still missing.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin changes department data.
+  - 409: `DEPARTMENT.CODE_TAKEN`, `DEPARTMENT.COST_CENTER_TAKEN` — The code is taken (DEPARTMENT.CODE_TAKEN) or another department already has the Cost Center (DEPARTMENT.COST_CENTER_TAKEN).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `DEPARTMENT.COST_CENTER_INACTIVE`, `DEPARTMENT.COST_CENTER_NOT_FOUND`, `DEPARTMENT.IT_ADMIN_INVALID`, `DEPARTMENT.NAME_INVALID` — The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `departmentDeactivate` — `POST /api/v1/departments/{id}/deactivate` (roles)
+  - 200: `DEPARTMENT.DEACTIVATED` — The department is retired: it takes no new member or head. If it is already retired, the answer is the same.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin changes department data.
+  - 404: `DEPARTMENT.NOT_FOUND` — The department does not exist.
+  - 409: `DEPARTMENT.IN_USE` — It still has members or owns service accounts (DEPARTMENT.IN_USE; details lists them).
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `departmentGet` — `GET /api/v1/departments/{id}` (roles)
+  - 200: `DEPARTMENT.FETCHED` — The profile: Cost Center, IT Admin in charge, head today and before, people count, projects, warnings.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN`, `DEPARTMENT.OUT_OF_SCOPE` — Not an IT Admin, or a department head asking about a department that is not theirs (DEPARTMENT.OUT_OF_SCOPE).
+  - 404: `DEPARTMENT.NOT_FOUND` — The department does not exist.
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `departmentHeadAssign` — `POST /api/v1/departments/{id}/head-assignments` (roles)
+  - 200: `DEPARTMENT.HEAD_ASSIGNED` — The person heads the department from the date; the head before ends the day before. The person must be a member of the department that day.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin changes department data.
+  - 404: `DEPARTMENT.NOT_FOUND` — The department does not exist.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `DEPARTMENT.HEAD_DATE_IN_PAST`, `DEPARTMENT.HEAD_EMPLOYEE_NOT_ACTIVE`, `DEPARTMENT.HEAD_EMPLOYEE_NOT_FOUND`, `DEPARTMENT.HEAD_HEADS_ANOTHER_DEPARTMENT`, `DEPARTMENT.HEAD_NOT_A_MEMBER_ON_DATE`, `DEPARTMENT.HEAD_SUPER_ADMIN_CANNOT_HEAD` — The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `departmentHeadVacate` — `POST /api/v1/departments/{id}/head-vacancies` (roles)
+  - 200: `DEPARTMENT.HEAD_VACATED` — Nobody heads the department from the date; it shows as missing a head. If there is no head to end, nothing changes.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin changes department data.
+  - 404: `DEPARTMENT.NOT_FOUND` — The department does not exist.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `DEPARTMENT.HEAD_DATE_IN_PAST` — The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `departmentList` — `GET /api/v1/departments` (roles)
+  - 200: `DEPARTMENT.LISTED` — A page of departments in code order, each with its head today, its people count and its warnings.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin changes department data.
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `departmentMemberList` — `GET /api/v1/departments/{id}/employees` (roles)
+  - 200: `DEPARTMENT.MEMBERS_LISTED` — The people in the department today: code, name, status, whether they have a work email, and since when. No email, contract or finance data.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN`, `DEPARTMENT.OUT_OF_SCOPE` — Not an IT Admin, or a department head asking about a department that is not theirs.
+  - 404: `DEPARTMENT.NOT_FOUND` — The department does not exist.
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `departmentToolsInUse` — `GET /api/v1/departments/{id}/tools-in-use` (roles)
+  - 200: `DEPARTMENT_TOOLS.LISTED` — One page of what the department uses today: the personal seats its people hold and the service accounts the department owns (kind SERVICE, shown with the employee the account is assigned to), one line per seat with the tool and plan, oldest start first, then by assignment id. The summary counts the seats of every page by plan, sorted by application then plan name; pagination gives the total. A start that is only the day of recording has a label and no grant date.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN`, `DEPARTMENT.OUT_OF_SCOPE` — Not an IT Admin, or a department head asking about a department that is not theirs (DEPARTMENT.OUT_OF_SCOPE).
+  - 404: `DEPARTMENT.NOT_FOUND` — The department does not exist (DEPARTMENT.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id or the query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `departmentUpdate` — `PATCH /api/v1/departments/{id}` (roles)
+  - 200: `DEPARTMENT.UPDATED` — The name, the description or the IT Admin in charge changed. The Cost Center and the people do not.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin changes department data.
+  - 404: `DEPARTMENT.NOT_FOUND` — The department does not exist.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `DEPARTMENT.IT_ADMIN_INVALID`, `DEPARTMENT.NAME_INVALID`, `DEPARTMENT.UPDATE_EMPTY` — The request is invalid (VALIDATION_ERROR) or a rule of the department refuses it; details name the reason.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `departmentWarningList` — `GET /api/v1/department-warnings` (roles)
+  - 200: `DEPARTMENT.WARNINGS_LISTED` — One page of the active departments that miss a head or a usable IT Admin in charge, by department code then warning. The Super Admin sees these and nothing else of the departments. The list is paged: without page and pageSize the answer holds the first 20 only. pagination.totalItems counts every warning and pagination.totalPages the pages; ask for page 2 up to totalPages (pageSize up to 100) to read the rest.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and the Super Admin see department warnings.
+  - 422: `VALIDATION_ERROR` — The paging query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `documentAttach` — `POST /api/v1/documents/{id}/attach` (roles)
+  - 200: `DOCUMENT.ATTACHED` — The file belongs to the contract for good, and the IT Admin and Finance open it. Only its uploader attaches it, and only once.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance keep and open files: the department head, an employee, the spending approver and the Super Admin are refused.
+  - 404: `DOCUMENT.NOT_FOUND`, `CONTRACT.NOT_FOUND` — The document is not the uploader's (DOCUMENT.NOT_FOUND) or the contract does not exist (CONTRACT.NOT_FOUND).
+  - 409: `DOCUMENT.ALREADY_ATTACHED`, `DOCUMENT.NOT_READY_TO_ATTACH` — The document has an owner already (DOCUMENT.ALREADY_ATTACHED) or is not uploaded (DOCUMENT.NOT_READY_TO_ATTACH).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `documentComplete` — `POST /api/v1/documents/{id}/complete` (roles)
+  - 200: `DOCUMENT.UPLOADED` — What the storage holds is the file that was declared: it now waits for its owner and only its uploader sees it.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance keep and open files: the department head, an employee, the spending approver and the Super Admin are refused.
+  - 404: `DOCUMENT.NOT_FOUND` — The document does not exist for this person: it is not theirs and not attached yet, not uploaded yet, or quarantined (DOCUMENT.NOT_FOUND).
+  - 409: `DOCUMENT.NOT_AWAITING_UPLOAD`, `DOCUMENT.UPLOAD_PENDING`, `DOCUMENT.UPLOAD_EXPIRED` — The upload is done already (DOCUMENT.NOT_AWAITING_UPLOAD), has not reached the storage yet and can be said again (DOCUMENT.UPLOAD_PENDING), or never came in a day and was given up (DOCUMENT.UPLOAD_EXPIRED).
+  - 422: `VALIDATION_ERROR`, `DOCUMENT.UPLOAD_MISMATCH` — The id is invalid (VALIDATION_ERROR) or the stored file is not what was declared (DOCUMENT.UPLOAD_MISMATCH): the object is deleted and the document quarantined.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `documentCreate` — `POST /api/v1/documents` (roles)
+  - 201: `DOCUMENT.CREATED` — The file is declared as awaiting its upload, with the link to put it in the storage: it lives two minutes and takes only a file of the declared type and size. The response is never cached. The uploader is the signed-in person; the body cannot say otherwise.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN`, `DOCUMENT.PURPOSE_FORBIDDEN` — Not the IT Admin or Finance, or the role may not choose this purpose (DOCUMENT.PURPOSE_FORBIDDEN).
+  - 409: `DOCUMENT.PURPOSE_NOT_AVAILABLE` — The purpose has nowhere to be attached yet (DOCUMENT.PURPOSE_NOT_AVAILABLE).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `DOCUMENT.TYPE_NOT_ALLOWED`, `DOCUMENT.TOO_LARGE`, `DOCUMENT.FILE_INVALID` — The request is invalid (VALIDATION_ERROR) or the file is refused: DOCUMENT.TYPE_NOT_ALLOWED, TOO_LARGE or FILE_INVALID. Nothing is made.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `documentGet` — `GET /api/v1/documents/{id}` (roles)
+  - 200: `DOCUMENT.FETCHED` — The file as declared, its state and its owner. A file not attached yet is its uploader's alone.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance keep and open files: the department head, an employee, the spending approver and the Super Admin are refused.
+  - 404: `DOCUMENT.NOT_FOUND` — The document does not exist for this person: it is not theirs and not attached yet, not uploaded yet, or quarantined (DOCUMENT.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `documentLink` — `POST /api/v1/documents/{id}/links` (roles)
+  - 200: `DOCUMENT.LINK_ISSUED` — A link valid for five minutes, kept nowhere: it opens the file as a download under its own name and type, and the response is never cached. Every request is one more link and one more event of the audit trail, which does not hold the link.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance keep and open files: the department head, an employee, the spending approver and the Super Admin are refused.
+  - 404: `DOCUMENT.NOT_FOUND` — The document does not exist for this person: it is not theirs and not attached yet, not uploaded yet, or quarantined (DOCUMENT.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `employeeCreate` — `POST /api/v1/employees` (roles)
+  - 201: `EMPLOYEE.CREATED` — The employee and their placement were created. No account, role, invitation or mail is created. The person is a member of the department from the day they are recorded.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin may enter people.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `EMPLOYEE.ROW_INVALID` — The body is malformed or lacks a part of the HR basis (VALIDATION_ERROR), or the row cannot become an employee (EMPLOYEE.ROW_INVALID; details.reasons lists every field and code, among them OWN_RECORD for the Super Admin's own code or email).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `employeeImportCancel` — `POST /api/v1/employee-imports/{id}/cancellations` (roles)
+  - 200: `EMPLOYEE_IMPORT.CANCELLED` — The preview is thrown away; nothing was written and nothing will be. Cancelling twice is the same.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin imports people.
+  - 404: `IMPORT.NOT_FOUND` — The import does not exist (IMPORT.NOT_FOUND).
+  - 409: `IMPORT.NOT_PREVIEW` — The import was already written (IMPORT.NOT_PREVIEW).
+  - 422: `VALIDATION_ERROR` — The identifier is not a UUID (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `employeeImportConfirm` — `POST /api/v1/employee-imports/{id}/confirmations` (roles)
+  - 200: `EMPLOYEE_IMPORT.CONFIRMED` — The people the preview promised are created, once, on the HR basis given; each carries it in the Audit Trail. The same confirmation sent again (same idempotency key) returns the first answer with replayed set.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin imports people.
+  - 404: `IMPORT.NOT_FOUND` — The import does not exist (IMPORT.NOT_FOUND).
+  - 409: `IMPORT.PREVIEW_OUTDATED`, `IMPORT.PREVIEW_STALE`, `IMPORT.DUPLICATE_FILE_NOT_ACKNOWLEDGED`, `IMPORT.ALREADY_CONFIRMED`, `IMPORT.CANCELLED`, `IMPORT.EXPIRED` — The preview is not the current one (IMPORT.PREVIEW_OUTDATED), the data changed since it (IMPORT.PREVIEW_STALE), the file was imported before and not acknowledged (IMPORT.DUPLICATE_FILE_NOT_ACKNOWLEDGED), the import was already written with another key (IMPORT.ALREADY_CONFIRMED), or it was cancelled or expired. Nothing was written.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR` — The request is invalid or lacks a part of the HR basis (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `employeeImportGet` — `GET /api/v1/employee-imports/{id}` (roles)
+  - 200: `EMPLOYEE_IMPORT.FETCHED` — The import with its preview or its result.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin imports people.
+  - 404: `IMPORT.NOT_FOUND` — The import does not exist (IMPORT.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The identifier is not a UUID (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `employeeImportPreviewRefresh` — `POST /api/v1/employee-imports/{id}/preview-refreshes` (roles)
+  - 200: `EMPLOYEE_IMPORT.PREVIEW_REFRESHED` — The same rows are judged again against the data as it is now, as a new preview version; the older version can no longer be confirmed.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin imports people.
+  - 404: `IMPORT.NOT_FOUND` — The import does not exist (IMPORT.NOT_FOUND).
+  - 409: `IMPORT.CANCELLED`, `IMPORT.NOT_PREVIEW` — The import is no longer a preview (IMPORT.CANCELLED, IMPORT.NOT_PREVIEW).
+  - 422: `VALIDATION_ERROR` — The identifier is not a UUID (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `employeeImportRowList` — `GET /api/v1/employee-imports/{id}/rows` (roles)
+  - 200: `EMPLOYEE_IMPORT.ROWS_LISTED` — The rows of the file with what the preview made of each: the line, the cells, the errors with their column and code, the differences of a person already there. Filter by outcome to download the errors.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin imports people.
+  - 404: `IMPORT.NOT_FOUND` — The import does not exist (IMPORT.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The identifier is not a UUID, or the filter or paging query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `employeeImportUpload` — `POST /api/v1/employee-imports` (roles)
+  - 201: `EMPLOYEE_IMPORT.UPLOADED` — The file was read and every row judged: nothing is written yet. The summary says how many rows are valid, wrong, there already, and the people by department.
+  - 400: `HTTP_BAD_REQUEST` — The form breaks a limit of the upload before it is read — more than 1 file, more than 2 text fields, more than 3 parts, a text field over 64 bytes — or it is not a readable multipart form (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin imports people.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The file is larger than 2 MiB (HTTP_PAYLOAD_TOO_LARGE).
+  - 422: `IMPORT.FILE_REQUIRED`, `IMPORT.FILE_EMPTY`, `IMPORT.FILE_NOT_TEXT`, `IMPORT.FILE_TOO_MANY_ROWS`, `IMPORT.FILE_UNREADABLE`, `IMPORT.FILE_MISSING_COLUMNS` — The file cannot be used as a whole: missing, empty, not text, unreadable, too many rows, or lacking a required column such as the department or the job title (IMPORT.FILE_*).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `employeeUpdateOfficialFields` — `PATCH /api/v1/employees/{id}` (roles)
+  - 200: `EMPLOYEE.UPDATED` — The name, work email, kind of staff or a hire date still to come were changed on the HR basis given; the Audit Trail keeps the values before and after and the basis. The login email, the department, the title and the status are untouched.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN`, `EMPLOYEE.ANOTHER_IT_ADMIN_NEEDED` — Only an IT Admin corrects these fields; the record of an IT Admin goes to another IT Admin when one can act (EMPLOYEE.ANOTHER_IT_ADMIN_NEEDED).
+  - 404: `EMPLOYEE.NOT_FOUND` — The employee does not exist (EMPLOYEE.NOT_FOUND).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `EMPLOYEE.ROW_INVALID`, `EMPLOYEE.UPDATE_EMPTY` — The body is malformed, names a field that is not an official one or lacks a part of the HR basis (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST, OPEN_ASSIGNMENT_NEEDS_EXPECTED_END — a contractor, freelancer or intern needs an expected end on every open seat).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `exchangeRateList` — `GET /api/v1/exchange-rates` (roles)
+  - 200: `EXCHANGE_RATE.LISTED` — A page of rates, newest day first, optionally for one currency and a range of days.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only Finance and the IT Admin read exchange rates.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `exchangeRateRecord` — `POST /api/v1/exchange-rates` (roles)
+  - 201: `EXCHANGE_RATE.RECORDED` — The rate is recorded for that currency and day, entered by hand.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only Finance records exchange rates.
+  - 409: `EXCHANGE_RATE.ALREADY_RECORDED` — A rate for that currency and day is already recorded (EXCHANGE_RATE.ALREADY_RECORDED).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `CURRENCY_NOT_SUPPORTED`, `EXCHANGE_RATE.DATE_IN_FUTURE`, `EXCHANGE_RATE.DATE_TOO_OLD`, `EXCHANGE_RATE.SAME_AS_REPORTING_CURRENCY`, `RATE_OUT_OF_RANGE`, `RATE_SCALE_EXCEEDED` — The request is invalid (VALIDATION_ERROR), the currency is not supported (CURRENCY_NOT_SUPPORTED), the rate has more than ten decimals (RATE_SCALE_EXCEEDED) or is not above 0 and below 10000000000 (RATE_OUT_OF_RANGE), the currency is the reporting currency (EXCHANGE_RATE.SAME_AS_REPORTING_CURRENCY), or the day is in the future (EXCHANGE_RATE.DATE_IN_FUTURE) or before 2000-01-01 (EXCHANGE_RATE.DATE_TOO_OLD).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `functionalGroupCreate` — `POST /api/v1/functional-groups` (roles)
+  - 201: `FUNCTIONAL_GROUP.CREATED` — The functional group exists and is active.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin changes functional groups.
+  - 409: `FUNCTIONAL_GROUP.NAME_TAKEN` — A group with this name exists, ignoring case, accents and spacing (FUNCTIONAL_GROUP.NAME_TAKEN).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `FUNCTIONAL_GROUP.NAME_INVALID` — The request is invalid (VALIDATION_ERROR), the name is empty or over 200 characters (FUNCTIONAL_GROUP.NAME_INVALID) or the update names nothing (FUNCTIONAL_GROUP.UPDATE_EMPTY).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `functionalGroupList` — `GET /api/v1/functional-groups` (roles)
+  - 200: `FUNCTIONAL_GROUP.LISTED` — A page of functional groups by name, optionally for one status.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read functional groups.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `functionalGroupUpdate` — `PATCH /api/v1/functional-groups/{id}` (roles)
+  - 200: `FUNCTIONAL_GROUP.UPDATED` — The group as it is after the change; a change of nothing is answered the same and not audited.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin changes functional groups.
+  - 404: `FUNCTIONAL_GROUP.NOT_FOUND` — The functional group does not exist (FUNCTIONAL_GROUP.NOT_FOUND).
+  - 409: `FUNCTIONAL_GROUP.NAME_TAKEN` — A group with this name exists, ignoring case, accents and spacing (FUNCTIONAL_GROUP.NAME_TAKEN).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `FUNCTIONAL_GROUP.NAME_INVALID`, `FUNCTIONAL_GROUP.UPDATE_EMPTY` — The request is invalid (VALIDATION_ERROR), the name is empty or over 200 characters (FUNCTIONAL_GROUP.NAME_INVALID) or the update names nothing (FUNCTIONAL_GROUP.UPDATE_EMPTY).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `healthGetLiveness` — `GET /api/v1/health/live` (public)
+  - 200: `HEALTH.LIVENESS_CHECKED` — The API process is alive.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 500: `INTERNAL_SERVER_ERROR` — The liveness check could not be completed.
+- `healthGetReadiness` — `GET /api/v1/health/ready` (public)
+  - 200: `HEALTH.READINESS_CHECKED` — Every required dependency is reachable.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 500: `INTERNAL_SERVER_ERROR` — The readiness check could not be completed.
+  - 503: `SERVICE_UNAVAILABLE` — A required dependency is unavailable.
+- `jobTitleCreate` — `POST /api/v1/job-titles` (roles)
+  - 201: `JOB_TITLE.CREATED` — The title was added and is active.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin may maintain the job title catalogue.
+  - 409: `JOB_TITLE.NAME_TAKEN` — Another title, active or not, already has this name once case and whitespace are ignored (JOB_TITLE.NAME_TAKEN; details.conflict names it).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `JOB_TITLE.NAME_REQUIRED`, `JOB_TITLE.NAME_TOO_LONG` — The request is invalid (VALIDATION_ERROR), or the name is empty or too long.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `jobTitleDeactivate` — `POST /api/v1/job-titles/{id}/deactivate` (roles)
+  - 200: `JOB_TITLE.DEACTIVATED` — The title is inactive; nobody who holds it loses it. If it is already inactive, the answer is the same.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin may maintain the job title catalogue.
+  - 404: `JOB_TITLE.NOT_FOUND` — The job title does not exist.
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR), or the name is empty or too long.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `jobTitleList` — `GET /api/v1/job-titles` (roles)
+  - 200: `JOB_TITLE.LISTED` — A page of job titles in name order, optionally by status or a literal search of the name.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin may maintain the job title catalogue.
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR), or the name is empty or too long.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `jobTitleReactivate` — `POST /api/v1/job-titles/{id}/reactivate` (roles)
+  - 200: `JOB_TITLE.REACTIVATED` — The title is active again. If it is already active, the answer is the same.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin may maintain the job title catalogue.
+  - 404: `JOB_TITLE.NOT_FOUND` — The job title does not exist.
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR), or the name is empty or too long.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `jobTitleRename` — `PATCH /api/v1/job-titles/{id}` (roles)
+  - 200: `JOB_TITLE.RENAMED` — The title has its new name; everyone who holds it keeps it.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin may maintain the job title catalogue.
+  - 404: `JOB_TITLE.NOT_FOUND` — The job title does not exist.
+  - 409: `JOB_TITLE.NAME_TAKEN` — Another title already has this name (JOB_TITLE.NAME_TAKEN; details.conflict names it).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `JOB_TITLE.NAME_REQUIRED`, `JOB_TITLE.NAME_TOO_LONG` — The request is invalid (VALIDATION_ERROR), or the name is empty or too long.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `licenseAssignmentChangeResponsible` — `POST /api/v1/license-assignments/{id}/responsible-changes` (roles)
+  - 200: `LICENSE_ASSIGNMENT.RESPONSIBLE_CHANGED` — The old assignment ends the day the change takes effect and the new one begins that day, with the same kind, Cost Center, reason and account identifier, chained to the old one. The seats taken do not change on any day.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin reads or changes the assignments of seats.
+  - 404: `LICENSE_ASSIGNMENT.NOT_FOUND` — The assignment does not exist (LICENSE_ASSIGNMENT.NOT_FOUND).
+  - 409: `LICENSE_ASSIGNMENT.NOT_OPEN` — The assignment has ended or is set to end (LICENSE_ASSIGNMENT.NOT_OPEN), or the seats are all taken (LICENSE_ASSIGNMENT.SEAT_CAPACITY).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `LICENSE_ASSIGNMENT.NOT_SERVICE_ACCOUNT`, `LICENSE_ASSIGNMENT.RESPONSIBLE_INVALID`, `LICENSE_ASSIGNMENT.EFFECTIVE_DATE_INVALID`, `LICENSE_ASSIGNMENT.EXPECTED_END_REQUIRED` — The request is invalid (VALIDATION_ERROR) or refused: LICENSE_ASSIGNMENT.NOT_SERVICE_ACCOUNT, RESPONSIBLE_INVALID, EFFECTIVE_DATE_INVALID, EXPECTED_END_REQUIRED, OVERLAP or IDENTIFIER_IN_USE.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `licenseAssignmentList` — `GET /api/v1/license-assignments` (roles)
+  - 200: `LICENSE_ASSIGNMENT.LISTED` — A page of assignments by start date, each with the person, the plan and the Cost Center it names. source tells a baseline assignment from one that came from a request or from a change of the person responsible; a start that is only the day of recording has no grantedOn and carries a label.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin reads or changes the assignments of seats.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `licenseKeyImport` — `POST /api/v1/license-keys/imports` (roles)
+  - 201: `LICENSE_KEY.IMPORTED` — Every valid key is kept, sealed. A line that is not kept is reported by its number with INVALID_FORMAT, DUPLICATE_IN_BATCH or ALREADY_IN_STORE, never with the key. The summary is the capacity of the purchase: the smaller of the seats bought and the keys still usable.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin works the vault of license keys.
+  - 404: `SUBSCRIPTION.NOT_FOUND` — The purchase does not exist (SUBSCRIPTION.NOT_FOUND).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `LICENSE_KEY.PLAN_NOT_K4` — The request is invalid (VALIDATION_ERROR) or the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `licenseKeyList` — `GET /api/v1/license-keys` (roles)
+  - 200: `LICENSE_KEY.LISTED` — The keys of the purchase, the oldest first, each with its last four characters only, and the capacity summary. warning is KEY_COUNT_DIFFERS when the keys are not as many as the seats bought and QUANTITY_UNKNOWN while the seats bought are not known.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin works the vault of license keys.
+  - 404: `SUBSCRIPTION.NOT_FOUND` — The purchase does not exist (SUBSCRIPTION.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `licenseKeyReveal` — `POST /api/v1/license-keys/{id}/reveal` (roles)
+  - 200: `LICENSE_KEY.REVEALED` — The key in full. Every call writes an event of the audit trail (who, when, which key) in the same transaction, and the answer is never cached.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin works the vault of license keys.
+  - 404: `LICENSE_KEY.NOT_FOUND` — The key does not exist (LICENSE_KEY.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — The account has opened as many keys as it may in this minute (10) or this day (200): HTTP_TOO_MANY_REQUESTS. Nothing was opened and nothing was counted. Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `meChangePassword` — `POST /api/v1/me/password` (authenticated)
+  - 200: `AUTH.PASSWORD_CHANGED` — The password was replaced and every session ended, this one included. Sign in again.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `AUTH.CURRENT_PASSWORD_INVALID`, `AUTH.PASSWORD_POLICY_VIOLATION` — The body is invalid (VALIDATION_ERROR), the current password is wrong (AUTH.CURRENT_PASSWORD_INVALID) or the new one breaks the policy (AUTH.PASSWORD_POLICY_VIOLATION).
+  - 429: `AUTH.LOGIN_TEMPORARILY_BLOCKED`, `HTTP_TOO_MANY_REQUESTS` — Too many wrong passwords for this email; see retryAfterSeconds (AUTH.LOGIN_TEMPORARILY_BLOCKED). Too many requests to this route from this address also answer 429 (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `meGet` — `GET /api/v1/me` (authenticated)
+  - 200: `ME.RETRIEVED` — The signed-in account, its employee record and its effective roles.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `nonWorkingDateAdd` — `POST /api/v1/non-working-dates` (roles)
+  - 201: `NON_WORKING_DATE.ADDED` — The day is a non-working date from now on. Today or a later day only.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin configures the operating parameters.
+  - 409: `NON_WORKING_DATE.TAKEN` — The day is already a non-working date (NON_WORKING_DATE.TAKEN).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `NON_WORKING_DATE.IN_PAST`, `NON_WORKING_DATE.REASON_INVALID` — The request is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `nonWorkingDateList` — `GET /api/v1/non-working-dates` (roles)
+  - 200: `NON_WORKING_DATE.LISTED` — One page of the days nobody works, in date order, optionally between two dates. The list is paged: without page and pageSize the answer holds the first 20 only. pagination.totalItems counts every matching day and pagination.totalPages the pages; ask for page 2 up to totalPages (pageSize up to 100) to read the rest.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin configures the operating parameters.
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `nonWorkingDateRemove` — `DELETE /api/v1/non-working-dates/{date}` (roles)
+  - 200: `NON_WORKING_DATE.REMOVED` — The day is a working day again. A day before today is refused (NON_WORKING_DATE.IN_PAST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin configures the operating parameters.
+  - 404: `NON_WORKING_DATE.NOT_FOUND` — The day is not a non-working date (NON_WORKING_DATE.NOT_FOUND).
+  - 422: `VALIDATION_ERROR`, `NON_WORKING_DATE.IN_PAST` — The request is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `nonWorkingDateRename` — `PATCH /api/v1/non-working-dates/{date}` (roles)
+  - 200: `NON_WORKING_DATE.RENAMED` — The reason of a non-working date changes. A day before today is refused (NON_WORKING_DATE.IN_PAST).
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin configures the operating parameters.
+  - 404: `NON_WORKING_DATE.NOT_FOUND` — The day is not a non-working date (NON_WORKING_DATE.NOT_FOUND).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `NON_WORKING_DATE.IN_PAST`, `NON_WORKING_DATE.REASON_INVALID` — The request is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `onboardingChecklistGet` — `GET /api/v1/onboarding-checklist` (roles)
+  - 200: `ONBOARDING.CHECKLIST_FETCHED` — The five steps and where each stands, judged from the data that exists. Step 1 says what is missing and which departments lack a head or an IT Admin; step 2 (applications) and step 3 (subscriptions) are done when the catalog holds one; step 4 (seat baseline) is blocked until steps 1 and 3 are done, then ready, and done once closed; step 5 (usage) is not built yet and says so. The suggestions name what is worth doing next without requiring it: the standard toolsets, after step 3.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin sees the onboarding checklist.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `operatingParameterHistory` — `GET /api/v1/operating-parameters/{key}/history` (roles)
+  - 200: `PARAMETER.HISTORY_LISTED` — The values the parameter has had, newest first.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin configures the operating parameters.
+  - 404: `PARAMETER.NOT_FOUND` — There is no such parameter (PARAMETER.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `operatingParameterList` — `GET /api/v1/operating-parameters` (roles)
+  - 200: `PARAMETER.LISTED` — Every parameter with the value in force, its default, its unit and the domain a value must stay in.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin configures the operating parameters.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `operatingParameterSet` — `PUT /api/v1/operating-parameters/{key}` (roles)
+  - 200: `PARAMETER.SET` — The value applies to what is created from now on; what already runs keeps the value it was created with. The same value again changes nothing.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin configures the operating parameters.
+  - 404: `PARAMETER.NOT_FOUND` — There is no such parameter (PARAMETER.NOT_FOUND).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `PARAMETER.VALUE_INVALID` — The request is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `planCreate` — `POST /api/v1/plans` (roles)
+  - 201: `PLAN.CREATED` — The plan is declared; seatTracking says whether seats are counted for it at all.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin declares or changes plans.
+  - 409: `PLAN.NAME_TAKEN` — The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS or SUBSCRIPTIONS).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `PLAN.APPLICATION_NOT_FOUND`, `PLAN.APPLICATION_RETIRED`, `PLAN.NAME_INVALID`, `PLAN.NOTE_INVALID`, `PLAN.PROVISIONING_TYPE_NOT_SUPPORTED`, `PLAN.PROVISIONING_TYPE_MISMATCH`, `PLAN.PRICING_MODEL_REQUIRED`, `PLAN.PRICING_MODEL_NOT_APPLICABLE`, `PLAN.CONTROL_LEVEL_REQUIRED`, `PLAN.DATA_LOSS_NOTE_REQUIRED` — The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED or UPDATE_EMPTY.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `planGet` — `GET /api/v1/plans/{id}` (roles)
+  - 200: `PLAN.FETCHED` — The plan and, for a K2 plan that has one, its workspace profile.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read plans.
+  - 404: `PLAN.NOT_FOUND` — The plan does not exist (PLAN.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is not a UUID (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `planList` — `GET /api/v1/plans` (roles)
+  - 200: `PLAN.LISTED` — A page of plans by application then plan name, optionally for one application or one kind.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read plans.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `planTermOpinionList` — `GET /api/v1/plans/{id}/term-opinions` (roles)
+  - 200: `PLAN_TERM_OPINION.LISTED` — A page of the opinions of the Business Owner on the terms of the plan, the newest first.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read the opinions.
+  - 404: `PLAN.NOT_FOUND` — The plan does not exist (PLAN.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is not a UUID or the query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `planTermOpinionRecord` — `POST /api/v1/plans/{id}/term-opinions` (roles)
+  - 201: `PLAN_TERM_OPINION.RECORDED` — The opinion is kept with the Business Owner of the application, who recorded it and when. It adds no step, deadline or approver.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin records the terms of a plan.
+  - 404: `PLAN.NOT_FOUND` — The plan does not exist (PLAN.NOT_FOUND).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `PLAN_TERMS.TEXT_INVALID`, `PLAN_TERMS.NOT_APPLICABLE` — The request is invalid (VALIDATION_ERROR), the opinion is empty or too long (PLAN_TERMS.TEXT_INVALID) or the plan has no terms (PLAN_TERMS.NOT_APPLICABLE).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `planTermsGet` — `GET /api/v1/plans/{id}/terms` (roles)
+  - 200: `PLAN_TERMS.FETCHED` — The terms as IT recorded them, the sharing policy kept on the plan, the opinions on them, and the review alerts open for the plan. A K5 plan answers applicable false.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read the terms of a plan.
+  - 404: `PLAN.NOT_FOUND` — The plan does not exist (PLAN.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is not a UUID (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `planTermsSet` — `PUT /api/v1/plans/{id}/terms` (roles)
+  - 200: `PLAN_TERMS.SET` — The terms replace the previous ones as a whole, exactly as given; changed says whether anything differed. The sharing policy is not set here but on the plan.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin records the terms of a plan.
+  - 404: `PLAN.NOT_FOUND` — The plan does not exist (PLAN.NOT_FOUND).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `PLAN_TERMS.NOT_APPLICABLE`, `PLAN_TERMS.URL_INVALID`, `PLAN_TERMS.TEXT_INVALID`, `PLAN_TERMS.REVIEW_DATE_IN_FUTURE`, `PLAN_TERMS.INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4` — The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN_TERMS.NOT_APPLICABLE, URL_INVALID, TEXT_INVALID, REVIEW_DATE_IN_FUTURE or INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `planUpdate` — `PATCH /api/v1/plans/{id}` (roles)
+  - 200: `PLAN.UPDATED` — The plan as it is after the change; a change of nothing is answered the same and not audited. The application cannot change.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin declares or changes plans.
+  - 404: `PLAN.NOT_FOUND` — The plan does not exist (PLAN.NOT_FOUND).
+  - 409: `PLAN.NAME_TAKEN`, `PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE`, `PLAN.TERMS_BLOCK_TYPE_CHANGE`, `PLAN.IN_USE_BLOCKS_CHANGE` — The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS or SUBSCRIPTIONS).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `PLAN.NAME_INVALID`, `PLAN.NOTE_INVALID`, `PLAN.PROVISIONING_TYPE_NOT_SUPPORTED`, `PLAN.PROVISIONING_TYPE_MISMATCH`, `PLAN.PRICING_MODEL_REQUIRED`, `PLAN.PRICING_MODEL_NOT_APPLICABLE`, `PLAN.CONTROL_LEVEL_REQUIRED`, `PLAN.DATA_LOSS_NOTE_REQUIRED`, `PLAN.UPDATE_EMPTY` — The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED or UPDATE_EMPTY.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `planWarningList` — `GET /api/v1/plan-warnings` (roles)
+  - 200: `PLAN_WARNING.LISTED` — A page of the review alerts open today, the earliest milestone first: the plan, the deadline of the subscription (and where it comes from), and the date of the last review.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin reads the review alerts.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `planWorkspaceProfileSet` — `PUT /api/v1/plans/{id}/workspace-profile` (roles)
+  - 200: `PLAN.WORKSPACE_PROFILE_SET` — The workspace profile replaces the previous one as a whole; it names the owners, the admins and the emergency account, and takes no password.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin declares or changes plans.
+  - 404: `PLAN.NOT_FOUND` — The plan does not exist (PLAN.NOT_FOUND).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE`, `PLAN.WORKSPACE_PERSON_INVALID`, `PLAN.PRIMARY_OWNER_NOT_LISTED`, `PLAN.WORKSPACE_MEMBER_DUPLICATE`, `PLAN.WORKSPACE_LIMIT_EXCEEDED`, `PLAN.WORKSPACE_TEXT_INVALID` — The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED or WORKSPACE_TEXT_INVALID.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `projectCreate` — `POST /api/v1/projects` (roles)
+  - 201: `PROJECT.CREATED` — The project is described and appears on the profile of each department that takes part.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin keeps the projects described on department profiles.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `PROJECT.INVALID_DEPARTMENT_NOT_FOUND`, `PROJECT.INVALID_DESCRIPTION`, `PROJECT.INVALID_NAME` — The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `projectGet` — `GET /api/v1/projects/{id}` (roles)
+  - 200: `PROJECT.FETCHED` — The project in full, with its description and the departments that take part.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin keeps the projects described on department profiles.
+  - 404: `PROJECT.NOT_FOUND` — The project does not exist (PROJECT.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `projectList` — `GET /api/v1/projects` (roles)
+  - 200: `PROJECT.LISTED` — A page of projects by name, optionally those a department takes part in. The description is read with GET /projects/{id}.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin keeps the projects described on department profiles.
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `projectUpdate` — `PATCH /api/v1/projects/{id}` (roles)
+  - 200: `PROJECT.UPDATED` — The project has its new description, status or departments.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin keeps the projects described on department profiles.
+  - 404: `PROJECT.NOT_FOUND` — The project does not exist (PROJECT.NOT_FOUND).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `PROJECT.INVALID_DEPARTMENT_NOT_FOUND`, `PROJECT.INVALID_DESCRIPTION`, `PROJECT.INVALID_NAME` — The request is invalid (VALIDATION_ERROR) or the project is not valid (PROJECT.INVALID).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `provisioningTaskClaim` — `POST /api/v1/provisioning-tasks/{id}/claim` (roles)
+  - 200: `PROVISIONING_TASK.CLAIMED` — The task is in progress under the name of this IT Admin; an IT Admin other than the one in charge may take it, and another may take it over. Taking it again is a no-op.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.
+  - 404: `PROVISIONING_TASK.NOT_FOUND` — The task does not exist (PROVISIONING_TASK.NOT_FOUND).
+  - 409: không ví dụ: chưa với tới được trên runtime hiện tại (chờ G5 gắn request gate) — PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed) or PROVISIONING.BENEFICIARY_DEPARTED (close the request as cancelled).
+  - 422: `VALIDATION_ERROR` — The id is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `provisioningTaskCloseFailed` — `POST /api/v1/provisioning-tasks/{id}/close-failed` (roles)
+  - 200: `PROVISIONING_TASK.CLOSED_FAILED` — The only end of a failed task. A grant leaves a failed assignment and the seat is free again; a revocation leaves its assignment as it was. The request, its commitment and the notice to the requester belong to other modules, which read the audit event.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.
+  - 404: `PROVISIONING_TASK.NOT_FOUND` — The task does not exist (PROVISIONING_TASK.NOT_FOUND).
+  - 409: không ví dụ: chưa với tới được trên runtime hiện tại (chờ G5 gắn request gate) — The task is not failed (PROVISIONING_TASK.NOT_FAILED), or its assignment is no longer open.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `PROVISIONING_TASK.REASON_REQUIRED` — The request is invalid (VALIDATION_ERROR) or has no reason (PROVISIONING_TASK.REASON_REQUIRED): nothing changes.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `provisioningTaskComplete` — `POST /api/v1/provisioning-tasks/{id}/complete` (roles)
+  - 200: `PROVISIONING_TASK.COMPLETED` — The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.
+  - 404: `PROVISIONING_TASK.NOT_FOUND` — The task does not exist (PROVISIONING_TASK.NOT_FOUND).
+  - 409: không ví dụ: chưa với tới được trên runtime hiện tại (chờ G5 gắn request gate) — PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `PROVISIONING_TASK.EVIDENCE_REQUIRED` — The request is invalid (VALIDATION_ERROR) or has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED): the task is unchanged.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `provisioningTaskGet` — `GET /api/v1/provisioning-tasks/{id}` (roles)
+  - 200: `PROVISIONING_TASK.FETCHED` — The task with the steps of its kind of provisioning and what ends it.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin works the queue of provisioning tasks.
+  - 404: `PROVISIONING_TASK.NOT_FOUND` — The task does not exist (PROVISIONING_TASK.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `provisioningTaskGrant` — `POST /api/v1/provisioning-tasks` (roles)
+  - 201: `PROVISIONING_TASK.CREATED` — The seat is taken from today by an assignment of source REQUEST, and a manual task is queued for the IT Admin in charge of the beneficiary department (none: the general queue, with a warning). K5 takes no subscription and no seat.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin works the queue of provisioning tasks.
+  - 404: `REQUEST.NOT_FOUND` — The request, the subscription, the plan or the beneficiary does not exist (REQUEST.NOT_FOUND, SUBSCRIPTION.NOT_FOUND, PLAN.NOT_FOUND, EMPLOYEE.NOT_FOUND).
+  - 409: không ví dụ: chưa với tới được trên runtime hiện tại (chờ G5 gắn request gate) — PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, TYPE_NOT_SUPPORTED (K3, K4), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR) or refused: PROVISIONING.PERSONAL_ACCOUNT, SUBSCRIPTION_REQUIRED, SUBSCRIPTION_NOT_ALLOWED, SUBSCRIPTION_PLAN_MISMATCH, SUBSCRIPTION_QUANTITY_UNKNOWN, SEAT_TARGET.SUBSCRIPTION_DRAFT (details.missing lists what the subscription lacks), LICENSE_ASSIGNMENT.OVERLAP, IDENTIFIER_IN_USE or EXPECTED_END_REQUIRED.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `provisioningTaskHandOff` — `POST /api/v1/provisioning-tasks/{id}/hand-off` (roles)
+  - 200: `PROVISIONING_TASK.HANDED_OFF` — The failed connector task is queued again as a task by hand, with who handed it over and the evidence given. Nothing hands a task over by itself. The evidence is never a password or a key.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.
+  - 404: `PROVISIONING_TASK.NOT_FOUND` — The task does not exist (PROVISIONING_TASK.NOT_FOUND).
+  - 409: không ví dụ: chưa với tới được trên runtime hiện tại (chờ G5 gắn request gate) — The task is not failed (NOT_FAILED) or is by hand already (PROVISIONING_TASK.ALREADY_MANUAL).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `PROVISIONING_TASK.EVIDENCE_REQUIRED` — The request is invalid (VALIDATION_ERROR) or has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED): the task is unchanged.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `provisioningTaskList` — `GET /api/v1/provisioning-tasks` (roles)
+  - 200: `PROVISIONING_TASK.LISTED` — The tasks of both channels in one queue, the oldest first, each with the time it has taken. scope MINE is the IT Admin in charge by default, GENERAL the tasks nobody in charge works, ALL every task.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin works the queue of provisioning tasks.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `provisioningTaskReportFailure` — `POST /api/v1/provisioning-tasks/{id}/report-failure` (roles)
+  - 200: `PROVISIONING_TASK.FAILED` — The task fails with the reason and is not completed; the seat stays taken. What happens next is decided by the failure handling.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.
+  - 404: `PROVISIONING_TASK.NOT_FOUND` — The task does not exist (PROVISIONING_TASK.NOT_FOUND).
+  - 409: không ví dụ: chưa với tới được trên runtime hiện tại (chờ G5 gắn request gate) — PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `PROVISIONING_TASK.REASON_REQUIRED` — The request is invalid (VALIDATION_ERROR) or has no reason (PROVISIONING_TASK.REASON_REQUIRED): the task is unchanged.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `provisioningTaskRetry` — `POST /api/v1/provisioning-tasks/{id}/retry` (roles)
+  - 200: `PROVISIONING_TASK.RETRY_REQUESTED` — The failed task is queued again on the same channel with its failure cleared and its tries counted from zero; the seat stays taken. The choice is recorded.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.
+  - 404: `PROVISIONING_TASK.NOT_FOUND` — The task does not exist (PROVISIONING_TASK.NOT_FOUND).
+  - 409: không ví dụ: chưa với tới được trên runtime hiện tại (chờ G5 gắn request gate) — The task is not failed (PROVISIONING_TASK.NOT_FAILED).
+  - 422: `VALIDATION_ERROR` — The id is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `reportingCurrencyGet` — `GET /api/v1/reporting-currency` (roles)
+  - 200: `REPORTING_CURRENCY.FETCHED` — The currency every converted value is kept in.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin reads or sets the reporting currency.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `reportingCurrencySet` — `PUT /api/v1/reporting-currency` (roles)
+  - 200: `REPORTING_CURRENCY.SET` — The currency is the reporting currency from now on; the same currency again changes nothing (changed false).
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the Super Admin reads or sets the reporting currency.
+  - 409: `REPORTING_CURRENCY.LOCKED` — A rate was entered or a subscription has a converted price: the currency is locked (REPORTING_CURRENCY.LOCKED, details.reason).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `CURRENCY_NOT_SUPPORTED` — The request is invalid (VALIDATION_ERROR) or the currency is not supported (CURRENCY_NOT_SUPPORTED).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `seatBaselineClose` — `POST /api/v1/seat-baseline/close` (roles)
+  - 200: `SEAT_BASELINE.CLOSED` — The baseline is closed from now on and stays closed; closing again changes nothing and answers alreadyClosed.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin reads or closes the seat baseline.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `seatBaselineGet` — `GET /api/v1/seat-baseline` (roles)
+  - 200: `SEAT_BASELINE.FETCHED` — Whether the baseline is closed and when.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin reads or closes the seat baseline.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `seatBaselineImportCancel` — `POST /api/v1/seat-baseline-imports/{id}/cancel` (roles)
+  - 200: `SEAT_BASELINE_IMPORT.CANCELLED` — Nothing was written and nothing will be; cancelling twice is the same as once.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin imports the seat baseline.
+  - 404: `SEAT_BASELINE_IMPORT.NOT_FOUND` — The import does not exist (SEAT_BASELINE_IMPORT.NOT_FOUND).
+  - 409: `SEAT_BASELINE_IMPORT.NOT_PREVIEW` — The import was already written (SEAT_BASELINE_IMPORT.NOT_PREVIEW).
+  - 422: `VALIDATION_ERROR` — The identifier is not a UUID (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `seatBaselineImportConfirm` — `POST /api/v1/seat-baseline-imports/{id}/confirm` (roles)
+  - 200: `SEAT_BASELINE_IMPORT.CONFIRMED` — The valid rows of the preview that is still current became assignments marked as the baseline, with no request; the wrong rows created nothing. The same idempotency key again answers the same result with replayed.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin imports the seat baseline.
+  - 404: `SEAT_BASELINE_IMPORT.NOT_FOUND` — The import does not exist (SEAT_BASELINE_IMPORT.NOT_FOUND).
+  - 409: `SEAT_BASELINE.CLOSED`, `SEAT_TARGET.APPLICATION_RETIRED`, `SEAT_BASELINE_IMPORT.PREVIEW_OUTDATED`, `SEAT_BASELINE_IMPORT.PREVIEW_STALE`, `SEAT_BASELINE_IMPORT.CANCELLED`, `SEAT_BASELINE_IMPORT.EXPIRED`, `SEAT_BASELINE_IMPORT.ALREADY_CONFIRMED` — The baseline is closed (SEAT_BASELINE.CLOSED), the application was retired since the preview (SEAT_TARGET.APPLICATION_RETIRED), the preview is outdated or stale (SEAT_BASELINE_IMPORT.PREVIEW_OUTDATED, PREVIEW_STALE), or the import was cancelled, expired or already written under another key (CANCELLED, EXPIRED, ALREADY_CONFIRMED).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `SEAT_TARGET.SUBSCRIPTION_DRAFT`, `SEAT_BASELINE.PLAN_NOT_SUPPORTED`, `SEAT_BASELINE.TARGET_INVALID` — The request is invalid (VALIDATION_ERROR) or the subscription is a draft (SEAT_TARGET.SUBSCRIPTION_DRAFT).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `seatBaselineImportGet` — `GET /api/v1/seat-baseline-imports/{id}` (roles)
+  - 200: `SEAT_BASELINE_IMPORT.FETCHED` — The import with its preview or its result.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin imports the seat baseline.
+  - 404: `SEAT_BASELINE_IMPORT.NOT_FOUND` — The import does not exist (SEAT_BASELINE_IMPORT.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The identifier is not a UUID (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `seatBaselineImportRows` — `GET /api/v1/seat-baseline-imports/{id}/rows` (roles)
+  - 200: `SEAT_BASELINE_IMPORT.ROWS_LISTED` — A page of the rows in the order of the file, each with what it said, its outcome and the reasons it is wrong; outcome=ERROR lists the rows to fix. An identifier that looks like a secret is shown masked.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin imports the seat baseline.
+  - 404: `SEAT_BASELINE_IMPORT.NOT_FOUND` — The import does not exist (SEAT_BASELINE_IMPORT.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The identifier is not a UUID (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `seatBaselineImportUpload` — `POST /api/v1/seat-baseline-imports` (roles)
+  - 201: `SEAT_BASELINE_IMPORT.UPLOADED` — The file was read and every row judged against the seats and the people as they are: nothing is written yet. The summary says how many rows are valid, wrong and why, and the seats before and after.
+  - 400: `HTTP_BAD_REQUEST` — The form breaks a limit of the upload before it is read — more than 1 file, more than 2 text fields, more than 3 parts, a text field over 64 bytes — or it is not a readable multipart form (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin imports the seat baseline.
+  - 404: `SUBSCRIPTION.NOT_FOUND`, `PLAN.NOT_FOUND` — The subscription or the plan does not exist (SUBSCRIPTION.NOT_FOUND, PLAN.NOT_FOUND).
+  - 409: `SEAT_BASELINE.CLOSED`, `SEAT_BASELINE.QUANTITY_UNKNOWN`, `SEAT_TARGET.APPLICATION_RETIRED` — The baseline is closed (SEAT_BASELINE.CLOSED), the subscription has no quantity (SEAT_BASELINE.QUANTITY_UNKNOWN) or the application is retired (SEAT_TARGET.APPLICATION_RETIRED).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The file is larger than 2 MiB (HTTP_PAYLOAD_TOO_LARGE).
+  - 422: `VALIDATION_ERROR`, `SEAT_BASELINE.TARGET_INVALID`, `SEAT_BASELINE.PLAN_NOT_SUPPORTED`, `SEAT_TARGET.SUBSCRIPTION_DRAFT`, `SEAT_BASELINE_IMPORT.FILE_REQUIRED`, `SEAT_BASELINE_IMPORT.FILE_EMPTY`, `SEAT_BASELINE_IMPORT.FILE_NOT_TEXT`, `SEAT_BASELINE_IMPORT.FILE_TOO_MANY_ROWS`, `SEAT_BASELINE_IMPORT.FILE_UNREADABLE`, `SEAT_BASELINE_IMPORT.FILE_MISSING_COLUMNS` — The request is invalid (VALIDATION_ERROR), the target is not one subscription or one internal plan (SEAT_BASELINE.TARGET_INVALID), its plan takes no baseline yet (SEAT_BASELINE.PLAN_NOT_SUPPORTED), the subscription is still a draft (SEAT_TARGET.SUBSCRIPTION_DRAFT, details.missing lists what it lacks), or the file cannot be used as a whole (SEAT_BASELINE_IMPORT.FILE_*).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `standardToolsetGet` — `GET /api/v1/standard-toolsets/{departmentId}/{jobTitleId}` (roles)
+  - 200: `STANDARD_TOOLSET.FETCHED` — The current toolset of the pair, or null when it has none.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN`, `DEPARTMENT.OUT_OF_SCOPE` — Only the IT Admin, or a department head for their own department (DEPARTMENT.OUT_OF_SCOPE), reads the toolsets of a department.
+  - 404: `DEPARTMENT.NOT_FOUND`, `JOB_TITLE.NOT_FOUND` — The department or the job title does not exist (DEPARTMENT.NOT_FOUND, JOB_TITLE.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id or the query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `standardToolsetHistory` — `GET /api/v1/standard-toolsets/{departmentId}/{jobTitleId}/history` (roles)
+  - 200: `STANDARD_TOOLSET.HISTORY_LISTED` — A page of the settings, newest first, each with who set it, why and when. None is ever changed.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin reads the history.
+  - 404: `DEPARTMENT.NOT_FOUND`, `JOB_TITLE.NOT_FOUND` — The department or the job title does not exist (DEPARTMENT.NOT_FOUND, JOB_TITLE.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id or the query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `standardToolsetList` — `GET /api/v1/standard-toolsets` (roles)
+  - 200: `STANDARD_TOOLSET.LISTED` — The pairs that have a toolset, with the current setting of each; a department head names their own department.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN`, `DEPARTMENT.OUT_OF_SCOPE` — Only the IT Admin, or a department head for their own department (DEPARTMENT.OUT_OF_SCOPE), reads the toolsets of a department.
+  - 422: `VALIDATION_ERROR` — The id or the query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `standardToolsetMine` — `GET /api/v1/standard-toolsets/mine` (authenticated)
+  - 200: `STANDARD_TOOLSET.FETCHED` — The toolset of the department and the job title the signed-in employee has today; the placement and the toolset are null when there is none.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `standardToolsetSet` — `PUT /api/v1/standard-toolsets/{departmentId}/{jobTitleId}` (roles)
+  - 200: `STANDARD_TOOLSET.SET` — The plans are the toolset of the pair from now on; a change is a new version and changed says so. It grants and revokes nothing.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin sets a standard toolset.
+  - 404: `DEPARTMENT.NOT_FOUND`, `JOB_TITLE.NOT_FOUND` — The department or the job title does not exist (DEPARTMENT.NOT_FOUND, JOB_TITLE.NOT_FOUND).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `STANDARD_TOOLSET.REASON_REQUIRED`, `STANDARD_TOOLSET.PLAN_NOT_FOUND`, `STANDARD_TOOLSET.PLAN_DUPLICATE`, `STANDARD_TOOLSET.TOO_MANY_PLANS`, `STANDARD_TOOLSET.JOB_TITLE_INACTIVE`, `STANDARD_TOOLSET.DEPARTMENT_INACTIVE` — The request is invalid (VALIDATION_ERROR) or refused: STANDARD_TOOLSET.REASON_REQUIRED, PLAN_NOT_FOUND (details.planIds), PLAN_DUPLICATE, TOO_MANY_PLANS, JOB_TITLE_INACTIVE or DEPARTMENT_INACTIVE (a new pair only).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `subscriptionComplete` — `POST /api/v1/subscriptions/{id}/completions` (roles)
+  - 200: `SUBSCRIPTION.COMPLETED` — The draft becomes active once its data is whole; a price with no rate for its day is converted at the rate entered for that day. An active subscription is answered unchanged.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin declares or changes subscriptions.
+  - 404: `SUBSCRIPTION.NOT_FOUND` — The subscription does not exist (SUBSCRIPTION.NOT_FOUND).
+  - 409: `REPORTING_CURRENCY_NOT_SUPPORTED` — A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.
+  - 422: `VALIDATION_ERROR`, `SUBSCRIPTION.STILL_DRAFT`, `MONEY_OUT_OF_RANGE` — The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or the rate of its price day (SUBSCRIPTION.STILL_DRAFT, details.missing).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `subscriptionCostAllocationGet` — `GET /api/v1/subscriptions/{id}/cost-allocation` (roles)
+  - 200: `SUBSCRIPTION_COST_ALLOCATION.FETCHED` — The newest declaration, or status MISSING with none; applicability says whether the plan takes an allocation at all (not a per-seat plan, and a pricing model that is declared).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read the cost allocation of a subscription.
+  - 404: `SUBSCRIPTION.NOT_FOUND` — The subscription does not exist (SUBSCRIPTION.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id or the query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `subscriptionCostAllocationHistory` — `GET /api/v1/subscriptions/{id}/cost-allocation/history` (roles)
+  - 200: `SUBSCRIPTION_COST_ALLOCATION.HISTORY_LISTED` — A page of the declarations, newest first, each with who declared it and when. None is ever changed.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read the cost allocation of a subscription.
+  - 404: `SUBSCRIPTION.NOT_FOUND` — The subscription does not exist (SUBSCRIPTION.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id or the query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `subscriptionCostAllocationSet` — `PUT /api/v1/subscriptions/{id}/cost-allocation` (roles)
+  - 200: `SUBSCRIPTION_COST_ALLOCATION.DECLARED` — The allocation is the current version; a declaration that differs from the current one is a new version and changed says so. The shares add up to exactly 100%.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only Finance declares a cost allocation.
+  - 404: `SUBSCRIPTION.NOT_FOUND` — The subscription does not exist (SUBSCRIPTION.NOT_FOUND).
+  - 409: `SUBSCRIPTION.COST_ALLOCATION_NOT_APPLICABLE` — The plan is billed per seat or its pricing model is not declared (SUBSCRIPTION.COST_ALLOCATION_NOT_APPLICABLE, details.reason).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `COST_ALLOCATION.TOTAL_NOT_100`, `COST_ALLOCATION.RATIO_INVALID`, `COST_ALLOCATION.LINE_COUNT_INVALID`, `COST_ALLOCATION.COST_CENTER_DUPLICATE`, `COST_ALLOCATION.COST_CENTER_NOT_FOUND`, `COST_ALLOCATION.COST_CENTER_INACTIVE` — The request is invalid (VALIDATION_ERROR) or a line is refused: COST_ALLOCATION.TOTAL_NOT_100 (details.totalPercent), RATIO_INVALID, LINE_COUNT_INVALID, COST_CENTER_DUPLICATE, COST_CENTER_NOT_FOUND or COST_CENTER_INACTIVE (details.costCenterIds).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `subscriptionCreate` — `POST /api/v1/subscriptions` (roles)
+  - 201: `SUBSCRIPTION.CREATED` — The subscription is stored: a draft while its data is incomplete, with what is missing; the unit price keeps the conversion at the rate of the day it was recorded.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin declares or changes subscriptions.
+  - 409: `REPORTING_CURRENCY_NOT_SUPPORTED` — A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `SUBSCRIPTION.PLAN_NOT_FOUND`, `SUBSCRIPTION.PLAN_HAS_NO_SUBSCRIPTION`, `SUBSCRIPTION.PERPETUAL_NEEDS_LICENSED_APPLICATION`, `SUBSCRIPTION.PERPETUAL_HAS_NO_TERM`, `SUBSCRIPTION.DATES_INVALID`, `MONEY_SCALE_EXCEEDED`, `MONEY_OUT_OF_RANGE`, `CURRENCY_NOT_SUPPORTED` — The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `subscriptionGet` — `GET /api/v1/subscriptions/{id}` (roles)
+  - 200: `SUBSCRIPTION.FETCHED` — The subscription with its derived notice deadline and source, alert dates, warning, tax profile and tax estimate.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read subscriptions: prices and contracts are hidden from the rest.
+  - 404: `SUBSCRIPTION.NOT_FOUND` — The subscription does not exist (SUBSCRIPTION.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is not a UUID (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `subscriptionList` — `GET /api/v1/subscriptions` (roles)
+  - 200: `SUBSCRIPTION.LISTED` — A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read subscriptions: prices and contracts are hidden from the rest.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `subscriptionSeatUsage` — `GET /api/v1/subscriptions/{id}/seat-usage` (roles)
+  - 200: `SUBSCRIPTION_SEAT_USAGE.FETCHED` — The seats bought, the assignments occupying today in the organization calendar and the seats free; purchased and free are null while the subscription has no quantity.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin reads the seats of a subscription.
+  - 404: `SUBSCRIPTION.NOT_FOUND` — The subscription does not exist (SUBSCRIPTION.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id is not a UUID (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `subscriptionUpdate` — `PATCH /api/v1/subscriptions/{id}` (roles)
+  - 200: `SUBSCRIPTION.UPDATED` — The subscription as it is after the change; a new unit price is converted again at the rate of today; a change of nothing is answered the same and not audited. The plan and the kind cannot change.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin declares or changes subscriptions.
+  - 404: `SUBSCRIPTION.NOT_FOUND` — The subscription does not exist (SUBSCRIPTION.NOT_FOUND).
+  - 409: `REPORTING_CURRENCY_NOT_SUPPORTED` — A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `SUBSCRIPTION.UPDATE_EMPTY`, `SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED`, `SUBSCRIPTION.PERPETUAL_HAS_NO_TERM`, `SUBSCRIPTION.DATES_INVALID`, `SUBSCRIPTION.STILL_DRAFT`, `MONEY_SCALE_EXCEEDED`, `MONEY_OUT_OF_RANGE`, `CURRENCY_NOT_SUPPORTED` — The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED. An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `superAdminTransfer` — `POST /api/v1/super-admin-transfers` (roles)
+  - 200: `SUPER_ADMIN.TRANSFERRED` — The successor holds the Super Admin role and the caller no longer does; from the caller’s next request on they hold only the roles they had besides it.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — The caller does not hold the Super Admin role (any more).
+  - 404: `SUPER_ADMIN_TRANSFER.SUCCESSOR_NOT_FOUND` — The successor account does not exist (SUPER_ADMIN_TRANSFER.SUCCESSOR_NOT_FOUND).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `SUPER_ADMIN_TRANSFER.SUCCESSOR_IS_HOLDER`, `SUPER_ADMIN_TRANSFER.ACCOUNT_LOCKED`, `SUPER_ADMIN_TRANSFER.EMPLOYEE_NOT_WORKING`, `SUPER_ADMIN_TRANSFER.NOT_ACTIVATED`, `SUPER_ADMIN_TRANSFER.EMAIL_NOT_VERIFIED`, `SUPER_ADMIN_TRANSFER.WORK_ROLE_HELD`, `SUPER_ADMIN_TRANSFER.APPROVAL_ROLE_HELD`, `SUPER_ADMIN_TRANSFER.HEADS_DEPARTMENT` — The request is invalid (VALIDATION_ERROR) or the successor does not qualify: the caller themselves, a locked account, a person who is not working, an account not activated or with an unverified email, one holding the IT Admin or Finance role, an approval role, or heading a department.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorGroupCreate` — `POST /api/v1/vendor-dictionary/groups` (roles)
+  - 201: `VENDOR_DICTIONARY.GROUP_CREATED` — The vendor group exists with no service line yet.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin uses the vendor dictionary.
+  - 409: `VENDOR_DICTIONARY.GROUP_NAME_TAKEN` — A group with this name exists, ignoring case, accents and spacing (VENDOR_DICTIONARY.GROUP_NAME_TAKEN).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `VENDOR_DICTIONARY.NAME_INVALID`, `VENDOR_DICTIONARY.DOMAIN_INVALID`, `VENDOR_DICTIONARY.TOO_MANY_VALUES` — The request is invalid (VALIDATION_ERROR) or a value is refused: VENDOR_DICTIONARY.NAME_INVALID, DOMAIN_INVALID, PATTERN_INVALID, TOO_MANY_VALUES or UPDATE_EMPTY.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorGroupList` — `GET /api/v1/vendor-dictionary/groups` (roles)
+  - 200: `VENDOR_DICTIONARY.GROUPS_LISTED` — A page of vendor groups by name, each with its service lines, optionally filtered by a name search.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin uses the vendor dictionary.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorGroupUpdate` — `PATCH /api/v1/vendor-dictionary/groups/{id}` (roles)
+  - 200: `VENDOR_DICTIONARY.GROUP_UPDATED` — The group as it is after the change; a change that changes nothing is answered the same and not audited.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin uses the vendor dictionary.
+  - 404: `VENDOR_DICTIONARY.GROUP_NOT_FOUND` — The vendor group does not exist (VENDOR_DICTIONARY.GROUP_NOT_FOUND).
+  - 409: `VENDOR_DICTIONARY.GROUP_NAME_TAKEN` — Another group has this name (VENDOR_DICTIONARY.GROUP_NAME_TAKEN).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `VENDOR_DICTIONARY.NAME_INVALID`, `VENDOR_DICTIONARY.DOMAIN_INVALID`, `VENDOR_DICTIONARY.TOO_MANY_VALUES`, `VENDOR_DICTIONARY.UPDATE_EMPTY` — The request is invalid (VALIDATION_ERROR) or a value is refused: VENDOR_DICTIONARY.NAME_INVALID, DOMAIN_INVALID, PATTERN_INVALID, TOO_MANY_VALUES or UPDATE_EMPTY.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorList` — `GET /api/v1/vendors` (roles)
+  - 200: `VENDOR.LISTED` — A page of vendors by name, each saying whether its tax profile is declared; taxProfile=MISSING lists the vendors Finance still has to declare.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read vendors and their tax profiles.
+  - 422: `VALIDATION_ERROR` — The id or the query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorNormalize` — `POST /api/v1/vendor-dictionary/normalizations` (roles)
+  - 200: `VENDOR_DICTIONARY.NORMALIZED` — One candidate is a unique match, several are ambiguous, none is no match; method says how the match was made.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin uses the vendor dictionary.
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR` — The request is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorProposalList` — `GET /api/v1/vendor-dictionary/proposals` (roles)
+  - 200: `VENDOR_DICTIONARY.PROPOSALS_LISTED` — A page of proposals, oldest first, optionally for one status.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin uses the vendor dictionary.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorProposalResolve` — `POST /api/v1/vendor-dictionary/proposals/{id}/resolutions` (roles)
+  - 200: `VENDOR_DICTIONARY.PROPOSAL_RESOLVED` — The proposal as it is after it was accepted (naming the line it became) or dismissed.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin uses the vendor dictionary.
+  - 404: `VENDOR_DICTIONARY.PROPOSAL_NOT_FOUND`, `VENDOR_DICTIONARY.SERVICE_LINE_NOT_FOUND` — The proposal (VENDOR_DICTIONARY.PROPOSAL_NOT_FOUND) or the named service line (VENDOR_DICTIONARY.SERVICE_LINE_NOT_FOUND) does not exist.
+  - 409: `VENDOR_DICTIONARY.PROPOSAL_ALREADY_RESOLVED` — The proposal was already resolved (VENDOR_DICTIONARY.PROPOSAL_ALREADY_RESOLVED).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `VENDOR_DICTIONARY.PROPOSAL_RESOLUTION_INVALID` — The request is invalid (VALIDATION_ERROR), or ACCEPTED names no line or DISMISSED names one (VENDOR_DICTIONARY.PROPOSAL_RESOLUTION_INVALID).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorServiceLineCreate` — `POST /api/v1/vendor-dictionary/groups/{id}/service-lines` (roles)
+  - 201: `VENDOR_DICTIONARY.SERVICE_LINE_CREATED` — The service line exists in the group, with its domains and literal description patterns.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin uses the vendor dictionary.
+  - 404: `VENDOR_DICTIONARY.GROUP_NOT_FOUND` — The vendor group does not exist (VENDOR_DICTIONARY.GROUP_NOT_FOUND).
+  - 409: `VENDOR_DICTIONARY.SERVICE_LINE_NAME_TAKEN` — The group already has a line with this name (VENDOR_DICTIONARY.SERVICE_LINE_NAME_TAKEN).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `VENDOR_DICTIONARY.NAME_INVALID`, `VENDOR_DICTIONARY.DOMAIN_INVALID`, `VENDOR_DICTIONARY.PATTERN_INVALID`, `VENDOR_DICTIONARY.TOO_MANY_VALUES` — The request is invalid (VALIDATION_ERROR) or a value is refused: VENDOR_DICTIONARY.NAME_INVALID, DOMAIN_INVALID, PATTERN_INVALID, TOO_MANY_VALUES or UPDATE_EMPTY.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorServiceLineUpdate` — `PATCH /api/v1/vendor-dictionary/service-lines/{id}` (roles)
+  - 200: `VENDOR_DICTIONARY.SERVICE_LINE_UPDATED` — The line as it is after the change; a change that changes nothing is answered the same and not audited.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin uses the vendor dictionary.
+  - 404: `VENDOR_DICTIONARY.SERVICE_LINE_NOT_FOUND` — The service line does not exist (VENDOR_DICTIONARY.SERVICE_LINE_NOT_FOUND).
+  - 409: `VENDOR_DICTIONARY.SERVICE_LINE_NAME_TAKEN` — Another line of the group has this name (VENDOR_DICTIONARY.SERVICE_LINE_NAME_TAKEN).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `VENDOR_DICTIONARY.NAME_INVALID`, `VENDOR_DICTIONARY.DOMAIN_INVALID`, `VENDOR_DICTIONARY.PATTERN_INVALID`, `VENDOR_DICTIONARY.TOO_MANY_VALUES`, `VENDOR_DICTIONARY.UPDATE_EMPTY` — The request is invalid (VALIDATION_ERROR) or a value is refused: VENDOR_DICTIONARY.NAME_INVALID, DOMAIN_INVALID, PATTERN_INVALID, TOO_MANY_VALUES or UPDATE_EMPTY.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorSuggestionList` — `GET /api/v1/vendor-dictionary/suggestions` (roles)
+  - 200: `VENDOR_DICTIONARY.SUGGESTED` — The lines the name could mean; none is chosen for the caller.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only an IT Admin uses the vendor dictionary.
+  - 422: `VALIDATION_ERROR` — The query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorTaxEstimate` — `GET /api/v1/vendors/{id}/tax-estimate` (roles)
+  - 200: `VENDOR_TAX_PROFILE.ESTIMATED` — The estimated tax split into the deductible part and the real cost, and the estimated cost. basis and label say whether it comes from the vendor profile or from the default one. Nothing is stored; this is an estimate, not a tax payable.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read vendors and their tax profiles.
+  - 404: `VENDOR.NOT_FOUND` — The vendor does not exist (VENDOR.NOT_FOUND).
+  - 422: `VALIDATION_ERROR`, `MONEY_SCALE_EXCEEDED`, `MONEY_OUT_OF_RANGE`, `CURRENCY_NOT_SUPPORTED` — The query is invalid (VALIDATION_ERROR), the amount is malformed, has too many decimals or is out of range (MONEY_*), or the currency is not supported (CURRENCY_NOT_SUPPORTED).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorTaxProfileGet` — `GET /api/v1/vendors/{id}/tax-profile` (roles)
+  - 200: `VENDOR_TAX_PROFILE.FETCHED` — The newest declaration, or status MISSING with the default profile the vendor is estimated by until one is declared.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read vendors and their tax profiles.
+  - 404: `VENDOR.NOT_FOUND` — The vendor does not exist (VENDOR.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id or the query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorTaxProfileHistory` — `GET /api/v1/vendors/{id}/tax-profile/history` (roles)
+  - 200: `VENDOR_TAX_PROFILE.HISTORY_LISTED` — A page of the declarations, newest first, each with who declared it and when. None is ever changed.
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only the IT Admin and Finance read vendors and their tax profiles.
+  - 404: `VENDOR.NOT_FOUND` — The vendor does not exist (VENDOR.NOT_FOUND).
+  - 422: `VALIDATION_ERROR` — The id or the query is invalid (VALIDATION_ERROR).
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+- `vendorTaxProfileSet` — `PUT /api/v1/vendors/{id}/tax-profile` (roles)
+  - 200: `VENDOR_TAX_PROFILE.DECLARED` — The profile is the current version; a declaration that differs from the current one is a new version and changed says so. The group defaults to T2.
+  - 400: `HTTP_BAD_REQUEST` — The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).
+  - 401: `AUTHENTICATION_REQUIRED`, `INVALID_ACCESS_TOKEN` — Authentication is required or the token is no longer valid.
+  - 403: `AUTHORIZATION.FORBIDDEN` — Only Finance declares a tax profile.
+  - 404: `VENDOR.NOT_FOUND` — The vendor does not exist (VENDOR.NOT_FOUND).
+  - 413: `HTTP_PAYLOAD_TOO_LARGE` — The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).
+  - 415: `HTTP_UNSUPPORTED_MEDIA_TYPE` — The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).
+  - 422: `VALIDATION_ERROR`, `VENDOR_TAX_PROFILE.TAX_TYPE_INVALID`, `VENDOR_TAX_PROFILE.TAX_TYPE_DUPLICATE`, `VENDOR_TAX_PROFILE.RATE_INVALID`, `VENDOR_TAX_PROFILE.TOO_MANY_LINES` — The request is invalid (VALIDATION_ERROR) or a tax line is refused: VENDOR_TAX_PROFILE.TAX_TYPE_INVALID, TAX_TYPE_DUPLICATE, RATE_INVALID or TOO_MANY_LINES.
+  - 429: `HTTP_TOO_MANY_REQUESTS` — Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).
+  - 503: `TOKEN_VERIFICATION_UNAVAILABLE`, `SERVICE_UNAVAILABLE` — Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).
+
+## Mô tả lệch code
+
+Ghi nhận khi truy vết (finding `OPENAPI-EXAMPLE.1-F1`, `-F2`, `-F5`; không sửa trong hạng mục này). Ví dụ ở danh sách trên lấy theo
+code thật, không theo mô tả.
+
+- `accountCandidatesList`
+  - No route-specific codes (AccountQueryService.listCandidates throws nothing).
+  - 422 'The query is invalid.' names no code: the real code is VALIDATION_ERROR (AccountCandidatesQueryDto).
+- `appUserCreate`
+  - 404 description names no code: the real code is ORGANIZATION.EMPLOYEE_NOT_FOUND.
+  - 409 description names no codes: the real codes are APP_USER.EMPLOYEE_TERMINATED, APP_USER.ALREADY_EXISTS_FOR_EMPLOYEE, APP_USER.LOGIN_EMAIL_TAKEN, APP_USER.FINANCE_ALREADY_ASSIGNED.
+  - 422 description ('body invalid or a role cannot be granted by hand') names no codes and omits APP_USER.LOGIN_EMAIL_REQUIRED and APP_USER.LOGIN_EMAIL_INVALID. Real codes: VALIDATION_ERROR, APP_USER.ROLE_DERIVED, APP_USER.SUPER_ADMIN_TRANSFER_ONLY, APP_USER.LOGIN_EMAIL_REQUIRED, APP_USER.LOGIN_EMAIL_INVALID.
+  - Mapped but unreachable here: APP_USER.ROLE_ALREADY_GRANTED (constraints:13; roles are de-duplicated with a Set), APP_USER.ROLE_COMBINATION_FORBIDDEN (constraints:18; SUPER_ADMIN is refused first, so no 23514 trigger fires), and APP_USER.NOT_FOUND from getAccount after create.
+  - A plain Error at account-invitation.service.ts:56 (before installation) gives undeclared 500.
+- `appUserGet`
+  - 404 description names no code: the real code is APP_USER.NOT_FOUND.
+  - 422 description names no code: the real code is VALIDATION_ERROR (AppUserIdParamDto).
+- `appUserGrantRole`
+  - 422 description 'The role is derived or moves only by transfer.' names no codes (APP_USER.ROLE_DERIVED, APP_USER.SUPER_ADMIN_TRANSFER_ONLY) and omits VALIDATION_ERROR (AppUserIdParamDto + GrantRoleBodyDto).
+  - 404/409 descriptions name no codes.
+- `appUserList`
+  - No route-specific codes.
+  - 422 'The query is invalid.' names no code: the real code is VALIDATION_ERROR (ListAppUsersQueryDto).
+- `appUserLock`
+  - 404/409 descriptions name no codes. Locking an already locked account is a no-op 200, not 409.
+- `appUserResendInvitation`
+  - 404 and 409 descriptions name no codes (real codes listed in codes).
+- `appUserRevokeRole`
+  - The revoke refusal message reads 'cannot be granted by hand' (RoleRequestRefusedError text), which is odd wording on a revoke.
+  - 422 description names no codes and omits VALIDATION_ERROR (AppUserRoleParamDto: id uuid, role enum).
+  - 404/409 descriptions name no codes.
+- `appUserUnlock`
+  - 404/409 descriptions name no codes. Unlocking an active account is a no-op 200.
+- `applicationBusinessOwnerHistory`
+  - Validation DTOs: ApplicationIdParamDto and OwnerWarningsQueryDto.
+- `applicationCreate`
+  - Validation DTO: DeclareApplicationBodyDto.
+  - The 422 description lists codes without their prefix. The real codes are APPLICATION.NAME_INVALID, APPLICATION.VENDOR_NAME_INVALID, APPLICATION.DOMAIN_INVALID, APPLICATION.TOO_MANY_DOMAINS, APPLICATION.NOTE_INVALID, APPLICATION.VENDOR_REQUIRED, APPLICATION.VENDOR_SOURCE_AMBIGUOUS, APPLICATION.INTERNAL_HAS_NO_VENDOR, APPLICATION.BUSINESS_OWNER_INVALID, APPLICATION.FUNCTIONAL_GROUP_INVALID, APPLICATION.DICTIONARY_LINE_NOT_FOUND and APPLICATION.DICTIONARY_LINE_MISMATCH.
+  - UPDATE_EMPTY (APPLICATION.UPDATE_EMPTY) is named in the 422 description but cannot be returned on create.
+  - DICTIONARY_LINE_MISMATCH on create normally means a vendor with the group's name already holds another dictionary group (VendorNameHeldByAnotherGroupError). The message does not say that.
+  - APPLICATION.NAME_TAKEN's message and the 409 description both say 'the vendor', but for an INTERNAL application the uniqueness is across the whole organization (applications_internal_name_key) and there is no vendor.
+  - Before installation, requireOrganizationId throws a plain Error (application.service.ts:394), which becomes 500.
+- `applicationGet`
+  - Validation DTO: ApplicationIdParamDto.
+  - If no seat-occupancy reader is registered, recommendationsOf (application.service.ts:334) throws SeatOccupancyNotRegisteredError, which is not mapped and becomes 500.
+- `applicationList`
+  - Validation DTO: ListApplicationsQueryDto. ApplicationListService.list throws no domain error. A missing Business Owner employee is a plain Error (application-list.service.ts:54) and becomes 500.
+- `applicationRetire`
+  - Validation DTO: RetirementParamDto (there is no body).
+  - Decision order: ALREADY_RETIRED (409), then NEEDS_CONFIRMATION (422), then BLOCKED (409).
+  - details.assignments items also carry employeeCode, fullName and planName, and details.subscriptions items carry planName (enriched in blockersOf). The description does not say so.
+  - Before installation, a plain Error (:240) becomes 500, as does SeatOccupancyNotRegisteredError.
+- `applicationRetirementConfirm`
+  - Validation DTOs: RetirementParamDto and ConfirmRetirementBodyDto.
+  - NOTE_REQUIRED is checked before the lookup, so a blank note on an unknown id answers 422, not 404.
+  - RETIREMENT_NOT_BUSINESS_OWNER also covers an employee id that does not exist (owner null). The EmployeeNotFoundError from lockEmployeeForShare at :91 is not mapped (it would be 500), but it cannot happen: only the current owner, who exists by FK, is locked.
+  - Before installation, a plain Error (application-retirement.service.ts:240) becomes 500.
+- `applicationRetirementGet`
+  - Validation DTO: RetirementParamDto. If no seat-occupancy reader is registered, SeatOccupancyNotRegisteredError (seat-occupancy.registry.ts:26) becomes 500.
+- `applicationUpdate`
+  - Validation DTOs: ApplicationIdParamDto and UpdateApplicationBodyDto.
+  - The 422 description lists codes without their prefix (APPLICATION.*).
+  - VENDOR_NAME_INVALID, VENDOR_REQUIRED and VENDOR_SOURCE_AMBIGUOUS are named in the 422 description but cannot be returned on update (vendorSourceOf is not called, and the body has no vendorName or kind).
+  - On update, INTERNAL_HAS_NO_VENDOR means 'a dictionary line was set on an internal application'.
+  - Before installation, the plain Error from requireOrganizationId becomes 500.
+- `approvalRoleList`
+  - No route-specific codes (ApprovalRoleService.list throws nothing). No input DTO, so no 422 (correctly undeclared).
+- `approvalRoleSet`
+  - None against the description. The 404 comes only from the row lock (employee.repo.ts:150), not from a service-level check. A plain Error at approval-role.service.ts:83 (before installation) gives undeclared 500.
+- `auditEventList`
+  - No route-specific codes: AuditQueryService.list / AuditQueryRepo throw nothing of their own. DTO: ListAuditEventsQueryDto (strict object plus superRefine: resourceId requires resourceType; occurredFrom < occurredTo).
+- `authLogin`
+  - 401 description names no code: the real code is AUTH.INVALID_CREDENTIALS.
+  - 422 description 'The request body is invalid.' names no code: the real code is VALIDATION_ERROR (LoginBodyDto).
+  - 503 description 'The database is temporarily unavailable. Retry shortly.' names no code: the real code is AUTH.UNAVAILABLE with message 'Authentication is temporarily unavailable. Retry shortly.' SERVICE_UNAVAILABLE is never emitted here (toAuthApiException does not call toUnavailableApiException).
+  - A non-transient DB/driver error falls through toAuthApiException unchanged and becomes 500 INTERNAL_SERVER_ERROR (undeclared).
+- `authLogout`
+  - 204 is bodyless (@RawResponse + @HttpCode(204), returns void). An absent, malformed or unknown token, or a revoked/expired session, returns 204, so there is no 401 (correctly undeclared). Error responses still carry the JSON envelope.
+  - 503 description names no code: the real code is AUTH.UNAVAILABLE ('Authentication is temporarily unavailable. Retry shortly.').
+- `authRedeemInvitation`
+  - 400 description names no code: the real code is AUTH.INVITATION_INVALID (plus the global parser HTTP_BAD_REQUEST).
+  - 422 description names no codes: the real codes are VALIDATION_ERROR (RedeemInvitationBodyDto) and AUTH.PASSWORD_POLICY_VIOLATION.
+  - 503 description 'The database is temporarily unavailable. Retry shortly.' names no code: the real code is SERVICE_UNAVAILABLE ('The service is temporarily unavailable. Retry shortly.'), unlike the other five auth routes, which emit AUTH.UNAVAILABLE.
+- `authRefresh`
+  - 401 description names no code: the real code is AUTH.SESSION_INVALID. The mapper message 'The session is not valid. Sign in again.' differs from error.message 'The session is not valid.'; the mapper literal is what is sent.
+  - 503 description names no code: the real code is AUTH.UNAVAILABLE ('Authentication is temporarily unavailable. Retry shortly.'), not SERVICE_UNAVAILABLE.
+  - 422 'The body has no refresh token' is incomplete: VALIDATION_ERROR also covers extra fields (strictObject) and length > 512.
+- `authRequestPasswordReset`
+  - 503 description names no code: the real code is AUTH.UNAVAILABLE ('Authentication is temporarily unavailable. Retry shortly.').
+  - 429 is only the global HTTP_TOO_MANY_REQUESTS with the route override @Throttle 10/60s (auth.controller.ts:134); there is no AUTH.LOGIN_TEMPORARILY_BLOCKED here.
+  - No business codes: every refusal returns 202 (AC-3).
+- `authResetPassword`
+  - 400 description names no code: the real code is AUTH.PASSWORD_RESET_INVALID. 400 is also the global JSON-parser HTTP_BAD_REQUEST.
+  - 422 description names no codes: the real codes are VALIDATION_ERROR (PasswordResetBodyDto) and AUTH.PASSWORD_POLICY_VIOLATION (details.violation).
+  - 503 description names no code: the real code is AUTH.UNAVAILABLE. SERVICE_UNAVAILABLE (auth.http-errors.ts:78) is effectively unreachable: the service turns every transient driver error into TransientDatabaseError, which line 83 catches first, and object storage is not on the path.
+  - A recovery link whose new email was taken meanwhile (password-reset-redemption.service.ts:62) also gives 400 AUTH.PASSWORD_RESET_INVALID, after the transaction commits the consume/credential change.
+- `businessOwnerWarningList`
+  - Validation DTO: OwnerWarningsQueryDto (defined in the controller). No domain error; viewOf throws a plain Error (application-owner.service.ts:31), which becomes 500.
+- `costCenterDeactivate`
+  - The 422 text names KIND_NOT_SUPPORTED, NAME_INVALID and NAME_RESERVED; none is reachable (no body).
+  - The 404 text names no code: COST_CENTER.NOT_FOUND.
+- `costCenterEmployeeList`
+  - The 422 text names KIND_NOT_SUPPORTED, NAME_INVALID and NAME_RESERVED; none is reachable.
+  - The 404 text names no code: COST_CENTER.NOT_FOUND.
+  - The 403 text describes maintenance on a read route.
+- `costCenterRename`
+  - The 422 text names COST_CENTER.KIND_NOT_SUPPORTED, unreachable on rename.
+  - The 404 text names no code: COST_CENTER.NOT_FOUND.
+- `departmentCreate`
+  - The 422 text says details name the reason; none of the reachable 422 codes carries details.
+  - The 422 text names no codes: DEPARTMENT.NAME_INVALID, COST_CENTER_NOT_FOUND, COST_CENTER_INACTIVE, IT_ADMIN_INVALID.
+  - A function longer than 1000 characters answers DEPARTMENT.NAME_INVALID with a message about the name.
+  - DEPARTMENT.COST_CENTER_NOT_UNIT cannot be reached (Cost Center kind is UNIT only).
+- `departmentDeactivate`
+  - The 422 text about department rules is false: only VALIDATION_ERROR.
+  - The 404 text names no code: DEPARTMENT.NOT_FOUND.
+  - An unregistered service-account reader would answer 500.
+- `departmentGet`
+  - The 404 text names no code: DEPARTMENT.NOT_FOUND.
+  - The 422 text about department rules is false: only VALIDATION_ERROR.
+  - The existence check (404) runs before the scope check (403).
+- `departmentHeadAssign`
+  - 409 DEPARTMENT.INACTIVE is reachable but 409 is not declared.
+  - The 422 text names no codes and promises details: the reason is in the code (DEPARTMENT.HEAD_*), with no details.
+  - The 404 text names no code: DEPARTMENT.NOT_FOUND.
+- `departmentHeadVacate`
+  - The only domain 422 is DEPARTMENT.HEAD_DATE_IN_PAST; its message says 'assigned' on a vacancy.
+  - The 404 text names no code: DEPARTMENT.NOT_FOUND.
+- `departmentList`
+  - The 422 text 'a rule of the department refuses it' is false: only VALIDATION_ERROR.
+  - The 403 text 'Only an IT Admin changes department data.' is on a read route.
+- `departmentMemberList`
+  - The 403 text names no code: DEPARTMENT.OUT_OF_SCOPE is reachable.
+  - The 404 text names no code: DEPARTMENT.NOT_FOUND.
+  - The 422 text about department rules is false: only VALIDATION_ERROR.
+- `departmentToolsInUse`
+  - The 403 description 'Not an IT Admin' is wrong: the route is @RequireRoles('IT_ADMIN', 'MANAGER'). AUTHORIZATION.FORBIDDEN only hits callers with neither role. A MANAGER passes the guard and gets DEPARTMENT.OUT_OF_SCOPE for any department they do not head today, including when they head none.
+  - 404 is checked before scope (service:55 then :56), so a MANAGER can tell whether any department id exists.
+  - Validation DTOs: DepartmentToolsParamDto, DepartmentToolsQueryDto.
+- `departmentUpdate`
+  - 409 DEPARTMENT.INACTIVE is reachable but 409 is not declared.
+  - The 422 text names no codes and promises details: DEPARTMENT.UPDATE_EMPTY, NAME_INVALID, IT_ADMIN_INVALID have none.
+  - The 404 text names no code: DEPARTMENT.NOT_FOUND.
+- `documentAttach`
+  - DOCUMENT.PURPOSE_FORBIDDEN (403) has a code path (document.service.ts:268) but cannot happen: only CONTRACT_ATTACHMENT/PURCHASE_DOCUMENT files can exist, and both allow IT_ADMIN and FINANCE, which the guard already requires
+  - NOT_READY_TO_ATTACH also covers QUARANTINED and EXPIRED, not just 'not uploaded'
+  - order: DOCUMENT.NOT_FOUND -> CONTRACT.NOT_FOUND -> 409
+- `documentComplete`
+  - the 404 text describes the visibility rules (visibleTo), but complete only checks ownership (ownedBy): the uploader's own quarantined, expired or attached file answers 409 NOT_AWAITING_UPLOAD, not 404
+  - a file already expired by the sweeper answers NOT_AWAITING_UPLOAD (:139), not UPLOAD_EXPIRED; UPLOAD_EXPIRED is only for expiry by this call or a simultaneous one
+  - 503 also covers storage outages (head/readPrefix/copyIfMatch go through the guarded adapter -> ObjectStorageUnavailableError)
+- `documentCreate`
+  - TOO_LARGE and FILE_INVALID named without the DOCUMENT. prefix; details not described (TOO_LARGE details.maxBytes, FILE_INVALID details.problem, PURPOSE_NOT_AVAILABLE details.purpose)
+  - 503 can also come from storage (createUploadUrl, document.service.ts:112) after the row is committed; the AWAITING_UPLOAD row stays (the 'Nothing is made' wording is only true for the 422s)
+- `documentGet`
+  - DocumentAccessForbiddenError (document.service.ts:343 -> 403 AUTHORIZATION.FORBIDDEN, message 'This role may not open documents.', mapper :36) cannot happen: RequireRoles(IT_ADMIN, FINANCE) has already passed, so mayOpen never returns FORBIDDEN
+  - the 404 also covers EXPIRED
+- `documentLink`
+  - the AUTHORIZATION.FORBIDDEN path via DocumentAccessForbiddenError (:343) cannot happen, same as documentGet
+  - 503 also covers a storage failure in createDownloadUrl (document.service.ts:307, guarded)
+- `employeeCreate`
+  - EMPLOYEE.ROW_INVALID reason OWN_RECORD only appears when the Super Admin has an employee record.
+- `employeeImportConfirm`
+  - The 409 description says 'or it was cancelled or expired' but gives no codes. The real codes are IMPORT.CANCELLED and IMPORT.EXPIRED.
+  - IMPORT.NOT_PREVIEW cannot happen on confirm: a COMPLETED import is either replayed (same key) or answers ALREADY_CONFIRMED.
+  - Validation DTOs: ImportIdParamDto, ConfirmImportBodyDto (previewVersion, idempotencyKey 8..100, acknowledgeDuplicateFile, hrBasis).
+- `employeeImportGet`
+  - Validation DTO: ImportIdParamDto.
+- `employeeImportPreviewRefresh`
+  - Refresh never checks expiresAt, so IMPORT.EXPIRED cannot happen here. An expired preview is refreshed and its expiry renewed (service.ts:152). The description is consistent with this.
+- `employeeImportRowList`
+  - Validation DTOs: ImportIdParamDto, ListImportRowsQueryDto (outcome enum, page, pageSize ≤200).
+- `employeeImportUpload`
+  - No validation: there is no @Body/@Param/@Query, and @UploadedFile has paramtype 'custom', which ApplicationZodValidationPipe skips. Extra text fields are ignored.
+  - 400/413 are not ApiExceptions. Nest's FileInterceptor transformException (node_modules/@nestjs/platform-express/multer/multer/multer.utils.js) turns multer limit errors and busboy 'Boundary not found'/'Malformed part header'/'Unexpected end of form/file' into BadRequestException/PayloadTooLargeException. The filter answers HTTP_BAD_REQUEST / HTTP_PAYLOAD_TOO_LARGE with the generic message 'The request could not be processed.'. request-parser-errors.ts only catches raw MulterErrors as a fallback.
+  - A file part under a field name other than 'file' gives 400 (multer LIMIT_UNEXPECTED_FILE 'Unexpected field'), not IMPORT.FILE_REQUIRED. FILE_REQUIRED is only for a request with no file part at all.
+  - FILE_REQUIRED, FILE_EMPTY and FILE_NOT_TEXT send details: {} (an empty object, not an absent field), because the ctor default is {} and refuse() keeps any truthy details.
+- `employeeUpdateOfficialFields`
+  - The EMPLOYEE.NOT_FOUND message contains the requested id ('Employee not found: <id>').
+  - Order: UPDATE_EMPTY (422), then ANOTHER_IT_ADMIN_NEEDED (403), then NOT_FOUND (404).
+- `exchangeRateRecord`
+  - A malformed rate answers VALIDATION_ERROR with a domain message and no details, unlike the pipe's (one example per code: the pipe's).
+  - CURRENCY_NOT_SUPPORTED and SAME_AS_REPORTING_CURRENCY carry details.currency, not mentioned.
+- `functionalGroupCreate`
+  - Validation DTO: CreateFunctionalGroupBodyDto.
+  - FUNCTIONAL_GROUP.UPDATE_EMPTY is named in the 422 description (shared INVALID constant) but cannot be returned on create.
+  - Before installation, a plain Error (functional-group.service.ts:130) becomes 500.
+- `functionalGroupList`
+  - Validation DTO: ListFunctionalGroupsQueryDto. The list throws no domain error.
+- `functionalGroupUpdate`
+  - Validation DTOs: FunctionalGroupIdParamDto and UpdateFunctionalGroupBodyDto. UPDATE_EMPTY and NAME_INVALID are checked before the lookup, so an empty body on an unknown id answers 422, not 404.
+- `healthGetLiveness`
+  - The handler returns a literal { status: 'ok' } and has no throw, so 500 is only the generic fallback (e.g. a serialization failure); no route-specific code exists. 500 description names no code: the real code is INTERNAL_SERVER_ERROR.
+- `healthGetReadiness`
+  - 503 code is SERVICE_UNAVAILABLE but its message is 'A required dependency is unavailable.', not the toUnavailableApiException message 'The service is temporarily unavailable. Retry shortly.'
+  - Neither the 503 nor the 500 description names a code (real codes: SERVICE_UNAVAILABLE / INTERNAL_SERVER_ERROR).
+- `jobTitleCreate`
+  - The 422 text names no codes: the real ones are JOB_TITLE.NAME_REQUIRED and JOB_TITLE.NAME_TOO_LONG.
+  - details.conflict of JOB_TITLE.NAME_TAKEN is absent when the clashing title cannot be re-read after the rollback.
+- `jobTitleDeactivate`
+  - The 404 text names no code: JOB_TITLE.NOT_FOUND.
+  - The 422 text about the name cannot apply: there is no body.
+- `jobTitleList`
+  - The 422 text about an empty or too long name cannot apply: list has no body (only VALIDATION_ERROR).
+- `jobTitleReactivate`
+  - The 404 text names no code: JOB_TITLE.NOT_FOUND.
+  - The 422 text about the name cannot apply: there is no body.
+- `jobTitleRename`
+  - The 404 text names no code: JOB_TITLE.NOT_FOUND.
+  - The 422 text names no codes: JOB_TITLE.NAME_REQUIRED, JOB_TITLE.NAME_TOO_LONG.
+  - Name checks (422) run before the existence check (404).
+- `licenseAssignmentChangeResponsible`
+  - Described but unreachable: 409 LICENSE_ASSIGNMENT.SEAT_CAPACITY. Code path: assignment.service.ts:310 → assignment-conflicts.ts:20. The old assignment ends on the same day the new one starts (repo.end; the extend trigger does not fire for NULL→date), so the capacity trigger counts the same peak, which was already ≤ seats.
+  - Described but unreachable: 422 LICENSE_ASSIGNMENT.OVERLAP. The person exclusion constraint only covers kind='PERSONAL', and this route only proceeds for SERVICE (policy:48).
+  - Described but unreachable: 422 LICENSE_ASSIGNMENT.IDENTIFIER_IN_USE. The old open period already excluded every other row with the same identifier from its start onward.
+  - The DB variant of EXPECTED_END_REQUIRED (message 'An assignment conflicts with the data as it is now: EXPECTED_END_REQUIRED.') is pre-empted by policy:65, which reads the holder under FOR SHARE.
+  - The real order of 422/409 checks is: NOT_SERVICE_ACCOUNT → NOT_OPEN → EFFECTIVE_DATE (NOT_AFTER_START, IN_THE_PAST) → RESPONSIBLE_INVALID → EFFECTIVE_DATE (EXPECTED_END_BEFORE_START) → EXPECTED_END_REQUIRED.
+  - Validation DTOs: AssignmentIdParamDto, ResponsibleChangeBodyDto.
+- `licenseAssignmentList`
+  - Validation DTO: ListAssignmentsQueryDto.
+- `licenseKeyImport`
+  - Validation DTO: ImportBodyDto (subscriptionId uuid, keys 1..MAX_KEYS_PER_BATCH strings ≤512). Draft or retired purchases are not refused.
+- `licenseKeyList`
+  - There is no K4 check on list: a non-K4 purchase answers 200 with an empty vault, not LICENSE_KEY.PLAN_NOT_K4. Validation DTO: ListKeysQueryDto.
+- `licenseKeyReveal`
+  - The quota 429 carries no details. The window (MINUTE/DAY) is not exposed. Same code as the throttler, different message.
+  - 'Nothing was opened and nothing was counted' holds: the refusal is thrown inside runner.run, so both window slots roll back. The 404 check runs before the quota, so an unknown key costs no slot.
+  - LicenseKeyDecryptionError (license-key-cipher.ts:58/69) is not mapped and becomes 500 INTERNAL_SERVER_ERROR (not declared; acceptable).
+- `meChangePassword`
+  - 401 can also come from the mapper (INVALID_ACCESS_TOKEN, same code and message as the guard) when the account is gone, locked, not activated or its employee left between the guard and the change.
+  - The 429 message says 'sign-in attempts' even on a password change. The block check (password-change.service.ts:49) runs before the current password is verified, so a blocked caller gets 429, not 422.
+  - The policy is checked only after the current password has been verified, so with a wrong current password you get CURRENT_PASSWORD_INVALID, never POLICY_VIOLATION.
+- `meGet`
+  - No route-specific codes. The plain Error at src/modules/identity-access/access/me.service.ts:38 (principal lost its account/employee) becomes undeclared 500 INTERNAL_SERVER_ERROR.
+- `nonWorkingDateAdd`
+  - 422 NON_WORKING_DATE.REASON_INVALID and NON_WORKING_DATE.IN_PAST are reachable but not in the 422 text.
+  - The IN_PAST message says 'is not after today', but today is accepted.
+  - The 409 answer carries details.date, not mentioned.
+- `nonWorkingDateRemove`
+  - NON_WORKING_DATE.IN_PAST is described in the 200 text, not under 422.
+- `nonWorkingDateRename`
+  - NON_WORKING_DATE.IN_PAST is described in the 200 text, not under 422; REASON_INVALID is not described.
+  - The 404 answer carries details.date, not mentioned.
+- `operatingParameterSet`
+  - 422 PARAMETER.VALUE_INVALID (details.key, details.problem) is reachable but not in the 422 text.
+- `planCreate`
+  - Validation DTO: DeclarePlanBodyDto. K3 passes the DTO on purpose (plan.dto.ts:14).
+  - PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE and PLAN.IN_USE_BLOCKS_CHANGE are named in the 409 description but cannot be returned on create: the service check is update-only (plan.service.ts:180), and the triggers plans_keep_terms_kind and plans_keep_children_valid are BEFORE UPDATE only.
+  - The 422 description lists codes without their prefix. The real codes are PLAN.APPLICATION_RETIRED, PLAN.NAME_INVALID, PLAN.NOTE_INVALID, PLAN.PROVISIONING_TYPE_NOT_SUPPORTED, PLAN.PROVISIONING_TYPE_MISMATCH, PLAN.PRICING_MODEL_REQUIRED, PLAN.PRICING_MODEL_NOT_APPLICABLE, PLAN.CONTROL_LEVEL_REQUIRED and PLAN.DATA_LOSS_NOTE_REQUIRED.
+  - UPDATE_EMPTY (PLAN.UPDATE_EMPTY) is named in the 422 description but cannot be returned on create.
+  - Before installation, a plain Error (plan.service.ts:218) becomes 500.
+- `planGet`
+  - Validation DTO: PlanIdParamDto.
+- `planList`
+  - Validation DTO: ListPlansQueryDto. The list throws no domain error.
+- `planTermOpinionList`
+  - Validation DTOs: PlanIdParamDto and TermOpinionsQueryDto (same schema as planWarningsQuerySchema).
+- `planTermOpinionRecord`
+  - Validation DTOs: PlanIdParamDto and OpinionBodyDto.
+  - The description says NOT_APPLICABLE means 'the plan has no terms'. In code it means the plan is K5. A non-K5 plan with no terms recorded is accepted.
+  - For an empty opinion, TEXT_INVALID returns the message 'A text of the terms is at most 2000 characters.', which is misleading.
+  - Before installation, a plain Error (plan-terms.service.ts:191) becomes 500.
+- `planTermsGet`
+  - Validation DTO: PlanIdParamDto (plan-terms.dto.ts).
+- `planTermsSet`
+  - Validation DTOs: PlanIdParamDto and PlanTermsBodyDto.
+  - The 422 description lists codes without their prefix. The real codes are PLAN_TERMS.URL_INVALID, PLAN_TERMS.TEXT_INVALID, PLAN_TERMS.REVIEW_DATE_IN_FUTURE and PLAN_TERMS.INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4.
+  - URL, text and review-date errors are checked before the plan lookup, so they can come before 404.
+  - Before installation, a plain Error (plan-terms.service.ts:143) becomes 500.
+- `planUpdate`
+  - Validation DTOs: PlanIdParamDto and UpdatePlanBodyDto.
+  - PLAN.APPLICATION_NOT_FOUND and APPLICATION_RETIRED (PLAN.APPLICATION_RETIRED) are named in the 422 description but cannot be returned on update. update() never looks up the application, so a plan of a retired application can still be changed.
+  - The 422 description lists codes without their prefix (PLAN.*).
+  - details.reason 'SUBSCRIPTIONS' cannot occur in practice: it needs a change to K5, and assertPlanShape (policy.ts:64) refuses a K5 change on a non-internal application with PROVISIONING_TYPE_MISMATCH first; internal applications already have only K5 plans.
+  - The trigger plans_keep_workspace_kind would map to PLAN.PROVISIONING_TYPE_MISMATCH (generic 23514 at :211), not WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE. Only a race reaches it: the plan is locked FOR UPDATE and the service checks first at :178.
+- `planWarningList`
+  - Validation DTO: PlanWarningsQueryDto. The list throws no domain error.
+- `planWorkspaceProfileSet`
+  - Validation DTOs: PlanIdParamDto and WorkspaceProfileBodyDto.
+  - The 422 description lists codes without their prefix. The real codes are PLAN.WORKSPACE_PERSON_INVALID, PLAN.PRIMARY_OWNER_NOT_LISTED, PLAN.WORKSPACE_MEMBER_DUPLICATE, PLAN.WORKSPACE_LIMIT_EXCEEDED and PLAN.WORKSPACE_TEXT_INVALID. Their details (employeeId, role) are not described.
+  - The WORKSPACE_TEXT_INVALID message says 'too long', but it is also thrown for a blank emergencyAccount.identity (:183). The identity can never be too long: the DTO caps it at 1000 and the rule is 2000.
+  - WORKSPACE_TEXT_INVALID is checked before the plan lookup, so it can come before PLAN.NOT_FOUND.
+- `projectCreate`
+  - The 422 text says PROJECT.INVALID; the real codes are PROJECT.INVALID_NAME, INVALID_DESCRIPTION, INVALID_DEPARTMENT_NOT_FOUND.
+- `projectGet`
+  - The 422 text names PROJECT.INVALID, which does not exist and is unreachable on get.
+- `projectList`
+  - The 422 text names PROJECT.INVALID: no such code; nothing but VALIDATION_ERROR is reachable.
+- `projectUpdate`
+  - The 422 text says PROJECT.INVALID; the real codes are PROJECT.INVALID_NAME, INVALID_DESCRIPTION, INVALID_DEPARTMENT_NOT_FOUND.
+  - Name and description checks (422) run before NOT_FOUND (404).
+- `provisioningTaskClaim`
+  - 'NOT_CLAIMABLE' in the description has no prefix. The real code is PROVISIONING_TASK.NOT_CLAIMABLE. It is raised for every MANUAL task not QUEUED or IN_PROGRESS, which includes CLOSED_FAILED, not just 'done or failed'.
+  - BENEFICIARY_DEPARTED details are requestId plus nextStep 'CANCEL_REQUEST'.
+  - The same admin claiming again is a no-op (service.ts:179) that happens before the departed check.
+  - Order: 404 → 409 NOT_MANUAL/NOT_CLAIMABLE → 403 ANOTHER_IT_ADMIN_NEEDED → 409 BENEFICIARY_DEPARTED.
+- `provisioningTaskCloseFailed`
+  - The 409 clause 'its assignment is no longer open' names no code. The mapped code is LICENSE_ASSIGNMENT.NOT_OPEN (AssignmentNotOpenError, message 'The assignment has ended or is set to end: only an open one changes hands.', which is misleading here), from assignment.service.ts:225 via provisioning-decision.service.ts:79, mapped at licensing.http-errors.ts:54.
+  - LICENSE_ASSIGNMENT.NOT_OPEN is unreachable in the current code. A GRANT task's assignment is always source REQUEST, kind PERSONAL. The only writers that end or fail an assignment are repo.end (changeResponsible, SERVICE only) and markFailed (this route, which also moves the task to CLOSED_FAILED in the same transaction, so later calls hit NOT_FAILED first).
+  - Mapped on the path but unreachable: 404 LICENSE_ASSIGNMENT.NOT_FOUND ('The assignment does not exist.', assignment.service.ts:221/224). Assignments are never deleted (the license_assignments_immutable trigger).
+  - Validation DTOs: TaskIdParamDto, CloseFailedBodyDto.
+- `provisioningTaskComplete`
+  - 'NOT_IN_PROGRESS' has no prefix. The real code is PROVISIONING_TASK.NOT_IN_PROGRESS.
+  - EVIDENCE_REQUIRED (blank or missing evidence; the DTO defaults it to '') is checked before 404/409/403.
+  - Validation DTOs: TaskIdParamDto, CompleteBodyDto.
+- `provisioningTaskGrant`
+  - Biggest issue: the shipped gate is RefusingGrantRequestGate (licensing.module.ts:97; refusing-grant-request-gate.service.ts always answers NOT_FOUND), and nothing else provides GRANT_REQUEST_GATE. So today every valid body ends at 404 REQUEST.NOT_FOUND (service.ts:76). Every other code listed is only reachable once a real requests-module gate is bound.
+  - The 409 description drops prefixes. The real codes are PROVISIONING.REQUEST_ENDED, PROVISIONING.TYPE_NOT_SUPPORTED, PROVISIONING.BENEFICIARY_DEPARTED and PROVISIONING.BENEFICIARY_NOT_STARTED.
+  - The 422 description drops prefixes. The real codes are PROVISIONING.SUBSCRIPTION_REQUIRED, PROVISIONING.SUBSCRIPTION_NOT_ALLOWED, PROVISIONING.SUBSCRIPTION_PLAN_MISMATCH, PROVISIONING.SUBSCRIPTION_QUANTITY_UNKNOWN, LICENSE_ASSIGNMENT.IDENTIFIER_IN_USE and LICENSE_ASSIGNMENT.EXPECTED_END_REQUIRED.
+  - Details the description leaves out: BENEFICIARY_DEPARTED also carries details.requestId, BENEFICIARY_NOT_STARTED also carries details.requestId, and TYPE_NOT_SUPPORTED carries details.provisioningType.
+  - The '!employee' branch at service.ts:93 is dead. lockEmployeeForShare (service.ts:91) throws EmployeeNotFoundError first, so a missing beneficiary gives 404 EMPLOYEE.NOT_FOUND, never BENEFICIARY_DEPARTED.
+  - EMPLOYEE.NOT_FOUND's message embeds the beneficiary UUID and has no trailing period.
+  - SEAT_BASELINE.CLOSED cannot happen here: the DB trigger only refuses source='BASELINE' (migration 20261023110000).
+- `provisioningTaskHandOff`
+  - 'NOT_FAILED' has no prefix. The real code is PROVISIONING_TASK.NOT_FAILED.
+  - EVIDENCE_REQUIRED's message speaks of 'completion' even on hand-off.
+  - NOT_FAILED is checked before ALREADY_MANUAL.
+  - Validation DTOs: TaskIdParamDto, HandOffBodyDto.
+- `provisioningTaskList`
+  - Validation DTO: ListTasksQueryDto.
+- `provisioningTaskReportFailure`
+  - 'NOT_IN_PROGRESS' has no prefix. The real code is PROVISIONING_TASK.NOT_IN_PROGRESS.
+  - REASON_REQUIRED is checked before 404/409/403.
+  - Validation DTOs: TaskIdParamDto, FailureBodyDto.
+- `provisioningTaskRetry`
+  - Retry has no channel check, so it works on MANUAL and CONNECTOR tasks.
+- `reportingCurrencySet`
+  - A database refusal 55000 that names neither table falls through as a raw error and answers 500.
+- `seatBaselineClose`
+  - Closing again answers 200 alreadyClosed. No 409 exists.
+- `seatBaselineImportConfirm`
+  - The description names codes without their prefix. The real codes are SEAT_BASELINE_IMPORT.PREVIEW_STALE, SEAT_BASELINE_IMPORT.CANCELLED, SEAT_BASELINE_IMPORT.EXPIRED and SEAT_BASELINE_IMPORT.ALREADY_CONFIRMED.
+  - Reachable but not in the 422 description: SEAT_BASELINE.PLAN_NOT_SUPPORTED and SEAT_BASELINE.TARGET_INVALID. assertBaselineTarget is run again under lock and the plan's provisioningType can change after the preview.
+  - Mapped on the path but unreachable in practice: SEAT_BASELINE.QUANTITY_UNKNOWN (409, policy:34). Upload already refuses a null quantity, and the subscription update DTO cannot set purchasedQuantity back to null.
+  - Mapped on the path but unreachable in practice: SUBSCRIPTION.NOT_FOUND / PLAN.NOT_FOUND (404, policy:28). No route deletes plans or subscriptions.
+  - SEAT_BASELINE_IMPORT.NOT_PREVIEW cannot happen on confirm.
+  - Validation DTOs: SeatImportIdParamDto, ConfirmSeatImportBodyDto (previewVersion, idempotencyKey 8..128).
+- `seatBaselineImportRows`
+  - The 422 description only mentions the id. The query (ListSeatImportRowsQueryDto: outcome VALID\|ERROR, page, pageSize ≤100, strict) is also validated and also gives VALIDATION_ERROR.
+- `seatBaselineImportUpload`
+  - Validation DTO: UploadSeatImportBodyDto (strict; the multipart text fields subscriptionId/planId must be uuid). Any other text field gives 422 VALIDATION_ERROR. Pipes run after the multer interceptor, so 400/413 come before 422.
+  - 400/413 are not ApiExceptions (FileInterceptor transformException → HTTP_BAD_REQUEST / HTTP_PAYLOAD_TOO_LARGE, message 'The request could not be processed.'). A file under a field other than 'file' gives 400 'Unexpected field', not FILE_REQUIRED.
+  - Order of checks: file errors (service.ts:80), then target errors (81-82), then SEAT_BASELINE.CLOSED (84). Inside the target check: not found → K3/K4 PLAN_NOT_SUPPORTED → PLAN_NEEDS_SUBSCRIPTION → RETIRED → DRAFT → QUANTITY_UNKNOWN.
+  - SeatTargetProblem 'SUBSCRIPTION_NEEDS_PLAN_ONLY' is declared in licensing.errors.ts:17 but never thrown.
+  - FILE_REQUIRED, FILE_EMPTY and FILE_NOT_TEXT send details: {}.
+- `standardToolsetGet`
+  - Validation DTO: ToolsetPairParamDto.
+  - The 404 checks run before the scope check, so a MANAGER can learn whether any department or job title id exists.
+  - The 422 description says 'the id or the query', but this route has no query.
+- `standardToolsetHistory`
+  - Validation DTOs: ToolsetPairParamDto and ToolsetHistoryQueryDto. IT_ADMIN only, so DEPARTMENT.OUT_OF_SCOPE cannot occur.
+- `standardToolsetList`
+  - Validation DTO: ListToolsetsQueryDto. Roles are IT_ADMIN and MANAGER.
+  - A MANAGER who leaves out departmentId gets OUT_OF_SCOPE. The description does not say a department head must pass departmentId.
+  - There is no 404: an unknown departmentId gives an empty page for IT_ADMIN and OUT_OF_SCOPE for a MANAGER.
+  - The 403 status therefore carries two codes: AUTHORIZATION.FORBIDDEN from the guard and DEPARTMENT.OUT_OF_SCOPE.
+- `standardToolsetMine`
+  - @AuthenticatedOnly with no @RequireRoles, so 403 AUTHORIZATION.FORBIDDEN cannot occur. There is no Zod input, and mine() throws no domain error. ToolsetEmployeeNotFoundError is defined in standard-toolset.errors.ts but never thrown or mapped.
+- `standardToolsetSet`
+  - Validation DTOs: ToolsetPairParamDto and SetToolsetBodyDto.
+  - The 422 description lists codes without their prefix. The real codes are STANDARD_TOOLSET.PLAN_NOT_FOUND, STANDARD_TOOLSET.PLAN_DUPLICATE, STANDARD_TOOLSET.TOO_MANY_PLANS, STANDARD_TOOLSET.JOB_TITLE_INACTIVE and STANDARD_TOOLSET.DEPARTMENT_INACTIVE.
+  - PLAN_DUPLICATE carries details.planId, which is not described.
+  - PLAN_NOT_FOUND is checked before the department and job title, so a missing plan answers 422 even when the pair does not exist.
+  - Before installation, a plain Error (service :250) becomes 500.
+- `subscriptionComplete`
+  - MONEY_OUT_OF_RANGE is reachable at 422 (the conversion at the newly entered rate) but not described
+  - SUBSCRIPTION.PLAN_NOT_FOUND (:275) is a dead path (plans never deleted)
+  - CURRENCY_NOT_SUPPORTED (finance.service.ts:72) is a dead path: the price currency is a Restrict FK
+  - an ACTIVE subscription answers 200 unchanged (:273), never an error
+- `subscriptionCostAllocationGet`
+  - 422 text says 'The id or the query' but the route has no query DTO
+- `subscriptionCostAllocationSet`
+  - RATIO_INVALID ... COST_CENTER_INACTIVE named without the COST_ALLOCATION. prefix
+  - undescribed details: RATIO_INVALID and COST_CENTER_DUPLICATE details.costCenterId, LINE_COUNT_INVALID details.lines; details.totalPercent is a string (formatRatePercent, e.g. '90')
+  - reason PRICING_MODEL_UNDECLARED cannot happen through the API: non-K5 plans must have a pricing model (plan.policy assertPlanShape) and K5 plans cannot have subscriptions; only legacy rows can reach it
+  - SUBSCRIPTION.PLAN_NOT_FOUND (422, subscription-allocation.service.ts:62) is a dead path and is not described
+  - order: 404 -> 409 -> line 422s -> cost-center 422s; cost centers are only checked when the allocation differs from the current one
+- `subscriptionCreate`
+  - UPDATE_EMPTY named but unreachable on create (the shared INVALID text)
+  - PLAN_HAS_NO_SUBSCRIPTION ... UPDATE_EMPTY named without the SUBSCRIPTION. prefix
+  - a malformed price answers VALIDATION_ERROR with the money message, not the pipe's
+  - undescribed details: PERPETUAL_HAS_NO_TERM details.fields, DATES_INVALID details.reason, MONEY_SCALE_EXCEEDED details.allowedDecimals, CURRENCY_NOT_SUPPORTED details.currency
+  - 409 is held off by the DB-02 foreign key (organization.reportingCurrency -> currencies); only legacy data can reach it (the text already says so)
+- `subscriptionSeatUsage`
+  - Validation DTO: SubscriptionSeatsParamDto.
+- `subscriptionUpdate`
+  - SUBSCRIPTION.STILL_DRAFT (details.missing ['EXCHANGE_RATE']) is reachable at 422 but not described
+  - SUBSCRIPTION.PLAN_NOT_FOUND (:191), PLAN_HAS_NO_SUBSCRIPTION and PERPETUAL_NEEDS_LICENSED_APPLICATION (policy via :205) have code paths, but the API cannot reach them: plans are never deleted, K5<->INTERNAL is enforced by assertPlanShape, application kind is immutable, and create already refuses these
+  - codes after the first named without a prefix
+  - SeatOccupancyNotRegisteredError (seat-occupancy.registry.ts:25) is not mapped -> 500 if licensing never registered
+  - order: UPDATE_EMPTY and the money errors come before the 404
+- `superAdminTransfer`
+  - 403 can also come from the mapper (AUTHORIZATION.FORBIDDEN, same code and message as AuthorizationGuard) when the caller lost SUPER_ADMIN before the lock (service:52/65).
+  - 22 description names no domain codes: the real codes are SUPER_ADMIN_TRANSFER.{SUCCESSOR_IS_HOLDER, ACCOUNT_LOCKED, EMPLOYEE_NOT_WORKING, NOT_ACTIVATED, EMAIL_NOT_VERIFIED, WORK_ROLE_HELD, APPROVAL_ROLE_HELD, HEADS_DEPARTMENT} plus VALIDATION_ERROR.
+  - service:75 maps ANY SQLSTATE 23514 on the grant to WORK_ROLE_HELD. That includes the role_grants_super_admin_exclusions trigger, which refuses for department heads and approval-role holders (prisma/migrations/20261016190000_super_admin_exclusions/migration.sql:28-38), so a race can report the wrong reason.
+  - Mapped but practically unreachable: 404 ORGANIZATION.EMPLOYEE_NOT_FOUND via lockEmployeeForShare (employee.repo.ts:150 via service:46) if the successor's employee row is missing. The 404 description names only SUCCESSOR_NOT_FOUND.
+  - A plain Error at super-admin-transfer.service.ts:36 (before installation) gives undeclared 500.
+- `vendorGroupCreate`
+  - PATTERN_INVALID named but unreachable: a group has no patterns, cleanPatterns is never called
+  - UPDATE_EMPTY named but unreachable on a create
+  - DOMAIN_INVALID, PATTERN_INVALID, TOO_MANY_VALUES, UPDATE_EMPTY named without the VENDOR_DICTIONARY. prefix
+  - details not described: DOMAIN_INVALID details.value, TOO_MANY_VALUES details.limit
+- `vendorGroupUpdate`
+  - PATTERN_INVALID named but unreachable (groups have no patterns)
+  - codes after the first named without the VENDOR_DICTIONARY. prefix
+  - order: UPDATE_EMPTY/NAME/DOMAIN 422 are judged before the group lookup, so a bad body on a missing id gives 422, not 404
+- `vendorList`
+  - 422 text says 'The id or the query is invalid' but the route has no id parameter
+- `vendorProposalResolve`
+  - order: RESOLUTION_INVALID (422) is checked before the proposal lookup, then ALREADY_RESOLVED before SERVICE_LINE_NOT_FOUND
+- `vendorServiceLineCreate`
+  - UPDATE_EMPTY named but unreachable on a create
+  - codes after the first named without the VENDOR_DICTIONARY. prefix
+  - order: value 422s come before the group lookup 404
+- `vendorServiceLineUpdate`
+  - codes after the first named without the VENDOR_DICTIONARY. prefix
+- `vendorTaxEstimate`
+  - '(MONEY_*)' is a wildcard: the real codes are MONEY_SCALE_EXCEEDED and MONEY_OUT_OF_RANGE
+  - a malformed amount answers VALIDATION_ERROR (with the MoneyMalformedError message, no details), not a MONEY_* code
+  - a negative netAmount answers MONEY_OUT_OF_RANGE (tax-estimate.ts:35); not described
+  - RATE_OUT_OF_RANGE has a path (tax-estimate.ts:41) but stored rates are always <=100%, so it cannot happen
+  - order: the vendor 404 comes before the money checks
+- `vendorTaxProfileGet`
+  - 422 text says 'The id or the query' but the route has no query DTO
+- `vendorTaxProfileSet`
+  - TAX_TYPE_DUPLICATE, RATE_INVALID, TOO_MANY_LINES named without the VENDOR_TAX_PROFILE. prefix
+  - RATE_INVALID details.taxType not described
+  - order: the vendor 404 is checked before the lines are judged

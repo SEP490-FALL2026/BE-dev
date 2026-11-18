@@ -186,5 +186,8 @@ describe('AuthenticationGuard', () => {
     const entry = JSON.parse(written[0]) as { level: string; message: string; stack?: string };
     expect(entry.level).toBe('error');
     expect(entry.stack).toContain('ECONNREFUSED');
+    // The shared description of a failure: the kind and whether it can be retried, never the address in the message.
+    expect(entry.stack).toContain('retryable=true');
+    expect(entry.stack).not.toContain('10.0.0.5');
   });
 });

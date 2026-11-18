@@ -10,7 +10,14 @@ import { defaultMaxNewTokens } from '../../quality/lib/generate-adapter.mjs';
 
 class StoppingCriteriaBase {}
 
-const eos = (text, extra = {}) => ({ text, inputTokens: 5, generatedTokens: 6, endedWithEos: true, finishReason: 'eos', ...extra });
+const eos = (text, extra = {}) => ({
+  text,
+  inputTokens: 5,
+  generatedTokens: 6,
+  endedWithEos: true,
+  finishReason: 'eos',
+  ...extra,
+});
 
 /** Fake adapter: results[i] is a result object, or a function (opts, text) => result. It invokes the criterion once like the library. */
 function fakeAdapter(results, { callCriterion = true, onCall } = {}) {
@@ -47,13 +54,26 @@ test('all segments end with EOS: complete, outputs in order, handle and text pas
   assert.equal(d.deadlineHit, false);
   assert.equal(d.cancelled, false);
   assert.equal(d.reason, undefined);
-  assert.deepEqual(ad.calls.map((c) => c.text), ['a', 'b', 'c']);
+  assert.deepEqual(
+    ad.calls.map((c) => c.text),
+    ['a', 'b', 'c'],
+  );
   assert.ok(ad.calls.every((c) => c.handle.h === 1));
   assert.ok(d.stats.steps >= 3);
 });
 
 test('TRUNCATED: a segment that reaches max_new_tokens without EOS makes the whole job incomplete; no outputs; later segments are not run', async () => {
-  const ad = fakeAdapter([eos('A'), { text: 'half of a sente', inputTokens: 5, generatedTokens: 26, endedWithEos: false, finishReason: 'max_new_tokens' }, eos('C')]);
+  const ad = fakeAdapter([
+    eos('A'),
+    {
+      text: 'half of a sente',
+      inputTokens: 5,
+      generatedTokens: 26,
+      endedWithEos: false,
+      finishReason: 'max_new_tokens',
+    },
+    eos('C'),
+  ]);
   const d = await runJob(base({ translateSegment: ad.translateSegment }));
   assert.equal(d.complete, false);
   assert.equal(d.reason, 'TRUNCATED');
@@ -78,7 +98,10 @@ test('maxNewTokens override (tests/bench): an integer budget is passed through t
   const ad = fakeAdapter([eos('A', { maxNewTokens: 2 })]);
   await runJob(base({ segments: ['a'], maxNewTokensOverride: 2, translateSegment: ad.translateSegment }));
   assert.equal(ad.calls[0].opts.maxNewTokens, 2);
-  await assert.rejects(runJob(base({ segments: ['a'], maxNewTokensOverride: 0, translateSegment: ad.translateSegment })), (e) => e.code === 'BAD_MAX_NEW_TOKENS');
+  await assert.rejects(
+    runJob(base({ segments: ['a'], maxNewTokensOverride: 0, translateSegment: ad.translateSegment })),
+    (e) => e.code === 'BAD_MAX_NEW_TOKENS',
+  );
 });
 
 test('DEADLINE: criterion hit -> finishReason stopped -> done{complete:false, reason DEADLINE, deadlineHit}', async () => {
@@ -93,7 +116,9 @@ test('DEADLINE: criterion hit -> finishReason stopped -> done{complete:false, re
     ],
     { callCriterion: false },
   );
-  const d = await runJob(base({ segments: ['a', 'b'], computeDeadlineEpochMs: 1500, now: () => now, translateSegment: ad.translateSegment }));
+  const d = await runJob(
+    base({ segments: ['a', 'b'], computeDeadlineEpochMs: 1500, now: () => now, translateSegment: ad.translateSegment }),
+  );
   assert.equal(d.complete, false);
   assert.equal(d.reason, 'DEADLINE');
   assert.equal(d.deadlineHit, true);
@@ -156,23 +181,37 @@ test('fail closed on contradictory or unknown adapter results: incomplete, never
 });
 
 test('finishReason stopped without a deadline or cancel flag is INCOMPLETE (someone else stopped it)', async () => {
-  const ad = fakeAdapter([{ text: 'x', inputTokens: 1, generatedTokens: 1, endedWithEos: false, finishReason: 'stopped' }]);
+  const ad = fakeAdapter([
+    { text: 'x', inputTokens: 1, generatedTokens: 1, endedWithEos: false, finishReason: 'stopped' },
+  ]);
   const d = await runJob(base({ segments: ['a'], translateSegment: ad.translateSegment }));
   assert.equal(d.reason, 'INCOMPLETE');
 });
 
 test('criterion never invoked: cannot claim enforcement -> error CRITERION_NOT_INVOKED (thrown with a code)', async () => {
   const ad = fakeAdapter([eos('A')], { callCriterion: false });
-  await assert.rejects(runJob(base({ segments: ['a'], translateSegment: ad.translateSegment })), (e) => e.code === 'CRITERION_NOT_INVOKED');
+  await assert.rejects(
+    runJob(base({ segments: ['a'], translateSegment: ad.translateSegment })),
+    (e) => e.code === 'CRITERION_NOT_INVOKED',
+  );
 });
 
 test('adapter errors propagate (the worker maps them to RUN_FAILED; raw messages never leave the worker)', async () => {
-  const d = runJob(base({ segments: ['a'], translateSegment: async () => { throw new Error('secret text in message'); } }));
+  const d = runJob(
+    base({
+      segments: ['a'],
+      translateSegment: async () => {
+        throw new Error('secret text in message');
+      },
+    }),
+  );
   await assert.rejects(d, /secret/);
 });
 
 test('a TRUNCATED segment after a deadline-free first segment still reports only TRUNCATED, and a later deadline cannot hide it', async () => {
-  const ad = fakeAdapter([{ text: 'x', inputTokens: 5, generatedTokens: 26, endedWithEos: false, finishReason: 'max_new_tokens' }]);
+  const ad = fakeAdapter([
+    { text: 'x', inputTokens: 5, generatedTokens: 26, endedWithEos: false, finishReason: 'max_new_tokens' },
+  ]);
   const d = await runJob(base({ segments: ['a', 'b'], translateSegment: ad.translateSegment }));
   assert.equal(d.reason, 'TRUNCATED');
 });

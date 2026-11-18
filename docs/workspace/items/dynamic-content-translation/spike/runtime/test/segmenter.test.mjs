@@ -34,7 +34,10 @@ test('over-long segments are split at whitespace, never exceed maxChars, nothing
 
 test('a single token longer than maxChars is hard-cut', () => {
   const parts = splitSentences('x'.repeat(250), { maxChars: 100 });
-  assert.deepEqual(parts.map((p) => p.length), [100, 100, 50]);
+  assert.deepEqual(
+    parts.map((p) => p.length),
+    [100, 100, 50],
+  );
 });
 
 test('joinSegments joins with a single space', () => {
