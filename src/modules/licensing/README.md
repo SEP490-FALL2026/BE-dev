@@ -170,8 +170,7 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   `seats-needed/` (số seat cần của kỳ sau, `QĐ-103e`), `outcome/` (lõi ghi kết quả: kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
   `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`; route `/{id}/outcome` chỉ còn cho ca `DECIDED` cũ), `alerts/` (điểm điều chỉnh, cảnh báo đỏ gói năm, gói tháng giữ nguyên, chất lượng dữ liệu — `renewal-adjustment-alerts.policy.ts`), `deadline/`
   (sự cố tự gia hạn/đánh dấu hết hạn theo ngày gia hạn `end`); không còn bước trưởng phòng xác nhận (route `decision` đã gỡ). Đọc theo vai ở
-  `subscription-renewal-view.service.ts` + `readScopeOf` (IT Admin, Finance đọc mọi ca kể cả thuê bao kho không phòng sở hữu; trưởng phòng chỉ
-  ca của phòng mình); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; `subscription-renewal-ranking.policy.ts`
+  `subscription-renewal-view.service.ts` + `readScopeOf` (IT Admin, Finance đọc mọi ca; thuê bao không có phòng sở hữu, `QĐ-113g`; trưởng phòng không đọc); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; `subscription-renewal-ranking.policy.ts`
   còn cho route `seat-ranking` (deprecated). Ghi kết quả không tạo khoản cam kết ngân sách (`QĐ-62s`). Cột JSON
   `subscription_renewals.decision_snapshot` đi qua codec `subscription-renewal-decision-snapshot.json.ts` (spec cạnh file).
 - Gốc module (dùng chung nhiều capability): `licensing-audit-event.mapper.ts`, `licensing.http-errors.ts`;

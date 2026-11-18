@@ -165,7 +165,7 @@ export class DepartmentService {
   /**
    * Retires a department. Refused while anything keeps it in use, and the refusal lists each group with its first things and
    * its total (AC-19, `QĐ-90e`, `QĐ-86c`): the people in it, the service accounts it owns, the open work (Requests not over,
-   * personnel events waiting, open tasks) and the subscriptions and purchases it owns that still owe a payment. What the
+   * personnel events waiting, open tasks). A subscription has no owning department (`QĐ-113g`) and never keeps one in use. What the
    * department was, who headed it and what was charged to it stay as they were. Already retired ⟹ the same answer. Throws
    * DepartmentForbiddenError, DepartmentNotFoundError or DepartmentInUseError.
    */
@@ -183,7 +183,7 @@ export class DepartmentService {
       // A service account is owned by the department, not held by a member: it stays until its chain ends (`QĐ-86c`).
       const accounts = await this.serviceAccounts.get().ownedBy(id, today, IN_USE_LISTED, tx);
       const use = await this.use.readDepartment(id, today, IN_USE_LISTED, tx);
-      if (members.total > 0 || accounts.total > 0 || use.openWork.total > 0 || use.subscriptions.total > 0) {
+      if (members.total > 0 || accounts.total > 0 || use.openWork.total > 0) {
         throw new DepartmentInUseError({
           members: {
             items: members.items.map((member) => ({ employeeCode: member.employeeCode, fullName: member.fullName })),
@@ -191,7 +191,6 @@ export class DepartmentService {
           },
           serviceAccounts: accounts,
           openWork: use.openWork,
-          subscriptions: use.subscriptions,
         });
       }
 

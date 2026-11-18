@@ -87,42 +87,22 @@ describe('the final release over a database the compatibility release ran on (in
     expect(rows).toEqual([{ total: committedMigrations().length, open: 0, rolled: 0 }]);
   });
 
-  describe('the owner department of a subscription (migration (B), F02)', () => {
-    it('copies the department of the recorded basis, keeps the one that was set, writes one SYSTEM audit record for each copy', async () => {
-      const { rows } = await sql.query<{ id: string; owner_department_id: string }>(
-        `SELECT id, owner_department_id FROM subscriptions WHERE id = ANY($1::uuid[]) ORDER BY id`,
-        [[ids.assigned, ids.ownedAlready]],
+  describe('the owner department of a subscription is gone (migration (B) set it, `drop_subscription_owner_department` removes it)', () => {
+    it('drops the column, the table of the recorded assignments and the guard of the owner, and keeps the subscriptions', async () => {
+      const column = await sql.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'owner_department_id'`,
       );
-      const owner = Object.fromEntries(rows.map((row) => [row.id, row.owner_department_id]));
-      expect(owner[ids.assigned]).toBe(world.departments.ops);
-      expect(owner[ids.ownedAlready]).toBe(world.departments.eng);
-
-      const audit = await sql.query<{ resource_id: string; actor_kind: string; correlation_id: string }>(
-        `SELECT resource_id, actor_kind, correlation_id FROM audit_events WHERE action = 'SUBSCRIPTION.OWNER_SET_FROM_ASSIGNMENT'`,
+      expect(column.rows).toEqual([]);
+      const table = await sql.query<{ assignments: string | null }>(
+        `SELECT to_regclass('subscription_owner_assignments')::text AS assignments`,
       );
-      expect(audit.rows.map((row) => [row.resource_id, row.actor_kind])).toEqual([[ids.assigned, 'SYSTEM']]);
-      expect(audit.rows[0].correlation_id).toContain('subscription_owner_required');
-    });
-
-    // Rewritten for QĐ-103d: `shared_pool_grant` (the migration after this one) makes the column nullable, so a subscription no department owns is
-    // stored (the insert with no department was 23502); the department a subscription has stays unchangeable. W5 drops the column.
-    it('leaves the department nullable (shared pool) and unchangeable once set', async () => {
-      const column = await sql.query<{ is_nullable: string }>(
-        `SELECT is_nullable FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'owner_department_id'`,
-      );
-      expect(column.rows).toEqual([{ is_nullable: 'YES' }]);
+      expect(table.rows).toEqual([{ assignments: null }]);
+      const kept = await sql.query<{ id: string }>(`SELECT id FROM subscriptions WHERE id = ANY($1::uuid[])`, [
+        [ids.assigned, ids.ownedAlready],
+      ]);
+      expect(kept.rows).toHaveLength(2);
       expect(
-        await sqlState(sql, `UPDATE subscriptions SET owner_department_id = $2 WHERE id = $1`, [
-          ids.assigned,
-          world.departments.eng,
-        ]),
-      ).toBe('23514');
-      expect(
-        await sqlState(
-          sql,
-          `UPDATE subscriptions SET owner_department_id = owner_department_id, purchased_quantity = 4 WHERE id = $1`,
-          [ids.assigned],
-        ),
+        await sqlState(sql, `UPDATE subscriptions SET purchased_quantity = 4 WHERE id = $1`, [ids.assigned]),
       ).toBeNull();
     });
   });

@@ -4,8 +4,8 @@ const r = (scenario: DemoRequestScenario): DemoRequestScenario => scenario;
 
 /*
  * The eighteen requests of SPEC S10b, sent after the thirty-one of `requests.ts`, in the states the demo still lacked: a refusal of the spending
- * approver, three kinds of return to the requester, a refusal of IT, a grant being worked, one that failed, one withdrawn while the task waits to be
- * closed, a group with one person refused, an internal system, and the queues of the heads. They keep to the invariants of the dataset (SPEC 4.2): no
+ * approver, three kinds of return to the requester, a refusal of IT, a grant being worked, two that failed (the task closed as failed by IT, SBF-17;
+ * withdrawing a request that is being granted is no longer possible, `QĐ-113d`), a group with one person refused, an internal system, and the queues of the heads. They keep to the invariants of the dataset (SPEC 4.2): no
  * request in Marketing, Design or Sales (R10, R21 and R11 keep their budgets), the old people send nothing but the heads of Finance, the Board and
  * IT, nobody asks for a plan they hold, and a person has at most three requests open at once.
  *
@@ -195,9 +195,10 @@ export const REQUESTS_EXTRA: DemoRequestScenario[] = [
     requester: 'NV-ITO2',
     plan: 'zoom-pro',
     termMonths: 1,
-    target: 'AWAITING_IT_CLOSE',
+    target: 'FAILED',
     grant: 'POOL',
-    summary: 'Tác vụ cấp quyền báo lỗi; người gửi rút Request nên nó chờ IT đóng tác vụ rồi mới kết thúc.',
+    summary:
+      'Đã duyệt chi, tác vụ cấp quyền báo lỗi vĩnh viễn: IT Admin đóng tác vụ là thất bại (SBF-17) và Request thất bại; người gửi không rút được vì đã có quyết định (QĐ-113d).',
   }),
   r({
     key: 'R54',

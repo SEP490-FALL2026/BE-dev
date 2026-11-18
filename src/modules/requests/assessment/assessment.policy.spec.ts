@@ -7,6 +7,7 @@ import {
   internalRegistrationBasis,
   judgeCompletion,
   missingFields,
+  monthlyPriceOfQuote,
   registeredShapeOf,
 } from './assessment.policy';
 
@@ -329,5 +330,28 @@ describe('the scope of the assessment of a proposal', () => {
   it('is the plan alone when the proposal names an application of the catalog, the whole otherwise', () => {
     expect(assessmentScopeOf({ existingApplicationId: 'app-1' })).toBe('PLAN_ONLY');
     expect(assessmentScopeOf({ existingApplicationId: null })).toBe('FULL');
+  });
+});
+
+describe('QĐ-113a: the monthly price a quote gives the reference price of the plan', () => {
+  const quoteOf = (amountMinor: bigint, billingCycle: Quote['billingCycle']): Quote => ({
+    ...quote,
+    unitPrice: { amountMinor, currency: 'VND' },
+    billingCycle,
+  });
+
+  it('keeps a monthly quote as it is', () => {
+    expect(monthlyPriceOfQuote(quoteOf(500_000n, 'MONTHLY'))).toEqual({ amountMinor: 500_000n, currency: 'VND' });
+  });
+
+  it('divides a quarterly quote by 3 and an annual one by 12', () => {
+    expect(monthlyPriceOfQuote(quoteOf(1_500_000n, 'QUARTERLY')).amountMinor).toBe(500_000n);
+    expect(monthlyPriceOfQuote(quoteOf(6_000_000n, 'ANNUAL')).amountMinor).toBe(500_000n);
+  });
+
+  it('rounds up to the dong', () => {
+    expect(monthlyPriceOfQuote(quoteOf(1_000_000n, 'QUARTERLY')).amountMinor).toBe(333_334n);
+    expect(monthlyPriceOfQuote(quoteOf(1_000_001n, 'ANNUAL')).amountMinor).toBe(83_334n);
+    expect(monthlyPriceOfQuote(quoteOf(0n, 'ANNUAL')).amountMinor).toBe(0n);
   });
 });

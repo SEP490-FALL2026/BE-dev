@@ -119,7 +119,13 @@ export class AccessRequestWithdrawalRefusedError extends Error {
   constructor(
     readonly reason: WithdrawalRefusal,
     /** What the refusal points the person to: the seat the grant made, when the way on is a return, or the people it is about. */
-    readonly details: { assignmentId?: string; employeeIds?: readonly string[] } | null = null,
+    readonly details: {
+      assignmentId?: string;
+      employeeIds?: readonly string[];
+      /** The state of what was decided: the person's line (`scope` LINE) or the request (`scope` REQUEST). */
+      state?: string;
+      scope?: 'LINE' | 'REQUEST';
+    } | null = null,
   ) {
     super(`The request cannot be withdrawn: ${reason}.`);
     this.name = 'AccessRequestWithdrawalRefusedError';

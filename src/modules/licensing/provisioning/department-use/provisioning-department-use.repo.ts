@@ -14,22 +14,18 @@ export class ProvisioningDepartmentUseRepo {
 
   /**
    * The first `take` open tasks (queued, waiting for a retry, being worked or failed; a grant or a revocation) whose assignment belongs
-   * to the department, by id, and how many there are in all. An assignment belongs to the department that is its owning department,
-   * or, when it has none (a seat written before a personal seat carried it), the one that owns its subscription
-   * (`subscriptionIds`, asked of the catalog).
+   * to the department, by id, and how many there are in all. An assignment belongs to the department that is its owning department;
+   * a subscription has no owning department (`QĐ-113g`), so it never makes a task the department's.
    */
   async openOfDepartment(
     departmentId: string,
-    subscriptionIds: readonly string[],
     take: number,
     tx?: DbTx,
   ): Promise<{ items: { taskId: string; planId: string }[]; total: number }> {
     const db = tx ?? this.prisma;
     const where = {
       status: { in: [...OPEN_GRANT_TASK_STATUSES] },
-      assignment: {
-        OR: [{ owningDepartmentId: departmentId }, { subscriptionId: { in: [...subscriptionIds] } }],
-      },
+      assignment: { owningDepartmentId: departmentId },
     };
     const rows = await db.provisioningTask.findMany({
       where,

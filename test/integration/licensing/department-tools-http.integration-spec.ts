@@ -117,9 +117,9 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     await enter(finance.code, 'F-1');
 
     // Figma and GitHub belong to design, Slack to finance; a person of one department holds a seat on a subscription of the other (F22).
-    figmaSubscription = await h.subscription(10, 'K2', design.id);
-    githubSubscription = await h.subscription(10, 'K1', design.id);
-    const slackSubscription = await h.subscription(10, 'K2', finance.id);
+    figmaSubscription = await h.subscription(10, 'K2');
+    githubSubscription = await h.subscription(10, 'K1');
+    const slackSubscription = await h.subscription(10, 'K2');
     const person = (code: string, prefix = '') => ({
       employee_code: code,
       account_identifier: `${prefix}${code.toLowerCase()}@acme.vn`,
@@ -206,7 +206,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
 
     beforeAll(async () => {
       trm = await department('P-TRM');
-      trmSubscription = await h.subscription(20, 'K1', trm.id);
+      trmSubscription = await h.subscription(20, 'K1');
     });
 
     /** A person of the department with a seat from long ago on its K1 subscription; extra columns of the file go with it. */

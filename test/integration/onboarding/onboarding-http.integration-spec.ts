@@ -284,7 +284,6 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
       .post('/api/v1/subscriptions')
       .set(as(it1))
       .send({
-        ownerDepartmentId: seed.departmentId,
         planId: (plan.body as { data: { id: string } }).data.id,
         kind: 'TERM',
         purchasedQuantity: 100,

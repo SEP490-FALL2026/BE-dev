@@ -118,10 +118,10 @@ describe('reporting currency integrity (integration, DB-01 and DB-02 of the post
 
   /** A draft subscription whose price was recorded in `currency` and frozen into `reportingCurrency` at rate 1. */
   const insertPriced = (f: Fixture, currency: string, reportingCurrency: string): [string, unknown[]] => [
-    `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, unit_price_minor,
+    `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, unit_price_minor,
        unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source, price_reporting_minor,
        price_reporting_currency)
-     VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'TERM', 'DRAFT', 1000, $4, '2026-09-01', 1, '2026-09-01', 'SAME_CURRENCY', 1000, $5)`,
+     VALUES ($1, $2, $3, 'TERM', 'DRAFT', 1000, $4, '2026-09-01', 1, '2026-09-01', 'SAME_CURRENCY', 1000, $5)`,
     [randomUUID(), f.organizationId, f.planId, currency, reportingCurrency],
   ];
 

@@ -10,7 +10,8 @@ const h = new ProvisioningHarness();
 /**
  * F15 (`QĐ-90e`, spec B): licensing tells the organization which provisioning tasks are still open for a department, so that it cannot
  * be retired while seats of it are being granted or taken away. A task is open while it is queued, waiting for its retry, being worked
- * or failed; it belongs to the department that owns its seat, or, for a seat that carries none, to the owner of its subscription.
+ * or failed; it belongs to the department that owns its seat. A subscription has no owning department (`QĐ-113g`), so a seat that carries
+ * none is nobody's through its subscription.
  * Read through `OrganizationApi.getDepartmentUse`, the way retiring a department reads it, on real PostgreSQL.
  */
 describe('what keeps a department in use: the open provisioning tasks (integration, F15)', () => {
@@ -21,6 +22,7 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
   let ownerSubscription: string;
   let ownerPlan: string;
   const open: string[] = [];
+  let unowned: string;
   let counter = 0;
 
   const use = async (departmentId: string, limit = 50) => {
@@ -32,8 +34,8 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
   };
   const granted = async (subscriptionId: string, planId: string, departmentId: string) =>
     h.granted(await h.person(`E-OW${(counter += 1)}`), planId, { subscriptionId, departmentId });
-  const subscriptionOf = async (departmentId: string) => {
-    const subscriptionId = await h.subscription(20, 'K2', departmentId);
+  const subscriptionOf = async () => {
+    const subscriptionId = await h.subscription(20, 'K2');
 
     return { subscriptionId, planId: await h.planOf(subscriptionId) };
   };
@@ -68,7 +70,7 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
     owner = await h.department('P-OWNER');
     other = await h.department('P-OTHER');
     nothing = await h.department('P-NOTHING');
-    ({ subscriptionId: ownerSubscription, planId: ownerPlan } = await subscriptionOf(owner.id));
+    ({ subscriptionId: ownerSubscription, planId: ownerPlan } = await subscriptionOf());
 
     // Open: a queued task, one being worked, one that failed (a grant of a seat on a subscription of the department).
     open.push((await granted(ownerSubscription, ownerPlan, owner.id)).id);
@@ -79,8 +81,8 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
     await h.claim(failed.id).expect(200);
     await h.fail(failed.id, { reason: 'could not be done' }).expect(200);
     open.push(failed.id);
-    // Open, found through the subscription: a seat made before a personal seat carried its department has none of its own.
-    open.push(await legacyTask());
+    // Open but nobody's: a seat made before a personal seat carried its department has none, and the subscription owns none (QĐ-113g).
+    unowned = await legacyTask();
 
     // Not open: a task that is done and one closed as failed.
     const done = await granted(ownerSubscription, ownerPlan, owner.id);
@@ -91,7 +93,7 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
     await h.fail(closed.id, { reason: 'no' }).expect(200);
     await h.closeFailed(closed.id, { reason: 'not wanted' }).expect(200);
     // Another department's seat is not this one's.
-    const elsewhere = await subscriptionOf(other.id);
+    const elsewhere = await subscriptionOf();
     await granted(elsewhere.subscriptionId, elsewhere.planId, other.id);
   }, 300000);
 
@@ -99,10 +101,11 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
     await h.stop();
   });
 
-  it('lists the tasks that are open for the department, by id, whether the seat carries the department or only its subscription does', async () => {
+  it('lists the tasks that are open for the department, by id, for the seats that carry the department and not for a seat that carries none', async () => {
     const { items, total } = await use(owner.id);
 
-    expect(total).toBe(4);
+    expect(total).toBe(3);
+    expect(items.map((item) => item.id)).not.toContain(unowned);
     expect(items.map((item) => item.id)).toEqual([...open].sort());
     for (const item of items) expect(item.label).toMatch(/ \/ /);
   });
@@ -127,7 +130,7 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
   it('is bounded: a page shorter than the total names the first by id and still counts them all', async () => {
     const { items, total } = await use(owner.id, 2);
 
-    expect(total).toBe(4);
+    expect(total).toBe(3);
     expect(items.map((item) => item.id)).toEqual([...open].sort().slice(0, 2));
   });
 

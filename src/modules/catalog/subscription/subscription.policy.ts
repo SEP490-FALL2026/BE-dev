@@ -292,3 +292,8 @@ export function declaredStateOf<B extends string, C extends number>(input: {
     isPrimaryForPlan: false,
   };
 }
+
+/** An edit made on a read of the row is stale when the row's `updated_at` (kept to the millisecond, `Timestamptz(3)`) is no longer that read; no read named means no check. */
+export function isStaleEdit(expectedUpdatedAt: Date | undefined, currentUpdatedAt: Date): boolean {
+  return expectedUpdatedAt !== undefined && expectedUpdatedAt.getTime() !== currentUpdatedAt.getTime();
+}

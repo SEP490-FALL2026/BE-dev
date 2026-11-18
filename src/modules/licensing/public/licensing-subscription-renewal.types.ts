@@ -3,7 +3,6 @@ import type { BusinessDate } from '../../../core/business-date';
 /** The period a renewal is decided on, as the module that owns budgets and costs reads it to build the snapshot of the decider. */
 export interface RenewalFinancialSubject {
   subscriptionId: string;
-  ownerDepartmentId: string;
   /** The day the next period would begin (the renewal date, else the day after the end): its fiscal year is the one shown. */
   renewalOn: BusinessDate | null;
   purchasedQuantity: number | null;

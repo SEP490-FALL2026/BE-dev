@@ -12,6 +12,7 @@
  * - NO_EXAMPLE_RESPONSES: declared error responses the running system cannot answer yet, so they show no example (their declaration
  *   says why in `noExampleBecause`). The list only shrinks: the slice that makes one reachable adds its examples and removes the entry.
  */
+import { SUCCESS_MESSAGES_ORGANIZATION } from './openapi-example-messages-organization';
 import { SUCCESS_MESSAGES_POLICIES } from './openapi-example-messages-policies';
 import { ROUTE_ERROR_CODES_AI_ASSIST } from './openapi-example-route-codes-ai-assist';
 import { ROUTE_ERROR_CODES_BUDGETS } from './openapi-example-route-codes-budgets';
@@ -38,6 +39,7 @@ export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '
 export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   ...SUCCESS_MESSAGES_DEVICES,
   ...SUCCESS_MESSAGES_OPTIMIZATION,
+  ...SUCCESS_MESSAGES_ORGANIZATION,
   ...SUCCESS_MESSAGES_POLICIES,
   ...SUCCESS_MESSAGES_PURCHASE_INVOICE,
   ...SUCCESS_MESSAGES_USAGE,
@@ -160,9 +162,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   costCenterList: 'COST_CENTER.LISTED',
   costCenterRename: 'COST_CENTER.RENAMED',
   currencyList: 'CURRENCY.LISTED',
-  departmentCreate: 'DEPARTMENT.CREATED',
-  departmentDeactivate: 'DEPARTMENT.DEACTIVATED',
-  departmentGet: 'DEPARTMENT.FETCHED',
   departmentHeadAssign: 'DEPARTMENT.HEAD_ASSIGNED',
   departmentHeadVacate: 'DEPARTMENT.HEAD_VACATED',
   departmentList: 'DEPARTMENT.LISTED',
@@ -188,7 +187,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   departmentTransferPreview: 'DEPARTMENT_TRANSFER.PREVIEWED',
   departmentTransferRecord: 'DEPARTMENT_TRANSFER.RECORDED',
   departmentTransferReschedule: 'DEPARTMENT_TRANSFER.RESCHEDULED',
-  departmentUpdate: 'DEPARTMENT.UPDATED',
   departmentWarningList: 'DEPARTMENT.WARNINGS_LISTED',
   documentAttach: 'DOCUMENT.ATTACHED',
   documentComplete: 'DOCUMENT.UPLOADED',

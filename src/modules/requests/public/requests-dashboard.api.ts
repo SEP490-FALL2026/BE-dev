@@ -34,11 +34,11 @@ export class RequestsDashboardApi {
   }
 
   /**
-   * How many periods of a right paid by the month or the year have no invoice five working days after their payment day, in these departments
-   * (`PI-2`): the number `GET /purchase-invoices/missing-periods` answers as its total for an IT Admin who works them.
+   * How many periods of a right paid by the month or the year have no invoice five working days after their payment day, in the requests of
+   * these departments and in the subscriptions this IT Admin answers for (`PI-2`): the number `GET /purchase-invoices/missing-periods` answers as its total for them.
    */
-  async missingInvoicePeriods(departmentIds: readonly string[]): Promise<number> {
-    return this.missingInvoices.countOf({ kind: 'DEPARTMENTS', departmentIds });
+  async missingInvoicePeriods(departmentIds: readonly string[], responsibleItAdminEmployeeId: string): Promise<number> {
+    return this.missingInvoices.countOf({ kind: 'DEPARTMENTS', departmentIds, responsibleItAdminEmployeeId });
   }
 
   /**

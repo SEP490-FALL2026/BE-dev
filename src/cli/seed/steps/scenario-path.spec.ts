@@ -72,12 +72,14 @@ describe('the paths to the remaining states of a request (T10, S10a)', () => {
     ['AWAITING_IT_ASSESSMENT', null, goal('IT_REJECTED'), 'ASSESSMENT_REJECT'],
     ['AWAITING_EXECUTION', null, goal('EXECUTING'), 'GRANT'],
     ['AWAITING_EXECUTION', null, goal('FAILED'), 'GRANT'],
-    ['AWAITING_EXECUTION', null, goal('AWAITING_IT_CLOSE'), 'GRANT'],
     // Review 1 (C-3): the state of the task of the grant goes beside the state of the request.
     ['EXECUTING', 'QUEUED', goal('FAILED'), 'FAIL_TASK_OPEN'],
     ['EXECUTING', 'FAILED', goal('FAILED'), 'FAIL_TASK_CLOSE'],
-    ['EXECUTING', 'QUEUED', goal('AWAITING_IT_CLOSE'), 'FAIL_TASK_OPEN'],
-    ['EXECUTING', 'FAILED', goal('AWAITING_IT_CLOSE'), 'WITHDRAW'],
+    // QĐ-113d: the requester withdraws only before the first decision; once sent back, the withdrawal ends the request.
+    ['PENDING', null, goal('WITHDRAWN_AFTER_RETURN'), 'NEED_RETURN'],
+    ['AWAITING_REQUESTER_REVISION', null, goal('WITHDRAWN_AFTER_RETURN'), 'WITHDRAW'],
+    ['WITHDRAWN', null, goal('WITHDRAWN_AFTER_RETURN'), null],
+    ['AWAITING_REQUESTER_REVISION', null, goal('AWAITING_REQUESTER_REVISION', { returnAt: 'NEED' }), null],
     ['EXECUTING', null, goal('EXECUTING'), null],
     ['EXECUTING', 'QUEUED', goal('COMPLETED'), 'COMPLETE_TASK'],
     ['PENDING', null, goal('PENDING_OR_CANCELLED'), null],

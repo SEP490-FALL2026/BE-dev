@@ -8,22 +8,29 @@ import type {
 } from './subscription-renewal.dto';
 import type { DeadlineEventRecord, ReleasedSeat, RenewalRecord } from './subscription-renewal.types';
 
-/** The subscription of a case; `ownerDepartmentId` is null for one of the shared pool (a K2 workspace no department owns). */
-const briefOf = (period: RenewalPeriodFacts) => ({
+/** The subscription of a case. */
+export type ItAdminWire = { employeeId: string; employeeCode: string; fullName: string };
+
+const briefOf = (period: RenewalPeriodFacts, admins: ReadonlyMap<string, ItAdminWire>) => ({
   id: period.subscriptionId,
   planId: period.planId,
   planName: period.planName,
   applicationId: period.applicationId,
   applicationName: period.applicationName,
-  ownerDepartmentId: period.ownerDepartmentId,
+  provisioningType: period.provisioningType,
+  responsibleItAdmin: (period.responsibleItAdminEmployeeId && admins.get(period.responsibleItAdminEmployeeId)) || null,
 });
 
 /** A case as a list shows it: the period it is about, the milestone, the choice proposed and where the case stands. */
-export function toRenewalSummary(record: RenewalRecord, period: RenewalPeriodFacts): RenewalSummaryWire {
+export function toRenewalSummary(
+  record: RenewalRecord,
+  period: RenewalPeriodFacts,
+  admins: ReadonlyMap<string, ItAdminWire>,
+): RenewalSummaryWire {
   return {
     id: record.id,
     state: record.state,
-    subscription: briefOf(period),
+    subscription: briefOf(period, admins),
     milestone: { basis: record.noticeBasis, baseDate: record.noticeBaseDate },
     proposedChoice: record.proposedChoice,
     proposedQuantity: record.proposedQuantity,
@@ -64,6 +71,7 @@ export function toRenewalDetail(
   record: RenewalRecord,
   context: {
     period: RenewalPeriodFacts;
+    admins: ReadonlyMap<string, ItAdminWire>;
     seatsInUse: number;
     usageAvailable: boolean;
     released: readonly ReleasedSeat[];
@@ -78,7 +86,7 @@ export function toRenewalDetail(
   const { decision, outcome } = record;
 
   return {
-    ...toRenewalSummary(record, period),
+    ...toRenewalSummary(record, period, context.admins),
     period: {
       purchasedQuantity: period.purchasedQuantity,
       billingCycle: period.billingCycle,
@@ -114,10 +122,14 @@ export function toRenewalDetail(
   };
 }
 
-export function toDeadlineEvent(event: DeadlineEventRecord, period: RenewalPeriodFacts): DeadlineEventWire {
+export function toDeadlineEvent(
+  event: DeadlineEventRecord,
+  period: RenewalPeriodFacts,
+  admins: ReadonlyMap<string, ItAdminWire>,
+): DeadlineEventWire {
   return {
     id: event.id,
-    subscription: briefOf(period),
+    subscription: briefOf(period, admins),
     kind: event.kind,
     milestoneDate: event.noticeBaseDate,
     autoRenewAtTime: event.autoRenewAtTime,

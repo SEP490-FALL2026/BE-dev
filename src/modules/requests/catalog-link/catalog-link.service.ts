@@ -15,7 +15,7 @@ import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import { CatalogLinkApplicationMismatchError, CatalogLinkRefusedError } from '../assessment/assessment.errors';
-import { canLinkCatalogPlan } from '../assessment/assessment.policy';
+import { canLinkCatalogPlan, monthlyPriceOfQuote } from '../assessment/assessment.policy';
 import { AssessmentTermFitService } from '../assessment/assessment-term-fit.service';
 import { CatalogLinkDepartmentListService } from './catalog-link-department-list.service';
 
@@ -37,6 +37,7 @@ export interface CatalogLinked {
  * plan of that application (`QĐ-53c`: software that is new goes through the gate of the control level); a proposal of software that is new links to any plan.
  * The plan can be of another kind than the one the assessment concluded, so the months of the request are judged again by the kind of the plan
  * (`AssessmentTermFitService`, the rule of the completion): a plan bought once clears them, a plan that does not take them refuses the link.
+ * The approved quote (per month: a quarterly one over 3, an annual one over 12, rounded up to the dong) becomes the reference price of a K1 or K2 plan that has none (`QĐ-113a`).
  */
 @Injectable()
 export class CatalogLinkService {
@@ -72,6 +73,7 @@ export class CatalogLinkService {
       const fitted = await this.termFit.fitToLinkedPlan(tx, request, target.provisioningType, new Date());
 
       await this.requests.setPlan(tx, requestId, input.planId);
+      const referencePriceAdopted = await this.adoptQuotePrice(tx, actor, requestId, input.planId);
       const departmentList =
         input.addToDepartmentList === true
           ? await this.departmentList.add(tx, actor, request.departmentId, target.applicationId, input.planId)
@@ -94,6 +96,7 @@ export class CatalogLinkService {
             // The time of use the request keeps, and the months a plan bought once cleared from it (`QĐ-111i`).
             termMonths: fitted.request.termMonths,
             termMonthsCleared: fitted.termMonthsCleared,
+            referencePriceAdopted,
           },
         ),
       );
@@ -103,6 +106,18 @@ export class CatalogLinkService {
 
       return { request: linked, departmentList };
     });
+  }
+
+  /** The approved quote of a case B request becomes the reference price of a K1 or K2 plan that has none (`QĐ-113a`); whether it did. */
+  private async adoptQuotePrice(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    requestId: string,
+    planId: string,
+  ): Promise<boolean> {
+    const quote = (await this.assessments.findAssessment(requestId, tx))?.quote ?? null;
+
+    return quote ? this.catalog.adoptPlanQuotePrice(actor, planId, monthlyPriceOfQuote(quote), tx) : false;
   }
 
   /**

@@ -39,7 +39,7 @@ export interface ItAdminDashboard {
  * `a10-it-admin-dashboard`); `subscriptionRenewalList` lists only the cases already proposed, so it is not the source either. The discrepancies
  * (people active in a vendor with no seat to cover the day, `FR-4.8`) are the open findings of the vendor usage import; the company machines whose holder has not
  * acknowledged the notice are counted from the register of the organization (`unconfirmedDevices`, the total `deviceList` answers for that state). The recommendations of wasted seats are counted as the `G2` not closed plus the `G1` open of the whole organization (`ghostSeats`).
- * The periods of a right paid by the month or the year whose invoice is five working days late are counted in the departments in scope (`missingInvoicePeriods`, `PI-2`).
+ * The periods of a right paid by the month or the year whose invoice is five working days late are counted in the requests of the departments in scope and the subscriptions the caller answers for (`missingInvoicePeriods`, `PI-2`).
  * The cases outside the process on a company asset whose revocation is due now (nobody to wait for, or the ten working days of the wait passed) are counted for the whole
  * organization (`outOfProcessRevocationsDue`, `US-13-05` AC-23); the cases are not of a department.
  * The progress of the departures and the transfers of those departments (`departures`, `transfers`), the seats of the shared pools got back in the tasks
@@ -72,7 +72,11 @@ export class ItAdminDashboardService {
       responsibleEmployeeId: actor.employeeId,
     });
     const organization = await this.organizationReads.getOrganization();
-    const counts = await this.facts.read({ organizationId: organization?.id ?? null, departmentIds });
+    const counts = await this.facts.read({
+      organizationId: organization?.id ?? null,
+      employeeId: actor.employeeId,
+      departmentIds,
+    });
 
     return {
       asOf: today,

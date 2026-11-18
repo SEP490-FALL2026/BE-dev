@@ -59,20 +59,18 @@ export class DepartmentUpdateEmptyError extends Error {
 /**
  * What still keeps a department in use, group by group: each holds the first of its things and how many there are in all
  * (`US-03-06` AC-19, `QĐ-90e`, `QĐ-86c`). The first group is the people in it, the second the service accounts it owns, the third the
- * open work (Requests not over, personnel events waiting, tasks open) and the last the subscriptions and purchases it owns that
- * still owe a payment.
+ * open work (Requests not over, personnel events waiting, tasks open). A subscription has no owning department, so none keeps it in use.
  */
 export interface DepartmentInUseGroups {
   members: { items: { employeeCode: string; fullName: string }[]; total: number };
   serviceAccounts: { items: { assignmentId: string; accountIdentifier: string }[]; total: number };
   openWork: { items: UseItem[]; total: number };
-  subscriptions: { items: UseItem[]; total: number };
 }
 
 /** Something still keeps the department in use, so it cannot be retired. */
 export class DepartmentInUseError extends Error {
   constructor(readonly groups: DepartmentInUseGroups) {
-    super('The department still has members, service accounts, open work or subscriptions that owe a payment.');
+    super('The department still has members, service accounts, or open work.');
     this.name = 'DepartmentInUseError';
   }
 }
@@ -154,5 +152,37 @@ export class DepartmentCodeInvalidError extends Error {
       'Department code must be 2 to 20 uppercase letters or digits in groups separated by single hyphens (e.g. P-ENG).',
     );
     this.name = 'DepartmentCodeInvalidError';
+  }
+}
+
+/** No file came with the request of a department picture (`QĐ-113c`). */
+export class DepartmentAvatarFileRequiredError extends Error {
+  constructor() {
+    super('Send the picture as the form field "file".');
+    this.name = 'DepartmentAvatarFileRequiredError';
+  }
+}
+
+/** The picture is larger than one megabyte. */
+export class DepartmentAvatarTooLargeError extends Error {
+  constructor() {
+    super('The picture is larger than 1 MiB.');
+    this.name = 'DepartmentAvatarTooLargeError';
+  }
+}
+
+/** By its first bytes the file is not a png, jpeg or webp. */
+export class DepartmentAvatarTypeUnsupportedError extends Error {
+  constructor() {
+    super('The picture must be a png, jpeg or webp.');
+    this.name = 'DepartmentAvatarTypeUnsupportedError';
+  }
+}
+
+/** The picture is empty, or is not the type it declares. */
+export class DepartmentAvatarInvalidError extends Error {
+  constructor(readonly reason: 'EMPTY' | 'TYPE_MISMATCH') {
+    super(reason === 'EMPTY' ? 'The picture is empty.' : 'The picture is not the type it says it is.');
+    this.name = 'DepartmentAvatarInvalidError';
   }
 }

@@ -29,6 +29,8 @@ import { RevocationOverdueService } from './departure-deadline/revocation-overdu
 import { DepartmentMemberQueryService } from './department-member/department-member-query.service';
 import { DepartmentOpenWorkReader } from './event-notice/department-open-work.listener';
 import { DepartmentOpenWorkRepo } from './event-notice/department-open-work.repo';
+import { FirstPlacementPersonnelReader } from './event-notice/first-placement-personnel.listener';
+import { FirstPlacementPersonnelRepo } from './event-notice/first-placement-personnel.repo';
 import { PersonnelGroundsDateService } from './personnel-grounds-date.service';
 import { PersonnelNotifier } from './event-notice/personnel-notifier.service';
 import { LeaveDepartureService } from './leave/leave-departure.service';
@@ -228,6 +230,8 @@ import { ItHandoverViewService } from './it-handover/it-handover-view.service';
     TransferRepo,
     DepartmentOpenWorkRepo,
     DepartmentOpenWorkReader,
+    FirstPlacementPersonnelRepo,
+    FirstPlacementPersonnelReader,
     PersonnelNotifier,
     TransferGuardService,
     TransferSettlementService,

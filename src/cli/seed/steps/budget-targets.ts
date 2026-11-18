@@ -85,12 +85,7 @@ function spentThrough(fixture: Basis, today: Day, department: string, month: num
 }
 
 /** The states of a request that hold its cost for the year, and those that wait for the decision on it. */
-const HELD_TARGETS: ReadonlySet<string> = new Set([
-  'COMPLETED',
-  'AWAITING_EXECUTION',
-  'EXECUTING',
-  'AWAITING_IT_CLOSE',
-]);
+const HELD_TARGETS: ReadonlySet<string> = new Set(['COMPLETED', 'AWAITING_EXECUTION', 'EXECUTING']);
 const WAITING_TARGETS: ReadonlySet<string> = new Set([
   'AWAITING_SPEND_DECISION',
   'AWAITING_SPEND_SUBMISSION',
@@ -101,18 +96,24 @@ const WAITING_TARGETS: ReadonlySet<string> = new Set([
 function requestCost(fixture: Basis, today: Day, request: DemoRequestScenario): number {
   const subscription = fixture.subscriptions.find((candidate) => candidate.plan === request.plan);
   const plan = request.plan ? planOf(fixture, request.plan) : undefined;
-  if (!subscription || !plan) return 0;
+  if (!plan) return 0;
+  // A plan with no subscription is priced by its reference price (`QĐ-113a`): a K1/K2 plan one seat a month, a K4 plan one purchase.
+  const price = subscription
+    ? { monthly: monthlyPriceOf(subscription), purchase: Number(subscription.unitPrice.amount) }
+    : plan.referencePrice
+      ? { monthly: Number(plan.referencePrice), purchase: Number(plan.referencePrice) }
+      : null;
+  if (!price) return 0;
   // The people the spending approver refuses hold nothing: they are never granted (R49).
   const people = (request.beneficiaries ?? [request.requester]).filter(
     (code) => !request.rejectedLines?.includes(code),
   ).length;
-  if (plan.provisioningType === 'K4')
-    return request.grant === 'KEY' ? 0 : Number(subscription.unitPrice.amount) * people;
+  if (plan.provisioningType === 'K4') return request.grant === 'KEY' ? 0 : price.purchase * people;
   if (plan.provisioningType === 'K5') return 0;
   const monthsLeft = 12 - Number(today.slice(5, 7)) + 1;
   const months = Math.min(request.termMonths ?? monthsLeft, monthsLeft);
 
-  return monthlyPriceOf(subscription) * people * months;
+  return price.monthly * people * months;
 }
 
 /** What a department is expected to have spent through the latest closed month, to hold and to have waiting, from the seats and the requests of the fixture. */

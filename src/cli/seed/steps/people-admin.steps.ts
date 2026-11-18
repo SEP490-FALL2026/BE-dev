@@ -170,12 +170,55 @@ async function accountStates(ctx: DemoRunContext): Promise<StepOutcome> {
   return summarize(results);
 }
 
+/**
+ * The first placement of an employee from a day to come (`QĐ-93g(3)`, `QĐ-113e`): the person was entered with no department, and the Super Admin
+ * places them from a later day, so the placement can still be corrected. A person already placed (an earlier run, or the day has come) is left as is.
+ */
+async function futurePlacements(ctx: DemoRunContext): Promise<StepOutcome> {
+  const results: Result[] = [];
+  for (const person of ctx.fixture.people.filter((candidate) => candidate.firstPlacement)) {
+    const { department, effectiveInDays } = person.firstPlacement!;
+    const label = `xếp ${person.code} vào ${department} từ ngày sau`;
+    const employeeId = ctx.ids.employees.get(person.code);
+    const departmentId = ctx.ids.departments.get(department);
+    if (ctx.mode === 'plan') {
+      results.push({ status: 'planned', label });
+      continue;
+    }
+    if (!employeeId || !departmentId) {
+      results.push({ status: 'conflict', label: `${label}: chưa có nhân viên hoặc phòng` });
+      continue;
+    }
+    try {
+      await ctx.api.call(ctx.superAdminEmail, 'POST', `/employees/${employeeId}/first-placements`, {
+        departmentId,
+        effectiveFrom: dayOffset(ctx.today, effectiveInDays),
+      });
+      results.push({ status: 'done', label });
+    } catch (error) {
+      if (error instanceof DemoApiError && error.code === 'EMPLOYEE.ALREADY_PLACED') {
+        results.push({ status: 'present', label });
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return summarize(results);
+}
+
 export const PEOPLE_ADMIN_STEPS: readonly DemoStep[] = [
   {
     key: 'org.employee-imports',
     title: 'Nhập nhân sự: một file đã xác nhận, một bản xem trước có dòng lỗi (Super Admin)',
     needs: ['org.employees'],
     run: employeeImports,
+  },
+  {
+    key: 'org.future-placements',
+    title: 'Một nhân viên xếp phòng lần đầu từ ngày sau, để demo sửa xếp phòng (Super Admin)',
+    needs: ['org.employees'],
+    run: futurePlacements,
   },
   {
     key: 'org.account-states',

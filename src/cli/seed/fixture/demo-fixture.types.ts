@@ -36,6 +36,12 @@ export interface DemoPerson {
   contractEndInDays?: number;
   /** The dataset locks this person's account (`org.account-states`): the later runs do not check that account against its spec (C-1). */
   lockedInDemo?: true;
+  /**
+   * The person is entered with no department and then placed for the first time (`QĐ-93g(3)`) in this department from a day in the FUTURE
+   * (`effectiveInDays` from today), so the placement has not taken effect yet and the Super Admin can still correct it (`QĐ-113e`). With it,
+   * `department` is null (the person is in no department today).
+   */
+  firstPlacement?: { department: string; effectiveInDays: number };
 }
 
 /** A line of a people file the Super Admin imports (`SBF-01a`): the department is a code that may be wrong on purpose. */
@@ -75,6 +81,11 @@ export interface DemoPlan {
   vendorAdmin?: string;
   /** The workspace profile names no company account that owns the workspace: the subscription carries the flag `ownerAccountEmailMissing` (`QĐ-110u`). */
   withoutOwnerAccountEmail?: true;
+  /**
+   * The reference price of a paid plan in dong before tax (`QĐ-113a`): K1/K2 one seat for one month (a yearly price over 12, rounded up), K4 one purchase.
+   * Written by `withReferencePrices` from the subscription of the plan, or by hand for a plan with no subscription; K5 has none.
+   */
+  referencePrice?: string;
 }
 
 export interface DemoApplication {
@@ -117,8 +128,6 @@ export interface DemoSubscription {
   responsible: string;
   /** Seats bought on top of the baseline ones: the free seats of the pool the demo can grant from. */
   freeAfterBaseline: number;
-  /** A K1 purchase must name the department it is bought for (`SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE` otherwise); the other plans name none. */
-  ownerDepartment?: string;
   /** Seats bought when no baseline file gives the number (K1, K4, K5). */
   quantity?: number;
 }
@@ -212,6 +221,8 @@ export type DemoRequestTarget =
   | 'WAITING_CONTROLLED'
   | 'REJECTED'
   | 'WITHDRAWN'
+  /** Sent back by the head to add what is missing (`Trả về bổ sung`), then withdrawn by the requester (`QĐ-113d`). */
+  | 'WITHDRAWN_AFTER_RETURN'
   | 'AWAITING_SPEND_SUBMISSION'
   | 'AWAITING_SPEND_DECISION'
   | 'AWAITING_EXECUTION'
@@ -223,7 +234,6 @@ export type DemoRequestTarget =
   | 'IT_REJECTED'
   | 'EXECUTING'
   | 'FAILED'
-  | 'AWAITING_IT_CLOSE'
   /** Where a request is that a job may cancel later (the head of its sender is blocked): both are the end of the scenario. */
   | 'PENDING_OR_CANCELLED';
 

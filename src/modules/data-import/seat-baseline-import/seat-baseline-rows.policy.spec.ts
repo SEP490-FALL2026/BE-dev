@@ -127,15 +127,11 @@ describe('judgeSeatRows: the person and the account', () => {
 
 describe('judgeSeatRows: where a personal seat is held (QĐ-103d)', () => {
   it('writes a personal seat with the department of the person, whoever owns the subscription (L3-06, QĐ-103d)', () => {
-    const owned = (ownerDepartmentId: string | null) => ({
-      target: { kind: 'SUBSCRIPTION' as const, purchasedQuantity: 100, ownerDepartmentId },
-    });
+    const target = { kind: 'SUBSCRIPTION' as const, purchasedQuantity: 100 };
     const own = { employee_code: 'E1', account_identifier: 'e1@congty.vn' };
 
-    // E1 is a person of the design department: on the subscription of finance the seat is still design's, and the row is valid.
-    expect(judgeOne(own, owned('d-fin'))).toMatchObject({ outcome: 'VALID', parsed: { owningDepartmentId: 'd-des' } });
-    expect(judgeOne(own, owned('d-des')).parsed).toMatchObject({ owningDepartmentId: 'd-des' });
-    expect(judgeOne(own, owned(null)).parsed).toMatchObject({ owningDepartmentId: 'd-des' });
+    // E1 is a person of the design department: the seat is design's, and the row is valid.
+    expect(judgeOne(own, { target })).toMatchObject({ outcome: 'VALID', parsed: { owningDepartmentId: 'd-des' } });
   });
 
   it('writes no reason and no Cost Center: the columns of a service account are ignored, and a personal seat names none', () => {

@@ -67,9 +67,10 @@ describe('shared dataset v4: the organization', () => {
       'NV-NEW2',
       'NV-NEW3',
     ];
-    expect(F.people).toHaveLength(41 + 17);
+    // NV-NEW4 is the eighteenth: placed for the first time from a day to come (`QĐ-113e`), outside the seventeen of SPEC S01.
+    expect(F.people).toHaveLength(41 + 17 + 1);
     expect(added.map((code) => person(code).code)).toEqual(added);
-    expect(F.people.filter((p) => p.department === null).map((p) => p.code)).toEqual(['NV-NEW2']);
+    expect(F.people.filter((p) => p.department === null).map((p) => p.code)).toEqual(['NV-NEW2', 'NV-NEW4']);
     expect(F.people.filter((p) => p.account !== null)).toHaveLength(30 + 12);
     const withoutAccount = added.filter((code) => person(code).account === null);
     expect(withoutAccount).toEqual(['NV-BOD5', 'NV-BOD6', 'NV-SAL3', 'NV-SAL4', 'NV-NEW3']);
@@ -88,23 +89,95 @@ describe('shared dataset v4: the organization', () => {
     }
   });
 
+  it('enters one employee with no department and places them for the first time from a day to come, with no request and no account (QĐ-113e)', () => {
+    const placed = F.people.filter((p) => p.firstPlacement !== undefined);
+
+    expect(placed.map((p) => p.code)).toEqual(['NV-NEW4']);
+    const [one] = placed;
+    expect(one.department).toBeNull();
+    expect(one.account).toBeNull();
+    expect(one.firstPlacement!.effectiveInDays).toBeGreaterThan(0);
+    expect(department(one.firstPlacement!.department)).toBeDefined();
+    expect(F.requests.some((r) => [r.requester, ...(r.beneficiaries ?? [])].includes(one.code))).toBe(false);
+    expect(F.seats.some((seat) => seat.holder === one.code)).toBe(false);
+  });
+
   it('has enough people in one department for a group', () => {
     expect(F.people.filter((p) => p.department === 'ENG').length).toBeGreaterThanOrEqual(5);
   });
 });
 
 describe('shared dataset v4: the catalog and the shared pool', () => {
-  it('has one subscription per plan of the catalog except the internal one and Skype, which is retired (T6)', () => {
+  it('has one subscription per plan of the catalog except the internal one, Skype (retired) and the K1 plan that has only a reference price (T6, QĐ-113a)', () => {
     const plans = F.applications
       .flatMap((app) => app.plans)
-      .filter((p) => p.provisioningType !== 'K5' && p.key !== 'skype-online');
+      .filter((p) => p.provisioningType !== 'K5' && p.key !== 'skype-online' && p.key !== 'grammarly-business');
     expect(F.subscriptions.map((s) => s.plan).sort()).toEqual(plans.map((p) => p.key).sort());
-    expect(F.subscriptions).toHaveLength(29);
+    expect(F.subscriptions).toHaveLength(30);
   });
 
-  it('holds 25 applications of 32 plans, named as they are sold, with none of the three the budget scenarios refuse (T4, S04)', () => {
+  it('gives every paid plan a reference price in dong: the monthly price of its subscription, the price of one key (K4), or a price of its own when it has no subscription (QĐ-113a)', () => {
+    for (const declared of F.applications.flatMap((app) => app.plans)) {
+      const subscription = F.subscriptions.find((s) => s.plan === declared.key);
+      if (declared.provisioningType === 'K5') {
+        expect(declared.referencePrice).toBeUndefined();
+        continue;
+      }
+      // Skype is retired with no subscription and no price; every other paid plan has one.
+      if (declared.key === 'skype-online') continue;
+      expect(BigInt(declared.referencePrice!)).toBeGreaterThan(0n);
+      if (!subscription) continue;
+      const amount = BigInt(subscription.unitPrice.amount);
+      const perMonth = subscription.billingCycle === 'ANNUAL' ? (amount + 11n) / 12n : amount;
+      expect(BigInt(declared.referencePrice!)).toBe(declared.provisioningType === 'K4' ? amount : perMonth);
+    }
+    expect(plan('claude-team-standard').referencePrice).toBe('500000');
+    expect(plan('claude-team-premium').referencePrice).toBe('2500000');
+    expect(plan('jetbrains-all').referencePrice).toBe('6000000');
+  });
+
+  it('has one K1 plan with no subscription but a reference price, and a request on it waiting for the spending approver (QĐ-113a, R59)', () => {
+    const withoutSubscription = F.applications
+      .flatMap((app) => app.plans)
+      .filter((p) => p.provisioningType !== 'K5' && p.key !== 'skype-online')
+      .filter((p) => !F.subscriptions.some((s) => s.plan === p.key));
+
+    expect(withoutSubscription.map((p) => p.key)).toEqual(['grammarly-business']);
+    expect(withoutSubscription[0]).toMatchObject({ provisioningType: 'K1', referencePrice: '360000' });
+    expect(F.requests.find((r) => r.key === 'R59')).toMatchObject({
+      plan: 'grammarly-business',
+      target: 'AWAITING_SPEND_DECISION',
+    });
+  });
+
+  it('replaces Claude Team by two plans, two subscriptions and two workspaces, the three seats split between them (QĐ-113b)', () => {
+    expect(F.applications.flatMap((app) => app.plans.map((p) => p.key))).not.toContain('claude-team');
+    expect(plan('claude-team-standard')).toMatchObject({ provisioningType: 'K2' });
+    expect(plan('claude-team-premium')).toMatchObject({ provisioningType: 'K2' });
+    expect(subscriptionOf('claude-team-standard')).toMatchObject({
+      billingCycle: 'ANNUAL',
+      unitPrice: { amount: '6000000' },
+    });
+    expect(subscriptionOf('claude-team-premium')).toMatchObject({
+      billingCycle: 'ANNUAL',
+      unitPrice: { amount: '30000000' },
+    });
+    const holders = (key: string) =>
+      F.seats
+        .filter((seat) => seat.subscription === key)
+        .map((seat) => seat.holder)
+        .sort();
+    expect(holders('claude-team-standard')).toEqual(['NV-DEV6', 'NV-ITO1']);
+    expect(holders('claude-team-premium')).toEqual(['NV-DEV5']);
+    // The workspace profile of each names the owner of the subscription and another IT Admin (QĐ-110k).
+    expect(subscriptionOf('claude-team-standard').responsible).toBe('NV-ITA1');
+    expect(subscriptionOf('claude-team-premium').responsible).toBe('NV-ITA1');
+    expect(F.people.filter((p) => p.account === 'IT_ADMIN').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('holds 25 applications of 34 plans, named as they are sold, with none of the three the budget scenarios refuse (T4, S04)', () => {
     expect(F.applications).toHaveLength(25);
-    expect(F.applications.flatMap((app) => app.plans)).toHaveLength(32);
+    expect(F.applications.flatMap((app) => app.plans)).toHaveLength(34);
     expect(F.applications.filter((app) => app.kind === 'SAAS')).toHaveLength(23);
     expect(F.applications.filter((app) => app.kind === 'INTERNAL')).toHaveLength(2);
     const names = F.applications.map((app) => app.name.toLowerCase());
@@ -112,8 +185,8 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
     expect(new Set(F.applications.map((app) => app.key)).size).toBe(25);
     expect(new Set(F.applications.map((app) => app.name)).size).toBe(25);
     const planNames = F.applications.flatMap((app) => app.plans.map((p) => p.name));
-    expect(new Set(planNames).size).toBe(32);
-    expect(new Set(F.applications.flatMap((app) => app.plans.map((p) => p.key))).size).toBe(32);
+    expect(new Set(planNames).size).toBe(34);
+    expect(new Set(F.applications.flatMap((app) => app.plans.map((p) => p.key))).size).toBe(34);
   });
 
   it('gives each plan the kind of control and sharing its application needs, and a note to a plan that loses data (T4)', () => {
@@ -148,11 +221,12 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
     expect(F.keys.some((k) => k.subscription === 'datagrip')).toBe(false);
   });
 
-  it('commits for a year to seven annual subscriptions, and prices every subscription in dong (the dollar prices of Cursor, Claude Pro and Copilot Pro stay beside it as the original price)', () => {
+  it('commits for a year to eight annual subscriptions, and prices every subscription in dong (the dollar prices of Cursor, Claude Pro and Copilot Pro stay beside it as the original price)', () => {
     const annual = F.subscriptions.filter((s) => s.billingCycle === 'ANNUAL' && s.kind === 'TERM');
     expect(annual.map((s) => s.key).sort()).toEqual([
       'adobe-cc-teams',
-      'claude-team',
+      'claude-team-premium',
+      'claude-team-standard',
       'confluence-premium',
       'figma',
       'm365-standard',
@@ -208,13 +282,15 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
     expect(subscriptionOf('notion-plus').renewalInDays! - 30).toBeGreaterThan(7);
     expect(subscriptionOf('confluence-premium')).toMatchObject({ renewalInDays: 70, noticeDeadlineInDays: 25 });
     expect(subscriptionOf('zoom-business')).toMatchObject({ renewalInDays: -3 });
-    expect(subscriptionOf('claude-team')).toMatchObject({ withoutDates: true });
+    for (const key of ['claude-team-standard', 'claude-team-premium'])
+      expect(subscriptionOf(key)).toMatchObject({ withoutDates: true });
     expect(subscriptionOf('hubspot-starter').renewalInDays).toBe(1);
   });
 
-  it('leaves the stock of the new K1, K4 plans as the plan needs and the K1 plans for ENG (T6)', () => {
+  it('leaves the stock of the new K1, K4 plans as the plan needs and the K1 plans with no owner department (T6)', () => {
     for (const key of ['claude-pro', 'copilot-pro']) {
-      expect(subscriptionOf(key)).toMatchObject({ quantity: 0, ownerDepartment: 'ENG', responsible: 'NV-ITA1' });
+      expect(subscriptionOf(key)).toMatchObject({ quantity: 0, responsible: 'NV-ITA1' });
+      expect(subscriptionOf(key)).not.toHaveProperty('ownerDepartment');
     }
     expect(subscriptionOf('visio-pro')).toMatchObject({ kind: 'PERPETUAL', quantity: 3 });
     expect(subscriptionOf('sublime-license')).toMatchObject({ kind: 'PERPETUAL', quantity: 2 });
@@ -344,7 +420,7 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
 
   it('leaves the pool enough free seats for what is granted from it', () => {
     const drawn = new Map<string, number>();
-    const draws = ['COMPLETED', 'AWAITING_EXECUTION', 'EXECUTING', 'FAILED', 'AWAITING_IT_CLOSE'];
+    const draws = ['COMPLETED', 'AWAITING_EXECUTION', 'EXECUTING', 'FAILED'];
     for (const request of F.requests) {
       const subscription = request.plan ? subscriptionOf(request.plan) : undefined;
       if (!subscription || subscription.quantity !== undefined) continue;
@@ -449,7 +525,6 @@ describe('shared dataset v4: the requests of MF-1', () => {
     'RESERVE_UNCONFIRMED',
     'AWAITING_REQUESTER_REVISION',
     'EXECUTING',
-    'AWAITING_IT_CLOSE',
     'PENDING_OR_CANCELLED',
   ];
 
@@ -478,6 +553,7 @@ describe('shared dataset v4: the requests of MF-1', () => {
       'PENDING',
       'REJECTED',
       'WITHDRAWN',
+      'WITHDRAWN_AFTER_RETURN',
       'AWAITING_SPEND_SUBMISSION',
       'AWAITING_SPEND_DECISION',
       'AWAITING_EXECUTION',
@@ -595,11 +671,22 @@ describe('shared dataset v4: the eighteen requests of S10b (T12)', () => {
   it('reaches every state the demo lacked, each by the step that sends it there', () => {
     const at = (target: string, fields: Record<string, unknown> = {}) =>
       extra.some((r) => r.target === target && Object.entries(fields).every(([k, v]) => (r as never)[k] === v));
-    for (const target of ['IT_REJECTED', 'EXECUTING', 'FAILED', 'AWAITING_IT_CLOSE', 'PENDING_OR_CANCELLED'])
-      expect(at(target)).toBe(true);
+    for (const target of ['IT_REJECTED', 'EXECUTING', 'FAILED', 'PENDING_OR_CANCELLED']) expect(at(target)).toBe(true);
     expect(at('REJECTED', { rejectAt: 'SPEND' })).toBe(true);
     for (const returnAt of ['NEED', 'ASSESSMENT', 'SPEND'])
       expect(at('AWAITING_REQUESTER_REVISION', { returnAt })).toBe(true);
+  });
+
+  it('keeps every withdrawal legal under QĐ-113d: before any decision, from the head queue or after a return to the requester', () => {
+    const withdrawn = F.requests.filter((r) => r.target === 'WITHDRAWN' || r.target === 'WITHDRAWN_AFTER_RETURN');
+
+    expect(withdrawn.map((r) => `${r.key}:${r.target}`)).toEqual(['R05:WITHDRAWN', 'R60:WITHDRAWN_AFTER_RETURN']);
+    // Both requesters are staff, so a need step of the head exists and nothing is decided yet.
+    expect(F.departments.map((d) => d.head)).not.toContain(request('R05').requester);
+    expect(F.departments.map((d) => d.head)).not.toContain(request('R60').requester);
+    // The scenario that once waited for the task to be closed (QĐ-77g) is now a request IT closed as failed (SBF-17).
+    expect(request('R48')).toMatchObject({ target: 'FAILED', grant: 'POOL' });
+    expect(F.requests.some((r) => (r.target as string) === 'AWAITING_IT_CLOSE')).toBe(false);
   });
 
   it('sends back at the spending approver only a request of one step: a head sends it (R42)', () => {

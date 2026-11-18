@@ -45,8 +45,6 @@ export interface SubscriptionRecord {
   /** The kind of the plan and whether it is a `K4` plan with an admin console: which plans need admins at the vendor (`R-53`). */
   planProvisioningType: ProvisioningType;
   planHasAdminConsole: boolean;
-  /** The department that owns the purchase; **Gói 9: nullable — kho dùng chung không gắn với phòng** (`QĐ-103d`). */
-  ownerDepartmentId: string | null;
   applicationId: string;
   applicationName: string;
   /** The https link to the logo the IT Admin pasted for the application, never checked; null when none is set. */
@@ -83,8 +81,6 @@ export interface SubscriptionRecord {
 export interface NewSubscription {
   organizationId: string;
   planId: string;
-  /** Gói 9: nullable — kho dùng chung không gắn với phòng; khi tạo BE tự chọn */
-  ownerDepartmentId: string | null;
   kind: SubscriptionKind;
   status: SubscriptionStatus;
   purchasedQuantity: number | null;
@@ -108,10 +104,7 @@ export interface NewSubscription {
 }
 
 /** What a write stores: the whole mutable state of the subscription, as computed. */
-export type SubscriptionState = Omit<
-  NewSubscription,
-  'organizationId' | 'planId' | 'kind' | 'ownerDepartmentId' | 'renewedFromId'
->;
+export type SubscriptionState = Omit<NewSubscription, 'organizationId' | 'planId' | 'kind' | 'renewedFromId'>;
 
 export interface SubscriptionListFilter {
   applicationId?: string;
@@ -155,7 +148,6 @@ export interface SubscriptionView {
   id: string;
   planId: string;
   planName: string;
-  ownerDepartmentId: string | null; // Gói 9: nullable kho dùng chung
   applicationId: string;
   applicationName: string;
   logoUrl: string | null;

@@ -15,7 +15,7 @@ const person = (id: string, hireDate: string) => ({
 });
 
 const facts: SeatFacts = {
-  target: { kind: 'SUBSCRIPTION', purchasedQuantity: 10, ownerDepartmentId: null },
+  target: { kind: 'SUBSCRIPTION', purchasedQuantity: 10 },
   recordedOn: '2026-11-15',
   employees: new Map([
     ['NV0101', person('e1', '2025-03-01')],

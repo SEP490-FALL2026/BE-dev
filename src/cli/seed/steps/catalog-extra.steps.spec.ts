@@ -28,13 +28,15 @@ describe('the body of the terms of a plan (SPEC S06)', () => {
     expect(planTermsBody(ctxOf(), termsOf('visio-pro'))).toMatchObject({ installLimit: { maxDevicesPerKey: 2 } });
   });
 
-  it('says in Claude Team that the customer data is not used to train the model', () => {
-    expect(String(planTermsBody(ctxOf(), termsOf('claude-team')).aiTraining)).toContain('huấn luyện');
+  it('says in both Claude Team plans (QĐ-113b) that the customer data is not used to train the model', () => {
+    for (const key of ['claude-team-standard', 'claude-team-premium'])
+      expect(String(planTermsBody(ctxOf(), termsOf(key)).aiTraining)).toContain('huấn luyện');
   });
 
-  it('names exactly four plans of the catalog, none of them the plan with no terms on purpose (Confluence Premium) or Figma', () => {
+  it('names exactly five plans of the catalog, none of them the plan with no terms on purpose (Confluence Premium) or Figma', () => {
     expect(SHARED_DEMO_V4.planTerms.map((terms) => terms.plan).sort()).toEqual([
-      'claude-team',
+      'claude-team-premium',
+      'claude-team-standard',
       'm365-standard',
       'notion-plus',
       'visio-pro',

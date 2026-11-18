@@ -41,8 +41,12 @@ export interface PurchaseInvoicePlan {
   flags: PurchaseInvoiceFlag[];
 }
 
-/** Whose periods without an invoice are read: Finance reads every one, an IT Admin the periods of the departments they work (`D8`). */
-export type MissingInvoiceScope = { kind: 'ALL' } | { kind: 'DEPARTMENTS'; departmentIds: readonly string[] };
+/**
+ * Whose periods without an invoice are read: Finance reads every one; an IT Admin the periods of the requests of the departments they work (`D8`) and of the
+ * subscriptions they answer for (`responsibleItAdminEmployeeId`).
+ */
+export type MissingInvoiceScope =
+  { kind: 'ALL' } | { kind: 'DEPARTMENTS'; departmentIds: readonly string[]; responsibleItAdminEmployeeId: string };
 
 /** A period of a right paid by the month or the year whose invoice has not come past its due day (`PI-2`, `QĐ-111x`). */
 export interface MissingInvoicePeriod {

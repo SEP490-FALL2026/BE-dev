@@ -10,6 +10,20 @@ chạy CI GitHub.
 đổi), cộng **test theo file** đã chạm (unit; http/integration của route/luật mới, `--maxWorkers=2`). Không chạy full suite — CI GitHub lo.
 Mỗi luật mới: viết test đỏ trước, chạy thấy đỏ, rồi code cho xanh.
 
+## Làn song song (Owner chọn 18/11: code song song 3 Sonnet, review + CI theo từng gói)
+
+| Làn | Worktree / nhánh | Gói | Module chạm |
+| --- | --- | --- | --- |
+| A | `BE-WDP` (cây chính), `feat/qd113` | P1 rút Request (đã có WIP) | requests |
+| B | `BE-WDP-wt/p2`, `feat/qd113-p2` | P2 giá tham chiếu | catalog (plan, subscription/price), requests (pricing đọc qua facade), application-intake |
+| C | `BE-WDP-wt/p34`, `feat/qd113-p34` | P3 ảnh phòng → P4 sửa xếp phòng | infrastructure/object-storage, identity-access (chỉ dùng lại hàm), organization, personnel |
+| D | `feat/qd113` sau khi gộp A, B, C | P5 seed | src/cli/seed, docs |
+
+Ở máy chỉ chạy kiểm nhanh **không cần DB**: `pnpm typecheck`, `pnpm lint`, `pnpm arch:check`, `pnpm rules:check`, `pnpm test:gates`,
+unit test theo file, `pnpm openapi:export`. Http/integration/e2e/seed chạy trên **CI GitHub** của BE-WDP (`gh workflow run ci.yml --ref <nhánh>`).
+Mỗi gói xong: commit, coordinator push nhánh làn + chạy CI, Opus review song song. Gộp: coordinator merge B, C vào `feat/qd113`, sinh lại
+`openapi.json`, `docs/generated/routes.md`.
+
 ## Thứ tự
 
 | # | Gói | Mức | Việc chính |

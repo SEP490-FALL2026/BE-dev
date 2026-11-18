@@ -48,14 +48,12 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
     expect(h.codeOf(capacity)).toBe('LICENSE_ASSIGNMENT.SEAT_CAPACITY');
     expect(h.detailsOf(capacity)).toEqual({ freeSeatsInPool: 0 });
 
-    // The seat it buys goes on into the next period (FX2-R1): one that buys no seat for it refuses the grant, so it is sized for it first.
-    const short = await h.grant({ requestId: h.gate.grantable(person(), planId), purchase: {} }).expect(422);
-    expect(h.codeOf(short)).toBe('PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS');
-    await sizeNext(next, 3);
+    // The seat it buys goes on into the next period (FX2-R1): no department owns it (QĐ-113g), so it is the pool and buys that seat for the person too.
     const bought = await h.grant({ requestId: h.gate.grantable(person(), planId), purchase: {} }).expect(201);
     expect(h.dataOf<{ task: { purchase: { kind: string } | null } }>(bought).task.purchase).toMatchObject({
       kind: 'POOL_TOP_UP',
     });
+    expect(await purchasedOf(next)).toBe(3);
   });
 
   it('B2B-02 the seats carried to a next period not started yet are the same seats: ten seats and four people leave six free, not twelve', async () => {
@@ -241,7 +239,7 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
     expect(await heldOn(next, startsOn)).toBe(1);
   });
 
-  it('FX2-R1 a next period that buys fewer seats than the grant needs refuses the grant, 422 SUBSCRIPTION_NEXT_PERIOD_SEATS, and writes nothing', async () => {
+  it('FX2-R1 a next period that buys fewer seats than the grant needs buys the seat itself, 201, since no department owns it (QĐ-113g) and it is always the pool', async () => {
     const running = await h.subscription(10, 'K2');
     const planId = await h.planOf(running);
     for (let index = 0; index < 4; index += 1) await h.seat({ subscriptionId: running }, code());
@@ -250,13 +248,12 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
     await carry(h, running, next, startsOn);
     await sizeNext(next, 4);
 
-    const refused = await h.grant({ requestId: h.gate.grantable(person(), planId) }).expect(422);
+    await h.grant({ requestId: h.gate.grantable(person(), planId) }).expect(201);
 
-    expect(h.codeOf(refused)).toBe('PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS');
-    expect(await heldOn(running, h.today())).toBe(4);
-    expect(await heldOn(next, startsOn)).toBe(4);
-    // A next period a department owns is no pool: no seat is bought on it, the grant is refused as before (S20-T4c).
-    expect(await purchasedOf(next)).toBe(4);
+    expect(await heldOn(running, h.today())).toBe(5);
+    expect(await heldOn(next, startsOn)).toBe(5);
+    // The seat the grant needs on the next period is bought there, one seat (QĐ-113g: every subscription is the shared pool).
+    expect(await purchasedOf(next)).toBe(5);
   });
 
   const purchasedOf = async (subscriptionId: string): Promise<number> =>

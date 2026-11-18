@@ -86,6 +86,7 @@ import { OpenRequestRepo } from './access-request/open-request/open-request.repo
 import { OpenRequestService } from './access-request/open-request/open-request.service';
 import { CostCenterOpenRequestsReader } from './access-request/open-request/cost-center-open-requests.listener';
 import { DepartmentOpenRequestsReader } from './access-request/open-request/department-open-requests.listener';
+import { FirstPlacementRequestsReader } from './access-request/open-request/first-placement-requests.listener';
 import { RequestUseRepo } from './access-request/open-request/request-use.repo';
 import { RequestEndService } from './request-end/request-end.service';
 import { RequestsApi } from './public/requests.api';
@@ -331,6 +332,7 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     // What the organization asks before it retires a department or a Cost Center: the requests that are not over.
     RequestUseRepo,
     DepartmentOpenRequestsReader,
+    FirstPlacementRequestsReader,
     CostCenterOpenRequestsReader,
     RequestsApi,
     SimilarSeatsService,

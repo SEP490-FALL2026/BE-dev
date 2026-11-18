@@ -100,14 +100,10 @@ export class AiSummaryHarness extends GroupHarness {
    * note: what `RenewalHarness.recordedRenewal` makes, on this branch of the harnesses. The notice deadline is 20 days from today, so its
    * point of adjustment has come. Returns the case and its subscription.
    */
-  async recordedRenewal(
-    ownerDepartmentId: string,
-    opinion: string,
-  ): Promise<{ renewalId: string; subscriptionId: string }> {
+  async recordedRenewal(opinion: string): Promise<{ renewalId: string; subscriptionId: string }> {
     const inDays = (days: number) =>
       new Date(Date.parse(`${this.today()}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
     const subscriptionId = await declareSubscription(this.ctx, this.it1.accessToken, {
-      ownerDepartmentId,
       planId: await this.plan('K2', 'PER_SEAT'),
       kind: 'TERM',
       purchasedQuantity: 10,

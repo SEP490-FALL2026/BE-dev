@@ -14,6 +14,7 @@ import type {
   PlanRecord,
   PlanSummaryRecord,
   ProvisioningType,
+  ReferencePrice,
   WorkspaceProfileRecord,
 } from './plan.types';
 import { applicationPlanName } from './plan.policy';
@@ -21,6 +22,21 @@ import { applicationPlanName } from './plan.policy';
 const WITH_APPLICATION = { application: { select: { name: true, kind: true, logoUrl: true } } } as const;
 type PlanRow = Prisma.PlanGetPayload<{ include: typeof WITH_APPLICATION }>;
 type ProfileRow = Prisma.PlanWorkspaceProfileGetPayload<{ include: { members: true } }>;
+
+/** The reference price of a plan row (`QĐ-113a`): both columns or none (a CHECK of the table). */
+const referencePriceOf = (row: {
+  referencePriceMinor: bigint | null;
+  referencePriceCurrency: string | null;
+}): ReferencePrice | null =>
+  row.referencePriceMinor === null || row.referencePriceCurrency === null
+    ? null
+    : { amountMinor: row.referencePriceMinor, currency: row.referencePriceCurrency };
+
+/** The columns of a reference price to write: none when the change leaves it, both null when it clears it. */
+const referencePriceColumns = (price: ReferencePrice | null | undefined) =>
+  price === undefined
+    ? {}
+    : { referencePriceMinor: price?.amountMinor ?? null, referencePriceCurrency: price?.currency ?? null };
 
 const toPlan = (row: PlanRow): PlanRecord => ({
   id: row.id,
@@ -36,6 +52,7 @@ const toPlan = (row: PlanRow): PlanRecord => ({
   dataLossOnRemoval: row.dataLossOnRemoval,
   sharingPolicy: row.sharingPolicy,
   hasAdminConsole: row.hasAdminConsole,
+  referencePrice: referencePriceOf(row),
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -80,6 +97,8 @@ export class PlanRepo {
         dataLossOnRemoval: input.dataLossOnRemoval,
         sharingPolicy: input.sharingPolicy,
         hasAdminConsole: input.hasAdminConsole,
+        referencePriceMinor: input.referencePrice?.amountMinor ?? null,
+        referencePriceCurrency: input.referencePrice?.currency ?? null,
       },
       include: WITH_APPLICATION,
     });
@@ -147,6 +166,7 @@ export class PlanRepo {
         ...(changes.dataLossOnRemoval !== undefined ? { dataLossOnRemoval: changes.dataLossOnRemoval } : {}),
         ...(changes.sharingPolicy !== undefined ? { sharingPolicy: changes.sharingPolicy } : {}),
         ...(changes.hasAdminConsole !== undefined ? { hasAdminConsole: changes.hasAdminConsole } : {}),
+        ...referencePriceColumns(changes.referencePrice),
       },
       include: WITH_APPLICATION,
     });
@@ -363,6 +383,8 @@ export class PlanRepo {
             dataLossOnRemoval: true,
             sharingPolicy: true,
             hasAdminConsole: true,
+            referencePriceMinor: true,
+            referencePriceCurrency: true,
             createdAt: true,
             updatedAt: true,
             application: { select: { name: true, kind: true, logoUrl: true } },
@@ -373,8 +395,9 @@ export class PlanRepo {
         });
 
         return {
-          items: rows.map(({ application, ...row }) => ({
+          items: rows.map(({ application, referencePriceMinor, referencePriceCurrency, ...row }) => ({
             ...row,
+            referencePrice: referencePriceOf({ referencePriceMinor, referencePriceCurrency }),
             applicationName: application.name,
             applicationLogoUrl: application.logoUrl,
             applicationKind: application.kind,

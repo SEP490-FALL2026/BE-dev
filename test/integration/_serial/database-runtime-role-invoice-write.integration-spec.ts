@@ -82,7 +82,7 @@ describe('signing a purchase invoice runs as the runtime role (integration, Post
 
   /** A subscription of the kind with its price in USD, and the department whose head and IT Admin the request goes through. */
   const world = async (kind: 'K1' | 'K2', code: string) => {
-    const subscriptionId = await h.subscription(20, kind, h.seed.departmentId);
+    const subscriptionId = await h.subscription(20, kind);
     // A K2 plan is the shared pool of the company: no department owns it (`QĐ-104c`(3)).
     if (kind === 'K2') await takeOwnerOff(h, subscriptionId);
     await h.ctx.sql.query(

@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { StatusHarness, type NoticeRow } from '../../support/status-harness';
 import type { Unit } from '../../support/spend-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 const h = new StatusHarness();
 const M = 1_000_000;
@@ -12,6 +13,8 @@ interface TaskWire {
 
 /** What a notice says, without the ids that differ from one run to the next. */
 const said = (rows: NoticeRow[]) => rows.map((row) => row.code);
+
+afterEach(() => jest.restoreAllMocks());
 
 describe('the status of a request told to the people it concerns, over PostgreSQL (US-05-15)', () => {
   let plan: string;
@@ -460,6 +463,8 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     });
 
     it('tells the approver who held the spend step that it was closed', async () => {
+      // QĐ-113d: this test withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const u = await example();
       const id = await h.waitingForApprover(u, plan, { amount: 5 * M });
 
@@ -474,6 +479,8 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     });
 
     it('tells the IT Admin and Finance once that what was held went back, and the IT Admin that the task of the grant was cancelled', async () => {
+      // QĐ-113d: this test withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const u = await example();
       const id = await approved(u);
       // Nobody has worked it: the grant takes the work for whoever presses it, so this is a task put back in the queue after a failure.
@@ -493,6 +500,7 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     });
 
     it('gives the IT Admin the task to close when the grant had failed, and tells nobody the request ended before it did', async () => {
+      liftWithdrawalAfterDecisionRefusal();
       const u = await example();
       const id = await approved(u);
       const task = await granted(id);

@@ -140,7 +140,6 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
         .post('/api/v1/subscriptions')
         .set(as(it1))
         .send({
-          ownerDepartmentId: seed.departmentId,
           planId,
           kind: 'TERM',
           purchasedQuantity: 10,
@@ -393,7 +392,6 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
         .post('/api/v1/subscriptions')
         .set(as(it1))
         .send({
-          ownerDepartmentId: seed.departmentId,
           planId: licensed.planId,
           kind: 'PERPETUAL',
           purchasedQuantity: 50,
@@ -406,7 +404,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
       await request(server())
         .post('/api/v1/subscriptions')
         .set(as(it1))
-        .send({ ownerDepartmentId: seed.departmentId, planId: saas.planId, kind: 'TERM', endDate: '2026-12-31' })
+        .send({ planId: saas.planId, kind: 'TERM', endDate: '2026-12-31' })
         .expect(201);
 
       for (const day of ['2026-03-20', '2026-11-20', '2026-12-20']) {

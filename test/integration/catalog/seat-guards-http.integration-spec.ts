@@ -293,7 +293,6 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
           .post('/api/v1/subscriptions')
           .set(h.as(h.it1))
           .send({
-            ownerDepartmentId: h.seed.departmentId,
             planId: software.otherPlan,
             kind: 'TERM',
             purchasedQuantity: 5,

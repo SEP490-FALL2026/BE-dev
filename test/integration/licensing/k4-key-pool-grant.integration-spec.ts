@@ -199,7 +199,6 @@ describe('BR-MF1-09: the grant of a K4 key from the pool (integration, real Post
   it('BR-MF1-09c: a K4 key given from the pool records its purchase price as the cost avoided; a bought key records none', async () => {
     const planId = await h.plan('K4');
     const subscriptionId = await declareSubscription(h.ctx, h.it1.accessToken, {
-      ownerDepartmentId: h.seed.departmentId,
       planId,
       kind: 'PERPETUAL',
       purchasedQuantity: 2,

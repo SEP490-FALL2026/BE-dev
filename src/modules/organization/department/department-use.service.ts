@@ -42,7 +42,7 @@ export class DepartmentUseService {
       return mergeGroups(answers, limit);
     };
 
-    return { openWork: await ask('OPEN_WORK'), subscriptions: await ask('SUBSCRIPTIONS') };
+    return { openWork: await ask('OPEN_WORK') };
   }
 
   /** What keeps the Cost Center in use: the first `limit` of each group and the totals. */

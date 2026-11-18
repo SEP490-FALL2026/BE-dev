@@ -68,7 +68,7 @@ export class GhostSeatWorld extends RevocationHarness {
 
   /** A subscription of the world's department with seats bought, of a kind and a pricing; flat rate when `quantity` is null. */
   worldSubscription(quantity: number | null, type: 'K1' | 'K2' | 'K4' = 'K2'): Promise<string> {
-    return this.subscription(quantity, type, this.worldDepartment);
+    return this.subscription(quantity, type);
   }
 
   /** `count` seats on a subscription, made by one statement (people `prefix0…`, placed in the seed department). */
@@ -79,10 +79,10 @@ export class GhostSeatWorld extends RevocationHarness {
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
          normalized_account_identifier, valid_from, valid_from_basis, owning_department_id, created_by_app_user_id)
        SELECT gen_random_uuid(), s.organization_id, 'PERSONAL', 'REQUEST', s.plan_id, s.id, e.id, e.work_email, e.work_email,
-              '2026-01-05', 'RECORDED', s.owner_department_id, $3::uuid
+              '2026-01-05', 'RECORDED', $4::uuid, $3::uuid
          FROM subscriptions s JOIN employees e ON e.employee_code LIKE $2 || '%' WHERE s.id = $1
        RETURNING id`,
-      [subscriptionId, tag, randomUUID()],
+      [subscriptionId, tag, randomUUID(), this.worldDepartment],
     );
 
     return rows.map((row) => row.id);
@@ -291,10 +291,10 @@ export class GhostSeatWorld extends RevocationHarness {
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
          normalized_account_identifier, valid_from, valid_from_basis, owning_department_id, created_by_app_user_id)
        SELECT gen_random_uuid(), s.organization_id, 'PERSONAL', 'REQUEST', s.plan_id, s.id, e.id, e.work_email, e.work_email,
-              '2026-01-05', 'RECORDED', s.owner_department_id, $3::uuid
+              '2026-01-05', 'RECORDED', $4::uuid, $3::uuid
          FROM subscriptions s JOIN employees e ON e.id = $2 WHERE s.id = $1
        RETURNING id`,
-      [subscriptionId, employeeId, randomUUID()],
+      [subscriptionId, employeeId, randomUUID(), this.worldDepartment],
     );
 
     return rows[0].id;

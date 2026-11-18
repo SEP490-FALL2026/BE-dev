@@ -92,11 +92,11 @@ describe('the subscriptions near or past their adjustment point, over HTTP (inte
     ids.draft = await byTheMonth({ unitPrice: undefined, renewalDate: addDays(today, 3) });
     ids.continued = await byTheMonth({ renewalDate: addDays(today, 3) });
     await h.ctx.sql.query(
-      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity, unit_price_minor,
+      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity, unit_price_minor,
          unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source, price_reporting_minor,
          price_reporting_currency, billing_cycle, commitment_term_months, start_date, responsible_it_admin_employee_id, auto_renew,
          allows_mid_term_reduction, renewed_from_id, updated_at)
-       SELECT gen_random_uuid(), organization_id, plan_id, owner_department_id, kind, 'DRAFT', purchased_quantity, unit_price_minor,
+       SELECT gen_random_uuid(), organization_id, plan_id, kind, 'DRAFT', purchased_quantity, unit_price_minor,
               unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source, price_reporting_minor,
               price_reporting_currency, billing_cycle, commitment_term_months, '2026-02-05', responsible_it_admin_employee_id, auto_renew,
               allows_mid_term_reduction, id, now()

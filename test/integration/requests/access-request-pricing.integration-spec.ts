@@ -72,6 +72,7 @@ describe('requests over HTTP: the amount of a request (integration, real Postgre
 
       expect(event.after).toMatchObject({
         pricingStatus: 'PRICED',
+        priceSource: 'SUBSCRIPTION',
         amountMinor: '1000000',
         amountCurrency: 'VND',
         budgetYear: year,

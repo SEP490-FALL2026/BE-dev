@@ -104,6 +104,8 @@ describe('requests over HTTP: the preview before sending (integration, real Post
           'canSubmit',
           'budgetYear',
           'pricing',
+          // QĐ-113a: `SUBSCRIPTION` or `PLAN_REFERENCE` for a priced request, null otherwise.
+          'priceSource',
           'cost',
           'costEstimate',
           'spendSubmission',

@@ -14,6 +14,7 @@ import { organizationAuditEvent } from '../organization-audit-event.mapper';
 import { OrganizationContextService } from '../organization-context.service';
 import { EmployeeNotFoundError } from '../public/organization.errors';
 import { EmployeeRecordService } from './employee-record.service';
+import { firstPlacementView } from './employee-first-placement.mapper';
 import { firstPlacementProblem } from './employee-first-placement.policy';
 import { FirstPlacementError } from './employee.errors';
 import { assertMayEnterEmployees } from './employee.policy';
@@ -72,21 +73,7 @@ export class EmployeeFirstPlacementService {
         onDate: input.effectiveFrom,
       });
       for (const notice of notices) await this.notifications.notifyInApp(tx, notice);
-      return {
-        id: employee.id,
-        employeeCode: employee.employeeCode,
-        fullName: employee.fullName,
-        workEmail: employee.workEmail,
-        employmentType: employee.employmentType,
-        hireDate: employee.hireDate,
-        contractEndDate: employee.contractEndDate,
-        status: employee.status,
-        workState: employee.workState,
-        memberSince: input.effectiveFrom,
-        department: { id: department.id, code: department.code, name: department.name },
-        unplaced: false,
-        jobTitle: employee.jobTitle ?? null,
-      };
+      return firstPlacementView(employee, department, input.effectiveFrom);
     });
   }
 

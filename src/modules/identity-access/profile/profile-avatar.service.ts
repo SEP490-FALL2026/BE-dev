@@ -12,7 +12,8 @@ import {
   AvatarTooLargeError,
   AvatarTypeUnsupportedError,
 } from './profile.errors';
-import { avatarObjectKey, judgeAvatar } from './profile.policy';
+import { judgePicture } from '../../../infrastructure/object-storage/picture-image';
+import { avatarObjectKey } from './profile.policy';
 import { ProfileRepo } from './profile.repo';
 import { ProfileQueryService, type AvatarLink } from './profile-query.service';
 
@@ -43,7 +44,7 @@ export class ProfileAvatarService {
     now: Date = new Date(),
   ): Promise<{ avatar: AvatarLink | null }> {
     if (!file) throw new AvatarFileRequiredError();
-    const judged = judgeAvatar(file);
+    const judged = judgePicture(file);
     if (!judged.ok) {
       if (judged.reason === 'TOO_LARGE') throw new AvatarTooLargeError();
       if (judged.reason === 'UNSUPPORTED_TYPE') throw new AvatarTypeUnsupportedError();

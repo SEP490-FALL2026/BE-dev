@@ -67,17 +67,13 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
   let department: string;
   let counter = 0;
 
-  /** A subscription always has the department that owns it (F02): `department` unless the test names another. */
-  const newSubscription = async (
-    planId: string,
-    quantity: number | null,
-    ownerDepartmentId: string = department,
-  ): Promise<string> => {
+  /** A subscription of the plan with `quantity` seats (it owns no department). */
+  const newSubscription = async (planId: string, quantity: number | null): Promise<string> => {
     const id = randomUUID();
     await sql.query(
-      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity)
-       VALUES ($1, $2, $3, $4, 'TERM', 'DRAFT', $5)`,
-      [id, organizationId, planId, ownerDepartmentId, quantity],
+      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity)
+       VALUES ($1, $2, $3, 'TERM', 'DRAFT', $4)`,
+      [id, organizationId, planId, quantity],
     );
 
     return id;
@@ -175,8 +171,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
     );
   const personal = (subscriptionId: string, extra: AssignmentInput = {}) =>
     insert({ planId: flatPlan, subscriptionId, ...extra });
-  const fresh = async (quantity: number | null = 3, ownerDepartmentId?: string): Promise<string> =>
-    newSubscription(flatPlan, quantity, ownerDepartmentId);
+  const fresh = async (quantity: number | null = 3): Promise<string> => newSubscription(flatPlan, quantity);
 
   beforeAll(async () => {
     database = await provisionDisposableDatabase();
@@ -257,7 +252,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
     const subscriptionId = await fresh();
     const { unit: otherUnit } = await newDepartmentWithUnit('P-OTHER');
     const { department: retired, unit: retiredUnit } = await newDepartmentWithUnit('P-OLD', 'INACTIVE');
-    const retiredSubscription = await fresh(3, retired);
+    const retiredSubscription = await fresh(3);
     const service = { kind: 'SERVICE', reason: 'CI' } as const;
 
     expect(

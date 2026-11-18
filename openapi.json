@@ -691,6 +691,383 @@
         "tags": ["employees"]
       }
     },
+    "/api/v1/employees/{id}/first-placement": {
+      "patch": {
+        "operationId": "employeeFirstPlacementCorrect",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CorrectFirstPlacementBodyDto" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The department and/or the first day of the first placement changed, with the reason kept in the Audit Trail; a new department is told like a first placement. Values the placement already has change nothing. Allowed only while the placement starts after today and nothing refers to it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/EmployeeResponseDto" },
+                    { "properties": { "message": { "example": "EMPLOYEE.FIRST_PLACEMENT_CORRECTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only SUPER_ADMIN corrects a placement, and never the one of their own record (EMPLOYEE.SELF_CHANGE_FORBIDDEN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.SELF_CHANGE_FORBIDDEN": {
+                    "summary": "You cannot change your own employee record. The Super Admin record is changed with: pnpm ops:record-super-admin-event profile-correct.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.SELF_CHANGE_FORBIDDEN",
+                        "message": "You cannot change your own employee record. The Super Admin record is changed with: pnpm ops:record-super-admin-event profile-correct.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Employee or department not found.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "EMPLOYEE.NOT_FOUND": {
+                    "summary": "Employee not found: <employee-id>",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_FOUND",
+                        "message": "Employee not found: <employee-id>",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.NOT_FOUND": {
+                    "summary": "Department not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.NOT_FOUND",
+                        "message": "Department not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The employee has no placement (EMPLOYEE.NOT_PLACED), it already took effect or is not the only one (EMPLOYEE.FIRST_PLACEMENT_ALREADY_EFFECTIVE: a change of department is then a transfer), something refers to it (EMPLOYEE.FIRST_PLACEMENT_IN_USE, details.usedBy: REQUEST, TRANSFER, HEAD_PERIOD or OFFBOARDING), the employee is not active (EMPLOYEE.EMPLOYEE_INACTIVE) or is leaving (EMPLOYEE.EMPLOYEE_LEAVING), or the department is retired (DEPARTMENT.INACTIVE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "EMPLOYEE.NOT_PLACED": {
+                    "summary": "The employee has no placement to correct; place them for the first time.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_PLACED",
+                        "message": "The employee has no placement to correct; place them for the first time.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.FIRST_PLACEMENT_ALREADY_EFFECTIVE": {
+                    "summary": "Only the first placement of a person, before it takes effect, can be corrected; a change of department after that is a transfer.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.FIRST_PLACEMENT_ALREADY_EFFECTIVE",
+                        "message": "Only the first placement of a person, before it takes effect, can be corrected; a change of department after that is a transfer.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.FIRST_PLACEMENT_IN_USE": {
+                    "summary": "Something already refers to this placement (a Request, a transfer, a period as head or a departure).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.FIRST_PLACEMENT_IN_USE",
+                        "message": "Something already refers to this placement (a Request, a transfer, a period as head or a departure).",
+                        "details": { "usedBy": "REQUEST" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.EMPLOYEE_INACTIVE": {
+                    "summary": "Employee must be active and not handing over.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.EMPLOYEE_INACTIVE",
+                        "message": "Employee must be active and not handing over.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.EMPLOYEE_LEAVING": {
+                    "summary": "The employee is currently handing over and leaving the organization.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.EMPLOYEE_LEAVING",
+                        "message": "The employee is currently handing over and leaving the organization.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.INACTIVE": {
+                    "summary": "The department is no longer in use.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.INACTIVE",
+                        "message": "The department is no longer in use.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid body (neither a department nor a day, or no reason), a day before today or the hire date (EMPLOYEE.DATE_INVALID), or a department that takes effect later than the day (DEPARTMENT.NOT_YET_EFFECTIVE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.UPDATE_EMPTY": {
+                    "summary": "Name at least one official field to change.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.UPDATE_EMPTY",
+                        "message": "Name at least one official field to change.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.DATE_INVALID": {
+                    "summary": "Effective date must be on or after today and hire date.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.DATE_INVALID",
+                        "message": "Effective date must be on or after today and hire date.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.NOT_YET_EFFECTIVE": {
+                    "summary": "The department takes effect on 2027-01-01.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.NOT_YET_EFFECTIVE",
+                        "message": "The department takes effect on 2027-01-01.",
+                        "details": { "effectiveFrom": "2027-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Correct the first placement of an employee",
+        "tags": ["employees"]
+      }
+    },
     "/api/v1/employees": {
       "post": {
         "operationId": "employeeCreate",
@@ -3667,6 +4044,515 @@
         "tags": ["departments"]
       }
     },
+    "/api/v1/departments/{id}/avatar": {
+      "put": {
+        "operationId": "departmentAvatarPut",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": { "file": { "type": "string", "format": "binary" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The picture (png, jpeg or webp, at most 1 MiB, judged by its first bytes) was stored and the department points at it; avatarUrl is a link that works for 15 minutes. The picture before it, if any, is deleted after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DepartmentResponseDto" },
+                    { "properties": { "message": { "example": "DEPARTMENT.AVATAR_CHANGED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The form is not a readable multipart form with one file (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin changes department data. The IT Admin does not.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The department does not exist, or an IT Admin is asking about one they are not in charge of or standing in for.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT.NOT_FOUND": {
+                    "summary": "Department not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.NOT_FOUND",
+                        "message": "Department not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The department is retired (DEPARTMENT.INACTIVE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT.INACTIVE": {
+                    "summary": "The department is no longer in use.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.INACTIVE",
+                        "message": "The department is no longer in use.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The picture is larger than 1 MiB: DEPARTMENT.AVATAR_TOO_LARGE for one a little over it, HTTP_PAYLOAD_TOO_LARGE for any larger one, which the parser stops at once.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT.AVATAR_TOO_LARGE": {
+                    "summary": "The picture is larger than 1 MiB.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.AVATAR_TOO_LARGE",
+                        "message": "The picture is larger than 1 MiB.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "By its first bytes the file is not a png, jpeg or webp (DEPARTMENT.AVATAR_TYPE_UNSUPPORTED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT.AVATAR_TYPE_UNSUPPORTED": {
+                    "summary": "The picture must be a png, jpeg or webp.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.AVATAR_TYPE_UNSUPPORTED",
+                        "message": "The picture must be a png, jpeg or webp.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id is not a UUID (VALIDATION_ERROR), no file was sent (DEPARTMENT.AVATAR_FILE_REQUIRED), it is empty (DEPARTMENT.AVATAR_EMPTY) or it is not the type it says it is (DEPARTMENT.AVATAR_TYPE_MISMATCH).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.AVATAR_FILE_REQUIRED": {
+                    "summary": "Send the picture as the form field \"file\".",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.AVATAR_FILE_REQUIRED",
+                        "message": "Send the picture as the form field \"file\".",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.AVATAR_EMPTY": {
+                    "summary": "The picture is empty.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.AVATAR_EMPTY",
+                        "message": "The picture is empty.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.AVATAR_TYPE_MISMATCH": {
+                    "summary": "The picture is not the type it says it is.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.AVATAR_TYPE_MISMATCH",
+                        "message": "The picture is not the type it says it is.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Set the picture of a department",
+        "tags": ["departments"]
+      },
+      "delete": {
+        "operationId": "departmentAvatarDelete",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The department has no picture now; with none to begin with, nothing changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DepartmentResponseDto" },
+                    { "properties": { "message": { "example": "DEPARTMENT.AVATAR_REMOVED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin changes department data. The IT Admin does not.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The department does not exist, or an IT Admin is asking about one they are not in charge of or standing in for.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT.NOT_FOUND": {
+                    "summary": "Department not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.NOT_FOUND",
+                        "message": "Department not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The department is retired (DEPARTMENT.INACTIVE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT.INACTIVE": {
+                    "summary": "The department is no longer in use.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.INACTIVE",
+                        "message": "The department is no longer in use.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id is not a UUID (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Remove the picture of a department",
+        "tags": ["departments"]
+      }
+    },
     "/api/v1/departments/{id}/deactivate": {
       "post": {
         "operationId": "departmentDeactivate",
@@ -3789,27 +4675,25 @@
             }
           },
           "409": {
-            "description": "Something still keeps it in use (DEPARTMENT.IN_USE; details lists each group with its first things and its total): the people in it, the service accounts it owns, open work (Requests not over, personnel events waiting, open tasks) and the subscriptions or purchases it owns that still owe a payment.",
+            "description": "Something still keeps it in use (DEPARTMENT.IN_USE; details lists each group with its first things and its total): the people in it, the service accounts it owns, and open work (Requests not over, personnel events waiting, open tasks). Subscriptions never keep a department in use: a subscription has no owning department.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "DEPARTMENT.IN_USE": {
-                    "summary": "The department still has members, service accounts, open work or subscriptions that owe a payment.",
+                    "summary": "The department still has members, service accounts, or open work.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "DEPARTMENT.IN_USE",
-                        "message": "The department still has members, service accounts, open work or subscriptions that owe a payment.",
+                        "message": "The department still has members, service accounts, or open work.",
                         "details": {
                           "members": [{ "employeeCode": "E001", "fullName": "<full-name>" }],
                           "totalMembers": 1,
                           "serviceAccounts": [],
                           "totalServiceAccounts": 0,
                           "openWork": [{ "kind": "ACCESS_REQUEST", "id": "<request-id>", "label": null }],
-                          "totalOpenWork": 1,
-                          "subscriptions": [{ "kind": "SUBSCRIPTION", "id": "<subscription-id>", "label": null }],
-                          "totalSubscriptions": 1
+                          "totalOpenWork": 1
                         },
                         "requestId": "req_example"
                       }
@@ -21064,7 +21948,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone) or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone), REFERENCE_PRICE_NOT_VND (the reference price is in dong), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -21210,6 +22094,40 @@
                       "error": {
                         "code": "PLAN.ADMIN_CONSOLE_NOT_APPLICABLE",
                         "message": "Only a K4 plan says whether it has an admin console.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.REFERENCE_PRICE_NOT_VND": {
+                    "summary": "The reference price of a plan is entered in dong (VND).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.REFERENCE_PRICE_NOT_VND",
+                        "message": "The reference price of a plan is entered in dong (VND).",
+                        "details": { "currency": "USD" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.REFERENCE_PRICE_NOT_APPLICABLE": {
+                    "summary": "Only a K1, K2 or K4 plan has a reference price.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.REFERENCE_PRICE_NOT_APPLICABLE",
+                        "message": "Only a K1, K2 or K4 plan has a reference price.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.REFERENCE_PRICE_NOT_POSITIVE": {
+                    "summary": "The reference price of a plan must be above zero.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.REFERENCE_PRICE_NOT_POSITIVE",
+                        "message": "The reference price of a plan must be above zero.",
                         "requestId": "req_example"
                       }
                     }
@@ -21668,7 +22586,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone) or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone), REFERENCE_PRICE_NOT_VND (the reference price is in dong), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -21792,6 +22710,40 @@
                       "error": {
                         "code": "PLAN.ADMIN_CONSOLE_NOT_APPLICABLE",
                         "message": "Only a K4 plan says whether it has an admin console.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.REFERENCE_PRICE_NOT_VND": {
+                    "summary": "The reference price of a plan is entered in dong (VND).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.REFERENCE_PRICE_NOT_VND",
+                        "message": "The reference price of a plan is entered in dong (VND).",
+                        "details": { "currency": "USD" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.REFERENCE_PRICE_NOT_APPLICABLE": {
+                    "summary": "Only a K1, K2 or K4 plan has a reference price.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.REFERENCE_PRICE_NOT_APPLICABLE",
+                        "message": "Only a K1, K2 or K4 plan has a reference price.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.REFERENCE_PRICE_NOT_POSITIVE": {
+                    "summary": "The reference price of a plan must be above zero.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.REFERENCE_PRICE_NOT_POSITIVE",
+                        "message": "The reference price of a plan must be above zero.",
                         "requestId": "req_example"
                       }
                     }
@@ -23936,7 +24888,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from, mine=true those the caller answers for, expiry=SOON or EXPIRED those from the point of adjustment to the last day of their period, or past it (a plan by the month opens 7 days before its next payment day, a plan by the year 30 days before the deadline to cancel; a purchase made once never). Each row says the days left to the deadline, the seats of a shared pool (K2), who answers for it and the logo of the application. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.",
+            "description": "A page of subscriptions by application, plan and creation, optionally filtered (planId finds the subscription to grant a seat from or to edit, as a plan has one subscription; a subscription has no owning department); warning=NO_ALERT_ANCHOR lists those with no date to alert from, mine=true those the caller answers for, expiry=SOON or EXPIRED those from the point of adjustment to the last day of their period, or past it (a plan by the month opens 7 days before its next payment day, a plan by the year 30 days before the deadline to cancel; a purchase made once never). Each row says the days left to the deadline, the seats of a shared pool (K2), who answers for it and the logo of the application. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.",
             "content": {
               "application/json": {
                 "schema": {
@@ -24090,7 +25042,7 @@
         },
         "responses": {
           "201": {
-            "description": "The subscription is stored: a draft while its data is incomplete, with what is missing; the unit price is in dong, and the price in the currency of the vendor is kept beside it when given.",
+            "description": "The subscription is stored: it has no owning department and a plan has one subscription; a K1 subscription is the shared record of the personal purchases of the plan, and each grant adds one seat to it. It is a draft while its data is incomplete, with what is missing; the unit price is in dong, and the price in the currency of the vendor is kept beside it when given.",
             "content": {
               "application/json": {
                 "schema": {
@@ -24241,7 +25193,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, while its workspace profile names fewer than two different IT Admins; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price).",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, while its workspace profile names fewer than two different IT Admins; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -24265,17 +25217,6 @@
                       "error": {
                         "code": "SUBSCRIPTION.PLAN_NOT_FOUND",
                         "message": "The plan does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE": {
-                    "summary": "The department that would own the subscription does not exist or is not active.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE",
-                        "message": "The department that would own the subscription does not exist or is not active.",
                         "requestId": "req_example"
                       }
                     }
@@ -24734,7 +25675,7 @@
         },
         "responses": {
           "200": {
-            "description": "The subscription as it is after the change; a new unit price is in dong and nothing is converted; a change of nothing is answered the same and not audited. The plan, the kind and the owner department cannot change.",
+            "description": "The subscription as it is after the change; a new unit price is in dong and nothing is converted; a change of nothing is answered the same and not audited. The plan and the kind cannot change.",
             "content": {
               "application/json": {
                 "schema": {
@@ -24842,23 +25783,11 @@
             }
           },
           "409": {
-            "description": "The department that owns the subscription has no Cost Center in use yet and the change creates, raises or extends what is owed: a higher quantity, a later end or renewal date (or one where there was none), auto renewal switched on or a higher unit price (FINANCE.SETUP_INCOMPLETE, nothing is written). The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire.",
+            "description": "The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire. When expectedUpdatedAt is sent and the subscription was changed since (by another edit, or by a seat bought for a grant), nothing is written (SUBSCRIPTION.STALE, details.currentUpdatedAt): read it again and redo the edit.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
-                  "FINANCE.SETUP_INCOMPLETE": {
-                    "summary": "The department has no Cost Center in use yet: Finance has to create one for it first.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "FINANCE.SETUP_INCOMPLETE",
-                        "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
-                        "details": { "departmentId": "<department-id>" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
                   "SUBSCRIPTION.PRIMARY_CONFLICT": {
                     "summary": "Another subscription of the plan was made the primary one at the same time. Read it again and retry.",
                     "value": {
@@ -24866,6 +25795,18 @@
                       "error": {
                         "code": "SUBSCRIPTION.PRIMARY_CONFLICT",
                         "message": "Another subscription of the plan was made the primary one at the same time. Read it again and retry.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.STALE": {
+                    "summary": "The subscription was changed by someone else since it was read: read it again before editing.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.STALE",
+                        "message": "The subscription was changed by someone else since it was read: read it again before editing.",
+                        "details": { "currentUpdatedAt": "2026-01-01T00:00:00.000Z" },
                         "requestId": "req_example"
                       }
                     }
@@ -24917,7 +25858,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, while its workspace profile names fewer than two different IT Admins; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price). An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, while its workspace profile names fewer than two different IT Admins; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price). An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -32294,7 +33235,7 @@
         },
         "responses": {
           "201": {
-            "description": "The seat is taken from today by an assignment of source REQUEST, and a manual task is made that the IT Admin who pressed has already taken: it is in progress (IN_PROGRESS) under their account (claimedBy), whoever is in charge of the beneficiary department by default (defaultResponsibleEmployeeId; none: the general queue, with a warning). Pressing again for the same request (for a request for a group, the same person), or another IT Admin pressing, makes nothing new: the answer is the task that exists, 201 with no warnings, still taken by whoever took it first. K5 takes no subscription and no seat. The task of a K1 grant carries k1Checklist (variant GRANT) to tick before it is completed. For the request of a service account the IT Admin enters the account identifier (not read from the request) and may name another active person of the owning department to answer for it (responsibleEmployeeId); the assignment is a service one, owned by that department and charged to its Unit Cost Center, with the purpose as its reason.",
+            "description": "The seat is taken from today by an assignment of source REQUEST, and a manual task is made that the IT Admin who pressed has already taken: it is in progress (IN_PROGRESS) under their account (claimedBy), whoever is in charge of the beneficiary department by default (defaultResponsibleEmployeeId; none: the general queue, with a warning). Pressing again for the same request (for a request for a group, the same person), or another IT Admin pressing, makes nothing new: the answer is the task that exists, 201 with no warnings, still taken by whoever took it first. K5 takes no subscription and no seat. The seat is taken from the subscription of the plan, with no department filter: a subscription has no owning department. The task of a K1 grant carries k1Checklist (variant GRANT) to tick before it is completed. For the request of a service account the IT Admin enters the account identifier (not read from the request) and may name another active person of the owning department to answer for it (responsibleEmployeeId); the assignment is a service one, owned by that department and charged to its Unit Cost Center, with the purpose as its reason.",
             "content": {
               "application/json": {
                 "schema": {
@@ -39754,6 +40695,13 @@
             "schema": { "type": "string", "enum": ["true", "false"] }
           },
           {
+            "name": "mine",
+            "required": false,
+            "in": "query",
+            "description": "true lists only the renewals of the subscriptions the caller answers for as their IT Admin; false or absent lists them all.",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -39774,7 +40722,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of the renewal cases: the period (subscription.ownerDepartmentId is null for a subscription of the shared pool), the day the case counts from and where it comes from (a declared or an inferred cancellation deadline, the renewal day, the payment day or the end date), the choice recorded, the decision and the outcome. The IT Admin and Finance (who only reads) see every case; the head of a department sees those of the subscriptions the department owns, and none of the shared pool. A case that waited for a head before the one-write renewal is closed (state STALE); waitingReason is always null. Filter by state, by subscription or by the late flag.",
+            "description": "A page of the renewal cases: the period, the day the case counts from and where it comes from (a declared or an inferred cancellation deadline, the renewal day, the payment day or the end date), the choice recorded, the decision and the outcome. The IT Admin and Finance (who only reads) see every case; nobody else reads them. Cases are not scoped by department: each subscription names the IT Admin who answers for it (subscription.responsibleItAdmin) and its kind of provisioning (subscription.provisioningType: K1 personal seats, K2 or K4 a shared pool). A case that waited for a head before the one-write renewal is closed (state STALE); waitingReason is always null. Filter by state, by subscription or by the late flag; mine=true keeps the renewals of the subscriptions the caller answers for (the default view of an IT Admin).",
             "content": {
               "application/json": {
                 "schema": {
@@ -39819,18 +40767,18 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin, Finance and the head of a department read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN); the head reads those of the subscriptions their department owns, and Finance does not read the seats.",
+            "description": "Only the IT Admin and Finance read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN); Finance does not read the seats.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "SUBSCRIPTION_RENEWAL.READ_FORBIDDEN": {
-                    "summary": "Only the IT Admin, Finance and the head of the department that owns the subscription read the renewals.",
+                    "summary": "Only the IT Admin and Finance read the renewals.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.READ_FORBIDDEN",
-                        "message": "Only the IT Admin, Finance and the head of the department that owns the subscription read the renewals.",
+                        "message": "Only the IT Admin and Finance read the renewals.",
                         "requestId": "req_example"
                       }
                     }
@@ -40453,7 +41401,7 @@
             }
           },
           "409": {
-            "description": "The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool (a department owns it, or it is a key or a one-time license), a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); a cancellation decided before the one-write rule still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId: the IT Admin records its outcome first); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE).",
+            "description": "The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool (a key or a one-time license), a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); a cancellation decided before the one-write rule still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId: the IT Admin records its outcome first); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40631,18 +41579,18 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin, Finance and the head of a department read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN); the head reads those of the subscriptions their department owns, and Finance does not read the seats.",
+            "description": "Only the IT Admin and Finance read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN); Finance does not read the seats.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "SUBSCRIPTION_RENEWAL.READ_FORBIDDEN": {
-                    "summary": "Only the IT Admin, Finance and the head of the department that owns the subscription read the renewals.",
+                    "summary": "Only the IT Admin and Finance read the renewals.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.READ_FORBIDDEN",
-                        "message": "Only the IT Admin, Finance and the head of the department that owns the subscription read the renewals.",
+                        "message": "Only the IT Admin and Finance read the renewals.",
                         "requestId": "req_example"
                       }
                     }
@@ -40652,7 +41600,7 @@
             }
           },
           "404": {
-            "description": "There is no renewal with this id, or it belongs to a subscription another department owns, or to the shared pool, and the caller is a head (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
+            "description": "There is no renewal with this id (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40785,7 +41733,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Deprecated: no seat is chosen for a reduction any more, the system counts them (`SBF-20`). The personal seats in use of the period, in the order a reduction below them was chosen from: the seats whose revocation is already decided, then those whose holder left, then those a waste rule flagged and the rest by the oldest last activity. While no evidence of use is connected (usage NOT_AVAILABLE) no seat is flagged, lastActivityOn is null and the rest come oldest seat first: an order, not a judgement of use. Each seat shows whether the IT Admin proposed to take it back (inProposal; proposedOnly=true lists only those). Read by the IT Admin and by the head of the owner department; the head sees the code and name of the holder and nothing else of them.",
+            "description": "Deprecated: no seat is chosen for a reduction any more, the system counts them (`SBF-20`). The personal seats in use of the period, in the order a reduction below them was chosen from: the seats whose revocation is already decided, then those whose holder left, then those a waste rule flagged and the rest by the oldest last activity. While no evidence of use is connected (usage NOT_AVAILABLE) no seat is flagged, lastActivityOn is null and the rest come oldest seat first: an order, not a judgement of use. Each seat shows whether the IT Admin proposed to take it back (inProposal; proposedOnly=true lists only those). Read by the IT Admin, not by Finance; each holder is shown by code and name and nothing else.",
             "content": {
               "application/json": {
                 "schema": {
@@ -40830,18 +41778,18 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin, Finance and the head of a department read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN); the head reads those of the subscriptions their department owns, and Finance does not read the seats.",
+            "description": "Only the IT Admin and Finance read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN); Finance does not read the seats.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
                   "SUBSCRIPTION_RENEWAL.READ_FORBIDDEN": {
-                    "summary": "Only the IT Admin, Finance and the head of the department that owns the subscription read the renewals.",
+                    "summary": "Only the IT Admin and Finance read the renewals.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "SUBSCRIPTION_RENEWAL.READ_FORBIDDEN",
-                        "message": "Only the IT Admin, Finance and the head of the department that owns the subscription read the renewals.",
+                        "message": "Only the IT Admin and Finance read the renewals.",
                         "requestId": "req_example"
                       }
                     }
@@ -40851,7 +41799,7 @@
             }
           },
           "404": {
-            "description": "There is no renewal with this id, or it belongs to a subscription another department owns, or to the shared pool, and the caller is a head (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
+            "description": "There is no renewal with this id (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -41053,7 +42001,7 @@
             }
           },
           "404": {
-            "description": "There is no renewal with this id, or it belongs to a subscription another department owns, or to the shared pool, and the caller is a head (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
+            "description": "There is no renewal with this id (SUBSCRIPTION_RENEWAL.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -41333,7 +42281,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of what the system recorded when the renewal day of a period passed with no result recorded, the newest first: an incident for a subscription that renews itself (what the measure of unwanted renewals counts, one per period) or a mark that a subscription that does not renew itself expired without renewal. A result recorded later never removes an event, and a step past its SLA is never one. subscription.ownerDepartmentId is null for a subscription of the shared pool. Filter by kind and by the day recorded.",
+            "description": "A page of what the system recorded when the renewal day of a period passed with no result recorded, the newest first: an incident for a subscription that renews itself (what the measure of unwanted renewals counts, one per period) or a mark that a subscription that does not renew itself expired without renewal. Each subscription names the IT Admin who answers for it (subscription.responsibleItAdmin) and its provisioningType. A result recorded later never removes an event, and a step past its SLA is never one. Filter by kind and by the day recorded.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44331,7 +45279,7 @@
         },
         "responses": {
           "200": {
-            "description": "The requester withdraws the request while it waits or while the grant has not been carried out; the head of the department does too, with a reason, only while the budget or the data stopped the request or it waits for the head to confirm the reserve. The open steps close, the request leaves the batch it was sent in, what was held for it goes back to the budget and a task nobody has worked is cancelled with its assignment (never failed). When the grant had failed the request waits (AWAITING_IT_CLOSE) until the IT Admin cancels the task, and it then ends as withdrawn.",
+            "description": "The requester withdraws the request only before any decision was taken on it: while it waits for the head at the need step or stands waiting for a head, while it is sent back to add what is missing, or, when no head decides the need, until the first who decides (the spending approver, the IT Admin) has decided; a direct grant until its task is begun. After that the way back is a return once granted. The head of the department does too, with a reason, only while the budget or the data stopped the request or it waits for the head to confirm the reserve. The open steps close, the request leaves the batch it was sent in, what was held for it goes back to the budget and a task nobody has worked is cancelled with its assignment (never failed). When the grant had failed the request waits (AWAITING_IT_CLOSE) until the IT Admin cancels the task, and it then ends as withdrawn.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44439,11 +45387,23 @@
             }
           },
           "409": {
-            "description": "Nothing is left to withdraw (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin (ACCESS_REQUEST.WITHDRAWAL_PENDING), the task of the grant is being worked: ask again when it has a result (ACCESS_REQUEST.GRANT_RUNNING), or the seat is real and the way back is a return (ACCESS_REQUEST.GRANT_COMPLETED). Nothing changes.",
+            "description": "A decision was already taken (ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION, details.scope and details.state), nothing is left to withdraw (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin (ACCESS_REQUEST.WITHDRAWAL_PENDING), the task of the grant is being worked: ask again when it has a result (ACCESS_REQUEST.GRANT_RUNNING), or the seat is real and the way back is a return (ACCESS_REQUEST.GRANT_COMPLETED). Nothing changes.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION": {
+                    "summary": "The request cannot be withdrawn: WITHDRAWAL_AFTER_DECISION.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION",
+                        "message": "The request cannot be withdrawn: WITHDRAWAL_AFTER_DECISION.",
+                        "details": { "scope": "REQUEST", "state": "AWAITING_SPEND_DECISION" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "ACCESS_REQUEST.ALREADY_ENDED": {
                     "summary": "The request cannot be withdrawn: ALREADY_ENDED.",
                     "value": {
@@ -44623,7 +45583,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Withdraw a request that is still waiting",
+        "summary": "Withdraw a request nobody has decided yet",
         "tags": ["access-requests"]
       }
     },
@@ -53047,7 +54007,7 @@
         },
         "responses": {
           "201": {
-            "description": "The invoice is kept as it was read against its request or subscription, with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.",
+            "description": "The invoice is kept as it was read against its request or subscription (any IT Admin may submit the invoice of a subscription period, as it has no owning department; one for a request is submitted by the IT Admin of the department of the request), with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.",
             "content": {
               "application/json": {
                 "schema": {
@@ -58332,7 +59292,7 @@
         },
         "responses": {
           "200": {
-            "description": "The sender withdraws one person while their seat is not real; the head of the department does too, with a reason, in the stages the head acts on. Before the spend nothing is held, and the request is priced again for those who remain. Once the spend is approved the share of that person goes back to the budget and nobody else’s does; a task nobody has worked is cancelled with its assignment (never failed), and when the grant had failed the person waits until the IT Admin cancels the task. The other people are not touched.",
+            "description": "The sender withdraws one person only while their line still awaits the need, or while the request is sent back to add what is missing; after any decision the way back is a return once granted. The head of the department does too, with a reason, in the stages the head acts on. Before the spend nothing is held, and the request is priced again for those who remain. Once the spend is approved the share of that person goes back to the budget and nobody else’s does; a task nobody has worked is cancelled with its assignment (never failed), and when the grant had failed the person waits until the IT Admin cancels the task. The other people are not touched.",
             "content": {
               "application/json": {
                 "schema": {
@@ -58440,11 +59400,23 @@
             }
           },
           "409": {
-            "description": "Nothing is left to withdraw (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin (ACCESS_REQUEST.WITHDRAWAL_PENDING), the task of the grant is being worked (ACCESS_REQUEST.GRANT_RUNNING), or the seat is real and the way back is a return (ACCESS_REQUEST.GRANT_COMPLETED). Nothing changes.",
+            "description": "A decision was already taken on the person (ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION), nothing is left to withdraw (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin (ACCESS_REQUEST.WITHDRAWAL_PENDING), the task of the grant is being worked (ACCESS_REQUEST.GRANT_RUNNING), or the seat is real and the way back is a return (ACCESS_REQUEST.GRANT_COMPLETED). Nothing changes.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION": {
+                    "summary": "The request cannot be withdrawn: WITHDRAWAL_AFTER_DECISION.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION",
+                        "message": "The request cannot be withdrawn: WITHDRAWAL_AFTER_DECISION.",
+                        "details": { "scope": "LINE", "state": "APPROVED" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "ACCESS_REQUEST.ALREADY_ENDED": {
                     "summary": "The request cannot be withdrawn: ALREADY_ENDED.",
                     "value": {
@@ -100653,6 +101625,20 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "CorrectFirstPlacementBodyDto": {
+        "type": "object",
+        "properties": {
+          "departmentId": { "type": "string", "format": "uuid" },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+        },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
       "CreateEmployeeBodyDto": {
         "type": "object",
         "properties": {
@@ -101192,6 +102178,7 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
+                    "avatarUrl": { "type": "string", "nullable": true },
                     "memberCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                     "warnings": {
                       "type": "array",
@@ -101215,6 +102202,7 @@
                     "costCenter",
                     "itAdmin",
                     "head",
+                    "avatarUrl",
                     "memberCount",
                     "warnings",
                     "effectiveFrom",
@@ -101316,6 +102304,7 @@
                 "additionalProperties": false,
                 "nullable": true
               },
+              "avatarUrl": { "type": "string", "nullable": true },
               "memberCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
               "warnings": {
                 "type": "array",
@@ -101363,6 +102352,7 @@
               "costCenter",
               "itAdmin",
               "head",
+              "avatarUrl",
               "memberCount",
               "warnings",
               "effectiveFrom",
@@ -105470,7 +106460,17 @@
               "revocationNote": { "type": "string", "maxLength": 5000, "nullable": true },
               "dataLossOnRemoval": { "type": "boolean" },
               "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED"] },
-              "hasAdminConsole": { "type": "boolean" }
+              "hasAdminConsole": { "type": "boolean" },
+              "referencePrice": {
+                "type": "object",
+                "properties": {
+                  "amount": { "type": "string", "maxLength": 40 },
+                  "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+                },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "The price before tax in dong, a decimal string in major units, currency VND: K1/K2, one seat for one month (a yearly price over 12); K4, one purchase. Used by a request when no subscription of the plan has a price. K5 has none."
+              }
             },
             "required": ["name", "provisioningType"],
             "additionalProperties": false
@@ -105562,6 +106562,14 @@
                   "dataLossOnRemoval": { "type": "boolean" },
                   "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
                   "hasAdminConsole": { "type": "boolean" },
+                  "referencePrice": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "description": "The reference price in dong before tax, or null when none is entered.",
+                    "nullable": true
+                  },
                   "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
                   "createdAt": { "type": "string", "format": "date-time" },
                   "updatedAt": { "type": "string", "format": "date-time" },
@@ -105579,6 +106587,7 @@
                   "dataLossOnRemoval",
                   "sharingPolicy",
                   "hasAdminConsole",
+                  "referencePrice",
                   "seatTracking",
                   "createdAt",
                   "updatedAt",
@@ -105746,6 +106755,14 @@
                     "dataLossOnRemoval": { "type": "boolean" },
                     "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
                     "hasAdminConsole": { "type": "boolean" },
+                    "referencePrice": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "The reference price in dong before tax, or null when none is entered.",
+                      "nullable": true
+                    },
                     "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "updatedAt": { "type": "string", "format": "date-time" }
@@ -105762,6 +106779,7 @@
                     "dataLossOnRemoval",
                     "sharingPolicy",
                     "hasAdminConsole",
+                    "referencePrice",
                     "seatTracking",
                     "createdAt",
                     "updatedAt"
@@ -105808,7 +106826,17 @@
           "revocationNote": { "type": "string", "maxLength": 5000, "nullable": true },
           "dataLossOnRemoval": { "type": "boolean" },
           "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED"] },
-          "hasAdminConsole": { "type": "boolean" }
+          "hasAdminConsole": { "type": "boolean" },
+          "referencePrice": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "string", "maxLength": 40 },
+              "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+            },
+            "required": ["amount", "currency"],
+            "additionalProperties": false,
+            "description": "The price before tax in dong, a decimal string in major units, currency VND: K1/K2, one seat for one month (a yearly price over 12); K4, one purchase. Used by a request when no subscription of the plan has a price. K5 has none."
+          }
         },
         "required": ["applicationId", "name", "provisioningType"],
         "additionalProperties": false
@@ -105844,6 +106872,14 @@
               "dataLossOnRemoval": { "type": "boolean" },
               "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
               "hasAdminConsole": { "type": "boolean" },
+              "referencePrice": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "The reference price in dong before tax, or null when none is entered.",
+                "nullable": true
+              },
               "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
               "createdAt": { "type": "string", "format": "date-time" },
               "updatedAt": { "type": "string", "format": "date-time" },
@@ -105861,6 +106897,7 @@
               "dataLossOnRemoval",
               "sharingPolicy",
               "hasAdminConsole",
+              "referencePrice",
               "seatTracking",
               "createdAt",
               "updatedAt",
@@ -105904,6 +106941,14 @@
               "dataLossOnRemoval": { "type": "boolean" },
               "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
               "hasAdminConsole": { "type": "boolean" },
+              "referencePrice": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "The reference price in dong before tax, or null when none is entered.",
+                "nullable": true
+              },
               "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
               "createdAt": { "type": "string", "format": "date-time" },
               "updatedAt": { "type": "string", "format": "date-time" },
@@ -106000,6 +107045,7 @@
               "dataLossOnRemoval",
               "sharingPolicy",
               "hasAdminConsole",
+              "referencePrice",
               "seatTracking",
               "createdAt",
               "updatedAt",
@@ -106027,7 +107073,18 @@
           "revocationNote": { "type": "string", "maxLength": 5000, "nullable": true },
           "dataLossOnRemoval": { "type": "boolean" },
           "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
-          "hasAdminConsole": { "type": "boolean" }
+          "hasAdminConsole": { "type": "boolean" },
+          "referencePrice": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "string", "maxLength": 40 },
+              "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+            },
+            "required": ["amount", "currency"],
+            "additionalProperties": false,
+            "description": "The reference price; null clears it. Moving the plan to K5, or between K1/K2 and K4, clears it too.",
+            "nullable": true
+          }
         },
         "additionalProperties": false
       },
@@ -106732,7 +107789,6 @@
                     "id": { "type": "string", "format": "uuid" },
                     "planId": { "type": "string", "format": "uuid" },
                     "planName": { "type": "string" },
-                    "ownerDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
                     "applicationId": { "type": "string", "format": "uuid" },
                     "applicationName": { "type": "string" },
                     "logoUrl": {
@@ -106941,7 +107997,6 @@
                     "id",
                     "planId",
                     "planName",
-                    "ownerDepartmentId",
                     "applicationId",
                     "applicationName",
                     "logoUrl",
@@ -107033,7 +108088,6 @@
         "type": "object",
         "properties": {
           "planId": { "type": "string", "format": "uuid" },
-          "ownerDepartmentId": { "type": "string", "format": "uuid" },
           "kind": { "type": "string", "enum": ["TERM", "PERPETUAL"] },
           "purchasedQuantity": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
           "unitPrice": {
@@ -107107,7 +108161,6 @@
               "id": { "type": "string", "format": "uuid" },
               "planId": { "type": "string", "format": "uuid" },
               "planName": { "type": "string" },
-              "ownerDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
               "applicationId": { "type": "string", "format": "uuid" },
               "applicationName": { "type": "string" },
               "logoUrl": {
@@ -107316,7 +108369,6 @@
               "id",
               "planId",
               "planName",
-              "ownerDepartmentId",
               "applicationId",
               "applicationName",
               "logoUrl",
@@ -107425,7 +108477,12 @@
           "allowsMidTermReduction": { "type": "boolean" },
           "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid" },
           "vendorMinimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000000, "nullable": true },
-          "isPrimaryForPlan": { "type": "boolean" }
+          "isPrimaryForPlan": { "type": "boolean" },
+          "expectedUpdatedAt": {
+            "description": "The updatedAt of the subscription as the client read it. When it is not the current one the change is refused (SUBSCRIPTION.STALE) and nothing is written; leave it out to change without the check.",
+            "type": "string",
+            "format": "date-time"
+          }
         },
         "additionalProperties": false
       },
@@ -108352,7 +109409,7 @@
                       },
                       "required": ["status", "missingReason"],
                       "additionalProperties": false,
-                      "description": "Whether the department of the caller can price the plan, never the price itself. A missing price does not stop the request: the preview says it cannot go on to the spend step until the plan is priced."
+                      "description": "Whether the department of the caller can price the plan, never the price itself: a plan with a subscription that has a price, or with a reference price of its own, is priced; NO_PRICED_SUBSCRIPTION means neither exists. A missing price does not stop the request: the preview says it cannot go on to the spend step until the plan is priced."
                     },
                     "costsMoney": {
                       "type": "boolean",
@@ -108445,7 +109502,7 @@
                 },
                 "required": ["status", "missingReason"],
                 "additionalProperties": false,
-                "description": "Whether the department of the caller can price the plan, never the price itself. A missing price does not stop the request: the preview says it cannot go on to the spend step until the plan is priced."
+                "description": "Whether the department of the caller can price the plan, never the price itself: a plan with a subscription that has a price, or with a reference price of its own, is priced; NO_PRICED_SUBSCRIPTION means neither exists. A missing price does not stop the request: the preview says it cannot go on to the spend step until the plan is priced."
               },
               "costsMoney": {
                 "type": "boolean",
@@ -111576,9 +112633,33 @@
                         "planName": { "type": "string" },
                         "applicationId": { "type": "string", "format": "uuid" },
                         "applicationName": { "type": "string" },
-                        "ownerDepartmentId": { "type": "string", "format": "uuid", "nullable": true }
+                        "provisioningType": {
+                          "type": "string",
+                          "enum": ["K1", "K2", "K3", "K4", "K5"],
+                          "description": "K1 is a plan of personal seats; K2 and K4 are shared pools (a workspace, a key pool)."
+                        },
+                        "responsibleItAdmin": {
+                          "type": "object",
+                          "properties": {
+                            "employeeId": { "type": "string", "format": "uuid" },
+                            "employeeCode": { "type": "string" },
+                            "fullName": { "type": "string" }
+                          },
+                          "required": ["employeeId", "employeeCode", "fullName"],
+                          "additionalProperties": false,
+                          "description": "The IT Admin who answers for the subscription, by name; null when none is named.",
+                          "nullable": true
+                        }
                       },
-                      "required": ["id", "planId", "planName", "applicationId", "applicationName", "ownerDepartmentId"],
+                      "required": [
+                        "id",
+                        "planId",
+                        "planName",
+                        "applicationId",
+                        "applicationName",
+                        "provisioningType",
+                        "responsibleItAdmin"
+                      ],
                       "additionalProperties": false
                     },
                     "milestone": {
@@ -111776,9 +112857,33 @@
                       "planName": { "type": "string" },
                       "applicationId": { "type": "string", "format": "uuid" },
                       "applicationName": { "type": "string" },
-                      "ownerDepartmentId": { "type": "string", "format": "uuid", "nullable": true }
+                      "provisioningType": {
+                        "type": "string",
+                        "enum": ["K1", "K2", "K3", "K4", "K5"],
+                        "description": "K1 is a plan of personal seats; K2 and K4 are shared pools (a workspace, a key pool)."
+                      },
+                      "responsibleItAdmin": {
+                        "type": "object",
+                        "properties": {
+                          "employeeId": { "type": "string", "format": "uuid" },
+                          "employeeCode": { "type": "string" },
+                          "fullName": { "type": "string" }
+                        },
+                        "required": ["employeeId", "employeeCode", "fullName"],
+                        "additionalProperties": false,
+                        "description": "The IT Admin who answers for the subscription, by name; null when none is named.",
+                        "nullable": true
+                      }
                     },
-                    "required": ["id", "planId", "planName", "applicationId", "applicationName", "ownerDepartmentId"],
+                    "required": [
+                      "id",
+                      "planId",
+                      "planName",
+                      "applicationId",
+                      "applicationName",
+                      "provisioningType",
+                      "responsibleItAdmin"
+                    ],
                     "additionalProperties": false
                   },
                   "milestone": {
@@ -112288,9 +113393,33 @@
                         "planName": { "type": "string" },
                         "applicationId": { "type": "string", "format": "uuid" },
                         "applicationName": { "type": "string" },
-                        "ownerDepartmentId": { "type": "string", "format": "uuid", "nullable": true }
+                        "provisioningType": {
+                          "type": "string",
+                          "enum": ["K1", "K2", "K3", "K4", "K5"],
+                          "description": "K1 is a plan of personal seats; K2 and K4 are shared pools (a workspace, a key pool)."
+                        },
+                        "responsibleItAdmin": {
+                          "type": "object",
+                          "properties": {
+                            "employeeId": { "type": "string", "format": "uuid" },
+                            "employeeCode": { "type": "string" },
+                            "fullName": { "type": "string" }
+                          },
+                          "required": ["employeeId", "employeeCode", "fullName"],
+                          "additionalProperties": false,
+                          "description": "The IT Admin who answers for the subscription, by name; null when none is named.",
+                          "nullable": true
+                        }
                       },
-                      "required": ["id", "planId", "planName", "applicationId", "applicationName", "ownerDepartmentId"],
+                      "required": [
+                        "id",
+                        "planId",
+                        "planName",
+                        "applicationId",
+                        "applicationName",
+                        "provisioningType",
+                        "responsibleItAdmin"
+                      ],
                       "additionalProperties": false
                     },
                     "kind": { "type": "string", "enum": ["AUTO_RENEWAL_INCIDENT", "EXPIRY_MARKED"] },
@@ -113973,6 +115102,11 @@
                     ],
                     "additionalProperties": false
                   },
+                  "priceSource": {
+                    "type": "string",
+                    "enum": ["SUBSCRIPTION", "PLAN_REFERENCE", null],
+                    "nullable": true
+                  },
                   "cost": {
                     "type": "object",
                     "properties": {
@@ -114177,6 +115311,7 @@
                   "canSubmit",
                   "budgetYear",
                   "pricing",
+                  "priceSource",
                   "cost",
                   "costEstimate",
                   "spendSubmission",
@@ -120112,7 +121247,7 @@
                       "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
                       "required": ["id", "name"],
                       "additionalProperties": false,
-                      "description": "The department of the request, or the one that owns the subscription; null for a subscription of the shared pool, which no department owns.",
+                      "description": "The department of the request; null for the invoice of a subscription period, which has no owning department.",
                       "nullable": true
                     }
                   },
@@ -136732,7 +137867,7 @@
                     },
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
-                    "description": "The periods of a right paid by the month or the year whose invoice has not been submitted five working days after the payment day, in the departments of the caller: the total of the list of them (`purchaseInvoiceMissingPeriodList`)."
+                    "description": "The periods of a right paid by the month or the year whose invoice has not been submitted five working days after the payment day, in the requests of the departments of the caller and the subscriptions the caller answers for: the total of the list of them (`purchaseInvoiceMissingPeriodList`)."
                   },
                   "outOfProcessRevocationsDue": {
                     "type": "object",

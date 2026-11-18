@@ -316,8 +316,8 @@ describe('failed provisioning tasks and failed assignments (integration, Postgre
     it('takes no seat on any day: the seat can be given to another person, and to the same one again', async () => {
       const subscriptionId = randomUUID();
       await sql.query(
-        `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity)
-         VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'TERM', 'DRAFT', 1)`,
+        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity)
+         VALUES ($1, $2, $3, 'TERM', 'DRAFT', 1)`,
         [subscriptionId, organizationId, paidPlanId],
       );
       const employee = await newEmployee();
@@ -335,8 +335,8 @@ describe('failed provisioning tasks and failed assignments (integration, Postgre
     it('does not make the same person overlap themselves: after failing, they can hold a seat on that day again', async () => {
       const subscriptionId = randomUUID();
       await sql.query(
-        `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity)
-         VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'TERM', 'DRAFT', 5)`,
+        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity)
+         VALUES ($1, $2, $3, 'TERM', 'DRAFT', 5)`,
         [subscriptionId, organizationId, paidPlanId],
       );
       const employee = await newEmployee();

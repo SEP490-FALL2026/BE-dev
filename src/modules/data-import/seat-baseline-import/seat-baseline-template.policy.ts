@@ -17,8 +17,8 @@ export const SEAT_BASELINE_TEMPLATE: ImportTemplateDefinition = {
       format: 'Mã đã có trong hệ thống',
       example: 'NV0101',
       constraint:
-        'Nhân viên phải tồn tại và đang làm việc; với thuê bao dùng chung, phòng của nhân viên phải là phòng sở hữu thuê bao.',
-      refusedWith: ['EMPLOYEE_NOT_FOUND', 'EMPLOYEE_NOT_ACTIVE', 'SUBSCRIPTION_DEPARTMENT_MISMATCH'],
+        'Nhân viên phải tồn tại và đang làm việc; seat thuộc phòng của nhân viên, thuê bao không có phòng sở hữu.',
+      refusedWith: ['EMPLOYEE_NOT_FOUND', 'EMPLOYEE_NOT_ACTIVE'],
     },
     {
       key: 'account_identifier',

@@ -38,7 +38,6 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
 
   const subscribe = (planId: string, over: Record<string, unknown>) =>
     declareSubscription(h.ctx, h.it1.accessToken, {
-      ownerDepartmentId: h.seed.departmentId,
       planId,
       kind: 'TERM',
       billingCycle: 'MONTHLY',

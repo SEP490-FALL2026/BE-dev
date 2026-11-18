@@ -1,4 +1,4 @@
-import type { DemoApplication, DemoFixture, DemoSeat, DemoSubscription } from '../demo-fixture.types';
+import type { DemoApplication, DemoFixture, DemoPlan, DemoSeat, DemoSubscription } from '../demo-fixture.types';
 import { EXTRA_APPLICATIONS, EXTRA_SEATS, EXTRA_SUBSCRIPTIONS, PLAN_TERMS } from './catalog-extra';
 import { app, groupOf, k2, k4, monthly } from './catalog-kit';
 
@@ -80,6 +80,16 @@ const APPLICATIONS: DemoApplication[] = [
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
       },
+      // A K1 plan with no subscription at all, only a reference price: a request for it is priced from the plan (`QĐ-113a`, R59).
+      {
+        key: 'grammarly-business',
+        name: 'Grammarly Business',
+        provisioningType: 'K1',
+        controlLevel: 'PARTIAL',
+        dataLossOnRemoval: false,
+        sharingPolicy: 'NOT_ALLOWED',
+        referencePrice: '360000',
+      },
     ],
     'SAAS',
     'MEDIUM',
@@ -123,17 +133,16 @@ const SUBSCRIPTIONS: DemoSubscription[] = [
   { ...monthly('mailchimp', 'mailchimp-standard', '400000', 'NV-ITA4', 4), renewalInDays: 20 },
   { ...monthly('canva', 'canva-teams', '250000', 'NV-ITA2', 4), renewalInDays: 20 },
   // K1: bought one by one when a seat is granted, so ChatGPT and Cursor start with none (the MF-5 reduction flows count their seats).
-  { ...monthly('chatgpt', 'chatgpt-plus', '500000', 'NV-ITA1', 0), quantity: 0, ownerDepartment: 'ENG' },
+  { ...monthly('chatgpt', 'chatgpt-plus', '500000', 'NV-ITA1', 0), quantity: 0 },
   // The vendor quotes 20 USD; a price is written in dong (`QĐ-111an`), so it is 508.000 (at the 25.400 the dataset used to record) and the
   // dollar quote stays beside it as the original price (FX-1, D-45).
   {
     ...monthly('cursor', 'cursor-pro', '508000', 'NV-ITA1', 0),
     quantity: 0,
-    ownerDepartment: 'ENG',
     originalPrice: { amount: '20', currency: 'USD' },
   },
   // The K1 plan of the person who leaves today: its one seat is his, so his revocation shows the K1 checklist (D-62).
-  { ...monthly('grammarly', 'grammarly-pro', '300000', 'NV-ITA1', 0), quantity: 1, ownerDepartment: 'ENG' },
+  { ...monthly('grammarly', 'grammarly-pro', '300000', 'NV-ITA1', 0), quantity: 1 },
   // K4: a key is bought once; the keys sit in the key store. JetBrains has three, DataGrip none.
   {
     key: 'jetbrains',
@@ -198,8 +207,31 @@ const SEATS: DemoSeat[] = [
   ...seat('grammarly', ['NV-OFF1']),
 ];
 
+/**
+ * The reference price of every paid plan (`QĐ-113a`): the price of one seat for a month of the subscription of the plan (a yearly price over 12, rounded
+ * up to the dong), or the price of one key (K4). A plan the fixture gave a price by hand (a plan with no subscription) keeps it; K5 has none.
+ */
+function withReferencePrices(
+  applications: readonly DemoApplication[],
+  subscriptions: readonly DemoSubscription[],
+): DemoApplication[] {
+  const priced = (plan: DemoPlan): DemoPlan => {
+    const subscription = subscriptions.find((candidate) => candidate.plan === plan.key);
+    if (plan.provisioningType === 'K5' || plan.referencePrice !== undefined || !subscription) return plan;
+    const amount = BigInt(subscription.unitPrice.amount);
+    const perMonth = subscription.billingCycle === 'ANNUAL' ? (amount + 11n) / 12n : amount;
+
+    return { ...plan, referencePrice: String(plan.provisioningType === 'K4' ? amount : perMonth) };
+  };
+
+  return applications.map((application) => ({ ...application, plans: application.plans.map(priced) }));
+}
+
 export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats' | 'planTerms'> = {
-  applications: [...APPLICATIONS, ...EXTRA_APPLICATIONS],
+  applications: withReferencePrices(
+    [...APPLICATIONS, ...EXTRA_APPLICATIONS],
+    [...SUBSCRIPTIONS, ...EXTRA_SUBSCRIPTIONS],
+  ),
   subscriptions: [...SUBSCRIPTIONS, ...EXTRA_SUBSCRIPTIONS],
   seats: [...SEATS, ...EXTRA_SEATS],
   planTerms: PLAN_TERMS,

@@ -117,8 +117,7 @@ describe('the seats the next period needs (integration, real PostgreSQL)', () =>
   };
 
   const subscription = async () => {
-    const unit = await h.unit(0);
-    const subscriptionId = await h.term({ ownerDepartmentId: unit.department.id });
+    const subscriptionId = await h.term({});
     const planId = (
       await h.ctx.sql.query<{ plan_id: string }>(`SELECT plan_id FROM subscriptions WHERE id = $1`, [subscriptionId])
     ).rows[0].plan_id;
@@ -172,7 +171,7 @@ describe('the seats the next period needs (integration, real PostgreSQL)', () =>
   describe('the open requests of a plan, read through the module of requests', () => {
     it('counts a request until it reaches a final state', async () => {
       const unit = await h.unit(1);
-      const subscriptionId = await h.term({ ownerDepartmentId: unit.department.id });
+      const subscriptionId = await h.term({});
       const planId = await h.planOf(subscriptionId);
       const requests = h.ctx.app.get(AccessRequestRepo, { strict: false });
       expect(await requests.countOpenOfPlan(planId)).toBe(0);

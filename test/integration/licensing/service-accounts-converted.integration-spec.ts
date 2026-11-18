@@ -68,8 +68,8 @@ describe('the migration that takes service accounts out of the scope (integratio
     await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = NULL WHERE id = $1`, [ownerWithoutItAdmin.id]);
     subscriptions = {
       seed: await h.subscription(40, 'K2'),
-      withIt: await h.subscription(40, 'K2', ownerWithItAdmin.id),
-      without: await h.subscription(40, 'K2', ownerWithoutItAdmin.id),
+      withIt: await h.subscription(40, 'K2'),
+      without: await h.subscription(40, 'K2'),
     };
     h.ctx.sql.on('notice', (notice) => notices.push(notice.message ?? ''));
   }, 240000);
@@ -95,19 +95,26 @@ describe('the migration that takes service accounts out of the scope (integratio
   };
   const tomorrow = () => inDays(1);
 
-  /** A service account as an earlier release wrote it: charged to the Unit of the department that owns its subscription. */
+  /** A service account as an earlier release wrote it: charged to the Unit of `extra.departmentId` (the seed department by default). The seat itself carries
+   * its owning department, which is what the migration reads for Q2; the subscription has none (QĐ-113g). */
   const serviceAccount = async (
     subscriptionId: string,
     responsible: string,
-    extra: { identifier?: string; validFrom?: string; validUntil?: string | null; reason?: string } = {},
+    extra: {
+      departmentId?: string;
+      identifier?: string;
+      validFrom?: string;
+      validUntil?: string | null;
+      reason?: string;
+    } = {},
   ): Promise<string> => {
     const { rows } = await h.ctx.sql.query<{ id: string }>(
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
          normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from, valid_from_basis, valid_until,
          created_by_app_user_id)
        SELECT gen_random_uuid(), s.organization_id, 'SERVICE', 'REQUEST', s.plan_id, s.id, $2, $3, lower($3), $4,
-              c.id, s.owner_department_id, $5, 'RECORDED', $6, $7
-         FROM subscriptions s JOIN cost_centers c ON c.department_id = s.owner_department_id AND c.status = 'ACTIVE' WHERE s.id = $1
+              c.id, c.department_id, $5, 'RECORDED', $6, $7
+         FROM subscriptions s JOIN cost_centers c ON c.department_id = $8::uuid AND c.status = 'ACTIVE' WHERE s.id = $1
        RETURNING id`,
       [
         subscriptionId,
@@ -117,6 +124,7 @@ describe('the migration that takes service accounts out of the scope (integratio
         extra.validFrom ?? '2026-01-05',
         extra.validUntil ?? null,
         randomUUID(),
+        extra.departmentId ?? h.seed.departmentId,
       ],
     );
 
@@ -210,8 +218,14 @@ describe('the migration that takes service accounts out of the scope (integratio
 
     it('gives the account of a person who is not an IT Admin to the IT Admin in charge of the department that owns it (Q2), or else to the first IT Admin who can act', async () => {
       const worker = await h.person(code());
-      const inCharge = await serviceAccount(subscriptions.withIt, worker, { reason: 'Deploys the site' });
-      const nobodyInCharge = await serviceAccount(subscriptions.without, worker, { reason: 'Runs the reports' });
+      const inCharge = await serviceAccount(subscriptions.withIt, worker, {
+        reason: 'Deploys the site',
+        departmentId: ownerWithItAdmin.id,
+      });
+      const nobodyInCharge = await serviceAccount(subscriptions.without, worker, {
+        reason: 'Runs the reports',
+        departmentId: ownerWithoutItAdmin.id,
+      });
 
       await migrate();
 

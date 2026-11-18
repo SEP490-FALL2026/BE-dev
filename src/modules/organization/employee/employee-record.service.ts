@@ -78,6 +78,18 @@ export class EmployeeRecordService {
     return this.repo.insertFirstPlacement(tx, input);
   }
 
+  placementsOf(tx: DbTx, employeeId: string): Promise<{ id: string; departmentId: string; validFrom: BusinessDate }[]> {
+    return this.repo.placementsOf(tx, employeeId);
+  }
+
+  correctFirstPlacement(
+    tx: DbTx,
+    placementId: string,
+    changes: { departmentId?: string; effectiveFrom?: BusinessDate },
+  ): Promise<void> {
+    return this.repo.correctFirstPlacement(tx, placementId, changes);
+  }
+
   scheduledFirstPlacement(
     employeeId: string,
     onDate: BusinessDate,

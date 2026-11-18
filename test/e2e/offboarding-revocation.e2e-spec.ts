@@ -27,7 +27,7 @@ describe('the departure of a person and the revocation of their seats (e2e, D-3)
     head = await h.worker(design, 'DES-H1');
     await h.makeHead(design, head);
     // Two subscriptions the department owns (a seat sits only on a subscription of its own department, F20).
-    subscriptions = [await h.subscription(20, 'K2', design.id), await h.subscription(20, 'K2', design.id)];
+    subscriptions = [await h.subscription(20, 'K2'), await h.subscription(20, 'K2')];
     // The person holds a seat of each subscription, as the seat baseline recorded them.
     leaver = await h.worker(design, 'DES-E1');
     seats = [];

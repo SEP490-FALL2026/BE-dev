@@ -45,6 +45,7 @@ export function submissionEvents(
       hasSpendStep: hasSpendStep(policy),
       slaWorkingDays: policy.slaWorkingDays,
       pricingStatus: pricing.status,
+      priceSource: pricing.priceSource ?? null,
       amountMinor: pricing.amount?.amountMinor.toString() ?? null,
       amountCurrency: pricing.amount?.currency ?? null,
       budgetYear: pricing.budgetYear,

@@ -22,7 +22,6 @@ const subscription = (over: Partial<SeatTarget> = {}): SeatTarget => ({
   status: 'ACTIVE',
   missing: [],
   purchasedQuantity: 100,
-  ownerDepartmentId: 'd1',
   allowsMidTermReduction: false,
   ...over,
 });
@@ -34,7 +33,6 @@ const internal: SeatTarget = subscription({
   provisioningType: 'K5',
   status: null,
   purchasedQuantity: null,
-  ownerDepartmentId: null,
 });
 
 describe('toSeatTargetRef (a baseline is for one subscription or one internal plan)', () => {

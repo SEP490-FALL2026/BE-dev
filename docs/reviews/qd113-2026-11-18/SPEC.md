@@ -1,7 +1,10 @@
 # SPEC — QĐ-113 (18/11/2026)
 
+Repo làm trước: **BE-WDP** (`WDP301-FA26-GR8/BE`), nhánh `feat/qd113`; sau khi xanh mới chép sang BE đồ án (SEP).
+Giữ phương án **Dự phòng** của `QĐ-113a`. `QĐ-113b` (bản 18/11 chiều): mỗi loại seat là một gói **và một workspace riêng**, hóa đơn tách theo
+workspace — không cần code. `QĐ-113f`: thuê bao `K1` giữ một bản ghi giá/chu kỳ — không cần code.
 Căn cứ nghiệp vụ: Docs `Decisions/project-decisions.md` `QĐ-113a` → `QĐ-113e`, BRD 4.14 (`FR-1.2`, `FR-1.6`, `FR-2.2`, `FR-3.1`,
-mục 5.3 bảng rút Request) — Docs commit `65fccd1`. Nhánh: `feat/qd113` từ `dev`. Không đổi gì ngoài 4 gói dưới đây.
+mục 5.3 bảng rút Request) — Docs commit `65fccd1`, `cc7e3fe`, `bfe96ac`. Nhánh: `feat/qd113` từ `dev`. Không đổi gì ngoài 4 gói dưới đây.
 Không làm: sửa từng phần hồ sơ workspace (đã có `PUT /plans/:id/workspace-profile`), API sửa thuê bao (đã có
 `PATCH /subscriptions/:id`, `POST /subscriptions/:id/completions`).
 
@@ -90,19 +93,33 @@ Hiện: gói không có giá; giá chỉ ở thuê bao. Điểm chung: `Subscrip
 7. `MissingPriceReason` giữ `NO_PRICED_SUBSCRIPTION` cho trường hợp thiếu cả hai (mô tả đổi thành "không có thuê bao có giá và gói chưa có
    giá tham chiếu").
 
-## P5 — Seed demo
+## P5 — Seed demo (review toàn bộ seed theo luật mới)
 
-1. Mọi gói trả phí của demo (`src/cli/seed/fixture/shared-demo-v4/catalog.ts`, `catalog-extra.ts`, `catalog-kit.ts`, `steps/catalog.steps.ts`)
-   có `referencePrice` VND hợp lý (K2: bằng giá tháng quy đổi của thuê bao đang có; K1: giá gói tháng; K4: giá khóa).
-2. Thêm một gói **không có thuê bao** nhưng có giá tham chiếu (vd. một gói `K1` mới) để demo Request định giá từ gói.
-3. Nếu catalog có Claude: tách *Claude Team – Standard* và *Claude Team – Premium* thành hai gói (`QĐ-113b`); không có thì bỏ qua.
-4. Một nhân viên được xếp phòng lần đầu với ngày tương lai, chưa có Request — để demo P2.
-5. Không seed ảnh phòng (không có file); cập nhật docs/guides/demo-dataset.md.
+Seed chạy qua **API thật** (`src/cli/seed/steps/*`, `demo-api-client.ts`), nên mọi luật mới của P1–P4 áp vào seed. Rà **từng** kịch bản trong
+`src/cli/seed/fixture/shared-demo-v4/*` và `README.md` của fixture:
+
+1. **Rút Request (P1):** kịch bản rút phải hợp luật mới. R05 (`requests.ts`, "tự rút khi còn chờ") phải rút lúc còn chờ trưởng phòng.
+   Kịch bản *"withdrawn while the task waits to be closed"* trong `requests-extra.ts` (rút khi tác vụ cấp lỗi/chờ chấp nhận — `QĐ-77g` đã
+   bị thay) **không còn hợp lệ**: đổi thành một kịch bản hợp lệ cùng mục đích demo (vd. Request bị **từ chối**/**thất bại** hoặc
+   Request có tác vụ cấp lỗi được IT đóng *thất bại* theo `SBF-17`), giữ bất biến dataset (SPEC 4.2 của seed). Thêm 1 Request bị
+   *Trả về bổ sung* rồi người yêu cầu rút (nếu chưa có) để demo luật mới.
+2. **Giá tham chiếu (P2):** mọi gói trả phí có `referencePrice` VND chưa thuế — `K2`: bằng giá tháng quy đổi của thuê bao đang có;
+   `K1`: giá gói tháng; `K4`: giá một khóa. Thêm **một gói `K1` chưa có thuê bao**, chỉ có giá tham chiếu, và một Request của gói đó ở
+   trạng thái chờ duyệt chi (demo Request tính tiền từ gói).
+3. **Claude Team (`QĐ-113b`):** thay gói `claude-team` bằng hai gói `claude-team-standard` và `claude-team-premium` — **hai workspace,
+   hai thuê bao**, mỗi thuê bao có hồ sơ workspace riêng (≥ 2 IT Admin, `QĐ-110k`) và giá riêng (Standard ≈ 500.000 đ/seat/tháng trả năm,
+   Premium ≈ 2.500.000 đ). Chia seat hiện có (NV-DEV5, NV-DEV6, NV-ITO1) giữa hai gói; sửa các chỗ nhắc `claude-team` (finance.ts
+   dòng `BM-10`, renewals, usage, devices nếu có, README, spec của fixture).
+4. **Sửa xếp phòng (P4):** thêm một nhân viên đã xếp phòng lần đầu với ngày **tương lai**, chưa có Request/tài khoản dùng — để demo sửa.
+5. **Ảnh phòng (P3):** không seed ảnh.
+6. Cập nhật `shared-demo-v4.spec.ts`, `catalog.steps.spec.ts` và các spec seed liên quan; `README.md` của fixture (bảng gói, bảng Request,
+   kịch bản DEMO) và `docs/guides/demo-dataset.md`.
 
 ## Chung
 
 - OpenAPI: `pnpm openapi:export` rồi commit `openapi.json`; cập nhật `test/support/api-coverage-manifest.ts`,
   `openapi-example-manifest.ts` cho route mới; `docs/generated/routes.md`.
 - README module chạm tới (requests, catalog, organization, personnel) ghi luật mới kèm `QĐ-113x`.
+- Migration: P2 dùng `20261118100000_*`, P3 `20261118110000_*`, P4 `20261118120000_*` (tránh trùng khi chạy song song).
 - Mỗi luật mới có test đỏ trước rồi xanh (policy spec + 1 http/integration cho route mới). Test cũ hỏng vì luật đổi (đặc biệt P1: các
   test rút Request sau khi duyệt) thì sửa test theo luật mới; test hỏng ngoài phạm vi ghi vào `## Nợ test` của PLAN.

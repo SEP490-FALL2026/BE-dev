@@ -128,7 +128,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 - **Lõi và dùng chung (không controller)**
   - `access-request/` — `access-request.repo.ts` (writer duy nhất của `access_requests`, `access_request_beneficiaries`,
     `access_request_steps`), `assessment-read.repo.ts`, `routing.policy.ts` + `routing-facts.service.ts` (định tuyến bước nhu cầu),
-    `pricing.policy.ts` (`requestAmountOf`: giá tháng của thuê bao chính × số tháng **bắt đầu** trong năm của `asOf` (tháng k bắt đầu ở ngày bắt đầu + k − 1 tháng, R-39);
+    `pricing.policy.ts` (`requestAmountOf`: giá tháng của thuê bao chính — gói chưa có thuê bao có giá thì giá tham chiếu của gói (`QĐ-113a`, `CatalogApi.getPlanPrice`, nguồn `PLAN_REFERENCE`) — × số tháng **bắt đầu** trong năm của `asOf` (tháng k bắt đầu ở ngày bắt đầu + k − 1 tháng, R-39);
     số tháng bắt đầu năm sau là `nextYearAmount` (Dùng lâu dài = 12 tháng, R-46); thời gian dùng đi bằng số tháng `termMonths` (`core/term-limit.ts`: `K1` 1–9, `K2`/`K5` 1–12 hoặc không, `K4` không hỏi), người có thời hạn bị **cắt** ở ngày hết hợp đồng (`employees.contract_end_date`), không bị từ chối; `K4` = giá mua;
     Request tiếp tục có kỳ mới năm sau ⟹ 0 + `nextYearAmount`, QĐ-109b; mốc `asOf` theo QĐ-109e: gửi = tạm tính, mỗi lần `BudgetCheckService.run`
     tính lại và ghi `ACCESS_REQUEST.REPRICED`), `request-facts.service.ts` (đọc mọi sự kiện mà một request được xét bởi: phòng ban, kế hoạch, giá, người
@@ -165,13 +165,18 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     `similar-seats.controller.ts`, US-05-04; `NeedDecisionService` quyết định, `NeedDecisionEffects` làm những gì theo sau trong
     cùng transaction) và route rút ở `withdraw/` (`withdrawal.controller.ts`, US-05-08; `WithdrawalPreconditions` đọc, khóa và kiểm
     lại, `WithdrawalWriter` ghi, `withdrawal.policy.ts` ở L0); ba controller khai báo
-    ngay sau hub trong `requests.module.ts` để thứ tự path của API không đổi.
+    ngay sau hub trong `requests.module.ts` để thứ tự path của API không đổi. **Luật rút (`QĐ-113d`)**: người yêu cầu chỉ rút khi
+    Request chưa có quyết định nào (bước nhu cầu đang chờ/đứng chờ, hoặc `AWAITING_REQUESTER_REVISION`; Request không có bước nhu cầu: tới khi
+    người quyết đầu tiên chưa quyết, K5 cấp thẳng tới khi tác vụ chưa bắt đầu; dòng nhóm: còn `AWAITING_NEED` hoặc được trưởng phòng
+    xác nhận khi gửi và Người duyệt chi chưa quyết); ngoài đó `409 ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION` (`details.state`), muốn thôi thì
+    chờ cấp xong rồi hoàn trả. Trưởng phòng giữ luật `BLOCKED`/`RESERVE_CONFIRMATION` kèm lý do. `canWithdraw` của `my-requests` dùng cùng
+    policy. Hậu quả của việc rút (rời lô, giải phóng cam kết, hủy tác vụ) giữ nguyên.
   - `draft/` — bản nháp: lưu, liệt kê, gửi, xóa; `request-drafts.controller.ts`; `RequestDraftService`.
   - `repricing/` — tính lại số tiền của Request theo ngày (QĐ-109e): `RepricingService` (giá thuê bao chính hoặc báo giá của IT Admin, tính theo `asOf`; Request giữ số tháng thì mỗi người một ngày kết thúc riêng qua `RequestTermEndsService`), `quote-pricing.policy.ts` (số tiền từ báo giá); `spend`, `spend-submission`, `group-request`, `assessment` gọi, không import capability nào ngoài lõi `access-request`.
   - `assessment/` — thẩm định phần mềm ngoài catalog, đăng ký nội bộ, nối plan (US-05-06, US-05-18, US-05-20); hoàn tất và từ chối ở cổng nhận `checklist` của bước `1.3` (`AssessmentGate.judgeChecklist`, `QĐ-111ap`); `assessment-decision/` — `AssessmentDecisionService` chọn `REJECT` hay `RETURN` của `POST /access-requests/{id}/assessment/rejection`, `AssessmentReturnService` trả đề xuất về người gửi (`AWAITING_REQUESTER_REVISION`, bước đánh giá `CLOSED`, audit `ASSESSMENT_RETURNED`, thông báo `REQUEST_RETURNED` by `IT_ASSESSMENT`; không có bản ghi phê duyệt vì IT Admin chưa có vai ở `approval_records`);
     `AssessmentQueryService` (đọc), `AssessmentService` (lưu), `AssessmentCompletionService`, `AssessmentRejectionService`, qua cổng chung
     `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `AssessmentTermFitService` là chỗ duy nhất xét lại số tháng của đề xuất
-    theo kiểu cấp (QĐ-111i; K4 xóa tháng, K1 ngoài 1–9 ⟹ 422 `ASSESSMENT.TERM_NOT_FIT_KIND`): hoàn tất đánh giá dùng kiểu IT kết luận, `catalog-link/`
+    theo kiểu cấp (QĐ-111i; K4 xóa tháng, K1 ngoài 1–9 ⟹ 422 `ASSESSMENT.TERM_NOT_FIT_KIND`): hoàn tất đánh giá dùng kiểu IT kết luận, `catalog-link/` (nối plan còn chép giá tháng của báo giá đã duyệt thành giá tham chiếu của gói `K1`/`K2` chưa có giá, `QĐ-113a`, `monthlyPriceOfQuote`)
     dùng kiểu của gói được gắn khi khác kiểu đã kết luận; `ProposalService`,
     `need-spend.service.ts`, `internal-registration.service.ts` (đăng ký nội bộ; `internalRegistrationBasis`, `registeredShapeOf`,
     `actsForAssignee` ở `assessment.policy.ts`); `proposal-review/` — `proposals.controller.ts`. Đề xuất rút gọn (case B) cho gói của ứng dụng nội bộ (`INTERNAL`: mọi gói
