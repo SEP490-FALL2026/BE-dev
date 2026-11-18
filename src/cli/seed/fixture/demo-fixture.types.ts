@@ -281,7 +281,10 @@ export interface DemoRequestScenario {
   grant?: 'POOL' | 'PURCHASE' | 'KEY';
   /** The IT Admin does the grant (default: the one in charge of the requester's department). */
   grantedBy?: string;
+  /** A note for the developer (README, report, step title); never sent to the API. */
   summary: string;
+  /** The business reason the requester writes: what the work is for, as a real person would say it. Sent as `businessReason` (or `purpose` of a proposal). */
+  reason: string;
 }
 
 /** A holder's SaaS report and the point in its handling where the demo leaves it. */
