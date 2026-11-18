@@ -213,6 +213,8 @@ export interface RequestPlanPrice {
   kind: 'RECURRING' | 'ONE_TIME';
   unitPrice: Money;
   billingCycle: BillingCycleCode;
+  /** Where the price comes from (`QĐ-113a`); a price that does not say is taken to come from no subscription or reference. */
+  source?: 'SUBSCRIPTION' | 'PLAN_REFERENCE';
 }
 
 /** What a request for internal software costs: nothing, and no day the money goes out. */
@@ -306,5 +308,6 @@ export function pricingRecordFor(input: RequestPriceInput, price: RequestPlanPri
     unitPrice: priced.unitPrice,
     billingCycle: priced.billingCycle,
     nextYearAmount: priced.nextYearAmount,
+    priceSource: price?.source ?? null,
   };
 }

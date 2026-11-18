@@ -44,35 +44,23 @@ describe('DepartmentUseService (what keeps a department or a Cost Center in use,
   describe('a department', () => {
     it('asks the reader of each group in the caller transaction, with the day and the limit', async () => {
       const work = departmentReader('OPEN_WORK', group([item('ACCESS_REQUEST', 'r-1')]));
-      const subscriptions = departmentReader('SUBSCRIPTIONS', group([]));
-      const service = serviceWith([work.reader, subscriptions.reader]);
+      const service = serviceWith([work.reader]);
 
       const use = await service.readDepartment('dep-1', '2026-10-28', 20, tx);
 
-      expect(use).toEqual({ openWork: group([item('ACCESS_REQUEST', 'r-1')]), subscriptions: group([]) });
+      expect(use).toEqual({ openWork: group([item('ACCESS_REQUEST', 'r-1')]) });
       expect(work.read).toHaveBeenCalledWith('dep-1', '2026-10-28', 20, tx);
-      expect(subscriptions.read).toHaveBeenCalledWith('dep-1', '2026-10-28', 20, tx);
     });
 
     it('merges several readers of one group in the order they registered, cuts the items at the limit and adds the totals', async () => {
       const service = serviceWith([
         departmentReader('OPEN_WORK', group([item('ACCESS_REQUEST', 'r-1')], 5)).reader,
         departmentReader('OPEN_WORK', group([item('TRANSFER', 't-1'), item('TRANSFER', 't-2')], 2)).reader,
-        departmentReader('SUBSCRIPTIONS', group([])).reader,
       ]);
 
       const { openWork } = await service.readDepartment('dep-1', '2026-10-28', 2);
 
       expect(openWork).toEqual(group([item('ACCESS_REQUEST', 'r-1'), item('TRANSFER', 't-1')], 7));
-    });
-
-    it('fails loudly when no module reads a group, rather than letting a retirement pass what it cannot see', async () => {
-      const service = serviceWith([departmentReader('OPEN_WORK', group([])).reader]);
-
-      await expect(service.readDepartment('dep-1', '2026-10-28', 20)).rejects.toThrow(UseReaderMissingError);
-      await expect(service.readDepartment('dep-1', '2026-10-28', 20)).rejects.toMatchObject({
-        group: 'SUBSCRIPTIONS',
-      });
     });
 
     it('fails loudly when nobody registered anything', async () => {

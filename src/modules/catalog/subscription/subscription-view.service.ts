@@ -282,7 +282,6 @@ export class SubscriptionViewService {
         id: record.id,
         planId: record.planId,
         planName: record.planName,
-        ownerDepartmentId: record.ownerDepartmentId,
         applicationId: record.applicationId,
         applicationName: record.applicationName,
         vendor: record.vendor,

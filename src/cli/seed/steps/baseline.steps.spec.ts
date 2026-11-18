@@ -34,7 +34,7 @@ describe('the day a baseline seat was granted (T8)', () => {
   });
 
   it('never grants a seat before its subscription starts: the annual ones started late in the year', () => {
-    const early = { subscription: 'claude-team', holder: 'NV-DEV5', grantedDaysAgo: 300 };
+    const early = { subscription: 'claude-team-premium', holder: 'NV-DEV5', grantedDaysAgo: 300 };
     expect(grantedOnOf(ctxOn('2026-11-17'), early)).toBe('2026-05-01');
     const standard = { subscription: 'm365-standard', holder: 'NV-FINH', grantedDaysAgo: 340 };
     expect(grantedOnOf(ctxOn('2026-11-17'), standard) >= '2026-03-17').toBe(true);

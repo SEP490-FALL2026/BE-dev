@@ -13,11 +13,11 @@ export async function nextPeriod(
 ): Promise<string> {
   return (
     await h.ctx.sql.query<{ id: string }>(
-      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity, unit_price_minor,
+      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity, unit_price_minor,
          unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source, price_reporting_minor,
          price_reporting_currency, billing_cycle, commitment_term_months, start_date, responsible_it_admin_employee_id, auto_renew,
          allows_mid_term_reduction, renewed_from_id, updated_at)
-       SELECT gen_random_uuid(), organization_id, plan_id, owner_department_id, kind, $2::"SubscriptionStatus", purchased_quantity,
+       SELECT gen_random_uuid(), organization_id, plan_id, kind, $2::"SubscriptionStatus", purchased_quantity,
               unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source,
               price_reporting_minor, price_reporting_currency, billing_cycle, commitment_term_months, $3::date,
               responsible_it_admin_employee_id, auto_renew, allows_mid_term_reduction, id, now()

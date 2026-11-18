@@ -145,10 +145,10 @@ describe('the flag of a machine account over HTTP and PostgreSQL (integration)',
     await h.ctx.sql.query(
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
          normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from, valid_from_basis, created_by_app_user_id)
-       SELECT $2, s.organization_id, 'SERVICE', 'REQUEST', s.plan_id, s.id, $3, 'old-bot', 'old-bot', 'CI', $4, s.owner_department_id,
+       SELECT $2, s.organization_id, 'SERVICE', 'REQUEST', s.plan_id, s.id, $3, 'old-bot', 'old-bot', 'CI', $4, $6::uuid,
               '2026-01-05', 'RECORDED', $5
          FROM subscriptions s WHERE s.id = $1`,
-      [subscriptionId, service, h.it1.employeeId, unit.rows[0].id, randomUUID()],
+      [subscriptionId, service, h.it1.employeeId, unit.rows[0].id, randomUUID(), h.seed.departmentId],
     );
 
     const closed = await flag(ended.id, { isMachineAccount: true, note: NOTE }).expect(409);

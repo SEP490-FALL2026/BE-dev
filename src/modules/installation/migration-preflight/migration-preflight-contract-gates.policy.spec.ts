@@ -5,7 +5,7 @@ import type { ContractGateFacts, PreflightReport } from '../public/migration-pre
 /**
  * The contract gates of `g0-g6-final-business-baseline-remediation`, as the FINAL release judges them:
  * what its migrations need from the data, judged beside the unit-only conversion. A database that skipped the expansion of the
- * compatibility release, a subscription with no owner department, a Cost Center with no department or an organization whose
+ * compatibility release, a Cost Center with no department or an organization whose
  * link was not activated, and a waiting row of a kind that is gone, each block; only the proposals the migration can reconcile
  * are information. An empty database and a fully migrated one are ready, with nothing listed.
  */
@@ -17,20 +17,17 @@ const noDirection: ContractGateFacts['costCenterDirection'] = {
   mismatches: [],
   notActivated: [],
 };
-const gates = (overrides: Partial<ContractGateFacts['subscriptionOwner']> = {}): ContractGateFacts => ({
-  subscriptionOwner: { schema: 'READY', subscriptionIds: [], ...overrides },
+const gates = (): ContractGateFacts => ({
   costCenterDirection: noDirection,
   retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], serviceAccountIds: [] },
   legacyReturns: noReturns,
 });
 const direction = (overrides: Partial<ContractGateFacts['costCenterDirection']> = {}): ContractGateFacts => ({
-  subscriptionOwner: { schema: 'NO_TABLE', subscriptionIds: [] },
   costCenterDirection: { ...noDirection, schema: 'READY', ...overrides },
   retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], serviceAccountIds: [] },
   legacyReturns: noReturns,
 });
 const retired = (overrides: Partial<ContractGateFacts['retiredKinds']> = {}): ContractGateFacts => ({
-  subscriptionOwner: { schema: 'NO_TABLE', subscriptionIds: [] },
   costCenterDirection: noDirection,
   retiredKinds: {
     pendingNoticeIds: [],
@@ -49,53 +46,6 @@ const converged: PreflightReport = {
   companyCostCentersRemoved: [],
   information: [],
 };
-
-describe('judgeContractGates: the owner department of a subscription (F02, spec L.3)', () => {
-  it('before the expansion migration: each subscription blocks by its id, in order, and nothing is only information', () => {
-    expect(judgeContractGates(gates({ schema: 'ABSENT', subscriptionIds: ['s-2', 's-1'] }))).toEqual({
-      blockers: [
-        { code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED', subscriptionId: 's-1' },
-        { code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED', subscriptionId: 's-2' },
-      ],
-      information: [],
-    });
-  });
-
-  it('before the expansion migration, with no subscription (an empty or new database): nothing to report', () => {
-    expect(judgeContractGates(gates({ schema: 'ABSENT', subscriptionIds: [] }))).toEqual({
-      blockers: [],
-      information: [],
-    });
-  });
-
-  it('after it: each subscription with no valid assignment, or in conflict with one, blocks by its id, in order', () => {
-    expect(judgeContractGates(gates({ schema: 'READY', subscriptionIds: ['s-9', 's-3'] }))).toEqual({
-      blockers: [
-        { code: 'SUBSCRIPTION_OWNER_UNASSIGNED', subscriptionId: 's-3' },
-        { code: 'SUBSCRIPTION_OWNER_UNASSIGNED', subscriptionId: 's-9' },
-      ],
-      information: [],
-    });
-  });
-
-  it('after it, with every subscription owned or assigned, or once the final migration made the column required: nothing to report', () => {
-    expect(judgeContractGates(gates({ schema: 'READY', subscriptionIds: [] }))).toEqual({
-      blockers: [],
-      information: [],
-    });
-  });
-
-  it('with the column or the table but not both: blocks, because the history cannot be trusted either way', () => {
-    expect(judgeContractGates(gates({ schema: 'PARTIAL' }))).toEqual({
-      blockers: [{ code: 'SUBSCRIPTION_OWNER_SCHEMA_PARTIAL' }],
-      information: [],
-    });
-  });
-
-  it('with no subscriptions table (an empty database): nothing to report', () => {
-    expect(judgeContractGates(gates({ schema: 'NO_TABLE' }))).toEqual({ blockers: [], information: [] });
-  });
-});
 
 describe('judgeContractGates: every Cost Center belongs to one department (F01, spec L.11)', () => {
   it('before the compatibility migration: each organization blocks by its id, in order (the release skipped the expansion)', () => {
@@ -222,7 +172,6 @@ describe('withContractGates', () => {
     const report = withContractGates(
       converged,
       judgeContractGates({
-        subscriptionOwner: { schema: 'READY', subscriptionIds: [] },
         costCenterDirection: { ...noDirection, schema: 'READY' },
         retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], serviceAccountIds: [] },
         legacyReturns: noReturns,
@@ -240,11 +189,14 @@ describe('withContractGates', () => {
 
     const report = withContractGates(
       withCorrection,
-      judgeContractGates(gates({ schema: 'READY', subscriptionIds: ['s-1'] })),
+      judgeContractGates({
+        ...gates(),
+        costCenterDirection: { ...noDirection, schema: 'READY', costCenterIds: ['c-1'] },
+      }),
     );
 
     expect(report.status).toBe('BLOCKED');
-    expect(report.blockers).toEqual([{ code: 'SUBSCRIPTION_OWNER_UNASSIGNED', subscriptionId: 's-1' }]);
+    expect(report.blockers).toEqual([{ code: 'COST_CENTER_UNLINKED', costCenterId: 'c-1' }]);
     expect(report.corrections).toEqual(withCorrection.corrections);
   });
 
@@ -256,7 +208,7 @@ describe('withContractGates', () => {
         blockers: [{ code: 'DEPARTMENT_CHARGED_TO_COMPANY', department: 'HQ', costCenter: 'CC-CORP' }],
       },
       judgeContractGates({
-        ...gates({ schema: 'ABSENT', subscriptionIds: ['s-1'] }),
+        ...gates(),
         costCenterDirection: { ...noDirection, schema: 'ABSENT', organizationIds: ['o-1'] },
       }),
     );
@@ -264,7 +216,6 @@ describe('withContractGates', () => {
     expect(report.blockers.map((blocker) => blocker.code)).toEqual([
       'COST_CENTER_DIRECTION_EXPANSION_REQUIRED',
       'DEPARTMENT_CHARGED_TO_COMPANY',
-      'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED',
     ]);
   });
 
@@ -272,14 +223,14 @@ describe('withContractGates', () => {
     const skipped = withContractGates(
       converged,
       judgeContractGates({
-        ...gates({ schema: 'ABSENT', subscriptionIds: ['s-1'] }),
+        ...gates(),
         costCenterDirection: { ...noDirection, schema: 'ABSENT', organizationIds: ['o-1'] },
       }),
     );
     const empty = withContractGates(
       converged,
       judgeContractGates({
-        ...gates({ schema: 'NO_TABLE' }),
+        ...gates(),
         costCenterDirection: { ...noDirection, schema: 'NO_TABLE' },
       }),
     );
@@ -336,42 +287,5 @@ describe('the text of the Cost Center gates (F01)', () => {
     expect(text).toContain('COST_CENTER_LINK_MISMATCH');
     expect(text).toContain('d-8');
     expect(text).toContain('COST_CENTER_DIRECTION_SCHEMA_PARTIAL');
-  });
-});
-
-describe('the text of the subscription owner gate (F02)', () => {
-  it('names each subscription of a database that skipped the expansion by its id, and says to deploy the compatibility release and assign first', () => {
-    const text = formatPreflight({
-      ...converged,
-      status: 'BLOCKED',
-      blockers: [{ code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED', subscriptionId: 's-1' }],
-    });
-
-    expect(text).toMatch(/do not run `prisma migrate deploy`/i);
-    expect(text).toContain('SUBSCRIPTION_OWNER_EXPANSION_REQUIRED');
-    expect(text).toContain('subscription s-1');
-    expect(text).toContain('compatibility release');
-    expect(text).toContain('ops:assign-subscription-owner');
-  });
-
-  it('names every unassigned subscription by its id and what the operator has to do', () => {
-    const text = formatPreflight({
-      ...converged,
-      status: 'BLOCKED',
-      blockers: [
-        { code: 'SUBSCRIPTION_OWNER_UNASSIGNED', subscriptionId: 's-7' },
-        { code: 'SUBSCRIPTION_OWNER_SCHEMA_PARTIAL' },
-      ],
-    });
-
-    expect(text).toMatch(/do not run `prisma migrate deploy`/i);
-    expect(text).toContain('SUBSCRIPTION_OWNER_UNASSIGNED');
-    expect(text).toContain('s-7');
-    expect(text).toContain('ops:assign-subscription-owner');
-    expect(text).toContain('SUBSCRIPTION_OWNER_SCHEMA_PARTIAL');
-  });
-
-  it('lists nothing as information for a ready database: the only information left is the proposals the migration reconciles', () => {
-    expect(formatPreflight(converged)).not.toMatch(/SUBSCRIPTION_OWNER|COST_CENTER/);
   });
 });

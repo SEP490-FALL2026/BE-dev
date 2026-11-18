@@ -28,6 +28,14 @@ describe('BR-MF1-06 shared intake and worker pricing record', () => {
     });
   });
 
+  it('says where the price comes from, in the record of a priced request only (QĐ-113a)', () => {
+    const base = { kind: 'RECURRING', unitPrice: SEAT, billingCycle: 'MONTHLY' } as const;
+
+    expect(pricingRecordFor(request, { ...base, source: 'SUBSCRIPTION' }).priceSource).toBe('SUBSCRIPTION');
+    expect(pricingRecordFor(request, { ...base, source: 'PLAN_REFERENCE' }).priceSource).toBe('PLAN_REFERENCE');
+    expect(pricingRecordFor(request, null).priceSource).toBeUndefined();
+  });
+
   it('preserves missing-price and internal-free records without guessing an amount', () => {
     expect(pricingRecordFor(request, null)).toMatchObject({
       status: 'MISSING',

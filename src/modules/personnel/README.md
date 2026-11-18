@@ -48,7 +48,8 @@ Bốn point mở của module (cả bốn do listener trong chính module đăng
   `leave/leave-notice.listener.ts`, `offboarding/offboarding-notice.listener.ts`.
 
 Đăng ký vào: `licensing.revocation` (`RevocationListeners`) — `departure-closure/mailbox-lock-revocation.listener.ts`; `organization.change-listeners` — `transfer/transfer-effective.listener.ts`; `organization.department-use-readers` —
-`event-notice/department-open-work.listener.ts`.
+`event-notice/department-open-work.listener.ts`; `organization.first-placement-use-readers` (`QĐ-113e`: điều chuyển/hồ sơ nghỉ việc của người đó chặn sửa lần xếp phòng đầu) —
+`event-notice/first-placement-personnel.listener.ts`.
 
 ## Hướng phụ thuộc giữa capability (R6)
 

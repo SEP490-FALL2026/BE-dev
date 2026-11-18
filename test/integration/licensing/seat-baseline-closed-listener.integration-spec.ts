@@ -57,8 +57,8 @@ describe('closing the seat baseline tells the listeners, and no seat of another 
     h.ctx.app
       .get(SeatBaselineClosedListeners, { strict: false })
       .add('test.recorder', (tx, event) => listener.baselineClosed(tx, event));
-    const figma = await h.subscription(10, 'K2', design.id);
-    const slack = await h.subscription(10, 'K2', finance.id);
+    const figma = await h.subscription(10, 'K2');
+    const slack = await h.subscription(10, 'K2');
     // Figma is design's: two of its own people and a person of finance; Slack is finance's: its own person and a person of design. Before the
     // shared pool this was two people to review; now it is none.
     await h.written({ subscriptionId: figma }, [seat('D-1', 'figma'), seat('D-2', 'figma'), seat('F-1', 'figma')]);

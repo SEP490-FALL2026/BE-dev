@@ -20,7 +20,6 @@ describe('a subscription recorded as cancelled leaves the adjustment and the sto
   /** A plan by the month, paid on a day 5 days away and renewing itself, with 10 seats and none held: it may be cancelled today. */
   const monthly = async (planId: string, purchasedQuantity = 10): Promise<string> =>
     declareSubscription(h.ctx, h.it1.accessToken, {
-      ownerDepartmentId: h.seed.departmentId,
       planId,
       kind: 'TERM',
       purchasedQuantity,

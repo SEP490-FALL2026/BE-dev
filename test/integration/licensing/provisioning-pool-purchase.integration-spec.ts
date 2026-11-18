@@ -25,7 +25,6 @@ describe('the purchase recorded with a grant from the shared pool (integration, 
   /** A second subscription of the same plan: allowed while the seat baseline is open (it is only warned about). */
   const another = (planId: string, body: Record<string, unknown>) =>
     declareSubscription(h.ctx, h.it1.accessToken, {
-      ownerDepartmentId: h.seed.departmentId,
       planId,
       kind: 'TERM',
       ...body,

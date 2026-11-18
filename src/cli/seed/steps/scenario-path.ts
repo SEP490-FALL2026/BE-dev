@@ -42,6 +42,7 @@ export interface ScenarioGoal {
 export function reachedTarget(position: ScenarioPosition, goal: ScenarioGoal): boolean {
   if (goal.target === 'RESERVE_UNCONFIRMED') return position.stage === 'RESERVE_CONFIRMATION';
   if (goal.target === 'BLOCKED') return position.stage === 'BLOCKED' || position.stage === 'RETURNED_TO_REQUESTER';
+  if (goal.target === 'WITHDRAWN_AFTER_RETURN') return position.state === 'WITHDRAWN';
   if (goal.target === 'PENDING_OR_CANCELLED') return position.state === 'PENDING' || position.state === 'CANCELLED';
   if (goal.target === 'REJECTED') {
     return position.state === 'REJECTED' && (position.stage === 'REFUSED') === (goal.rejectAt === 'SPEND');
@@ -66,7 +67,7 @@ function pointOf(goal: ScenarioGoal): Point {
 }
 
 /** The targets where the grant task has been opened: the request was approved to be granted. */
-const GRANTED: readonly Point[] = ['EXECUTING', 'FAILED', 'AWAITING_IT_CLOSE'];
+const GRANTED: readonly Point[] = ['EXECUTING', 'FAILED'];
 
 const PAST_NEED: ReadonlySet<Point> = new Set<Point>([
   'AWAITING_SPEND_SUBMISSION',
@@ -110,6 +111,8 @@ const fromPending: Step = (goal) => {
   if (point === 'REJECTED') return 'NEED_REJECT';
   if (point === 'RETURNED_AT_NEED') return 'NEED_RETURN';
   if (point === 'WITHDRAWN') return 'WITHDRAW';
+  // QĐ-113d: the head sends it back first (nothing is decided yet), and the requester withdraws it from there.
+  if (point === 'WITHDRAWN_AFTER_RETURN') return 'NEED_RETURN';
 
   return PAST_NEED.has(point) ? 'NEED_APPROVE' : null;
 };
@@ -142,11 +145,13 @@ const fromSpendDecision: Step = (goal) => {
 const fromExecution: Step = (goal) =>
   goal.target !== 'AWAITING_EXECUTION' && PAST_SPEND.has(pointOf(goal)) ? 'GRANT' : null;
 
-/** The grant task is open: complete it, or fail it, and then close it as failed or withdraw the request while it waits for the close. */
+/** The request was sent back to its requester: a scenario of withdrawal after the return ends it with the withdrawal (`QĐ-113d`). */
+const fromRevision: Step = (goal) => (goal.target === 'WITHDRAWN_AFTER_RETURN' ? 'WITHDRAW' : null);
+
+/** The grant task is open: complete it, or fail it and close it as failed (`SBF-17`); the requester no longer withdraws a request being granted. */
 const fromExecuting: Step = (goal, taskStatus) => {
   if (goal.target === 'COMPLETED') return 'COMPLETE_TASK';
   if (goal.target === 'FAILED') return taskStatus === 'FAILED' ? 'FAIL_TASK_CLOSE' : 'FAIL_TASK_OPEN';
-  if (goal.target === 'AWAITING_IT_CLOSE') return taskStatus === 'FAILED' ? 'WITHDRAW' : 'FAIL_TASK_OPEN';
 
   return null;
 };
@@ -158,6 +163,7 @@ const FROM_STATE: Readonly<Record<string, Step>> = {
   AWAITING_SPEND_SUBMISSION: fromSubmission,
   AWAITING_SPEND_DECISION: fromSpendDecision,
   AWAITING_EXECUTION: fromExecution,
+  AWAITING_REQUESTER_REVISION: fromRevision,
   EXECUTING: fromExecuting,
 };
 

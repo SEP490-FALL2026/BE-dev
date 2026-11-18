@@ -20,6 +20,8 @@ interface DepartmentRow {
   updated_at: Date;
   deactivated_at: Date | null;
   effective_from: Date;
+  avatar_object_key: string | null;
+  avatar_content_type: string | null;
   cc_id: string | null;
   cc_code: string | null;
   cc_name: string | null;
@@ -32,6 +34,7 @@ interface DepartmentRow {
 
 const SELECT_DEPARTMENT = Prisma.sql`
   SELECT d.id, d.code, d.name, d.function_description, d.status, d.created_at, d.updated_at, d.deactivated_at, d.effective_from,
+         d.avatar_object_key, d.avatar_content_type,
          c.id AS cc_id, c.code AS cc_code, c.name AS cc_name, c.status AS cc_status,
          e.id AS it_id, e.employee_code AS it_code, e.full_name AS it_name, e.status AS it_status
     FROM departments d
@@ -61,6 +64,8 @@ function toRecord(row: DepartmentRow): DepartmentRecord {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deactivatedAt: row.deactivated_at,
+    avatarObjectKey: row.avatar_object_key,
+    avatarContentType: row.avatar_content_type,
   };
 }
 
@@ -223,6 +228,21 @@ export class DepartmentRepo {
     now: Date,
   ): Promise<void> {
     await tx.department.update({ where: { id }, data: { ...data, updatedAt: now } });
+  }
+
+  /** Points the department at a picture already written to the storage (`QĐ-113c`). */
+  async setAvatar(tx: DbTx, id: string, values: { key: string; contentType: string; at: Date }): Promise<void> {
+    await tx.department.update({
+      where: { id },
+      data: { avatarObjectKey: values.key, avatarContentType: values.contentType, avatarUpdatedAt: values.at },
+    });
+  }
+
+  async clearAvatar(tx: DbTx, id: string, now: Date): Promise<void> {
+    await tx.department.update({
+      where: { id },
+      data: { avatarObjectKey: null, avatarContentType: null, avatarUpdatedAt: null, updatedAt: now },
+    });
   }
 
   async deactivate(tx: DbTx, id: string, now: Date): Promise<void> {

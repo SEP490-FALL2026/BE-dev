@@ -3,8 +3,9 @@ import { fromDateColumn } from '../../../core/business-date';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { requestPolicyJson } from '../access-request/access-request.json';
-import { hasSpendStep } from '../access-request/access-request.policy';
+import { hasAssessmentStep, hasSpendStep } from '../access-request/access-request.policy';
 import type { NeedStepState, ReadableNeedWaitingReason } from '../access-request/access-request.types';
+import { needStepOfGroup } from '../group-request/group-withdrawal.policy';
 import { needStepOf } from './my-requests.policy';
 import type { MyRequestFilter, MyRequestRow, RequestedSoftware, RequestScope, SentState } from './my-requests.types';
 
@@ -29,6 +30,8 @@ const SELECT_ROW = {
   policy: true,
   beneficiaries: { select: { employeeId: true }, orderBy: { position: 'asc' }, take: 1 },
   _count: { select: { beneficiaries: true } },
+  // Only a request for a group reads them: the same rule as its withdrawal judges its people by.
+  lines: { select: { state: true, needStepId: true } },
   steps: {
     where: { kind: 'NEED' },
     select: { id: true, state: true, assigneeEmployeeId: true, waitingReason: true },
@@ -43,6 +46,7 @@ function toRow(row: Row): MyRequestRow {
     throw new Error(`The request ${row.id} has not been sent: it is a draft, not a row of the list.`);
   const step = needStepOf(row.steps);
   const isGroup = row.type === 'GROUP_GRANT';
+  const policy = requestPolicyJson.decode(row.policy);
 
   return {
     id: row.id,
@@ -61,7 +65,20 @@ function toRow(row: Row): MyRequestRow {
     expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
     submittedAt: row.submittedAt,
     updatedAt: row.updatedAt,
-    hasSpendStep: hasSpendStep(requestPolicyJson.decode(row.policy)),
+    hasSpendStep: hasSpendStep(policy),
+    hasAssessmentStep: hasAssessmentStep(policy),
+    withdrawalNeedStep: isGroup
+      ? needStepOfGroup(
+          row.steps.map((s) => ({
+            id: s.id,
+            state: s.state as NeedStepState,
+            assigneeEmployeeId: s.assigneeEmployeeId,
+          })),
+          { state: step.state as NeedStepState },
+          row.lines,
+          row.requesterEmployeeId,
+        )
+      : (step.state as NeedStepState),
     beneficiaryEmployeeId: isGroup ? null : (row.beneficiaries[0]?.employeeId ?? null),
     lineCount: row._count.beneficiaries,
     needStepId: step.id,

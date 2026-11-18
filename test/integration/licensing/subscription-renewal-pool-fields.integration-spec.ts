@@ -60,7 +60,6 @@ describe('the pool fields of the period a renewal records (integration, real Pos
           renewalDate: h.inDays(5),
           endDate: h.inDays(5),
           autoRenew: true,
-          ownerDepartmentId: unit.department.id,
         })
       : (await h.termWithSeats(unit, 20, { quantity: 3, ...year() })).subscriptionId;
     if (monthly) for (const member of unit.members) await h.seatOf(member, { subscriptionId });

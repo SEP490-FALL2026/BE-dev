@@ -12,7 +12,6 @@ import type { Department, Person } from './request-harness';
 /** The term of a subscription a test declares; anything not named is left out (no deadline, no auto renewal...). */
 export interface TermOptions {
   quantity?: number;
-  ownerDepartmentId?: string;
   unitPrice?: string;
   currency?: string;
   billingCycle?: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
@@ -92,7 +91,6 @@ export class RenewalHarness extends ExpiryHarness {
     const planId = await this.plan(options.type ?? 'K2', 'PER_SEAT');
 
     return declareSubscription(this.ctx, this.it1.accessToken, {
-      ownerDepartmentId: options.ownerDepartmentId ?? this.seed.departmentId,
       planId,
       kind: 'TERM',
       purchasedQuantity: options.quantity ?? 10,
@@ -126,7 +124,6 @@ export class RenewalHarness extends ExpiryHarness {
     });
 
     return declareSubscription(this.ctx, this.it1.accessToken, {
-      ownerDepartmentId: this.seed.departmentId,
       planId,
       kind: 'PERPETUAL',
       purchasedQuantity: 5,
@@ -145,7 +142,6 @@ export class RenewalHarness extends ExpiryHarness {
       endDate: this.inDays(deadlineInDays + 30),
       noticeDeadline: this.inDays(deadlineInDays),
       ...options,
-      ownerDepartmentId: unit.department.id,
     });
     const seats: string[] = [];
     for (const member of unit.members) seats.push(await this.seatOf(member, { subscriptionId }));

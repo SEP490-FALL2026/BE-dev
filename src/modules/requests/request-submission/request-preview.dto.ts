@@ -102,6 +102,8 @@ const previewSchema = z.strictObject({
   canSubmit: z.boolean(),
   budgetYear: z.number().int().nullable(),
   pricing: pricingSchema,
+  /** Where the price comes from when the request is priced (`QĐ-113a`): the subscription that prices the plan, or the reference price of the plan; null when it is not priced. */
+  priceSource: z.enum(['SUBSCRIPTION', 'PLAN_REFERENCE']).nullable(),
   /**
    * The cost by the year before tax: the months that begin this year, the part of the year after (an estimate; for a right with no end, twelve
    * months), the months that have begun by the end of the term and the day a contract cut it short. Only the spending approver and Finance

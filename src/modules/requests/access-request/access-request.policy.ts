@@ -92,6 +92,10 @@ export function proposalPolicy(slaWorkingDays: number, routing?: RequestRouting)
  */
 export const mayRequest = (roles: readonly string[]): boolean => !roles.includes('SUPER_ADMIN');
 
+/** Whether the chain has an IT assessment: a proposal of software that is not in the catalog (`QĐ-113d`: the IT Admin decides first). */
+export const hasAssessmentStep = (policy: Pick<RequestPolicy, 'chain'>): boolean =>
+  policy.chain.includes('IT_ASSESSMENT');
+
 /** Whether the chain has a spend step: only then can one person hold both the need step and the spend step. */
 export const hasSpendStep = (policy: Pick<RequestPolicy, 'chain'>): boolean => policy.chain.includes('SPEND_APPROVAL');
 

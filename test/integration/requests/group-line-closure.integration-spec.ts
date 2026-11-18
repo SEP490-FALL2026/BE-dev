@@ -2,6 +2,7 @@ import { RequestsApi } from '../../../src/modules/requests/public/requests.api';
 import { GroupHarness } from '../../support/group-harness';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 const h = new GroupHarness();
 const M = 1_000_000;
@@ -36,6 +37,8 @@ async function sqlState(text: string, values: unknown[] = []): Promise<string | 
  * (`US-03-04` AC-25, `US-05-17`), over HTTP, on real PostgreSQL: the line is cancelled with the cause, only that person's task and share
  * go, the request closes only with its last live line, and each person is told only of their own line.
  */
+afterEach(() => jest.restoreAllMocks());
+
 describe('removing a person who left from a request for a group (integration, real PostgreSQL)', () => {
   let subscriptionId: string;
   let paid: string;
@@ -284,6 +287,8 @@ describe('removing a person who left from a request for a group (integration, re
     });
 
     it('ends as cancelled when the others had been withdrawn before', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(2);
       const [e1, e2] = people;
       await h.withdrawLine(id, e1.employeeId, {}, u.head.account).expect(200);
@@ -330,6 +335,8 @@ describe('removing a person who left from a request for a group (integration, re
     });
 
     it('cancels the request when the one live line is the leaver’s', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(2);
       const [e1, e2] = people;
       await h.withdrawLine(id, e2.employeeId, {}, u.head.account).expect(200);
@@ -345,6 +352,8 @@ describe('removing a person who left from a request for a group (integration, re
     });
 
     it('refuses the sole live person while they still work, whichever way it is asked', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(2);
       const [e1, e2] = people;
       await h.withdrawLine(id, e2.employeeId, {}, u.head.account).expect(200);
@@ -360,6 +369,8 @@ describe('removing a person who left from a request for a group (integration, re
 
   describe('what is refused', () => {
     it('refuses a person who still works, a line that ended, a withdrawal that waits for the IT Admin, and nobody’s line', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(3);
       const [e1, e2, e3] = people;
       const stranger = await h.colleague(await unit());
@@ -451,6 +462,8 @@ describe('removing a person who left from a request for a group (integration, re
 
   describe('what the database keeps', () => {
     it('keeps the cause and the end of a cancelled line, and moves only the lines that may be cancelled', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(3);
       const [e1, e2] = people;
       const other = await unit();

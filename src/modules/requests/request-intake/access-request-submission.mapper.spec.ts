@@ -94,6 +94,7 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
       hasSpendStep: true,
       slaWorkingDays: 2,
       pricingStatus: 'COMPUTED',
+      priceSource: null,
       amountMinor: '1200',
       amountCurrency: 'VND',
       budgetYear: 2026,

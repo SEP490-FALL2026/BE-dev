@@ -1,6 +1,7 @@
 import { CURRENT_POLICY_VERSION, type RequestPolicy } from '../access-request/access-request.policy';
 import type { AccessRequestState } from '../access-request/access-request.types';
-import type { AssessmentFields } from '../access-request/assessment-record.types';
+import type { Money } from '../../../core/money/money';
+import type { AssessmentFields, Quote } from '../access-request/assessment-record.types';
 
 /**
  * The rules of the assessment the IT Admin completes for software that is not in the catalog (`US-05-06`, `BM-02`), as
@@ -189,5 +190,20 @@ export function registeredShapeOf(
       slaWorkingDays: sent.slaWorkingDays,
     },
     state: 'AWAITING_EXECUTION',
+  };
+}
+
+const QUOTE_CYCLE_MONTHS: Readonly<Record<Quote['billingCycle'], bigint>> = { MONTHLY: 1n, QUARTERLY: 3n, ANNUAL: 12n };
+
+/**
+ * The price of one person for one month a quote gives (`QĐ-113a`): a monthly quote as it is, a quarterly one over 3, an annual one over 12, rounded up
+ * to the dong. It is the reference price a plan takes from the approved quote of a case B request.
+ */
+export function monthlyPriceOfQuote(quote: Pick<Quote, 'unitPrice' | 'billingCycle'>): Money {
+  const months = QUOTE_CYCLE_MONTHS[quote.billingCycle];
+
+  return {
+    amountMinor: (quote.unitPrice.amountMinor + months - 1n) / months,
+    currency: quote.unitPrice.currency,
   };
 }

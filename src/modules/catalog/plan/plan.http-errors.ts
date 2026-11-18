@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { toMoneyApiException } from '../../../infrastructure/http/errors/money-errors';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   PlanNameInvalidError,
@@ -11,6 +12,9 @@ import {
   PlanApplicationRetiredError,
   PlanProvisioningTypeNotSupportedError,
   PlanProvisioningTypeMismatchError,
+  PlanReferencePriceNotApplicableError,
+  PlanReferencePriceNotPositiveError,
+  PlanReferencePriceNotVndError,
   PlanPricingModelRequiredError,
   PlanPricingModelNotApplicableError,
   PlanPricingModelNotDerivedError,
@@ -66,6 +70,14 @@ export function toPlanApiException(error: unknown): unknown {
   }
   if (error instanceof PlanPricingModelNotApplicableError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.PRICING_MODEL_NOT_APPLICABLE', error.message);
+  if (error instanceof PlanReferencePriceNotVndError)
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.REFERENCE_PRICE_NOT_VND', error.message, {
+      currency: error.currency,
+    });
+  if (error instanceof PlanReferencePriceNotPositiveError)
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.REFERENCE_PRICE_NOT_POSITIVE', error.message);
+  if (error instanceof PlanReferencePriceNotApplicableError)
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.REFERENCE_PRICE_NOT_APPLICABLE', error.message);
   if (error instanceof PlanControlLevelRequiredError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.CONTROL_LEVEL_REQUIRED', error.message);
   if (error instanceof PlanDataLossNoteRequiredError)
@@ -106,6 +118,9 @@ export function toPlanApiException(error: unknown): unknown {
     return refuse(HttpStatus.CONFLICT, 'PLAN.IN_USE_BLOCKS_CHANGE', error.message, { reason: error.reason });
   }
 
+  const money = toMoneyApiException(error);
+  if (money !== error) return money;
+
   return toUnavailableApiException(error) ?? error;
 }
 
@@ -124,6 +139,9 @@ export const PLAN_ERROR_EXAMPLES = {
   PRICING_MODEL_REQUIRED: example(new PlanPricingModelRequiredError()),
   PRICING_MODEL_NOT_APPLICABLE: example(new PlanPricingModelNotApplicableError()),
   PRICING_MODEL_NOT_DERIVED: example(new PlanPricingModelNotDerivedError('PER_SEAT')),
+  REFERENCE_PRICE_NOT_VND: example(new PlanReferencePriceNotVndError('USD')),
+  REFERENCE_PRICE_NOT_POSITIVE: example(new PlanReferencePriceNotPositiveError()),
+  REFERENCE_PRICE_NOT_APPLICABLE: example(new PlanReferencePriceNotApplicableError()),
   CONTROL_LEVEL_REQUIRED: example(new PlanControlLevelRequiredError()),
   DATA_LOSS_NOTE_REQUIRED: example(new PlanDataLossNoteRequiredError()),
   UPDATE_EMPTY: example(new PlanUpdateEmptyError()),

@@ -73,7 +73,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'cursor-pro',
       termMonths: 3,
       target: 'WITHDRAWN',
-      summary: 'Người yêu cầu tự rút khi còn chờ.',
+      summary: 'Người yêu cầu tự rút khi còn chờ trưởng phòng duyệt nhu cầu, chưa có quyết định nào (QĐ-113d).',
     }),
     r({
       key: 'R04',
@@ -282,6 +282,24 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       termMonths: 9,
       target: 'COMPLETED',
       summary: 'K1 9 tháng qua năm: năm nay giữ phần còn lại của năm, số năm sau đã lưu khi duyệt chi (DEMO-4).',
+    }),
+    r({
+      key: 'R59',
+      requester: 'NV-DEV5',
+      plan: 'grammarly-business',
+      termMonths: 3,
+      target: 'AWAITING_SPEND_DECISION',
+      summary:
+        'Gói K1 chưa có thuê bao, chỉ có giá tham chiếu: số tiền Request tính từ giá của gói (QĐ-113a); trưởng phòng đã trình lô, chờ Người duyệt chi.',
+    }),
+    r({
+      key: 'R60',
+      requester: 'NV-DEV3',
+      plan: 'confluence-standard',
+      termMonths: null,
+      target: 'WITHDRAWN_AFTER_RETURN',
+      summary:
+        'Trưởng phòng trả về bổ sung (chưa có quyết định nào), người yêu cầu không bổ sung nữa và tự rút (QĐ-113d).',
     }),
   ],
   keys: [

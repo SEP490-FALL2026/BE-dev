@@ -23,8 +23,8 @@ describe('the grant of a seat and the work on a task: the department of the seat
   let other: { id: string; code: string };
   let foreignSubscription: { subscriptionId: string; planId: string };
 
-  const subscriptionOf = async (departmentId?: string) => {
-    const subscriptionId = await h.subscription(5, 'K2', departmentId);
+  const subscriptionOf = async () => {
+    const subscriptionId = await h.subscription(5, 'K2');
 
     return { subscriptionId, planId: await h.planOf(subscriptionId) };
   };
@@ -59,7 +59,7 @@ describe('the grant of a seat and the work on a task: the department of the seat
     await h.start();
     other = await h.department('P-OTH');
     own = await subscriptionOf();
-    foreignSubscription = await subscriptionOf(other.id);
+    foreignSubscription = await subscriptionOf();
   }, 240000);
 
   afterAll(async () => {

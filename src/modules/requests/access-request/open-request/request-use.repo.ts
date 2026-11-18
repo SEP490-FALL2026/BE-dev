@@ -42,6 +42,17 @@ export class RequestUseRepo {
     return this.read({ costCenterId, state: NOT_OVER, branch: { not: 'INTERNAL_FREE' } }, limit, tx);
   }
 
+  /** Whether the person made a request or is the beneficiary of one, whatever its state: what refers to their first placement (`QĐ-113e`). */
+  async involvesEmployee(employeeId: string, tx?: DbTx): Promise<boolean> {
+    const db = tx ?? this.prisma;
+    if (await db.accessRequest.findFirst({ where: { requesterEmployeeId: employeeId }, select: { id: true } }))
+      return true;
+
+    return (
+      (await db.accessRequestBeneficiary.findFirst({ where: { employeeId }, select: { requestId: true } })) !== null
+    );
+  }
+
   private async read(where: Prisma.AccessRequestWhereInput, limit: number, tx?: DbTx): Promise<RequestUse> {
     const db = tx ?? this.prisma;
     const rows = await db.accessRequest.findMany({

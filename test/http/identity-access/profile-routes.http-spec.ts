@@ -11,7 +11,7 @@ import {
   AvatarTypeUnsupportedError,
   WorkPhoneInvalidError,
 } from '../../../src/modules/identity-access/profile/profile.errors';
-import { AVATAR_MAX_BYTES } from '../../../src/modules/identity-access/profile/profile.policy';
+import { PICTURE_MAX_BYTES as AVATAR_MAX_BYTES } from '../../../src/infrastructure/object-storage/picture-image';
 import { ProfileAvatarService } from '../../../src/modules/identity-access/profile/profile-avatar.service';
 import { ProfilePhoneService } from '../../../src/modules/identity-access/profile/profile-phone.service';
 import { ProfileQueryService } from '../../../src/modules/identity-access/profile/profile-query.service';

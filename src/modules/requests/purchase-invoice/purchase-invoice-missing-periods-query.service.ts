@@ -31,9 +31,8 @@ type Unpaid = Omit<MissingInvoicePeriod, 'dueDate'>;
 
 /**
  * The periods of a right paid by the month or the year that have no invoice past the fifth working day after their payment day (`PI-2`, `QĐ-111x`,
- * `R-30`): the months of a `K1` right a request granted while a seat of it is still held, and the payments of a subscription, a department's
- * or the shared pool's, by the cycle of its plan. An invoice that was returned does not count; one that was submitted or signed does, whatever it says. The mark is
- * read, never kept, so it goes the day an invoice is submitted. Finance reads every period; an IT Admin those of the departments they work and of the shared pool, which every IT Admin works (`D8`, `PI-1c`).
+ * `R-30`): the months of a `K1` right a request granted while a seat of it is still held, and the payments of a subscription by the cycle of its plan. An invoice that was returned does not count; one that was submitted or signed does, whatever it says. The mark is
+ * read, never kept, so it goes the day an invoice is submitted. Finance reads every period; an IT Admin those of the requests of the departments they work (`D8`) and of the subscriptions they answer for.
  * The periods are derived from the rights that are still held, a set the grants and subscriptions bound, so they are cut into pages after the
  * count; the number of statements does not grow with them.
  */
@@ -73,6 +72,7 @@ export class PurchaseInvoiceMissingPeriodsQueryService {
       departmentIds: await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
         this.identity.findUsableItAdminEmployeeIds(ids),
       ),
+      responsibleItAdminEmployeeId: actor.employeeId,
     };
   }
 
@@ -82,7 +82,10 @@ export class PurchaseInvoiceMissingPeriodsQueryService {
     const today = await this.organizationReads.businessToday();
     const departmentIds = scope.kind === 'ALL' ? null : scope.departmentIds;
     const running = await this.runningGrants(departmentIds, today, organization.timeZone);
-    const schedules = await this.subscriptions.listPaymentSchedules(departmentIds);
+    const schedules = (await this.subscriptions.listPaymentSchedules()).filter(
+      (schedule) =>
+        scope.kind === 'ALL' || schedule.responsibleItAdminEmployeeId === scope.responsibleItAdminEmployeeId,
+    );
     const months = await this.invoices.openServiceMonths({
       requestIds: running.map((grant) => grant.id),
       subscriptionIds: schedules.map((schedule) => schedule.subscriptionId),
@@ -182,7 +185,7 @@ export class PurchaseInvoiceMissingPeriodsQueryService {
       .map((period) => ({
         link: { kind: 'SUBSCRIPTION', subscriptionId: schedule.subscriptionId },
         planId: schedule.planId,
-        departmentId: schedule.ownerDepartmentId,
+        departmentId: null,
         label: 'RENEWAL',
         periodIndex: null,
         periodCount: null,

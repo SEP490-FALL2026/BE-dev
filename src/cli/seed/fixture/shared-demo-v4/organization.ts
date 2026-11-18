@@ -162,6 +162,12 @@ const PEOPLE: DemoPerson[] = [
   person('NV-NEW1', 'Hồ Thị Tâm', 'tam.ho', 'OPS', null, 'CONTRACTOR'),
   // Placed in no department on purpose: the Super Admin places them from the list of unplaced employees (`QĐ-93g`).
   person('NV-NEW2', 'Âu Thị Xuyến', 'xuyen.au', null, 'EMPLOYEE'),
+  // Placed for the first time in Engineering from a day to come, with no request and no account: the Super Admin corrects the department or the day
+  // with `PATCH /employees/{id}/first-placement` while the day has not come (`QĐ-113e`).
+  {
+    ...person('NV-NEW4', 'Đoàn Thị Hiền', 'hien.doan', null, null),
+    firstPlacement: { department: 'ENG', effectiveInDays: 14 },
+  },
 ];
 
 /*

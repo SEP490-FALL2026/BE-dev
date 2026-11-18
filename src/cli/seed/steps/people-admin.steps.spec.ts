@@ -208,3 +208,32 @@ describe('org.account-states (SPEC S03)', () => {
     expect(SHARED_DEMO_V4.people.find((person) => person.code === 'NV-NEW3')!.account).toBeNull();
   });
 });
+
+describe('org.future-placements (QĐ-113e)', () => {
+  const step = PEOPLE_ADMIN_STEPS.find((candidate) => candidate.key === 'org.future-placements')!;
+  const run = (call: jest.Mock) =>
+    step.run(
+      ctxOf({
+        api: { call },
+        ids: { employees: new Map([['NV-NEW4', 'e-4']]), departments: new Map([['ENG', 'd-eng']]) },
+      }),
+    );
+
+  it('places the person from fourteen days ahead', async () => {
+    const call = jest.fn(() => Promise.resolve({}));
+
+    await expect(run(call)).resolves.toMatchObject({ status: 'done' });
+    expect(call).toHaveBeenCalledWith('sa@example.test', 'POST', '/employees/e-4/first-placements', {
+      departmentId: 'd-eng',
+      effectiveFrom: '2026-12-01',
+    });
+  });
+
+  it('reports a person already placed as present on a rerun', async () => {
+    const call = jest.fn(() =>
+      Promise.reject(new DemoApiError('POST', '/employees/e-4/first-placements', 409, 'EMPLOYEE.ALREADY_PLACED')),
+    );
+
+    await expect(run(call)).resolves.toMatchObject({ status: 'present' });
+  });
+});

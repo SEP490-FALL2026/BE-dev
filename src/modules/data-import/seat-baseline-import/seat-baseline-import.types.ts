@@ -32,7 +32,6 @@ export const SEAT_ROW_ERROR_CODES = [
   'EXPECTED_END_INVALID',
   'OVERLAP',
   'SEAT_LIMIT_EXCEEDED',
-  'SUBSCRIPTION_DEPARTMENT_MISMATCH',
 ] as const;
 export type SeatRowErrorCode = (typeof SEAT_ROW_ERROR_CODES)[number];
 

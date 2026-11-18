@@ -52,8 +52,6 @@ export interface SeatFacts {
   target: {
     kind: 'SUBSCRIPTION' | 'PLAN';
     purchasedQuantity: number | null;
-    /** The department that owns the subscription (`QĐ-89a`); null only for an internal plan, which has no subscription. */
-    ownerDepartmentId?: string | null;
   };
   recordedOn: BusinessDate;
   /** By employee code. */

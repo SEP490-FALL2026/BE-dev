@@ -55,11 +55,11 @@ describe('subscriptions (integration, PostgreSQL constraints)', () => {
 
     return sqlState(
       sql,
-      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity,
+      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity,
          unit_price_minor, unit_price_currency, price_recorded_on,
          price_rate, price_rate_date, price_rate_source, price_reporting_minor, price_reporting_currency, price_exchange_rate_id,
          billing_cycle, start_date, end_date, renewal_date, notice_deadline, notice_period_days, auto_renew, allows_mid_term_reduction)
-       VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), $4::"SubscriptionKind", $5::"SubscriptionStatus", $6,
+       VALUES ($1, $2, $3, $4::"SubscriptionKind", $5::"SubscriptionStatus", $6,
          $7, $8, $9,
          $10, $11, $12::"PriceRateSource", $13, $14, $15,
          $16::"BillingCycle", $17, $18, $19, $20, $21, $22, $23)`,
@@ -177,8 +177,8 @@ describe('subscriptions (integration, PostgreSQL constraints)', () => {
     const bare = (columns: string, values: unknown[]) =>
       sqlState(
         sql,
-        `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, ${columns})
-         VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'TERM', 'DRAFT', ${values.map((_, index) => `$${index + 4}`).join(', ')})`,
+        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, ${columns})
+         VALUES ($1, $2, $3, 'TERM', 'DRAFT', ${values.map((_, index) => `$${index + 4}`).join(', ')})`,
         [randomUUID(), organizationId, perSeatPlan, ...values],
       );
 
@@ -279,8 +279,8 @@ describe('subscriptions (integration, PostgreSQL constraints)', () => {
     const withOriginal = (minor: unknown, currency: unknown) =>
       sqlState(
         sql,
-        `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, original_unit_price_minor, original_currency)
-         VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'TERM', 'DRAFT', $4, $5)`,
+        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, original_unit_price_minor, original_currency)
+         VALUES ($1, $2, $3, 'TERM', 'DRAFT', $4, $5)`,
         [randomUUID(), organizationId, perSeatPlan, minor, currency],
       );
 
@@ -297,10 +297,10 @@ describe('subscriptions (integration, PostgreSQL constraints)', () => {
   it('QĐ-111an: an active subscription priced in dong with the snapshot of the same currency (rate 1, SAME_CURRENCY, no exchange rate) satisfies every constraint', async () => {
     const state = await sqlState(
       sql,
-      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity,
+      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity,
          unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source,
          price_reporting_minor, price_reporting_currency, price_exchange_rate_id, billing_cycle, start_date, original_unit_price_minor, original_currency)
-       VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'TERM', 'ACTIVE', 10,
+       VALUES ($1, $2, $3, 'TERM', 'ACTIVE', 10,
          600000, 'VND', '2026-11-14', 1, '2026-11-14', 'SAME_CURRENCY', 600000, 'VND', NULL, 'MONTHLY', '2026-11-14', 2400, 'USD')`,
       [randomUUID(), organizationId, perSeatPlan],
     );

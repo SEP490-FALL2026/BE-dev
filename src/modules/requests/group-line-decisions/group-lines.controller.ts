@@ -203,7 +203,7 @@ export class GroupLinesController {
   @ApiSuccessResponse(GroupResponseDto, {
     message: 'GROUP_REQUEST.LINE_WITHDRAWN',
     description:
-      'The sender withdraws one person while their seat is not real; the head of the department does too, with a reason, in the stages the head acts on. Before the spend nothing is held, and the request is priced again for those who remain. Once the spend is approved the share of that person goes back to the budget and nobody else’s does; a task nobody has worked is cancelled with its assignment (never failed), and when the grant had failed the person waits until the IT Admin cancels the task. The other people are not touched.',
+      'The sender withdraws one person only while their line still awaits the need, or while the request is sent back to add what is missing; after any decision the way back is a return once granted. The head of the department does too, with a reason, in the stages the head acts on. Before the spend nothing is held, and the request is priced again for those who remain. Once the spend is approved the share of that person goes back to the budget and nobody else’s does; a task nobody has worked is cancelled with its assignment (never failed), and when the grant had failed the person waits until the IT Admin cancels the task. The other people are not touched.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -217,8 +217,9 @@ export class GroupLinesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'Nothing is left to withdraw (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin (ACCESS_REQUEST.WITHDRAWAL_PENDING), the task of the grant is being worked (ACCESS_REQUEST.GRANT_RUNNING), or the seat is real and the way back is a return (ACCESS_REQUEST.GRANT_COMPLETED). Nothing changes.',
+        'A decision was already taken on the person (ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION), nothing is left to withdraw (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin (ACCESS_REQUEST.WITHDRAWAL_PENDING), the task of the grant is being worked (ACCESS_REQUEST.GRANT_RUNNING), or the seat is real and the way back is a return (ACCESS_REQUEST.GRANT_COMPLETED). Nothing changes.',
       examples: [
+        GROUP_REQUEST_ERROR_EXAMPLES.WITHDRAWAL_AFTER_DECISION,
         GROUP_REQUEST_ERROR_EXAMPLES.WITHDRAWAL_ALREADY_ENDED,
         GROUP_REQUEST_ERROR_EXAMPLES.WITHDRAWAL_PENDING,
         GROUP_REQUEST_ERROR_EXAMPLES.GRANT_RUNNING,

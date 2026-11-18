@@ -289,11 +289,6 @@ describe('cost attribution to Units: every migration history converges (integrat
               employeeCode: 'E-C',
               validFrom: '2026-10-01',
             },
-            // The flat-rate subscription of the allocation: a database that skipped the expansion cannot give it an owner department.
-            {
-              code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED',
-              subscriptionId: (await fixture.sql.query<{ id: string }>('SELECT id FROM subscriptions')).rows[0].id,
-            },
           ]);
           expect(await fingerprint(fixture.sql)).toBe(untouched);
         } finally {

@@ -154,7 +154,7 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
       R45: 'AWAITING_REQUESTER_REVISION',
       R46: 'EXECUTING',
       R47: 'FAILED',
-      R48: 'AWAITING_IT_CLOSE',
+      R48: 'FAILED',
       R49: 'AWAITING_EXECUTION',
       R50: 'COMPLETED',
       R51: 'PENDING',

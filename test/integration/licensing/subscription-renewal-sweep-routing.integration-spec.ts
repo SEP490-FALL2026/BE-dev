@@ -61,15 +61,27 @@ describe('who the pass tells and from which date (integration, real PostgreSQL)'
       expect(await recipients('SUBSCRIPTION_RENEWAL_ALERT', subscriptionId)).toEqual([responsible.employeeId]);
     });
 
-    it('falls back to the IT Admin in charge of the department when none is named, or the one named is locked or has left', async () => {
+    it('falls back to the first usable IT Admin by employee code when none is named, or the one named is locked or has left (no department takes part, QĐ-113g)', async () => {
       const responsible = await h.account('E-IT-FALL', await h.person('E-IT-FALL'), 'IT_ADMIN');
+      /** The usable IT Admin with the smallest employee code: who the pass falls back to. */
+      const firstUsable = async (): Promise<string> => {
+        const rows = await h.ctx.sql.query<{ employee_id: string }>(
+          `SELECT u.employee_id FROM app_users u
+             JOIN employees e ON e.id = u.employee_id
+             JOIN role_grants g ON g.app_user_id = u.id AND g.role = 'IT_ADMIN' AND g.revoked_at IS NULL
+            WHERE u.status = 'ACTIVE' AND e.status = 'ACTIVE'
+            ORDER BY e.employee_code ASC LIMIT 1`,
+        );
+
+        return rows.rows[0].employee_id;
+      };
 
       expect(await alertedWhenResponsibleIs(responsible.employeeId)).toEqual([responsible.employeeId]);
-      expect(await alertedWhenResponsibleIs(null)).toEqual([h.it1.employeeId]);
+      expect(await alertedWhenResponsibleIs(null)).toEqual([await firstUsable()]);
 
       await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [responsible.employeeId]);
       try {
-        expect(await alertedWhenResponsibleIs(responsible.employeeId)).toEqual([h.it1.employeeId]);
+        expect(await alertedWhenResponsibleIs(responsible.employeeId)).toEqual([await firstUsable()]);
       } finally {
         await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE employee_id = $1`, [
           responsible.employeeId,
@@ -78,7 +90,7 @@ describe('who the pass tells and from which date (integration, real PostgreSQL)'
       // Left the company, the account not locked yet: no longer usable either.
       await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [responsible.employeeId]);
       try {
-        expect(await alertedWhenResponsibleIs(responsible.employeeId)).toEqual([h.it1.employeeId]);
+        expect(await alertedWhenResponsibleIs(responsible.employeeId)).toEqual([await firstUsable()]);
       } finally {
         await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [responsible.employeeId]);
       }
@@ -125,7 +137,6 @@ describe('who the pass tells and from which date (integration, real PostgreSQL)'
     it('counts the point and the red alert from the renewal day minus the days of notice, says the deadline is inferred, and tells nothing from the renewal day itself', async () => {
       // Renewal in 80 days, 30 days of notice: the deadline is in 50, the point (30 days before it) in 20 and the red alert (7 before it) in 43.
       const subscriptionId = await h.term({
-        ownerDepartmentId: unit.department.id,
         quantity: 10,
         startDate: h.inDays(-285),
         renewalDate: h.inDays(80),

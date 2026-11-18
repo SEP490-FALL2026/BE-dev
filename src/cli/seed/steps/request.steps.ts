@@ -91,7 +91,7 @@ async function positionOf(
   scenario: DemoRequestScenario,
   request: RequestWire,
 ): Promise<ScenarioPosition> {
-  const needsTask = request.state === 'EXECUTING' && ['FAILED', 'AWAITING_IT_CLOSE'].includes(scenario.target);
+  const needsTask = request.state === 'EXECUTING' && scenario.target === 'FAILED';
 
   return {
     state: request.state,

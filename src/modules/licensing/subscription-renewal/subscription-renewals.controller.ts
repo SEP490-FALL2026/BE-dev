@@ -40,22 +40,19 @@ const INVALID: ErrorResponseDeclaration = {
 const READERS_ONLY: ErrorResponseDeclaration = {
   status: HttpStatus.FORBIDDEN,
   description:
-    'Only the IT Admin, Finance and the head of a department read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN); the head reads those of the subscriptions their department owns, and Finance does not read the seats.',
+    'Only the IT Admin and Finance read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN); Finance does not read the seats.',
   examples: [EXAMPLES.READ_FORBIDDEN],
 };
 const NOT_FOUND: ErrorResponseDeclaration = {
   status: HttpStatus.NOT_FOUND,
-  description:
-    'There is no renewal with this id, or it belongs to a subscription another department owns, or to the shared pool, and the caller is a head (SUBSCRIPTION_RENEWAL.NOT_FOUND).',
+  description: 'There is no renewal with this id (SUBSCRIPTION_RENEWAL.NOT_FOUND).',
   examples: [EXAMPLES.NOT_FOUND],
 };
 
-/**
- * The renewal of a subscription of the shared pool at its point of adjustment (`QĐ-103e`, `SBF-20`): the IT Admin records the result once
- * (the seats the system counts for the next period, what the vendor did and the new period), and the case is written complete: decided by the
- * IT Admin in charge, outcome recorded. No head confirms and the person who decides spending takes no part. Nothing here renews, cancels or
- * pays a vendor, and it holds no budget commitment. A case decided before this rule still takes its outcome through its own route.
- */
+// The renewal of a subscription at its point of adjustment (QĐ-103e, SBF-20): the IT Admin records the result once
+// (the seats the system counts for the next period, what the vendor did and the new period), and the case is written complete: decided by the
+// IT Admin in charge, outcome recorded. No head confirms and the person who decides spending takes no part. Nothing here renews, cancels or
+// pays a vendor, and it holds no budget commitment. A case decided before this rule still takes its outcome through its own route.
 @ApiTags('subscription-renewals')
 @Controller({ version: '1' })
 export class SubscriptionRenewalsController {
@@ -71,7 +68,7 @@ export class SubscriptionRenewalsController {
   @ApiSuccessResponse(SubscriptionRenewalPageResponseDto, {
     message: 'SUBSCRIPTION_RENEWAL.LISTED',
     description:
-      'A page of the renewal cases: the period (subscription.ownerDepartmentId is null for a subscription of the shared pool), the day the case counts from and where it comes from (a declared or an inferred cancellation deadline, the renewal day, the payment day or the end date), the choice recorded, the decision and the outcome. The IT Admin and Finance (who only reads) see every case; the head of a department sees those of the subscriptions the department owns, and none of the shared pool. A case that waited for a head before the one-write renewal is closed (state STALE); waitingReason is always null. Filter by state, by subscription or by the late flag.',
+      'A page of the renewal cases: the period, the day the case counts from and where it comes from (a declared or an inferred cancellation deadline, the renewal day, the payment day or the end date), the choice recorded, the decision and the outcome. The IT Admin and Finance (who only reads) see every case; nobody else reads them. Cases are not scoped by department: each subscription names the IT Admin who answers for it (subscription.responsibleItAdmin) and its kind of provisioning (subscription.provisioningType: K1 personal seats, K2 or K4 a shared pool). A case that waited for a head before the one-write renewal is closed (state STALE); waitingReason is always null. Filter by state, by subscription or by the late flag; mine=true keeps the renewals of the subscriptions the caller answers for (the default view of an IT Admin).',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS_ONLY, INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: SubscriptionRenewalListQueryDto) {
@@ -109,7 +106,7 @@ export class SubscriptionRenewalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool (a department owns it, or it is a key or a one-time license), a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); a cancellation decided before the one-write rule still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId: the IT Admin records its outcome first); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE).',
+        'The subscription has no point of adjustment: a perpetual purchase, internal software, a term that is not a workspace of the shared pool (a key or a one-time license), a draft, a period already continued or a subscription already recorded as cancelled (SUBSCRIPTION_RENEWAL.NOT_RENEWABLE, details.reason PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED); a cancellation decided before the one-write rule still waits for its outcome (SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED, details.renewalId: the IT Admin records its outcome first); no date gives its point and its contract data must be completed first (SUBSCRIPTION_RENEWAL.CONTRACT_DATA_INCOMPLETE).',
       examples: [EXAMPLES.NOT_RENEWABLE, EXAMPLES.ALREADY_PROPOSED, EXAMPLES.CONTRACT_DATA_INCOMPLETE],
     },
     INVALID,
@@ -151,7 +148,7 @@ export class SubscriptionRenewalsController {
   @ApiSuccessResponse(SubscriptionRenewalSeatRankingResponseDto, {
     message: 'SUBSCRIPTION_RENEWAL.SEATS_RANKED',
     description:
-      'Deprecated: no seat is chosen for a reduction any more, the system counts them (`SBF-20`). The personal seats in use of the period, in the order a reduction below them was chosen from: the seats whose revocation is already decided, then those whose holder left, then those a waste rule flagged and the rest by the oldest last activity. While no evidence of use is connected (usage NOT_AVAILABLE) no seat is flagged, lastActivityOn is null and the rest come oldest seat first: an order, not a judgement of use. Each seat shows whether the IT Admin proposed to take it back (inProposal; proposedOnly=true lists only those). Read by the IT Admin and by the head of the owner department; the head sees the code and name of the holder and nothing else of them.',
+      'Deprecated: no seat is chosen for a reduction any more, the system counts them (`SBF-20`). The personal seats in use of the period, in the order a reduction below them was chosen from: the seats whose revocation is already decided, then those whose holder left, then those a waste rule flagged and the rest by the oldest last activity. While no evidence of use is connected (usage NOT_AVAILABLE) no seat is flagged, lastActivityOn is null and the rest come oldest seat first: an order, not a judgement of use. Each seat shows whether the IT Admin proposed to take it back (inProposal; proposedOnly=true lists only those). Read by the IT Admin, not by Finance; each holder is shown by code and name and nothing else.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS_ONLY, NOT_FOUND, INVALID)
   async seatRanking(
@@ -293,7 +290,7 @@ export class SubscriptionRenewalsController {
   @ApiSuccessResponse(SubscriptionDeadlineEventPageResponseDto, {
     message: 'SUBSCRIPTION_DEADLINE_EVENT.LISTED',
     description:
-      'A page of what the system recorded when the renewal day of a period passed with no result recorded, the newest first: an incident for a subscription that renews itself (what the measure of unwanted renewals counts, one per period) or a mark that a subscription that does not renew itself expired without renewal. A result recorded later never removes an event, and a step past its SLA is never one. subscription.ownerDepartmentId is null for a subscription of the shared pool. Filter by kind and by the day recorded.',
+      'A page of what the system recorded when the renewal day of a period passed with no result recorded, the newest first: an incident for a subscription that renews itself (what the measure of unwanted renewals counts, one per period) or a mark that a subscription that does not renew itself expired without renewal. Each subscription names the IT Admin who answers for it (subscription.responsibleItAdmin) and its provisioningType. A result recorded later never removes an event, and a step past its SLA is never one. Filter by kind and by the day recorded.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

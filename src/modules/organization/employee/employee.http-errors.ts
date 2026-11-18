@@ -10,6 +10,7 @@ import {
 } from '../department/department.errors';
 import { refuse, toOrganizationApiException } from '../organization.http-errors';
 import {
+  FirstPlacementCorrectionError,
   FirstPlacementError,
   EmployeeForbiddenError,
   EmployeeRowInvalidError,
@@ -19,6 +20,14 @@ import {
 
 /** Maps the errors of the employee routes to their HTTP answers; every other error goes to the mapper of the module. */
 export function toEmployeeApiException(error: unknown): unknown {
+  if (error instanceof FirstPlacementCorrectionError) {
+    const code =
+      error.problem === 'ALREADY_EFFECTIVE' || error.problem === 'IN_USE'
+        ? `EMPLOYEE.FIRST_PLACEMENT_${error.problem}`
+        : `EMPLOYEE.${error.problem}`;
+
+    return refuse(HttpStatus.CONFLICT, code, error.message, error.use ? { usedBy: error.use } : undefined);
+  }
   if (error instanceof FirstPlacementError)
     return refuse(
       error.problem === 'DATE_INVALID' ? HttpStatus.UNPROCESSABLE_ENTITY : HttpStatus.CONFLICT,
@@ -64,6 +73,9 @@ export const EMPLOYEE_ERROR_EXAMPLES = {
   EMPLOYEE_ALREADY_PLACED: example(new FirstPlacementError('ALREADY_PLACED')),
   EMPLOYEE_INACTIVE: example(new FirstPlacementError('EMPLOYEE_INACTIVE')),
   EMPLOYEE_LEAVING: example(new FirstPlacementError('EMPLOYEE_LEAVING')),
+  EMPLOYEE_NOT_PLACED: example(new FirstPlacementCorrectionError('NOT_PLACED')),
+  EMPLOYEE_FIRST_PLACEMENT_ALREADY_EFFECTIVE: example(new FirstPlacementCorrectionError('ALREADY_EFFECTIVE')),
+  EMPLOYEE_FIRST_PLACEMENT_IN_USE: example(new FirstPlacementCorrectionError('IN_USE', 'REQUEST')),
   EMPLOYEE_DATE_INVALID: example(new FirstPlacementError('DATE_INVALID')),
   EMPLOYEE_ROW_INVALID: example(new EmployeeRowInvalidError([{ field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' }])),
   /** The same code when an official field is corrected: the reasons name the fields that route changes. */

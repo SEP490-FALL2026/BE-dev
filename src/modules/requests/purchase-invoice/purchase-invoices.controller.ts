@@ -159,7 +159,7 @@ export class PurchaseInvoicesController {
     status: HttpStatus.CREATED,
     message: 'PURCHASE_INVOICE.SUBMITTED',
     description:
-      'The invoice is kept as it was read against its request or subscription, with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.',
+      'The invoice is kept as it was read against its request or subscription (any IT Admin may submit the invoice of a subscription period, as it has no owning department; one for a request is submitted by the IT Admin of the department of the request), with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.',
   })
   @ApiErrorResponses(...SUBMIT_ERRORS)
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: PurchaseInvoiceSubmitBodyDto) {

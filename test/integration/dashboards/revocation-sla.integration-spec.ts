@@ -151,8 +151,8 @@ describe('the report of the SLA of the revocations (integration, real PostgreSQL
     it2 = await h.staff(eng.department, 'SLA-IT2', 'IT_ADMIN');
     await h.setItAdminInCharge(des.department, { employeeId: it1.employeeId, account: it1 });
     await h.setItAdminInCharge(eng.department, it2);
-    desPool = await h.subscription(40, 'K2', des.department.id);
-    engPool = await h.subscription(40, 'K2', eng.department.id);
+    desPool = await h.subscription(40, 'K2');
+    engPool = await h.subscription(40, 'K2');
 
     // Departures: U1 late (done after the deadline), U2 on time, U3 open past the deadline, U4 on time in the other department.
     const u1 = await departure(des.department, desPool);
@@ -355,7 +355,7 @@ describe('the report of the SLA of the revocations (integration, real PostgreSQL
   });
 
   it('RD-R2: a departure with one task done and a right that never got a task is not finished before its deadline either; the day the deadline passes it is overdue, never finished and then overdue', async () => {
-    const secondPool = await h.subscription(40, 'K2', des.department.id);
+    const secondPool = await h.subscription(40, 'K2');
     const leaver = await person(des.department);
     const first = await h.rightOf(leaver, leaver.code, { subscriptionId: desPool });
     await h.rightOf(leaver, leaver.code, { subscriptionId: secondPool });

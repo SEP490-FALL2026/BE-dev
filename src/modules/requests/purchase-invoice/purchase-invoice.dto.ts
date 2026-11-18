@@ -175,7 +175,7 @@ const missingPeriodSchema = z.strictObject({
   }),
   department: z.strictObject({ id: z.uuid(), name: z.string() }).nullable().meta({
     description:
-      'The department of the request, or the one that owns the subscription; null for a subscription of the shared pool, which no department owns.',
+      'The department of the request; null for the invoice of a subscription period, which has no owning department.',
   }),
 });
 

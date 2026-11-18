@@ -77,7 +77,7 @@ function firstPlanBody(plan: DemoPlan): Record<string, unknown> {
   return body;
 }
 
-function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown> {
+export function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown> {
   return {
     applicationId,
     name: plan.name,
@@ -87,6 +87,8 @@ function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown
     ...(plan.revocationNote ? { revocationNote: plan.revocationNote } : {}),
     ...(plan.sharingPolicy ? { sharingPolicy: plan.sharingPolicy } : {}),
     ...(plan.hasAdminConsole !== undefined ? { hasAdminConsole: plan.hasAdminConsole } : {}),
+    // QĐ-113a: the price before tax in dong of a paid plan, the one a request falls back to when no subscription of the plan has a price.
+    ...(plan.referencePrice ? { referencePrice: { amount: plan.referencePrice, currency: 'VND' } } : {}),
   };
 }
 
@@ -299,9 +301,6 @@ export function subscriptionBody(
   return {
     planId,
     kind: subscription.kind,
-    ...(subscription.ownerDepartment
-      ? { ownerDepartmentId: ctx.ids.departments.get(subscription.ownerDepartment) }
-      : {}),
     ...subscriptionTerms(ctx, subscription),
   };
 }

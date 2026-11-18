@@ -91,17 +91,16 @@ describe('the migration that turns prices into dong (integration, real PostgreSQ
     const planId = await h.plan('K2');
     const snapshot = input.snapshot === undefined ? null : input.snapshot;
     await h.ctx.sql.query(
-      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity,
+      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity,
          unit_price_minor, unit_price_currency, price_recorded_on,
          price_rate, price_rate_date, price_rate_source, price_reporting_minor, price_reporting_currency, price_exchange_rate_id,
          billing_cycle, commitment_term_months, start_date)
-       VALUES ($1, $2, $3, $4, 'TERM', $5::"SubscriptionStatus", 10, $6, $7, '2026-09-01',
-         $8, $9, $10::"PriceRateSource", $11, $12, $13, 'MONTHLY', 1, '2026-09-01')`,
+       VALUES ($1, $2, $3, 'TERM', $4::"SubscriptionStatus", 10, $5, $6, '2026-09-01',
+         $7, $8, $9::"PriceRateSource", $10, $11, $12, 'MONTHLY', 1, '2026-09-01')`,
       [
         id,
         organizationId(),
         planId,
-        department.id,
         input.status ?? 'ACTIVE',
         input.minor.toString(),
         input.currency,

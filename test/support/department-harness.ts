@@ -254,7 +254,6 @@ export class DepartmentHarness {
 
   afterEach() {
     this.useFacts.openWork = [];
-    this.useFacts.subscriptions = [];
   }
 
   async stop() {

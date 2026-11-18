@@ -1,7 +1,24 @@
-import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Header,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { PICTURE_MAX_BYTES } from '../../../infrastructure/object-storage/picture-image';
 import {
   ApiErrorResponses,
+  fallbackExample,
   FORBIDDEN_EXAMPLE,
   VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
@@ -11,6 +28,7 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { DEPARTMENT_ERROR_EXAMPLES, toDepartmentApiException } from './department.http-errors';
 import { DepartmentQueryService } from './department-query.service';
+import { DepartmentAvatarService } from './department-avatar.service';
 import { DepartmentService } from './department.service';
 import {
   CreateDepartmentBodyDto,
@@ -29,6 +47,7 @@ import {
 import { toDepartmentProfileWire, toDepartmentWire } from './department.mapper';
 import {
   AUTH_ERRORS,
+  DEPARTMENT_INACTIVE_RESPONSE,
   ID_INVALID,
   ID_OR_QUERY_INVALID,
   NOT_FOUND,
@@ -60,6 +79,53 @@ const UPDATE_INVALID = {
   ],
 } as const;
 /**
+ * One file and nothing else. The limit is a byte over the picture limit, so a file only a little too large is told by the rule
+ * (DEPARTMENT.AVATAR_TOO_LARGE); the parser stops anything larger at once (HTTP_PAYLOAD_TOO_LARGE).
+ */
+const UPLOAD_LIMITS = { fileSize: PICTURE_MAX_BYTES + 1, files: 1, fields: 0, parts: 1 };
+
+/** The answers of a picture upload beyond the guards. */
+const AVATAR_PUT_ERRORS = [
+  {
+    status: HttpStatus.BAD_REQUEST,
+    description: 'The form is not a readable multipart form with one file (HTTP_BAD_REQUEST).',
+    examples: [fallbackExample(HttpStatus.BAD_REQUEST)],
+  },
+  {
+    status: HttpStatus.CONFLICT,
+    description: 'The department is retired (DEPARTMENT.INACTIVE).',
+    examples: [DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_INACTIVE],
+  },
+  {
+    status: HttpStatus.PAYLOAD_TOO_LARGE,
+    description:
+      'The picture is larger than 1 MiB: DEPARTMENT.AVATAR_TOO_LARGE for one a little over it, HTTP_PAYLOAD_TOO_LARGE for any larger one, which the parser stops at once.',
+    examples: [DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_AVATAR_TOO_LARGE, fallbackExample(HttpStatus.PAYLOAD_TOO_LARGE)],
+  },
+  {
+    status: HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+    description: 'By its first bytes the file is not a png, jpeg or webp (DEPARTMENT.AVATAR_TYPE_UNSUPPORTED).',
+    examples: [DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_AVATAR_TYPE_UNSUPPORTED],
+  },
+  {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'The id is not a UUID (VALIDATION_ERROR), no file was sent (DEPARTMENT.AVATAR_FILE_REQUIRED), it is empty (DEPARTMENT.AVATAR_EMPTY) or it is not the type it says it is (DEPARTMENT.AVATAR_TYPE_MISMATCH).',
+    examples: [
+      VALIDATION_EXAMPLE,
+      DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_AVATAR_FILE_REQUIRED,
+      DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_AVATAR_EMPTY,
+      DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_AVATAR_TYPE_MISMATCH,
+    ],
+  },
+] as const;
+
+interface UploadedBinary {
+  buffer: Buffer;
+  mimetype: string;
+}
+
+/**
  * Department profiles (`US-03-06`). The Super Admin keeps them, with no HR basis to give (`QĐ-93f`), and reads them in full (`QĐ-87a`); the IT Admin
  * changes nothing and reads only the departments they are in charge of or stand in for; a department head reads the one they head
  * and the list of its people (`US-01-02` AC-7); Finance and employees change nothing here (AC-16). Who may do what is decided
@@ -72,6 +138,7 @@ export class DepartmentsController {
   constructor(
     private readonly queries: DepartmentQueryService,
     private readonly departments: DepartmentService,
+    private readonly avatars: DepartmentAvatarService,
   ) {}
 
   private async profileAfter(actor: AuthenticatedPrincipal, id: string) {
@@ -188,6 +255,57 @@ export class DepartmentsController {
     }
   }
 
+  @Put('departments/:id/avatar')
+  @Header('Cache-Control', 'no-store')
+  @RequireRoles('SUPER_ADMIN')
+  @UseInterceptors(FileInterceptor('file', { limits: UPLOAD_LIMITS }))
+  @ApiOperation({ operationId: 'departmentAvatarPut', summary: 'Set the picture of a department' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: { type: 'object', required: ['file'], properties: { file: { type: 'string', format: 'binary' } } },
+  })
+  @ApiSuccessResponse(DepartmentResponseDto, {
+    message: 'DEPARTMENT.AVATAR_CHANGED',
+    description:
+      'The picture (png, jpeg or webp, at most 1 MiB, judged by its first bytes) was stored and the department points at it; avatarUrl is a link that works for 15 minutes. The picture before it, if any, is deleted after the change.',
+  })
+  @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, NOT_FOUND, ...AVATAR_PUT_ERRORS)
+  async setAvatar(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: DepartmentIdParamDto,
+    @UploadedFile() file: UploadedBinary | undefined,
+  ) {
+    try {
+      await this.avatars.upload(
+        actor,
+        params.id,
+        file ? { bytes: file.buffer, declaredContentType: file.mimetype } : undefined,
+      );
+
+      return await this.profileAfter(actor, params.id);
+    } catch (error) {
+      throw toDepartmentApiException(error);
+    }
+  }
+
+  @Delete('departments/:id/avatar')
+  @RequireRoles('SUPER_ADMIN')
+  @ApiOperation({ operationId: 'departmentAvatarDelete', summary: 'Remove the picture of a department' })
+  @ApiSuccessResponse(DepartmentResponseDto, {
+    message: 'DEPARTMENT.AVATAR_REMOVED',
+    description: 'The department has no picture now; with none to begin with, nothing changed.',
+  })
+  @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, ID_INVALID, NOT_FOUND, DEPARTMENT_INACTIVE_RESPONSE)
+  async removeAvatar(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: DepartmentIdParamDto) {
+    try {
+      await this.avatars.remove(actor, params.id);
+
+      return await this.profileAfter(actor, params.id);
+    } catch (error) {
+      throw toDepartmentApiException(error);
+    }
+  }
+
   @Post('departments/:id/deactivate')
   @RequireRoles('SUPER_ADMIN')
   @ApiOperation({ operationId: 'departmentDeactivate', summary: 'Retire a department' })
@@ -199,7 +317,7 @@ export class DepartmentsController {
   @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, VALIDATION_ERROR, NOT_FOUND, {
     status: HttpStatus.CONFLICT,
     description:
-      'Something still keeps it in use (DEPARTMENT.IN_USE; details lists each group with its first things and its total): the people in it, the service accounts it owns, open work (Requests not over, personnel events waiting, open tasks) and the subscriptions or purchases it owns that still owe a payment.',
+      'Something still keeps it in use (DEPARTMENT.IN_USE; details lists each group with its first things and its total): the people in it, the service accounts it owns, and open work (Requests not over, personnel events waiting, open tasks). Subscriptions never keep a department in use: a subscription has no owning department.',
     examples: [DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_IN_USE],
   })
   async deactivate(

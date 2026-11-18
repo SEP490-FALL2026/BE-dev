@@ -44,7 +44,7 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
 
   /** A subscription of the shared pool of a K2 plan at 400.000 đ a seat a month. */
   async function newPool(): Promise<string> {
-    const pool = await takeOwnerOff(h, await h.subscription(10, 'K2', h.seed.departmentId));
+    const pool = await takeOwnerOff(h, await h.subscription(10, 'K2'));
     await h.ctx.sql.query(
       `UPDATE subscriptions SET unit_price_minor = 400000, price_reporting_minor = 400000 WHERE id = $1`,
       [pool],
@@ -372,7 +372,7 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     }
     // The whole year is invoiced in July; a department's own purchase of the same plan is invoiced beside it and is no line of the pool.
     await h.recordPurchase(vendorId, { subscriptionId: pool, serviceMonth: `${h.year}-07-01`, netMinor: 36_000_000n });
-    const owned = await h.subscription(5, 'K1', unit.department.id);
+    const owned = await h.subscription(5, 'K1');
     await h.recordPurchase((await h.vendorOf(await h.planOf(owned))).id, {
       subscriptionId: owned,
       serviceMonth: `${h.year}-07-01`,

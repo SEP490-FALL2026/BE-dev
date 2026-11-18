@@ -286,7 +286,7 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
   it('reads an invoice of a subscription as a renewal with no period, for the IT Admin of the department that owns it', async () => {
     const unit = await h.departmentWithHead(`P-PIS${counter++}`);
     await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
-    const owned = await h.subscription(10, 'K2', unit.department.id);
+    const owned = await h.subscription(10, 'K2');
     await h.ctx.sql.query(
       `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
       [owned],
@@ -313,7 +313,7 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
 
   it('takes the invoice of a subscription of the shared pool, K2 or K4, from the IT Admin who answers for it and from every other IT Admin, and from nobody who is not one (PI-1c)', async () => {
     const pool = async (type: 'K2' | 'K4'): Promise<string> => {
-      const id = await takeOwnerOff(h, await h.subscription(10, type, h.seed.departmentId));
+      const id = await takeOwnerOff(h, await h.subscription(10, type));
       await h.ctx.sql.query(
         `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
         [id],
@@ -343,7 +343,7 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     for (const kept of [byResponsible, byOther, ofKey]) {
       expect(kept).toMatchObject({ label: 'RENEWAL', matchResult: 'MATCHED', chargedCostCenterId: null });
     }
-    // The preview reads it the same way, and a subscription that is not the pool's is still the IT Admin of its department's only.
+    // The preview reads it the same way, and every subscription is of the pool now: any IT Admin submits its invoice.
     expect(
       h.dataOf<Preview>(
         await api('post', '/preview', it2)
@@ -351,18 +351,14 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
           .expect(200),
       ),
     ).toMatchObject({ label: 'RENEWAL', matchResult: 'MATCHED' });
-    const unit = await h.departmentWithHead(`P-PIP${counter++}`);
-    await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
-    const owned = await h.subscription(10, 'K2', unit.department.id);
-    expect(((await submitFor(owned, it2, 404)).body as { error: { code: string } }).error.code).toBe(
-      'PURCHASE_INVOICE.LINK_NOT_FOUND',
-    );
+    const owned = await h.subscription(10, 'K2');
+    await submitFor(owned, it2, 201);
     await submitFor(k2, h.finance, 403);
     await submitFor(k2, h.boss.account, 403);
   });
 
   it('marks over an invoice of the shared pool, linked to the pool or to a K2 request, and the invoice of a renewal, by the seats bought times the price of a month times the months to the renewal day, and never refuses it (B3B-06, QĐ-103w(3), QĐ-104c(3), QĐ-104d)', async () => {
-    const pool = await takeOwnerOff(h, await h.subscription(10, 'K2', h.seed.departmentId));
+    const pool = await takeOwnerOff(h, await h.subscription(10, 'K2'));
     // 10 seats at 1.000.000 đ a month (the harness price); the renewal day is 05/12, so September has three months to it.
     await h.ctx.sql.query(
       `UPDATE subscriptions SET renewal_date = $2, original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
