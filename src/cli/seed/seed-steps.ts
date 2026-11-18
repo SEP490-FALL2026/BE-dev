@@ -16,6 +16,7 @@ import { ABRUPT_DEPARTURE_STEPS, PERSONNEL_STEPS } from './steps/personnel.steps
 import { requestSteps } from './steps/request.steps';
 import { SAAS_ISSUE_STEPS } from './steps/saas-issues.steps';
 import { RETURN_STEPS } from './steps/returns.steps';
+import { RENEWAL_STEPS } from './steps/renewals.steps';
 import { SOFTWARE_LIST_STEPS } from './steps/software-list.steps';
 import { USAGE_STEPS } from './steps/usage.steps';
 
@@ -51,6 +52,7 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     ...NOTICE_STEPS,
     ...ABRUPT_DEPARTURE_STEPS,
     ...USAGE_STEPS,
+    ...RENEWAL_STEPS,
     // Last: the invoices, the closes of the months and the adjustments read what the requests and seats above hold; the policy published
     // again changes the version every checklist answers, so it comes after every decision of the dataset.
     ...DEMO_STEPS,

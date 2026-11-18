@@ -4,6 +4,7 @@ import { FINANCE } from './finance';
 import { ORGANIZATION } from './organization';
 import { REQUESTS } from './requests';
 import { REQUESTS_EXTRA, RETURNS } from './requests-extra';
+import { RENEWALS } from './renewals';
 import { SOFTWARE_LIST } from './software-list';
 import { USAGE } from './usage';
 import { EXTRA_USAGE_SOURCES } from './usage-extra';
@@ -19,6 +20,7 @@ export const SHARED_DEMO_V4: DemoFixture = {
   ...REQUESTS,
   requests: [...REQUESTS.requests, ...REQUESTS_EXTRA],
   returns: RETURNS,
+  renewals: RENEWALS,
   ...USAGE,
   usageSources: [...USAGE.usageSources, ...EXTRA_USAGE_SOURCES],
   ...SOFTWARE_LIST,

@@ -371,6 +371,14 @@ export interface DemoSoftwareProposal {
   rejectionReason?: string;
 }
 
+export interface DemoRenewal {
+  subscription: string;
+  by: string;
+  outcome: 'AS_DECIDED' | 'VENDOR_REFUSED';
+  outcomeNote: string;
+  nextPeriod: boolean;
+}
+
 export interface DemoFixture {
   id: string;
   /** The prefix of every code and the tag written into free text, so a person can tell demo data from the rest. */
@@ -412,6 +420,7 @@ export interface DemoFixture {
   returns: DemoReturn[];
   keys: DemoKeys[];
   usageSources: DemoUsageSource[];
+  renewals: DemoRenewal[];
   ghostDecisions: DemoGhostDecision[];
   personnel: DemoPersonnelEvent[];
   departmentSoftware: DemoDepartmentSoftware[];
