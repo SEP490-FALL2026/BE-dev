@@ -15,8 +15,15 @@ export const MONITORING_NOTICE: DemoMonitoringNotice = {
 export const DEVICES: DemoDevice[] = [
   { assetCode: 'SV-LT-001', holder: 'NV-DEV5', signature: true, acknowledge: true, tools: ['CLAUDE_CODE', 'CODEX'] },
   { assetCode: 'SV-LT-002', holder: 'NV-ITO1', signature: true, acknowledge: true, tools: ['CLAUDE_CODE'] },
-  { assetCode: 'SV-LT-003', holder: 'NV-BOD1', signature: true, acknowledge: true, tools: ['CLAUDE_CODE', 'CODEX'] },
-  { assetCode: 'SV-LT-004', holder: 'NV-BOD4', signature: true, acknowledge: true },
+  {
+    assetCode: 'SV-LT-003',
+    holder: 'NV-BOD1',
+    signature: true,
+    acknowledge: true,
+    tools: ['CLAUDE_CODE', 'CODEX'],
+    stop: 'COMPLETED',
+  },
+  { assetCode: 'SV-LT-004', holder: 'NV-BOD4', signature: true, acknowledge: true, stop: 'OPEN' },
   { assetCode: 'SV-LT-005', holder: 'NV-FIN2', signature: true, acknowledge: false },
   { assetCode: 'SV-LT-006', holder: 'NV-ITO2', signature: false, acknowledge: false, changeTo: 'NV-ITOH' },
   { assetCode: 'SV-LT-007', holder: 'NV-DEV6', signature: false, acknowledge: false, retire: true },

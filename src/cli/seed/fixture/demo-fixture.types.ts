@@ -387,6 +387,7 @@ export interface DemoDevice {
   changeTo?: string;
   retire?: boolean;
   tools?: ('CLAUDE_CODE' | 'CODEX')[];
+  stop?: 'OPEN' | 'COMPLETED';
 }
 
 export interface DemoMonitoringNotice {
