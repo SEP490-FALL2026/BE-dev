@@ -352,6 +352,13 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       ).rows;
       expect(events).toHaveLength(1);
       expect(events[0].after.loginEmail).toBe('Finance.New+x@Acme.vn');
+      const mails = (
+        await h.ctx.sql.query<{ recipient: string }>(
+          `SELECT recipient FROM email_outbox WHERE template = 'LOGIN_EMAIL_CHANGED_NOTICE'`,
+        )
+      ).rows;
+      expect(mails).toHaveLength(2);
+      expect(mails.map((mail) => mail.recipient)).toContain('Finance.New+x@Acme.vn');
     });
 
     it('refuses the whole correction when another account already logs in with the new address, and changes nothing', async () => {

@@ -35,6 +35,8 @@ export function renderEmail(
       return renderPasswordReset(english, greeting, payload, appPublicUrl);
     case 'PASSWORD_CHANGED_NOTICE':
       return renderPasswordChangedNotice(english, greeting, payload);
+    case 'LOGIN_EMAIL_CHANGED_NOTICE':
+      return renderLoginEmailChangedNotice(english, greeting, payload);
     case 'ACCOUNT_INVITATION':
       return renderInvitation(english, greeting, payload, appPublicUrl);
     default:
@@ -127,5 +129,40 @@ function renderPasswordChangedNotice(
       `${greeting}Mật khẩu của bạn đã được ${wasReset ? 'đặt lại' : 'đổi'}${at ? ` lúc ${at}` : ''}.\n` +
       'Mọi phiên đăng nhập đã bị đăng xuất; hãy đăng nhập lại bằng mật khẩu mới.\n\n' +
       'Nếu đây không phải bạn, hãy liên hệ quản trị viên ngay.',
+  };
+}
+
+/**
+ * Says that the login email changed, from which address to which, and when; it carries no link, token or secret. The same notice goes to the
+ * previous address (`audience: 'PREVIOUS'`, which also says what to do if the change was not wanted) and to the new one.
+ */
+function renderLoginEmailChangedNotice(
+  english: boolean,
+  greeting: string,
+  payload: Record<string, unknown>,
+): RenderedEmail {
+  const at = typeof payload.at === 'string' ? payload.at : '';
+  const previous = typeof payload.previousEmail === 'string' ? payload.previousEmail : '';
+  const current = typeof payload.currentEmail === 'string' ? payload.currentEmail : '';
+  const toPrevious = payload.audience === 'PREVIOUS';
+
+  if (english) {
+    return {
+      subject: 'Your SaaS-Sentry login email was changed',
+      text:
+        `${greeting}Your SaaS-Sentry login email was changed from ${previous} to ${current}${at ? ` at ${at}` : ''}, ` +
+        'because an administrator updated your profile.\n' +
+        'Sign in with the new address from now on; your password and your open sessions are unchanged.' +
+        (toPrevious ? '\n\nIf you did not ask for this change, contact your administrator.' : ''),
+    };
+  }
+
+  return {
+    subject: 'Email đăng nhập SaaS-Sentry của bạn đã được thay đổi',
+    text:
+      `${greeting}Email đăng nhập SaaS-Sentry của bạn đã được đổi từ ${previous} sang ${current}${at ? ` lúc ${at}` : ''}, ` +
+      'do quản trị viên cập nhật hồ sơ của bạn.\n' +
+      'Từ nay hãy đăng nhập bằng địa chỉ mới; mật khẩu và các phiên đang mở của bạn không đổi.' +
+      (toPrevious ? '\n\nNếu bạn không yêu cầu thay đổi này, hãy liên hệ quản trị viên.' : ''),
   };
 }

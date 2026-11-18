@@ -2,7 +2,7 @@
 
 Mục đích: hai kênh báo tin — email qua outbox giao dịch (worker gửi sau commit) và hộp thư trong ứng dụng
 (`/notifications*`), kể cả thông báo giữ lại cho phòng ban chưa có trưởng. Story chính: US-05-15 (hộp thư, mục
-`g5-request-status-notifications` của roadmap), `FR-3.11`; mail mời và đặt lại mật khẩu của identity-access.
+`g5-request-status-notifications` của roadmap), `FR-3.11`; mail mời, đặt lại mật khẩu, báo đổi mật khẩu (`PASSWORD_CHANGED_NOTICE`) và báo đổi email đăng nhập (`LOGIN_EMAIL_CHANGED_NOTICE`, gửi cả địa chỉ cũ và mới) của identity-access.
 
 Tầng: T1 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: không module nghiệp vụ nào
 (`infrastructure/database`, `infrastructure/mail`). Được dùng bởi: budgets, data-import, identity-access, licensing,

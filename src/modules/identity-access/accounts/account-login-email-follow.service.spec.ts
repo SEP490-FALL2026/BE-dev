@@ -49,7 +49,7 @@ describe('AccountLoginEmailFollowService', () => {
   it('does nothing for a person with no account', async () => {
     const { service, accounts, audit } = setup({ account: null });
 
-    await expect(service.follow(tx, input)).resolves.toBe('NO_ACCOUNT');
+    await expect(service.follow(tx, input)).resolves.toEqual({ result: 'NO_ACCOUNT', moved: null });
 
     expect(accounts.lockAppUser).not.toHaveBeenCalled();
     expect(accounts.moveLoginEmail).not.toHaveBeenCalled();
@@ -59,7 +59,10 @@ describe('AccountLoginEmailFollowService', () => {
   it('refuses to follow a cleared work email for a person with an account, and writes nothing', async () => {
     const { service, accounts, audit } = setup();
 
-    await expect(service.follow(tx, { ...input, workEmail: null })).resolves.toBe('ACCOUNT_NEEDS_EMAIL');
+    await expect(service.follow(tx, { ...input, workEmail: null })).resolves.toEqual({
+      result: 'ACCOUNT_NEEDS_EMAIL',
+      moved: null,
+    });
 
     expect(accounts.lockAppUser).not.toHaveBeenCalled();
     expect(accounts.moveLoginEmail).not.toHaveBeenCalled();
@@ -69,13 +72,19 @@ describe('AccountLoginEmailFollowService', () => {
   it('answers a cleared work email of a person with no account as no account', async () => {
     const { service } = setup({ account: null });
 
-    await expect(service.follow(tx, { ...input, workEmail: null })).resolves.toBe('NO_ACCOUNT');
+    await expect(service.follow(tx, { ...input, workEmail: null })).resolves.toEqual({
+      result: 'NO_ACCOUNT',
+      moved: null,
+    });
   });
 
   it('locks the account, then moves the login email with its normalized form and audits it, touching no verification', async () => {
     const { service, accounts, audit, order } = setup();
 
-    await expect(service.follow(tx, input)).resolves.toBe('FOLLOWED');
+    await expect(service.follow(tx, input)).resolves.toEqual({
+      result: 'FOLLOWED',
+      moved: { previousEmail: 'old@corp.test', currentEmail: 'New.Name+tag@Corp.test' },
+    });
 
     expect(order).toEqual(['lock', 'read', 'move', 'audit']);
     expect(accounts.moveLoginEmail).toHaveBeenCalledWith(tx, 'acc', {
@@ -98,7 +107,7 @@ describe('AccountLoginEmailFollowService', () => {
   it('refuses, writing and auditing nothing, when another account already logs in with the address', async () => {
     const { service, accounts, audit } = setup({ holder: 'someone-else' });
 
-    await expect(service.follow(tx, input)).resolves.toBe('TAKEN');
+    await expect(service.follow(tx, input)).resolves.toEqual({ result: 'TAKEN', moved: null });
 
     expect(accounts.moveLoginEmail).not.toHaveBeenCalled();
     expect(audit.record).not.toHaveBeenCalled();
@@ -110,7 +119,7 @@ describe('AccountLoginEmailFollowService', () => {
       holder: 'acc',
     });
 
-    await expect(service.follow(tx, input)).resolves.toBe('FOLLOWED');
+    await expect(service.follow(tx, input)).resolves.toEqual({ result: 'FOLLOWED', moved: null });
 
     expect(accounts.moveLoginEmail).not.toHaveBeenCalled();
     expect(audit.record).not.toHaveBeenCalled();

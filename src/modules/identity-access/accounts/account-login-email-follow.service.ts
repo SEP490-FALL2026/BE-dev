@@ -14,6 +14,12 @@ import { AppUserRepo } from './app-user.repo';
  * Clearing the work email of someone who has an account is refused (`ACCOUNT_NEEDS_EMAIL`). A new address that another account already logs in with is refused with nothing written (`TAKEN`); the unique index backs the check.
  * The caller holds the employee `FOR UPDATE`, so this takes the account `FOR UPDATE` after it (lock order: the employee, then the account).
  */
+/** What `follow` did: its answer, and the two addresses when the login email really moved (the caller then tells both). */
+export interface LoginEmailFollowOutcome {
+  result: LoginEmailFollow;
+  moved: { previousEmail: string; currentEmail: string } | null;
+}
+
 @Injectable()
 export class AccountLoginEmailFollowService {
   constructor(
@@ -24,21 +30,21 @@ export class AccountLoginEmailFollowService {
   async follow(
     tx: DbTx,
     input: { actor: AuthenticatedPrincipal; organizationId: string; employeeId: string; workEmail: string | null },
-  ): Promise<LoginEmailFollow> {
+  ): Promise<LoginEmailFollowOutcome> {
     const accountId = await this.accounts.findAccountIdByEmployee(tx, input.employeeId);
-    if (accountId === null) return 'NO_ACCOUNT';
+    if (accountId === null) return { result: 'NO_ACCOUNT', moved: null };
     // The work email is being cleared: an account cannot have no login email, so nothing is written and the caller refuses.
-    if (input.workEmail === null) return 'ACCOUNT_NEEDS_EMAIL';
+    if (input.workEmail === null) return { result: 'ACCOUNT_NEEDS_EMAIL', moved: null };
     await this.accounts.lockAppUser(tx, accountId, 'UPDATE');
     // A statement of its own after the lock (lock protocol rule 2).
     const account = await this.accounts.findLoginEmailOfEmployee(tx, input.employeeId);
-    if (account === null) return 'NO_ACCOUNT';
+    if (account === null) return { result: 'NO_ACCOUNT', moved: null };
 
     const loginEmail = input.workEmail.trim();
     const normalized = normalizeEmail(loginEmail);
     const holder = await this.accounts.findAccountIdByNormalizedLoginEmail(tx, input.organizationId, normalized);
-    if (holder !== null && holder !== account.id) return 'TAKEN';
-    if (account.loginEmail === loginEmail) return 'FOLLOWED';
+    if (holder !== null && holder !== account.id) return { result: 'TAKEN', moved: null };
+    if (account.loginEmail === loginEmail) return { result: 'FOLLOWED', moved: null };
 
     await this.accounts.moveLoginEmail(tx, account.id, { loginEmail, normalizedLoginEmail: normalized });
     await this.audit.record(tx, {
@@ -54,6 +60,6 @@ export class AccountLoginEmailFollowService {
       correlationId: input.actor.sessionId,
     });
 
-    return 'FOLLOWED';
+    return { result: 'FOLLOWED', moved: { previousEmail: account.loginEmail, currentEmail: loginEmail } };
   }
 }

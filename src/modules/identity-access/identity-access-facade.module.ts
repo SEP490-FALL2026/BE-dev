@@ -12,7 +12,6 @@ import { AppUserRepo } from './accounts/app-user.repo';
 import { CredentialRepo } from './credentials/credential.repo';
 import { CredentialService } from './credentials/credential.service';
 import { ProfileRepo } from './profile/profile.repo';
-import { EmployeeAccountsListener } from './accounts/employee-accounts.listener';
 import { PasswordHasher } from './credentials/password-hasher.service';
 import { RoleGrantRepo } from './accounts/role-grant.repo';
 import { RoleGrantService } from './accounts/role-grant.service';
@@ -30,8 +29,8 @@ import {
  * IdentityAccessApi is the public facade installation and the worker use. The account persistence is declared
  * here once, because every graph needs it (API, worker, installation, recovery); the API and the recovery command reach
  * it only through the account contracts exported below. No repository, hasher or helper is exported. The change listeners of the
- * approval roles and the checks of the grant of SPENDING_APPROVER are held here once per graph, and `EmployeeAccountsListener` binds the organization's `EmployeeAccountsHook` to
- * the facade (D5) in every graph that loads it.
+ * approval roles and the checks of the grant of SPENDING_APPROVER are held here once per graph. `EmployeeAccountsListener` (which binds the organization's
+ * `EmployeeAccountsHook`, D5) is in `IdentityAccessModule`, not here: only the API loads the use cases that read the hook, and it queues mail, which the CLI graphs never load.
  */
 @Module({
   imports: [DatabaseModule, OrganizationModule, AuditModule],
@@ -56,12 +55,12 @@ import {
     IdentityAccessApi,
     RequestPartyEligibilityService,
     RequestPartyEligibilityApi,
-    EmployeeAccountsListener,
   ],
   exports: [
     IdentityAccessApi,
     RequestPartyEligibilityApi,
     AccountRecordService,
+    AccountLoginEmailFollowService,
     AccessBlockService,
     RoleGrantService,
     ActionLinkService,
