@@ -1052,3 +1052,27 @@ server, không lùi ngày nhận usage.
 | Q-C | **Đồng ý.** Ngân sách ENG/FIN/BOD/ITO tính theo ngày seed, rải ngày cấp ghế, thêm hóa đơn các tháng trước, để đủ 4 đèn và có xu hướng qua các tháng. Chỉ số "tỷ lệ chi phí seat Trống" (FR-5.10) chưa có route ⟹ ghi **nợ prompt 4b**, seed không làm. |
 | Q-D | **PDF tiếng Việt có dấu:** thêm `pdf-lib` (dependency thường, vì seed chạy cả trên VPS) và một font Unicode (Noto Sans, giấy phép OFL) vào repo. |
 | Q-E | **Cả hai tệp.** BM-10 của trưởng phòng ghi số tiền đề nghị, các dòng nhu cầu và số cơ sở + dự phòng *đề xuất*. Tệp XLSX giải thích của Finance ghi số cơ sở + dự phòng *đã chốt*, cùng chênh lệch so với đề xuất. Mọi số khớp với số đã nhập trong hệ thống. |
+
+## Audit điều phối và Owner chốt (18/11/2026)
+
+Audit sau "SEED XONG" (`0097724b`): ba reviewer độc lập + seed thật trên DB trống, chạy lại cùng ngày, và mô phỏng ngày 30/11→01/12,
+30/12→31/12. Owner chốt:
+
+| Mục            | Chốt                                                                                                                                                                                                                                                                  |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-16 (đèn)     | DES **YELLOW** (RED không thể có cùng R21 "dùng dự phòng": hai điều kiện loại trừ nhau); SAL **RED** nhờ chi ngoài quy trình NV-SAL1 = 400.000. Đủ bốn đèn: RED SAL · YELLOW FIN/DES/MKT · GREEN BOD · UNDER ENG/ITO                                                  |
+| D-9 (xu hướng) | Chấp nhận: hệ thống tính chi phí từ ngày đưa vào dùng (go-live), không có ghế-tháng của các tháng trước. **Việc sau:** thiết kế kỹ luồng nhập dữ liệu lịch sử của công ty trước khi có hệ thống (ví dụ `member_since` khi nhập nhân sự lần đầu) — cần QĐ mới, làm sau |
+| Ngân sách      | BM-10 hợp lý: ENG 170 tr, ITO 33 tr ≈ tổng dòng phần mềm thật của phòng (dòng cân ≤ 10 %); BOD/FIN do đèn quyết; MKT/DES/SAL giữ số nhỏ của kịch bản R10/R21/R11 (BM-10 năm nay chỉ có dòng cân, năm sau có dòng thật); giá dòng = giá danh mục                       |
+| D-15 (R58)     | Giữ R58; §6 sửa thành 19 Request mới (R40–R58), hàng duyệt chi NV-CEO ≥ 8                                                                                                                                                                                             |
+| D-14           | Báo lỗi SaaS: 6 dòng (5 báo lỗi + 1 bản trùng); "7" ở §6 là cộng trùng                                                                                                                                                                                                |
+| D-10           | 62 nhân viên (58 + NV-SA + 3 NV-IMP), 44 tài khoản (42 demo + NV-SA + 1 INVITED)                                                                                                                                                                                      |
+
+Sửa của điều phối: AI bật rồi đổi `MODEL` vẫn `present`; collector gửi ngày nghiệp vụ của máy (lượt qua nửa đêm); SBF-20 và chốt tháng
+cần mọi Request; NV-NEW2 đã xếp khi demo vẫn `present`; hóa đơn SV-INV-011/012 lấy tháng của `D0` (không cờ `OUTSIDE_TERM`); PDF bỏ
+`ccmp` để copy/tìm chữ có dấu đúng, ngày tạo = ngày chứng từ; R57 integration chấp nhận `PENDING|CANCELLED`; lấy tác vụ cấp đang chạy
+và mới nhất; gói gợi ý của R43 thiếu thì báo lỗi; `abruptDeparture` vào fixture.
+
+**Lịch dùng (giới hạn sản phẩm, không sửa bằng dữ liệu):** dữ liệu đúng từ ngày seed tới **hết tháng seed**. Sang tháng mới, job ghế-tháng
+tính chi phí tháng vừa hết cho phòng người giữ ghế; ngân sách nhỏ của DES làm R21 bị chặn khi trưởng phòng xác nhận dự phòng. Nhiều ca
+neo theo `D0` (điều chuyển DEV4 ngày mai, ITA4 nghỉ ngày làm việc thứ 3, R33 hết sau 7 ngày, cửa sổ SBF-20). Vì vậy **seed lại ngày
+trước buổi demo** (khoảng 3 phút), trong cùng tháng với buổi demo.

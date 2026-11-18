@@ -54,7 +54,7 @@ Super Admin thuộc phòng `ADMIN — Quản trị hệ thống`, **phòng khở
 | NV-DEV4  | Lương Hoàng Phi | phi.luong@saoviet.example   | EMPLOYEE          | ENG        | -     | Nhân viên: R22 chờ IT cấp từ kho GitHub; **điều chuyển sang ITO từ ngày mai** (giữ Jira, 1Password, Mailchimp trong ân hạn)        |
 | NV-DEV5  | Phạm Anh Tuấn   | tuan.pham@saoviet.example   | EMPLOYEE          | ENG        | -     | Nhân viên: Request mới, thiết bị                                                                                                   |
 | NV-DEV6  | Bùi Thị Diệp    | diep.bui@saoviet.example    | EMPLOYEE          | ENG        | -     | Nhân viên: Request mới, hoàn trả, thiết bị                                                                                         |
-| NV-DEV7  | Đặng Văn Hiếu   | hieu.dang@saoviet.example   | EMPLOYEE          | ENG        | -     | Nhân viên: nghỉ đột ngột (ngày cuối hôm nay), thiết bị                                                                             |
+| NV-DEV7  | Đặng Văn Hiếu   | hieu.dang@saoviet.example   | EMPLOYEE          | ENG        | -     | Nhân viên: nghỉ đột ngột (ngày cuối hôm nay)                                                                                       |
 | NV-OFF1  | Hà Văn Nam      | nam.ha@saoviet.example      | EMPLOYEE          | ENG        | -     | Nghỉ việc chặn ngay hôm nay; còn Figma, Jira, GitHub và Grammarly (K1): IT làm 1a, thu hồi, checklist K1, 1b (G2)                  |
 | NV-CTR1  | Vũ Quốc Phong   | phong.vu@saoviet.example    | EMPLOYEE          | ENG        | -     | Nhà thầu, hợp đồng hết sau 20 ngày: R16 xin 3 tháng, quyền Jira bị cắt đúng hôm đó, vào cửa sổ Request tiếp tục                    |
 | NV-INT1  | Đặng Quốc Huy   | no account                  | -                 | ENG        | -     | Thực tập sinh: ứng viên tạo tài khoản                                                                                              |
@@ -127,17 +127,17 @@ ngày seed và **khóa từ D0+1** (ngày demo), nên điều chỉnh ngân sác
 **và trưởng phòng** có phiên bản **đã duyệt**: trưởng phòng tải tệp và gửi `BM-10` (một số tiền + tệp) → Finance lập phiên bản (dự phòng
 mặc định 10 % do server tính), đính tệp của phiên bản, gửi → Người duyệt chi duyệt (checklist bước `4.7`, mọi câu _Có_).
 
-| Phòng | Cơ sở                            | Dự phòng 10 %  | Dùng để minh họa                                                                       |
-| ----- | -------------------------------- | -------------- | -------------------------------------------------------------------------------------- |
-| ENG   | 600.000.000                      | 60.000.000     | Rộng: mọi Request ENG ra "trong số cơ sở"                                              |
-| MKT   | 240.000                          | 24.000         | R10 (Canva 250.000 trong tháng) vượt cơ sở, nằm trong dự phòng → **dùng dự phòng**     |
-| DES   | 280.000                          | 28.000         | R21 (Postman 300.000) → **dùng dự phòng, chưa xác nhận**                               |
-| SAL   | 290.000                          | 29.000         | R11 (Mailchimp 400.000) vượt cả dự phòng → **bị chặn** `OVER_RESERVE`                  |
-| BOD   | `baseFor` theo cam kết/chờ duyệt | mặc định       | GREEN; CP6 18/11: cơ sở 5.000.000, dự phòng 500.000                                    |
-| FIN   | `baseFor` theo dự kiến / 1,25    | 60 %, có lý do | YELLOW; CP6 18/11: cơ sở 600.000, dự phòng 360.000                                     |
-| ITO   | `baseFor` theo dự kiến / 0,5     | mặc định       | UNDER; tính lại theo ngày lúc tạo, continue không so lại số                            |
-| LGL   | -                                | -              | Không trưởng phòng, không `BM-10`: phiên bản số liệu nền chỉ lập được sau hạn (D-Z2-2) |
-| OPS   | -                                | -              | Không Cost Center: không có ngân sách                                                  |
+| Phòng | Cơ sở                            | Dự phòng 10 %  | Dùng để minh họa                                                                              |
+| ----- | -------------------------------- | -------------- | --------------------------------------------------------------------------------------------- |
+| ENG   | 170.000.000 (≈ các dòng BM-10)   | 17.000.000     | UNDER; rộng: mọi Request ENG ra "trong số cơ sở"                                              |
+| MKT   | 240.000                          | 24.000         | R10 (Canva 250.000 trong tháng) vượt cơ sở, nằm trong dự phòng → **dùng dự phòng**            |
+| DES   | 280.000                          | 28.000         | R21 (Postman 300.000) → **dùng dự phòng, chưa xác nhận**                                      |
+| SAL   | 290.000                          | 29.000         | R11 (Mailchimp 400.000) vượt cả dự phòng → **bị chặn**; đèn RED (chi ngoài quy trình 400.000) |
+| BOD   | `baseFor` theo cam kết/chờ duyệt | mặc định       | GREEN; CP6 18/11: cơ sở 5.000.000, dự phòng 500.000                                           |
+| FIN   | `baseFor` theo dự kiến / 1,25    | 60 %, có lý do | YELLOW; CP6 18/11: cơ sở 600.000, dự phòng 360.000                                            |
+| ITO   | 33.000.000 (≈ các dòng BM-10)    | mặc định       | UNDER; không thấp hơn dự kiến / 0,5                                                           |
+| LGL   | -                                | -              | Không trưởng phòng, không `BM-10`: phiên bản số liệu nền chỉ lập được sau hạn (D-Z2-2)        |
+| OPS   | -                                | -              | Không Cost Center: không có ngân sách                                                         |
 
 Các Request R10, R21, R11 xin đúng **một tháng** (`termMonths: 1`) nên giá trị luôn là một tháng giá, không phụ thuộc ngày chạy seed; các
 phòng MKT, DES, SAL không có Request nào khác giữ hoặc chờ ngân sách.
@@ -389,11 +389,12 @@ Allowlist chỉ CLAUDE_CODE → Claude và CODEX → ChatGPT. Usage có coverage
 - **Request case B đánh giá `adminConsole: true` nối gói K4 (Z9) chưa có**: chờ Owner quyết điểm C-3 của AUDIT-C.
 - Nghỉ dài (NV-DES7), nghỉ việc (NV-OFF1, NV-ITA4) và điều chuyển (NV-DEV4) do Super Admin ghi kèm căn cứ hợp lệ; không ai trong số đó là trưởng phòng nên không cần kế nhiệm.
 - Dữ liệu usage là **dữ liệu mô phỏng theo cấu trúc export thật**; thông báo theo dõi của lần nhập đầu ghi nhận do IT xác nhận đã gửi.
-- Không tạo được placement quá khứ cho người mới, nên các ngày cấp ghế lùi ngày không tạo thực chi ghế-tháng quá khứ (D-9). Không hứa xu hướng tháng từ ghế. Hai hóa đơn R18/R56 cho ENG có kỳ tháng M−1 và M; không gia hạn hoặc đổi ghế.
-- CP6 ngày 18/11/2026: ENG/ITO UNDER, BOD GREEN, FIN YELLOW; DES YELLOW và SAL UNDER, chưa đạt hai RED của SPEC. Owner chọn giữ dữ liệu và ghi CP6 chưa đạt. Các đẳng thức tài chính và tệp XLSX đạt; không chỉnh tay đèn/base để che giới hạn.
-- Bốn đèn chỉ có thể bảo đảm trong khoảng ngày seed 01/10–31/12 nếu dữ liệu chi phí đạt giả định. Ngoài khoảng này xem detail của ngân sách, không ép trạng thái. Không có tỷ lệ ghế Trống FR-5.10; đó là nợ sản phẩm, seed chỉ in số mua/giữ/trống.
+- **Chi phí tính từ ngày đưa vào dùng (D-9, Owner chốt 18/11):** nhân viên seed tạo thuộc phòng từ ngày seed (sản phẩm không cho xếp phòng lùi ngày), nên các tháng trước không có ghế-tháng; ghế cấp lùi ngày tính vào _Chưa phân bổ — kho dùng chung_ cho tới ngày seed. Báo cáo không có xu hướng qua các tháng. Nhập dữ liệu lịch sử của công ty trước khi có hệ thống là việc sau (cần QĐ). Mọi hóa đơn ghi kỳ của tháng `D0`: hóa đơn của Request cho tháng trước ngày cấp mang cờ `OUTSIDE_TERM`.
+- **Đèn ở kỳ chốt mới nhất (Owner chốt 18/11):** SAL **RED** (chi ngoài quy trình 400.000 > 319.000), FIN, DES, MKT **YELLOW**, BOD **GREEN**, ENG, ITO **UNDER**. DES không thể RED cùng R21 "dùng dự phòng" (hai điều kiện loại trừ nhau). Đủ đèn khi seed từ 01/10 tới 30/12 (kỳ chốt mới nhất luôn là tháng 10). Không có tỷ lệ ghế Trống FR-5.10; đó là nợ sản phẩm.
+- **Dùng tới hết tháng seed:** sang tháng mới, job ghế-tháng tính chi phí tháng vừa hết cho phòng người giữ ghế; ngân sách nhỏ của DES (308.000) không đủ nên R21 bị chặn khi NV-DESH xác nhận dự phòng, và các con số Budget vs Actual đổi. Seed lại trong cùng tháng với buổi demo, tốt nhất **ngày trước buổi demo** (nhiều ca neo theo `D0`: DEV4 điều chuyển ngày mai, ITA4 nghỉ ngày làm việc thứ 3, R33 hết sau 7 ngày, cửa sổ SBF-20).
 - Lời mời chỉ được ghi vào outbox, không gửi SMTP thật trong môi trường seed local. Trạng thái quá hạn dừng cần hai ngày làm việc; các cảnh báo gia hạn/giải trình phụ thuộc lịch job.
-- Continue D0+1 ghi điều chỉnh ngân sách DEMO-14 và usage ngày mới; khi sang tháng có thể chốt thêm tháng tới M=10. Seed 31/12 rồi continue 01/01 bị từ chối lịch, exit 3; cần seed lại cho năm mới.
+- Continue D0+1 ghi điều chỉnh ngân sách DEMO-14 và usage AI ngày mới (kỳ chốt mới nhất vẫn là tháng 10 trong cả khoảng 01/11–31/12). Seed 31/12 rồi continue 01/01 bị từ chối lịch, exit 3; cần seed lại cho năm mới.
+- Sau khi Owner đổi AI sang `MODEL`, hoặc demo xếp phòng cho NV-NEW2, `--continue` vẫn chạy (các bước đó ra "đã có").
 - **Thông báo tăng seat (`SUBSCRIPTION_SEATS_INCREASED`, S-4):** cấp R15 (1Password hết ghế, IT mua thêm) do NV-ITA1 làm, cũng là IT phụ trách thuê bao, nên không sinh thông báo; tăng seat K1 (R18) không bao giờ báo.
 - Quá trình nạp gồm tổ chức, Request và PDF/XLSX thật; bước ghost.decisions có thể chờ tới 9 phút. Thời gian tùy máy, không cam kết một phút.
 
