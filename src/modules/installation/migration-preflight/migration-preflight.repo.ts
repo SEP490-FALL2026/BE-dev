@@ -378,7 +378,10 @@ export class MigrationPreflightRepo {
    * The owner department of a subscription (F02, spec L.3). Before the expansion migration every subscription is listed (the
    * database skipped the expansion). Valid assignment: exactly one row for the subscription, of the same organization, to a
    * department of that organization. Open: no owner department and no valid assignment, or an owner department the assignment
-   * contradicts — none once the final migration made the column required. The ids come out sorted and nothing else is read.
+   * contradicts. Once `shared_pool_grant` (QĐ-103d) is applied **and** the column is nullable, a subscription with no owner
+   * department is a shared pool nobody owns and is not listed; only an owner department the assignment contradicts (another
+   * department or another organization) still is. Before that migration the old rule stands. The ids come out sorted and
+   * nothing else is read.
    */
   private async subscriptionOwnerFacts(tx: DbTx): Promise<ContractGateFacts['subscriptionOwner']> {
     const [probe] = await tx.$queryRaw<{ hasSubscriptions: boolean; hasColumn: boolean; hasTable: boolean }[]>`
@@ -398,12 +401,22 @@ export class MigrationPreflightRepo {
       return { schema, subscriptionIds: rows.map((row) => row.id) };
     }
 
+    const [pool] = await tx.$queryRaw<{ allowed: boolean }[]>`
+      SELECT (EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_schema = 'public' AND table_name = 'subscriptions'
+                         AND column_name = 'owner_department_id' AND is_nullable = 'YES')
+              AND to_regclass('public._prisma_migrations') IS NOT NULL
+              AND EXISTS (SELECT 1 FROM public._prisma_migrations
+                           WHERE migration_name ~ '_shared_pool_grant$'
+                             AND finished_at IS NOT NULL AND rolled_back_at IS NULL)) AS "allowed"`;
+    const poolAllowed = pool.allowed;
+
     const rows = await tx.$queryRaw<{ id: string }[]>`
       SELECT s."id"::text AS "id"
         FROM "subscriptions" s
         LEFT JOIN "subscription_owner_assignments" a ON a."subscription_id" = s."id"
         LEFT JOIN "departments" d ON d."id" = a."department_id"
-       WHERE (s."owner_department_id" IS NULL
+       WHERE (s."owner_department_id" IS NULL AND NOT ${poolAllowed}
               AND (a."id" IS NULL OR d."id" IS NULL
                    OR a."organization_id" <> s."organization_id" OR d."organization_id" <> s."organization_id"))
           OR (s."owner_department_id" IS NOT NULL AND a."id" IS NOT NULL

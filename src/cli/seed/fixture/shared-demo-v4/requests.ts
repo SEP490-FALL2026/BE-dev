@@ -10,7 +10,7 @@ const r = (scenario: DemoRequestScenario): DemoRequestScenario => scenario;
  * software (K2, K5) takes 1 to 12 or none (a right with no end, never for a person with a term), a plan bought once (K4) takes none. The dates
  * of the budget scenarios do not depend on the day the seed runs: R10, R21 and R11 ask for one month, which costs one month of the price.
  */
-export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIssue' | 'notice'> = {
+export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIssues' | 'notices'> = {
   requests: [
     r({
       key: 'R01',
@@ -284,17 +284,94 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       summary: 'K1 9 tháng qua năm: năm nay giữ phần còn lại của năm, số năm sau đã lưu khi duyệt chi (DEMO-4).',
     }),
   ],
-  keys: [{ subscription: 'jetbrains', count: 3 }],
+  keys: [
+    { subscription: 'jetbrains', count: 3 },
+    { subscription: 'visio-pro', count: 3 },
+    { subscription: 'sublime-license', count: 2 },
+  ],
   draft: { requester: 'NV-OPS1', plan: 'jira-standard', termMonths: null },
-  saasIssue: {
-    request: 'R01',
-    description: '[SV-ISSUE] Không mở được bộ sưu tập sau khi được thêm vào workspace.',
-  },
-  notice: {
-    sender: 'NV-ENGH',
-    employee: 'NV-DEV3',
-    kind: 'LONG_LEAVE',
-    proposedInDays: 14,
-    note: '[SV-NOTICE] Dự kiến nghỉ dài hạn, chờ căn cứ của phòng Nhân sự.',
-  },
+  saasIssues: [
+    {
+      key: 'ISSUE',
+      reporter: 'NV-DEV1',
+      plan: 'postman-professional',
+      end: 'NEW',
+      description: 'Không mở được bộ sưu tập sau khi được thêm vào workspace.',
+    },
+    {
+      key: 'ISSUE2',
+      reporter: 'NV-DEV5',
+      plan: 'confluence-standard',
+      end: 'IN_PROGRESS',
+      description: 'Không vào được trang tài liệu của nhóm.',
+      reporterReply: 'Đã thử lại bằng tài khoản công ty nhưng vẫn gặp lỗi.',
+    },
+    {
+      key: 'ISSUE3',
+      reporter: 'NV-ITO1',
+      plan: 'm365-basic',
+      end: 'RESOLVED',
+      description: 'Không kích hoạt được tài khoản Microsoft 365.',
+    },
+    {
+      key: 'ISSUE4',
+      reporter: 'NV-BOD1',
+      plan: 'zoom-pro',
+      end: 'REOPENED',
+      description: 'Không mở được cuộc họp bằng tài khoản công ty.',
+    },
+    {
+      key: 'ISSUE5',
+      reporter: 'NV-BOD4',
+      plan: 'adobe-cc-teams',
+      end: 'WAITING_PROVIDER',
+      description: 'Ứng dụng không nhận giấy phép của nhóm.',
+    },
+    {
+      key: 'ISSUE5B',
+      reporter: 'NV-BOD4',
+      plan: 'adobe-cc-teams',
+      end: 'DUPLICATE',
+      duplicateOf: 'ISSUE5',
+      description: 'Gửi lại lỗi giấy phép Adobe của cùng tài khoản.',
+    },
+  ],
+  notices: [
+    {
+      key: 'NOTICE',
+      sender: 'NV-ENGH',
+      employee: 'NV-DEV3',
+      kind: 'LONG_LEAVE',
+      proposedInDays: 14,
+      note: 'Dự kiến nghỉ dài hạn, chờ căn cứ của phòng Nhân sự.',
+    },
+    {
+      key: 'NOTICE2',
+      sender: 'NV-DESH',
+      employee: 'NV-DES7',
+      kind: 'LONG_LEAVE',
+      proposedInDays: 0,
+      handling: 'LINK',
+      note: 'Nghỉ dài hạn đã được phòng Nhân sự ghi nhận.',
+    },
+    {
+      key: 'NOTICE3',
+      sender: 'NV-DEP',
+      employee: 'NV-BOD5',
+      kind: 'DEPARTURE',
+      proposedInDays: 30,
+      handling: 'REJECT',
+      note: 'Dự kiến nghỉ việc, chưa có căn cứ xác nhận.',
+    },
+    {
+      key: 'NOTICE4',
+      sender: 'NV-ITOH',
+      employee: 'NV-ITO2',
+      kind: 'LONG_LEAVE',
+      proposedInDays: 0,
+      handling: 'RECORD',
+      returnInDays: 5,
+      note: 'Nghỉ dài hạn có quyết định và ngày trở lại sau năm ngày.',
+    },
+  ],
 };

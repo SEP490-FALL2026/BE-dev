@@ -1,4 +1,4 @@
-import { nextScenarioAction, reachedTarget } from './scenario-path';
+import { nextScenarioAction, reachedTarget, type ScenarioGoal } from './scenario-path';
 
 const at = (state: string, stage: string | null = null) => ({ state, stage });
 
@@ -48,5 +48,64 @@ describe('the next action of a demo request scenario', () => {
     [at('WAITING_CONTROLLED'), 'COMPLETED'],
   ] as const)('from %j towards %s is none', (position, target) => {
     expect(nextScenarioAction(position, { target })).toBeNull();
+  });
+});
+
+describe('the paths to the remaining states of a request (T10, S10a)', () => {
+  const goal = (target: string, extra: Record<string, unknown> = {}) => ({ target, ...extra }) as ScenarioGoal;
+
+  it.each([
+    ['AWAITING_SPEND_DECISION', null, goal('REJECTED', { rejectAt: 'SPEND' }), 'REJECT_SPEND'],
+    ['PENDING', null, goal('REJECTED', { rejectAt: 'SPEND' }), 'NEED_APPROVE'],
+    ['PENDING', null, goal('REJECTED'), 'NEED_REJECT'],
+    ['PENDING', null, goal('AWAITING_REQUESTER_REVISION', { returnAt: 'NEED' }), 'NEED_RETURN'],
+    ['PENDING', null, goal('AWAITING_REQUESTER_REVISION', { returnAt: 'ASSESSMENT' }), 'NEED_APPROVE'],
+    [
+      'AWAITING_IT_ASSESSMENT',
+      null,
+      goal('AWAITING_REQUESTER_REVISION', { returnAt: 'ASSESSMENT' }),
+      'ASSESSMENT_RETURN',
+    ],
+    ['AWAITING_SPEND_DECISION', null, goal('AWAITING_REQUESTER_REVISION', { returnAt: 'SPEND' }), 'RETURN_SPEND'],
+    ['AWAITING_SPEND_SUBMISSION', null, goal('AWAITING_REQUESTER_REVISION', { returnAt: 'SPEND' }), 'SUBMIT_BATCH'],
+    ['PENDING', null, goal('IT_REJECTED'), 'NEED_APPROVE'],
+    ['AWAITING_IT_ASSESSMENT', null, goal('IT_REJECTED'), 'ASSESSMENT_REJECT'],
+    ['AWAITING_EXECUTION', null, goal('EXECUTING'), 'GRANT'],
+    ['AWAITING_EXECUTION', null, goal('FAILED'), 'GRANT'],
+    ['AWAITING_EXECUTION', null, goal('AWAITING_IT_CLOSE'), 'GRANT'],
+    // Review 1 (C-3): the state of the task of the grant goes beside the state of the request.
+    ['EXECUTING', 'QUEUED', goal('FAILED'), 'FAIL_TASK_OPEN'],
+    ['EXECUTING', 'FAILED', goal('FAILED'), 'FAIL_TASK_CLOSE'],
+    ['EXECUTING', 'QUEUED', goal('AWAITING_IT_CLOSE'), 'FAIL_TASK_OPEN'],
+    ['EXECUTING', 'FAILED', goal('AWAITING_IT_CLOSE'), 'WITHDRAW'],
+    ['EXECUTING', null, goal('EXECUTING'), null],
+    ['EXECUTING', 'QUEUED', goal('COMPLETED'), 'COMPLETE_TASK'],
+    ['PENDING', null, goal('PENDING_OR_CANCELLED'), null],
+    ['CANCELLED', null, goal('PENDING_OR_CANCELLED'), null],
+  ] as const)('from %s (%s) towards %j is %s', (state, stage, aim, action) => {
+    expect(nextScenarioAction(at(state, stage), aim)).toBe(action);
+  });
+
+  it('reads a refusal of the spending approver from the spend step, and a refusal of the need as no such refusal', () => {
+    const refusedAtSpend = goal('REJECTED', { rejectAt: 'SPEND' });
+
+    expect(reachedTarget(at('REJECTED', 'REFUSED'), refusedAtSpend)).toBe(true);
+    expect(reachedTarget(at('REJECTED', null), refusedAtSpend)).toBe(false);
+    expect(reachedTarget(at('REJECTED', null), goal('REJECTED'))).toBe(true);
+    expect(reachedTarget(at('REJECTED', 'REFUSED'), goal('REJECTED'))).toBe(false);
+  });
+
+  it.each(['PENDING', 'CANCELLED'])(
+    'counts %s as where a request that may be cancelled by a job has arrived',
+    (state) => {
+      expect(reachedTarget(at(state), goal('PENDING_OR_CANCELLED'))).toBe(true);
+      expect(reachedTarget(at('AWAITING_EXECUTION'), goal('PENDING_OR_CANCELLED'))).toBe(false);
+    },
+  );
+
+  it('counts a request sent back to its requester as arrived whichever step sent it back', () => {
+    expect(
+      reachedTarget(at('AWAITING_REQUESTER_REVISION', 'RETURNED_TO_REQUESTER'), goal('AWAITING_REQUESTER_REVISION')),
+    ).toBe(true);
   });
 });

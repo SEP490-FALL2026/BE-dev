@@ -2,15 +2,15 @@
 
 Bộ dữ liệu demo duy nhất của `seed`, viết lại theo luật của **MF-1** (xin và cấp quyền), **MF-2** (nghỉ việc), **MF-3** (điều chuyển), **MF-4** (chốt ngân sách năm) và **MF-5** (rà soát usage, thu hồi) trên **kho dùng chung** (`QĐ-103` → `QĐ-111`). Seed lại ≤ 1 ngày trước buổi demo: mọi trạng thái tính theo ngày chạy. Mọi danh tính đều hư cấu. Mật khẩu chỉ đến từ stdin của người vận hành; tệp này không chứa mật khẩu.
 
-Mọi bản ghi được ghi qua HTTP API đúng vai (Super Admin, Finance, IT Admin, trưởng phòng, Người duyệt chi, nhân viên), nên dữ liệu có đúng luật của code. Mọi ngày tính **tương đối theo ngày chạy seed** (`D0` = ngày nghiệp vụ của tổ chức, `Y` = năm của `D0`), không có ngày tuyệt đối: chạy hôm nào cũng ra đúng các trạng thái dưới đây. Chạy lại cùng ngày hoặc ngày khác cùng năm không ghi thêm gì (mã thoát 2); muốn dựng lại từ đầu thì reset bằng wrapper ([seed.md](../../../../../docs/guides/seed.md)).
+Mọi bản ghi được ghi qua HTTP API đúng vai (Super Admin, Finance, IT Admin, trưởng phòng, Người duyệt chi, nhân viên). Ngày fixture tính **tương đối theo ngày chạy seed** (`D0` = ngày nghiệp vụ của tổ chức, `Y` = năm của `D0`); trạng thái phụ thuộc job và giới hạn lịch được ghi phía dưới. Chạy lại cùng ngày không ghi thêm gì (mã thoát 2); ngày sau có thể thêm điều chỉnh ngân sách, usage AI và kỳ chốt tháng (mã thoát 0). Muốn dựng lại từ đầu xem quy trình local trong [seed.md](../../../../../docs/guides/seed.md).
 
 **Vì sao thay hẳn v3 bằng v4:** v3 viết cho mô hình cũ (thuê bao theo phòng sở hữu, Finance ghi hóa đơn lên cam kết, `termMonths`). Code hiện hành đã bỏ các luật đó nên v3 không dựng được trên code mới; giữ song song chỉ để lại một dataset chạy sai. Các tệp kiểm thử vẫn trỏ tới id cũ đã được đổi sang `shared-demo-v4`; các assertion phụ thuộc dữ liệu cũ do chat review sửa khi gộp.
 
 ## Cài đặt
 
-| Organization                       | Root department | Super Admin | Login                        | Purpose                                                                  |
-| ---------------------------------- | --------------- | ----------- | ---------------------------- | ------------------------------------------------------------------------ |
-| Công ty Cổ phần Công nghệ Sao Việt | ADMIN           | NV-SA       | system.admin@saoviet.example | Bootstrap và quản trị tài khoản; phòng gốc không dùng cho nghiệp vụ khác |
+| Organization                       | Start department | Super Admin | Login                        | Purpose                                                             |
+| ---------------------------------- | ---------------- | ----------- | ---------------------------- | ------------------------------------------------------------------- |
+| Công ty Cổ phần Công nghệ Sao Việt | ADMIN            | NV-SA       | system.admin@saoviet.example | Bootstrap và quản trị tài khoản; phòng khởi đầu do lệnh cài đặt tạo |
 
 Super Admin đăng nhập bằng `--super-admin-email` (mặc định `system.admin@saoviet.example`) và `SEED_SUPER_ADMIN_PASSWORD`; mọi tài khoản demo khác dùng `SEED_DEMO_ACCOUNT_PASSWORD`.
 
@@ -32,17 +32,29 @@ Super Admin đăng nhập bằng `--super-admin-email` (mặc định `system.ad
 
 ## People and accounts
 
-41 người, 30 tài khoản đăng nhập; cài đặt thêm một Super Admin riêng và phòng gốc `ADMIN`. Mỗi tài khoản đúng một vai. Mỗi IT Admin phụ trách tối đa 4 phòng (`QĐ-110l`): NV-ITA1 và NV-ITA2 mỗi người 4, NV-ITA3 một, NV-ITA4 không phòng nào. NV-CEO tạo ra là EMPLOYEE rồi bước vai đổi thành SPENDING_APPROVER (đúng một Người duyệt chi, đúng một Finance). Tất cả vào làm cách đây 400 ngày. Cột cuối là vai trong demo.
+58 người trong fixture và 42 tài khoản demo; thêm NV-SA và 3 NV-IMP từ nhập nhân sự thành 62 nhân viên. Tổng tài khoản là 44 gồm Super Admin và lời mời NV-NEW3 chưa kích hoạt; NV-BOD3 bị khóa. Mỗi tài khoản đúng một vai. Mỗi IT Admin phụ trách tối đa 4 phòng (`QĐ-110l`): NV-ITA1 và NV-ITA2 mỗi người 4, NV-ITA3 một, NV-ITA4 không phòng nào. NV-CEO tạo ra là EMPLOYEE rồi bước vai đổi thành SPENDING_APPROVER (đúng một Người duyệt chi, đúng một Finance). Ngày vào làm của người trong fixture là 400 ngày trước seed; placement bắt đầu ngày seed. Cột cuối là vai trong demo.
+
+Super Admin thuộc phòng `ADMIN — Quản trị hệ thống`, **phòng khởi đầu do lệnh cài đặt tạo** (`QĐ-87f(1)`, `QĐ-67a`), không phải phòng cha (mô hình phòng phẳng, `QĐ-52`). Theo `FR-8.7`, Super Admin vẫn thuộc một phòng nhưng không gửi Request (`SoD-1`). Phòng này cố ý không có trưởng phòng, IT Admin phụ trách hay Cost Center: đó là trạng thái đúng. `ADMIN` xuất hiện trong `departmentWarningList` và cảnh báo thiếu Cost Center; FE hiển thị cảnh báo, không ẩn phòng hoặc coi Super Admin là chưa xếp phòng.
 
 | Employee | Name            | Login email (or no account) | Final role        | Department | Heads | Vai trong demo                                                                                                                     |
 | -------- | --------------- | --------------------------- | ----------------- | ---------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | NV-CEO   | Nguyễn Văn An   | an.nguyen@saoviet.example   | SPENDING_APPROVER | BOD        | -     | Người duyệt chi: duyệt chi Request, quyết phiên bản ngân sách; không là bên của Request nào                                        |
 | NV-DEP   | Trần Thị Bích   | bich.tran@saoviet.example   | MANAGER           | BOD        | BOD   | Trưởng phòng Ban Giám đốc                                                                                                          |
+| NV-BOD1  | Trần Quốc Khải  | khai.tran@saoviet.example   | EMPLOYEE          | BOD        | -     | Nhân viên: Request, Request nhóm, thiết bị, báo lỗi SaaS                                                                           |
+| NV-BOD2  | Nguyễn Thị Lụa  | lua.nguyen@saoviet.example  | EMPLOYEE          | BOD        | -     | Nhân viên: Request, Request nhóm, thiết bị, báo lỗi SaaS                                                                           |
+| NV-BOD3  | Hoàng Văn Minh  | minh.hoang@saoviet.example  | EMPLOYEE          | BOD        | -     | **Tài khoản bị khóa** (S03); ghế Notion không dùng 95 ngày (G4); không gửi Request nào                                             |
+| NV-BOD4  | Phùng Thị Nga   | nga.phung@saoviet.example   | EMPLOYEE          | BOD        | -     | Ghế Adobe, Zoom; báo lỗi SaaS; máy SV-LT-004 có yêu cầu dừng chờ                                                                   |
+| NV-BOD5  | Lương Văn Ơn    | no account                  | -                 | BOD        | -     | Ghế Adobe (G4); BM-09 bị từ chối                                                                                                   |
+| NV-BOD6  | Tống Thị Quyên  | no account                  | -                 | BOD        | -     | Ghế Adobe (G3)                                                                                                                     |
+| NV-NEW3  | Thái Bảo Châu   | no account                  | -                 | BOD        | -     | Chưa có tài khoản: seed tạo lời mời chưa kích hoạt (S03)                                                                           |
 | NV-ENGH  | Lê Minh Cường   | cuong.le@saoviet.example    | MANAGER           | ENG        | ENG   | Trưởng phòng Kỹ thuật: duyệt nhu cầu, trình lô, Request nhóm R14, tự gửi R12 (một bước); đề xuất Mailchimp bị từ chối (P2)         |
 | NV-DEV1  | Phạm Thu Dung   | dung.pham@saoviet.example   | EMPLOYEE          | ENG        | -     | Nhân viên: R01, R18 đã cấp; R05 rút; R08 đề xuất Miro chờ IT                                                                       |
 | NV-DEV2  | Hoàng Văn Em    | em.hoang@saoviet.example    | EMPLOYEE          | ENG        | -     | Nhân viên: R19 đã cấp; R07 chờ trình lô, R02 chờ duyệt chi, R15 chờ IT mua thêm                                                    |
 | NV-DEV3  | Vũ Thị Giang    | giang.vu@saoviet.example    | EMPLOYEE          | ENG        | -     | Nhân viên: R17 đã cấp; R03 chờ nhu cầu; R20 chờ IT mua khóa DataGrip                                                               |
 | NV-DEV4  | Lương Hoàng Phi | phi.luong@saoviet.example   | EMPLOYEE          | ENG        | -     | Nhân viên: R22 chờ IT cấp từ kho GitHub; **điều chuyển sang ITO từ ngày mai** (giữ Jira, 1Password, Mailchimp trong ân hạn)        |
+| NV-DEV5  | Phạm Anh Tuấn   | tuan.pham@saoviet.example   | EMPLOYEE          | ENG        | -     | Nhân viên: Request mới, thiết bị                                                                                                   |
+| NV-DEV6  | Bùi Thị Diệp    | diep.bui@saoviet.example    | EMPLOYEE          | ENG        | -     | Nhân viên: Request mới, hoàn trả, thiết bị                                                                                         |
+| NV-DEV7  | Đặng Văn Hiếu   | hieu.dang@saoviet.example   | EMPLOYEE          | ENG        | -     | Nhân viên: nghỉ đột ngột (ngày cuối hôm nay)                                                                                       |
 | NV-OFF1  | Hà Văn Nam      | nam.ha@saoviet.example      | EMPLOYEE          | ENG        | -     | Nghỉ việc chặn ngay hôm nay; còn Figma, Jira, GitHub và Grammarly (K1): IT làm 1a, thu hồi, checklist K1, 1b (G2)                  |
 | NV-CTR1  | Vũ Quốc Phong   | phong.vu@saoviet.example    | EMPLOYEE          | ENG        | -     | Nhà thầu, hợp đồng hết sau 20 ngày: R16 xin 3 tháng, quyền Jira bị cắt đúng hôm đó, vào cửa sổ Request tiếp tục                    |
 | NV-INT1  | Đặng Quốc Huy   | no account                  | -                 | ENG        | -     | Thực tập sinh: ứng viên tạo tài khoản                                                                                              |
@@ -62,25 +74,32 @@ Super Admin đăng nhập bằng `--super-admin-email` (mặc định `system.ad
 | NV-DES12 | Cao Thị Sương   | no account                  | -                 | DES        | -     | Figma không hoạt động 65 ngày, quyền còn hơn 1 tháng; seed cho Miễn trừ 90 ngày                                                    |
 | NV-FINH  | Phan Thị Ngọc   | ngoc.phan@saoviet.example   | MANAGER           | FIN        | FIN   | Trưởng phòng Tài chính                                                                                                             |
 | NV-FIN1  | Trịnh Văn Phúc  | phuc.trinh@saoviet.example  | FINANCE           | FIN        | -     | Finance (đúng một người): kỳ ngân sách, Trần, phiên bản, Cost Center, thuế                                                         |
+| NV-FIN2  | Dương Thị Thảo  | thao.duong@saoviet.example  | EMPLOYEE          | FIN        | -     | Nhân viên: Request; máy chưa xác nhận                                                                                              |
 | NV-ITOH  | Trần Minh Thanh | thanh.tran@saoviet.example  | MANAGER           | ITO        | ITO   | Trưởng phòng CNTT: duyệt nhu cầu R24 của IT Admin; đề xuất ngân sách 2027 chờ Finance                                              |
 | NV-ITA1  | Lý Minh Quân    | quan.ly@saoviet.example     | IT_ADMIN          | ITO        | -     | IT Admin (ENG, ITO, SAL, LGL): Jira, GitHub, Slack, Postman, 1Password, JetBrains; hàng chờ cấp; chạy luật; danh sách phần mềm ENG |
 | NV-ITA2  | Mai Thị Rạng    | rang.mai@saoviet.example    | IT_ADMIN          | ITO        | -     | IT Admin (BOD, DES, FIN, MKT): Figma, Canva; thẩm định phần mềm mới; nguồn usage Figma/Canva; danh sách DES, MKT; xét đề xuất P1   |
 | NV-ITA3  | Đoàn Văn Sáng   | sang.doan@saoviet.example   | IT_ADMIN          | ITO        | -     | IT Admin (OPS); admin thứ hai ở nhà cung cấp của Mailchimp và JetBrains All; người nhận bàn giao của NV-ITA4                       |
 | NV-ITA4  | Kim Văn Tú      | tu.kim@saoviet.example      | IT_ADMIN          | ITO        | -     | IT Admin **nghỉ việc ngày làm việc thứ 3 từ hôm nay**: phụ trách thuê bao Mailchimp, chủ workspace Mailchimp; bàn giao IT (P5)     |
+| NV-ITO1  | Ngô Thanh Hải   | hai.ngo@saoviet.example     | EMPLOYEE          | ITO        | -     | Nhân viên CNTT: Request qua NV-ITOH, thiết bị                                                                                      |
+| NV-ITO2  | Vương Thị Yến   | yen.vuong@saoviet.example   | EMPLOYEE          | ITO        | -     | Nhân viên CNTT: Request qua NV-ITOH, BM-09 ghi nghỉ dài                                                                            |
 | NV-MKTH  | Đinh Thị Uyên   | uyen.dinh@saoviet.example   | MANAGER           | MKT        | MKT   | Trưởng phòng Marketing: xác nhận dùng dự phòng R10 (đã xác nhận); ngân sách sát mức                                                |
 | NV-MKT1  | Lâm Văn Vinh    | vinh.lam@saoviet.example    | EMPLOYEE          | MKT        | -     | Nhân viên: R10 Canva dùng dự phòng, đang chờ Người duyệt chi                                                                       |
 | NV-MKT2  | Châu Thị Xuân   | xuan.chau@saoviet.example   | EMPLOYEE          | MKT        | -     | Nhân viên Marketing                                                                                                                |
 | NV-SALH  | Trương Văn Yên  | yen.truong@saoviet.example  | MANAGER           | SAL        | SAL   | Trưởng phòng Kinh doanh: ngân sách hẹp; phiên bản 2027 bị yêu cầu sửa                                                              |
 | NV-SAL1  | Kiều Thị Ánh    | anh.kieu@saoviet.example    | EMPLOYEE          | SAL        | -     | Nhân viên: R11 Mailchimp bị chặn vì vượt dự phòng                                                                                  |
 | NV-SAL2  | Quách Văn Bảo   | bao.quach@saoviet.example   | EMPLOYEE          | SAL        | -     | Nhân viên Kinh doanh                                                                                                               |
+| NV-SAL3  | Mạc Văn Tài     | no account                  | -                 | SAL        | -     | Ghế HubSpot, Zoom                                                                                                                  |
+| NV-SAL4  | Lưu Thị Uyển    | no account                  | -                 | SAL        | -     | Ghế HubSpot, Zoom hết hạn (G3)                                                                                                     |
 | NV-LGL1  | Lý Thu Thủy     | thu.ly@saoviet.example      | EMPLOYEE          | LGL        | -     | Nhân viên Pháp chế (phòng không có trưởng phòng): R13 chờ trưởng phòng ở bước nhu cầu; R28 K5 IT cấp thẳng (cờ audit)              |
 | NV-OPSH  | Quan Thị Trang  | trang.quan@saoviet.example  | MANAGER           | OPS        | OPS   | Trưởng phòng Vận hành (phòng chưa có Cost Center)                                                                                  |
 | NV-OPS1  | Tạ Văn Sơn      | son.ta@saoviet.example      | EMPLOYEE          | OPS        | -     | Nhân viên Vận hành: Request trả phí chỉ lưu nháp được                                                                              |
+| NV-OPS2  | Cù Văn Việt     | viet.cu@saoviet.example     | EMPLOYEE          | OPS        | -     | Nhân viên Vận hành: Request K5 chờ NV-OPSH                                                                                         |
 | NV-NEW1  | Hồ Thị Tâm      | no account                  | -                 | OPS        | -     | Nhà thầu mới, chưa có tài khoản                                                                                                    |
+| NV-NEW2  | Âu Thị Xuyến    | xuyen.au@saoviet.example    | EMPLOYEE          | -          | -     | **Chưa xếp phòng** (`QĐ-93g`): lọc `unplaced`, nút "Xếp phòng"                                                                     |
 
 ## Danh mục và kho dùng chung
 
-13 ứng dụng, 14 gói. Mỗi (ứng dụng, gói) có **một** thuê bao: kho ghế của cả công ty, không thuộc phòng nào (`QĐ-103d`). Mỗi gói **cần admin ở nhà cung cấp** (mọi K2, và K4 có trang quản trị `hasAdminConsole`: JetBrains All Products) có **hồ sơ workspace** hai IT Admin khác nhau (chủ = IT Admin phụ trách thuê bao, admin = `vendorAdmin` của gói hoặc một IT Admin khác, kèm email tài khoản công ty `it-<gói>@saoviet.example`) được ghi bằng `PUT /plans/{id}/workspace-profile` **trước** khi tạo thuê bao: thuê bao của gói cần admin không kích hoạt khi hồ sơ thiếu (`QĐ-110k`, R-53). DataGrip là K4 **không** trang quản trị: ca đối chứng, tạo thuê bao không cần hồ sơ; K1 và K5 không cần. Mailchimp: chủ NV-ITA4 (sắp nghỉ), admin NV-ITA3; JetBrains All: chủ NV-ITA1, admin NV-ITA3. **Canva không ghi email tài khoản công ty** ⟹ thuê bao mang cờ `ownerAccountEmailMissing` (`QĐ-110u`). Sau ngày cuối của NV-ITA4, Mailchimp chỉ còn một admin làm việc ⟹ cờ `vendorAdminsBelowMinimum` và `plansBelowVendorAdminMinimum` của dashboard > 0 (cờ bật từ ngày chặn, không bật trước). Ghế nền được nạp bằng tệp CSV năm cột của mẫu (`employee_code,account_identifier,kind,granted_on,expected_end_date`, không cột thừa nên preview không có `ignoredColumns`) do IT Admin phụ trách phòng CNTT nạp (`seatBaselineImport`), cấp từ 130 ngày trước, rồi đóng baseline.
+25 ứng dụng, 32 gói, 29 thuê bao gốc và một kỳ Adobe nối tiếp (30 dòng). Giá mô phỏng, không phải báo giá. Bảng đầu giữ danh mục gốc; bảng mở rộng phía dưới liệt kê phần thêm. Thuê bao K2 là kho ghế của cả công ty, không thuộc phòng nào (`QĐ-103d`). Mỗi gói **cần admin ở nhà cung cấp** (mọi K2, và K4 có trang quản trị `hasAdminConsole`: JetBrains All Products) có **hồ sơ workspace** hai IT Admin khác nhau (chủ = IT Admin phụ trách thuê bao, admin = `vendorAdmin` của gói hoặc một IT Admin khác, kèm email tài khoản công ty `it-<gói>@saoviet.example`) được ghi bằng `PUT /plans/{id}/workspace-profile` **trước** khi tạo thuê bao: thuê bao của gói cần admin không kích hoạt khi hồ sơ thiếu (`QĐ-110k`, R-53). DataGrip là K4 **không** trang quản trị: ca đối chứng, tạo thuê bao không cần hồ sơ; K1 và K5 không cần. Mailchimp: chủ NV-ITA4 (sắp nghỉ), admin NV-ITA3; JetBrains All: chủ NV-ITA1, admin NV-ITA3. **Canva không ghi email tài khoản công ty** ⟹ thuê bao mang cờ `ownerAccountEmailMissing` (`QĐ-110u`). Sau ngày cuối của NV-ITA4, Mailchimp chỉ còn một admin làm việc ⟹ cờ `vendorAdminsBelowMinimum` và `plansBelowVendorAdminMinimum` của dashboard > 0 (cờ bật từ ngày chặn, không bật trước). Ghế nền được nạp bằng tệp CSV năm cột của mẫu (`employee_code,account_identifier,kind,granted_on,expected_end_date`, không cột thừa nên preview không có `ignoredColumns`) do IT Admin phụ trách phòng CNTT nạp (`seatBaselineImport`), cấp từ 130 ngày trước, rồi đóng baseline.
 
 | Ứng dụng · gói         | Kiểu | Giá / ghế                            | Mua | Đang giữ | Trống | Vai trong demo                                                               |
 | ---------------------- | ---- | ------------------------------------ | --- | -------- | ----- | ---------------------------------------------------------------------------- |
@@ -108,15 +127,17 @@ ngày seed và **khóa từ D0+1** (ngày demo), nên điều chỉnh ngân sác
 **và trưởng phòng** có phiên bản **đã duyệt**: trưởng phòng tải tệp và gửi `BM-10` (một số tiền + tệp) → Finance lập phiên bản (dự phòng
 mặc định 10 % do server tính), đính tệp của phiên bản, gửi → Người duyệt chi duyệt (checklist bước `4.7`, mọi câu _Có_).
 
-| Phòng         | Cơ sở          | Dự phòng 10 % | Dùng để minh họa                                                                       |
-| ------------- | -------------- | ------------- | -------------------------------------------------------------------------------------- |
-| ENG           | 600.000.000    | 60.000.000    | Rộng: mọi Request ENG ra "trong số cơ sở"                                              |
-| MKT           | 240.000        | 24.000        | R10 (Canva 250.000 trong tháng) vượt cơ sở, nằm trong dự phòng → **dùng dự phòng**     |
-| DES           | 280.000        | 28.000        | R21 (Postman 300.000) → **dùng dự phòng, chưa xác nhận**                               |
-| SAL           | 290.000        | 29.000        | R11 (Mailchimp 400.000) vượt cả dự phòng → **bị chặn** `OVER_RESERVE`                  |
-| BOD, FIN, ITO | 50.000.000 mỗi | 5.000.000     | Dashboard; R24 của IT Admin                                                            |
-| LGL           | -              | -             | Không trưởng phòng, không `BM-10`: phiên bản số liệu nền chỉ lập được sau hạn (D-Z2-2) |
-| OPS           | -              | -             | Không Cost Center: không có ngân sách                                                  |
+| Phòng | Cơ sở                            | Dự phòng 10 %  | Dùng để minh họa                                                                              |
+| ----- | -------------------------------- | -------------- | --------------------------------------------------------------------------------------------- |
+| ENG   | 170.000.000 (≈ các dòng BM-10)   | 17.000.000     | UNDER; rộng: mọi Request ENG ra "trong số cơ sở"                                              |
+| MKT   | 240.000                          | 24.000         | R10 (Canva 250.000 trong tháng) vượt cơ sở, nằm trong dự phòng → **dùng dự phòng**            |
+| DES   | 280.000                          | 28.000         | R21 (Postman 300.000) → **dùng dự phòng, chưa xác nhận**                                      |
+| SAL   | 290.000                          | 29.000         | R11 (Mailchimp 400.000) vượt cả dự phòng → **bị chặn**; đèn RED (chi ngoài quy trình 400.000) |
+| BOD   | `baseFor` theo cam kết/chờ duyệt | mặc định       | GREEN; CP6 18/11: cơ sở 5.000.000, dự phòng 500.000                                           |
+| FIN   | `baseFor` theo dự kiến / 1,25    | 60 %, có lý do | YELLOW; CP6 18/11: cơ sở 600.000, dự phòng 360.000                                            |
+| ITO   | 33.000.000 (≈ các dòng BM-10)    | mặc định       | UNDER; không thấp hơn dự kiến / 0,5                                                           |
+| LGL   | -                                | -              | Không trưởng phòng, không `BM-10`: phiên bản số liệu nền chỉ lập được sau hạn (D-Z2-2)        |
+| OPS   | -                                | -              | Không Cost Center: không có ngân sách                                                         |
 
 Các Request R10, R21, R11 xin đúng **một tháng** (`termMonths: 1`) nên giá trị luôn là một tháng giá, không phụ thuộc ngày chạy seed; các
 phòng MKT, DES, SAL không có Request nào khác giữ hoặc chờ ngân sách.
@@ -278,10 +299,87 @@ Ba nguồn usage nhập bằng tệp CSV theo mẫu (cột `email`, `last_activi
 
 Bước `demo.*` chạy cuối (chi tiết, giới hạn và bằng chứng: [Z2-NOTES](../../../../../docs/reviews/fe-feedback-2026-11-11/Z2-NOTES.md)):
 hợp đồng `SV-HD-ATL-01` (Jira, K2) và `SV-HD-JB-01` (JetBrains, K4) có tệp; hóa đơn mua `SV-INV-001` chờ ký, `-002` đã ký, `-003` bị trả,
-`-004` ký với 12 ghế so với 7 đã mua (ca lệch `SBF-11a`); chốt tháng 1–10 của năm (quý 9 chờ giải trình, Thiết kế đã giải trình); điều chỉnh
+`-004` ký với 12 ghế so với 7 đã mua (ca lệch `SBF-11a`); chốt các tháng đã hết tới tháng 10 (quý cũ đã ký; quý mới nhất FIN và DES giải trình, còn dòng chờ); điều chỉnh
 năm `Y` ở lượt seed chạy lại từ D0+1; NV-SAL1 dùng Jira ngoài quy trình (Finance ghi phần đã chi, `SBF-07a`), NV-DEV2 dùng Jira không ghế
 (`SBF-08`); ghế Slack của NV-ITA3 là tài khoản máy; ghế Postman của NV-SAL2 hết hạn D0+7 có Request tiếp tục R33 chờ trưởng phòng; POL-MF2
 bản 2 chờ xác nhận lại. Seed lại ≤ 1 ngày trước demo.
+
+## Danh mục bổ sung (giá mô phỏng)
+
+| Ứng dụng             | Gói                                                  | Loại | Giá / chu kỳ           | IT phụ trách |
+| -------------------- | ---------------------------------------------------- | ---- | ---------------------- | ------------ |
+| Microsoft 365        | Microsoft 365 Business Basic (m365-basic)            | K2   | 150000 VND / MONTHLY   | NV-ITA1      |
+| Microsoft 365        | Microsoft 365 Business Standard (m365-standard)      | K2   | 3800000 VND / ANNUAL   | NV-ITA1      |
+| Zoom Workplace       | Zoom Workplace Pro (zoom-pro)                        | K2   | 360000 VND / MONTHLY   | NV-ITA1      |
+| Zoom Workplace       | Zoom Workplace Business (zoom-business)              | K2   | 5200000 VND / ANNUAL   | NV-ITA1      |
+| Notion               | Notion Business (notion-business)                    | K2   | 500000 VND / MONTHLY   | NV-ITA2      |
+| Notion               | Notion Plus (notion-plus)                            | K2   | 2900000 VND / ANNUAL   | NV-ITA2      |
+| Confluence           | Confluence Standard (confluence-standard)            | K2   | 160000 VND / MONTHLY   | NV-ITA1      |
+| Confluence           | Confluence Premium (confluence-premium)              | K2   | 3700000 VND / ANNUAL   | NV-ITA1      |
+| Adobe Creative Cloud | Adobe Creative Cloud Teams All Apps (adobe-cc-teams) | K2   | 22000000 VND / ANNUAL  | NV-ITA2      |
+| Adobe Creative Cloud | Adobe Photoshop (adobe-photoshop)                    | K2   | 560000 VND / MONTHLY   | NV-ITA2      |
+| Claude               | Claude Pro (claude-pro)                              | K1   | 508000 VND / MONTHLY   | NV-ITA1      |
+| Claude               | Claude Team (claude-team)                            | K2   | 7500000 VND / ANNUAL   | NV-ITA1      |
+| GitHub Copilot       | GitHub Copilot Pro (copilot-pro)                     | K1   | 254000 VND / MONTHLY   | NV-ITA1      |
+| Microsoft Visio      | Visio Professional (visio-pro)                       | K4   | 13000000 VND / MONTHLY | NV-ITA1      |
+| Sublime Text         | Sublime Text License (sublime-license)               | K4   | 2500000 VND / MONTHLY  | NV-ITA1      |
+| HubSpot Sales Hub    | HubSpot Sales Hub Starter (hubspot-starter)          | K2   | 450000 VND / MONTHLY   | NV-ITA1      |
+| Hệ thống Chấm công   | Truy cập Chấm công (attendance-access)               | K5   | Không thuê bao         | —            |
+| Skype for Business   | Skype Online Plan 2 (skype-online)                   | K2   | Không thuê bao         | —            |
+
+## Request bổ sung
+
+R40–R57 là 18 ca của SPEC; thêm R58 theo D-15 để R49 đủ ngân sách tạm trước khi quyết từng người (19 ca mới). Không Request mới nào của MKT/DES/SAL.
+
+| Mã  | Người gửi | Gói                 | Đích                        | Kịch bản                                                                                                          |
+| --- | --------- | ------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| R50 | NV-ITO1   | attendance-access   | COMPLETED                   | Hệ thống nội bộ không phí: trưởng phòng duyệt nhu cầu, IT Admin cấp quyền, không kiểm tra ngân sách.              |
+| R56 | NV-DEV6   | copilot-pro         | COMPLETED                   | Gói K1 không kiểm soát được (GitHub Copilot): IT mua thêm một ghế khi cấp và ghi chú các bước của danh sách.      |
+| R58 | NV-BOD1   | adobe-cc-teams      | AWAITING_SPEND_DECISION     | Biên tập bộ tài liệu điều hành bằng Adobe Creative Cloud: trưởng phòng đã trình lô, chờ Người duyệt chi.          |
+| R47 | NV-BOD1   | adobe-photoshop     | FAILED                      | Đã duyệt chi nhưng IT không cấp được: nhà cung cấp chưa tạo tài khoản, tác vụ báo lỗi rồi đóng, Request thất bại. |
+| R49 | NV-DEP    | m365-standard       | AWAITING_EXECUTION          | Request nhóm của trưởng phòng Ban Giám đốc: Người duyệt chi duyệt một người, từ chối người còn lại; chờ IT cấp.   |
+| R44 | NV-BOD1   | Phần mềm đề xuất    | AWAITING_REQUESTER_REVISION | Đề xuất phần mềm ngoài danh mục: IT trả lại để người đề xuất bổ sung thông tin về dữ liệu.                        |
+| R53 | NV-BOD2   | notion-business     | PENDING                     | Đang chờ trưởng phòng Ban Giám đốc duyệt nhu cầu.                                                                 |
+| R42 | NV-FINH   | notion-plus         | AWAITING_REQUESTER_REVISION | Trưởng phòng Tài chính tự gửi (một bước): Người duyệt chi trả về để bổ sung số tháng sử dụng.                     |
+| R55 | NV-FIN2   | zoom-pro            | AWAITING_SPEND_DECISION     | Tài chính: dùng dự phòng, trưởng phòng đã xác nhận kèm lý do; đang chờ Người duyệt chi.                           |
+| R52 | NV-FIN2   | confluence-standard | PENDING                     | Đang chờ trưởng phòng Tài chính duyệt nhu cầu.                                                                    |
+| R40 | NV-DEV5   | confluence-premium  | AWAITING_SPEND_DECISION     | Gói năm trong cửa sổ rà soát: trưởng phòng đã trình lô, đang chờ Người duyệt chi.                                 |
+| R41 | NV-DEV5   | claude-pro          | REJECTED                    | Người duyệt chi từ chối kèm lý do (khác với trưởng phòng từ chối ở bước nhu cầu).                                 |
+| R43 | NV-DEV6   | Phần mềm đề xuất    | IT_REJECTED                 | Đề xuất phần mềm ngoài danh mục: IT từ chối vì không đủ điều kiện và gợi ý dùng Jira Standard.                    |
+| R46 | NV-DEV6   | notion-plus         | EXECUTING                   | Đã duyệt chi, IT đã mở tác vụ cấp quyền và chưa nhận: Request đang được thực hiện.                                |
+| R57 | NV-DEV7   | notion-business     | PENDING_OR_CANCELLED        | Người gửi nghỉ việc ngay sau đó: Request chờ ở trưởng phòng và bị hủy khi lượt chặn truy cập chạy.                |
+| R45 | NV-ITO1   | zoom-pro            | AWAITING_REQUESTER_REVISION | Trưởng phòng Công nghệ thông tin trả lại ở bước nhu cầu để người gửi bổ sung lý do.                               |
+| R48 | NV-ITO2   | zoom-pro            | AWAITING_IT_CLOSE           | Tác vụ cấp quyền báo lỗi; người gửi rút Request nên nó chờ IT đóng tác vụ rồi mới kết thúc.                       |
+| R54 | NV-ITO2   | adobe-photoshop     | AWAITING_SPEND_DECISION     | Đã duyệt nhu cầu và trưởng phòng trình lô; đang chờ Người duyệt chi.                                              |
+| R51 | NV-OPS2   | attendance-access   | PENDING                     | Đang chờ trưởng phòng Vận hành duyệt nhu cầu (phòng chưa có Cost Center nhưng hệ thống nội bộ không phí).         |
+
+## Bộ mở rộng: thiết bị, collector, SBF-20 và AI
+
+| Mục                | Dữ liệu sau seed DB rỗng                                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Danh mục           | 25 ứng dụng, 32 gói, 29 thuê bao gốc và một kỳ nối tiếp Adobe: 30 dòng; giá đều mô phỏng                                                    |
+| Tài khoản          | 1 bị khóa (BOD3), 1 lời mời chưa kích hoạt (NEW3); nhập nhân sự 3 dòng thành công và bản xem trước 2 dòng lỗi                               |
+| Hoàn trả           | DEV6/Notion hoàn tất, BOD2/Adobe chờ thu hồi                                                                                                |
+| SaaS               | 6 dòng theo từng ca S12, gồm bản trùng; tổng 7 ở bảng SPEC là cộng lệch (D-14)                                                              |
+| BM-09              | 4 thông báo: 1 chờ xác minh, 2 đã ghi, 1 bị từ chối                                                                                         |
+| Usage nhà cung cấp | 6 nguồn: Figma, Jira, Canva, Adobe, HubSpot, Notion; BOD6/SAL4 vào G3, BOD3 không dùng 95 ngày                                              |
+| SBF-20             | Adobe: AS_DECIDED, kỳ năm tiếp theo; Zoom Pro: VENDOR_REFUSED; 2 OUTCOME_RECORDED, 0 PROPOSED                                               |
+| SBF-20 chưa ghi    | Notion Plus và Confluence Premium trong cửa sổ, có cảnh báo điều khoản; Claude Team thiếu mốc ngày; Microsoft ngoài cửa sổ                  |
+| Hợp đồng / hóa đơn | 5 hợp đồng có PDF; Zoom không thời hạn. 13 hóa đơn: 6 CONFIRMED, 4 SUBMITTED, 3 RETURNED, gồm 007R nộp lại và 011/012 gắn R18/R56           |
+| Báo cáo            | Chốt tháng 1…M với M=min(10, tháng seed−1); ký mọi quý cũ; quý mới nhất có hai giải trình FIN/DES và còn dòng chờ                           |
+| AI                 | ENGH, CEO, ITOH gọi tóm tắt; AI_ENABLED và AI_ACCESS_REQUEST_SUMMARY_ENABLED ON, không sửa AI_PROVIDER_MODE; giả lập, không phải model thật |
+
+| Máy       | Người giữ   | Sau seed                                | Usage mô phỏng                          |
+| --------- | ----------- | --------------------------------------- | --------------------------------------- |
+| SV-LT-001 | DEV5        | ACTIVE, đã ký/xác nhận                  | CLAUDE_CODE + CODEX                     |
+| SV-LT-002 | ITO1        | ACTIVE, đã ký/xác nhận                  | CLAUDE_CODE                             |
+| SV-LT-003 | BOD1        | COLLECTION_STOPPED, yêu cầu đã hoàn tất | Hai tool ở D0; CODEX NOT_OBSERVABLE 0/0 |
+| SV-LT-004 | BOD4        | ACTIVE, yêu cầu dừng OPEN               | Chưa enroll                             |
+| SV-LT-005 | FIN2        | AWAITING_ACKNOWLEDGEMENT, đã có BM-06   | Có thể xác nhận ở Thiết bị của tôi      |
+| SV-LT-006 | ITO2 → ITOH | Đã đổi người giữ, chờ xác nhận          | Chưa enroll                             |
+| SV-LT-007 | DEV6        | RETIRED                                 | Không thu thập                          |
+
+Allowlist chỉ CLAUDE_CODE → Claude và CODEX → ChatGPT. Usage có coverage PARTIAL của ngày chạy, quota windows đúng tool; không thu prompt, nội dung trả lời hoặc mã nguồn. Token enrollment chỉ trong bộ nhớ. Lượt continue cùng ngày không phát mã mới; ngày sau chỉ thêm usage cho LT001/LT002, LT003 đã dừng giữ usage D0.
 
 ## Giới hạn
 
@@ -291,8 +389,14 @@ bản 2 chờ xác nhận lại. Seed lại ≤ 1 ngày trước demo.
 - **Request case B đánh giá `adminConsole: true` nối gói K4 (Z9) chưa có**: chờ Owner quyết điểm C-3 của AUDIT-C.
 - Nghỉ dài (NV-DES7), nghỉ việc (NV-OFF1, NV-ITA4) và điều chuyển (NV-DEV4) do Super Admin ghi kèm căn cứ hợp lệ; không ai trong số đó là trưởng phòng nên không cần kế nhiệm.
 - Dữ liệu usage là **dữ liệu mô phỏng theo cấu trúc export thật**; thông báo theo dõi của lần nhập đầu ghi nhận do IT xác nhận đã gửi.
+- **Chi phí tính từ ngày đưa vào dùng (D-9, Owner chốt 18/11):** nhân viên seed tạo thuộc phòng từ ngày seed (sản phẩm không cho xếp phòng lùi ngày), nên các tháng trước không có ghế-tháng; ghế cấp lùi ngày tính vào _Chưa phân bổ — kho dùng chung_ cho tới ngày seed. Báo cáo không có xu hướng qua các tháng. Nhập dữ liệu lịch sử của công ty trước khi có hệ thống là việc sau (cần QĐ). Mọi hóa đơn ghi kỳ của tháng `D0`: hóa đơn của Request cho tháng trước ngày cấp mang cờ `OUTSIDE_TERM`.
+- **Đèn ở kỳ chốt mới nhất (Owner chốt 18/11):** SAL **RED** (chi ngoài quy trình 400.000 > 319.000), FIN, DES, MKT **YELLOW**, BOD **GREEN**, ENG, ITO **UNDER**. DES không thể RED cùng R21 "dùng dự phòng" (hai điều kiện loại trừ nhau). Đủ đèn khi seed từ 01/10 tới 30/12 (kỳ chốt mới nhất luôn là tháng 10). Không có tỷ lệ ghế Trống FR-5.10; đó là nợ sản phẩm.
+- **Dùng tới hết tháng seed:** sang tháng mới, job ghế-tháng tính chi phí tháng vừa hết cho phòng người giữ ghế; ngân sách nhỏ của DES (308.000) không đủ nên R21 bị chặn khi NV-DESH xác nhận dự phòng, và các con số Budget vs Actual đổi. Seed lại trong cùng tháng với buổi demo, tốt nhất **ngày trước buổi demo** (nhiều ca neo theo `D0`: DEV4 điều chuyển ngày mai, ITA4 nghỉ ngày làm việc thứ 3, R33 hết sau 7 ngày, cửa sổ SBF-20).
+- Lời mời chỉ được ghi vào outbox, không gửi SMTP thật trong môi trường seed local. Trạng thái quá hạn dừng cần hai ngày làm việc; các cảnh báo gia hạn/giải trình phụ thuộc lịch job.
+- Continue D0+1 ghi điều chỉnh ngân sách DEMO-14 và usage AI ngày mới (kỳ chốt mới nhất vẫn là tháng 10 trong cả khoảng 01/11–31/12). Seed 31/12 rồi continue 01/01 bị từ chối lịch, exit 3; cần seed lại cho năm mới.
+- Sau khi Owner đổi AI sang `MODEL`, hoặc demo xếp phòng cho NV-NEW2, `--continue` vẫn chạy (các bước đó ra "đã có").
 - **Thông báo tăng seat (`SUBSCRIPTION_SEATS_INCREASED`, S-4):** cấp R15 (1Password hết ghế, IT mua thêm) do NV-ITA1 làm, cũng là IT phụ trách thuê bao, nên không sinh thông báo; tăng seat K1 (R18) không bao giờ báo.
-- Quá trình nạp một lần: khoảng một phút cho phần tổ chức → Request, cộng thời gian chờ job hàng chờ (xem trên).
+- Quá trình nạp gồm tổ chức, Request và PDF/XLSX thật; bước ghost.decisions có thể chờ tới 9 phút. Thời gian tùy máy, không cam kết một phút.
 
 ## Thêm dữ liệu
 

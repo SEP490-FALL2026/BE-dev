@@ -47,15 +47,96 @@ describe('shared dataset v4: the organization', () => {
     expect(F.departments.filter((d) => d.costCenter === null).map((d) => d.code)).toEqual(['OPS']);
   });
 
+  it('adds seventeen people of SPEC S01, one of them left unplaced, with the accounts the scenarios need (T1)', () => {
+    const added = [
+      'NV-DEV5',
+      'NV-DEV6',
+      'NV-DEV7',
+      'NV-ITO1',
+      'NV-ITO2',
+      'NV-FIN2',
+      'NV-BOD1',
+      'NV-BOD2',
+      'NV-BOD3',
+      'NV-BOD4',
+      'NV-BOD5',
+      'NV-BOD6',
+      'NV-SAL3',
+      'NV-SAL4',
+      'NV-OPS2',
+      'NV-NEW2',
+      'NV-NEW3',
+    ];
+    expect(F.people).toHaveLength(41 + 17);
+    expect(added.map((code) => person(code).code)).toEqual(added);
+    expect(F.people.filter((p) => p.department === null).map((p) => p.code)).toEqual(['NV-NEW2']);
+    expect(F.people.filter((p) => p.account !== null)).toHaveLength(30 + 12);
+    const withoutAccount = added.filter((code) => person(code).account === null);
+    expect(withoutAccount).toEqual(['NV-BOD5', 'NV-BOD6', 'NV-SAL3', 'NV-SAL4', 'NV-NEW3']);
+    expect(person('NV-NEW2').account).toBe('EMPLOYEE');
+    expect(person('NV-BOD3').account).toBe('EMPLOYEE');
+    for (const [code, dept] of [
+      ['NV-DEV7', 'ENG'],
+      ['NV-ITO2', 'ITO'],
+      ['NV-FIN2', 'FIN'],
+      ['NV-BOD6', 'BOD'],
+      ['NV-SAL4', 'SAL'],
+      ['NV-OPS2', 'OPS'],
+      ['NV-NEW3', 'BOD'],
+    ]) {
+      expect(person(code).department).toBe(dept);
+    }
+  });
+
   it('has enough people in one department for a group', () => {
     expect(F.people.filter((p) => p.department === 'ENG').length).toBeGreaterThanOrEqual(5);
   });
 });
 
 describe('shared dataset v4: the catalog and the shared pool', () => {
-  it('has one subscription per plan of the catalog except the internal one', () => {
-    const plans = F.applications.flatMap((app) => app.plans).filter((p) => p.provisioningType !== 'K5');
+  it('has one subscription per plan of the catalog except the internal one and Skype, which is retired (T6)', () => {
+    const plans = F.applications
+      .flatMap((app) => app.plans)
+      .filter((p) => p.provisioningType !== 'K5' && p.key !== 'skype-online');
     expect(F.subscriptions.map((s) => s.plan).sort()).toEqual(plans.map((p) => p.key).sort());
+    expect(F.subscriptions).toHaveLength(29);
+  });
+
+  it('holds 25 applications of 32 plans, named as they are sold, with none of the three the budget scenarios refuse (T4, S04)', () => {
+    expect(F.applications).toHaveLength(25);
+    expect(F.applications.flatMap((app) => app.plans)).toHaveLength(32);
+    expect(F.applications.filter((app) => app.kind === 'SAAS')).toHaveLength(23);
+    expect(F.applications.filter((app) => app.kind === 'INTERNAL')).toHaveLength(2);
+    const names = F.applications.map((app) => app.name.toLowerCase());
+    for (const refused of ['miro', 'whimsical', 'canva enterprise']) expect(names).not.toContain(refused);
+    expect(new Set(F.applications.map((app) => app.key)).size).toBe(25);
+    expect(new Set(F.applications.map((app) => app.name)).size).toBe(25);
+    const planNames = F.applications.flatMap((app) => app.plans.map((p) => p.name));
+    expect(new Set(planNames).size).toBe(32);
+    expect(new Set(F.applications.flatMap((app) => app.plans.map((p) => p.key))).size).toBe(32);
+  });
+
+  it('gives each plan the kind of control and sharing its application needs, and a note to a plan that loses data (T4)', () => {
+    expect(plan('copilot-pro')).toMatchObject({ provisioningType: 'K1', controlLevel: 'UNCONTROLLABLE' });
+    expect(plan('visio-pro')).toMatchObject({
+      provisioningType: 'K4',
+      hasAdminConsole: true,
+      sharingPolicy: 'ALLOWED',
+    });
+    expect(plan('sublime-license')).toMatchObject({ provisioningType: 'K4' });
+    expect(plan('sublime-license').hasAdminConsole).toBeUndefined();
+    expect(plan('adobe-cc-teams').dataLossOnRemoval).toBe(true);
+    expect(plan('adobe-cc-teams').revocationNote).toBeTruthy();
+    expect(plan('attendance-access').provisioningType).toBe('K5');
+    for (const declared of F.applications.flatMap((app) => app.plans).filter((p) => p.dataLossOnRemoval)) {
+      expect(declared.revocationNote).toBeTruthy();
+    }
+  });
+
+  it('keeps Zoom and Skype in the group the usage rules never collect (T4)', () => {
+    const group = (key: string) => F.applications.find((app) => app.key === key)!.functionalGroup;
+    expect(group('zoom')).toBe('Liên lạc (email, chat, họp)');
+    expect(group('skype')).toBe('Liên lạc (email, chat, họp)');
   });
 
   it('covers K1, K2 with free seats and a sold-out plan, K4 with and without keys, and K5', () => {
@@ -67,19 +148,80 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
     expect(F.keys.some((k) => k.subscription === 'datagrip')).toBe(false);
   });
 
-  it('has one annual subscription with a commitment, and prices every subscription in dong (the dollar price of Cursor stays beside it as the original price)', () => {
-    const annual = F.subscriptions.filter((s) => s.billingCycle === 'ANNUAL');
-    expect(annual).toHaveLength(1);
-    expect(annual[0]).toMatchObject({ termMonths: 12, renewalInDays: 50 });
+  it('commits for a year to seven annual subscriptions, and prices every subscription in dong (the dollar prices of Cursor, Claude Pro and Copilot Pro stay beside it as the original price)', () => {
+    const annual = F.subscriptions.filter((s) => s.billingCycle === 'ANNUAL' && s.kind === 'TERM');
+    expect(annual.map((s) => s.key).sort()).toEqual([
+      'adobe-cc-teams',
+      'claude-team',
+      'confluence-premium',
+      'figma',
+      'm365-standard',
+      'notion-plus',
+      'zoom-business',
+    ]);
+    for (const declared of annual) expect(declared.termMonths).toBe(12);
+    expect(subscriptionOf('figma-professional')).toMatchObject({ termMonths: 12, renewalInDays: 50 });
     // QĐ-111an: a price is written in dong only; no rate is recorded any more (the route is gone), so the fixture holds none.
     expect(F.subscriptions.filter((s) => s.unitPrice.currency !== F.currency)).toEqual([]);
     expect(F).not.toHaveProperty('exchangeRates');
     // 20 USD at the 25.400 the dataset once recorded for the day: the same price, in dong.
-    expect(F.subscriptions.filter((s) => s.originalPrice !== undefined).map((s) => s.key)).toEqual(['cursor']);
+    expect(
+      F.subscriptions
+        .filter((s) => s.originalPrice !== undefined)
+        .map((s) => s.key)
+        .sort(),
+    ).toEqual(['claude-pro', 'copilot-pro', 'cursor']);
     expect(subscriptionOf('cursor-pro')).toMatchObject({
       unitPrice: { amount: '508000', currency: 'VND' },
       originalPrice: { amount: '20', currency: 'USD' },
     });
+    expect(subscriptionOf('claude-pro')).toMatchObject({
+      unitPrice: { amount: '508000' },
+      originalPrice: { amount: '20' },
+    });
+    expect(subscriptionOf('copilot-pro')).toMatchObject({
+      unitPrice: { amount: '254000' },
+      originalPrice: { amount: '10' },
+    });
+  });
+
+  it('puts each new subscription inside or outside the window of adjustment of SBF-20 as the demo needs on any day (T6, SPEC 4.5)', () => {
+    const monthlyWindow = 7;
+    const annualWindow = 30;
+    const insideMonthly = (key: string) => subscriptionOf(key).renewalInDays! <= monthlyWindow;
+    const insideAnnual = (key: string) => {
+      const declared = subscriptionOf(key);
+      const deadline = declared.noticeDeadlineInDays ?? declared.renewalInDays! - (declared.noticePeriodDays ?? 30);
+
+      return deadline <= annualWindow;
+    };
+    for (const key of ['zoom-pro', 'confluence-standard', 'hubspot-starter']) expect(insideMonthly(key)).toBe(true);
+    for (const key of ['m365-basic', 'notion-business', 'adobe-photoshop', 'jira-standard', 'slack-pro']) {
+      expect(insideMonthly(key)).toBe(false);
+    }
+    for (const key of ['figma-professional', 'notion-plus', 'confluence-premium', 'adobe-cc-teams']) {
+      expect(insideAnnual(key)).toBe(true);
+    }
+    expect(insideAnnual('m365-standard')).toBe(false);
+    // Adobe is red (7 days before the deadline) on the day of the seed; Notion Plus is not yet (its deadline is 15 days away).
+    expect(subscriptionOf('adobe-cc-teams').renewalInDays! - 30).toBeLessThanOrEqual(7);
+    expect(subscriptionOf('notion-plus').renewalInDays! - 30).toBeGreaterThan(7);
+    expect(subscriptionOf('confluence-premium')).toMatchObject({ renewalInDays: 70, noticeDeadlineInDays: 25 });
+    expect(subscriptionOf('zoom-business')).toMatchObject({ renewalInDays: -3 });
+    expect(subscriptionOf('claude-team')).toMatchObject({ withoutDates: true });
+    expect(subscriptionOf('hubspot-starter').renewalInDays).toBe(1);
+  });
+
+  it('leaves the stock of the new K1, K4 plans as the plan needs and the K1 plans for ENG (T6)', () => {
+    for (const key of ['claude-pro', 'copilot-pro']) {
+      expect(subscriptionOf(key)).toMatchObject({ quantity: 0, ownerDepartment: 'ENG', responsible: 'NV-ITA1' });
+    }
+    expect(subscriptionOf('visio-pro')).toMatchObject({ kind: 'PERPETUAL', quantity: 3 });
+    expect(subscriptionOf('sublime-license')).toMatchObject({ kind: 'PERPETUAL', quantity: 2 });
+    expect(subscriptionOf('adobe-cc-teams').responsible).toBe('NV-ITA2');
+    expect(subscriptionOf('notion-business').responsible).toBe('NV-ITA2');
+    // Each subscription is named by the key of its plan (SPEC 4.4), the first thirteen by the key they have always had.
+    for (const declared of F.subscriptions.slice(13)) expect(declared.key).toBe(declared.plan);
   });
 
   it('declares no application of the old kind and no pricing model: the system works both out from the plan (CT-1, B-5)', () => {
@@ -104,6 +246,92 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
     }
   });
 
+  it('gives the new subscriptions seats of the people of T1 and of four heads only: the people the flows count are never touched (T8, SPEC 4.2)', () => {
+    const newPeople = new Set([
+      'NV-DEV5',
+      'NV-DEV6',
+      'NV-DEV7',
+      'NV-ITO1',
+      'NV-ITO2',
+      'NV-FIN2',
+      'NV-BOD1',
+      'NV-BOD2',
+      'NV-BOD3',
+      'NV-BOD4',
+      'NV-BOD5',
+      'NV-BOD6',
+      'NV-SAL3',
+      'NV-SAL4',
+      'NV-OPS2',
+      'NV-NEW2',
+      'NV-NEW3',
+    ]);
+    const oldKeys = new Set([
+      'jira',
+      'figma',
+      'slack',
+      'github',
+      'onepassword',
+      'postman',
+      'mailchimp',
+      'canva',
+      'chatgpt',
+      'cursor',
+      'grammarly',
+      'jetbrains',
+      'datagrip',
+    ]);
+    const added = F.seats.filter((seat) => !oldKeys.has(seat.subscription));
+
+    expect(added.length).toBeGreaterThan(0);
+    for (const seat of F.seats.filter((candidate) => oldKeys.has(candidate.subscription))) {
+      expect(newPeople.has(seat.holder)).toBe(false);
+    }
+    const oldHolders = new Set(added.map((seat) => seat.holder).filter((code) => !newPeople.has(code)));
+    expect([...oldHolders].sort()).toEqual(['NV-DEP', 'NV-FINH', 'NV-ITOH', 'NV-SALH']);
+    for (const seat of added) expect(person(seat.holder).department).not.toBe('MKT');
+    expect(added.some((seat) => person(seat.holder).department === 'DES')).toBe(false);
+    for (const key of ['figma', 'onepassword', 'datagrip', 'github']) {
+      expect(F.seats.filter((seat) => seat.subscription === key).every((seat) => !newPeople.has(seat.holder))).toBe(
+        true,
+      );
+    }
+  });
+
+  it('puts the seats of Adobe and Zoom Pro on the Board, not on Marketing, so R10 keeps its budget (T8, Q-B)', () => {
+    const holders = (key: string) => F.seats.filter((seat) => seat.subscription === key).map((seat) => seat.holder);
+
+    expect(holders('adobe-cc-teams').sort()).toEqual(['NV-BOD4', 'NV-BOD5', 'NV-BOD6', 'NV-DEP']);
+    expect(holders('zoom-pro').sort()).toEqual(['NV-BOD1', 'NV-BOD4', 'NV-SAL3', 'NV-SAL4']);
+    expect(holders('zoom-business')).toEqual(['NV-DEP']);
+    expect(holders('hubspot-starter').sort()).toEqual(['NV-SAL3', 'NV-SAL4', 'NV-SALH']);
+    expect(holders('m365-basic')).toHaveLength(13);
+    expect(
+      F.seats.filter(
+        (seat) =>
+          person(seat.holder).department === 'MKT' &&
+          !['jira', 'figma', 'slack', 'github', 'onepassword', 'postman', 'mailchimp', 'canva', 'grammarly'].includes(
+            seat.subscription,
+          ),
+      ),
+    ).toEqual([]);
+  });
+
+  it('has two seats that ended before today, the ones the queue of expiring rights shows (T8)', () => {
+    const ended = F.seats.filter((seat) => seat.endInDays !== undefined && seat.endInDays < 0);
+
+    expect(ended.map((seat) => `${seat.subscription}:${seat.holder}`).sort()).toEqual([
+      'confluence-standard:NV-ITO2',
+      'zoom-pro:NV-SAL4',
+    ]);
+  });
+
+  it('puts the keys of the two new K4 plans in the store: three for Visio, two for Sublime (T8)', () => {
+    expect(F.keys).toContainEqual({ subscription: 'visio-pro', count: 3 });
+    expect(F.keys).toContainEqual({ subscription: 'sublime-license', count: 2 });
+    expect(F.keys.some((k) => k.subscription === 'datagrip')).toBe(false);
+  });
+
   it('never makes a person ask for a plan they already hold', () => {
     for (const request of F.requests) {
       const subscription = request.plan ? subscriptionOf(request.plan) : undefined;
@@ -116,10 +344,11 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
 
   it('leaves the pool enough free seats for what is granted from it', () => {
     const drawn = new Map<string, number>();
+    const draws = ['COMPLETED', 'AWAITING_EXECUTION', 'EXECUTING', 'FAILED', 'AWAITING_IT_CLOSE'];
     for (const request of F.requests) {
       const subscription = request.plan ? subscriptionOf(request.plan) : undefined;
       if (!subscription || subscription.quantity !== undefined) continue;
-      if (request.grant === 'PURCHASE' || !['COMPLETED', 'AWAITING_EXECUTION'].includes(request.target)) continue;
+      if (request.grant === 'PURCHASE' || !draws.includes(request.target)) continue;
       drawn.set(subscription.key, (drawn.get(subscription.key) ?? 0) + (request.beneficiaries?.length ?? 1));
     }
     for (const [key, used] of drawn) {
@@ -218,6 +447,10 @@ describe('shared dataset v4: the requests of MF-1', () => {
     'AWAITING_EXECUTION',
     'AWAITING_IT_ASSESSMENT',
     'RESERVE_UNCONFIRMED',
+    'AWAITING_REQUESTER_REVISION',
+    'EXECUTING',
+    'AWAITING_IT_CLOSE',
+    'PENDING_OR_CANCELLED',
   ];
 
   it('has unique keys and requesters with an account, none of them the spending approver', () => {
@@ -294,12 +527,124 @@ describe('shared dataset v4: the requests of MF-1', () => {
   });
 
   it('saves a draft in a department with no Cost Center, which can only stay a draft', () => {
-    expect(department(person(F.draft.requester).department).costCenter).toBeNull();
+    expect(department(person(F.draft.requester).department!).costCenter).toBeNull();
   });
 
   it('counts its dates from today only', () => {
     expect(dayOffset('2026-11-10', 20)).toBe('2026-11-30');
     expect(endOfMonth('2026-02-10')).toBe('2026-02-28');
+  });
+});
+
+describe('shared dataset v4: the eighteen requests of S10b (T12)', () => {
+  const NEW_PEOPLE = new Set([
+    'NV-DEV5',
+    'NV-DEV6',
+    'NV-DEV7',
+    'NV-ITO1',
+    'NV-ITO2',
+    'NV-FIN2',
+    'NV-BOD1',
+    'NV-BOD2',
+    'NV-BOD3',
+    'NV-BOD4',
+    'NV-BOD5',
+    'NV-BOD6',
+    'NV-SAL3',
+    'NV-SAL4',
+    'NV-OPS2',
+    'NV-NEW2',
+    'NV-NEW3',
+  ]);
+  const OLD_SENDERS = new Set(['NV-FINH', 'NV-DEP', 'NV-ITOH']);
+  const extra = F.requests.filter((r) => /^R(4\d|5[0-8])$/.test(r.key));
+  const request = (key: string) => F.requests.find((r) => r.key === key)!;
+
+  it('adds R40 to R57 and the additional pending Board request needed before the group budget check', () => {
+    expect(extra.map((r) => r.key).sort()).toEqual(Array.from({ length: 19 }, (_, i) => `R${40 + i}`));
+    expect(F.requests.slice(-19)).toEqual(extra);
+    expect(request('R58')).toMatchObject({
+      requester: 'NV-BOD1',
+      plan: 'adobe-cc-teams',
+      target: 'AWAITING_SPEND_DECISION',
+    });
+    expect(F.requests.indexOf(request('R58'))).toBeLessThan(F.requests.indexOf(request('R49')));
+  });
+
+  it('puts nobody of Marketing, Design or Sales in a new request, as sender or as beneficiary (SPEC 4.2: R10, R21, R11 keep their budgets)', () => {
+    for (const r of extra) {
+      for (const code of [r.requester, ...(r.beneficiaries ?? [])]) {
+        expect(['MKT', 'DES', 'SAL']).not.toContain(person(code).department);
+      }
+    }
+  });
+
+  it('is sent by the people of T1, or by the heads of Finance, the Board and IT only (SPEC 4.2)', () => {
+    for (const r of extra) expect(NEW_PEOPLE.has(r.requester) || OLD_SENDERS.has(r.requester)).toBe(true);
+    for (const r of extra) for (const code of r.beneficiaries ?? []) expect(NEW_PEOPLE.has(code)).toBe(true);
+  });
+
+  it('has the head of Finance send R42 in one step, and the Board group R49 refuse a person who is one of its beneficiaries', () => {
+    expect(department('FIN').head).toBe(request('R42').requester);
+    expect(department('BOD').head).toBe(request('R49').requester);
+    expect(request('R49').rejectedLines).toEqual(['NV-BOD2']);
+    for (const code of request('R49').rejectedLines ?? []) expect(request('R49').beneficiaries).toContain(code);
+    expect(request('R49').target).toBe('AWAITING_EXECUTION');
+  });
+
+  it('reaches every state the demo lacked, each by the step that sends it there', () => {
+    const at = (target: string, fields: Record<string, unknown> = {}) =>
+      extra.some((r) => r.target === target && Object.entries(fields).every(([k, v]) => (r as never)[k] === v));
+    for (const target of ['IT_REJECTED', 'EXECUTING', 'FAILED', 'AWAITING_IT_CLOSE', 'PENDING_OR_CANCELLED'])
+      expect(at(target)).toBe(true);
+    expect(at('REJECTED', { rejectAt: 'SPEND' })).toBe(true);
+    for (const returnAt of ['NEED', 'ASSESSMENT', 'SPEND'])
+      expect(at('AWAITING_REQUESTER_REVISION', { returnAt })).toBe(true);
+  });
+
+  it('sends back at the spending approver only a request of one step: a head sends it (R42)', () => {
+    for (const r of extra.filter((candidate) => candidate.returnAt === 'SPEND')) {
+      expect(F.departments.map((d) => d.head)).toContain(r.requester);
+    }
+  });
+
+  it('lets Finance confirm the reserve of the two requests its budget cannot hold without it (R42, R55)', () => {
+    expect(request('R42').confirmReserve).toBe(true);
+    expect(request('R55').confirmReserve).toBe(true);
+    expect(extra.filter((r) => r.confirmReserve).every((r) => person(r.requester).department === 'FIN')).toBe(true);
+  });
+
+  it('reads R57 as the head of the department of its sender, who is blocked and cannot sign in (C-2)', () => {
+    const r57 = request('R57');
+    expect(r57.target).toBe('PENDING_OR_CANCELLED');
+    expect(r57.readAs).toBe(department(person(r57.requester).department!).head);
+    expect(extra.filter((r) => r.readAs).map((r) => r.key)).toEqual(['R57']);
+  });
+
+  it('sends the completed requests first, and the Board request that fails before the group it decides line by line', () => {
+    const order = F.requests.map((r) => r.key);
+    expect(order.indexOf('R50')).toBeLessThan(order.indexOf('R47'));
+    expect(order.indexOf('R56')).toBeLessThan(order.indexOf('R47'));
+    expect(order.indexOf('R47')).toBeLessThan(order.indexOf('R49'));
+    expect(order.indexOf('R48')).toBeLessThan(order.indexOf('R54'));
+  });
+
+  it('proposes Linear and Loom with the real address of their site, and points the refused proposal at a plan of the catalog', () => {
+    expect(request('R43').proposal).toMatchObject({ softwareName: 'Linear', homepageUrl: 'https://linear.app' });
+    expect(request('R44').proposal).toMatchObject({ softwareName: 'Loom', homepageUrl: 'https://www.loom.com' });
+    expect(plan(request('R43').alternativePlan!)).toBeDefined();
+  });
+
+  it('asks for a K5 plan of the internal attendance system without months, and a K1 plan for the months a K1 plan allows', () => {
+    expect(plan(request('R50').plan!).provisioningType).toBe('K5');
+    expect(request('R50').termMonths).toBeNull();
+    expect(request('R56').termMonths).toBe(2);
+    expect(request('R56').grant).toBe('PURCHASE');
+  });
+
+  it('leaves requests waiting for the need in the queues of the heads of the Board, Finance and Operations', () => {
+    const queues = new Set(extra.filter((r) => r.target === 'PENDING').map((r) => person(r.requester).department));
+    expect([...queues].sort()).toEqual(['BOD', 'FIN', 'OPS']);
   });
 });
 
@@ -401,7 +746,10 @@ describe('shared dataset v4: MF-2, MF-3 and the IT Admins (QĐ-110, QĐ-111)', (
     expect(plan('jetbrains-all')).toMatchObject({ provisioningType: 'K4', hasAdminConsole: true });
     expect(plan('jetbrains-datagrip').hasAdminConsole).toBeUndefined();
     const flagged = F.applications.flatMap((a) => a.plans).filter((p) => p.withoutOwnerAccountEmail);
-    expect(flagged.map((p) => [p.key, p.provisioningType])).toEqual([['canva-teams', 'K2']]);
+    expect(flagged.map((p) => [p.key, p.provisioningType]).sort()).toEqual([
+      ['canva-teams', 'K2'],
+      ['notion-business', 'K2'],
+    ]);
   });
 
   it('lists software for departments with an IT Admin, from the catalog, and proposes only what their list does not hold (P16–P18)', () => {
@@ -445,7 +793,7 @@ describe('shared dataset v4: the documentation', () => {
       const role = p.code === F.approvalRoles.SPENDING_APPROVER ? 'SPENDING_APPROVER' : (p.account ?? '-');
       const email = p.account ? `${p.email}@${F.emailDomain}` : 'no account';
       const head = F.departments.find((d) => d.head === p.code)?.code ?? '-';
-      expect(readme).toContain(`| ${p.code} | ${p.fullName} | ${email} | ${role} | ${p.department} | ${head} |`);
+      expect(readme).toContain(`| ${p.code} | ${p.fullName} | ${email} | ${role} | ${p.department ?? '-'} | ${head} |`);
     }
   });
 });

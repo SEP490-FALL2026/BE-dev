@@ -26,6 +26,13 @@ describe('the steps of the shared dataset', () => {
     }
   });
 
+  it('records SBF-20 and closes the months only once every request stands where the fixture puts it', () => {
+    for (const key of ['renewals.adjustments', 'demo.budget-reviews']) {
+      const step = steps.find((candidate) => candidate.key === key)!;
+      for (const request of SHARED_DEMO_V4.requests) expect(step.needs).toContain(`requests.${request.key}`);
+    }
+  });
+
   it('runs the rules of MF-5 after the usage is imported and the people moved, and the head decides after the rules', () => {
     expect(keys.indexOf('rules.first-run')).toBeGreaterThan(keys.indexOf('usage.imports'));
     expect(keys.indexOf('rules.first-run')).toBeGreaterThan(keys.indexOf('personnel.events'));

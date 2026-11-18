@@ -84,7 +84,7 @@ const CANVA: DemoUsageSource = {
   rows: [row('NV-DESH', 12), row('NV-DES5', 15)],
 };
 
-export const USAGE: Pick<DemoFixture, 'usageSources' | 'ghostDecisions' | 'personnel'> = {
+export const USAGE: Pick<DemoFixture, 'usageSources' | 'ghostDecisions' | 'personnel' | 'abruptDeparture'> = {
   usageSources: [FIGMA, JIRA, CANVA],
   /*
    * After the seed runs the rules, the head of Design decides some of what they raised and leaves the rest to be decided in the demo:
@@ -124,4 +124,5 @@ export const USAGE: Pick<DemoFixture, 'usageSources' | 'ghostDecisions' | 'perso
     { kind: 'OFFBOARDING', employee: 'NV-ITA4', lastDayInWorkingDays: 3 },
     { kind: 'TRANSFER', employee: 'NV-DEV4', toDepartment: 'ITO', effectiveInDays: 1 },
   ],
+  abruptDeparture: { kind: 'OFFBOARDING', employee: 'NV-DEV7' },
 };

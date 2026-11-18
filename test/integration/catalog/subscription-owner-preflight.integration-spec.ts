@@ -196,6 +196,48 @@ describe('ops:preflight, the owner department of a subscription (integration, re
   );
 
   it(
+    'after shared_pool_grant a subscription with no owner department and no assignment is a shared pool: not listed',
+    async () => {
+      const pool = await insertSubscriptionAs7c28e75(sql, world);
+      const owner = await sql.query<{ owner_department_id: string | null }>(
+        `SELECT owner_department_id FROM subscriptions WHERE id = $1`,
+        [pool],
+      );
+      expect(owner.rows).toEqual([{ owner_department_id: null }]);
+
+      const { code, report } = await preflight();
+
+      expect(report.blockers).toEqual([]);
+      expect({ code, status: report.status }).toEqual({ code: 0, status: 'READY' });
+    },
+    CLI_COLD_START_MS,
+  );
+
+  it(
+    'after shared_pool_grant an owner department the assignment contradicts still blocks',
+    async () => {
+      // The final schema refuses this state through its triggers, so it is forced the way a damaged database would hold it.
+      const contradicted = await insertSubscriptionAs7c28e75(sql, world);
+      await assign(contradicted, world.departments.eng);
+      await sql.query(`ALTER TABLE subscriptions DISABLE TRIGGER USER`);
+      try {
+        await sql.query(`UPDATE subscriptions SET owner_department_id = $2 WHERE id = $1`, [
+          contradicted,
+          world.departments.ops,
+        ]);
+      } finally {
+        await sql.query(`ALTER TABLE subscriptions ENABLE TRIGGER USER`);
+      }
+
+      const { code, report } = await preflight();
+
+      expect(code).toBe(2);
+      expect(report.blockers).toEqual([{ code: 'SUBSCRIPTION_OWNER_UNASSIGNED', subscriptionId: contradicted }]);
+    },
+    CLI_COLD_START_MS,
+  );
+
+  it(
     'one of the two objects without the other cannot be trusted either way: blocked',
     async () => {
       await sql.query(`DROP TABLE subscription_owner_assignments CASCADE`);
