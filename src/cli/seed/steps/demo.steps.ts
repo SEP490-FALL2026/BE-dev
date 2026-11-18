@@ -38,9 +38,28 @@ interface PeriodLine {
   explanationStatus: string;
 }
 
+export function quartersToSign(periods: readonly PeriodRow[]): PeriodRow[] {
+  const quarters = periods.filter((period) => period.kind === 'QUARTER').sort((a, b) => a.month - b.month);
+  return quarters.slice(0, -1).filter((period) => period.state !== 'SIGNED');
+}
+
+export function explanationMove(
+  lines: readonly PeriodLine[],
+): { kind: 'present' } | { kind: 'limited'; pending: number } | { kind: 'explain'; line: PeriodLine } {
+  const explained = lines.filter((line) => line.explanationStatus === 'EXPLAINED').length;
+  if (explained >= 2) return { kind: 'present' };
+  const pending = lines.filter((line) => line.costCenter !== null && line.explanationStatus === 'PENDING');
+  if (pending.length < 3 - explained) return { kind: 'limited', pending: pending.length };
+  const line =
+    pending.find((row) => row.costCenter?.code === 'CC-FIN') ??
+    pending.find((row) => row.costCenter?.code === 'CC-DES') ??
+    pending[0];
+  return { kind: 'explain', line };
+}
+
 /**
  * DEMO-12/13: Finance closes the months of the year that have ended, up to October (a quarter month opens explanations); in the last
- * quarter closed one head explains its line and the others wait; Finance does not sign.
+ * quarter closed two heads explain and at least one waits; Finance signs every older quarter.
  */
 async function reviews(ctx: DemoRunContext): Promise<StepOutcome> {
   const finance = await as(ctx, financePerson(ctx));
@@ -61,6 +80,16 @@ async function reviews(ctx: DemoRunContext): Promise<StepOutcome> {
     closed.push(await ctx.api.call<PeriodRow>(finance, 'POST', '/budget-review-periods', { year, month }));
     results.push({ status: 'done', label: `tháng ${month}` });
   }
+  for (const quarter of quartersToSign(closed)) {
+    if (ctx.mode === 'plan') results.push({ status: 'planned', label: `ký quý tháng ${quarter.month}` });
+    else {
+      await ctx.api.call(finance, 'POST', `/budget-review-periods/${quarter.id}/signature`, {
+        note: `${tag(ctx, 'REVIEW')} Ký kỳ quý đã qua.`,
+      });
+      quarter.state = 'SIGNED';
+      results.push({ status: 'done', label: `ký quý tháng ${quarter.month}` });
+    }
+  }
   const quarter = closed
     .filter((period) => period.kind === 'QUARTER' && period.state === 'AWAITING_EXPLANATIONS')
     .sort((a, b) => b.month - a.month)[0];
@@ -71,27 +100,36 @@ async function reviews(ctx: DemoRunContext): Promise<StepOutcome> {
 
 async function explainOne(ctx: DemoRunContext, finance: string, quarter: PeriodRow): Promise<Result> {
   const label = `giải trình quý (tháng ${quarter.month})`;
-  const detail = await ctx.api.call<{ items: PeriodLine[] }>(
-    finance,
-    'GET',
-    `/budget-review-periods/${quarter.id}?pageSize=100`,
-  );
-  const lines = detail.items.filter((line) => line.costCenter && headOfCostCenter(ctx, line.costCenter.code));
-  if (lines.some((line) => line.explanationStatus === 'EXPLAINED')) return { status: 'present', label };
-  const pending = lines.filter((line) => line.explanationStatus === 'PENDING');
-  // One head explains, at least one other is left waiting (DEMO-13); with a single line asked nothing is explained.
-  if (pending.length < 2) return { status: 'present', label: `${label}: ${pending.length} dòng chờ, không giải trình` };
-  if (ctx.mode === 'plan') return { status: 'planned', label };
-  const line = pending[0];
+  const written: string[] = [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const detail = await ctx.api.call<{ items: PeriodLine[] }>(
+      finance,
+      'GET',
+      `/budget-review-periods/${quarter.id}?pageSize=100`,
+    );
+    const lines = detail.items.filter((line) => line.costCenter && headOfCostCenter(ctx, line.costCenter.code));
+    const move = explanationMove(lines);
+    if (move.kind === 'present') return { status: written.length ? 'done' : 'present', label };
+    if (move.kind === 'limited')
+      return {
+        status: 'present',
+        label: `${label}: ${move.pending} dòng chờ, không đủ hai giải trình và một dòng còn chờ`,
+      };
+    if (ctx.mode === 'plan') return { status: 'planned', label };
+    await explainLine(ctx, quarter.id, move.line);
+    written.push(move.line.costCenter?.code ?? '?');
+  }
+  return { status: 'done', label: `${label}: ${written.join(', ')}` };
+}
+
+async function explainLine(ctx: DemoRunContext, quarterId: string, line: PeriodLine): Promise<void> {
   const head = await as(ctx, headOfCostCenter(ctx, line.costCenter?.code ?? '') ?? '');
-  await ctx.api.call(head, 'PUT', `/budget-review-periods/${quarter.id}/lines/${line.costCenter?.id}/explanation`, {
+  await ctx.api.call(head, 'PUT', `/budget-review-periods/${quarterId}/lines/${line.costCenter?.id}/explanation`, {
     cause: 'Mua thêm ghế cho người mới vào giữa quý, chưa có trong số đề xuất đầu năm.',
     persistence: 'ONE_OFF',
     action: 'Rà soát ghế không dùng trong tháng tới và thu hồi trước kỳ gia hạn.',
     knownNeedsToYearEnd: { amount: money('0'), note: 'Không có nhu cầu mới tới cuối năm.' },
   });
-
-  return { status: 'done', label: `${label}: ${line.costCenter?.code}` };
 }
 
 /**
@@ -287,12 +325,6 @@ async function policyAgain(ctx: DemoRunContext): Promise<StepOutcome> {
 
 export const DEMO_STEPS: readonly DemoStep[] = [
   {
-    key: 'demo.budget-reviews',
-    title: 'Chốt số các tháng đã qua của năm, quý chờ giải trình (Finance, trưởng phòng; DEMO-12/13)',
-    needs: ['budget.year'],
-    run: reviews,
-  },
-  {
     key: 'demo.budget-adjustments',
     title: 'Điều chỉnh ngân sách năm khi kỳ đã khóa: Bổ sung chờ duyệt, Chuyển đã duyệt (DEMO-14)',
     needs: ['budget.year', 'org.approval-roles'],
@@ -321,5 +353,11 @@ export const DEMO_STEPS: readonly DemoStep[] = [
     title: 'Một chính sách xuất bản lại, chờ xác nhận lại (Super Admin)',
     needs: ['org.accounts'],
     run: policyAgain,
+  },
+  {
+    key: 'demo.budget-reviews',
+    title: 'Chốt tháng, ký quý cũ và hai giải trình ở quý mới nhất (Finance, trưởng phòng)',
+    needs: ['budget.year', 'demo.purchase-invoices', 'demo.out-of-process'],
+    run: reviews,
   },
 ];

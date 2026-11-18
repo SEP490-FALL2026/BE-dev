@@ -19,6 +19,8 @@ export interface InvoiceFixture {
   quantity: number;
   target: 'SUBMITTED' | 'CONFIRMED' | 'RETURNED' | 'RESUBMITTED';
   resubmitAs?: string;
+  request?: string;
+  reviewMonthOffset?: number;
 }
 export interface InvoiceRow {
   id: string;
@@ -123,6 +125,22 @@ export const INVOICES: InvoiceFixture[] = [
   { number: 'SV-INV-008', subscription: 'adobe-cc-teams', quantity: 7, target: 'CONFIRMED' },
   { number: 'SV-INV-009', subscription: 'hubspot-starter', quantity: 5, target: 'SUBMITTED' },
   { number: 'SV-INV-010', subscription: 'confluence-standard', quantity: 7, target: 'RETURNED' },
+  {
+    number: 'SV-INV-011',
+    subscription: 'chatgpt',
+    request: 'R18',
+    reviewMonthOffset: -1,
+    quantity: 1,
+    target: 'CONFIRMED',
+  },
+  {
+    number: 'SV-INV-012',
+    subscription: 'copilot-pro',
+    request: 'R56',
+    reviewMonthOffset: 0,
+    quantity: 1,
+    target: 'CONFIRMED',
+  },
 ];
 
 /** A resubmission is a new invoice: its returned original must not cause a conflict on the next run. */
@@ -142,7 +160,7 @@ function invoiceFields(ctx: DemoRunContext, spec: InvoiceFixture, documentId: st
   return {
     vendorInvoiceNumber: number,
     issuedOn: ctx.today,
-    servicePeriodMonth: ctx.today.slice(0, 7),
+    servicePeriodMonth: invoiceMonth(ctx, spec),
     quantity: spec.quantity,
     unitPriceOriginal: { amount: price.toString(), currency: 'VND' },
     netAmount: money((price * BigInt(spec.quantity)).toString()),
@@ -153,9 +171,18 @@ function invoiceFields(ctx: DemoRunContext, spec: InvoiceFixture, documentId: st
 
 export function invoiceBody(ctx: DemoRunContext, spec: InvoiceFixture, documentId: string) {
   return {
-    link: { subscriptionId: ctx.ids.subscriptions.get(spec.subscription) },
+    link: spec.request
+      ? { requestId: ctx.ids.requests.get(spec.request) }
+      : { subscriptionId: ctx.ids.subscriptions.get(spec.subscription) },
     ...invoiceFields(ctx, spec, documentId, spec.number),
   };
+}
+
+function invoiceMonth(ctx: DemoRunContext, spec: InvoiceFixture): string {
+  if (spec.reviewMonthOffset === undefined) return ctx.today.slice(0, 7);
+  const year = Number(ctx.today.slice(0, 4));
+  const last = Math.min(10, Number(ctx.today.slice(5, 7)) - 1);
+  return new Date(Date.UTC(year, last - 1 + spec.reviewMonthOffset, 1)).toISOString().slice(0, 7);
 }
 
 export function resubmissionBody(ctx: DemoRunContext, spec: InvoiceFixture, documentId: string) {

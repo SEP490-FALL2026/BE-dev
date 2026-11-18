@@ -19,8 +19,8 @@ describe('contracts and invoices of the expanded fixture', () => {
     expect(zoom.subscriptions).toEqual(['zoom-pro', 'zoom-business']);
   });
   it('has unique invoice numbers and preserves the intentional Postman discrepancy', () => {
-    expect(INVOICES).toHaveLength(10);
-    expect(new Set(INVOICES.map(({ number }) => number)).size).toBe(10);
+    expect(INVOICES).toHaveLength(12);
+    expect(new Set(INVOICES.map(({ number }) => number)).size).toBe(12);
     const resubmitted = INVOICES.find(({ number }) => number === 'SV-INV-007')!;
     expect(resubmitted).toMatchObject({ target: 'RESUBMITTED', resubmitAs: 'SV-INV-007R' });
     expect(INVOICES.find(({ number }) => number === 'SV-INV-004')!.quantity).toBe(12);
