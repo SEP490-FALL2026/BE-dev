@@ -30,9 +30,13 @@ export function grantedOnOf(ctx: Pick<DemoRunContext, 'fixture' | 'today'>, seat
 
 /** One line of the seat file for a seat of the fixture: the import takes personal seats only (`QĐ-110m`). */
 export function lineOf(ctx: DemoRunContext, seat: DemoSeat): string {
-  const end = seat.endInDays === undefined ? '' : dayOffset(ctx.today, seat.endInDays);
+  const granted = grantedOnOf(ctx, seat);
+  // A seat that has already ended never ends before it was granted: early in January the grant is clamped to the first day of the
+  // subscription (the 1st of the year), after the few days back the fixture asks for (SL-R1).
+  const wanted = seat.endInDays === undefined ? '' : dayOffset(ctx.today, seat.endInDays);
+  const end = wanted !== '' && wanted < granted ? granted : wanted;
 
-  return [seat.holder, emailOf(ctx, seat.holder), 'personal', grantedOnOf(ctx, seat), end].map(csvCell).join(',');
+  return [seat.holder, emailOf(ctx, seat.holder), 'personal', granted, end].map(csvCell).join(',');
 }
 
 interface ImportPreview {

@@ -64,4 +64,16 @@ describe('the day a baseline seat was granted (T8)', () => {
 
     expect(line[3]).toBe(grantedOnOf(ctxOn('2026-11-17'), seat('m365-basic', 'NV-DEV5')));
   });
+
+  it.each(['2026-11-18', '2026-12-31', '2027-01-03', '2027-01-10'])(
+    'never writes a seat that ends before it was granted, early in January too (SL-R1), on %s',
+    (today) => {
+      for (const declared of SHARED_DEMO_V4.seats.filter((candidate) => candidate.endInDays !== undefined)) {
+        const [, , , granted, end] = lineOf(ctxOn(today), declared).split(',');
+
+        expect(end >= granted).toBe(true);
+        expect(end <= today).toBe(declared.endInDays! <= 0);
+      }
+    },
+  );
 });
