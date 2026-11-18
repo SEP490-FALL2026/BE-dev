@@ -17,6 +17,22 @@ const spec = (key: string) => {
 };
 
 describe('the recorded subscription adjustments', () => {
+  it('unwraps the adjustment resource returned by the API before recording it', async () => {
+    const writes: unknown[] = [];
+    const call = jest.fn((_email: string, method: string, path: string, body?: unknown) => {
+      if (method === 'POST') writes.push(body);
+      return Promise.resolve(path.startsWith('/subscription-renewals?') ? { items: [] } : { adjustment });
+    });
+    const ctx = {
+      fixture: { ...fixture, renewals: [fixture.renewals[0]] },
+      mode: 'apply',
+      ids: { subscriptions: new Map([['adobe-cc-teams', 'sub-1']]) },
+      api: { call, signIn: jest.fn().mockResolvedValue(undefined) },
+    } as unknown as DemoRunContext;
+    await expect(RENEWAL_STEPS[0].run(ctx)).resolves.toMatchObject({ status: 'done' });
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toMatchObject({ subscriptionId: 'sub-1', choice: 'REDUCE', proposedQuantity: 4 });
+  });
   it('uses the server choice and target and carries the annual price as Money', () => {
     expect(renewalBody(adjustment, spec('adobe-cc-teams'))).toMatchObject({
       subscriptionId: 'sub-1',

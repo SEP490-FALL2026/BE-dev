@@ -56,7 +56,7 @@ async function oneRenewal(ctx: DemoRunContext, spec: DemoRenewal) {
   const email = await as(ctx, spec.by);
   const existing = await listAll<{ id: string }>(ctx, email, `/subscription-renewals?subscriptionId=${subscriptionId}`);
   if (existing.length) return { status: 'present' as const, label: spec.subscription };
-  const adjustment = await ctx.api.call<Adjustment>(
+  const { adjustment } = await ctx.api.call<{ adjustment: Adjustment }>(
     email,
     'GET',
     `/subscription-renewals/adjustment?subscriptionId=${subscriptionId}`,
