@@ -201,7 +201,7 @@ const taskSummarySchema = z.strictObject({
       fullName: z.string(),
       workEmail: z.string().nullable().meta({
         description:
-          'The work email on the profile, as stored (not normalized): the address a grant is made to when the IT Admin names no other one (`QĐ-87b`, `FR-2.9`); null when the profile has none.',
+          'The work email on the profile, as stored (not normalized): the address a grant is made to when the IT Admin names no other one; null when the profile has none.',
       }),
     })
     .nullable(),
