@@ -202,14 +202,14 @@ describe('the base counted for the light a department must show (baseFor, SPEC S
     expect(roundUpTo(10_000_000, 1_000_000)).toBe(10_000_000);
   });
 
-  it('keeps ENG at 600 million or more, wide enough to give up 5 million on the next day and still cover the forecast and the Figma request of MF-4', () => {
+  it('keeps ENG at its BM-10 lines or more, wide enough to give up 5 million on the next day and still cover the forecast and the Figma request of MF-4', () => {
     for (const today of DAYS) {
       const choice = baseFor(F, 'ENG', today)!;
       const expected = expectedOf(F, 'ENG', today);
       const forecast = expected.spentThrough + expected.committed + expected.pending;
       const monthsLeft = 12 - Number(today.slice(5, 7)) + 1;
 
-      expect(choice.base).toBeGreaterThanOrEqual(600_000_000);
+      expect(choice.base).toBeGreaterThanOrEqual(170_000_000);
       expect(choice.base - 5_000_000).toBeGreaterThanOrEqual(forecast);
       expect(choice.base - 5_000_000 - forecast).toBeGreaterThanOrEqual(375_000 * monthsLeft);
     }

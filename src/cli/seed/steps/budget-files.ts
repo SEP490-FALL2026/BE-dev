@@ -31,7 +31,8 @@ const departmentOf = (ctx: DemoRunContext, code: string) =>
 
 /**
  * The lines a head can list within the amount asked: the amount is counted from the day of the seed, so it may be smaller than the lines of the
- * fixture add up to. A line that would go over is cut to the months that fit, one that fits no month is left out; the rest is one balancing line.
+ * fixture add up to. A line that would go over is cut to the months that fit; one that fits no month of all its seats is cut to the seats one month
+ * pays for, and left out when not even one seat-month fits; the rest is one balancing line.
  */
 export function fitLines(lines: readonly BudgetLine[], amount: number): BudgetLine[] {
   const fitted: BudgetLine[] = [];
@@ -39,9 +40,15 @@ export function fitLines(lines: readonly BudgetLine[], amount: number): BudgetLi
   for (const line of lines) {
     const month = line.seats * line.monthlyPrice;
     const months = Math.min(line.months, month > 0 ? Math.floor(left / month) : 0);
-    if (months < 1) continue;
-    fitted.push(months === line.months ? line : { ...line, months });
-    left -= month * months;
+    if (months >= 1) {
+      fitted.push(months === line.months ? line : { ...line, months });
+      left -= month * months;
+      continue;
+    }
+    const seats = line.monthlyPrice > 0 ? Math.min(line.seats, Math.floor(left / line.monthlyPrice)) : 0;
+    if (seats < 1) continue;
+    fitted.push({ ...line, seats, months: 1 });
+    left -= seats * line.monthlyPrice;
   }
 
   return fitted;

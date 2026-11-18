@@ -189,6 +189,12 @@ interface DiscrepancyRow {
 }
 
 /**
+ * What Finance records as spent for the Jira that a Sales employee bought himself for two months (D-16): over the base and the reserve of
+ * Sales (290.000 + 29.000), so the department shows the red light; R11 of Sales stays blocked whatever this amount is.
+ */
+export const OUT_OF_PROCESS_SPENT = '400000';
+
+/**
  * DEMO-11 (`SBF-07a`): of the accounts the Jira usage file shows with no seat (`SBF-08`), the IT Admin of Jira sends NV-SAL1's out of
  * process (not a company asset), and Finance records what it cost with the receipt, charged to Sales: the case closes. The other account
  * and the unknown identity of the Figma file stay open (`SBF-08` keeps two values).
@@ -231,16 +237,16 @@ async function outOfProcess(ctx: DemoRunContext): Promise<StepOutcome> {
   const pdf = await receiptPdf({
     number: 'bien-nhan-jira-ca-nhan',
     vendor: vendorNameOf(ctx, 'jira'),
-    amount: '200000',
+    amount: OUT_OF_PROCESS_SPENT,
     issuedOn: ctx.today,
-    note: 'Nhân viên Kinh doanh tự mua Jira bằng thẻ cá nhân, Finance ghi phần đã chi theo biên nhận.',
+    note: 'Nhân viên Kinh doanh tự mua Jira hai tháng bằng thẻ cá nhân, Finance ghi phần đã chi theo biên nhận.',
   });
   const receipt = await uploadDocument(ctx, finance, 'PURCHASE_DOCUMENT', pdf);
   await ctx.api.call(finance, 'POST', `/out-of-process-cases/${caseId}/closure`, {
     outcome: 'RECORD_SPENT',
     note: `${tag(ctx, 'SBF07')} Ghi phần đã chi theo biên nhận, tính cho phòng Kinh doanh.`,
     documentIds: [receipt],
-    amount: money('200000'),
+    amount: money(OUT_OF_PROCESS_SPENT),
     costCenterId: ctx.ids.costCenters.get('SAL'),
   });
 

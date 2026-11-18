@@ -20,7 +20,6 @@ export interface InvoiceFixture {
   target: 'SUBMITTED' | 'CONFIRMED' | 'RETURNED' | 'RESUBMITTED';
   resubmitAs?: string;
   request?: string;
-  reviewMonthOffset?: number;
 }
 export interface InvoiceRow {
   id: string;
@@ -122,14 +121,15 @@ export const INVOICES: InvoiceFixture[] = [
     target: 'RESUBMITTED',
     resubmitAs: 'SV-INV-007R',
   },
-  { number: 'SV-INV-008', subscription: 'adobe-cc-teams', quantity: 7, target: 'CONFIRMED' },
+  // A monthly plan of Adobe: an invoice of the yearly plan in the month of the seed would bill a year against the weeks left to its renewal
+  // and carry `OVER_APPROVED` (the pooled ceiling is the seats times the price of a month times the months to the renewal day).
+  { number: 'SV-INV-008', subscription: 'adobe-photoshop', quantity: 3, target: 'CONFIRMED' },
   { number: 'SV-INV-009', subscription: 'hubspot-starter', quantity: 5, target: 'SUBMITTED' },
   { number: 'SV-INV-010', subscription: 'confluence-standard', quantity: 7, target: 'RETURNED' },
   {
     number: 'SV-INV-011',
     subscription: 'chatgpt',
     request: 'R18',
-    reviewMonthOffset: -1,
     quantity: 1,
     target: 'CONFIRMED',
   },
@@ -137,7 +137,6 @@ export const INVOICES: InvoiceFixture[] = [
     number: 'SV-INV-012',
     subscription: 'copilot-pro',
     request: 'R56',
-    reviewMonthOffset: 0,
     quantity: 1,
     target: 'CONFIRMED',
   },
@@ -160,7 +159,7 @@ function invoiceFields(ctx: DemoRunContext, spec: InvoiceFixture, documentId: st
   return {
     vendorInvoiceNumber: number,
     issuedOn: ctx.today,
-    servicePeriodMonth: invoiceMonth(ctx, spec),
+    servicePeriodMonth: invoiceMonth(ctx),
     quantity: spec.quantity,
     unitPriceOriginal: { amount: price.toString(), currency: 'VND' },
     netAmount: money((price * BigInt(spec.quantity)).toString()),
@@ -178,11 +177,13 @@ export function invoiceBody(ctx: DemoRunContext, spec: InvoiceFixture, documentI
   };
 }
 
-function invoiceMonth(ctx: DemoRunContext, spec: InvoiceFixture): string {
-  if (spec.reviewMonthOffset === undefined) return ctx.today.slice(0, 7);
-  const year = Number(ctx.today.slice(0, 4));
-  const last = Math.min(10, Number(ctx.today.slice(5, 7)) - 1);
-  return new Date(Date.UTC(year, last - 1 + spec.reviewMonthOffset, 1)).toISOString().slice(0, 7);
+/**
+ * Every invoice is for the month of the seed. An invoice of a request for a month before its grant carries the flag `OUTSIDE_TERM` (the plan of
+ * the request starts the month it was granted), and the people of the dataset are placed from the day of the seed (D-9), so a past month has
+ * no service to bill.
+ */
+function invoiceMonth(ctx: DemoRunContext): string {
+  return ctx.today.slice(0, 7);
 }
 
 export function resubmissionBody(ctx: DemoRunContext, spec: InvoiceFixture, documentId: string) {

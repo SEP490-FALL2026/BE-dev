@@ -241,7 +241,7 @@ function chooseBase(
 
 /**
  * The base of the department for the light its entry in `budgets` names, counted for `today` (SPEC S24 item 1), or null for a department with none.
- * ENG and ITO sit well under (a forecast of half the base, ENG never under 600 million so a transfer of 5 million the next day stays covered),
+ * ENG and ITO sit well under (never under what their BM-10 lines add up to, so a transfer of 5 million from ENG the next day stays covered),
  * the Board stays green with a margin over the pace, Finance is yellow with the reserve of 60 % that covers the forecast. A base is a whole million
  * when that keeps the light, else a finer step; a day too early for the light (`UNDER` exists from June) is reported by `reachable`, never thrown.
  */
@@ -251,7 +251,8 @@ export function baseFor(fixture: Basis, department: string, today: Day): BaseCho
   const expected = expectedOf(fixture, department, today);
   const forecast = expected.spentThrough + expected.committed + expected.pending;
   const reservePercent = entry.reserve?.percent ?? DEFAULT_RESERVE_PERCENT;
-  const floor = Number(entry.base) >= 600_000_000 ? Number(entry.base) : 0;
+  // A department meant to sit under asks at least what its BM-10 lines add up to (the fixture's base), never a figure counted from its few requests.
+  const floor = entry.light === 'UNDER' ? Number(entry.base) : 0;
   // Nothing counted for the department (no request of it holds or waits for money, and no seat has cost it a month yet): there is no figure to count a
   // base from, so the fixture's amount stands and the light it shows is reported, whichever it is.
   const chosen =

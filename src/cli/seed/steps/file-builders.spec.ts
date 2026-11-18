@@ -6,6 +6,7 @@ import { SHARED_DEMO_V4 as F } from '../fixture/shared-demo-v4';
 import { fakeBm10Template } from './bm10-template.fake';
 import { BALANCE_LINE, bm10Workbook, reserveOf, versionWorkbook } from './file-builders';
 import { contractPdf, invoicePdf, receiptPdf, signaturePdf } from './pdf-builders';
+import { fitLines } from './budget-files';
 
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -275,17 +276,32 @@ describe('the PDFs of the contracts, invoices, signed records and receipts', () 
 });
 
 describe('the budget lines of the fixture', () => {
-  it('never add up to more than the amount a department asks for, this year or next', () => {
+  it('fit within the amount a department asks for, this year or next, once cut to it', () => {
     const asked = [
-      ...F.budgets.map((budget) => ({ department: budget.department, amount: BigInt(budget.base) })),
-      ...F.nextYear.map((next) => ({ department: next.department, amount: BigInt(next.requestedAmount) })),
+      ...F.budgets.map((budget) => ({ department: budget.department, amount: Number(budget.base) })),
+      ...F.nextYear.map((next) => ({ department: next.department, amount: Number(next.requestedAmount) })),
     ];
     for (const { department, amount } of asked) {
       const rows = F.budgetLines[department] ?? [];
-      const sum = rows.reduce((total, line) => total + BigInt(line.seats * line.monthlyPrice * line.months), 0n);
+      const sum = fitLines(rows, amount).reduce(
+        (total, line) => total + line.seats * line.monthlyPrice * line.months,
+        0,
+      );
 
       expect(rows.length).toBeGreaterThan(0);
-      expect(sum <= amount).toBe(true);
+      expect(sum).toBeLessThanOrEqual(amount);
+    }
+  });
+
+  it('make the base of a department meant to sit under, so its balancing line stays a small part of BM-10', () => {
+    for (const budget of F.budgets.filter((entry) => entry.light === 'UNDER')) {
+      const sum = (F.budgetLines[budget.department] ?? []).reduce(
+        (total, line) => total + line.seats * line.monthlyPrice * line.months,
+        0,
+      );
+
+      expect(sum).toBeLessThanOrEqual(Number(budget.base));
+      expect(sum).toBeGreaterThanOrEqual(Number(budget.base) * 0.9);
     }
   });
 });

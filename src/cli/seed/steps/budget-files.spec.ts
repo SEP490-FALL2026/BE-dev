@@ -118,10 +118,15 @@ describe('the lines of BM-10 within the amount asked (T9b)', () => {
 
   it('cuts a line to the months that fit the amount and leaves out the ones that fit none', () => {
     expect(fitLines([line(12)], 3_000_000)).toEqual([line(3)]);
-    expect(fitLines([line(12), { ...line(12), software: 'Slack' }], 3_000_000).map((l) => l.software)).toEqual([
-      'Jira',
+    expect(fitLines([line(12), { ...line(12), software: 'Slack' }], 3_000_000)).toEqual([
+      line(3),
+      { ...line(12), software: 'Slack', seats: 3, months: 1 },
     ]);
-    expect(fitLines([line(12)], 500_000)).toEqual([]);
+    expect(fitLines([line(12)], 100_000)).toEqual([]);
+  });
+
+  it('cuts a line that fits no month of all its seats to the seats one month pays for', () => {
+    expect(fitLines([line(12)], 500_000)).toEqual([{ ...line(12), seats: 2, months: 1 }]);
   });
 
   it('never adds up to more than the amount, whatever it is', () => {

@@ -35,14 +35,14 @@ describe('the finished months and quarterly explanations', () => {
     expect(lines.filter(({ explanationStatus }) => explanationStatus === 'PENDING')).toHaveLength(1);
     expect(explanationMove(lines.slice(0, 1)).kind).toBe('limited');
   });
-  it('confirms two request invoices in the previous completed months without touching shared-pool links', () => {
+  it('confirms two request invoices for the month of the seed, never a month before the grant (no OUTSIDE_TERM)', () => {
     const ids = emptyIds();
     ids.requests.set('R18', 'request-18');
     ids.requests.set('R56', 'request-56');
     const ctx = { fixture, ids, today: '2026-11-18' } as unknown as DemoRunContext;
     for (const [number, requestId, month] of [
-      ['SV-INV-011', 'request-18', '2026-09'],
-      ['SV-INV-012', 'request-56', '2026-10'],
+      ['SV-INV-011', 'request-18', '2026-11'],
+      ['SV-INV-012', 'request-56', '2026-11'],
     ]) {
       const spec = INVOICES.find((row) => row.number === number)!;
       expect(spec).toMatchObject({ quantity: 1, target: 'CONFIRMED' });

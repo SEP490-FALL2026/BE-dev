@@ -64,9 +64,10 @@ export const FINANCE: Pick<
   budgets: [
     {
       department: 'ENG',
-      base: '600000000',
+      // What the lines of its BM-10 add up to over a year, and a little more: well over what the department spends, so it stays under.
+      base: '170000000',
       light: 'UNDER',
-      note: 'Jira, GitHub cho cả phòng; ChatGPT Plus cho nhóm R&D.',
+      note: 'Jira, GitHub, Slack cho cả phòng; ChatGPT Plus, Claude Team cho nhóm R&D.',
     },
     { department: 'MKT', base: '240000', note: 'Canva Teams cho nhóm nội dung.' },
     { department: 'SAL', base: '290000', note: 'Mailchimp Standard cho chiến dịch.' },
@@ -81,7 +82,12 @@ export const FINANCE: Pick<
         reason: 'Phòng có các khoản phát sinh theo kỳ đối soát, cần dự phòng cao hơn mức mặc định.',
       },
     },
-    { department: 'ITO', base: '50000000', light: 'UNDER' },
+    {
+      department: 'ITO',
+      base: '33000000',
+      light: 'UNDER',
+      note: 'Jira, 1Password, Confluence, Microsoft 365, Zoom của phòng IT.',
+    },
   ],
   /*
    * Where the next year is left (DEMO-15): Engineering's budget is approved (a Request that runs into the next year shows the spending
@@ -113,9 +119,10 @@ export const FINANCE: Pick<
     },
   ],
   /*
-   * What each head writes in the file of `BM-10` (the system keeps the file and reads none of it): the software the department already
-   * pays for, at the prices of the catalog. A line never adds up to more than the amount the head asks; the rest is one balancing line. The
-   * three tight departments ask so little that a month of one seat is all the file lists.
+   * What each head writes in the file of `BM-10` (the system keeps the file and reads none of it): the software the department uses, at the
+   * prices of the catalog, for a year. A line never adds up to more than the amount the head asks (`fitLines` cuts months, then seats); the rest
+   * is one balancing line. The three tight departments ask less than a seat-month of this year (their requests test the budget check), so their
+   * file of this year is the balancing line alone; their lines show in the file of next year.
    */
   budgetLines: {
     ENG: [
@@ -123,14 +130,29 @@ export const FINANCE: Pick<
       line('GitHub', 'Team', 9, 100000, 12, 'Quản lý mã nguồn cho cả phòng'),
       line('Slack', 'Pro', 8, 180000, 12, 'Trao đổi hằng ngày của nhóm'),
       line('ChatGPT', 'Plus', 5, 500000, 12, 'Nhóm R&D thử nghiệm trợ lý AI'),
+      line('Claude', 'Team', 3, 625000, 12, 'Trợ lý AI cho nhóm R&D (gói năm quy ra tháng)'),
+      line('Notion', 'Business', 3, 500000, 12, 'Tài liệu kỹ thuật của nhóm'),
+      line('Confluence', 'Standard', 3, 160000, 12, 'Trang tài liệu dự án'),
+      line('Microsoft 365', 'Business Basic', 3, 150000, 12, 'Thư và lịch của nhân viên mới'),
     ],
     ITO: [
       line('Jira', 'Standard', 6, 200000, 12, 'Theo dõi yêu cầu cấp quyền'),
       line('1Password', 'Business', 1, 200000, 12, 'Kho mật khẩu dùng chung của phòng'),
+      line('Confluence', 'Standard', 2, 160000, 12, 'Quy trình vận hành của phòng'),
+      line('Microsoft 365', 'Business Basic', 3, 150000, 12, 'Thư và lịch của phòng'),
+      line('Zoom Workplace', 'Pro', 1, 360000, 12, 'Họp với nhà cung cấp'),
     ],
-    MKT: [line('Canva', 'Teams', 1, 240000, 1, 'Một ghế một tháng cho nhóm nội dung')],
-    SAL: [line('Mailchimp', 'Standard', 1, 290000, 1, 'Một ghế một tháng cho chiến dịch')],
-    DES: [line('Postman', 'Professional', 1, 280000, 1, 'Một ghế một tháng cho nhóm kiểm thử giao diện')],
+    MKT: [
+      line('Canva', 'Teams', 4, 250000, 12, 'Thiết kế nội dung của nhóm'),
+      line('Notion', 'Business', 4, 500000, 12, 'Lịch nội dung và tài liệu chiến dịch'),
+      line('Adobe Photoshop', 'Photoshop', 2, 560000, 12, 'Chỉnh ảnh cho chiến dịch'),
+    ],
+    SAL: [
+      line('Mailchimp', 'Standard', 3, 400000, 12, 'Gửi thư chiến dịch'),
+      line('HubSpot Sales Hub', 'Starter', 3, 450000, 12, 'Quản lý khách hàng tiềm năng'),
+      line('Zoom Workplace', 'Pro', 3, 360000, 12, 'Họp với khách hàng'),
+    ],
+    DES: [line('Postman', 'Professional', 2, 300000, 12, 'Nhóm kiểm thử giao diện')],
     BOD: [line('Slack', 'Pro', 5, 180000, 12, 'Trao đổi của Ban Giám đốc')],
     FIN: [line('Jira', 'Standard', 4, 200000, 12, 'Theo dõi công việc đối soát')],
   },
