@@ -1,5 +1,7 @@
 import type { DemoRenewal } from '../demo-fixture.types';
 
+export const AI_SUMMARIES = ['NV-ENGH', 'NV-CEO', 'NV-ITOH'];
+
 export const RENEWALS: DemoRenewal[] = [
   {
     subscription: 'adobe-cc-teams',
