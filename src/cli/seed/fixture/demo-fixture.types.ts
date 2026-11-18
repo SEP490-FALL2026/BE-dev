@@ -379,6 +379,25 @@ export interface DemoRenewal {
   nextPeriod: boolean;
 }
 
+export interface DemoDevice {
+  assetCode: string;
+  holder: string;
+  signature: boolean;
+  acknowledge: boolean;
+  changeTo?: string;
+  retire?: boolean;
+}
+
+export interface DemoMonitoringNotice {
+  collected: string;
+  notCollected: string;
+  purpose: string;
+  retention: string;
+  stopRight: string;
+  includesToolStatus: boolean;
+  requiresReacknowledgement: boolean;
+}
+
 export interface DemoFixture {
   id: string;
   /** The prefix of every code and the tag written into free text, so a person can tell demo data from the rest. */
@@ -421,6 +440,8 @@ export interface DemoFixture {
   keys: DemoKeys[];
   usageSources: DemoUsageSource[];
   renewals: DemoRenewal[];
+  devices: DemoDevice[];
+  monitoringNotice: DemoMonitoringNotice;
   ghostDecisions: DemoGhostDecision[];
   personnel: DemoPersonnelEvent[];
   departmentSoftware: DemoDepartmentSoftware[];

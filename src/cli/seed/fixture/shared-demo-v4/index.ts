@@ -1,6 +1,7 @@
 import type { DemoFixture } from '../demo-fixture.types';
 import { CATALOG } from './catalog';
 import { FINANCE } from './finance';
+import { DEVICES, MONITORING_NOTICE } from './devices';
 import { ORGANIZATION } from './organization';
 import { REQUESTS } from './requests';
 import { REQUESTS_EXTRA, RETURNS } from './requests-extra';
@@ -21,6 +22,8 @@ export const SHARED_DEMO_V4: DemoFixture = {
   requests: [...REQUESTS.requests, ...REQUESTS_EXTRA],
   returns: RETURNS,
   renewals: RENEWALS,
+  devices: DEVICES,
+  monitoringNotice: MONITORING_NOTICE,
   ...USAGE,
   usageSources: [...USAGE.usageSources, ...EXTRA_USAGE_SOURCES],
   ...SOFTWARE_LIST,
