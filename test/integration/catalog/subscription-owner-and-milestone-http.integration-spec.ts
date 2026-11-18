@@ -1,10 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { SubscriptionHttpHarness, type SubscriptionWire, USD_1200 } from '../../support/subscription-http-harness';
+import { SubscriptionHttpHarness, type SubscriptionWire, VND_30M } from '../../support/subscription-http-harness';
+
+/** What an annual subscription needs to be active (AC-1): the point of adjustment is only read for one that runs a period. */
+const RUNNING_ANNUAL = {
+  purchasedQuantity: 100,
+  unitPrice: VND_30M,
+  billingCycle: 'ANNUAL',
+  startDate: '2026-01-01',
+  autoRenew: true,
+};
 
 describe('subscriptions and perpetual purchases over HTTP (integration, real PostgreSQL): the owner department and the milestone for a cancellation', () => {
   const h = new SubscriptionHttpHarness();
-  const { server, as, unique, dataOf, codeOf, today, rate, plan, create, patch, get, subscription, n, auditOf } = h;
+  const { server, as, dataOf, codeOf, today, plan, create, patch, subscription, n, auditOf } = h;
 
   beforeAll(async () => {
     await h.start();
@@ -16,97 +25,17 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
     await h.stop();
   });
 
-  describe('the owner department (F02, QĐ-89a)', () => {
-    /** A department of the organization that is no longer active, made the way the organization stops one. */
-    const stoppedDepartment = async (): Promise<string> => {
-      const departmentId = randomUUID();
-      await h.ctx.sql.query(
-        `INSERT INTO departments (id, organization_id, code, name, status, deactivated_at, updated_at)
-         VALUES ($1, $2, $3, 'Old department', 'INACTIVE', now(), now())`,
-        [departmentId, h.seed.organizationId, unique('OLD').replace(' ', '-')],
-      );
-
-      return departmentId;
-    };
-
-    it('declares a subscription for an active department: the wire and the audit event carry the owner', async () => {
-      const { planId } = await plan();
-
+  describe('a subscription has no owner department (QĐ-113g)', () => {
+    it('refuses a department a caller names, on a declaration and on a change: the body takes no such field', async () => {
+      const { planId } = await plan({ type: 'K1' });
       const created = await subscription(planId);
 
-      expect(created.ownerDepartmentId).toBe(h.seed.departmentId);
-      const stored = await h.ctx.sql.query<{ owner_department_id: string }>(
-        'SELECT owner_department_id FROM subscriptions WHERE id = $1',
-        [created.id],
-      );
-      expect(stored.rows[0].owner_department_id).toBe(h.seed.departmentId);
-      const [event] = await auditOf(created.id);
-      expect(event).toEqual(
-        expect.objectContaining({
-          action: 'SUBSCRIPTION.CREATED',
-          after: expect.objectContaining({ ownerDepartmentId: h.seed.departmentId }) as unknown,
-        }),
-      );
-    });
+      const declared = await create({ planId, kind: 'TERM', ownerDepartmentId: randomUUID() }).expect(422);
+      const changed = await patch(created.id, { ownerDepartmentId: randomUUID() }).expect(422);
 
-    it('refuses a declaration with no owner department: 422 VALIDATION_ERROR and nothing is written', async () => {
-      const { planId } = await plan();
-      const before = { subscriptions: await n('subscriptions'), audit: await n('audit_events') };
-
-      const response = await create({ planId, kind: 'TERM', ownerDepartmentId: undefined }).expect(422);
-
-      expect(codeOf(response)).toBe('VALIDATION_ERROR');
-      expect({ subscriptions: await n('subscriptions'), audit: await n('audit_events') }).toEqual(before);
-    });
-
-    it.each([
-      ['a department that does not exist', () => Promise.resolve(randomUUID())],
-      ['a department that has been stopped', async () => stoppedDepartment()],
-    ])('refuses %s: 422 SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE and nothing is written', async (_name, owner) => {
-      const { planId } = await plan();
-      const ownerDepartmentId = await owner();
-      const before = { subscriptions: await n('subscriptions'), audit: await n('audit_events') };
-
-      const response = await create({ planId, kind: 'TERM', ownerDepartmentId }).expect(422);
-
-      expect(codeOf(response)).toBe('SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE');
-      expect({ subscriptions: await n('subscriptions'), audit: await n('audit_events') }).toEqual(before);
-    });
-
-    it('reads the owner on every subscription (never null), and a change neither gives nor alters it: the body and the database both refuse', async () => {
-      const { planId } = await plan();
-      const created = await subscription(planId);
-
-      expect(dataOf<SubscriptionWire>(await get(created.id).expect(200)).ownerDepartmentId).toBe(h.seed.departmentId);
-      const changed = dataOf<SubscriptionWire>(await patch(created.id, { purchasedQuantity: 3 }).expect(200));
-      expect(changed.ownerDepartmentId).toBe(h.seed.departmentId);
-      const listed = dataOf<{ items: SubscriptionWire[] }>(
-        await request(server()).get('/api/v1/subscriptions').query({ planId }).set(as(h.it1)).expect(200),
-      );
-      expect(listed.items.map((item) => item.ownerDepartmentId)).toEqual([h.seed.departmentId]);
-      // The owner is not a field of a change; and even by SQL it cannot change or be cleared.
-      const refused = await patch(created.id, { ownerDepartmentId: await stoppedDepartment() }).expect(422);
-      expect(codeOf(refused)).toBe('VALIDATION_ERROR');
-      await expect(
-        h.ctx.sql.query(`UPDATE subscriptions SET owner_department_id = $2 WHERE id = $1`, [
-          created.id,
-          await stoppedDepartment(),
-        ]),
-      ).rejects.toMatchObject({ code: '23514' });
-      // The trigger that keeps the owner refuses a change to nothing before the NOT NULL of the column is looked at; the column is
-      // required all the same.
-      await expect(
-        h.ctx.sql.query(`UPDATE subscriptions SET owner_department_id = NULL WHERE id = $1`, [created.id]),
-      ).rejects.toMatchObject({ code: '23514' });
-      expect(
-        (
-          await h.ctx.sql.query<{ is_nullable: string }>(
-            `SELECT is_nullable FROM information_schema.columns
-              WHERE table_name = 'subscriptions' AND column_name = 'owner_department_id'`,
-          )
-        ).rows[0].is_nullable,
-      ).toBe('NO');
-      expect(dataOf<SubscriptionWire>(await get(created.id).expect(200)).ownerDepartmentId).toBe(h.seed.departmentId);
+      expect(codeOf(declared)).toBe('VALIDATION_ERROR');
+      expect(codeOf(changed)).toBe('VALIDATION_ERROR');
+      expect(Object.keys(created)).not.toContain('ownerDepartmentId');
     });
 
     it('F23: refuses to declare a subscription for a plan whose application is retired: 422 SUBSCRIPTION.APPLICATION_RETIRED, nothing is written', async () => {
@@ -124,14 +53,13 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
   });
 
   describe('the milestone for a cancellation (US-04-03)', () => {
-    it('AC-1: Figma, 100 seats, renewing 31/12, deadline 01/12, auto renewal: the deadline is used, the alerts count back from it', async () => {
+    it('AC-1: Figma, 100 seats, renewing 31/12, deadline 01/12, auto renewal: the deadline is used, the point of adjustment and the red alert count back from it', async () => {
       const { planId } = await plan({ vendorName: 'Figma Inc' });
       today('2026-09-01');
-      await rate('USD', '2026-09-01', '25000');
 
       const created = await subscription(planId, {
         purchasedQuantity: 100,
-        unitPrice: USD_1200,
+        unitPrice: VND_30M,
         billingCycle: 'ANNUAL',
         startDate: '2026-01-01',
         renewalDate: '2026-12-31',
@@ -145,7 +73,7 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
         missing: [],
         purchasedQuantity: 100,
         noticeDeadline: { value: '2026-12-01', source: 'DECLARED' },
-        alerts: { baseDate: '2026-12-01', dates: ['2026-11-16', '2026-11-24'] },
+        alerts: { baseDate: '2026-12-01', dates: ['2026-11-01', '2026-11-24'] },
         warnings: [],
       });
       expect(await auditOf(created.id)).toEqual([
@@ -156,10 +84,16 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
     it('AC-2: no deadline but a notice period of 30 days with renewal on 31/12 infers 01/12, unconfirmed; declaring it confirms and is audited', async () => {
       const { planId } = await plan();
 
-      const created = await subscription(planId, { renewalDate: '2026-12-31', noticePeriodDays: 30 });
+      today('2026-09-01');
+
+      const created = await subscription(planId, {
+        ...RUNNING_ANNUAL,
+        renewalDate: '2026-12-31',
+        noticePeriodDays: 30,
+      });
 
       expect(created.noticeDeadline).toEqual({ value: '2026-12-01', source: 'INFERRED_UNCONFIRMED' });
-      expect(created.alerts.dates).toEqual(['2026-11-16', '2026-11-24']);
+      expect(created.alerts).toEqual({ baseDate: '2026-12-01', dates: ['2026-11-01', '2026-11-24'] });
 
       const confirmed = dataOf<SubscriptionWire>(await patch(created.id, { noticeDeadline: '2026-12-01' }).expect(200));
       expect(confirmed.noticeDeadline).toEqual({ value: '2026-12-01', source: 'DECLARED' });
@@ -181,14 +115,39 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       expect(created.warnings).toEqual(['NO_ALERT_ANCHOR']);
     });
 
-    it('AC-7: Zoom ends 31/12 with no deadline, no notice period and no auto renewal: alerts from the end date, no warning', async () => {
-      const { planId } = await plan({ pricing: 'FLAT_RATE', type: 'K1' });
+    it('AC-7: Zoom ends 31/12 with no deadline, no notice period and no auto renewal: the point of adjustment counts from the end date, no warning', async () => {
+      const { planId } = await plan({ pricing: 'FLAT_RATE', type: 'K2' });
+      today('2026-09-01');
 
-      const created = await subscription(planId, { endDate: '2026-12-31', autoRenew: false });
+      // A plan paid by the month (R-E01): its payment day is the day of the end day in each month (R-1), so on 1/9 the next is 30/9 (the 31st of
+      // December counted back by three months) and the point opens 7 days before it; the last payment day is the end day; no red alert for a plan by the month.
+      const created = await subscription(planId, {
+        endDate: '2026-12-31',
+        autoRenew: false,
+        billingCycle: 'MONTHLY',
+        startDate: '2026-01-01',
+        unitPrice: VND_30M,
+      });
 
+      expect(created.status).toBe('ACTIVE');
       expect(created.noticeDeadline).toEqual({ value: null, source: 'BY_END_DATE' });
-      expect(created.alerts).toEqual({ baseDate: '2026-12-31', dates: ['2026-12-16', '2026-12-24'] });
+      expect(created.alerts).toEqual({ baseDate: '2026-09-30', dates: ['2026-09-23'] });
       expect(created.warnings).toEqual([]);
+    });
+
+    it('F5: a K1 term has no point of adjustment, so its alerts are empty whatever its dates say (the renewal says NOT_POOL_TERM)', async () => {
+      const { planId } = await plan({ pricing: 'FLAT_RATE', type: 'K1' });
+      today('2026-09-01');
+
+      const created = await subscription(planId, {
+        endDate: '2026-12-31',
+        autoRenew: false,
+        billingCycle: 'MONTHLY',
+        startDate: '2026-01-01',
+        unitPrice: VND_30M,
+      });
+
+      expect(created.alerts).toEqual({ baseDate: null, dates: [] });
     });
 
     it('AC-12: a term with no deadline, no notice period, no auto renewal and no end date sets no milestone and warns', async () => {
@@ -201,15 +160,19 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       expect(created.warnings).toEqual(['NO_ALERT_ANCHOR']);
     });
 
-    it('follows the operating parameter for the alert days, as it is now when the subscription is read', async () => {
+    it('has no alert dates for a subscription that runs no period: a draft, whatever its notice says', async () => {
       const { planId } = await plan();
-      const created = await subscription(planId, { endDate: '2026-12-31' });
-      expect(created.alerts.dates).toEqual(['2026-12-16', '2026-12-24']);
-      jest.spyOn(h.parameters, 'getValue').mockResolvedValue([30, 10, 1]);
+      today('2026-09-01');
 
-      const read = dataOf<SubscriptionWire>(await get(created.id).expect(200));
+      const draft = await subscription(planId, {
+        endDate: '2026-12-31',
+        renewalDate: '2026-12-31',
+        noticePeriodDays: 30,
+      });
 
-      expect(read.alerts).toEqual({ baseDate: '2026-12-31', dates: ['2026-12-01', '2026-12-21', '2026-12-30'] });
+      expect(draft.status).toBe('DRAFT');
+      expect(draft.noticeDeadline).toEqual({ value: '2026-12-01', source: 'INFERRED_UNCONFIRMED' });
+      expect(draft.alerts).toEqual({ baseDate: null, dates: [] });
     });
 
     it('lists exactly the subscriptions that warn about having no anchor, whichever way the data is combined', async () => {

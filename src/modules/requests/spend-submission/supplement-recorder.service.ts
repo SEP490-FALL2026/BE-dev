@@ -32,11 +32,14 @@ export class SupplementRecorder {
       repriced: PricingRecord;
       change: NonNullable<ReturnType<typeof supplementChangeOf>>;
       dropped: readonly string[];
+      /** The shorter time of use the file gives, kept on the request in place of the one it had. */
+      termMonths?: number;
       now: Date;
     },
   ): Promise<SupplementRecord> {
     const { repriced, change, dropped, now } = written;
     await this.requests.setPricing(tx, request.id, repriced);
+    if (written.termMonths !== undefined) await this.requests.setTermMonths(tx, request.id, written.termMonths);
     const saved = await this.supplements.insert(tx, {
       organizationId: request.organizationId,
       requestId: request.id,
@@ -54,7 +57,19 @@ export class SupplementRecorder {
         'ACCESS_REQUEST.SUPPLEMENT_ADDED',
         'ACCESS_REQUEST',
         request.id,
-        supplementAuditDetail(request.id, saved, dropped),
+        supplementAuditDetail(
+          request.id,
+          {
+            number: saved.number,
+            beforeExpectedEndDate: saved.beforeExpectedEndDate,
+            afterExpectedEndDate: saved.afterExpectedEndDate,
+            beforeBudgetYear: saved.beforeBudgetYear ?? 0,
+            afterBudgetYear: saved.afterBudgetYear ?? 0,
+            beforeAmountMinor: saved.beforeAmountMinor ?? 0n,
+            afterAmountMinor: saved.afterAmountMinor ?? 0n,
+          },
+          dropped,
+        ),
       ),
     );
 

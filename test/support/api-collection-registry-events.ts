@@ -1,4 +1,7 @@
 import type { NestedClassification, RegistryEvent } from './api-collection-registry';
+import { W2_REGISTRY_EVENTS } from './api-collection-registry-events-w2';
+import { QD111_REGISTRY_EVENTS } from './api-collection-registry-events-qd111';
+import { W3_REGISTRY_EVENTS } from './api-collection-registry-events-w3';
 
 export const closedException = (
   key: string,
@@ -65,6 +68,9 @@ export const removedByDecision = (key: string, from: NestedClassification): Regi
  * its difference. Prompt 10 (23/10/2026, commit 4cc9a47) closed these with the remediation items of the G0-G4 review.
  */
 export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
+  ...W2_REGISTRY_EVENTS,
+  ...W3_REGISTRY_EVENTS,
+  ...QD111_REGISTRY_EVENTS,
   // QĐ-93a, D-S19 (Owner 01/11/2026): `GET /me` returns `roles` as one array of the granted roles; the object { direct, derived, effective } goes.
   ...['meGet#roles.direct', 'meGet#roles.derived', 'meGet#roles.effective'].map((key): RegistryEvent => ({
     registry: 'nested',
@@ -299,20 +305,13 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     'The detail embeds the first similar applications with similarTotal.',
   ),
   boundedNested(
-    'planTermsGet#opinions',
-    'OPINIONS_IN_VIEW',
-    'LD-06',
-    'catalog-application-plan-read-contracts',
-    'The terms embed the newest opinions with opinionTotal; GET /plans/{id}/term-opinions pages them all.',
-  ),
-  boundedNested(
     'planTermsGet#warnings',
     'WARNINGS_IN_VIEW',
     'LD-16',
     'catalog-subscription-read-model',
     'The terms embed the earliest review alerts with warningTotal; planWarningList pages them all.',
   ),
-  ...['retirement.confirmations', 'retirement.blockers.assignments', 'retirement.blockers.subscriptions'].map((path) =>
+  ...['retirement.blockers.assignments', 'retirement.blockers.subscriptions'].map((path) =>
     boundedNested(
       `applicationRetirementGet#${path}`,
       'RETIREMENT_LIST_LIMIT',
@@ -334,14 +333,6 @@ export const REGISTRY_EVENTS_SINCE_INITIAL: readonly RegistryEvent[] = [
     'LD-14',
     'g0-g6-final-business-baseline-remediation',
     'The new history route of a version (F66, spec J.4): each entry shows the fields one edit changed, at most HISTORY_CHANGES_MAX.',
-    'added',
-  ),
-  boundedNested(
-    'transferReviewGet#unfinishedRequests',
-    'UNFINISHED_REQUESTS_MAX',
-    'LD-14',
-    'g0-g6-final-business-baseline-remediation',
-    'The review of a transfer lists the open Requests of the person beside the tools (F29), at most UNFINISHED_REQUESTS_MAX.',
     'added',
   ),
   {

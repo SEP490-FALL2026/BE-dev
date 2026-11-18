@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { CurrenciesController } from './currency/currencies.controller';
-import { ExchangeRatesController } from './exchange-rate/exchange-rates.controller';
 import { FinanceModule } from './finance.module';
 
 /**
@@ -11,6 +10,6 @@ import { FinanceModule } from './finance.module';
  */
 @Module({
   imports: [FinanceModule],
-  controllers: [ExchangeRatesController, CurrenciesController],
+  controllers: [CurrenciesController],
 })
 export class FinanceHttpModule {}

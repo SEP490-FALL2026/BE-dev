@@ -1,17 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import type { ProposalRecord } from '../access-request/assessment-record.types';
-import { PricingViewService, type PricingView } from './pricing-view.service';
+import { PricingViewService, type CostView, type MoneyView, type PricingView } from './pricing-view.service';
+import { RequestCostViewService } from './request-cost-view.service';
+import type { BlockReason } from '../spend/budget-check.policy';
+import type { SpendStage } from '../access-request/access-request.types';
 import { SpendStatusService, type SpendStatusView } from '../spend/spend-status.service';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
-import { canViewRequest, viewFactsOf, hasSpendStep } from '../access-request/access-request.policy';
+import { viewFactsOf, hasSpendStep } from '../access-request/access-request.policy';
+import { RequestReadAccessService } from './request-read-access.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, ApprovalRecordRecord, NeedStepRecord } from '../access-request/access-request.types';
 import type { ReadableCancelCause } from '../access-request/group-request.types';
+import type { LimitExemption } from '../request-limits/request-limits.policy';
 
 export interface EmployeeRefView {
   employeeId: string;
@@ -24,14 +28,28 @@ export interface NeedDecisionView extends Omit<ApprovalRecordRecord, 'decidedByE
   decidedBy: EmployeeRefView;
 }
 
-export interface NeedStepView extends Omit<NeedStepRecord, 'assigneeEmployeeId'> {
+export interface NeedStepView extends Omit<
+  NeedStepRecord,
+  'assigneeEmployeeId' | 'samePersonAsSpend' | 'slaWorkingDays'
+> {
   assignee: EmployeeRefView | null;
+  slaWorkingDays: number | null;
+}
+
+/** Where the request stands on its way to the spending approver, as the wire writes it (`BR-MF1-06g`). */
+export interface SpendView {
+  stage: SpendStage;
+  blockedReasons: (BlockReason | 'PRICE_MISSING')[];
+  /** How far over the base (waiting for the reserve to be confirmed) or over the reserve (blocked for that); null otherwise. */
+  overBy: MoneyView | null;
+  refusalReason: string | null;
 }
 
 /** A request as a reader sees it: the record with the names of the people, the plan, the department and the Cost Center. */
 export interface AccessRequestView extends Omit<
   AccessRequestRecord,
   | 'organizationId'
+  | 'oneStepBlockedReason'
   | 'planId'
   | 'departmentId'
   | 'costCenterId'
@@ -66,8 +84,10 @@ export interface AccessRequestView extends Omit<
   policy: { version: number; hasSpendStep: boolean; slaWorkingDays: number };
   budgetYear: number | null;
   pricing: PricingView;
-  /** Where the request stands on its way to the spending approver, for a request that costs money; never a figure of the budget. */
-  spend: SpendStatusView | null;
+  /** The cost by the year before tax, with the part of the year after (`QĐ-111j`, `QĐ-111k`); null when nothing is priced by the month. */
+  cost: CostView | null;
+  /** Where the request stands on its way to the spending approver, for a request that costs money; never what is left of the budget. */
+  spend: SpendView | null;
   needStep: NeedStepView;
   /** Null until the need step is decided. */
   needDecision: NeedDecisionView | null;
@@ -79,12 +99,14 @@ export interface AccessRequestView extends Omit<
   renewal: RenewalView | null;
   /** What a request for a service account adds; null for any other request. */
   serviceAccount: ServiceAccountView | null;
+  /** Why the request was left out of GH-1/GH-2 when it was sent (`QĐ-110q`); null for every other request. */
+  limitExemption: LimitExemption | null;
 }
 
 export interface RenewalView {
   assignmentId: string;
   previousExpectedEndDate: string;
-  newExpectedEndDate: string;
+  newExpectedEndDate: string | null;
   consecutiveMonths: number;
   /** The record approval wrote after the old one; null until the request is approved. */
   applied: { successorAssignmentId: string; appliedAt: Date } | null;
@@ -119,7 +141,7 @@ export interface CancellationView {
   note: string | null;
 }
 
-/** Reading a request (`US-05-03` AC-12: who holds the step and why). Only the people with a part in it see it. */
+/** Reading a request (`US-05-03` AC-12: who holds the step and why). Only the people `canReadRequest` names see it. */
 @Injectable()
 export class AccessRequestQueryService {
   constructor(
@@ -127,21 +149,29 @@ export class AccessRequestQueryService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly pricing: PricingViewService,
+    private readonly costs: RequestCostViewService,
     private readonly assessments: AssessmentReadRepo,
     private readonly spendStatus: SpendStatusService,
-    private readonly budgets: BudgetsApi,
+    private readonly readAccess: RequestReadAccessService,
   ) {}
 
   async get(actor: AuthenticatedPrincipal, id: string): Promise<AccessRequestView> {
     const record = await this.repo.findById(id);
-    // Finance reads the request a commitment was made for, to follow the commitment back to it (`US-06-09` AC-2).
-    const visible =
-      record !== null &&
-      (canViewRequest(actor, viewFactsOf(record)) ||
-        (actor.roles.includes('FINANCE') && (await this.budgets.requestHoldsCommitment(record.id))));
-    if (!visible) throw new AccessRequestNotFoundError();
+    // Whoever reads the history of the request reads its detail too: the head of its department, the spending approver once a
+    // spend step was opened, Finance once its spend was approved (`US-06-09` AC-2). Nobody else learns that it exists.
+    const access = record && (await this.readAccess.accessOf(actor, this.subjectOf(record)));
+    if (!record || !access?.read) throw new AccessRequestNotFoundError();
 
     return this.view(record);
+  }
+
+  private subjectOf(record: AccessRequestRecord) {
+    return {
+      ...viewFactsOf(record),
+      id: record.id,
+      isGroup: record.type === 'GROUP_GRANT',
+      departmentId: record.departmentId,
+    };
   }
 
   /** The record with its names, read in the calls of the facades of the other modules (one read each, not one per row). */
@@ -172,6 +202,7 @@ export class AccessRequestQueryService {
       record.branch === 'NEW_SOFTWARE' ? this.assessments.findProposal(record.id) : Promise.resolve(null),
       this.spendStatus.of(record),
     ]);
+    const spendView = spend && (await this.spendViewOf(spend));
     const person = (id: string): EmployeeRefView => {
       const found = people.find((candidate) => candidate.id === id);
       if (!found) throw new Error(`The employee ${id} of the request ${record.id} does not exist.`);
@@ -184,7 +215,9 @@ export class AccessRequestQueryService {
       throw new Error(`The request ${record.id} points at a missing record.`);
     }
 
-    const { assigneeEmployeeId, ...step } = needStep;
+    const { assigneeEmployeeId, ...legacyStep } = needStep;
+    const step = { ...legacyStep };
+    Reflect.deleteProperty(step, 'samePersonAsSpend');
     const decision = record.needDecision;
 
     return {
@@ -192,6 +225,7 @@ export class AccessRequestQueryService {
       type: record.type,
       branch: record.branch,
       state: record.state,
+      routing: record.routing ?? { mode: 'VIA_HEAD', oneStepReason: null },
       plan: plan && {
         planId: plan.planId,
         planName: plan.planName,
@@ -207,9 +241,10 @@ export class AccessRequestQueryService {
       businessReason: record.businessReason,
       termMonths: record.termMonths,
       expectedEndDate: record.expectedEndDate,
-      spend,
+      spend: spendView,
       budgetYear: record.pricing.budgetYear,
       pricing: await this.pricing.view(record.pricing),
+      cost: await this.costs.of(record, record.pricing),
       policy: {
         version: record.policy.version,
         hasSpendStep: hasSpendStep(record.policy),
@@ -238,8 +273,13 @@ export class AccessRequestQueryService {
               note: record.cancellation.note,
             },
       serviceAccount: this.serviceAccountOf(record.serviceAccount, person),
+      limitExemption: record.limitExemption ?? null,
       renewal: this.renewalOf(record.renewal),
-      needStep: { ...step, assignee: assigneeEmployeeId === null ? null : person(assigneeEmployeeId) },
+      needStep: {
+        ...step,
+        slaWorkingDays: step.state === 'NOT_REQUIRED' ? null : step.slaWorkingDays,
+        assignee: assigneeEmployeeId === null ? null : person(assigneeEmployeeId),
+      },
       needDecision:
         decision === null
           ? null
@@ -250,6 +290,17 @@ export class AccessRequestQueryService {
               reason: decision.reason,
               decidedAt: decision.decidedAt,
             },
+    };
+  }
+
+  private async spendViewOf(status: SpendStatusView): Promise<SpendView> {
+    return {
+      stage: status.stage,
+      blockedReasons: status.blockedReasons,
+      overBy:
+        status.overBy &&
+        (await this.pricing.moneyView({ amountMinor: status.overBy.minor, currency: status.overBy.currency })),
+      refusalReason: status.refusalReason,
     };
   }
 

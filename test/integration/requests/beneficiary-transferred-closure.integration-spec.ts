@@ -1,6 +1,7 @@
 import { GroupHarness } from '../../support/group-harness';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 /**
  * `g0-g6-final-business-baseline-remediation`, Task 4.1 (F29, `QĐ-90b`, spec L.8): the IT Admin closes the part of a request that is not
@@ -21,6 +22,8 @@ interface TaskWire {
   id: string;
   status: string;
 }
+
+afterEach(() => jest.restoreAllMocks());
 
 describe('closing a request because its person was transferred (integration, real PostgreSQL)', () => {
   let subscriptionId: string;
@@ -62,7 +65,6 @@ describe('closing a request because its person was transferred (integration, rea
     return sent.id;
   };
   /** A seat is taken on the subscription the department of the request owns (F20), which the harness gives every department. */
-  const ownOf = (u: Unit): string => h.owned.subscriptionFor(subscriptionId, u.department.id);
   const granted = async (requestId: string): Promise<string> =>
     h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId }).expect(201)).task.id;
   const commitmentOf = async (requestId: string) =>
@@ -80,6 +82,31 @@ describe('closing a request because its person was transferred (integration, rea
     ).rows[0];
 
   describe('a request for one person', () => {
+    it('BR-MF1-02/07: a request awaiting requester revision remains open and can be closed after transfer', async () => {
+      const u = await example();
+      const id = (await h.sent(u.person, plan, { termMonths: 1 })).id;
+      await h.ctx.sql.query(
+        `UPDATE access_request_steps SET state = 'NOT_REQUIRED', assignee_employee_id = NULL, assigned_at = NULL,
+           waiting_reason = NULL, waiting_since = NULL WHERE request_id = $1 AND kind = 'NEED'`,
+        [id],
+      );
+      await h.ctx.sql.query(
+        `UPDATE access_requests SET state = 'AWAITING_REQUESTER_REVISION', routing_mode = 'ONE_STEP', one_step_reason = 'HEAD_LEFT' WHERE id = $1`,
+        [id],
+      );
+      await h.moveTo(u.person.employeeId, u.target.department.id);
+
+      expect(await h.state(id)).toBe('AWAITING_REQUESTER_REVISION');
+      const response = await h.closeForDeparture(id, reason, h.it1).expect(200);
+
+      expect(h.dataOf<{ request: RequestWire }>(response).request).toMatchObject({
+        state: 'CANCELLED',
+        cancellation: { cause: 'BENEFICIARY_TRANSFERRED', note: reason.note },
+      });
+      expect(await commitmentOf(id)).toBeUndefined();
+      expect(await taskOf(id)).toBeUndefined();
+    });
+
     it('ends a request that was approved and not granted as cancelled, with the reason, and gives the money back', async () => {
       const u = await example();
       const id = await approvedFor(u, u.person, 15 * M);
@@ -145,14 +172,14 @@ describe('closing a request because its person was transferred (integration, rea
       const u = await example();
       const id = await approvedFor(u, u.person, 10 * M);
       await granted(id);
-      const free = await h.freeSeats(ownOf(u));
+      const free = await h.freeSeats(subscriptionId);
       await h.moveTo(u.person.employeeId, u.target.department.id);
 
       const refused = await h.closeForDeparture(id, reason, h.it1).expect(422);
 
       expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.EVIDENCE_REQUIRED');
       expect(await h.state(id)).toBe('EXECUTING');
-      expect(await taskOf(id)).toMatchObject({ status: 'QUEUED' });
+      expect(await taskOf(id)).toMatchObject({ status: 'IN_PROGRESS' });
 
       await h
         .closeForDeparture(id, { ...reason, evidence: 'Checked with the vendor and collected the invitation' }, h.it1)
@@ -161,7 +188,7 @@ describe('closing a request because its person was transferred (integration, rea
       expect(await h.state(id)).toBe('CANCELLED');
       expect(await taskOf(id)).toMatchObject({ status: 'CANCELLED' });
       expect(await commitmentOf(id)).toMatchObject({ state: 'RELEASED' });
-      expect(await h.freeSeats(ownOf(u))).toBe((free ?? 0) + 1);
+      expect(await h.freeSeats(subscriptionId)).toBe((free ?? 0) + 1);
     });
 
     it('needs the same confirmation for a task that failed, and then cancels it', async () => {
@@ -224,7 +251,7 @@ describe('closing a request because its person was transferred (integration, rea
       const people = await h.colleagues(u, count);
       const target = await h.departmentWithHead(`P-TGT${n}`);
 
-      return { u, people, target, id: await h.groupApproved(u, plan, people), own: ownOf(u) };
+      return { u, people, target, id: await h.groupApproved(u, plan, people), own: subscriptionId };
     };
     const releases = async (id: string) =>
       (
@@ -296,6 +323,8 @@ describe('closing a request because its person was transferred (integration, rea
     });
 
     it('closes a request whose last live line is the transferred person’s: the line goes and the request ends with it', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       // A group names two people at least, so the other one is taken out first and the last live line is the transferred person's.
       const { u, people, id, target } = await group(2);
       await h.withdrawLine(id, people[1].employeeId, {}, u.head.account).expect(200);

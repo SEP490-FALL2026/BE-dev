@@ -11,7 +11,7 @@ describe('the query of my requests', () => {
       page: '2',
       pageSize: '100',
       view: 'open',
-      state: 'PENDING,AWAITING_BUDGET',
+      state: 'PENDING,AWAITING_SPEND_DECISION',
       type: 'GROUP_GRANT',
       from: '2026-10-01T00:00:00Z',
       to: '2026-11-01T00:00:00Z',

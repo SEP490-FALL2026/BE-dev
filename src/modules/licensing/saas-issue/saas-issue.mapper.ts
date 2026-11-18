@@ -1,15 +1,17 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { SaasIssueEntryWire, SaasIssueSummaryWire, SaasIssueWire } from './saas-issue.dto';
-import { isResponseOverdue } from './saas-issue.policy';
+import { isResponseOverdue, issueTitleOf } from './saas-issue.policy';
 import type { EntryRecord, SaasIssueRecord } from './saas-issue.repo';
 
 type Brief = { employeeId: string; employeeCode: string; fullName: string };
-type PlanBriefWire = { planId: string; planName: string; applicationName: string };
+type PlanBriefWire = { planId: string; planName: string; applicationName: string; logoUrl: string | null };
 
 /** What the wire needs to name besides the report itself: the people, the plan of each assignment and the original of a duplicate. */
 export interface IssueNames {
   today: BusinessDate;
   employee: (id: string) => Brief;
+  /** The department a person is placed in today; null when they are placed in none. */
+  department: (employeeId: string) => { id: string; name: string } | null;
   plan: (assignmentId: string) => PlanBriefWire;
   originalCode: (id: string) => string;
 }
@@ -23,7 +25,9 @@ export function toSummary(record: SaasIssueRecord, names: IssueNames): SaasIssue
     impact: record.impact,
     assignmentId: record.assignmentId,
     plan: names.plan(record.assignmentId),
+    title: issueTitleOf(record.description),
     reporter: names.employee(record.reporterEmployeeId),
+    department: names.department(record.reporterEmployeeId),
     assignedItAdmin: names.employee(record.assignedItAdminEmployeeId),
     responseDueOn: record.responseDueOn,
     overdue: isResponseOverdue({ state: record.state, responseDueOn: record.responseDueOn, today: names.today }),

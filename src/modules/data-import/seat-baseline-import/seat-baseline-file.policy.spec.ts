@@ -22,11 +22,11 @@ describe('readSeatFile', () => {
 
   it('reads a file with a byte order mark, semicolons, quotes and loose headers', () => {
     const { rows } = readSeatFile(
-      file('﻿Employee Code;Account-Identifier;Reason\n"E1";"e1@congty.vn";"CI, nightly"\n'),
+      file('﻿Employee Code;Account-Identifier;Granted On\n"E1";"e1@congty.vn";"2026-01-05"\n'),
     );
 
     expect(rows).toEqual([
-      { lineNumber: 2, cells: { employee_code: 'E1', account_identifier: 'e1@congty.vn', reason: 'CI, nightly' } },
+      { lineNumber: 2, cells: { employee_code: 'E1', account_identifier: 'e1@congty.vn', granted_on: '2026-01-05' } },
     ]);
   });
 

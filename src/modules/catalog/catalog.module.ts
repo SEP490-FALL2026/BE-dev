@@ -1,19 +1,26 @@
+import { CatalogPricingFacadeModule } from './catalog-pricing-facade.module';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { ObjectStorageModule } from '../../infrastructure/object-storage/object-storage.module';
 import { AuditModule } from '../audit/audit.module';
 import { FinanceModule } from '../finance/finance.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { CatalogApi } from './public/catalog.api';
-import { SeatOccupancyHook } from './public/catalog.extension-points';
+import { CatalogContractApi } from './public/catalog-contract.api';
+import { CatalogResponsibilityApi } from './public/catalog-responsibility.api';
+import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
+import { ApplicationIntakeController } from './application-intake/application-intake.controller';
+import { ApplicationIntakeService } from './application-intake/application-intake.service';
 import { ApplicationFactsService } from './catalog-entry/application-facts.service';
-import { ApplicationOwnerService } from './catalog-entry/application-owner.service';
 import { ApplicationRetirementController } from './application-retirement/application-retirement.controller';
+import { ApplicationResponsibilityController } from './application-responsibility/application-responsibility.controller';
+import { ApplicationResponsibilityService } from './application-responsibility/application-responsibility.service';
+import { ResponsibilityHandoverService } from './application-responsibility/responsibility-handover.service';
 import { ApplicationRetirementRepo } from './application-retirement/application-retirement.repo';
 import { ApplicationRetirementService } from './application-retirement/application-retirement.service';
-import { ApplicationOwnersController } from './catalog-entry/application-owners.controller';
 import { ApplicationRepo } from './catalog-entry/application.repo';
 import { ApplicationListService } from './catalog-entry/application-list.service';
 import { ApplicationWriteGuards } from './catalog-entry/application-write-guards.service';
@@ -22,6 +29,10 @@ import { ApplicationPlans } from './catalog-entry/application-plans.types';
 import { ApplicationViewService } from './catalog-entry/application-view.service';
 import { ApplicationVendorLinkService } from './catalog-entry/application-vendor-link.service';
 import { ApplicationsController } from './catalog-entry/applications.controller';
+import { ContractQueryService } from './contract/contract-query.service';
+import { ContractSubscriptionRepo } from './contract/contract-subscription.repo';
+import { ContractSubscriptionService } from './contract/contract-subscription.service';
+import { ContractSubscriptionsController } from './contract/contract-subscriptions.controller';
 import { ContractRepo } from './contract/contract.repo';
 import { ContractService } from './contract/contract.service';
 import { ContractsController } from './contract/contracts.controller';
@@ -33,31 +44,38 @@ import { FunctionalGroupFactsService } from './functional-group/functional-group
 import { FunctionalGroupRepo } from './functional-group/functional-group.repo';
 import { FunctionalGroupService } from './functional-group/functional-group.service';
 import { FunctionalGroupsController } from './functional-group/functional-groups.controller';
-import { PlanTermsRepo } from './plan-terms/plan-terms.repo';
-import { PlanTermsService } from './plan-terms/plan-terms.service';
-import { PlanTermsController } from './plan-terms/plan-terms.controller';
 import { PlanFactsService } from './plan/plan-facts.service';
+import { PlanUsageRepo } from './plan/plan-usage.repo';
 import { PlanWorkspaceService } from './plan/plan-workspace.service';
+import { VendorAdminMinimumService } from './plan/vendor-admin-minimum.service';
+import { VendorAdminRolesService } from './plan/vendor-admin-roles.service';
 import { PlanRepo } from './plan/plan.repo';
 import { PlanService } from './plan/plan.service';
+import { PlanQuotePriceService } from './plan/plan-quote-price.service';
 import { PlansController } from './plan/plans.controller';
+import { PlanTermsController } from './plan-terms/plan-terms.controller';
+import { PlanTermsRepo } from './plan-terms/plan-terms.repo';
+import { PlanTermsService } from './plan-terms/plan-terms.service';
+import { CatalogNotificationNamesListener } from './requestable-software/catalog-notification-names.listener';
 import { RequestableSoftwareController } from './requestable-software/requestable-software.controller';
 import { RequestableSoftwareRepo } from './requestable-software/requestable-software.repo';
 import { RequestableSoftwareService } from './requestable-software/requestable-software.service';
 import { OnboardingFactsService } from './subscription/onboarding-facts.service';
 import { SeatTargetService } from './subscription/seat-target.service';
-import { SubscriptionDepartmentUseReader } from './subscription/subscription-department-use.listener';
 import { SubscriptionFactsService } from './subscription/subscription-facts.service';
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
-import { SubscriptionPeriodService } from './subscription/subscription-period.service';
+import { SubscriptionPeriodRepo } from './subscription/period/subscription-period.repo';
+import { SubscriptionPeriodService } from './subscription/period/subscription-period.service';
 import { SubscriptionPeriodApi } from './public/subscription-period.api';
-import { SubscriptionObligationService } from './subscription/subscription-obligation.service';
-import { SubscriptionRepo } from './subscription/subscription.repo';
+import { SubscriptionSeatIncreaseService } from './subscription/seat-increase/subscription-seat-increase.service';
+import { SubscriptionGrantingRepo } from './subscription/subscription-granting.repo';
 import { SubscriptionChangeGuard } from './subscription/subscription-change-guard.service';
 import { SubscriptionChangeService } from './subscription/subscription-change.service';
 import { SubscriptionService } from './subscription/subscription.service';
+import { SubscriptionPoolService } from './subscription/pool/subscription-pool.service';
 import { SubscriptionPricingService } from './subscription/subscription-pricing.service';
 import { SubscriptionViewService } from './subscription/subscription-view.service';
+import { SubscriptionWindowsService } from './subscription/subscription-windows.service';
 import { SubscriptionsController } from './subscription/subscriptions.controller';
 import { VendorDictionaryController } from './vendor-dictionary/vendor-dictionary.controller';
 import { VendorDictionaryFactsService } from './vendor-dictionary/vendor-dictionary-facts.service';
@@ -83,29 +101,37 @@ import { VendorRepo } from './vendor/vendor.repo';
  */
 @Module({
   imports: [
+    CatalogPricingFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
     IdentityAccessFacadeModule,
     FinanceModule,
     OperatingParametersModule,
+    NotificationsModule,
     ObjectStorageModule,
   ],
   controllers: [
     VendorDictionaryController,
     ApplicationsController,
+    ApplicationIntakeController,
     FunctionalGroupsController,
     PlansController,
+    PlanTermsController,
     VendorsController,
     SubscriptionsController,
-    PlanTermsController,
-    ApplicationOwnersController,
     ApplicationRetirementController,
+    ApplicationResponsibilityController,
     ContractsController,
+    ContractSubscriptionsController,
     DocumentsController,
     RequestableSoftwareController,
   ],
   providers: [
+    ApplicationResponsibilityService,
+    ResponsibilityHandoverService,
+    PlanTermsService,
+    PlanTermsRepo,
     VendorDictionaryService,
     VendorRecognitionService,
     VendorProposalService,
@@ -120,14 +146,19 @@ import { VendorRepo } from './vendor/vendor.repo';
     FunctionalGroupFactsService,
     ApplicationWriteGuards,
     ApplicationService,
+    ApplicationIntakeService,
     ApplicationViewService,
     ApplicationListService,
     ApplicationVendorLinkService,
     ApplicationRepo,
     ApplicationFactsService,
     PlanService,
+    PlanQuotePriceService,
     PlanWorkspaceService,
+    VendorAdminRolesService,
+    VendorAdminMinimumService,
     PlanRepo,
+    PlanUsageRepo,
     InternalSoftwareRegistrationService,
     VendorFactsService,
     VendorQueryService,
@@ -138,18 +169,24 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionChangeGuard,
     SubscriptionChangeService,
     SubscriptionService,
+    SubscriptionPoolService,
+    SubscriptionSeatIncreaseService,
     SubscriptionPricingService,
-    SubscriptionObligationService,
-    SubscriptionDepartmentUseReader,
-    SubscriptionRepo,
+    SubscriptionGrantingRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,
+    SubscriptionWindowsService,
+    SubscriptionPeriodRepo,
     SubscriptionPeriodService,
     SeatTargetService,
     OnboardingFactsService,
     SeatOccupancyHook,
+    SeatBaselinePhaseHook,
     ContractRepo,
     ContractService,
+    ContractQueryService,
+    ContractSubscriptionRepo,
+    ContractSubscriptionService,
     DocumentRepo,
     DocumentService,
     DocumentExpirySweeper,
@@ -157,15 +194,24 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRetirementRepo,
     ApplicationRetirementService,
     CatalogApi,
+    CatalogContractApi,
+    CatalogResponsibilityApi,
     SubscriptionPeriodApi,
-    PlanTermsService,
-    PlanTermsRepo,
-    ApplicationOwnerService,
     RequestableSoftwareRepo,
     RequestableSoftwareService,
+    // Names an application, a plan and a subscription in a notification sentence: added to the name sources of `notifications` when the module starts.
+    CatalogNotificationNamesListener,
   ],
   // The facade licensing reads the seat targets through (ADR-0013), and the hook licensing binds its reader of occupied seats to
-  // (`public/catalog.extension-points.ts`); the capability services and repos stay private.
-  exports: [CatalogApi, SubscriptionPeriodApi, SeatOccupancyHook],
+  // (`public/catalog.extension-points.ts`), and the facade the hand-over of an IT Admin who leaves moves their subscriptions and applications through
+  // (`public/catalog-responsibility.api.ts`), and the facade `usage` reads the applications of a contract through (`public/catalog-contract.api.ts`); the capability services and repos stay private.
+  exports: [
+    CatalogApi,
+    CatalogContractApi,
+    CatalogResponsibilityApi,
+    SubscriptionPeriodApi,
+    SeatOccupancyHook,
+    SeatBaselinePhaseHook,
+  ],
 })
 export class CatalogModule {}

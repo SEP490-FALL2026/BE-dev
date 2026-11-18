@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Page, cutHistory, pageOf } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import { normalizeDisplayName } from '../../../core/display-name';
+import { OBJECT_STORAGE, type ObjectStoragePort } from '../../../infrastructure/object-storage/object-storage.port';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { EmployeeTechnicalView } from '../public/organization.types';
 import { OrganizationContextService } from '../organization-context.service';
@@ -19,6 +20,7 @@ import {
   memberReadVerdict,
   technicalReadVerdict,
 } from '../department/department.policy';
+import { DEPARTMENT_AVATAR_LINK_SECONDS } from '../department/department-avatar.policy';
 import { DepartmentRepo } from '../department/department.repo';
 import { DepartmentTechnicalMembersRepo } from './department-technical-members.repo';
 import {
@@ -63,6 +65,7 @@ export class DepartmentQueryService {
     private readonly context: OrganizationContextService,
     private readonly departments: DepartmentRecordService,
     private readonly employeeAccounts: EmployeeAccountsHook,
+    @Inject(OBJECT_STORAGE) private readonly storage: ObjectStoragePort,
   ) {}
 
   /** The Super Admin reads all; an IT Admin the departments in their scope. Throws DepartmentForbiddenError for any other role. */
@@ -250,6 +253,18 @@ export class DepartmentQueryService {
     );
   }
 
+  /** A signed link to the picture, good for 15 minutes (`QĐ-113c`); the key itself never leaves the service. A retired department keeps its picture. */
+  private async avatarLinkOf(record: DepartmentRecord): Promise<string | null> {
+    if (!record.avatarObjectKey || !record.avatarContentType) return null;
+
+    return this.storage.createDownloadUrl({
+      key: record.avatarObjectKey,
+      fileName: `department.${record.avatarContentType === 'image/jpeg' ? 'jpg' : record.avatarContentType.slice(6)}`,
+      contentType: record.avatarContentType,
+      expiresInSeconds: DEPARTMENT_AVATAR_LINK_SECONDS,
+    });
+  }
+
   private async toViews(records: DepartmentRecord[]): Promise<DepartmentView[]> {
     const today = await this.context.businessToday();
     const ids = records.map((record) => record.id);
@@ -260,7 +275,9 @@ export class DepartmentQueryService {
     const itAdminIds = records.flatMap((record) => (record.itAdmin ? [record.itAdmin.employeeId] : []));
     const usable = await this.employeeAccounts.get().findUsableItAdminEmployeeIds(itAdminIds);
 
-    return records.map((record) => {
+    const links = await Promise.all(records.map((record) => this.avatarLinkOf(record)));
+
+    return records.map((record, index) => {
       const head = heads.get(record.id) ?? null;
       const itAdminUsable =
         record.itAdmin !== null && record.itAdmin.employeeStatus === 'ACTIVE' && usable.has(record.itAdmin.employeeId);
@@ -274,7 +291,14 @@ export class DepartmentQueryService {
             ]
           : [];
 
-      return { ...record, head, memberCount: counts.get(record.id) ?? 0, warnings, itAdminUsable };
+      return {
+        ...record,
+        head,
+        memberCount: counts.get(record.id) ?? 0,
+        warnings,
+        itAdminUsable,
+        avatarUrl: links[index] ?? null,
+      };
     });
   }
 }

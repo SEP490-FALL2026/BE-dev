@@ -1,3 +1,4 @@
+import { businessDateAt } from '../../../core/business-date';
 import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -38,11 +39,6 @@ export class OrganizationApi {
     return this.changes.emit(tx, change);
   }
 
-  /** Changes the reporting currency; the database locks it once a rate or a converted price exists (AC-9, `55000`). */
-  setReportingCurrency(tx: DbTx, organizationId: string, currency: string): Promise<void> {
-    return this.repo.setReportingCurrency(tx, organizationId, currency);
-  }
-
   createOrganization(tx: DbTx, input: CreateOrganizationInput): Promise<OrganizationRecord> {
     return this.repo.createOrganization(tx, input);
   }
@@ -51,8 +47,12 @@ export class OrganizationApi {
     return this.costCenters.createUnitForInstallation(tx, input);
   }
 
-  createDepartment(tx: DbTx, input: CreateDepartmentInput): Promise<{ id: string }> {
-    return this.departments.createForInstallation(tx, input);
+  /** The installation's department takes effect today in the calendar of the organization, named here and not left to the database clock. */
+  async createDepartment(tx: DbTx, input: CreateDepartmentInput): Promise<{ id: string }> {
+    const organization = await this.repo.findOrganization(tx);
+    const effectiveFrom = organization ? businessDateAt(new Date(), organization.timeZone) : undefined;
+
+    return this.departments.createForInstallation(tx, { effectiveFrom, ...input });
   }
 
   /** The only way to create an employee: Employee and its first placement, in the caller's transaction. */

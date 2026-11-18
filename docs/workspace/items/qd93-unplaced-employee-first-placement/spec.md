@@ -93,7 +93,6 @@ integration và migration test.
 | US-02-03 | AC-1, AC-2, AC-4, AC-8                 | partial  | AC-1 vế đã giao: `g2-employee-intake-by-super-admin`; AC-7: `g2-department-profile`, `qd93-remove-hr-basis-org-writes`; AC-3, AC-5, AC-6: `g2-employee-import-preview-confirm` (giao trước GOV.1)                                                                                      |
 | US-05-02 | AC-14                                  | partial  | AC-13: `qd93-remove-fallback-substitute-approvers`; AC-3, AC-5→AC-7, AC-9, AC-10, AC-12: `g5-request-submission-and-routing`; AC-1, AC-4, AC-11: `g5-request-amount-and-payment-schedule`; AC-2: `g5-group-requests`; AC-8: `g5-it-assessment-of-new-software`                         |
 | US-01-01 | AC-22                                  | partial  | AC-4, AC-12, AC-16, AC-17, AC-21: `qd93-direct-manager-spending-approver-roles`; AC-13: `qd93-remove-in-app-super-admin-transfer`; AC còn lại giao trước GOV.1 ở `us-01-bootstrap-login-session`, `us-01-account-invitation-activation`                                                |
-| US-03-02 | AC-15                                  | partial  | AC-15 vế Người duyệt chi và gộp lỗi tất-cả-hoặc-không (`D-S22`): `qd93-remove-fallback-substitute-approvers`; AC-1, AC-3→AC-14: `g5-delegated-requests`                                                                                                                                |
 | US-03-06 | AC-23                                  | partial  | AC-23 vế vai `MANAGER`, AC-24: `qd93-direct-manager-spending-approver-roles`; AC-1, AC-22: `qd93-remove-hr-basis-org-writes`; AC-25: `qd93-code-format-xlsx-employee-import`; AC khác: `g2-department-profile`, `g2-g4-unit-only-cost-attribution`                                     |
 | US-05-01 | AC-16                                  | partial  | AC-16 vế Người duyệt chi: `qd93-remove-fallback-substitute-approvers`; AC khác: `g5-request-preview`, `a01-employee-catalog-selector`                                                                                                                                                  |
 | US-05-03 | AC-15                                  | partial  | AC-15 vế Người duyệt chi, AC-4: `qd93-remove-fallback-substitute-approvers`; AC khác: `g5-request-submission-and-routing`, `g5-delegated-requests`, `g5-group-requests`                                                                                                                |
@@ -112,6 +111,8 @@ thụ hưởng/trưởng phòng là `E10`/`E302`). Dòng nào cũng `partial` v�
 Không còn claim: `US-06-14` AC-16 — `D-S23` bỏ thao tác thêm người thụ hưởng ở hồ sơ bổ sung (AC-16 viết lại, bỏ vế "thêm
 `E3`/`E10`"), nên không còn vế _chưa xếp phòng_ nào; lát này không khóa hành vi `VALIDATION_ERROR` và không làm gì ở hồ sơ bổ
 sung. Registry cần bỏ lát này khỏi _Remaining owner_ của dòng `US-06-14` AC-16 (01/11/2026).
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-03-02` AC-15 (partial) — Story `RETIRED` ở Docs `5bb2e6a` (`US-03-02` `QĐ-100t`); code đã merge là lịch sử, khóa ở scope map là `not affected`.
 
 ## Supporting references
 

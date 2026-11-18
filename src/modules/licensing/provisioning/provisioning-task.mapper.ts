@@ -9,6 +9,7 @@ export const toSummaryWire = (view: TaskSummaryView) => ({
   failedAt: view.failedAt?.toISOString() ?? null,
   nextRetryAt: view.nextRetryAt?.toISOString() ?? null,
   closedAt: view.closedAt?.toISOString() ?? null,
+  purchase: view.purchase && { ...view.purchase, purchasedAt: view.purchase.purchasedAt.toISOString() },
 });
 
 export const toWire = (view: TaskView) => ({ ...toSummaryWire(view), ...detailOf(view) });
@@ -26,11 +27,13 @@ const detailOf = (view: TaskView) => ({
   handOffEvidence: view.handOffEvidence,
   closedBy: view.closedBy,
   closeReason: view.closeReason,
+  k1Checklist: view.k1Checklist,
   revocation: view.revocation && {
     ...view.revocation,
     firstReason: view.revocation.firstReason && {
       ...view.revocation.firstReason,
       decidedAt: view.revocation.firstReason.decidedAt.toISOString(),
     },
+    lastWithdrawnAt: view.revocation.lastWithdrawnAt?.toISOString() ?? null,
   },
 });

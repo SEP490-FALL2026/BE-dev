@@ -31,10 +31,12 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
   describe('department contract kept by the Wave 3 move', () => {
     const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
     const LIST_KEYS = [
+      'avatarUrl',
       'code',
       'costCenter',
       'createdAt',
       'deactivatedAt',
+      'effectiveFrom',
       'function',
       'head',
       'id',
@@ -66,7 +68,9 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
         name: 'Design',
         function: 'line one\nline two',
         status: 'ACTIVE',
+        effectiveFrom: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) as unknown,
         costCenter: null,
+        avatarUrl: null,
         itAdmin: {
           employeeId: h.it2.employeeId,
           employeeCode: 'E-IT2',

@@ -26,15 +26,10 @@ const toRecord = (row: Row): ApplicationRecord => ({
   dictionaryServiceLineId: row.dictionaryLineId,
   domains: row.domains,
   dataSensitivity: row.dataSensitivity,
-  businessOwnerEmployeeId: row.businessOwnerEmployeeId,
-  communication: {
-    personToPersonMessaging: row.commPersonToPersonMessaging,
-    callsOrMeetings: row.commCallsOrMeetings,
-    mailbox: row.commMailbox,
-    isCommunicationService: row.isCommunicationService,
-    note: row.communicationNote,
-  },
-  functionalGroup: row.functionalGroup ? { id: row.functionalGroup.id, name: row.functionalGroup.name } : null,
+  logoUrl: row.logoUrl,
+  responsibleItAdminEmployeeId: row.responsibleItAdminEmployeeId,
+  isCommunicationService: row.functionalGroup.systemKey === 'COMMUNICATION',
+  functionalGroup: { id: row.functionalGroup.id, name: row.functionalGroup.name },
   status: row.catalogStatus,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
@@ -55,19 +50,97 @@ export class ApplicationRepo {
         normalizedName: searchKey(input.name),
         dictionaryLineId: input.dictionaryServiceLineId,
         functionalGroupId: input.functionalGroupId,
-        businessOwnerEmployeeId: input.businessOwnerEmployeeId,
+        responsibleItAdminEmployeeId: input.responsibleItAdminEmployeeId,
         dataSensitivity: input.dataSensitivity,
-        commPersonToPersonMessaging: input.communication.personToPersonMessaging,
-        commCallsOrMeetings: input.communication.callsOrMeetings,
-        commMailbox: input.communication.mailbox,
-        isCommunicationService: input.communication.isCommunicationService,
-        communicationNote: input.communication.note,
+        logoUrl: input.logoUrl,
         domains: input.domains,
       },
       include: WITH_RELATIONS,
     });
 
     return toRecord(row);
+  }
+
+  /** Names the IT Admin responsible for the application (`QĐ-111g`): the one writer of the column after the declaration. */
+  async setResponsible(tx: DbTx, id: string, employeeId: string): Promise<void> {
+    await tx.application.update({ where: { id }, data: { responsibleItAdminEmployeeId: employeeId } });
+  }
+
+  /**
+   * Hands every application that names `fromEmployeeId` responsible to `toEmployeeId` (`QĐ-111g`), in one statement: the rows are locked in
+   * id order first, so a handing over and the transfer of one application queue up. Returns the ids it moved, in id order.
+   */
+  async reassignResponsible(tx: DbTx, fromEmployeeId: string, toEmployeeId: string): Promise<string[]> {
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      WITH held AS (
+        SELECT id FROM applications WHERE responsible_it_admin_employee_id = ${fromEmployeeId}::uuid ORDER BY id FOR UPDATE)
+      UPDATE applications a
+         SET responsible_it_admin_employee_id = ${toEmployeeId}::uuid, updated_at = now()
+        FROM held WHERE a.id = held.id
+      RETURNING a.id`;
+
+    return rows.map((row) => row.id).sort();
+  }
+
+  /** How many applications name each of these IT Admins responsible (`QĐ-111g`); one who answers for none is absent. */
+  async countResponsibleOf(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string; total: number }[]>`
+      SELECT responsible_it_admin_employee_id AS employee_id, count(*)::int AS total
+        FROM applications WHERE responsible_it_admin_employee_id = ANY(${[...employeeIds]}::uuid[])
+       GROUP BY responsible_it_admin_employee_id`;
+
+    return new Map(rows.map((row) => [row.employee_id, row.total]));
+  }
+
+  /**
+   * Takes the lock of the duplicate check of the organization for the rest of the transaction: two declarations of the same software queue up, so the
+   * second one sees the first and is refused with it instead of both passing a check that neither has seen the other through.
+   */
+  async lockDuplicateCheck(tx: DbTx, organizationId: string): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`application-duplicate:${organizationId}`}, 0))`;
+  }
+
+  /**
+   * The approved applications that may be the same software as a candidate: the same normalized name, or a domain in common (the hosts are as the catalog
+   * stores them). The caller's rule (`duplicateOf`) says which one it is; at most twenty, by name.
+   */
+  async duplicateCandidates(
+    tx: DbTx,
+    normalizedName: string,
+    hosts: readonly string[],
+  ): Promise<
+    {
+      id: string;
+      name: string;
+      domains: string[];
+      vendorName: string | null;
+      functionalGroup: { id: string; name: string };
+    }[]
+  > {
+    const rows = await tx.application.findMany({
+      where: {
+        catalogStatus: 'APPROVED',
+        OR: [{ normalizedName }, ...(hosts.length > 0 ? [{ domains: { hasSome: [...hosts] } }] : [])],
+      },
+      select: {
+        id: true,
+        name: true,
+        domains: true,
+        vendor: { select: { name: true } },
+        functionalGroup: { select: { id: true, name: true } },
+      },
+      orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
+      take: 20,
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      domains: row.domains,
+      vendorName: row.vendor?.name ?? null,
+      functionalGroup: row.functionalGroup,
+    }));
   }
 
   /** The application, locked for the rest of the transaction, or null. */
@@ -89,27 +162,15 @@ export class ApplicationRepo {
   }
 
   async update(tx: DbTx, id: string, changes: ApplicationChanges): Promise<ApplicationRecord> {
-    const communication = changes.communication;
     const row = await tx.application.update({
       where: { id },
       data: {
         ...(changes.name !== undefined ? { name: changes.name, normalizedName: searchKey(changes.name) } : {}),
         ...(changes.dictionaryServiceLineId !== undefined ? { dictionaryLineId: changes.dictionaryServiceLineId } : {}),
         ...(changes.functionalGroupId !== undefined ? { functionalGroupId: changes.functionalGroupId } : {}),
-        ...(changes.businessOwnerEmployeeId !== undefined
-          ? { businessOwnerEmployeeId: changes.businessOwnerEmployeeId }
-          : {}),
         ...(changes.dataSensitivity !== undefined ? { dataSensitivity: changes.dataSensitivity } : {}),
+        ...(changes.logoUrl !== undefined ? { logoUrl: changes.logoUrl } : {}),
         ...(changes.domains !== undefined ? { domains: changes.domains } : {}),
-        ...(communication
-          ? {
-              commPersonToPersonMessaging: communication.personToPersonMessaging,
-              commCallsOrMeetings: communication.callsOrMeetings,
-              commMailbox: communication.mailbox,
-              isCommunicationService: communication.isCommunicationService,
-              communicationNote: communication.note,
-            }
-          : {}),
       },
       include: WITH_RELATIONS,
     });
@@ -121,7 +182,7 @@ export class ApplicationRepo {
   async markRetired(
     tx: DbTx,
     applicationId: string,
-    input: { appUserId: string; confirmationId: string; now: Date },
+    input: { appUserId: string; confirmationId: string | null; now: Date },
   ): Promise<void> {
     await tx.application.update({
       where: { id: applicationId },
@@ -150,93 +211,6 @@ export class ApplicationRepo {
     return rows.length === 0
       ? null
       : { id: rows[0].id, name: rows[0].name, kind: rows[0].kind, status: rows[0].catalog_status };
-  }
-
-  /** Opens a Business Owner period for the application: the person, now, and who made the change. */
-  async openOwnerPeriod(
-    tx: DbTx,
-    input: { applicationId: string; employeeId: string; assignedByAppUserId: string },
-  ): Promise<void> {
-    await tx.applicationBusinessOwner.create({ data: input });
-  }
-
-  /** Closes the open Business Owner period of the application, if it has one. */
-  async closeOpenOwnerPeriod(tx: DbTx, applicationId: string): Promise<void> {
-    await tx.applicationBusinessOwner.updateMany({
-      where: { applicationId, endedAt: null },
-      data: { endedAt: new Date() },
-    });
-  }
-
-  /** One page of the Business Owner periods of an application, the latest first, and the total, from one snapshot. */
-  listOwnerPeriods(applicationId: string, skip: number, take: number) {
-    return this.prisma.$transaction(
-      async (tx) => ({
-        items: await tx.applicationBusinessOwner.findMany({
-          where: { applicationId },
-          orderBy: [{ assignedAt: 'desc' }, { id: 'desc' }],
-          skip,
-          take,
-        }),
-        total: await tx.applicationBusinessOwner.count({ where: { applicationId } }),
-      }),
-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
-    );
-  }
-
-  /** The distinct Business Owners of all applications now: whose status decides which applications need a new one. */
-  async currentOwnerIds(): Promise<string[]> {
-    const rows = await this.prisma.application.findMany({
-      distinct: ['businessOwnerEmployeeId'],
-      select: { businessOwnerEmployeeId: true },
-    });
-
-    return rows.map((row) => row.businessOwnerEmployeeId);
-  }
-
-  /** The first `take` applications still in use whose Business Owner is this employee, by name, and how many there are. */
-  async ownedBy(
-    employeeId: string,
-    take: number,
-    tx?: DbTx,
-  ): Promise<{ items: { id: string; name: string }[]; total: number }> {
-    const where: Prisma.ApplicationWhereInput = { businessOwnerEmployeeId: employeeId, retiredAt: null };
-    const client = tx ?? this.prisma;
-    const items = await client.application.findMany({
-      where,
-      select: { id: true, name: true },
-      orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
-      take,
-    });
-
-    return { items, total: await client.application.count({ where }) };
-  }
-
-  /** One page of the applications of these Business Owners, by name, and the total, from one snapshot. */
-  async listByOwners(
-    ownerIds: readonly string[],
-    skip: number,
-    take: number,
-  ): Promise<{
-    items: { id: string; name: string; kind: ApplicationKind; businessOwnerEmployeeId: string }[];
-    total: number;
-  }> {
-    const where: Prisma.ApplicationWhereInput = { businessOwnerEmployeeId: { in: [...ownerIds] } };
-
-    return this.prisma.$transaction(
-      async (tx) => {
-        const rows = await tx.application.findMany({
-          where,
-          select: { id: true, name: true, kind: true, businessOwnerEmployeeId: true },
-          orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
-          skip,
-          take,
-        });
-
-        return { items: rows, total: await tx.application.count({ where }) };
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
-    );
   }
 
   /** The first `take` other approved applications of a functional group, by name: the similar tools, and how many there are. */
@@ -292,11 +266,11 @@ export class ApplicationRepo {
             kind: true,
             catalogStatus: true,
             dataSensitivity: true,
-            isCommunicationService: true,
-            businessOwnerEmployeeId: true,
+            logoUrl: true,
+            responsibleItAdminEmployeeId: true,
             updatedAt: true,
             vendor: { select: { id: true, name: true } },
-            functionalGroup: { select: { id: true, name: true } },
+            functionalGroup: { select: { id: true, name: true, systemKey: true } },
           },
           orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
           skip: filter.skip,
@@ -310,9 +284,10 @@ export class ApplicationRepo {
             kind: row.kind,
             vendor: row.vendor,
             dataSensitivity: row.dataSensitivity,
-            businessOwnerEmployeeId: row.businessOwnerEmployeeId,
-            isCommunicationService: row.isCommunicationService,
-            functionalGroup: row.functionalGroup,
+            logoUrl: row.logoUrl,
+            responsibleItAdminEmployeeId: row.responsibleItAdminEmployeeId,
+            isCommunicationService: row.functionalGroup.systemKey === 'COMMUNICATION',
+            functionalGroup: { id: row.functionalGroup.id, name: row.functionalGroup.name },
             status: row.catalogStatus,
             updatedAt: row.updatedAt,
           })),
@@ -323,17 +298,66 @@ export class ApplicationRepo {
     );
   }
 
-  /** The applications with these ids, for a decision on what a collector may report; those that do not exist are absent. */
+  /** What a proposal that names an application of the catalog needs to know of it: its name, whether it is still in the catalog, and its vendor; null when it does not exist. */
+  async entryFacts(
+    id: string,
+    tx?: DbTx,
+  ): Promise<{
+    id: string;
+    name: string;
+    catalogStatus: 'APPROVED' | 'RETIRED';
+    vendor: { id: string; name: string } | null;
+  } | null> {
+    return (tx ?? this.prisma).application.findUnique({
+      where: { id },
+      select: { id: true, name: true, catalogStatus: true, vendor: { select: { id: true, name: true } } },
+    });
+  }
+
+  /**
+   * The applications with these ids, for a decision on what a collector may report; those that do not exist are absent. An application is a
+   * communication service when it stands in the group Liên lạc (`QĐ-111e`): the group says it, no flag of the row is read.
+   */
   async collectorApplications(
     ids: readonly string[],
     tx?: DbTx,
   ): Promise<
-    { id: string; name: string; kind: ApplicationKind; isCommunicationService: boolean; retiredAt: Date | null }[]
+    {
+      id: string;
+      name: string;
+      kind: ApplicationKind;
+      logoUrl: string | null;
+      isCommunicationService: boolean;
+      retiredAt: Date | null;
+    }[]
   > {
-    return (tx ?? this.prisma).application.findMany({
+    const rows = await (tx ?? this.prisma).application.findMany({
       where: { id: { in: [...ids] } },
-      select: { id: true, name: true, kind: true, isCommunicationService: true, retiredAt: true },
+      select: {
+        id: true,
+        name: true,
+        kind: true,
+        logoUrl: true,
+        retiredAt: true,
+        functionalGroup: { select: { systemKey: true } },
+      },
       orderBy: { id: 'asc' },
     });
+
+    return rows.map(({ functionalGroup, ...row }) => ({
+      ...row,
+      isCommunicationService: functionalGroup?.systemKey === 'COMMUNICATION',
+    }));
+  }
+
+  /** The name of each of these applications, by id, in one read; an id that does not exist is absent (a retired application keeps its name). */
+  async namesOf(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).application.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, name: true },
+    });
+
+    return new Map(rows.map((row) => [row.id, row.name]));
   }
 }

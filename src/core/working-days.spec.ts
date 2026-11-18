@@ -2,6 +2,7 @@ import {
   addWorkingDays,
   instantAtWallClock,
   isWorkingDay,
+  nthWorkingDayFrom,
   slaDueAt,
   subtractWorkingDays,
   wallClockAt,
@@ -29,6 +30,27 @@ describe('working days', () => {
 
       expect(isWorkingDay('2026-10-26', holidays)).toBe(false);
       expect(isWorkingDay('2026-10-27', holidays)).toBe(true);
+    });
+  });
+
+  describe('nthWorkingDayFrom', () => {
+    it.each([
+      ['day 5 from a Monday is the Friday of the week', '2026-07-06', 5, '2026-07-10'],
+      ['day 3 from a Monday is the Wednesday', '2026-07-06', 3, '2026-07-08'],
+      ['day 1 is the start itself when it is a working day', '2026-07-06', 1, '2026-07-06'],
+      ['a Saturday is not day 1: the Monday after is, so day 5 is the Friday', '2026-07-04', 5, '2026-07-10'],
+      ['a Sunday start counts like a Saturday one', '2026-07-05', 1, '2026-07-06'],
+    ])('%s', (_name, start, n, expected) => {
+      expect(nthWorkingDayFrom(start, n, NONE)).toBe(expected);
+    });
+
+    it('steps over a day off inside the count and a day off the start falls on', () => {
+      expect(nthWorkingDayFrom('2026-07-06', 3, new Set(['2026-07-07']))).toBe('2026-07-09');
+      expect(nthWorkingDayFrom('2026-07-06', 1, new Set(['2026-07-06']))).toBe('2026-07-07');
+    });
+
+    it('refuses a count below one: there is no day 0', () => {
+      expect(() => nthWorkingDayFrom('2026-07-06', 0, NONE)).toThrow(RangeError);
     });
   });
 

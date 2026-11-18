@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { Grounds, GroundsInput } from '../personnel-grounds.policy';
+import type { RecordedGrounds } from '../personnel-grounds.policy';
 import type { RoleFlag } from '../public/personnel.types';
 
 /** How the access of the person is blocked: from the day after the last working day, or from the day the departure is recorded (QĐ-96c). */
@@ -12,7 +12,12 @@ export type OffboardingChangeKind =
   | 'MARKED_LEFT'
   | 'ACCOUNT_LOCK_RECORDED'
   | 'REVOCATIONS_OPENED'
-  | 'CLOSED';
+  | 'CLOSED'
+  | 'ACCESS_BLOCKED'
+  | 'REVOCATIONS_WITHDRAWN'
+  | 'IT_ADMIN_HANDED_OVER'
+  | 'CLOSED_BY_SYSTEM'
+  | 'MAILBOX_LOCKED';
 
 /** What the person was doing before the handover began. */
 export type PriorWorkState = 'WORKING' | 'ON_LONG_LEAVE';
@@ -40,7 +45,9 @@ export interface OffboardingRecord {
   lastWorkingDay: BusinessDate;
   departureEffectiveOn: BusinessDate;
   handoverDueOn: BusinessDate | null;
-  grounds: Grounds;
+  /** The day the IT Admin has until to take every right away (`QĐ-110c`); null for a case closed or cancelled before the rule. */
+  revocationDueOn: BusinessDate | null;
+  grounds: RecordedGrounds;
   headHandover: HeadHandoverFacts | null;
   placementClosedId: string | null;
   cancelledPlacementId: string | null;
@@ -56,7 +63,12 @@ export interface OffboardingRecord {
   accountLockByAppUserId: string | null;
   accountLockAt: Date | null;
   accountLockNote: string | null;
+  /** Item (1b) of `BM-08`, the lock of the mailbox for good (`B-1`); the account is null when the system wrote it (the last K1 revocation ticked it). */
+  mailboxLockAt: Date | null;
+  mailboxLockByAppUserId: string | null;
+  mailboxLockNote: string | null;
   closedAt: Date | null;
+  /** Null when the system closed the case (`QĐ-110e`). */
   closedByAppUserId: string | null;
   /** Who recorded it: an account, or the ticket of the controlled procedure: exactly one of the two is set. */
   recordedByAppUserId: string | null;
@@ -72,9 +84,10 @@ export interface OffboardingSummaryRecord {
   accessBlockMode: AccessBlockMode;
   lastWorkingDay: BusinessDate;
   leftOn: BusinessDate | null;
-  handoverDueOn: BusinessDate | null;
   accountLocked: boolean;
   closed: boolean;
+  /** The day the IT Admin has until to take every right away; null for a case closed or cancelled before the rule (`QĐ-110c`). */
+  revocationDueOn: BusinessDate | null;
   /** The person headed the department they leave: one of the roles that need someone to take over (`US-03-04` AC-11). */
   headsDepartment: boolean;
 }
@@ -101,6 +114,14 @@ export interface OffboardingListFilter {
   accountLockMissing?: boolean;
   /** Only the cases whose snapshot of roles, taken when the departure was recorded, has this one. */
   roleFlag?: RoleFlag;
+  /** `true`: only the departures past the deadline of their revocations that still have a right without a completed task; `false`: all the others (`QĐ-110c`). */
+  revocationOverdue?: boolean;
+  /** Only the cases whose last working day is on or after / on or before these days, both included (the calendar of the next working days, R5 E2). */
+  lastWorkingDayFrom?: BusinessDate;
+  lastWorkingDayTo?: BusinessDate;
+  /** The ids the service worked out from `revocationOverdue`: only these cases, or every case but these. */
+  onlyIds?: readonly string[];
+  exceptIds?: readonly string[];
   today: BusinessDate;
   page: number;
   pageSize: number;
@@ -114,7 +135,8 @@ export interface RecordOffboardingInput {
   employeeId: string;
   lastWorkingDay?: BusinessDate | undefined;
   accessBlockMode: AccessBlockMode;
-  grounds?: GroundsInput | undefined;
+  /** The basis in one box (`QĐ-110a`). */
+  groundsNote?: string | undefined;
   successor?: SuccessorChoice | undefined;
   /** The Super Admin confirms that a transfer waiting to take effect after the last working day is cancelled with the departure. */
   cancelPendingTransfer?: true | undefined;
@@ -125,7 +147,7 @@ export interface RecordOffboardingInput {
 export interface ChangeLastDayInput {
   lastWorkingDay: BusinessDate;
   reason: string;
-  grounds?: GroundsInput | undefined;
+  groundsNote?: string | undefined;
   successor?: SuccessorChoice | undefined;
 }
 

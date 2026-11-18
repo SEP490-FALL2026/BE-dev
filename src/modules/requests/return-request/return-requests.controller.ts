@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -20,7 +20,6 @@ import {
 } from './return-request.dto';
 import { RETURN_ERROR_EXAMPLES, toReturnApiException } from './return-request.http-errors';
 import { ReturnRequestQueryService } from './return-request-query.service';
-import { ReturnHandoverService } from './return-handover.service';
 import { ReturnRequestService } from './return-request.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -45,7 +44,6 @@ const INVALID_ID = {
 export class ReturnRequestsController {
   constructor(
     private readonly returns: ReturnRequestService,
-    private readonly handovers: ReturnHandoverService,
     private readonly queries: ReturnRequestQueryService,
   ) {}
 
@@ -56,7 +54,7 @@ export class ReturnRequestsController {
     status: HttpStatus.CREATED,
     message: 'RETURN_REQUEST.SUBMITTED',
     description:
-      'Names exactly one seat. The holder returns their own seat, whether or not their department has a head; the head of the department of the holder confirms that the seat is no longer needed. There is no approval step: the revocation of the seat is queued for the IT Admin in the same moment, and the seat is given back only when the IT Admin has taken the access away. A plan whose removal loses data asks the person who sent the return to confirm that the handover is done, by a short deadline; a plan that loses nothing only shows its note. No saving is recorded for a return. A request whose withdrawal was refused because its grant was done is named by fromRequestId.',
+      'Names exactly one seat. The holder returns their own seat, whether or not their department has a head; the head of the department of the holder confirms that the seat is no longer needed. There is no approval step: the revocation of the seat is queued for the IT Admin in the same moment, and the seat is given back only when the IT Admin has taken the access away. The note of the plan about what to do before the seat is taken away is shown to the IT Admin; no confirmation of a handover is asked of anyone. No saving is recorded for a return. A request whose withdrawal was refused because its grant was done is named by fromRequestId.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -113,7 +111,7 @@ export class ReturnRequestsController {
   @ApiSuccessResponse(ReturnListResponseDto, {
     message: 'RETURN_REQUEST.LISTED',
     description:
-      'The newest first. The IT Admin sees every return; anyone else sees the returns of the seats they hold, the returns they sent and, as the head of a department, those of the people of the department. Each row carries the plan, the source, the state of the revocation and what the handover asks, and none of the long texts.',
+      'The newest first. The IT Admin sees every return; anyone else sees the returns of the seats they hold, the returns they sent and, as the head of a department, those of the people of the department. Each row carries the plan, the source, the state of the revocation, and none of the long texts.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -134,54 +132,12 @@ export class ReturnRequestsController {
   @ApiSuccessResponse(ReturnResponseDto, {
     message: 'RETURN_REQUEST.READ',
     description:
-      'The return with its reason, the note of the plan, the handover and how the revocation ended. Only the holder, the person who sent it, the head of the department of the holder and the IT Admin read it.',
+      'The return with its reason, the note of the plan and how the revocation ended. Only the holder, the person who sent it, the head of the department of the holder and the IT Admin read it.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, INVALID_ID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ReturnIdParamDto) {
     try {
       return { returnRequest: await this.queries.get(actor, params.id) };
-    } catch (error) {
-      throw toReturnApiException(error);
-    }
-  }
-
-  @Post(':id/handover-confirmation')
-  @AuthenticatedOnly()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    operationId: 'returnRequestHandoverConfirm',
-    summary: 'Confirm that the handover of the data is done',
-  })
-  @ApiSuccessResponse(ReturnResponseDto, {
-    message: 'RETURN_REQUEST.HANDOVER_CONFIRMED',
-    description:
-      'The person who sent the return, the holder returning their seat or the head confirming it, says that the handover of the data is done. The IT Admin may complete the revocation of a plan that loses data only after this, or after the deadline has passed: a revocation completed after the deadline without it is flagged as completed without the confirmation. The confirmation is written once.',
-  })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    {
-      status: HttpStatus.FORBIDDEN,
-      description: 'The caller did not send the return (RETURN_REQUEST.NOT_REQUESTER).',
-      examples: [RETURN_ERROR_EXAMPLES.NOT_REQUESTER],
-    },
-    NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The plan asks for no handover (RETURN_REQUEST.HANDOVER_NOT_REQUIRED), it is confirmed already (RETURN_REQUEST.HANDOVER_ALREADY_CONFIRMED) or the return has ended (RETURN_REQUEST.NOT_AWAITING). Nothing changes.',
-      examples: [
-        RETURN_ERROR_EXAMPLES.HANDOVER_NOT_REQUIRED,
-        RETURN_ERROR_EXAMPLES.HANDOVER_ALREADY_CONFIRMED,
-        RETURN_ERROR_EXAMPLES.NOT_AWAITING,
-      ],
-    },
-    INVALID_ID,
-  )
-  async confirmHandover(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: ReturnIdParamDto) {
-    try {
-      const record = await this.handovers.confirmHandover(actor, params.id);
-
-      return { returnRequest: await this.queries.detail(record) };
     } catch (error) {
       throw toReturnApiException(error);
     }

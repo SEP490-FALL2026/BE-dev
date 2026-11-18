@@ -32,6 +32,8 @@ export class RegistrationEndService {
     if (!organization) throw new Error('A registration was ended before installation');
     const validUntil = validUntilOf(registration.validFrom, input.at, organization.timeZone);
     await this.repo.endRegistration(tx, registration.id, { endedAt: input.at, validUntil, cause: input.cause });
+    // A stop request still waiting can no longer be completed (`US-09-04`).
+    await this.repo.invalidateOpenStopRequests(tx, registration.id, input.at);
     await this.audit.record(
       tx,
       devicesEvent(

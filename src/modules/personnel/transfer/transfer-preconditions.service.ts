@@ -143,10 +143,11 @@ export class TransferPreconditions {
       employee: { status: held.employee.status, workState: held.employee.workState },
       current: { departmentId: held.current.departmentId, validFrom: held.current.validFrom },
       target: { departmentId: seen.toDepartmentId },
-      destinationDepartment: destination && { active: destination.active },
-      grounds: input.grounds,
+      destinationDepartment: destination && { active: destination.active, effectiveFrom: destination.effectiveFrom },
+      groundsNote: input.groundsNote,
       pending: await this.pendingOf(tx, input.employeeId),
-      namedAsSuccessor: await this.transfers.isNamedSuccessorOfPending(tx, input.employeeId),
+      unclosed: await this.unclosedOf(tx, input.employeeId),
+      namedAsSuccessor: await this.transfers.pendingTransferNaming(tx, input.employeeId),
       successor: await this.guard.successorFacts(tx, {
         required: seen.leavesAsHead,
         chosen: input.successor,
@@ -155,19 +156,20 @@ export class TransferPreconditions {
         day: input.effectiveOn,
       }),
     });
-    if (refusal) {
-      const oldDepartment = held.departments.get(seen.before.departmentId);
-      this.guard.refuse(
-        refusal,
-        refusal.code === 'HEAD_SUCCESSOR_REQUIRED' ? { departmentName: oldDepartment?.name } : undefined,
-      );
-    }
+    if (refusal) this.guard.refuse(refusal, seen.before.departmentId);
   }
 
-  private async pendingOf(tx: DbTx, employeeId: string): Promise<{ effectiveOn: BusinessDate } | null> {
+  private async pendingOf(tx: DbTx, employeeId: string): Promise<{ id: string; effectiveOn: BusinessDate } | null> {
     const pending = await this.transfers.findPendingOf(tx, employeeId);
 
-    return pending && { effectiveOn: pending.effectiveOn };
+    return pending && { id: pending.id, effectiveOn: pending.effectiveOn };
+  }
+
+  /** The transfer before, if it took effect and is not closed: a new one waits for it (`QĐ-110r`, `US-03-01` AC-28). */
+  private async unclosedOf(tx: DbTx, employeeId: string): Promise<{ id: string; effectiveOn: BusinessDate } | null> {
+    const unclosed = await this.transfers.findUnclosedOf(tx, employeeId);
+
+    return unclosed && { id: unclosed.id, effectiveOn: unclosed.effectiveOn };
   }
 
   /** Takes the successor row `FOR SHARE`; one that does not exist is judged by the policy, not here. */

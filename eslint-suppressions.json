@@ -4,27 +4,9 @@
       "count": 1
     }
   },
-  "src/modules/budgets/budget/version-view.service.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/budgets/proposal/proposal-view.service.ts": {
     "complexity": {
       "count": 1
-    }
-  },
-  "src/modules/budgets/version/line-import.service.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
-  "src/modules/budgets/year-end/year-end.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
     }
   },
   "src/modules/catalog/plan/plan.service.ts": {
@@ -108,11 +90,6 @@
       "count": 1
     }
   },
-  "src/modules/licensing/assignment/assignment.policy.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/licensing/assignment/renewal/assignment-renewal.service.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -123,21 +100,6 @@
       "count": 1
     }
   },
-  "src/modules/licensing/expiry/expiry-queue.service.ts": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "src/modules/licensing/handover/handover-issue.service.ts": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "src/modules/licensing/handover/handover-view.service.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/licensing/license-key/license-key.service.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -145,11 +107,6 @@
   },
   "src/modules/licensing/provisioning/grant-cancellation/grant-cancellation.policy.ts": {
     "complexity": {
-      "count": 1
-    }
-  },
-  "src/modules/licensing/provisioning/provisioning-task-view.service.ts": {
-    "max-lines-per-function": {
       "count": 1
     }
   },
@@ -268,14 +225,6 @@
       "count": 1
     }
   },
-  "src/modules/personnel/transfer-review/transfer-review-decision.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
   "src/modules/personnel/transfer/transfer.mapper.ts": {
     "complexity": {
       "count": 1
@@ -286,19 +235,9 @@
       "count": 1
     }
   },
-  "src/modules/requests/assessment/assessment-view.service.ts": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/modules/requests/assessment/proposal.service.ts": {
     "max-lines-per-function": {
       "count": 2
-    }
-  },
-  "src/modules/requests/assessment/quote-pricing.policy.ts": {
-    "complexity": {
-      "count": 1
     }
   },
   "src/modules/requests/cancellation/departure-cancellation.service.ts": {
@@ -328,9 +267,6 @@
   "src/modules/requests/group-line-decisions/group-spend-decision.service.ts": {
     "complexity": {
       "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
     }
   },
   "src/modules/requests/group-request-submission/group-request-trail.mapper.ts": {
@@ -372,19 +308,6 @@
       "count": 1
     }
   },
-  "src/modules/requests/request-view/pricing-view.service.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
-  "src/modules/requests/service-account-request/service-account-request.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
   "src/modules/requests/sla/backlog-alert.service.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -400,25 +323,12 @@
       "count": 1
     }
   },
-  "src/modules/requests/spend/budget-check.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/modules/requests/status/request-status-facts.service.ts": {
     "complexity": {
       "count": 1
     }
   },
   "src/modules/requests/status/rules/request-status-rules.policy.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
-  "src/modules/requests/timing/request-timing.policy.ts": {
     "complexity": {
       "count": 1
     }

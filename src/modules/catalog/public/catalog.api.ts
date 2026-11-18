@@ -1,10 +1,22 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
+import { searchKey } from '../../../core/search-key';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type {
+  BaselineSubscription,
+  CatalogEntry,
+  CatalogEntryMatch,
   CatalogOnboardingFacts,
   PlanRevocationInfo,
   PlanSummary,
+  PlanSummaryWithLogo,
+  PlanUsageRate,
+  PoolSubscription,
+  RuleSubscription,
+  StockPlanFilter,
+  StockPlanPage,
+  SubscriptionPrice,
   WorkspaceDuty,
   SeatTarget,
   SeatTargetRef,
@@ -67,16 +79,8 @@ export class CatalogApi {
   }
 
   /**
-   * The first `limit` applications in use whose Business Owner is this employee, and how many there are (a read, `US-03-01`
-   * AC-13): a person who moves to another department or leaves needs someone to take them over (`US-04-06`).
-   */
-  getApplicationsOwnedBy(employeeId: string, limit: number, tx?: DbTx) {
-    return this.applicationLookup.ownedBy(employeeId, limit, tx);
-  }
-
-  /**
    * The applications with these ids as a collector's allowlist needs to judge them: name, kind, whether the application is a
-   * communication service (never reported, `QĐ-62o`) and whether it is retired. An id that does not exist is absent.
+   * communication service (it stands in the group Liên lạc, `QĐ-111e`; never reported, `QĐ-62o`) and whether it is retired. An id that does not exist is absent.
    */
   getCollectorApplications(ids: readonly string[], tx?: DbTx) {
     return this.applicationLookup.collectorApplications(ids, tx);
@@ -90,22 +94,219 @@ export class CatalogApi {
     return this.plans.workspaceDutiesOf(employeeIds, tx);
   }
 
-  /** The plans with these ids by name, with their application, as far as they exist. */
-  getPlanSummaries(ids: readonly string[]): Promise<PlanSummary[]> {
-    return this.onboarding.planSummaries(ids);
+  /**
+   * The application of the catalog that is the same software as a declaration by its name and its web page, with its plans (`QĐ-111b`): what a person who
+   * proposes software the catalog already has is told, so they ask for it as case A. Null when the catalog has nothing like it. The rule is the one of
+   * `duplicateOf`, shared with the IT Admin who declares an application.
+   */
+  async findCatalogEntryOfSoftware(
+    tx: DbTx,
+    declared: { name: string; homepageUrl: string },
+  ): Promise<CatalogEntryMatch | null> {
+    const found = await this.applicationLookup.duplicateOfDeclared(tx, declared);
+    const entry = found && (await this.getCatalogEntry(tx, found.applicationId));
+
+    return found && entry ? { by: found.by, entry } : null;
   }
 
   /**
-   * What a plan is bought at for a department (unit price and billing cycle), from the newest priced active subscription that
-   * department owns; null when it has none. The price of another department's subscription is never used.
+   * One application of the catalog with its plans, for a proposal that names it (case B, short: `QĐ-111a`); `planName` finds the plan of that name, if the
+   * application has it. Null when the application does not exist.
    */
-  getPlanPrice(planId: string, ownerDepartmentId: string, tx?: DbTx) {
-    return this.subscriptions.priceOfPlan(planId, ownerDepartmentId, tx);
+  async getCatalogEntry(tx: DbTx, applicationId: string, planName?: string): Promise<CatalogEntry | null> {
+    const facts = await this.applicationLookup.entryFacts(tx, applicationId);
+    if (!facts) return null;
+    const plans = await this.plans.plansOfApplication(applicationId, tx);
+    const named =
+      planName === undefined ? undefined : plans.find((plan) => searchKey(plan.name) === searchKey(planName));
+
+    return {
+      applicationId: facts.id,
+      name: facts.name,
+      status: facts.catalogStatus,
+      vendor: facts.vendor,
+      plans: plans
+        .slice(0, 20)
+        .map((plan) => ({ planId: plan.id, name: plan.name, provisioningType: plan.provisioningType })),
+      planTotal: plans.length,
+      planNamed: named ? { planId: named.id, name: named.name } : null,
+    };
   }
 
-  /** The ids of every subscription and purchase a department owns, by id: for a module that finds what belongs to the department through them. */
-  getSubscriptionIdsOwnedBy(departmentId: string, tx?: DbTx): Promise<string[]> {
-    return this.subscriptions.idsOwnedBy(departmentId, tx);
+  /** The plans with these ids by name, with their application, as far as they exist; `tx` reads in the caller's transaction, which sees the plans it made. */
+  getPlanSummaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
+    return this.onboarding.planSummaries(ids, tx);
+  }
+
+  /** The same with the logo of the application of each plan (the https link the IT Admin pasted, or null), in the same read. */
+  getPlanSummariesWithLogo(ids: readonly string[], tx?: DbTx): Promise<PlanSummaryWithLogo[]> {
+    return this.plans.summariesWithLogo(ids, tx);
+  }
+
+  /**
+   * What a plan is bought at (kind, unit price and billing cycle), from the main subscription of the plan: the newest priced
+   * active one; else the reference price of the plan when it has one (`QĐ-113a`, `source` says which); null when it has none. It is the plan's price whatever department asks (S1-02). With `on`, the price of that day:
+   * the main one among the periods that run on it (begun, not ended, not yet continued by a later period that has begun), and
+   * the newest priced one as above only when no period runs on it.
+   */
+  getPlanPrice(planId: string, tx?: DbTx, on?: BusinessDate) {
+    return this.subscriptions.priceOfPlan(planId, tx, on);
+  }
+
+  /**
+   * What a plan is bought at by a subscription alone: null when none prices it, even if the plan has a reference price (`QĐ-113a`). The price of the
+   * cost of a seat, an adjustment and savings; `getPlanPrice` is for pricing a request, which the reference price may stand in for.
+   */
+  getSubscriptionPlanPrice(planId: string, tx?: DbTx, on?: BusinessDate) {
+    return this.subscriptions.subscriptionPriceOfPlan(planId, tx, on);
+  }
+
+  /**
+   * A plan the IT Admin linked to a case B request takes the monthly price of the approved quote as its reference price when it has none (`QĐ-113a`):
+   * only a K1 or K2 plan, never over a price already entered, in dong only. In the transaction of the caller, audited as a change of the plan by `actor`.
+   * Returns whether the price was set.
+   */
+  adoptPlanQuotePrice(
+    actor: AuthenticatedPrincipal,
+    planId: string,
+    price: { amountMinor: bigint; currency: string },
+    tx: DbTx,
+  ): Promise<boolean> {
+    return this.plans.adoptQuotePrice(actor, planId, price, tx);
+  }
+
+  /** The subscriptions of the plan a seat can be taken from today: the shared pool of the plan (`QĐ-103d`); a next period recorded ahead of its start is not one while the period it continues is (its seats are carried from it). */
+  getGrantableSubscriptions(planId: string, today: BusinessDate, tx?: DbTx): Promise<PoolSubscription[]> {
+    return this.subscriptions.grantableOfPlan(planId, today, tx);
+  }
+
+  /** The same for many plans in one read, by plan (a plan with none is absent): what the stock of a queue of grants is counted from. */
+  getGrantableSubscriptionsOfPlans(
+    planIds: readonly string[],
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, PoolSubscription[]>> {
+    return this.subscriptions.grantableOfPlans(planIds, today, tx);
+  }
+
+  /**
+   * One page of the plans that give out seats (K2), keys (K4) or personal accounts (K1), by application then plan, each with the subscriptions a seat
+   * can be taken from today (the shared pool of the plan, `getGrantableSubscriptions`) and the total for the same filter, from one snapshot: what
+   * the stock summary of the IT Admin counts over (`QĐ-111n`). A plan with no such subscription is absent; with `responsibleItAdminEmployeeId`
+   * only that IT Admin's subscriptions count.
+   */
+  getStockPlans(filter: StockPlanFilter): Promise<StockPlanPage> {
+    return this.subscriptions.stockPlansPage(filter);
+  }
+
+  /**
+   * Buys one more seat on the subscription, in the transaction of the caller, which holds it locked through `lockSeatTarget`: `purchased_quantity`
+   * rises by one (a K2 or K4 pool topped up with a grant, or the seat a K1 grant buys for its holder). It asks no Cost Center of the department
+   * that owns the subscription, if any. A rise of a K2 or K4 pool is told to the IT Admin who answers for it, with `requestId` (the request the seat is
+   * bought for) when the caller has one (`QĐ-110v`); a K1 purchase tells nobody (`S-4`). Throws PoolSeatNotAddableError for a subscription that is absent or a draft.
+   */
+  addPoolSeat(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    subscriptionId: string,
+    requestId: string | null = null,
+  ): Promise<number> {
+    return this.subscriptions.addSeat(tx, actor, subscriptionId, requestId);
+  }
+
+  /**
+   * Attaches the purchase documents of a purchase invoice (`PI-1`) to it in the transaction of the caller: only `PURCHASE_DOCUMENT` files the actor uploaded
+   * that are uploaded and not attached yet. Throws DocumentAttachRefusedError.
+   */
+  async attachPurchaseDocuments(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { documentIds: readonly string[]; purchaseInvoiceId: string },
+  ): Promise<void> {
+    try {
+      await this.documents.attachPurchaseDocuments(tx, actor, input);
+    } catch (error) {
+      if (error instanceof DocumentNotFoundError) throw new DocumentAttachRefusedError('NOT_FOUND');
+      if (error instanceof DocumentAlreadyAttachedError) throw new DocumentAttachRefusedError('ALREADY_ATTACHED');
+      if (error instanceof DocumentNotReadyToAttachError) throw new DocumentAttachRefusedError('NOT_READY_TO_ATTACH');
+      if (error instanceof DocumentPurposeMismatchError) throw new DocumentAttachRefusedError('PURPOSE_MISMATCH');
+      throw error;
+    }
+  }
+
+  /**
+   * Attaches the proofs of payment a case outside the process (`SBF-07a`) was closed with to it in the transaction of the caller: only `PURCHASE_DOCUMENT` files
+   * the actor uploaded that are uploaded and not attached yet. Throws DocumentAttachRefusedError.
+   */
+  async attachOutOfProcessCaseDocuments(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { documentIds: readonly string[]; outOfProcessCaseId: string },
+  ): Promise<void> {
+    try {
+      await this.documents.attachOutOfProcessCaseDocuments(tx, actor, input);
+    } catch (error) {
+      if (error instanceof DocumentNotFoundError) throw new DocumentAttachRefusedError('NOT_FOUND');
+      if (error instanceof DocumentAlreadyAttachedError) throw new DocumentAttachRefusedError('ALREADY_ATTACHED');
+      if (error instanceof DocumentNotReadyToAttachError) throw new DocumentAttachRefusedError('NOT_READY_TO_ATTACH');
+      if (error instanceof DocumentPurposeMismatchError) throw new DocumentAttachRefusedError('PURPOSE_MISMATCH');
+      throw error;
+    }
+  }
+
+  /** The price the vendor quoted for the main subscription of the plan, in the currency it was quoted in (`R-44`); null when none was kept. */
+  getPlanOriginalPrice(planId: string, tx?: DbTx, on?: BusinessDate) {
+    return this.subscriptions.originalPriceOfPlan(planId, tx, on);
+  }
+
+  /** The price the vendor quoted for one subscription, in the currency it was quoted in (`R-44`); null when none was kept. */
+  getSubscriptionOriginalPrice(subscriptionId: string, tx?: DbTx) {
+    return this.subscriptions.originalPriceOfSubscription(subscriptionId, tx);
+  }
+
+  /** What one subscription is bought at (unit price and billing cycle); null when it has no price. */
+  getSubscriptionPrice(subscriptionId: string, tx?: DbTx): Promise<SubscriptionPrice | null> {
+    return this.subscriptions.priceOfSubscription(subscriptionId, tx);
+  }
+
+  /**
+   * Every active subscription of the company with its price and term: what the baseline of the budget starts from (`FR-5.15`). Its cost is
+   * charged to the departments of the people who hold its seats, the idle seats to the shared pool (`QĐ-103k`), so none is left out for
+   * owning no department.
+   */
+  getBaselineSubscriptions(tx?: DbTx): Promise<BaselineSubscription[]> {
+    return this.subscriptions.baselineOf(tx);
+  }
+
+  /**
+   * Replaces what the organization knows of the usage of its plans priced per seat with what one weekly pass of the usage rules found
+   * (`KPI-3`, `QĐ-109d`), in the transaction of the caller: the module of the rules pushes it here, so the budget reads it below that module.
+   */
+  replacePlanUsageRates(
+    tx: DbTx,
+    organizationId: string,
+    assessedOn: BusinessDate,
+    rates: readonly PlanUsageRate[],
+  ): Promise<void> {
+    return this.plans.replaceUsageRates(tx, organizationId, assessedOn, rates);
+  }
+
+  /**
+   * `KPI-3` in percent of each of these plans (`QĐ-109d`): the seats with activity in the 30 days before the last pass over the seats bought,
+   * for a plan priced per seat that the pass judged. A plan with no usage known is absent (no figure, never zero).
+   */
+  getPlanKpi3(planIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    return this.plans.kpi3Of(planIds, tx);
+  }
+
+  /** The subscriptions that grant seats on `day` (active, not taken over by a later period that runs, not ended), with their plan facts, in one read. */
+  getSubscriptionsGrantingOn(day: BusinessDate, tx?: DbTx): Promise<RuleSubscription[]> {
+    return this.subscriptions.grantingOn(day, tx);
+  }
+
+  /** The IT Admin named responsible for the subscription; null when it names none: who answers for a seat of the shared pool. */
+  getSubscriptionResponsibleItAdmin(subscriptionId: string, tx?: DbTx): Promise<string | null> {
+    return this.subscriptions.responsibleItAdminOf(subscriptionId, tx);
   }
 
   /** The vendor of the application of the plan, null for internal software: whose tax profile estimates its price. */
@@ -118,19 +319,24 @@ export class CatalogApi {
     return this.plans.vendorIdsOf(planIds);
   }
 
-  /** The Business Owner of the application of the plan now, or null when the plan does not exist. */
-  getPlanBusinessOwnerId(planId: string, tx?: DbTx): Promise<string | null> {
-    return this.plans.businessOwnerIdOf(planId, tx);
+  /** The IT Admin responsible for the application now (`QĐ-111g`), or null when it does not exist. */
+  getApplicationResponsibleItAdminId(applicationId: string, tx?: DbTx): Promise<string | null> {
+    return this.applicationLookup.responsibleItAdminIdOf(applicationId, tx);
+  }
+
+  /** The IT Admin responsible for the application of the plan now (`QĐ-111g`), or null when there is none or the plan does not exist. */
+  getPlanResponsibleItAdminId(planId: string, tx?: DbTx): Promise<string | null> {
+    return this.plans.responsibleItAdminIdOf(planId, tx);
   }
 
   /**
-   * Registers software the company built itself, with its Business Owner and one plan granted by hand, in the transaction
-   * of the caller (`US-05-20`). A Business Owner who has left, or a name already taken, is a `REFUSED` answer.
+   * Registers software the company built itself, with the calling IT Admin responsible for it and one plan granted by hand, in the
+   * transaction of the caller (`US-05-20`). A name already taken is a `REFUSED` answer.
    */
   registerInternalSoftware(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    input: { name: string; businessOwnerEmployeeId: string; dataSensitivity: 'LOW' | 'MEDIUM' | 'HIGH' },
+    input: { name: string; dataSensitivity: 'LOW' | 'MEDIUM' | 'HIGH' | null },
   ): Promise<InternalRegistration> {
     return this.internalRegistration.register(tx, actor, input);
   }
@@ -145,7 +351,7 @@ export class CatalogApi {
     return this.plans.revocationInfos(planIds, tx);
   }
 
-  /** The plans of the other applications in the functional group of the plan's application (at most `limit`, by id). */
+  /** The plans of the other applications in the functional group of the plan's application (at most `limit`, by id); none for the group Khác, which is no one function. */
   getSimilarPlanIds(planId: string, limit: number, tx?: DbTx): Promise<string[]> {
     return this.plans.similarIds(planId, limit, tx);
   }

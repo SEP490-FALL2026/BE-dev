@@ -2,21 +2,19 @@ import { z } from 'zod';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { groupBodySchema } from '../group-request/group-request.dto';
-import { serviceAccountSubmitSchema } from '../service-account-request/service-account-request.dto';
 import { requestIdParamSchema, requestSchema, submitBodySchema } from '../access-request/access-request.dto';
 
-/** The kinds of request that can be kept as a draft: the three a person sends for themselves or for a group of the department. */
-export const DRAFT_KINDS = ['INDIVIDUAL', 'GROUP', 'SERVICE_ACCOUNT'] as const;
+/** The kinds of request that can be kept as a draft: the two a person sends for themselves or for a group of the department. */
+export const DRAFT_KINDS = ['INDIVIDUAL', 'GROUP'] as const;
 
 /**
  * What is saved as a draft: exactly the body of the operation that sends it, with the kind that says which operation that
- * is, validated by the same schema (`accessRequestSubmit`, `groupRequestSubmit`, `accessRequestServiceAccountSubmit`). Saving runs no
+ * is, validated by the same schema (`accessRequestSubmit`, `groupRequestSubmit`). Saving runs no
  * gate; sending the draft runs all of them again, on this content, with the department of the sender on the day.
  */
 export const draftSaveBodySchema = z.discriminatedUnion('kind', [
   submitBodySchema.extend({ kind: z.literal('INDIVIDUAL') }),
   groupBodySchema.extend({ kind: z.literal('GROUP') }),
-  serviceAccountSubmitSchema.extend({ kind: z.literal('SERVICE_ACCOUNT') }),
 ]);
 
 /** A page of the drafts of the caller: `page` from 1, `pageSize` 1 to 100 (20 when left out). */
@@ -47,7 +45,7 @@ const pagination = z.strictObject({
 });
 
 /**
- * The body of saving a draft is a union of three bodies, which a class cannot extend: the DTO is the class `createZodDto` makes, kept as
+ * The body of saving a draft is a union of two bodies, which a class cannot extend: the DTO is the class `createZodDto` makes, kept as
  * a value, and the same name is the type of what it validates, so the route reads `body: DraftSaveBodyDto` as for any other.
  */
 export const DraftSaveBodyDto = createZodDto(draftSaveBodySchema);

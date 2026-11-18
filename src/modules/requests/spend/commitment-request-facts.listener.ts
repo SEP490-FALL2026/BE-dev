@@ -52,6 +52,7 @@ export class RequestCommitmentFacts implements CommitmentRequestFacts, OnModuleI
         id: row.id,
         software: { name: software },
         plan: plan ? { name: plan.planName } : null,
+        planId: row.planId,
         requester: { employeeCode: requester.employeeCode, fullName: requester.fullName },
         beneficiaryCount: row.beneficiaryCount,
         spendApprovedAt: row.spendApprovedAt,

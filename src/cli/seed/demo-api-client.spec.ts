@@ -135,6 +135,54 @@ describe('the HTTP client of ops:seed', () => {
     });
   });
 
+  describe('download', () => {
+    const bytes = () =>
+      new Response(new Uint8Array([0x50, 0x4b, 3, 4]), {
+        status: 200,
+        headers: { 'content-type': 'application/octet-stream' },
+      });
+
+    it('answers the raw bytes of a file, with the Bearer token and no envelope to strip', async () => {
+      const { api, calls } = client([() => json(200, tokens), bytes]);
+      await api.signIn('a@x.example', 'pw');
+      const file = await api.download('a@x.example', '/import-templates/budget-proposal?format=xlsx');
+
+      expect([...file]).toEqual([0x50, 0x4b, 3, 4]);
+      expect(calls[1].url).toBe('http://api:3000/api/v1/import-templates/budget-proposal?format=xlsx');
+      expect((calls[1].init.headers as Record<string, string>).authorization).toBe('Bearer access-1');
+    });
+
+    it('signs in again once when the access token expired, then answers the bytes', async () => {
+      const { api } = client([
+        () => json(200, tokens),
+        () => json(401, { success: false, error: { code: 'INVALID_ACCESS_TOKEN' } }),
+        () => json(200, { success: true, data: { accessToken: 'access-2', refreshToken: 'refresh-2' } }),
+        bytes,
+      ]);
+      await api.signIn('a@x.example', 'pw');
+
+      await expect(api.download('a@x.example', '/import-templates/employees')).resolves.toHaveLength(4);
+    });
+
+    it('reports a refusal by method, path, status and code only', async () => {
+      const { api } = client([
+        () => json(200, tokens),
+        () => json(403, { success: false, error: { code: 'AUTHORIZATION.FORBIDDEN', message: 'secret detail' } }),
+      ]);
+      await api.signIn('a@x.example', 'pw');
+      const failure = await api.download('a@x.example', '/import-templates/employees').catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(DemoApiError);
+      expect(failure).toMatchObject({
+        method: 'GET',
+        path: '/import-templates/employees',
+        status: 403,
+        code: 'AUTHORIZATION.FORBIDDEN',
+      });
+      expect(String((failure as Error).message)).not.toContain('secret');
+    });
+  });
+
   it('ends every session it opened with the refresh token, and forgets them', async () => {
     const { api, calls } = client([() => json(200, tokens), () => new Response(null, { status: 204 })]);
     await api.signIn('a@x.example', 'pw');

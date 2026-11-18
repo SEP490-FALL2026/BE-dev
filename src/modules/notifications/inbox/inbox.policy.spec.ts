@@ -101,6 +101,11 @@ describe('the closed table of in-app notices', () => {
         notice({ code: 'STEP_SLA_REMINDER', params: { requestId: REQUEST, overdueWorkingDays: 2 } }),
       ),
     ).toBeNull();
+    expect(
+      refuseInAppNotification(
+        notice({ code: 'STEP_SLA_REMINDER', params: { requestId: REQUEST, recipientRole: 'REQUESTER' } }),
+      ),
+    ).toBeNull();
   });
 
   it('refuses parameters over 4 096 bytes, counted in bytes and not in characters', () => {
@@ -151,6 +156,49 @@ describe('the alerts of the rights (a03-license-inbox-alerts, FR-5.14 lines 3, 1
         code: 'LEAVER_K1_ACCESS_RUNS_ON',
         params: { taskId: ID, assignmentId: ID, employeeId: ID, planId: ID, accessUntil: '2026-11-30' },
       }),
+      // A seat still held by a person who left (`G2`): ids only, the interface turns them into names.
+      notice({
+        code: 'GHOST_SEAT_G2_DETECTED',
+        params: { recommendationId: ID, employeeId: ID, applicationId: ID },
+      }),
+      notice({ code: 'GHOST_SEAT_NEW', params: { recommendationId: ID, departmentId: ID, weekKey: '2026-W45' } }),
+      notice({
+        code: 'GHOST_SEAT_ACTION_TIER',
+        params: { recommendationId: ID, departmentId: ID, weekKey: '2026-W45' },
+      }),
+      notice({
+        code: 'GHOST_SEAT_DECISION_OVERDUE',
+        params: { recommendationId: ID, employeeId: ID, applicationId: ID, decisionDueOn: '2026-11-06' },
+      }),
+      notice({ code: 'GHOST_SEAT_WAITING_FOR_HEAD', params: { recommendationId: ID, departmentId: ID } }),
+      notice({ code: 'GHOST_SEAT_RETURNED', params: { recommendationId: ID, employeeId: ID, applicationId: ID } }),
+      notice({
+        code: 'GHOST_SEAT_EXEMPTION_ENDING',
+        params: { recommendationId: ID, employeeId: ID, applicationId: ID, exemptUntil: '2026-12-31' },
+      }),
+      notice({
+        code: 'USAGE_TRACKING_NOTICE',
+        params: {
+          applicationId: ID,
+          activityDefinition: 'mở hoặc chỉnh sửa một tệp',
+          dataKinds: 'ngày hoạt động theo tài khoản',
+          purpose: 'đối chiếu quyền đang giữ với việc sử dụng',
+          retentionMonths: 6,
+          viewPath: '/applications/x/usage-tracking',
+        },
+      }),
+      notice({
+        code: 'USAGE_SOURCE_STALE',
+        params: { applicationId: ID, source: 'Figma admin export', coverageTo: '2026-09-01', freshnessDays: 8 },
+      }),
+      notice({
+        code: 'REVOCATION_UPCOMING',
+        params: { taskId: ID, planId: ID, applicationId: ID, source: 'GHOST_SEAT', notBefore: '2026-11-08' },
+      }),
+      notice({
+        code: 'REVOCATION_CANCELLED',
+        params: { planId: ID, applicationId: ID, source: 'GHOST_SEAT' },
+      }),
     ];
     for (const input of accepted)
       expect({ code: input.code, refusal: refuseInAppNotification(input) }).toEqual({
@@ -168,33 +216,49 @@ describe('the alerts of the rights (a03-license-inbox-alerts, FR-5.14 lines 3, 1
 describe('the notices of the renewal of a subscription (a06, EP-11)', () => {
   const ID = '00000000-0000-4000-8000-0000000000a6';
   const KEYS_BY_CODE = {
+    // The keys of the point of adjustment (`SBF-20` §13) and, kept so a row already stored is still read, those of the old milestones.
     SUBSCRIPTION_RENEWAL_ALERT: [
       'subscriptionId',
       'renewalId',
-      'milestoneDays',
       'baseDate',
+      'renewalOn',
+      'seatsNeeded',
+      'commitment',
+      'milestoneDays',
       'noticeBasis',
       'audience',
       'decisionRecorded',
       'outcomeRecorded',
       'usageData',
     ],
+    SUBSCRIPTION_RENEWAL_RED_ALERT: ['subscriptionId', 'baseDate', 'renewalOn', 'seatsNeeded'],
+    SUBSCRIPTION_RENEWAL_KEPT: ['subscriptionId', 'renewalOn', 'purchasedQuantity', 'seatsNeeded'],
     SUBSCRIPTION_RENEWAL_DATA_QUALITY: ['subscriptionId', 'problem'],
-    SUBSCRIPTION_BUSINESS_OWNER_LEFT: ['subscriptionId', 'applicationId'],
     SUBSCRIPTION_RENEWAL_PROPOSED: ['renewalId', 'subscriptionId', 'choice'],
     SUBSCRIPTION_RENEWAL_DECIDED: ['renewalId', 'subscriptionId', 'choice', 'executionPoint'],
     SUBSCRIPTION_RENEWAL_LATE: ['renewalId', 'subscriptionId', 'baseDate'],
-    SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate'],
+    SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED: [
+      'renewalId',
+      'subscriptionId',
+      'choice',
+      'quantity',
+      'outcome',
+      'nextSubscriptionId',
+      'substitute',
+    ],
+    SUBSCRIPTION_AUTO_RENEWAL_INCIDENT: ['subscriptionId', 'baseDate', 'renewalId'],
     SUBSCRIPTION_EXPIRY_MARKED: ['subscriptionId', 'baseDate', 'endDate'],
   } as const;
 
-  it('pins the keys of each of the eight codes, so a new key is a decision and not an accident', () => {
+  it('pins the keys of each of the ten codes (the Business Owner notice is gone, `QĐ-111g`), so a new key is a decision and not an accident', () => {
     for (const [code, keys] of Object.entries(KEYS_BY_CODE))
       expect({ code, keys: [...(PARAM_KEYS_BY_CODE[code as keyof typeof PARAM_KEYS_BY_CODE] ?? [])].sort() }).toEqual({
         code,
         keys: [...keys].sort(),
       });
-    expect(Object.keys(KEYS_BY_CODE)).toHaveLength(8);
+    expect(Object.keys(KEYS_BY_CODE)).toHaveLength(10);
+    // The code is out of the table: nothing writes it any more, and a notice already kept under it is still read (its code is text).
+    expect(PARAM_KEYS_BY_CODE).not.toHaveProperty('SUBSCRIPTION_BUSINESS_OWNER_LEFT');
   });
 
   it('accepts a notice with exactly its keys and refuses an amount or a person smuggled into one', () => {

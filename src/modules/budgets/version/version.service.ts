@@ -38,13 +38,13 @@ export class VersionService {
 
   /**
    * Throws BudgetNotFinanceError, BudgetVersionNotFoundError, BudgetYearEndedError, BudgetVersionNotEditableError,
-   * BudgetReasonRequiredError, BudgetQuartersMismatchError and the money errors.
+   * BudgetReasonRequiredError, and the money errors.
    */
   async update(actor: AuthenticatedPrincipal, id: string, patch: VersionPatchDto): Promise<VersionWire> {
-    const fiscalStart = await this.access.begin(actor);
+    this.access.begin(actor);
 
     return this.runner.run(async (tx) => {
-      const version = await this.access.lockEditable(tx, id, fiscalStart);
+      const version = await this.access.lockEditable(tx, id);
       const next = await this.figures.patchOf(tx, version, patch);
 
       await this.versions.patch(tx, id, next);
@@ -61,7 +61,9 @@ export class VersionService {
    * withdrawn or given-back proposal left behind is not sent.
    */
   async send(actor: AuthenticatedPrincipal, id: string): Promise<VersionWire> {
-    const fiscalStart = await this.access.begin(actor);
+    this.access.begin(actor);
+    // The default share of the organization, read before the transaction opens, is what the reserve is judged against.
+    const defaultPercent = await this.figures.defaultPercent();
 
     return this.runner.run(async (tx) => {
       // The row of the grant of the spending approver first, `FOR SHARE`: a revocation that is being made and this sending take turns, so
@@ -70,16 +72,20 @@ export class VersionService {
       const approver = await this.access.usableApproverLocked(tx);
       const known = await this.versions.findById(id, tx);
       if (!known) throw new BudgetVersionNotFoundError();
+      // The cycle of the year first, before the proposal and the version (the order of the module: cycle, proposal, version, year).
+      const cycle = await this.access.lockCycleOf(tx, known);
       const proposal = known.proposalId ? await this.proposals.lockById(tx, known.proposalId) : null;
-      const version = await this.access.lockEditable(tx, id, fiscalStart);
+      const version = await this.access.lockEditable(tx, id);
       // A revision of the budget of a year is gone (`QĐ-97b`): one that an older release left is neither sent nor decided.
       if (version.kind === 'REVISION') throw new BudgetVersionNotEditableError(version.state);
-      // A reserve that is not the default share of the base says why; a version made before the share was kept asks nothing.
-      if (reserveReasonMissing(version)) throw new BudgetReasonRequiredError('RESERVE');
+      // A reserve that is not the default share of the organization says why, whoever chose it; a version made before the share was kept asks nothing.
+      if (reserveReasonMissing(version, defaultPercent)) throw new BudgetReasonRequiredError('RESERVE');
+      await this.access.requireExplained(tx, id);
       if (version.proposalId && (!proposal || (proposal.state !== 'SUBMITTED' && proposal.state !== 'REVIEWED'))) {
         throw new BudgetProposalStateError('REVIEW', proposal?.state ?? 'MISSING');
       }
       await this.yearLock.lock(tx, version.costCenterId, [version.year]);
+      await this.access.requireWithinAnnualCeiling(tx, cycle, version);
       if (proposal) await this.proposals.setReviewed(tx, proposal.id);
 
       await this.versions.setSent(tx, id, actor.employeeId, new Date());

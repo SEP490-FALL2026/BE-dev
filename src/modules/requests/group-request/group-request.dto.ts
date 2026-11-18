@@ -3,13 +3,13 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import {
   REASON_MAX_LENGTH,
-  TERM_MONTHS_MAX,
   employeeRef,
   moneySchema,
   pricingSchema,
   requestSchema,
+  termMonthsSchema,
 } from '../access-request/access-request.dto';
-import { LINE_STATES } from '../access-request/group-request.types';
+import { LINE_STATES, READABLE_CANCEL_CAUSES } from '../access-request/group-request.types';
 
 /**
  * The most people the body of a request for a group may carry: a bound against abuse, far above what a head may name. The limit of
@@ -20,9 +20,9 @@ export const GROUP_BODY_LINES_MAX = 1000;
 const reason = z.string().trim().min(1).max(REASON_MAX_LENGTH);
 
 /**
- * What the sender gives for a group (`US-05-17`, `US-05-02` AC-2): the plan, the people with the day the access of each ends when
- * they are not staff, and the reason, the term and the project they share. The branch, the Cost Center, the amount and who decides
- * are fixed by the system; a head confirms a term over twelve months in so many words when sending.
+ * What the sender gives for a group (`US-05-17`, `US-05-02` AC-2): the plan, the people, and the reason and the time of use in months
+ * they share (`QĐ-111i`). The branch, the Cost Center, the amount and who decides are fixed by the system; a person with a term whose
+ * contract ends sooner is cut at the end of it, on their own line (R-38).
  */
 export const groupBodySchema = z.strictObject({
   planId: z.uuid(),
@@ -31,16 +31,22 @@ export const groupBodySchema = z.strictObject({
     .min(1)
     .max(GROUP_BODY_LINES_MAX),
   businessReason: reason,
-  termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
+  /** The time of use of every person named, in months; null for no end, and then each person who has a term is refused (`FR-2.8`, `INV-07`). */
+  termMonths: termMonthsSchema.optional(),
 });
 
 const LINE_REASONS = [
+  'HEAD_IN_GROUP',
   'SPENDING_APPROVER',
   'OUTSIDE_DEPARTMENT',
   'NOT_ACTIVE',
   'EMAIL_REQUIRED',
   'HAS_ACCESS',
   'HAS_OPEN_REQUEST',
+  'TERM_REQUIRED',
+  'TERM_LONG_TERM_NOT_ALLOWED',
+  'TERM_CONTRACT_ENDED',
+  'OPEN_LIMIT_REACHED',
 ] as const;
 
 /** What the check of a group says: every reason of every person at once, and what it would cost; nothing is written. */
@@ -53,9 +59,14 @@ const checkSchema = z.strictObject({
   tooManyLines: z.strictObject({ max: z.number().int().positive() }).nullable(),
   /** The fewest different people a request for a group names, when fewer were named. */
   tooFewLines: z.strictObject({ min: z.number().int().positive() }).nullable(),
-  /** The longest term the plan takes from today, and whether the term asked for is beyond it. */
-  termLimit: z.strictObject({ maxMonths: z.number().int().positive(), endsBy: z.string().nullable() }),
-  termBeyondLimit: z.boolean(),
+  /**
+   * What is wrong with the time of use for the plan as a whole, or null (`QĐ-111i`); a person with a term who gets no months, or no end, is
+   * refused on their own line (`TERM_REQUIRED`, `TERM_LONG_TERM_NOT_ALLOWED`), and so is one whose contract ended before today
+   * (`TERM_CONTRACT_ENDED`); one whose contract ends sooner than the months is cut, not refused.
+   */
+  termRefusal: z
+    .enum(['TERM_REQUIRED', 'TERM_MONTHS_OUT_OF_RANGE', 'TERM_NOT_ASKED', 'TERM_LONG_TERM_NOT_ALLOWED'])
+    .nullable(),
   lines: z.array(
     z.strictObject({
       employeeId: z.uuid(),
@@ -66,7 +77,7 @@ const checkSchema = z.strictObject({
   lineCount: z.number().int().nonnegative(),
   hasSpendStep: z.boolean(),
   pricing: pricingSchema,
-  /** The unit price for the whole term, for one person; null when the plan has no price. */
+  /** What one person of the request costs for the months counted; null when the plan has no price or nobody is named. */
   amountPerPerson: moneySchema.nullable(),
 });
 
@@ -90,8 +101,7 @@ const lineDecisionSchema = z.strictObject({
   decision: z.enum(['APPROVED', 'REJECTED']),
   reason: z.string().nullable(),
   decidedBy: employeeRef,
-  /** `FALLBACK_APPROVER` and `CONFLICT_SUBSTITUTE` are historical: a decision of before `QĐ-93`; none is written now. */
-  deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER', 'FALLBACK_APPROVER', 'CONFLICT_SUBSTITUTE']),
+  deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER']),
   decidedAt: z.iso.datetime(),
 });
 
@@ -103,7 +113,7 @@ const lineSchema = z.strictObject({
   /** The need step that holds this person: the head's for the others, a step of its own for the head. */
   needStep: z.strictObject({
     id: z.uuid(),
-    state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED']),
+    state: z.enum(['PENDING', 'WAITING', 'APPROVED', 'REJECTED', 'CLOSED', 'NOT_REQUIRED']),
     assignee: employeeRef.nullable(),
   }),
   /** The day the access of this person ends, when they are not staff. */
@@ -117,8 +127,11 @@ const lineSchema = z.strictObject({
   endedAt: z.iso.datetime().nullable(),
   endedBy: employeeRef.nullable(),
   endReason: z.string().nullable(),
-  /** Why the line ended as cancelled: the IT Admin closed it, or the conversion command because the spending approver is a party. */
-  cancelCause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED', 'SPENDING_APPROVER_PARTY']).nullable(),
+  /**
+   * Why the line ended as cancelled: the IT Admin closed it, the conversion command because the spending approver is a party, or the
+   * system because the person left or was moved to another department (`QĐ-110d`, `QĐ-110o`).
+   */
+  cancelCause: z.enum(READABLE_CANCEL_CAUSES).nullable(),
 });
 
 export class GroupBodyDto extends createZodDto(groupBodySchema) {}

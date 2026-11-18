@@ -31,12 +31,12 @@ export class BudgetAttachmentQueryService {
 
     const isFinance = actor.roles.includes('FINANCE');
     const isDecider = await this.facts.isSpendingApprover(actor.employeeId);
-    const headedCostCenterId = await this.facts.headedCostCenter(actor.employeeId, today);
+    const headedCostCenterIds = await this.facts.headedCostCenters(actor.employeeId, today);
 
     const view = budgetRecordView({
       isFinance,
       isDecider,
-      headedCostCenterId,
+      headedCostCenterIds,
       recordCostCenterId: proposal.costCenterId,
       versionSentAt: undefined,
     });
@@ -62,9 +62,9 @@ export class BudgetAttachmentQueryService {
     const today = await this.facts.today(new Date());
     const isFinance = actor.roles.includes('FINANCE');
     const isDecider = await this.facts.isSpendingApprover(actor.employeeId);
-    const headedCostCenterId = await this.facts.headedCostCenter(actor.employeeId, today);
+    const headedCostCenterIds = await this.facts.headedCostCenters(actor.employeeId, today);
 
-    if (!isFinance && !isDecider && !headedCostCenterId) {
+    if (!isFinance && !isDecider && headedCostCenterIds.length === 0) {
       throw new BudgetAttachmentNotAReaderError();
     }
 
@@ -74,7 +74,7 @@ export class BudgetAttachmentQueryService {
     const view = budgetRecordView({
       isFinance,
       isDecider,
-      headedCostCenterId,
+      headedCostCenterIds,
       recordCostCenterId: version.costCenterId,
       versionSentAt: version.sentAt,
     });

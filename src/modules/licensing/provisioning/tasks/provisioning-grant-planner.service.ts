@@ -26,6 +26,8 @@ export interface GrantInput {
   responsibleEmployeeId?: string;
   /** The person of a request for a group this grant is for; a request for one person has none to name. */
   beneficiaryEmployeeId?: string;
+  /** Record a purchase with the grant when the pool of the plan has nothing free (`BR-MF1-09b`). */
+  purchase?: { reason?: string };
 }
 
 /**
@@ -67,8 +69,22 @@ export class ProvisioningGrantPlanner {
     // The most tries are fixed here: a parameter changed later reaches only the tasks made after it (US-01-04 AC-13).
     const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT')));
 
-    const fiscalYearStartMonth = Number(await this.parameters.getValue('FISCAL_YEAR_START_MONTH'));
+    // The end of the contract of the person the seat is for: a time of use that runs past it is cut there when the seat is written (R-38).
+    const holder = answer.seat === 'PERSONAL' ? await this.organizationReads.getEmployee(answer.employeeId) : null;
+    const holderContractEnd = holder?.contractEndDate ?? null;
+    // A person with a term has a seat that ends, whatever the months: a right with no months (a key bought once) ends at their contract (`INV-07`).
+    const holderHasTerm = holder !== null && holder.employmentType !== 'STAFF';
 
-    return { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts, fiscalYearStartMonth };
+    return {
+      answer,
+      plan,
+      serviceIdentifier,
+      organization,
+      today,
+      inCharge,
+      maxAttempts,
+      holderContractEnd,
+      holderHasTerm,
+    };
   }
 }

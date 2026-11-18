@@ -15,6 +15,7 @@ import {
   CreateDownloadUrlInput,
   CreateUploadUrlInput,
   ObjectStoragePort,
+  PutObjectInput,
   StoredObjectMetadata,
 } from './object-storage.port';
 
@@ -112,6 +113,20 @@ export class S3CompatibleObjectStorageAdapter implements ObjectStoragePort, OnMo
           Key: toKey,
           CopySource: `${this.bucket}/${fromKey.split('/').map(encodeURIComponent).join('/')}`,
           CopySourceIfMatch: etag,
+        }),
+      ),
+    );
+  }
+
+  async putObject(input: PutObjectInput): Promise<void> {
+    await this.guarded(() =>
+      this.client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: input.key,
+          Body: input.body,
+          ContentType: input.contentType,
+          ContentLength: input.body.length,
         }),
       ),
     );

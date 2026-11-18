@@ -1,8 +1,10 @@
 import type { Prisma } from '../../../generated/prisma/client';
-import { fromDateColumn } from '../../../core/business-date';
+import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { toPricing } from './access-request-pricing.mapper';
 import type { NeedStepState, AccessRequestRecord, ReadableNeedWaitingReason } from './access-request.types';
 import { requestPolicyJson } from './access-request.json';
+import { currentMissingReasonOf, currentStateOf } from './access-request.policy';
+import { LIMIT_EXEMPTIONS, type LimitExemption } from './access-request.types';
 
 /** What a request is read as: the columns, the people it is for, its need steps with their decisions, and the lines of a group. */
 export const SELECT_REQUEST = {
@@ -11,6 +13,11 @@ export const SELECT_REQUEST = {
   type: true,
   branch: true,
   state: true,
+  routingMode: true,
+  oneStepReason: true,
+  oneStepBlockedReason: true,
+  limitExemption: true,
+  replacesAssignmentId: true,
   planId: true,
   requesterEmployeeId: true,
   departmentId: true,
@@ -19,18 +26,19 @@ export const SELECT_REQUEST = {
   termMonths: true,
   pricingStatus: true,
   priceMissingReason: true,
-  expectedSpendOn: true,
+  priceKind: true,
   budgetYear: true,
+  amountMonths: true,
   amountMinor: true,
   amountCurrency: true,
   unitPriceMinor: true,
   billingCycle: true,
-  paymentSchedule: true,
+  expectedEndDate: true,
+  nextYearAmountMinor: true,
   planLineVersionId: true,
   planLinePosition: true,
   planLineConfirmed: true,
   offPlan: true,
-  expectedEndDate: true,
   policy: true,
   submittedAt: true,
   withdrawalRequestedAt: true,
@@ -123,6 +131,22 @@ function sentColumns(row: RequestRow): { costCenterId: string | null; submittedA
   return { costCenterId: row.costCenterId, submittedAt: row.submittedAt };
 }
 
+/** The exemption a request carries, as the policy knows it; a value the policy does not know (the overlap of a transfer of the old rule) reads as none. */
+export function limitExemptionOf(value: string | null): LimitExemption | null {
+  return (LIMIT_EXEMPTIONS as readonly string[]).includes(value ?? '') ? (value as LimitExemption) : null;
+}
+
+/** A date column that may be empty, as a business date. */
+const dayOrNull = (value: Date | null): BusinessDate | null => (value === null ? null : fromDateColumn(value));
+
+/**
+ * A request for a group keeps the step of its first head first; the step of a request for one person is the last it has, as a request that was
+ * sent back and sent on again has a new one (`QĐ-111ap`, R-24).
+ */
+function currentNeedStepOf<S>(type: string, steps: readonly S[]): S | undefined {
+  return type === 'GROUP_GRANT' ? steps[0] : steps[steps.length - 1];
+}
+
 export function toRecord(row: RequestRow): AccessRequestRecord {
   const sent = sentColumns(row);
   const needSteps = row.steps.map((step) => ({
@@ -137,18 +161,33 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     createdAt: step.createdAt,
     assignedAt: step.assignedAt,
     decidedAt: step.decidedAt,
-    decision: step.approvalRecord,
+    decision: step.approvalRecord && {
+      ...step.approvalRecord,
+      deciderRole:
+        step.approvalRecord.deciderRole === 'MANAGER' ? ('MANAGER' as const) : ('SPENDING_APPROVER' as const),
+    },
   }));
-  const first = needSteps[0];
+  const first = currentNeedStepOf(row.type, needSteps);
   if (!first) throw new Error(`The request ${row.id} has no need step.`);
   const { decision: firstDecision, ...step } = first;
 
   return {
+    // An older release also wrote RATE_MISSING; it is read as the missing price it comes to (`currentMissingReasonOf`).
+    oneStepBlockedReason:
+      row.oneStepBlockedReason === null
+        ? null
+        : currentMissingReasonOf(row.oneStepBlockedReason as 'PRICE_MISSING' | 'RATE_MISSING'),
+    limitExemption: limitExemptionOf(row.limitExemption),
+    replacesAssignmentId: row.replacesAssignmentId,
     id: row.id,
     organizationId: row.organizationId,
     type: row.type,
     branch: row.branch,
-    state: row.state,
+    state: currentStateOf(row.state),
+    routing: {
+      mode: row.routingMode,
+      oneStepReason: row.oneStepReason as import('./routing.policy').OneStepReason | null,
+    },
     planId: row.planId,
     requesterEmployeeId: row.requesterEmployeeId,
     departmentId: row.departmentId,
@@ -162,7 +201,13 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
         : null,
     offPlan: row.offPlan,
     expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
-    policy: requestPolicyJson.decode(row.policy),
+    policy:
+      row.routingMode === 'ONE_STEP'
+        ? {
+            ...requestPolicyJson.decode(row.policy),
+            chain: requestPolicyJson.decode(row.policy).chain.filter((kind) => kind !== 'NEED'),
+          }
+        : requestPolicyJson.decode(row.policy),
     submittedAt: sent.submittedAt,
     withdrawal:
       row.withdrawalRequestedAt !== null && row.withdrawnByEmployeeId !== null
@@ -189,7 +234,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
         : {
             assignmentId: row.renewal.assignmentId,
             previousExpectedEndDate: fromDateColumn(row.renewal.previousExpectedEndDate),
-            newExpectedEndDate: fromDateColumn(row.renewal.newExpectedEndDate),
+            newExpectedEndDate: dayOrNull(row.renewal.newExpectedEndDate),
             consecutiveMonths: row.renewal.consecutiveMonths,
             successorAssignmentId: row.renewal.successorAssignmentId,
             appliedAt: row.renewal.appliedAt,

@@ -11,8 +11,10 @@ import {
   AccountRecord,
   AccountSnapshot,
   ActivationState,
+  AppRole,
   AppUserStatus,
   CreateAppUserInput,
+  RoleHolderRecord,
 } from '../public/identity-access.types';
 
 type LockMode = 'SHARE' | 'UPDATE';
@@ -196,7 +198,10 @@ export class AppUserRepo {
     }));
   }
 
-  /** Among the employee ids given, those whose account is active and activated and holds an effective IT_ADMIN grant. */
+  /**
+   * Among the employee ids given, those who have not left and whose account is active and activated and holds an effective IT_ADMIN
+   * grant: the same test as the two below. A leaver's account stays active until someone locks it, and they must not count meanwhile.
+   */
   async findUsableItAdminEmployeeIds(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
     if (employeeIds.length === 0) return new Set();
     const rows = await (tx ?? this.prisma).appUser.findMany({
@@ -204,12 +209,79 @@ export class AppUserRepo {
         employeeId: { in: [...employeeIds] },
         status: 'ACTIVE',
         activationState: 'ACTIVATED',
+        employee: { status: 'ACTIVE' },
         roleGrants: { some: { role: 'IT_ADMIN', revokedAt: null } },
       },
       select: { employeeId: true },
     });
 
     return new Set(rows.map((row) => row.employeeId));
+  }
+
+  /** Every employee who holds an effective IT_ADMIN grant on an account that can act, by employee code. */
+  async findAllUsableItAdminEmployeeIds(tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).appUser.findMany({
+      where: {
+        status: 'ACTIVE',
+        activationState: 'ACTIVATED',
+        employee: { status: 'ACTIVE' },
+        roleGrants: { some: { role: 'IT_ADMIN', revokedAt: null } },
+      },
+      orderBy: { employee: { employeeCode: 'asc' } },
+      select: { employeeId: true },
+    });
+
+    return rows.map((row) => row.employeeId);
+  }
+
+  /** Every employee who holds an effective grant of any of these roles on an account that can act, by employee code. */
+  async findUsableEmployeeIdsHoldingRoles(roles: readonly AppRole[], tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).appUser.findMany({
+      where: {
+        status: 'ACTIVE',
+        activationState: 'ACTIVATED',
+        employee: { status: 'ACTIVE' },
+        roleGrants: { some: { role: { in: [...roles] }, revokedAt: null } },
+      },
+      orderBy: { employee: { employeeCode: 'asc' } },
+      select: { employeeId: true },
+    });
+
+    return rows.map((row) => row.employeeId);
+  }
+
+  /** A page of the accounts that can act and hold an effective grant of any of these roles, by employee code; the total counts all of them. */
+  async pageUsableRoleHolders(
+    roles: readonly AppRole[],
+    skip: number,
+    take: number,
+  ): Promise<{ rows: RoleHolderRecord[]; total: number }> {
+    const where = {
+      status: 'ACTIVE' as const,
+      activationState: 'ACTIVATED' as const,
+      employee: { status: 'ACTIVE' as const },
+      roleGrants: { some: { role: { in: [...roles] }, revokedAt: null } },
+    };
+    const [total, rows] = await this.prisma.$transaction([
+      this.prisma.appUser.count({ where }),
+      this.prisma.appUser.findMany({
+        where,
+        orderBy: [{ employee: { employeeCode: 'asc' } }, { id: 'asc' }],
+        skip,
+        take,
+        select: { id: true, employeeId: true, employee: { select: { employeeCode: true, fullName: true } } },
+      }),
+    ]);
+
+    return {
+      total,
+      rows: rows.map((row) => ({
+        appUserId: row.id,
+        employeeId: row.employeeId,
+        employeeCode: row.employee.employeeCode,
+        fullName: row.employee.fullName,
+      })),
+    };
   }
 
   /** The employee with the smallest employee code who holds an effective IT_ADMIN grant on an account that can act, or null. */

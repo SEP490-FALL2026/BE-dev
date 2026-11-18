@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import request from 'supertest';
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
+import { assignHead } from '../../support/builders/organization.builder';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
@@ -8,7 +10,8 @@ const h = new ProvisioningHarness();
 /**
  * F15 (`QĐ-90e`, spec B): licensing tells the organization which provisioning tasks are still open for a department, so that it cannot
  * be retired while seats of it are being granted or taken away. A task is open while it is queued, waiting for its retry, being worked
- * or failed; it belongs to the department that owns its seat, or, for a seat that carries none, to the owner of its subscription.
+ * or failed; it belongs to the department that owns its seat. A subscription has no owning department (`QĐ-113g`), so a seat that carries
+ * none is nobody's through its subscription.
  * Read through `OrganizationApi.getDepartmentUse`, the way retiring a department reads it, on real PostgreSQL.
  */
 describe('what keeps a department in use: the open provisioning tasks (integration, F15)', () => {
@@ -19,6 +22,7 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
   let ownerSubscription: string;
   let ownerPlan: string;
   const open: string[] = [];
+  let unowned: string;
   let counter = 0;
 
   const use = async (departmentId: string, limit = 50) => {
@@ -30,8 +34,8 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
   };
   const granted = async (subscriptionId: string, planId: string, departmentId: string) =>
     h.granted(await h.person(`E-OW${(counter += 1)}`), planId, { subscriptionId, departmentId });
-  const subscriptionOf = async (departmentId: string) => {
-    const subscriptionId = await h.subscription(20, 'K2', departmentId);
+  const subscriptionOf = async () => {
+    const subscriptionId = await h.subscription(20, 'K2');
 
     return { subscriptionId, planId: await h.planOf(subscriptionId) };
   };
@@ -66,7 +70,7 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
     owner = await h.department('P-OWNER');
     other = await h.department('P-OTHER');
     nothing = await h.department('P-NOTHING');
-    ({ subscriptionId: ownerSubscription, planId: ownerPlan } = await subscriptionOf(owner.id));
+    ({ subscriptionId: ownerSubscription, planId: ownerPlan } = await subscriptionOf());
 
     // Open: a queued task, one being worked, one that failed (a grant of a seat on a subscription of the department).
     open.push((await granted(ownerSubscription, ownerPlan, owner.id)).id);
@@ -77,8 +81,8 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
     await h.claim(failed.id).expect(200);
     await h.fail(failed.id, { reason: 'could not be done' }).expect(200);
     open.push(failed.id);
-    // Open, found through the subscription: a seat made before a personal seat carried its department has none of its own.
-    open.push(await legacyTask());
+    // Open but nobody's: a seat made before a personal seat carried its department has none, and the subscription owns none (QĐ-113g).
+    unowned = await legacyTask();
 
     // Not open: a task that is done and one closed as failed.
     const done = await granted(ownerSubscription, ownerPlan, owner.id);
@@ -89,7 +93,7 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
     await h.fail(closed.id, { reason: 'no' }).expect(200);
     await h.closeFailed(closed.id, { reason: 'not wanted' }).expect(200);
     // Another department's seat is not this one's.
-    const elsewhere = await subscriptionOf(other.id);
+    const elsewhere = await subscriptionOf();
     await granted(elsewhere.subscriptionId, elsewhere.planId, other.id);
   }, 300000);
 
@@ -97,10 +101,11 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
     await h.stop();
   });
 
-  it('lists the tasks that are open for the department, by id, whether the seat carries the department or only its subscription does', async () => {
+  it('lists the tasks that are open for the department, by id, for the seats that carry the department and not for a seat that carries none', async () => {
     const { items, total } = await use(owner.id);
 
-    expect(total).toBe(4);
+    expect(total).toBe(3);
+    expect(items.map((item) => item.id)).not.toContain(unowned);
     expect(items.map((item) => item.id)).toEqual([...open].sort());
     for (const item of items) expect(item.label).toMatch(/ \/ /);
   });
@@ -125,7 +130,84 @@ describe('what keeps a department in use: the open provisioning tasks (integrati
   it('is bounded: a page shorter than the total names the first by id and still counts them all', async () => {
     const { items, total } = await use(owner.id, 2);
 
-    expect(total).toBe(4);
+    expect(total).toBe(3);
     expect(items.map((item) => item.id)).toEqual([...open].sort().slice(0, 2));
+  });
+
+  it('BR-MF1-02/07: requester revision keeps both the department and its Cost Center in use', async () => {
+    const department = await h.department('P-REVISION');
+    const employeeId = await h.member(department.code, 'E-REVISION', 'Specialist');
+    // The requester is the head (a department with no head makes a paid request wait, `QĐ-111bc`): the need step is skipped, and with
+    // no approved budget the paid request is retained for its requester to revise. A head holds `MANAGER` before it is named.
+    const account = await h.account('E-REVISION', employeeId, 'MANAGER');
+    await assignHead(h.ctx, h.admin, department.id, { employeeId, effectiveFrom: today });
+    const sent = await request(h.server())
+      .post('/api/v1/access-requests')
+      .set(h.as(account))
+      .send({ planId: ownerPlan, businessReason: 'Work in the new department' })
+      .expect(201);
+    const revision = h.dataOf<{ request: { id: string; state: string } }>(sent).request;
+    expect(revision.state).toBe('AWAITING_REQUESTER_REVISION');
+    const stored = await h.ctx.sql.query<{ cost_center_id: string }>(
+      `SELECT cost_center_id FROM access_requests WHERE id = $1`,
+      [revision.id],
+    );
+    const costCenterId = stored.rows[0].cost_center_id;
+    const api = h.ctx.app.get(OrganizationApi, { strict: false });
+
+    expect((await api.getDepartmentUse(department.id, today, 50)).openWork.items).toContainEqual({
+      kind: 'ACCESS_REQUEST',
+      id: revision.id,
+      label: null,
+    });
+    expect((await api.getCostCenterUse(costCenterId, 50)).requests).toEqual({
+      total: 1,
+      items: [{ kind: 'ACCESS_REQUEST', id: revision.id, label: null }],
+    });
+    const retireDepartment = await request(h.server())
+      .post(`/api/v1/departments/${department.id}/deactivate`)
+      .set({ Authorization: `Bearer ${h.admin}` })
+      .send({})
+      .expect(409);
+    expect(h.codeOf(retireDepartment)).toBe('DEPARTMENT.IN_USE');
+    expect(h.detailsOf(retireDepartment).openWork).toContainEqual({
+      kind: 'ACCESS_REQUEST',
+      id: revision.id,
+      label: null,
+    });
+    const retireCostCenter = await request(h.server())
+      .post(`/api/v1/cost-centers/${costCenterId}/deactivate`)
+      .set(h.as(h.finance))
+      .expect(409);
+    expect(h.codeOf(retireCostCenter)).toBe('COST_CENTER.IN_USE');
+    expect(h.detailsOf(retireCostCenter).requests).toEqual([{ kind: 'ACCESS_REQUEST', id: revision.id, label: null }]);
+  });
+
+  it('QĐ-111bc: a paid request waiting for a head that is not named yet keeps the department and its Cost Center in use as well', async () => {
+    const department = await h.department('P-NO-HEAD');
+    const employeeId = await h.member(department.code, 'E-NO-HEAD', 'Specialist');
+    const account = await h.account('E-NO-HEAD', employeeId);
+    const sent = await request(h.server())
+      .post('/api/v1/access-requests')
+      .set(h.as(account))
+      .send({ planId: ownerPlan, businessReason: 'Work in a department with no head' })
+      .expect(201);
+    const waiting = h.dataOf<{ request: { id: string; state: string } }>(sent).request;
+    expect(waiting.state).toBe('WAITING_CONTROLLED');
+    const stored = await h.ctx.sql.query<{ cost_center_id: string }>(
+      `SELECT cost_center_id FROM access_requests WHERE id = $1`,
+      [waiting.id],
+    );
+    const api = h.ctx.app.get(OrganizationApi, { strict: false });
+
+    expect((await api.getDepartmentUse(department.id, today, 50)).openWork.items).toContainEqual({
+      kind: 'ACCESS_REQUEST',
+      id: waiting.id,
+      label: null,
+    });
+    expect((await api.getCostCenterUse(stored.rows[0].cost_center_id, 50)).requests).toEqual({
+      total: 1,
+      items: [{ kind: 'ACCESS_REQUEST', id: waiting.id, label: null }],
+    });
   });
 });

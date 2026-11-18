@@ -885,10 +885,10 @@ describe('collection and detail contract gate', () => {
       expect(check({}, replaced('applicationGet#similarApplications', { from: 'owner-decision' }))).toEqual([
         "ledger nested reclassified applicationGet#similarApplications: from 'owner-decision' but INITIAL_NESTED_ARRAYS holds 'unbounded'",
       ]);
-      expect(check({}, replaced('planTermsGet#opinions', { to: 'unbounded' }))).toEqual([
-        "ledger nested reclassified planTermsGet#opinions: to 'unbounded' but NESTED_ARRAYS holds 'bounded'",
-        'ledger nested reclassified planTermsGet#opinions: from and to are the same, so nothing was reclassified',
-        'ledger nested reclassified planTermsGet#opinions: a nested key becomes unbounded only with the Owner decision that allows it',
+      expect(check({}, replaced('planTermsGet#warnings', { to: 'unbounded' }))).toEqual([
+        "ledger nested reclassified planTermsGet#warnings: to 'unbounded' but NESTED_ARRAYS holds 'bounded'",
+        'ledger nested reclassified planTermsGet#warnings: from and to are the same, so nothing was reclassified',
+        'ledger nested reclassified planTermsGet#warnings: a nested key becomes unbounded only with the Owner decision that allows it',
       ]);
     });
 

@@ -169,7 +169,7 @@ describe('budget-attachment.policy', () => {
         budgetRecordView({
           isFinance: true,
           isDecider: false,
-          headedCostCenterId: null,
+          headedCostCenterIds: [],
           recordCostCenterId: costCenterA,
           versionSentAt: null,
         }),
@@ -179,7 +179,7 @@ describe('budget-attachment.policy', () => {
         budgetRecordView({
           isFinance: false,
           isDecider: true,
-          headedCostCenterId: costCenterB,
+          headedCostCenterIds: [costCenterB],
           recordCostCenterId: costCenterA,
           versionSentAt: null,
         }),
@@ -191,7 +191,7 @@ describe('budget-attachment.policy', () => {
         budgetRecordView({
           isFinance: false,
           isDecider: false,
-          headedCostCenterId: costCenterA,
+          headedCostCenterIds: [costCenterA],
           recordCostCenterId: costCenterA,
           versionSentAt: undefined,
         }),
@@ -203,7 +203,7 @@ describe('budget-attachment.policy', () => {
         budgetRecordView({
           isFinance: false,
           isDecider: false,
-          headedCostCenterId: costCenterA,
+          headedCostCenterIds: [costCenterA],
           recordCostCenterId: costCenterA,
           versionSentAt: sentDate,
         }),
@@ -215,7 +215,7 @@ describe('budget-attachment.policy', () => {
         budgetRecordView({
           isFinance: false,
           isDecider: false,
-          headedCostCenterId: costCenterA,
+          headedCostCenterIds: [costCenterA],
           recordCostCenterId: costCenterA,
           versionSentAt: null,
         }),
@@ -227,7 +227,7 @@ describe('budget-attachment.policy', () => {
         budgetRecordView({
           isFinance: false,
           isDecider: false,
-          headedCostCenterId: costCenterB,
+          headedCostCenterIds: [costCenterB],
           recordCostCenterId: costCenterA,
           versionSentAt: sentDate,
         }),
@@ -237,7 +237,7 @@ describe('budget-attachment.policy', () => {
         budgetRecordView({
           isFinance: false,
           isDecider: false,
-          headedCostCenterId: null,
+          headedCostCenterIds: [],
           recordCostCenterId: costCenterA,
           versionSentAt: sentDate,
         }),

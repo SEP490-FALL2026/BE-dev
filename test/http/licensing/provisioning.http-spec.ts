@@ -90,8 +90,37 @@ describe('provisioning queue routes (e2e, no database)', () => {
     ['a grant that carries a password', 'post', BASE, { requestId: ID, password: 'hunter2' }],
     ['evidence of over two thousand characters', 'post', `${BASE}/${ID}/complete`, { evidence: 'x'.repeat(2001) }],
     ['a completion with an unknown field', 'post', `${BASE}/${ID}/complete`, { evidence: 'x', done: true }],
+    // QĐ-111az: the checklist of a K1 grant has the shape of the one of a revocation; only the shape is checked here.
+    [
+      'a grant completion with a step that does not exist',
+      'post',
+      `${BASE}/${ID}/complete`,
+      { k1Checklist: { items: [{ code: 'COFFEE_BREAK', done: true }] } },
+    ],
+    [
+      'a grant completion with a step ticked at a time that is not one',
+      'post',
+      `${BASE}/${ID}/complete`,
+      { k1Checklist: { items: [{ code: 'COMPANY_EMAIL_REGISTERED', done: true, doneAt: 'yesterday' }] } },
+    ],
+    [
+      'a grant completion with a variant chosen by the client',
+      'post',
+      `${BASE}/${ID}/complete`,
+      { k1Checklist: { variant: 'GRANT', items: [] } },
+    ],
+    [
+      'a grant completion with more than ten steps',
+      'post',
+      `${BASE}/${ID}/complete`,
+      { k1Checklist: { items: Array.from({ length: 11 }, () => ({ code: 'NO_PERSONAL_DEVICE_MFA', done: false })) } },
+    ],
     ['a reason of over a thousand characters', 'post', `${BASE}/${ID}/report-failure`, { reason: 'x'.repeat(1001) }],
     ['a status that does not exist', 'get', `${BASE}?status=DONE`, undefined],
+    // BR-MF5-04: the filter of the tasks that may be taken today is a flag.
+    ['a claimableNow that is not a flag', 'get', `${BASE}?claimableNow=maybe`, undefined],
+    // QĐ-110c: the filter of the tasks past their due day is a flag.
+    ['an overdue that is not a flag', 'get', `${BASE}?overdue=maybe`, undefined],
     // A hand-off changes only the channel: its body is an empty object, and the evidence is asked when the work by hand completes (F08).
     ['a hand-off that still carries evidence', 'post', `${BASE}/${ID}/hand-off`, { evidence: 'x' }],
     ['a hand-off with an unknown field', 'post', `${BASE}/${ID}/hand-off`, { password: 'p' }],
@@ -128,6 +157,58 @@ describe('provisioning queue routes (e2e, no database)', () => {
       `${BASE}/${ID}/revocation-completion`,
       { completion: 'ALREADY_GONE', note: 'x'.repeat(1001) },
     ],
+    // QĐ-111az, P25: the checklist of a K1 revocation lists steps with the instant each was done; the variant is the server's, never sent.
+    [
+      'a K1 checklist with a step that does not exist',
+      'post',
+      `${BASE}/${ID}/revocation-completion`,
+      { completion: 'RENEWAL_CANCELLED', k1Checklist: { items: [{ code: 'COFFEE_BREAK', done: true }] } },
+    ],
+    [
+      'a K1 checklist step whose instant is not one',
+      'post',
+      `${BASE}/${ID}/revocation-completion`,
+      {
+        completion: 'RENEWAL_CANCELLED',
+        k1Checklist: { items: [{ code: 'RENEWAL_DISABLED', done: true, doneAt: 'yesterday' }] },
+      },
+    ],
+    [
+      'a K1 checklist step whose flag is not a boolean',
+      'post',
+      `${BASE}/${ID}/revocation-completion`,
+      { completion: 'RENEWAL_CANCELLED', k1Checklist: { items: [{ code: 'RENEWAL_DISABLED', done: 'yes' }] } },
+    ],
+    [
+      'a K1 checklist step with an unknown field',
+      'post',
+      `${BASE}/${ID}/revocation-completion`,
+      {
+        completion: 'RENEWAL_CANCELLED',
+        k1Checklist: { items: [{ code: 'RENEWAL_DISABLED', done: true, tickedBy: 'me' }] },
+      },
+    ],
+    [
+      'a K1 checklist that names its own variant',
+      'post',
+      `${BASE}/${ID}/revocation-completion`,
+      { completion: 'RENEWAL_CANCELLED', k1Checklist: { variant: 'STILL_EMPLOYED', items: [] } },
+    ],
+    [
+      'a K1 checklist of more than ten steps',
+      'post',
+      `${BASE}/${ID}/revocation-completion`,
+      {
+        completion: 'RENEWAL_CANCELLED',
+        k1Checklist: { items: Array.from({ length: 11 }, () => ({ code: 'RENEWAL_DISABLED', done: false })) },
+      },
+    ],
+    [
+      'a K1 checklist with evidence of over two thousand characters',
+      'post',
+      `${BASE}/${ID}/revocation-completion`,
+      { completion: 'RENEWAL_CANCELLED', k1Checklist: { items: [], evidence: 'x'.repeat(2001) } },
+    ],
     ['an access cut with no day', 'post', `${BASE}/${ID}/access-cut`, { evidence: 'x' }],
     ['an access cut with a day that is not one', 'post', `${BASE}/${ID}/access-cut`, { accessCutOn: 'soon' }],
     [
@@ -145,6 +226,171 @@ describe('provisioning queue routes (e2e, no database)', () => {
 
     expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
   });
+
+  // BR-MF1-09b / P0-05: the subscription is optional (the pool of the plan gives one) and a purchase carries only a reason.
+  it.each([
+    [
+      'a purchase that names its own kind (the kind follows from the plan)',
+      { requestId: ID, purchase: { kind: 'POOL_TOP_UP' } },
+    ],
+    ['a purchase with a reason of more than 500 characters', { requestId: ID, purchase: { reason: 'x'.repeat(501) } }],
+    ['a purchase whose reason is blank', { requestId: ID, purchase: { reason: '   ' } }],
+  ])('turns away a grant with %s with 422', async (_name, body) => {
+    const response = await request(app.getHttpServer())
+      .post(BASE)
+      .set('Authorization', bearer(principal(['IT_ADMIN'])))
+      .send(body)
+      .expect(422);
+
+    expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('accepts a grant with no subscription named and a purchase with or without a reason (the gate then answers)', async () => {
+    for (const purchase of [{}, { reason: 'the pool is empty' }]) {
+      const response = await request(app.getHttpServer())
+        .post(BASE)
+        .set('Authorization', bearer(principal(['IT_ADMIN'])))
+        .send({ requestId: ID, purchase })
+        .expect(404);
+
+      expect(bodyOf(response).error.code).toBe('REQUEST.NOT_FOUND');
+    }
+  });
+
+  it('BR-MF5-04: accepts the filter of the tasks that may be taken today', async () => {
+    for (const flag of ['true', 'false']) {
+      const response = await request(app.getHttpServer())
+        .get(`${BASE}?claimableNow=${flag}`)
+        .set('Authorization', bearer(principal(['IT_ADMIN'])));
+
+      expect(response.status).not.toBe(422);
+    }
+  });
+
+  it('QĐ-110c: accepts the filter of the tasks past their due day', async () => {
+    for (const flag of ['true', 'false']) {
+      const response = await request(app.getHttpServer())
+        .get(`${BASE}?overdue=${flag}`)
+        .set('Authorization', bearer(principal(['IT_ADMIN'])));
+
+      expect(response.status).not.toBe(422);
+    }
+  });
+
+  it(
+    'BR-MF5-04: documents the 409 NOT_BEFORE of the claim and the completion of a revocation, and the new fields of a task',
+    () => {
+      const document = createOpenApiDocument(app);
+      const conflict = (path: string) =>
+        JSON.stringify(
+          (document.paths[path] as { post: { responses: Record<string, unknown> } }).post.responses['409'],
+        );
+
+      expect(conflict(`${BASE}/{id}/claim`)).toContain('PROVISIONING_TASK.NOT_BEFORE');
+      expect(conflict(`${BASE}/{id}/revocation-completion`)).toContain('PROVISIONING_TASK.NOT_BEFORE');
+      const schemas = JSON.stringify(document.components?.schemas ?? {});
+      for (const field of ['"claimableNow"', '"notBefore"', '"dueOn"', '"withdrawnReasonCount"']) {
+        expect(schemas).toContain(field);
+      }
+    },
+    OPENAPI_DOCUMENT_BUDGET_MS,
+  );
+
+  it('QĐ-111az: lets a K1 checklist of either variant through validation: the policy of the task then judges it', async () => {
+    const stamp = '2026-11-13T09:30:00+07:00';
+    const departure = [
+      'MAILBOX_PASSWORD_RESET',
+      'SOFTWARE_FORGOT_PASSWORD',
+      'SESSIONS_SIGNED_OUT',
+      'RENEWAL_DISABLED',
+      'EVIDENCE_RECORDED',
+      'MAILBOX_LOCKED',
+    ];
+    const stillEmployed = ['RENEWAL_DISABLED', 'EVIDENCE_RECORDED'];
+
+    for (const codes of [departure, stillEmployed]) {
+      const response = await request(app.getHttpServer())
+        .post(`${BASE}/${ID}/revocation-completion`)
+        .set('Authorization', bearer(principal(['IT_ADMIN'])))
+        .send({
+          completion: 'RENEWAL_CANCELLED',
+          paidThroughOn: '2026-11-30',
+          accessState: 'UNTIL_PAID_END',
+          k1Checklist: { items: codes.map((code) => ({ code, done: true, doneAt: stamp })), evidence: 'ticket IT-9' },
+        });
+
+      expect(response.status).not.toBe(422);
+    }
+  });
+
+  it(
+    'QĐ-111az: documents the K1 checklist of the completion and of the card, and its two codes of refusal',
+    () => {
+      const document = createOpenApiDocument(app);
+      const post = (path: string) =>
+        (document.paths[path] as { post: { requestBody: unknown; responses: Record<string, unknown> } }).post;
+      const schemas = JSON.stringify(document.components?.schemas ?? {});
+
+      const unprocessable = JSON.stringify(post(`${BASE}/{id}/revocation-completion`).responses['422']);
+      expect(unprocessable).toContain('REVOCATION.K1_CHECKLIST_INCOMPLETE');
+      expect(unprocessable).toContain('REVOCATION.K1_CHECKLIST_OUT_OF_ORDER');
+      // The two refusals of the checklist tell the variant the server worked out and the steps it expects (review O1).
+      const examples = (
+        post(`${BASE}/{id}/revocation-completion`).responses['422'] as {
+          content: { 'application/json': { examples: Record<string, { value: { error: { details?: unknown } } }> } };
+        }
+      ).content['application/json'].examples;
+      for (const code of ['REVOCATION.K1_CHECKLIST_INCOMPLETE', 'REVOCATION.K1_CHECKLIST_OUT_OF_ORDER']) {
+        expect(examples[code].value.error.details).toEqual({
+          variant: 'DEPARTURE',
+          codes: [
+            'MAILBOX_PASSWORD_RESET',
+            'SOFTWARE_FORGOT_PASSWORD',
+            'SESSIONS_SIGNED_OUT',
+            'RENEWAL_DISABLED',
+            'EVIDENCE_RECORDED',
+            'MAILBOX_LOCKED',
+          ],
+        });
+      }
+      expect(JSON.stringify(post(`${BASE}/{id}/revocation-completion`).requestBody)).toContain(
+        'RevocationCompletionBodyDto',
+      );
+      for (const field of ['"k1Checklist"', '"MAILBOX_LOCKED"', '"STILL_EMPLOYED"', '"doneAt"', '"label"']) {
+        expect(schemas).toContain(field);
+      }
+      const card = JSON.stringify((document.paths[`${BASE}/{id}`] as { get: unknown }).get);
+      expect(card).toContain('k1Checklist');
+    },
+    OPENAPI_DOCUMENT_BUDGET_MS,
+  );
+
+  it(
+    'QĐ-111az: documents the checklist of the grant of a K1 seat: the body, its three codes of refusal, and the steps they expect',
+    () => {
+      const document = createOpenApiDocument(app);
+      const complete = (
+        document.paths[`${BASE}/{id}/complete`] as {
+          post: { requestBody: unknown; responses: Record<string, unknown> };
+        }
+      ).post;
+      type Examples = Record<string, { value: { error: { details?: unknown } } }>;
+      const examples = (complete.responses['422'] as { content: { 'application/json': { examples: Examples } } })
+        .content['application/json'].examples;
+
+      expect(JSON.stringify(complete.requestBody)).toContain('CompleteBodyDto');
+      expect(JSON.stringify(document.components?.schemas ?? {})).toContain('COMPANY_EMAIL_REGISTERED');
+      for (const code of ['PROVISIONING.K1_CHECKLIST_INCOMPLETE', 'PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER']) {
+        expect(examples[code].value.error.details).toEqual({
+          variant: 'GRANT',
+          codes: ['COMPANY_EMAIL_REGISTERED', 'NO_PERSONAL_DEVICE_MFA'],
+        });
+      }
+      // A grant of another kind has no steps to tell.
+      expect(examples['PROVISIONING.K1_CHECKLIST_NOT_ALLOWED'].value.error.details).toBeUndefined();
+    },
+    OPENAPI_DOCUMENT_BUDGET_MS,
+  );
 
   it('answers REQUEST.NOT_FOUND to a grant of a request the gate does not know, and writes nothing', async () => {
     const response = await request(app.getHttpServer())

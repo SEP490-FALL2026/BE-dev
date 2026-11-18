@@ -24,10 +24,14 @@ Employee báo lỗi cho một quyền đang được cấp cho chính mình bằ
 
 ## Primary Story/AC
 
-| Story    | AC         | Coverage | Phần còn lại thuộc |
-| -------- | ---------- | -------- | ------------------ |
-| US-07-10 | AC-1→AC-10 | full     | —                  |
-| US-07-11 | AC-1→AC-9  | full     | —                  |
+| Story    | AC         | Coverage | Phần còn lại thuộc                                                    |
+| -------- | ---------- | -------- | --------------------------------------------------------------------- |
+| US-07-10 | AC-1→AC-10 | partial  | re-pin 11/11/2026 — AC-11: `g6-saas-error-report` (`deferred`)        |
+| US-07-11 | AC-1→AC-9  | partial  | re-pin 11/11/2026 — AC-10, AC-11: `g6-saas-error-report` (`deferred`) |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ `US-07-10` đổi `full` → `partial` vì Docs `5bb2e6a` thêm AC hoặc hạng mục khác cùng hiện thực khóa của Story này (scope map); phần đã code không đổi.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ `US-07-11` đổi `full` → `partial` vì Docs `5bb2e6a` thêm AC hoặc hạng mục khác cùng hiện thực khóa của Story này (scope map); phần đã code không đổi.
 
 ## Supporting references
 

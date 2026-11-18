@@ -6,6 +6,7 @@ import { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../../catalog/public/catalog.types';
 import { AssignmentService } from '../../assignment/assignment.service';
 import {
+  AssignmentConflictError,
   GrantRequestRefusedError,
   ProvisioningSubscriptionError,
   SeatQuantityUnknownError,
@@ -17,10 +18,12 @@ import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
 import type { GrantInput, ProvisioningGrantPlanner } from './provisioning-grant-planner.service';
-import { claimMatchesAnswer, grantTaskAudit } from './provisioning-grant.policy';
-import { effectiveEndOf } from '../../../../core/term-limit';
+import { claimMatchesAnswer, grantPurchaseOf, grantTaskAudit } from './provisioning-grant.policy';
+import { termRunOf } from '../../../../core/term-limit';
 import type { GrantRequestAnswer } from '../../public/licensing.types';
 import { ProvisioningHolderService } from './provisioning-holder.service';
+import { SharedPoolService } from '../../shared-pool/shared-pool.service';
+import type { PoolStock } from '../../shared-pool/shared-pool.policy';
 
 type Planned = Awaited<ReturnType<ProvisioningGrantPlanner['plan']>>;
 
@@ -39,6 +42,7 @@ export class ProvisioningGrantWriter {
     private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
     private readonly gate: GrantRequestGateHook,
+    private readonly sharedPool: SharedPoolService,
   ) {}
 
   async write(
@@ -47,29 +51,27 @@ export class ProvisioningGrantWriter {
     input: GrantInput,
     planned: Planned,
   ): Promise<ProvisioningTaskRecord> {
-    const { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts, fiscalYearStartMonth } =
-      planned;
+    const { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts } = planned;
+    const { holderContractEnd, holderHasTerm } = planned;
     // The request is locked and moved to "being carried out" here, in the transaction of the grant: a second grant of
     // the same request finds it no longer grantable, and a request that changed since the read above is refused.
     const claimed = await this.gate.get().claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);
     if (claimed.status !== 'GRANTABLE') throw new GrantRequestRefusedError(claimed.status);
     if (!claimMatchesAnswer(claimed, answer)) throw new GrantRequestRefusedError('NOT_APPROVED');
-    const target = await this.lockTarget(tx, plan, input.subscriptionId);
-    const holder =
-      claimed.seat === 'SERVICE' && serviceIdentifier !== null
-        ? await this.holders.service(tx, actor, {
-            requested: { employeeId: claimed.employeeId, account: claimed.serviceAccount },
-            named: input.responsibleEmployeeId,
-            accountIdentifier: serviceIdentifier,
-            today,
-          })
-        : await this.holders.personal(tx, actor, {
-            requestId: input.requestId,
-            employeeId: answer.employeeId,
-            accountIdentifier: input.accountIdentifier,
-            today,
-          });
-
+    const subscriptionId = await this.subscriptionOf(tx, plan, input.subscriptionId, today);
+    await this.requireGrantable(tx, plan, input.subscriptionId, today);
+    const target = await this.lockTarget(tx, plan, subscriptionId);
+    // R-49: the right the request replaces ends the day of the grant, before the seats are counted and the new right is written.
+    const replaced = await this.endReplacedRight(tx, actor, claimed, target, input.requestId, today, organization.id);
+    const purchase = await this.reserveSeat(tx, actor, {
+      plan,
+      target,
+      requested: input.purchase,
+      today,
+      carriesOn: replaced !== null,
+      requestId: input.requestId,
+    });
+    const holder = await this.holderOf(tx, actor, { input, answer, claimed, serviceIdentifier, today });
     const assignment = await this.assignments.createFromRequest(tx, actor, {
       organizationId: organization.id,
       requestId: input.requestId,
@@ -77,8 +79,11 @@ export class ProvisioningGrantWriter {
       target,
       holder,
       effectiveFrom: today,
-      expectedEndDate: this.endOfSeat(claimed, target, today, fiscalYearStartMonth),
+      expectedEndDate: this.endOfSeat(claimed, today, { contractEnd: holderContractEnd, hasTerm: holderHasTerm }),
+      replacesAssignmentId: replaced,
     });
+
+    const bought = grantPurchaseOf(plan.provisioningType, purchase, new Date(), replaced !== null);
     const task = await this.repo.insert(tx, {
       organizationId: organization.id,
       assignmentId: assignment.id,
@@ -87,44 +92,279 @@ export class ProvisioningGrantWriter {
       defaultResponsibleEmployeeId: inCharge?.itAdminEmployeeId ?? null,
       createdByAppUserId: actor.appUserId,
       maxAttempts,
+      ...(bought && { purchase: bought }),
     });
+
+    return this.recordTask(tx, actor, {
+      task,
+      organizationId: organization.id,
+      assignmentId: assignment.id,
+      input,
+      holder,
+    });
+  }
+
+  /**
+   * The audit event of the task, then the claim of the IT Admin who made it (`QĐ-111m`), then the notice to the Super Admin when the IT
+   * Admin answers for the account themselves because no other can (`SoD-5`). Returns the task as it stands, taken.
+   */
+  private async recordTask(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: {
+      task: ProvisioningTaskRecord;
+      organizationId: string;
+      assignmentId: string;
+      input: GrantInput;
+      holder: { selfExecuted: boolean | null };
+    },
+  ): Promise<ProvisioningTaskRecord> {
+    const { task, organizationId, holder } = facts;
     await this.audit.record(
       tx,
       licensingAuditEvent(
         actor,
-        organization.id,
+        organizationId,
         'PROVISIONING_TASK.CREATED',
         'ProvisioningTask',
         task.id,
         null,
-        grantTaskAudit(input.requestId, assignment.id, task, holder.selfExecuted),
+        grantTaskAudit(facts.input.requestId, facts.assignmentId, task, holder.selfExecuted),
       ),
     );
-    // An IT Admin who answers for the account themselves because no other can is told to the Super Admin (`SoD-5`).
-    if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
+    const taken = await this.takeTask(tx, actor, { task, organizationId, selfExecuted: holder.selfExecuted });
+    if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organizationId, task.id, actor.employeeId);
 
-    return task;
+    return taken;
   }
 
   /**
-   * The day the seat ends: the day the request carries (the IT Admin names none, `Q-03` c1), else the end of its term for a request that
-   * costs money, cut at the fiscal year for a flexible subscription (`QĐ-98`); free internal software and a service account have none.
+   * The IT Admin who presses "Grant" takes the work (`QĐ-111m`): the task is theirs from the moment it exists, with the event of the claim as any
+   * other claim of a task has it (what the task was before, who took it).
+   */
+  private async takeTask(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: { task: ProvisioningTaskRecord; organizationId: string; selfExecuted: boolean | null },
+  ): Promise<ProvisioningTaskRecord> {
+    const { task } = facts;
+    await this.repo.markClaimed(tx, task.id, actor.appUserId, new Date());
+    await this.audit.record(
+      tx,
+      licensingAuditEvent(
+        actor,
+        facts.organizationId,
+        'PROVISIONING_TASK.CLAIMED',
+        'ProvisioningTask',
+        task.id,
+        {
+          status: task.status,
+          claimedBy: task.claimedByAppUserId,
+          attempts: task.attempts,
+          defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
+        },
+        {
+          status: 'IN_PROGRESS',
+          claimedBy: actor.appUserId,
+          defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
+          selfExecuted: facts.selfExecuted === true,
+        },
+      ),
+    );
+
+    return (await this.repo.find(task.id, tx)) ?? task;
+  }
+
+  /**
+   * Judged under the locks of the grant, so the count of the free seats cannot change before the seat is written (`BR-MF1-09a`): whether the grant buys
+   * a seat, and the seat made room for. A grant that carries on a right it replaced (R-49) buys none. Returns the decision about the purchase.
+   */
+  private async reserveSeat(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: {
+      plan: SeatTarget;
+      target: SeatTarget;
+      requested: GrantInput['purchase'];
+      today: string;
+      carriesOn: boolean;
+      requestId: string;
+    },
+  ) {
+    const { plan, target, today, carriesOn } = facts;
+    const { decision, stock } = await this.sharedPool.judgePurchase(tx, {
+      planId: plan.planId,
+      provisioningType: plan.provisioningType,
+      today,
+      purchase: facts.requested,
+    });
+    await this.takeSeat(tx, actor, {
+      plan,
+      target,
+      purchased: decision.purchased,
+      stock,
+      carriesOn,
+      requestId: facts.requestId,
+    });
+
+    return decision;
+  }
+
+  /**
+   * Ends the right a request of a person in the grace of a transfer replaces, when the grant lands on the same seat target (R-49, `QĐ-110q`): the old
+   * right ends the day of the grant, in this transaction, before the new one is written, so the database never sees two personal rights of one person at
+   * once and the seat is counted once. Nothing is done at the vendor and no task of revocation is made. A right a task of revocation is working is left to
+   * that task. Returns the right it ended, or null.
+   */
+  private async endReplacedRight(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    claimed: Extract<GrantRequestAnswer, { status: 'GRANTABLE' }>,
+    target: SeatTarget,
+    requestId: string,
+    today: string,
+    organizationId: string,
+  ): Promise<string | null> {
+    if (claimed.seat !== 'PERSONAL' || !claimed.replacesAssignmentId) return null;
+
+    const ended = await this.assignments.endReplacedByGrant(tx, actor, {
+      organizationId,
+      requestId,
+      employeeId: claimed.employeeId,
+      replacesAssignmentId: claimed.replacesAssignmentId,
+      target,
+      today,
+      revocationUnderWay: await this.repo.hasLiveRevocation(tx, claimed.replacesAssignmentId),
+    });
+    // The money the old right still holds for the department they came from goes back from this day (the module of requests holds it).
+    if (ended !== null) {
+      await this.gate.get().reportRightReplaced(tx, {
+        assignmentId: ended,
+        provisioningType: target.provisioningType,
+        endedOn: today,
+        now: new Date(),
+      });
+    }
+
+    return ended;
+  }
+
+  /**
+   * The subscription the seat is taken from: the one the IT Admin names, else the one the shared pool of the plan gives (the primary
+   * subscription, the one with a free seat first). Read before the subscription is locked; the lock that follows holds it for the grant.
+   * Throws SeatTargetNotFoundError when the plan has no subscription a seat can be taken from today.
+   */
+  private async subscriptionOf(
+    tx: DbTx,
+    plan: SeatTarget,
+    named: string | undefined,
+    today: string,
+  ): Promise<string | undefined> {
+    if (named !== undefined || plan.provisioningType === 'K5') return named;
+    const chosen = await this.sharedPool.chooseSubscription(tx, {
+      planId: plan.planId,
+      provisioningType: plan.provisioningType,
+      today,
+    });
+    if (chosen === null) throw new SeatTargetNotFoundError('SUBSCRIPTION');
+
+    return chosen;
+  }
+
+  /**
+   * A subscription the IT Admin names must be one a seat can be taken from today (`BR-MF1-09a`): of the plan, active, its period not over
+   * and not taken over by a next period that runs, and not recorded as cancelled (`A1C-02`). A period that ended, was taken over or is to be
+   * closed would get the seat (or the seat bought) on a term that no longer runs, never carried on. Read before the subscription is locked, like the choice of one. Throws
+   * ProvisioningSubscriptionError (`NOT_GRANTABLE`).
+   */
+  private async requireGrantable(tx: DbTx, plan: SeatTarget, named: string | undefined, today: string): Promise<void> {
+    if (named === undefined || plan.provisioningType === 'K5') return;
+    const grantable = await this.sharedPool.grantableOf(tx, plan.planId, today);
+    if (grantable.some((subscription) => subscription.subscriptionId === named)) return;
+    // Another plan's subscription, a draft or none at all keeps the answer it had (`lockTarget`).
+    const target = await this.catalog.findSeatTarget({ subscriptionId: named }, tx);
+    if (target !== null && target.planId === plan.planId && target.status === 'ACTIVE') {
+      throw new ProvisioningSubscriptionError('NOT_GRANTABLE');
+    }
+  }
+
+  /**
+   * Makes room for the seat of this grant on the locked subscription. A K1 grant buys its own seat: the quantity rises by one, with no gate
+   * on the department that owns the subscription (`S1-04`). A K2 or K4 grant with a purchase tops the pool up by one seat, since a grant is
+   * for one person. A K2 or K4 grant with none must find a free seat in its subscription, else the answer says how many are free in the
+   * plan's other subscriptions. Throws AssignmentConflictError.
+   */
+  private async takeSeat(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: {
+      plan: SeatTarget;
+      target: SeatTarget;
+      purchased: boolean;
+      stock: PoolStock | null;
+      carriesOn: boolean;
+      requestId: string;
+    },
+  ): Promise<void> {
+    const { plan, target, purchased, stock, carriesOn } = facts;
+    if (target.subscriptionId === null) return;
+    // A K1 grant that carries on a right it replaced (R-49) buys no seat: the one the old right held at the vendor is the seat of the new one.
+    if ((plan.provisioningType === 'K1' && !carriesOn) || purchased) {
+      await this.catalog.addPoolSeat(tx, actor, target.subscriptionId, facts.requestId);
+
+      return;
+    }
+    // Read under the lock of the subscription, so the count is the one the database trigger will see: refusing here keeps the transaction usable.
+    if (stock !== null && stock.freeBySubscription.get(target.subscriptionId) === 0) {
+      throw new AssignmentConflictError('SEAT_CAPACITY', 0, stock.free);
+    }
+  }
+
+  /** The person or the service account the seat is for: a service account has the identifier and the responsible person the IT Admin gave. */
+  private holderOf(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: {
+      input: GrantInput;
+      answer: Planned['answer'];
+      claimed: Extract<GrantRequestAnswer, { status: 'GRANTABLE' }>;
+      serviceIdentifier: string | null;
+      today: string;
+    },
+  ) {
+    const { input, answer, claimed, serviceIdentifier, today } = facts;
+
+    return claimed.seat === 'SERVICE' && serviceIdentifier !== null
+      ? this.holders.service(tx, actor, {
+          requested: { employeeId: claimed.employeeId, account: claimed.serviceAccount },
+          named: input.responsibleEmployeeId,
+          accountIdentifier: serviceIdentifier,
+          today,
+        })
+      : this.holders.personal(tx, actor, {
+          requestId: input.requestId,
+          employeeId: answer.employeeId,
+          accountIdentifier: input.accountIdentifier,
+          today,
+        });
+  }
+
+  /**
+   * The day the seat ends: the day an older request carries (the IT Admin names none, `Q-03` c1), else the end of the months of use the
+   * request asked for, counted from today, the day it is granted, and never cut at the end of the calendar year (`QĐ-98`, `QĐ-111i`). A person
+   * with a term is cut at the end of their contract, whenever that comes first (R-38, `INV-07`). A right with no months and a service account
+   * have no end.
    */
   private endOfSeat(
     claimed: Extract<GrantRequestAnswer, { status: 'GRANTABLE' }>,
-    target: SeatTarget,
     today: string,
-    fiscalYearStartMonth: number,
+    holder: { contractEnd: string | null; hasTerm: boolean },
   ): string | null {
     if (claimed.expectedEndDate !== null) return claimed.expectedEndDate;
-    if (!claimed.termBound) return null;
+    // A right with no months still ends for a person with a term: at the end of their contract (`INV-07`, R-38).
+    if (!claimed.termBound) return holder.hasTerm ? holder.contractEnd : null;
 
-    return effectiveEndOf({
-      start: today,
-      months: claimed.termMonths,
-      flexible: target.allowsMidTermReduction,
-      fiscalYearStartMonth,
-    });
+    return termRunOf({ start: today, months: claimed.termMonths, contractEndDate: holder.contractEnd }).end;
   }
 
   /** K5: the plan itself (no seat); K1 and K2: the subscription, which must be of the plan and have a quantity. */

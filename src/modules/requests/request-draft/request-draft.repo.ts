@@ -29,7 +29,8 @@ export interface NewDraft {
   requesterEmployeeId: string;
   departmentId: string;
   businessReason: string;
-  termMonths: number;
+  /** A draft keeps no term: the end date, when there is one, is in its content. */
+  termMonths: number | null;
   /** The content the draft is sent from (`policy.draft`). */
   content: DraftPolicy['draft'];
   createdByAppUserId: string;
@@ -157,7 +158,6 @@ export class RequestDraftRepo {
 
   /** Deletes the draft with every row that hangs from it, in one go. The caller holds its lock and has judged that it is a draft. */
   async delete(tx: DbTx, id: string): Promise<void> {
-    await tx.accessRequestServiceAccount.deleteMany({ where: { requestId: id } });
     await tx.accessRequestBeneficiary.deleteMany({ where: { requestId: id } });
     await tx.accessRequest.delete({ where: { id, state: 'DRAFT' } });
   }

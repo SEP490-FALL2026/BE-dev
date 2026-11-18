@@ -1,7 +1,7 @@
 import { ExecutionContext, Controller, Get } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ApiException } from '../../http/errors/api.exception';
-import { AuthenticatedOnly, RequireRoles } from '../decorators/access.decorators';
+import { AuthenticatedOnly, RequireRoles, RequireRolesOrGrants } from '../decorators/access.decorators';
 import { Public } from '../decorators/public.decorator';
 import { AUTHENTICATED_IDENTITY } from '../models/current-principal';
 import type { AuthenticatedPrincipal } from '../tokens/access-token-verifier.port';
@@ -34,6 +34,7 @@ class ProbeController {
   @Get() @Public() publicRoute(): void {}
   @Get() @AuthenticatedOnly() selfService(): void {}
   @Get() @RequireRoles('IT_ADMIN', 'FINANCE') roles(): void {}
+  @Get() @RequireRolesOrGrants(['MANAGER'], ['MANAGER']) rolesOrGrants(): void {}
   @Get() @Public() @AuthenticatedOnly() conflicting(): void {}
 }
 
@@ -110,5 +111,28 @@ describe('AuthorizationGuard', () => {
 
   it('refuses a caller with no roles at all on a role route (self-service only)', () => {
     expect(() => guard.canActivate(contextOf(ProbeController, 'roles', principal([])))).toThrow(ApiException);
+  });
+
+  describe('a route that also admits a granted role (RequireRolesOrGrants)', () => {
+    const asGranted = (granted: string[], effective: string[]): AuthenticatedPrincipal => ({
+      ...principal(effective),
+      directRoles: granted,
+    });
+
+    it('admits the effective role, and the grant when the role is not effective', () => {
+      expect(guard.canActivate(contextOf(ProbeController, 'rolesOrGrants', asGranted(['MANAGER'], ['MANAGER'])))).toBe(
+        true,
+      );
+      expect(guard.canActivate(contextOf(ProbeController, 'rolesOrGrants', asGranted(['MANAGER'], [])))).toBe(true);
+    });
+
+    it('refuses a caller who holds neither the role nor the grant, and one who holds another grant', () => {
+      expect(() => guard.canActivate(contextOf(ProbeController, 'rolesOrGrants', asGranted([], [])))).toThrow(
+        ApiException,
+      );
+      expect(() =>
+        guard.canActivate(contextOf(ProbeController, 'rolesOrGrants', asGranted(['FINANCE'], ['FINANCE']))),
+      ).toThrow(ApiException);
+    });
   });
 });

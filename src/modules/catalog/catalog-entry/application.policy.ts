@@ -4,7 +4,6 @@ import {
   ApplicationDomainInvalidError,
   ApplicationInternalHasNoVendorError,
   ApplicationNameInvalidError,
-  ApplicationNoteInvalidError,
   ApplicationTooManyDomainsError,
   ApplicationVendorNameInvalidError,
   ApplicationVendorRequiredError,
@@ -13,24 +12,11 @@ import {
 
 export const MAX_NAME_LENGTH = 200;
 export const MAX_DOMAINS = 20;
-export const MAX_NOTE_LENGTH = 1000;
-
-/** The answers to the three classification questions (ADR-10). Comments, notes and design reviews are not messaging. */
-export interface CommunicationAnswers {
-  personToPersonMessaging: boolean;
-  callsOrMeetings: boolean;
-  mailbox: boolean;
-}
-
-/** The communication-service flag: "yes" to any of the three questions. */
-export function isCommunicationService(answers: CommunicationAnswers): boolean {
-  return answers.personToPersonMessaging || answers.callsOrMeetings || answers.mailbox;
-}
 
 /** The most similar applications a detail names; the total says how many there are. */
 export const SIMILAR_APPLICATION_LIMIT = 20;
 
-/** A communication service is not collected for usage by default (BR-06.2); otherwise nothing is decided here. */
+/** A communication service (an application of the group Liên lạc, `QĐ-111e`) is not collected for usage by default (BR-06.2); otherwise nothing is decided here. */
 export function usageCollectionDefault(communicationService: boolean): 'NOT_COLLECTED' | null {
   return communicationService ? 'NOT_COLLECTED' : null;
 }
@@ -58,15 +44,6 @@ export function cleanApplicationDomains(values: readonly string[]): string[] {
   if (hosts.size > MAX_DOMAINS) throw new ApplicationTooManyDomainsError();
 
   return [...hosts];
-}
-
-/** The free-text note beside the three answers: nothing or blanks is null; at most 1000 characters. */
-export function cleanNote(raw: string | null | undefined): string | null {
-  if (raw === null || raw === undefined) return null;
-  const note = normalizeDisplayName(raw);
-  if (note.length > MAX_NOTE_LENGTH) throw new ApplicationNoteInvalidError();
-
-  return note === '' ? null : note;
 }
 
 export type VendorSource = { type: 'NONE' } | { type: 'DICTIONARY'; lineId: string } | { type: 'NAME'; name: string };
@@ -97,9 +74,9 @@ export function vendorSourceOf(input: {
 }
 
 /**
- * Whether the Business Owner has to be replaced: they have left (`US-04-06`, `FR-1.7`). Only the employee status counts, so
- * a move to another department, which leaves it `ACTIVE`, never raises it. Read when the application is read, not stored.
+ * Whether the application needs a responsible IT Admin (`QĐ-111g`, `US-04-06` AC-7, AC-8): nobody is named, or the person named is no longer
+ * a usable IT Admin (left, locked, lost the role). Read when the application is read, never stored; `usableAmong` holds the usable ones.
  */
-export function replacementRequired(ownerStatus: 'ACTIVE' | 'TERMINATED'): boolean {
-  return ownerStatus === 'TERMINATED';
+export function needsResponsible(responsible: string | null, usableAmong: ReadonlySet<string>): boolean {
+  return responsible === null || !usableAmong.has(responsible);
 }

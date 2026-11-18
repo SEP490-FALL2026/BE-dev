@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
+import { toMoneyApiException } from '../../../infrastructure/http/errors/money-errors';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   PlanNameInvalidError,
@@ -11,13 +12,19 @@ import {
   PlanApplicationRetiredError,
   PlanProvisioningTypeNotSupportedError,
   PlanProvisioningTypeMismatchError,
+  PlanReferencePriceNotApplicableError,
+  PlanReferencePriceNotPositiveError,
+  PlanReferencePriceNotVndError,
   PlanPricingModelRequiredError,
   PlanPricingModelNotApplicableError,
+  PlanPricingModelNotDerivedError,
   PlanControlLevelRequiredError,
   PlanDataLossNoteRequiredError,
   PlanInUseBlocksChangeError,
   PlanTermsBlockTypeChangeError,
   PlanUpdateEmptyError,
+  PlanAdminConsoleNotApplicableError,
+  PlanVendorAdminsInvalidError,
   PlanWorkspaceProfileNotApplicableError,
   PlanWorkspacePersonInvalidError,
   PlanPrimaryOwnerNotListedError,
@@ -38,7 +45,14 @@ export function toPlanApiException(error: unknown): unknown {
   if (error instanceof PlanNoteInvalidError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.NOTE_INVALID', error.message);
   if (error instanceof PlanNotFoundError) return refuse(HttpStatus.NOT_FOUND, 'PLAN.NOT_FOUND', error.message);
-  if (error instanceof PlanNameTakenError) return refuse(HttpStatus.CONFLICT, 'PLAN.NAME_TAKEN', error.message);
+  if (error instanceof PlanNameTakenError) {
+    return refuse(
+      HttpStatus.CONFLICT,
+      'PLAN.NAME_TAKEN',
+      error.message,
+      error.existing ? { existing: error.existing } : undefined,
+    );
+  }
   if (error instanceof PlanApplicationNotFoundError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.APPLICATION_NOT_FOUND', error.message);
   if (error instanceof PlanApplicationRetiredError)
@@ -49,14 +63,34 @@ export function toPlanApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.PROVISIONING_TYPE_MISMATCH', error.message);
   if (error instanceof PlanPricingModelRequiredError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.PRICING_MODEL_REQUIRED', error.message);
+  if (error instanceof PlanPricingModelNotDerivedError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.PRICING_MODEL_NOT_DERIVED', error.message, {
+      expected: error.expected,
+    });
+  }
   if (error instanceof PlanPricingModelNotApplicableError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.PRICING_MODEL_NOT_APPLICABLE', error.message);
+  if (error instanceof PlanReferencePriceNotVndError)
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.REFERENCE_PRICE_NOT_VND', error.message, {
+      currency: error.currency,
+    });
+  if (error instanceof PlanReferencePriceNotPositiveError)
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.REFERENCE_PRICE_NOT_POSITIVE', error.message);
+  if (error instanceof PlanReferencePriceNotApplicableError)
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.REFERENCE_PRICE_NOT_APPLICABLE', error.message);
   if (error instanceof PlanControlLevelRequiredError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.CONTROL_LEVEL_REQUIRED', error.message);
   if (error instanceof PlanDataLossNoteRequiredError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.DATA_LOSS_NOTE_REQUIRED', error.message);
   if (error instanceof PlanUpdateEmptyError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.UPDATE_EMPTY', error.message);
+  if (error instanceof PlanAdminConsoleNotApplicableError)
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.ADMIN_CONSOLE_NOT_APPLICABLE', error.message);
+  if (error instanceof PlanVendorAdminsInvalidError)
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.VENDOR_ADMINS_INVALID', error.message, {
+      given: error.given,
+      required: error.required,
+    });
   if (error instanceof PlanWorkspaceProfileNotApplicableError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE', error.message);
   if (error instanceof PlanWorkspacePersonInvalidError)
@@ -84,6 +118,9 @@ export function toPlanApiException(error: unknown): unknown {
     return refuse(HttpStatus.CONFLICT, 'PLAN.IN_USE_BLOCKS_CHANGE', error.message, { reason: error.reason });
   }
 
+  const money = toMoneyApiException(error);
+  if (money !== error) return money;
+
   return toUnavailableApiException(error) ?? error;
 }
 
@@ -92,7 +129,7 @@ const example = (error: Error) => errorExampleOf(toPlanApiException(error));
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const PLAN_ERROR_EXAMPLES = {
   NOT_FOUND: example(new PlanNotFoundError()),
-  NAME_TAKEN: example(new PlanNameTakenError()),
+  NAME_TAKEN: example(new PlanNameTakenError({ id: '<plan-id>', name: 'Team', provisioningType: 'K2' })),
   NAME_INVALID: example(new PlanNameInvalidError()),
   NOTE_INVALID: example(new PlanNoteInvalidError()),
   APPLICATION_NOT_FOUND: example(new PlanApplicationNotFoundError()),
@@ -101,9 +138,15 @@ export const PLAN_ERROR_EXAMPLES = {
   PROVISIONING_TYPE_MISMATCH: example(new PlanProvisioningTypeMismatchError()),
   PRICING_MODEL_REQUIRED: example(new PlanPricingModelRequiredError()),
   PRICING_MODEL_NOT_APPLICABLE: example(new PlanPricingModelNotApplicableError()),
+  PRICING_MODEL_NOT_DERIVED: example(new PlanPricingModelNotDerivedError('PER_SEAT')),
+  REFERENCE_PRICE_NOT_VND: example(new PlanReferencePriceNotVndError('USD')),
+  REFERENCE_PRICE_NOT_POSITIVE: example(new PlanReferencePriceNotPositiveError()),
+  REFERENCE_PRICE_NOT_APPLICABLE: example(new PlanReferencePriceNotApplicableError()),
   CONTROL_LEVEL_REQUIRED: example(new PlanControlLevelRequiredError()),
   DATA_LOSS_NOTE_REQUIRED: example(new PlanDataLossNoteRequiredError()),
   UPDATE_EMPTY: example(new PlanUpdateEmptyError()),
+  ADMIN_CONSOLE_NOT_APPLICABLE: example(new PlanAdminConsoleNotApplicableError()),
+  VENDOR_ADMINS_INVALID: example(new PlanVendorAdminsInvalidError(1, 2)),
   WORKSPACE_PROFILE_NOT_APPLICABLE: example(new PlanWorkspaceProfileNotApplicableError()),
   WORKSPACE_PERSON_INVALID: example(new PlanWorkspacePersonInvalidError('<employee-id>')),
   PRIMARY_OWNER_NOT_LISTED: example(new PlanPrimaryOwnerNotListedError()),

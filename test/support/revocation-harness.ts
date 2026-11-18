@@ -7,8 +7,12 @@ import type {
   OpenedRevocation,
   RevocationContext,
   RevocationDecision,
+  RevocationSource,
+  SystemActor,
+  WithdrawnRevocation,
 } from '../../src/modules/licensing/public/licensing.types';
 import type { ApiAccount } from './api-accounts';
+import type { K1ChecklistCardWire } from './k1-checklist';
 import { ProvisioningHarness, type TaskWire } from './provisioning-harness';
 
 /** What a task of a revocation says of it on the wire, in a row of the list and in the detail. */
@@ -31,16 +35,24 @@ export interface RevocationBlockWire {
     note: string | null;
     decidedAt: string;
   } | null;
+  withdrawnReasonCount?: number;
+  lastWithdrawnAt?: string | null;
 }
 export type RevocationTaskWire = Omit<TaskWire, 'requestId'> & {
   requestId: string | null;
   revocation: RevocationBlockWire | null;
+  /** The checklist of a K1 revocation (`QĐ-111az`); null on any other task. */
+  k1Checklist: K1ChecklistCardWire | null;
 };
 
 export interface OpenOptions {
   decision?: Partial<RevocationDecision>;
   context?: RevocationContext;
-  actor?: AuthenticatedPrincipal;
+  /** The timing a source asks for (BR-MF5-04) and the notice to the holder (US-10-06 AC-2). */
+  timing?: { dueOn?: string; notBefore?: string };
+  notice?: { holder: true };
+  /** An account, or the system (a sweeper): the task is then marked as made by the system and no account made it. */
+  actor?: AuthenticatedPrincipal | SystemActor;
   now?: Date;
 }
 
@@ -73,10 +85,54 @@ export class RevocationHarness extends ProvisioningHarness {
         source,
         decision: { decidedRole: 'MANAGER', ...options.decision },
         ...(options.context ? { context: options.context } : {}),
+        ...(options.timing ? { timing: options.timing } : {}),
+        ...(options.notice ? { notice: options.notice } : {}),
         ...(options.now ? { now: options.now } : {}),
       }),
     );
   };
+
+  /** What a source module does to take back its own reason: the facade in its own transaction. */
+  withdraw = (
+    assignmentId: string,
+    source: RevocationSource,
+    referenceId: string | null,
+    options: { actor?: AuthenticatedPrincipal; cancelInProgressClaimedBy?: string } = {},
+  ): Promise<WithdrawnRevocation> => {
+    const facade = this.ctx.app.get(LicensingApi);
+    const actor = options.actor ?? this.actorOf(this.it1);
+
+    return this.ctx.app.get(TransactionRunner).run((tx) =>
+      facade.withdrawRevocationReason(tx, actor, {
+        assignmentId,
+        source,
+        referenceId,
+        cause: 'NO_LONGER_APPLIES',
+        ...(options.cancelInProgressClaimedBy ? { cancelInProgressClaimedBy: options.cancelInProgressClaimedBy } : {}),
+      }),
+    );
+  };
+
+  /** The columns the timing is kept in, of the task. */
+  async timingOf(taskId: string): Promise<{ not_before: string | null; due_on: string | null }> {
+    return (
+      await this.ctx.sql.query<{ not_before: string | null; due_on: string | null }>(
+        `SELECT to_char(not_before, 'YYYY-MM-DD') AS not_before, to_char(due_on, 'YYYY-MM-DD') AS due_on
+           FROM provisioning_tasks WHERE id = $1`,
+        [taskId],
+      )
+    ).rows[0];
+  }
+
+  /** The notices of a code a person has been sent. */
+  async noticesOf(employeeId: string, code: string): Promise<{ params: Record<string, unknown> }[]> {
+    return (
+      await this.ctx.sql.query<{ params: Record<string, unknown> }>(
+        `SELECT params FROM in_app_notifications WHERE recipient_employee_id = $1 AND code = $2 ORDER BY created_at`,
+        [employeeId, code],
+      )
+    ).rows;
+  }
 
   /** A seat of a person that began long ago (a baseline row), so ending it gives the seat back today; returns its assignment. */
   async seat(target: { subscriptionId?: string; planId?: string }, code: string, grantedOn = '2026-01-05') {

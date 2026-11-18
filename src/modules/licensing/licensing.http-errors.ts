@@ -4,12 +4,8 @@ import { toUnavailableApiException } from '../../infrastructure/http/errors/serv
 import { errorExampleOf } from '../../infrastructure/http/openapi-error-examples';
 import {
   AssignmentConflictError,
-  AssignmentEffectiveDateInvalidError,
-  AssignmentExpectedEndRequiredError,
   AssignmentNotFoundError,
   AssignmentNotOpenError,
-  AssignmentNotServiceAccountError,
-  AssignmentResponsibleInvalidError,
   SeatBaselineClosedError,
   SeatApplicationRetiredError,
   SeatSubscriptionDraftError,
@@ -53,34 +49,26 @@ export function toLicensingApiException(error: unknown): unknown {
   }
   if (error instanceof AssignmentNotOpenError)
     return refuse(HttpStatus.CONFLICT, 'LICENSE_ASSIGNMENT.NOT_OPEN', error.message);
-  if (error instanceof AssignmentNotServiceAccountError) {
-    return refuse(UNPROCESSABLE, 'LICENSE_ASSIGNMENT.NOT_SERVICE_ACCOUNT', error.message);
-  }
-  if (error instanceof AssignmentResponsibleInvalidError) {
-    return refuse(UNPROCESSABLE, 'LICENSE_ASSIGNMENT.RESPONSIBLE_INVALID', error.message, { problem: error.problem });
-  }
-  if (error instanceof AssignmentEffectiveDateInvalidError) {
-    return refuse(UNPROCESSABLE, 'LICENSE_ASSIGNMENT.EFFECTIVE_DATE_INVALID', error.message, {
-      problem: error.problem,
-    });
-  }
-  if (error instanceof AssignmentExpectedEndRequiredError) {
-    return refuse(UNPROCESSABLE, 'LICENSE_ASSIGNMENT.EXPECTED_END_REQUIRED', error.message);
-  }
   if (error instanceof AssignmentConflictError) {
-    if (error.conflict === 'SEAT_CAPACITY')
-      return refuse(HttpStatus.CONFLICT, 'LICENSE_ASSIGNMENT.SEAT_CAPACITY', error.message);
+    if (error.conflict === 'SEAT_CAPACITY') {
+      return refuse(
+        HttpStatus.CONFLICT,
+        'LICENSE_ASSIGNMENT.SEAT_CAPACITY',
+        error.message,
+        error.freeSeatsInPool === undefined ? undefined : { freeSeatsInPool: error.freeSeatsInPool },
+      );
+    }
     if (error.conflict === 'EXPECTED_END_REQUIRED') {
       return refuse(UNPROCESSABLE, 'LICENSE_ASSIGNMENT.EXPECTED_END_REQUIRED', error.message);
-    }
-    if (error.conflict === 'SUBSCRIPTION_DEPARTMENT_MISMATCH') {
-      return refuse(UNPROCESSABLE, 'LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH', error.message);
     }
 
     return refuse(
       UNPROCESSABLE,
       error.conflict === 'IDENTIFIER_IN_USE' ? 'LICENSE_ASSIGNMENT.IDENTIFIER_IN_USE' : 'LICENSE_ASSIGNMENT.OVERLAP',
       error.message,
+      error.conflictingAssignmentId === undefined
+        ? undefined
+        : { conflictingAssignmentId: error.conflictingAssignmentId },
     );
   }
 

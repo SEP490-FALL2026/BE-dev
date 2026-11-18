@@ -12,8 +12,10 @@ export interface RenewalSubmission {
   /** The person who holds the seat and the plan of it. */
   holder: { employeeId: string; planId: string };
   body: Pick<RenewalBodyDto, 'businessReason'>;
-  termMonths: number;
-  newEnd: BusinessDate;
+  /** The months of use asked; null for a right that goes on with no end. */
+  termMonths: number | null;
+  /** The last day of the new period, cut at the end of the contract of a person who has one; null for a right with no end. */
+  newEnd: BusinessDate | null;
   now: Date;
   assessed: Pick<Assessment, 'unit' | 'policy' | 'pricing' | 'routing'>;
 }
@@ -29,11 +31,10 @@ function needStepOf(facts: RenewalSubmission): NewNeedStep {
   const named = decision.outcome === 'ASSIGNED';
 
   return {
-    state: named ? 'PENDING' : 'WAITING',
+    state: decision.outcome === 'NOT_REQUIRED' ? 'NOT_REQUIRED' : named ? 'PENDING' : 'WAITING',
     assigneeEmployeeId: named ? decision.assigneeEmployeeId : null,
     routingRow: decision.row,
     waitingReason: named ? null : decision.reason,
-    samePersonAsSpend: named && decision.samePersonAsSpend,
     slaWorkingDays: policy.slaWorkingDays,
   };
 }
@@ -90,10 +91,10 @@ export function renewalSubmittedDetail(facts: RenewalSubmission, seat: RenewedSe
     hasSpendStep: hasSpendStep(policy),
     slaWorkingDays: policy.slaWorkingDays,
     pricingStatus: pricing.status,
+    priceSource: pricing.priceSource ?? null,
     amountMinor: pricing.amount?.amountMinor.toString() ?? null,
     amountCurrency: pricing.amount?.currency ?? null,
     budgetYear: pricing.budgetYear,
-    expectedSpendOn: pricing.expectedSpendOn,
     assignmentId: seat.assignmentId,
     previousExpectedEndDate: seat.previousEnd,
     newExpectedEndDate: facts.newEnd,
@@ -122,6 +123,5 @@ export function renewalRoutedDetail(facts: RenewalSubmission, requestId: string)
     assigneeEmployeeId: named ? decision.assigneeEmployeeId : null,
     role: named ? decision.role : null,
     waitingReason: named ? null : decision.reason,
-    samePersonAsSpend: named && decision.samePersonAsSpend,
   };
 }

@@ -16,14 +16,15 @@ const managerDashboardSchema = z.strictObject({
     departmentSoftware: section(
       'The seats the department is granted or manages on the business day: a read of the records, not a proof of use.',
     ),
-    transferReviews: section('The reviews of tools after a transfer into the department that are still open.'),
-    ghostSeats: section('The ghost seats waiting for a decision; they need usage data, which is not delivered yet.'),
+    ghostSeats: section(
+      'The recommendations about the seats of the department that wait for the head to decide, or were returned to them.',
+    ),
     spending: section(
       'The actual cost and the commitments held of the department; the figures are not delivered yet and are never shown as zero.',
     ),
     spendQueue: section('The requests ready to be submitted for spending approval, with those returned and why.'),
     budgetProposals: section('The budget proposals of the department.'),
-    approvedBudgetLines: section('The lines of the approved budget version of the department.'),
+    approvedBudgetLines: section('The approved budget of the department: one figure for the year, read at its source.'),
   }),
 });
 

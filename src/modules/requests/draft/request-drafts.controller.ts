@@ -14,9 +14,9 @@ import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/a
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { GROUP_REQUEST_ERROR_EXAMPLES, toGroupRequestApiException } from '../group-request/group-request.http-errors';
-import { toServiceAccountApiException } from '../service-account-request/service-account-request.http-errors';
 import {
   ACCESS_REQUEST_ERROR_EXAMPLES as EXAMPLES,
+  TERM_ERROR_EXAMPLES,
   toAccessRequestApiException,
 } from '../access-request/access-request.http-errors';
 import { AccessRequestQueryService } from '../request-view/access-request-query.service';
@@ -56,8 +56,10 @@ const NOT_DRAFT = {
 const SUBMITTED_MESSAGE: Readonly<Record<DraftKind, string>> = {
   INDIVIDUAL: 'ACCESS_REQUEST.SUBMITTED',
   GROUP: 'GROUP_REQUEST.SUBMITTED',
-  SERVICE_ACCOUNT: 'ACCESS_REQUEST.SERVICE_ACCOUNT_SUBMITTED',
 };
+
+/** GH-1 of the person a draft is sent for (`BR-MF1-01`): another request of the plan open. */
+const GH_CONFLICT_EXAMPLES = [EXAMPLES.OPEN_REQUEST_EXISTS];
 
 /**
  * The drafts of paid requests: what a person saves when their department has no Cost Center yet and a paid request
@@ -83,7 +85,7 @@ export class RequestDraftsController {
     status: HttpStatus.CREATED,
     message: 'ACCESS_REQUEST.DRAFT_SAVED',
     description:
-      'Keeps what the sender filled for an individual request, a request for a group or a request for a service account (the body is the one of the operation that sends it, with its kind), without any gate: no Cost Center, no check of the budget, no step, no commitment, and it counts for nothing. It is listed, sent and deleted only by the sender; to change it, delete it and save it again.',
+      'Keeps what the sender filled for an individual request or a request for a group (the body is the one of the operation that sends it, with its kind), without any gate: no Cost Center, no check of the budget, no step, no commitment, and it counts for nothing. It is listed, sent and deleted only by the sender; to change it, delete it and save it again.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -141,7 +143,7 @@ export class RequestDraftsController {
     status: HttpStatus.CREATED,
     message: 'ACCESS_REQUEST.SUBMITTED',
     description:
-      'Sends the draft by the operation that sends that kind of request, with every gate it has (the finance setup of the department of the sender on the day first), on what was saved: the draft becomes the request, sent now. It answers as that operation does, with its message (GROUP_REQUEST.SUBMITTED for a group, ACCESS_REQUEST.SERVICE_ACCOUNT_SUBMITTED for a service account). When a gate refuses, the answer is that operation’s own and the draft stays as it was.',
+      'Sends the draft by the operation that sends that kind of request, with every gate it has (the finance setup of the department of the sender on the day first), on what was saved: the draft becomes the request, sent now. It answers as that operation does, with its message (GROUP_REQUEST.SUBMITTED for a group). When a gate refuses, the answer is that operation’s own and the draft stays as it was.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -155,24 +157,25 @@ export class RequestDraftsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). The refusals particular to a group or a service account are those of their own operations.',
+        'The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01). The refusals particular to a group are those of its own operation.',
       examples: [
         EXAMPLES.NOT_DRAFT,
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
         EXAMPLES.APPLICATION_RETIRED,
         EXAMPLES.NO_DEPARTMENT,
         EXAMPLES.ALREADY_HOLDS_ACCESS,
+        ...GH_CONFLICT_EXAMPLES,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with a term of more than 12 months, which no request may ask for any more: ACCESS_REQUEST.TERM_BEYOND_LIMIT (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxMonths, endsBy }. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. Nothing changes: the draft stays, to be saved again with a shorter term.',
+        'The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the time of use the draft was saved with is refused: ACCESS_REQUEST.TERM_REQUIRED (a plan bought by the month, or a contractor, freelancer or intern, with no months), TERM_MONTHS_OUT_OF_RANGE (1 to 9 for a plan bought by the month, 1 to 12 for the others), TERM_NOT_ASKED (a plan bought once takes none) TERM_LONG_TERM_NOT_ALLOWED (no end for a contractor, freelancer or intern; for a group, that person is named on their own line) or TERM_CONTRACT_ENDED (the contract of a contractor, freelancer or intern ended before today, details.contractEndDate; for a group, on their own line). A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing changes: the draft stays, to be saved again with another time of use.',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.REQUEST_PARTY_INELIGIBLE,
-        EXAMPLES.TERM_BEYOND_LIMIT,
-        GROUP_REQUEST_ERROR_EXAMPLES.TERM_BEYOND_LIMIT,
+        ...TERM_ERROR_EXAMPLES,
+        EXAMPLES.OPEN_LIMIT_REACHED,
         GROUP_REQUEST_ERROR_EXAMPLES.TOO_FEW_LINES,
       ],
     },
@@ -189,9 +192,9 @@ export class RequestDraftsController {
 
       return { request: toWire(await this.queries.view(sent.record)) };
     } catch (error) {
-      // The answer is the one of the operation that sends this kind of request: its own refusals (a group, a service account) keep
-      // their own codes, and every other error is mapped as the request routes map it.
-      throw toServiceAccountApiException(toGroupRequestApiException(error));
+      // The answer is the one of the operation that sends this kind of request: its own refusals (a group) keep their own codes, and
+      // every other error is mapped as the request routes map it.
+      throw toGroupRequestApiException(error);
     }
   }
 

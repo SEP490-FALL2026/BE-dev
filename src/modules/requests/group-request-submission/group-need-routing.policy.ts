@@ -40,67 +40,39 @@ const held = (assigneeEmployeeId: string, routingRow: number, slaWorkingDays: nu
   assigneeEmployeeId,
   routingRow,
   waitingReason: null,
-  samePersonAsSpend: false,
-  slaWorkingDays,
-});
-
-const waiting = (
-  routingRow: number,
-  waitingReason: NonNullable<NewNeedStep['waitingReason']>,
-  slaWorkingDays: number,
-): NewNeedStep => ({
-  state: 'WAITING',
-  assigneeEmployeeId: null,
-  routingRow,
-  waitingReason,
-  samePersonAsSpend: false,
   slaWorkingDays,
 });
 
 export function planNeedSteps<Line extends { employeeId: string }>(
   input: NeedRoutingInput<Line>,
 ): PlannedNeedStep<Line>[] {
-  const { headEmployeeId, slaWorkingDays } = input;
-  const others = input.lines.filter((line) => line.employeeId !== headEmployeeId);
-  const own = input.lines.filter((line) => line.employeeId === headEmployeeId);
-  const planned: PlannedNeedStep<Line>[] = [];
-
-  if (others.length > 0) {
-    if (input.senderIsHead) {
-      planned.push({
-        lines: others,
+  const { slaWorkingDays } = input;
+  if (input.senderIsHead)
+    return [
+      {
+        lines: [...input.lines],
         confirmedBySending: true,
         step: held(input.senderEmployeeId, SENT_BY_HEAD_ROW, slaWorkingDays),
-      });
-    } else {
-      // The one who would decide the people is the head, who is none of them (`others` leaves the head out); a department with
-      // no head leaves the step waiting for one (`NO_DEPARTMENT_HEAD`, row 4), and no fallback approver takes it (`QĐ-93c`).
-      const decision = routeNeedStep(input.facts);
-      planned.push({
-        lines: others,
-        confirmedBySending: false,
-        step:
-          decision.outcome === 'ASSIGNED'
-            ? held(
-                decision.assigneeEmployeeId,
-                decision.row === 1 ? SENT_BY_EMPLOYEE_ROW : decision.row,
-                slaWorkingDays,
-              )
-            : waiting(decision.row, decision.reason, slaWorkingDays),
-      });
-    }
-  }
-  if (own.length > 0 && headEmployeeId !== null) {
-    const decision = routeNeedStep({ ...input.facts, requesterEmployeeId: headEmployeeId });
-    planned.push({
-      lines: own,
+      },
+    ];
+  const decision = routeNeedStep(input.facts);
+  const oneStep = decision.outcome === 'NOT_REQUIRED';
+  const planned: PlannedNeedStep<Line>[] = [
+    {
+      lines: [...input.lines],
       confirmedBySending: false,
       step:
         decision.outcome === 'ASSIGNED'
-          ? held(decision.assigneeEmployeeId, decision.row, slaWorkingDays)
-          : waiting(decision.row, decision.reason, slaWorkingDays),
-    });
-  }
+          ? held(decision.assigneeEmployeeId, SENT_BY_EMPLOYEE_ROW, slaWorkingDays)
+          : {
+              state: oneStep ? 'NOT_REQUIRED' : 'WAITING',
+              assigneeEmployeeId: null,
+              routingRow: decision.row,
+              waitingReason: decision.reason,
+              slaWorkingDays,
+            },
+    },
+  ];
 
   return planned;
 }
@@ -135,7 +107,10 @@ export function groupLineRowsOf<Line extends { employeeId: string; expectedEndDa
     entry.lines.map((line) => ({
       requestId,
       employeeId: line.employeeId,
-      state: entry.confirmedBySending ? ('NEED_CONFIRMED' as const) : ('AWAITING_NEED' as const),
+      state:
+        entry.confirmedBySending || entry.step.state === 'NOT_REQUIRED'
+          ? ('NEED_CONFIRMED' as const)
+          : ('AWAITING_NEED' as const),
       needStepId: stepIds[index],
       expectedEndDate: line.expectedEndDate ?? null,
     })),

@@ -25,11 +25,43 @@ Tầng: T6 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit,
   ([prisma/models/ai-assist.prisma](../../../prisma/models/ai-assist.prisma)). Mỗi (tổ chức, người, tính năng,
   `source_revision`, `provider_mode`) có tối đa một lần gọi đang chạy hoặc đang giữ làm kết quả (unique index một phần
   `ai_invocations_active_per_revision`): đổi chế độ rồi hỏi lại cùng revision tạo lần gọi mới. `provider_mode` (`MODEL` |
-  `SIMULATED`) ghi lúc tạo, không có default; lần gọi có trước migration `20261109100000_ai_provider_mode` là `MODEL`.
+  `SIMULATED`) ghi lúc tạo, không có default; lần gọi có trước migration `20261117120000_ai_provider_mode` là `MODEL`.
 
 ## Extension point
 
 - Mở: không có. Đăng ký vào: không có.
+
+### Port lưu lịch sử AI (`AiInvocationHistoryStore`)
+
+Mọi đọc/ghi `ai_invocation_contents` (câu gửi, câu trả lời thô, kết quả đã parse, ngữ cảnh) đi qua port
+`invocation/invocation-history-store.types.ts` (QĐ-102g); bản hiện có là PostgreSQL (`AiInvocationContentRepo`, nối bằng
+`useExisting` ở `ai-assist.module.ts` và `purge/ai-assist-purge-cli.module.ts`). Port không phải extension point giữa module (không
+export ra ngoài `ai-assist`), chỉ là chỗ thay kho.
+
+| Điểm cắm                                               | Method                                                                                                 | Gọi từ (cùng transaction với)                                |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Nhận lần gọi (kể cả `SOURCE_UNREADABLE`, context rỗng) | `recordAdmitted(tx, call)`                                                                             | `queue-summary.service.ts` (audit `REQUESTED`)               |
+| Lần gọi kết thúc có câu trả lời                        | `recordAnswered(tx, call)` — chỉ khi run là bên kết thúc lần gọi                                       | `queue-summary-run.service.ts` (audit `COMPLETED`/`FAILED`)  |
+| Super Admin đọc nội dung                               | `find(tx, invocationId)` → bản ghi hoặc `null`                                                         | `invocation-content-query.service.ts` (audit `CONTENT_READ`) |
+| Purge: đếm / xóa                                       | `countPurgeable(before)` / `purge(tx, before)` (lần gọi `COMPLETED` có nội dung bị xóa chuyển `STALE`) | `public/ai-purge.api.ts` (audit `PURGED`)                    |
+
+**Ranh giới đọc/ghi (đọc ngoài port, ghi trong port).** `AiInvocationRepo.findOwned` (chủ lần gọi đọc `result`, QĐ-79a) nằm
+ngoài port và đọc PostgreSQL: nó lấy **sự tồn tại của hàng `ai_invocation_contents`** làm dấu "chưa purge" (`content: { isNot: null }`)
+và đọc cột `result` của hàng đó. Hai thứ này do bản PostgreSQL của port ghi trong cùng transaction: hàng do `recordAdmitted`, cột
+`result` do `recordAnswered`. Hệ quả cho adapter khác: chỉ đổi `provide` thì **không đủ** — không ai tạo hàng PG ⇒ mọi
+`GET /ai/access-request-summaries/{invocationId}` trả 404 `AI.NOT_FOUND`, kể cả lần gọi `COMPLETED`. Adapter khác phải **hoặc** vẫn
+ghi vào PostgreSQL phần `findOwned` cần (ít nhất `invocation_id`, `created_at`, `result`), **hoặc** sửa `findOwned` và `purge` sang
+dấu của kho đó (WDP: bảng `ai_invocation_results`). Mọi lần gọi vẫn đọc `organizationId` và `providerMode` của lần gọi qua `find` từ
+`ai_invocations` (PostgreSQL), nên adapter cũng đọc hai trường đó từ PostgreSQL bằng `tx`.
+
+Thêm kho khác (ví dụ MongoDB ở repo WDP): viết một class `extends`/`implements AiInvocationHistoryStore`, đổi `provide: AiInvocationHistoryStore`
+trong hai `*.module.ts` (chọn theo env), **không sửa** `queue-summary.service.ts`, `queue-summary-run.service.ts`,
+`invocation-content-query.service.ts`. `find` trả `null` khi không có; trạng thái riêng của kho (đang ghi, kho lỗi) là lỗi do adapter
+ném và map ở `invocation-content.http-errors.ts` của nhánh đó — không thêm mã lỗi vào API đồ án.
+
+Mọi method chạy trong transaction PostgreSQL của nơi gọi, và transaction đó có thể rollback sau khi method đã trả về (ví dụ ghi audit
+lỗi). Vì vậy adapter **không ghi thẳng vào kho ngoài** trong method: ghi một bản ghi chờ (outbox) vào PostgreSQL bằng `tx`, rồi một
+worker đẩy sang kho ngoài sau khi commit (cách WDP đang làm) — nếu không, rollback để lại tài liệu mồ côi ở kho ngoài.
 
 ## Cấu hình
 
@@ -37,7 +69,7 @@ Tầng: T6 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit,
 - Dịch vụ AI: `AI_SERVICE_BASE_URL`, `AI_SERVICE_TOKEN` (bearer cấp dịch vụ), `AI_SERVICE_TIMEOUT_MS`
   (`ai-service/ai-service-environment.policy.ts`). Không cấu hình: ở chế độ `MODEL` tính năng trả `AI.PROVIDER_UNAVAILABLE`
   (chế độ `SIMULATED` không cần dịch vụ AI); có địa chỉ mà thiếu token: chặn khởi động.
-- Nối dịch vụ AI trên Modal (SPEC §9.4 của repo `AI-SERVICE`): `.env` của VPS BE đặt (không commit giá trị thật)
+- Nối dịch vụ AI trên Modal (repo AI service bản WDP `WDP301-FA26-GR8/AI-service`, `modal_app.py` và README của repo đó): `.env` của VPS BE đặt (không commit giá trị thật)
 
   ```dotenv
   AI_SERVICE_BASE_URL=https://<workspace>--saas-sentry-ai-web.modal.run
@@ -47,6 +79,10 @@ Tầng: T6 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit,
 
   Vì sao `120000`: mặc định 90 000 ms thấp hơn hạn 105 s của dịch vụ và khởi động lạnh GPU ~110 s, nên lần gọi lúc GPU đang tắt
   hết giờ ở BE trong khi GPU vẫn chạy. Sau đó Super Admin bật hai công tắc và chọn `AI_PROVIDER_MODE`.
+
+  Dịch vụ AI phải chạy model thật: deploy có GPU (`AI_DEPLOY_GPU` khác `0`) và `/healthz` có `modelId` khác `stub`. Câu của runner
+  `stub` (câu mẫu, không qua model) bị BE từ chối ngay ở `ai-service-client.service.ts` — lần gọi `FAILED` với `AI.PROVIDER_UNAVAILABLE`,
+  không lưu kết quả — để không bao giờ có câu mẫu ghi là `MODEL`, hiện không nhãn _Giả lập_ (QĐ-102f).
 
 - Tham số vận hành `AI_PROVIDER_MODE` (nhóm `AI`, enum `SIMULATED` mặc định | `MODEL`; Super Admin đổi qua
   `PUT /operating-parameters/AI_PROVIDER_MODE`, có Audit Trail; chỉ có hiệu lực khi hai công tắc `ON`):
@@ -67,8 +103,8 @@ Tầng: T6 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit,
 - `ai-service/` — client của dịch vụ AI (`ai-service-client.service.ts`, hợp đồng và kiểu ở `ai-service.types.ts`, lỗi
   `ai-service.errors.ts`, cấu hình `ai-service-environment.policy.ts`), client giả lập (`ai-service-simulated-client.service.ts`,
   câu mẫu ở `ai-service-simulated.policy.ts`) và chọn client theo chế độ (`ai-service-clients.service.ts`).
-- `invocation/` — bản ghi mỗi lần gọi: `invocation.repo.ts` (SQL của `ai_invocations` và ghi nội dung của một lần gọi),
-  `invocation-content.repo.ts` (đọc một nội dung, đếm và xóa nội dung theo mốc cắt), `invocation-content.json.ts` (codec cột JSON),
+- `invocation/` — bản ghi mỗi lần gọi: `invocation.repo.ts` (SQL của `ai_invocations`, không ghi nội dung),
+  `invocation-history-store.types.ts` (port lưu lịch sử), `invocation-content.repo.ts` (bản PostgreSQL của port: ghi, đọc, đếm và xóa nội dung), `invocation-content.json.ts` (codec cột JSON),
   `invocation-audit-event.mapper.ts` (`AI_INVOCATION.CONTENT_READ`, `AI_INVOCATION.PURGED`), `invocation.types.ts`.
 - `invocation-content/` — đọc nội dung (chỉ Super Admin): `invocation-content-query.service.ts`, `.controller.ts`, `.dto.ts`,
   `invocation-content.errors.ts`, `invocation-content.http-errors.ts`.
@@ -111,7 +147,7 @@ Tầng: T6 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit,
   không phải của request chạm tới nó).
 - Production: `AI_SERVICE_BASE_URL` phải là `https://` hoặc `http://` tới chính máy (`localhost`, `127.0.0.0/8`, `::1`), sai
   thì module không mount được (thông báo nêu tên biến, không nêu giá trị).
-- Bộ kiểm đầu ra giữ cùng luật với `AI-SERVICE/eval/validators.py` (phiên bản `OUTPUT_CHECK_VERSION`); sửa một bên thì sửa cả bên kia.
+- Bộ kiểm đầu ra giữ cùng luật với `eval/validators.py` của repo AI service WDP (phiên bản `OUTPUT_CHECK_VERSION`); sửa một bên thì sửa cả bên kia.
 - Nội dung thô (`ai_invocation_contents`) chỉ Super Admin đọc, mỗi lần đọc có audit; chỉ `ops:ai-purge` xóa nó (khóa ngoại `RESTRICT`: nội
   dung bị xóa trước, `ai_invocations` được giữ).
 

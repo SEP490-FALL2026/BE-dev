@@ -1,14 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { pretendBusinessToday } from '../../support/pretend-today';
+import { ensureVendorAdmins } from '../../support/builders/catalog.builder';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
-import {
-  HttpTestApp,
-  SeededInstallation,
-  createHttpTestApp,
-  insertEmployeeFixture,
-  seedInstallation,
-} from '../../support/http-test-app';
+import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
+import { intakeBodyOf } from '../../support/application-body';
+import { pricingOfBody, writeLegacyPricing } from '../../support/legacy-pricing';
 
 interface TermsWire {
   termsUrl: string | null;
@@ -37,13 +34,6 @@ interface TermsView {
   applicable: boolean;
   sharingPolicy: string | null;
   terms: TermsWire | null;
-  opinions: Array<{
-    id: string;
-    businessOwner: { employeeId: string; employeeCode: string; fullName: string };
-    opinion: string;
-    recordedBy: string;
-    recordedAt: string;
-  }>;
   warnings: WarningWire[];
 }
 
@@ -65,7 +55,6 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
   let it1: ApiAccount;
   let finance: ApiAccount;
   let employee: ApiAccount;
-  let businessOwner: { employeeId: string; code: string };
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
@@ -87,8 +76,6 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
       role: 'EMPLOYEE',
       admin,
     });
-    const owner = await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' });
-    businessOwner = { employeeId: owner.employeeId, code: 'E-OWN' };
   }, 120000);
 
   afterEach(() => {
@@ -115,14 +102,15 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
       await request(server())
         .post('/api/v1/applications')
         .set(as(it1))
-        .send({
-          name: unique('App'),
-          kind,
-          ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
-          dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: businessOwner.employeeId,
-          communication: NO,
-        })
+        .send(
+          intakeBodyOf({
+            name: unique('App'),
+            kind,
+            ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
+            dataSensitivity: 'LOW',
+            communication: NO,
+          }),
+        )
         .expect(201),
     );
     const type = setup.type ?? (kind === 'INTERNAL' ? 'K5' : 'K2');
@@ -134,10 +122,14 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
           applicationId: application.id,
           name: unique('Plan'),
           provisioningType: type,
-          ...(type === 'K5' ? {} : { pricingModel: setup.pricing ?? 'PER_SEAT', controlLevel: 'FULL' }),
+          ...(type === 'K5' ? {} : { ...pricingOfBody(type, setup.pricing ?? 'PER_SEAT'), controlLevel: 'FULL' }),
         })
         .expect(201),
     );
+
+    await writeLegacyPricing(ctx.sql, created.id, type, setup.pricing ?? 'PER_SEAT');
+    // A plan that needs admins at the vendor gets the two-person profile an active subscription asks for (X-IT.5).
+    await ensureVendorAdmins(ctx, created.id, it1.employeeId);
 
     return { planId: created.id, applicationId: application.id };
   };
@@ -148,12 +140,13 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
         .post('/api/v1/subscriptions')
         .set(as(it1))
         .send({
-          ownerDepartmentId: seed.departmentId,
           planId,
           kind: 'TERM',
           purchasedQuantity: 10,
           unitPrice: { amount: '1000000', currency: 'VND' },
           billingCycle: 'ANNUAL',
+          commitmentTermMonths: 12,
+          responsibleItAdminEmployeeId: it1.employeeId,
           startDate: '2026-01-01',
           ...extra,
         })
@@ -163,8 +156,6 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
     request(server()).put(`/api/v1/plans/${planId}/terms`).set(as(account)).send(body);
   const getTerms = (planId: string, account: ApiAccount = it1) =>
     request(server()).get(`/api/v1/plans/${planId}/terms`).set(as(account));
-  const postOpinion = (planId: string, body: object, account: ApiAccount = it1) =>
-    request(server()).post(`/api/v1/plans/${planId}/term-opinions`).set(as(account)).send(body);
   const warningsOf = async (planId: string): Promise<WarningWire[]> =>
     dataOf<{ items: WarningWire[] }>(
       await request(server()).get('/api/v1/plan-warnings').query({ pageSize: 100 }).set(as(it1)).expect(200),
@@ -201,7 +192,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
         cancellationRefund: 'Báo hủy trước 30 ngày, tự gia hạn, không hoàn tiền',
       });
       const read = dataOf<TermsView>(await getTerms(planId).expect(200));
-      expect(read).toMatchObject({ applicable: true, sharingPolicy: 'NOT_ALLOWED', opinions: [], warnings: [] });
+      expect(read).toMatchObject({ applicable: true, sharingPolicy: 'NOT_ALLOWED', warnings: [] });
       expect(read.terms).toMatchObject({ dataLocation: 'Lưu trữ tại EU' });
       const events = (await auditOf(planId)).filter((event) => event.action === 'PLAN_TERMS.SET');
       expect(events).toEqual([
@@ -288,7 +279,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
       const response = await request(server())
         .patch(`/api/v1/plans/${k4.planId}`)
         .set(as(it1))
-        .send({ provisioningType: 'K1', pricingModel: 'FLAT_RATE', controlLevel: 'PARTIAL' })
+        .send({ provisioningType: 'K1', controlLevel: 'PARTIAL' })
         .expect(409);
 
       expect(codeOf(response)).toBe('PLAN.TERMS_BLOCK_TYPE_CHANGE');
@@ -309,7 +300,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
   });
 
   describe('the alert that the terms need a new review (AC-3, AC-4, AC-9)', () => {
-    it('AC-3: with a deadline of 01/12/2026 and the last review on 15/11/2025, the alert opens on 16/11 and ends after 01/12', async () => {
+    it('AC-3: with a deadline of 01/12/2026 and the last review on 15/11/2025, the alert opens on 01/11 (30 days before it) and ends after 01/12', async () => {
       const { planId } = await plan();
       await putTerms(planId, { lastReviewedOn: '2025-11-15' }).expect(200);
       const subscriptionId = await subscription(planId, {
@@ -318,10 +309,10 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
         autoRenew: true,
       });
 
-      today('2026-11-15');
+      today('2026-10-31');
       expect(await warningsOf(planId)).toEqual([]);
 
-      for (const day of ['2026-11-16', '2026-11-24', '2026-12-01']) {
+      for (const day of ['2026-11-01', '2026-11-24', '2026-12-01']) {
         today(day);
         const [warning] = await warningsOf(planId);
         expect(warning).toMatchObject({
@@ -329,7 +320,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
           subscriptionId,
           noticeDeadline: { value: '2026-12-01', source: 'DECLARED' },
           baseDate: '2026-12-01',
-          reviewFrom: '2026-11-16',
+          reviewFrom: '2026-11-01',
           lastReviewedOn: '2025-11-15',
         });
         expect(dataOf<TermsView>(await getTerms(planId).expect(200)).warnings).toHaveLength(1);
@@ -345,7 +336,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
 
       today('2026-11-20');
       expect(await warningsOf(planId)).toHaveLength(1);
-      await putTerms(planId, { lastReviewedOn: '2026-11-15' }).expect(200);
+      await putTerms(planId, { lastReviewedOn: '2026-10-31' }).expect(200);
       expect(await warningsOf(planId)).toHaveLength(1);
       await putTerms(planId, {
         lastReviewedOn: '2026-11-20',
@@ -374,17 +365,23 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
 
     it('AC-9: a subscription with no deadline that ends on 31/12 and does not renew is alerted from its end date, marked as such', async () => {
       const { planId } = await plan({ pricing: 'FLAT_RATE', type: 'K1' });
-      await subscription(planId, { endDate: '2026-12-31', autoRenew: false });
+      // A K1 plan is for one month and paid by the month (R-E01).
+      await subscription(planId, {
+        endDate: '2026-12-31',
+        autoRenew: false,
+        billingCycle: 'MONTHLY',
+        commitmentTermMonths: 1,
+      });
 
-      today('2026-12-15');
+      today('2026-11-30');
       expect(await warningsOf(planId)).toEqual([]);
-      today('2026-12-16');
+      today('2026-12-01');
       const [warning] = await warningsOf(planId);
 
       expect(warning).toMatchObject({
         noticeDeadline: { value: null, source: 'BY_END_DATE' },
         baseDate: '2026-12-31',
-        reviewFrom: '2026-12-16',
+        reviewFrom: '2026-12-01',
       });
     });
 
@@ -395,19 +392,19 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
         .post('/api/v1/subscriptions')
         .set(as(it1))
         .send({
-          ownerDepartmentId: seed.departmentId,
           planId: licensed.planId,
           kind: 'PERPETUAL',
           purchasedQuantity: 50,
           unitPrice: { amount: '500000', currency: 'VND' },
           startDate: '2026-03-15',
+          responsibleItAdminEmployeeId: it1.employeeId,
         })
         .expect(201);
       await subscription(saas.planId, { autoRenew: true });
       await request(server())
         .post('/api/v1/subscriptions')
         .set(as(it1))
-        .send({ ownerDepartmentId: seed.departmentId, planId: saas.planId, kind: 'TERM', endDate: '2026-12-31' })
+        .send({ planId: saas.planId, kind: 'TERM', endDate: '2026-12-31' })
         .expect(201);
 
       for (const day of ['2026-03-20', '2026-11-20', '2026-12-20']) {
@@ -423,19 +420,19 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
       await subscription(late.planId, { noticeDeadline: '2027-03-10', renewalDate: '2027-03-10' });
       await subscription(early.planId, { noticeDeadline: '2027-03-05', renewalDate: '2027-03-05' });
 
-      today('2027-02-20');
+      today('2027-02-05');
       const all = dataOf<{ items: WarningWire[]; pagination: { totalItems: number }; asOf: string }>(
         await request(server()).get('/api/v1/plan-warnings').query({ pageSize: 100 }).set(as(it1)).expect(200),
       );
       const mine = all.items.filter((item) => [early.planId, late.planId].includes(item.planId));
 
       expect(mine.map((item) => item.planId)).toEqual([early.planId]);
-      today('2027-02-25');
+      today('2027-02-10');
       const later = dataOf<{ items: WarningWire[] }>(
         await request(server()).get('/api/v1/plan-warnings').query({ pageSize: 100 }).set(as(it1)).expect(200),
       ).items.filter((item) => [early.planId, late.planId].includes(item.planId));
       expect(later.map((item) => item.planId)).toEqual([early.planId, late.planId]);
-      expect(all.asOf).toBe('2027-02-20');
+      expect(all.asOf).toBe('2027-02-05');
       const paged = dataOf<{ items: WarningWire[]; pagination: { pageSize: number } }>(
         await request(server()).get('/api/v1/plan-warnings').query({ page: 2, pageSize: 1 }).set(as(it1)).expect(200),
       );
@@ -444,63 +441,31 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
     });
   });
 
-  describe('the opinion of the Business Owner (AC-6)', () => {
-    it('is kept with the Business Owner of the application, who recorded it and when, and adds no step', async () => {
+  describe('the opinion of the Business Owner is gone (QĐ-111g)', () => {
+    it('has no route that records or lists one, and the terms carry no opinion', async () => {
       const { planId } = await plan();
-      const before = { audit: (await auditOf(planId)).length };
 
-      const recorded = dataOf<TermsView['opinions'][number]>(
-        await postOpinion(planId, { opinion: '  Nên rà điều khoản chia sẻ   trước kỳ gia hạn ' }).expect(201),
-      );
-
-      expect(recorded).toMatchObject({
-        businessOwner: { employeeId: businessOwner.employeeId, employeeCode: 'E-OWN' },
-        opinion: 'Nên rà điều khoản chia sẻ trước kỳ gia hạn',
-        recordedBy: it1.appUserId,
-      });
-      expect(new Date(recorded.recordedAt).getTime()).toBeGreaterThan(0);
-      expect(dataOf<TermsView>(await getTerms(planId).expect(200)).opinions.map((item) => item.id)).toEqual([
-        recorded.id,
-      ]);
-      const events = await auditOf(planId);
-      expect(events).toHaveLength(before.audit + 1);
-      expect(events[events.length - 1]).toMatchObject({
-        action: 'PLAN_TERM_OPINION.RECORDED',
-        actor_roles: ['IT_ADMIN'],
-      });
-      expect(await warningsOf(planId)).toEqual([]);
-    });
-
-    it('lists the newest opinion first, never changes one, and refuses an empty or over-long opinion', async () => {
-      const { planId } = await plan();
-      const first = dataOf<{ id: string }>(await postOpinion(planId, { opinion: 'first' }).expect(201));
-      const second = dataOf<{ id: string }>(await postOpinion(planId, { opinion: 'second' }).expect(201));
-
-      expect(dataOf<TermsView>(await getTerms(planId).expect(200)).opinions.map((item) => item.id)).toEqual([
-        second.id,
-        first.id,
-      ]);
-      expect(codeOf(await postOpinion(planId, { opinion: '   ' }).expect(422))).toBe('PLAN_TERMS.TEXT_INVALID');
-      expect(codeOf(await postOpinion(planId, { opinion: 'x'.repeat(2001) }).expect(422))).toBe(
-        'PLAN_TERMS.TEXT_INVALID',
-      );
-      await expect(
-        ctx.sql.query(`UPDATE plan_term_opinions SET opinion = 'changed' WHERE id = $1`, [first.id]),
-      ).rejects.toMatchObject({ code: '55000' });
+      await request(server())
+        .post(`/api/v1/plans/${planId}/term-opinions`)
+        .set(as(it1))
+        .send({ opinion: 'x' })
+        .expect(404);
+      await request(server()).get(`/api/v1/plans/${planId}/term-opinions`).set(as(it1)).expect(404);
+      const read = dataOf<TermsView>(await getTerms(planId).expect(200));
+      expect(read).not.toHaveProperty('opinions');
+      expect(read).not.toHaveProperty('opinionTotal');
     });
   });
 
   describe('a plan with no terms (AC-7)', () => {
-    it('has no terms, no opinion and no alert for a K5 plan of an internal application', async () => {
+    it('has no terms and no alert for a K5 plan of an internal application', async () => {
       const { planId } = await plan({ kind: 'INTERNAL' });
       const before = await n('plan_terms');
 
       expect(codeOf(await putTerms(planId, SIX_POINTS).expect(422))).toBe('PLAN_TERMS.NOT_APPLICABLE');
-      expect(codeOf(await postOpinion(planId, { opinion: 'x' }).expect(422))).toBe('PLAN_TERMS.NOT_APPLICABLE');
       expect(dataOf<TermsView>(await getTerms(planId).expect(200))).toMatchObject({
         applicable: false,
         terms: null,
-        opinions: [],
         warnings: [],
       });
       expect(await warningsOf(planId)).toEqual([]);
@@ -512,35 +477,26 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
 
       expect(codeOf(await getTerms(missing).expect(404))).toBe('PLAN.NOT_FOUND');
       expect(codeOf(await putTerms(missing, {}).expect(404))).toBe('PLAN.NOT_FOUND');
-      expect(codeOf(await postOpinion(missing, { opinion: 'x' }).expect(404))).toBe('PLAN.NOT_FOUND');
     });
   });
 
   describe('who may use it (AC-8)', () => {
-    it('turns Finance, an employee and the Super Admin away from recording terms and opinions, and keeps Finance out of the alerts', async () => {
+    it('turns Finance, an employee and the Super Admin away from recording terms, and keeps Finance out of the alerts', async () => {
       const { planId } = await plan();
       await putTerms(planId, { aiTraining: 'as recorded' }).expect(200);
       const before = {
         terms: await n('plan_terms'),
-        opinions: await n('plan_term_opinions'),
         audit: await n('audit_events'),
       };
       const asSuperAdmin = { Authorization: `Bearer ${admin}` };
 
       for (const account of [finance, employee]) {
         await putTerms(planId, { aiTraining: 'changed' }, account).expect(403);
-        await postOpinion(planId, { opinion: 'x' }, account).expect(403);
       }
       await request(server()).put(`/api/v1/plans/${planId}/terms`).set(asSuperAdmin).send({}).expect(403);
-      await request(server())
-        .post(`/api/v1/plans/${planId}/term-opinions`)
-        .set(asSuperAdmin)
-        .send({ opinion: 'x' })
-        .expect(403);
 
       expect({
         terms: await n('plan_terms'),
-        opinions: await n('plan_term_opinions'),
         audit: await n('audit_events'),
       }).toEqual(before);
       expect(dataOf<TermsView>(await getTerms(planId).expect(200)).terms?.aiTraining).toBe('as recorded');

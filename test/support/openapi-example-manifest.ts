@@ -1,41 +1,48 @@
 /**
- * The literal expectations of the OpenAPI examples (OPENAPI-EXAMPLE.1), written out so the test never asks the code that
- * builds the examples what they should be. Traced on BE `ea73c2f` (25/10/2026), and for the G5/G6 routes on their
- * merge `0da8f56` (Prompt 02, 26/10/2026), from each handler through its service, policies and repository to the HTTP
- * mapper — never from a response description; see docs/workspace/items/openapi-response-examples/spec.md.
+ * The literal expectations of the OpenAPI examples (OPENAPI-EXAMPLE.1), written out so the test never asks the code that builds the
+ * examples what they should be. Traced on BE `ea73c2f` and, for the G5/G6 routes, on `0da8f56`, from each handler through its service,
+ * policies and repository to the HTTP mapper — never from a response description; see docs/workspace/items/openapi-response-examples/spec.md.
  *
  * - SUCCESS_MESSAGES: the success `message` each operation answers with (its `@ApiSuccessResponse` metadata).
  * - BODYLESS_RESPONSES: success responses that have no JSON body, with the reason.
  * - ROUTE_ERROR_CODES: the codes an operation can answer with at a status beyond the ones every operation of its kind
  *   answers with (guards, validation pipe, throttler, request parsers — written out in api-inventory.e2e-spec.ts).
- *   Adding a code here needs the traced code path; a code that cannot be reached is never listed. A reachable code of
- *   another capability that the route only passes through is not shown until its owner can give the example within the
- *   module boundaries (Prompt 02 decision: personnelNoticeRecord, the revocation hooks; see the item spec).
- * - NO_EXAMPLE_RESPONSES: declared error responses the running system cannot answer yet, so they show no example
- *   (their declaration says why in `noExampleBecause`). The list only shrinks: the slice that makes one reachable adds
- *   its examples and removes the entry.
+ *   Adding a code here needs the traced code path; a code that cannot be reached is never listed. A reachable code of another
+ *   capability that the route only passes through is not shown until its owner can give the example within the module boundaries.
+ * - NO_EXAMPLE_RESPONSES: declared error responses the running system cannot answer yet, so they show no example (their declaration
+ *   says why in `noExampleBecause`). The list only shrinks: the slice that makes one reachable adds its examples and removes the entry.
  */
-
+import { SUCCESS_MESSAGES_ORGANIZATION } from './openapi-example-messages-organization';
+import { SUCCESS_MESSAGES_POLICIES } from './openapi-example-messages-policies';
 import { ROUTE_ERROR_CODES_AI_ASSIST } from './openapi-example-route-codes-ai-assist';
 import { ROUTE_ERROR_CODES_BUDGETS } from './openapi-example-route-codes-budgets';
 import { ROUTE_ERROR_CODES_CATALOG } from './openapi-example-route-codes-catalog';
 import { ROUTE_ERROR_CODES_DATA_IMPORT } from './openapi-example-route-codes-data-import';
 import { SUCCESS_MESSAGES_DEVICES } from './openapi-example-messages-devices';
+import { SUCCESS_MESSAGES_OPTIMIZATION } from './openapi-example-messages-optimization';
+import { SUCCESS_MESSAGES_PURCHASE_INVOICE } from './openapi-example-messages-purchase-invoice';
+import { SUCCESS_MESSAGES_USAGE } from './openapi-example-messages-usage';
 import { ROUTE_ERROR_CODES_DEVICES } from './openapi-example-route-codes-devices';
-import { ROUTE_ERROR_CODES_FINANCE } from './openapi-example-route-codes-finance';
 import { ROUTE_ERROR_CODES_HEALTH } from './openapi-example-route-codes-health';
 import { ROUTE_ERROR_CODES_IDENTITY_ACCESS } from './openapi-example-route-codes-identity-access';
 import { ROUTE_ERROR_CODES_LICENSING } from './openapi-example-route-codes-licensing';
 import { ROUTE_ERROR_CODES_OPERATING_PARAMETERS } from './openapi-example-route-codes-operating-parameters';
 import { ROUTE_ERROR_CODES_ORGANIZATION } from './openapi-example-route-codes-organization';
+import { ROUTE_ERROR_CODES_OPTIMIZATION } from './openapi-example-route-codes-optimization';
 import { ROUTE_ERROR_CODES_PERSONNEL } from './openapi-example-route-codes-personnel';
 import { ROUTE_ERROR_CODES_REQUESTS } from './openapi-example-route-codes-requests';
 import { ROUTE_ERROR_CODES_REQUESTS_SPEND } from './openapi-example-route-codes-requests-spend';
+import { ROUTE_ERROR_CODES_USAGE } from './openapi-example-route-codes-usage';
 
-export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '422' | '429' | '500' | '503';
+export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '415' | '422' | '429' | '500' | '503';
 
 export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   ...SUCCESS_MESSAGES_DEVICES,
+  ...SUCCESS_MESSAGES_OPTIMIZATION,
+  ...SUCCESS_MESSAGES_ORGANIZATION,
+  ...SUCCESS_MESSAGES_POLICIES,
+  ...SUCCESS_MESSAGES_PURCHASE_INVOICE,
+  ...SUCCESS_MESSAGES_USAGE,
   accessRequestAssessmentComplete: 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
   accessRequestAssessmentGet: 'ACCESS_REQUEST.ASSESSMENT_FETCHED',
   accessRequestAssessmentReject: 'ACCESS_REQUEST.ASSESSMENT_REJECTED',
@@ -56,10 +63,9 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   accessRequestPreview: 'ACCESS_REQUEST.PREVIEWED',
   accessRequestPropose: 'ACCESS_REQUEST.PROPOSED',
   accessRequestRenewalSubmit: 'ACCESS_REQUEST.RENEWAL_SUBMITTED',
-  accessRequestServiceAccountReview: 'ACCESS_REQUEST.SERVICE_ACCOUNT_REVIEWED',
-  accessRequestServiceAccountSubmit: 'ACCESS_REQUEST.SERVICE_ACCOUNT_SUBMITTED',
   accessRequestSimilarSeatList: 'ACCESS_REQUEST.SIMILAR_SEATS_LISTED',
   accessRequestSubmit: 'ACCESS_REQUEST.SUBMITTED',
+  accessRequestResubmit: 'ACCESS_REQUEST.RESUBMITTED',
   accessRequestSupplementAdd: 'ACCESS_REQUEST.SUPPLEMENT_ADDED',
   accessRequestSupplementList: 'ACCESS_REQUEST.SUPPLEMENTS_LISTED',
   accessRequestTimingsGet: 'ACCESS_REQUEST.TIMINGS_FETCHED',
@@ -76,13 +82,14 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   appUserLock: 'APP_USER.LOCKED',
   appUserResendInvitation: 'APP_USER.INVITATION_SENT',
   appUserUnlock: 'APP_USER.UNLOCKED',
-  applicationBusinessOwnerHistory: 'APPLICATION.BUSINESS_OWNERS_LISTED',
+  assessmentDecisionList: 'ASSESSMENT_DECISIONS.LISTED',
+  assessmentQueueDepartmentList: 'ASSESSMENT_QUEUE.DEPARTMENTS_LISTED',
   assessmentQueueList: 'ASSESSMENT_QUEUE.LISTED',
   applicationCreate: 'APPLICATION.CREATED',
   applicationGet: 'APPLICATION.FETCHED',
   applicationList: 'APPLICATION.LISTED',
+  applicationResponsibilityTransfer: 'APPLICATION.RESPONSIBILITY_TRANSFERRED',
   applicationRetire: 'APPLICATION.RETIRED',
-  applicationRetirementConfirm: 'APPLICATION.RETIREMENT_CONFIRMED',
   applicationRetirementGet: 'APPLICATION.RETIREMENT_FETCHED',
   applicationUpdate: 'APPLICATION.UPDATED',
   assignmentExpiryQueueList: 'ASSIGNMENT_EXPIRY_QUEUE.LISTED',
@@ -102,20 +109,29 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   budgetCheckYearList: 'BUDGET_CHECK.YEARS_LISTED',
   budgetCommitmentList: 'BUDGET_COMMITMENT.LISTED',
   budgetCommitmentInvoiceList: 'BUDGET_COMMITMENT.INVOICES_LISTED',
-  budgetCommitmentInvoiceRecord: 'BUDGET_COMMITMENT.INVOICE_RECORDED',
+  budgetCycleBaseline: 'BUDGET_CYCLE.BASELINE_FETCHED',
+  budgetCycleGet: 'BUDGET_CYCLE.FETCHED',
+  budgetCycleList: 'BUDGET_CYCLE.LISTED',
+  budgetCyclePackage: 'BUDGET_CYCLE.PACKAGE_FETCHED',
+  budgetCycleCreate: 'BUDGET_CYCLE.CREATED',
+  budgetReviewPeriodClose: 'BUDGET_REVIEW.CLOSED',
+  budgetReviewPeriodGet: 'BUDGET_REVIEW.RETRIEVED',
+  budgetReviewPeriodList: 'BUDGET_REVIEW.LISTED',
+  budgetReviewPeriodSign: 'BUDGET_REVIEW.SIGNED',
+  budgetReviewLineExplain: 'BUDGET_REVIEW.LINE_EXPLAINED',
+  budgetAdjustmentCreate: 'BUDGET_ADJUSTMENT.CREATED',
+  budgetAdjustmentDecide: 'BUDGET_ADJUSTMENT.DECIDED',
+  budgetAdjustmentList: 'BUDGET_ADJUSTMENT.LISTED',
+  budgetCycleDelete: 'BUDGET_CYCLE.DELETED',
+  budgetCycleOpen: 'BUDGET_CYCLE.OPENED',
+  budgetCycleUpdate: 'BUDGET_CYCLE.UPDATED',
   budgetCommitmentRelease: 'BUDGET_COMMITMENT.RELEASED',
   budgetCommitmentReleases: 'BUDGET_COMMITMENT.RELEASES_LISTED',
-  budgetInformationAnswer: 'BUDGET_INFORMATION.ANSWERED',
-  budgetInformationAsk: 'BUDGET_INFORMATION.ASKED',
-  budgetInformationList: 'BUDGET_INFORMATION.LISTED',
-  budgetInformationOfRequest: 'BUDGET_INFORMATION.LISTED',
   budgetMine: 'BUDGET.FETCHED',
-  budgetMineLineList: 'BUDGET.LINES_LISTED',
   budgetMineVersionList: 'BUDGET.VERSIONS_LISTED',
   budgetProposalAttachmentDeclare: 'BUDGET_ATTACHMENT.DECLARED',
   budgetProposalAttachmentList: 'BUDGET_ATTACHMENT.LISTED',
   budgetProposalGet: 'BUDGET_PROPOSAL.FETCHED',
-  budgetProposalLineList: 'BUDGET_PROPOSAL.LINES_LISTED',
   budgetProposalList: 'BUDGET_PROPOSAL.LISTED',
   budgetProposalResubmit: 'BUDGET_PROPOSAL.RESUBMITTED',
   budgetProposalReturn: 'BUDGET_PROPOSAL.RETURNED',
@@ -130,16 +146,15 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   budgetVersionDecide: 'BUDGET_VERSION.DECIDED',
   budgetVersionGet: 'BUDGET_VERSION.FETCHED',
   budgetVersionHistoryList: 'BUDGET_VERSION.HISTORY_LISTED',
-  budgetVersionImport: 'BUDGET_VERSION.LINES_IMPORTED',
-  budgetVersionLineAdd: 'BUDGET_VERSION.LINES_ADDED',
-  budgetVersionLineList: 'BUDGET_VERSION.LINES_LISTED',
-  budgetVersionLineUpdate: 'BUDGET_VERSION.LINE_CHANGED',
   budgetVersionList: 'BUDGET_VERSION.LISTED',
   budgetVersionSend: 'BUDGET_VERSION.SENT',
   budgetVersionUpdate: 'BUDGET_VERSION.UPDATED',
-  businessOwnerWarningList: 'BUSINESS_OWNER_WARNING.LISTED',
   contractCreate: 'CONTRACT.CREATED',
   contractGet: 'CONTRACT.FETCHED',
+  contractList: 'CONTRACT.LISTED',
+  contractSubscriptionLink: 'CONTRACT.SUBSCRIPTION_LINKED',
+  contractSubscriptionUnlink: 'CONTRACT.SUBSCRIPTION_UNLINKED',
+  contractUpdate: 'CONTRACT.UPDATED',
   controlledWaitList: 'CONTROLLED_WAIT.LISTED',
   costCenterCreate: 'COST_CENTER.CREATED',
   costCenterDeactivate: 'COST_CENTER.DEACTIVATED',
@@ -147,9 +162,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   costCenterList: 'COST_CENTER.LISTED',
   costCenterRename: 'COST_CENTER.RENAMED',
   currencyList: 'CURRENCY.LISTED',
-  departmentCreate: 'DEPARTMENT.CREATED',
-  departmentDeactivate: 'DEPARTMENT.DEACTIVATED',
-  departmentGet: 'DEPARTMENT.FETCHED',
   departmentHeadAssign: 'DEPARTMENT.HEAD_ASSIGNED',
   departmentHeadVacate: 'DEPARTMENT.HEAD_VACATED',
   departmentList: 'DEPARTMENT.LISTED',
@@ -157,18 +169,24 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   departmentMemberList: 'DEPARTMENT.MEMBERS_LISTED',
   departmentMemberOpenRequestList: 'DEPARTMENT_MEMBER.OPEN_REQUESTS_LISTED',
   departmentMemberSoftwareRightList: 'DEPARTMENT_MEMBER.SOFTWARE_RIGHTS_LISTED',
+  departmentSoftwareList: 'DEPARTMENT_SOFTWARE.LISTED',
+  departmentSoftwareListChange: 'DEPARTMENT_SOFTWARE.CHANGED',
+  departmentSoftwareProposalAccept: 'DEPARTMENT_SOFTWARE.PROPOSAL_ACCEPTED',
+  departmentSoftwareProposalCreate: 'DEPARTMENT_SOFTWARE.PROPOSED',
+  departmentSoftwareProposalList: 'DEPARTMENT_SOFTWARE.PROPOSALS_LISTED',
+  departmentSoftwareProposalReject: 'DEPARTMENT_SOFTWARE.PROPOSAL_REJECTED',
   departmentSuccessorClear: 'DEPARTMENT.SUCCESSOR_CLEARED',
   departmentSuccessorDesignate: 'DEPARTMENT.SUCCESSOR_DESIGNATED',
   departmentTechnicalMemberList: 'DEPARTMENT.TECHNICAL_MEMBERS_LISTED',
   departmentToolsInUse: 'DEPARTMENT_TOOLS.LISTED',
   departmentTransferCancel: 'DEPARTMENT_TRANSFER.CANCELLED',
+  departmentTransferItAdminHandover: 'DEPARTMENT_TRANSFER.IT_ADMIN_HANDED_OVER',
   departmentTransferChangeList: 'DEPARTMENT_TRANSFER.CHANGES_LISTED',
-  departmentTransferClose: 'DEPARTMENT_TRANSFER.CLOSED',
   departmentTransferGet: 'DEPARTMENT_TRANSFER.RETRIEVED',
   departmentTransferList: 'DEPARTMENT_TRANSFER.LISTED',
+  departmentTransferPreview: 'DEPARTMENT_TRANSFER.PREVIEWED',
   departmentTransferRecord: 'DEPARTMENT_TRANSFER.RECORDED',
   departmentTransferReschedule: 'DEPARTMENT_TRANSFER.RESCHEDULED',
-  departmentUpdate: 'DEPARTMENT.UPDATED',
   departmentWarningList: 'DEPARTMENT.WARNINGS_LISTED',
   documentAttach: 'DOCUMENT.ATTACHED',
   documentComplete: 'DOCUMENT.UPLOADED',
@@ -187,11 +205,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   employeeImportUpload: 'EMPLOYEE_IMPORT.UPLOADED',
   employeeList: 'EMPLOYEE.LISTED',
   employeeUpdateOfficialFields: 'EMPLOYEE.UPDATED',
-  exchangeRateList: 'EXCHANGE_RATE.LISTED',
-  exchangeRateRecord: 'EXCHANGE_RATE.RECORDED',
-  financeReviewComplete: 'FINANCE_REVIEW.COMPLETED',
-  financeReviewGet: 'FINANCE_REVIEW.FETCHED',
-  financeReviewList: 'FINANCE_REVIEW.LISTED',
   functionalGroupCreate: 'FUNCTIONAL_GROUP.CREATED',
   functionalGroupList: 'FUNCTIONAL_GROUP.LISTED',
   functionalGroupUpdate: 'FUNCTIONAL_GROUP.UPDATED',
@@ -199,17 +212,16 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   groupRequestCandidateList: 'GROUP_REQUEST.CANDIDATES_LISTED',
   groupRequestCheck: 'GROUP_REQUEST.CHECKED',
   groupRequestSubmit: 'GROUP_REQUEST.SUBMITTED',
-  handoverDutyConfirm: 'HANDOVER_DUTY.CONFIRMED',
-  handoverDutyGet: 'HANDOVER_DUTY.RETRIEVED',
-  handoverDutyList: 'HANDOVER_DUTY.LISTED',
   healthGetLiveness: 'HEALTH.LIVENESS_CHECKED',
   healthGetReadiness: 'HEALTH.READINESS_CHECKED',
   itAdminDashboardGet: 'DASHBOARD.IT_ADMIN_RETRIEVED',
-  licenseAssignmentChangeResponsible: 'LICENSE_ASSIGNMENT.RESPONSIBLE_CHANGED',
+  itAdminList: 'IT_ADMIN.LISTED',
   licenseAssignmentList: 'LICENSE_ASSIGNMENT.LISTED',
+  licenseAssignmentSetMachineAccount: 'LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_CHANGED',
   licenseKeyImport: 'LICENSE_KEY.IMPORTED',
   licenseKeyList: 'LICENSE_KEY.LISTED',
   licenseKeyReveal: 'LICENSE_KEY.REVEALED',
+  licenseKeyWithdraw: 'LICENSE_KEY.WITHDRAWN',
   longLeaveChangeList: 'LONG_LEAVE.CHANGES_LISTED',
   longLeaveChangeReturnDate: 'LONG_LEAVE.RETURN_DATE_CHANGED',
   longLeaveConfirmReturn: 'LONG_LEAVE.RETURNED',
@@ -218,8 +230,14 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   longLeaveStart: 'LONG_LEAVE.STARTED',
   managerDashboardGet: 'DASHBOARD.MANAGER_RETRIEVED',
   meAccessRequestList: 'ME.ACCESS_REQUESTS_LISTED',
+  departmentAccessRequestList: 'ACCESS_REQUEST_HISTORY.DEPARTMENT_LISTED',
+  accessRequestList: 'ACCESS_REQUEST_HISTORY.LISTED',
+  accessRequestEventList: 'ACCESS_REQUEST_HISTORY.EVENTS_LISTED',
+  accessRequestAuditFlagList: 'ACCESS_REQUEST_HISTORY.AUDIT_FLAGS_LISTED',
   meChangePassword: 'AUTH.PASSWORD_CHANGED',
   needDecisionList: 'NEED_DECISION.LISTED',
+  meDepartmentSoftwareList: 'ME.DEPARTMENT_SOFTWARE_LISTED',
+  meDepartmentTransferGet: 'ME.DEPARTMENT_TRANSFER_RETRIEVED',
   meDepartureNoticeGet: 'ME.DEPARTURE_NOTICE_RETRIEVED',
   meSoftwareRightList: 'ME.SOFTWARE_RIGHTS_LISTED',
   meGet: 'ME.RETRIEVED',
@@ -234,15 +252,17 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   offboardingCaseCancel: 'OFFBOARDING_CASE.CANCELLED',
   offboardingCaseChangeLastDay: 'OFFBOARDING_CASE.LAST_DAY_CHANGED',
   offboardingCaseChangeList: 'OFFBOARDING_CASE.CHANGES_LISTED',
-  offboardingCaseClose: 'OFFBOARDING_CASE.CLOSED',
   offboardingCaseGet: 'OFFBOARDING_CASE.RETRIEVED',
   offboardingCaseList: 'OFFBOARDING_CASE.LISTED',
   offboardingCaseMarkLeft: 'OFFBOARDING_CASE.LEFT',
   offboardingCaseOpenGrantTaskList: 'OFFBOARDING_CASE.OPEN_GRANT_TASKS_LISTED',
   offboardingCaseOpenRequestList: 'OFFBOARDING_CASE.OPEN_REQUESTS_LISTED',
+  offboardingCasePreview: 'OFFBOARDING_CASE.PREVIEWED',
   offboardingCaseOpenRevocations: 'OFFBOARDING_CASE.REVOCATIONS_OPENED',
   offboardingCaseRecord: 'OFFBOARDING_CASE.RECORDED',
   offboardingCaseRecordAccountLock: 'OFFBOARDING_CASE.ACCOUNT_LOCK_RECORDED',
+  offboardingCaseItAdminHandover: 'OFFBOARDING_CASE.IT_ADMIN_HANDED_OVER',
+  offboardingCaseRecordMailboxLock: 'OFFBOARDING_CASE.MAILBOX_LOCK_RECORDED',
   offboardingCaseRightList: 'OFFBOARDING_CASE.RIGHTS_LISTED',
   onboardingChecklistGet: 'ONBOARDING.CHECKLIST_FETCHED',
   operatingParameterHistory: 'PARAMETER.HISTORY_LISTED',
@@ -258,8 +278,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   planCreate: 'PLAN.CREATED',
   planGet: 'PLAN.FETCHED',
   planList: 'PLAN.LISTED',
-  planTermOpinionList: 'PLAN_TERM_OPINION.LISTED',
-  planTermOpinionRecord: 'PLAN_TERM_OPINION.RECORDED',
   planTermsGet: 'PLAN_TERMS.FETCHED',
   planTermsSet: 'PLAN_TERMS.SET',
   planUpdate: 'PLAN.UPDATED',
@@ -278,15 +296,14 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   provisioningTaskReportFailure: 'PROVISIONING_TASK.FAILED',
   provisioningTaskRetry: 'PROVISIONING_TASK.RETRY_REQUESTED',
   reportingCurrencyGet: 'REPORTING_CURRENCY.FETCHED',
-  reportingCurrencySet: 'REPORTING_CURRENCY.SET',
   requestableApplicationGet: 'REQUESTABLE_APPLICATION.FETCHED',
   requestableApplicationList: 'REQUESTABLE_APPLICATION.LISTED',
   requestablePlanGet: 'REQUESTABLE_PLAN.FETCHED',
   requestablePlanList: 'REQUESTABLE_PLAN.LISTED',
   returnRequestGet: 'RETURN_REQUEST.READ',
-  returnRequestHandoverConfirm: 'RETURN_REQUEST.HANDOVER_CONFIRMED',
   returnRequestList: 'RETURN_REQUEST.LISTED',
   returnRequestSubmit: 'RETURN_REQUEST.SUBMITTED',
+  revocationSlaGet: 'REPORT.REVOCATION_SLA_RETRIEVED',
   saasIssueAddMessage: 'SAAS_ISSUE.MESSAGE_ADDED',
   saasIssueEntryList: 'SAAS_ISSUE.ENTRIES_LISTED',
   saasIssueFormOptions: 'SAAS_ISSUE.OPTIONS_READ',
@@ -303,7 +320,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   seatBaselineImportGet: 'SEAT_BASELINE_IMPORT.FETCHED',
   seatBaselineImportRows: 'SEAT_BASELINE_IMPORT.ROWS_LISTED',
   seatBaselineImportUpload: 'SEAT_BASELINE_IMPORT.UPLOADED',
-  serviceAccountDutyList: 'SERVICE_ACCOUNT_DUTY.LISTED',
+  seatMonthChargeList: 'SEAT_MONTH_CHARGE.LISTED',
   spendApprovalDecide: 'SPEND_APPROVAL.DECIDED',
   spendApprovalGet: 'SPEND_APPROVAL.FETCHED',
   spendApprovalLineDecide: 'SPEND_APPROVAL.LINES_DECIDED',
@@ -314,29 +331,27 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   spendBatchList: 'SPEND_BATCH.LISTED',
   spendBatchSubmit: 'SPEND_BATCH.SUBMITTED',
   spendQueueList: 'SPEND_QUEUE.LISTED',
+  spendReserveConfirm: 'SPEND.RESERVE_CONFIRMED',
   stepCongestionIncidentList: 'STEP_CONGESTION.INCIDENTS_LISTED',
   stepCongestionIncidentRecord: 'STEP_CONGESTION.INCIDENT_RECORDED',
   stepCongestionList: 'STEP_CONGESTION.LISTED',
   stepCongestionStepList: 'STEP_CONGESTION.STEPS_LISTED',
+  stockSummaryList: 'STOCK_SUMMARY.LISTED',
   subscriptionComplete: 'SUBSCRIPTION.COMPLETED',
   subscriptionDeadlineEventList: 'SUBSCRIPTION_DEADLINE_EVENT.LISTED',
   subscriptionCreate: 'SUBSCRIPTION.CREATED',
   subscriptionGet: 'SUBSCRIPTION.FETCHED',
   subscriptionList: 'SUBSCRIPTION.LISTED',
-  subscriptionRenewalDecide: 'SUBSCRIPTION_RENEWAL.DECIDED',
+  subscriptionRenewalAdjustmentGet: 'SUBSCRIPTION_RENEWAL.ADJUSTMENT_FOUND',
   subscriptionRenewalGet: 'SUBSCRIPTION_RENEWAL.FOUND',
   subscriptionRenewalList: 'SUBSCRIPTION_RENEWAL.LISTED',
-  subscriptionRenewalPropose: 'SUBSCRIPTION_RENEWAL.PROPOSED',
+  subscriptionRenewalPropose: 'SUBSCRIPTION_RENEWAL.OUTCOME_RECORDED',
   subscriptionRenewalRecordOutcome: 'SUBSCRIPTION_RENEWAL.OUTCOME_RECORDED',
   subscriptionRenewalSeatRanking: 'SUBSCRIPTION_RENEWAL.SEATS_RANKED',
   subscriptionSeatUsage: 'SUBSCRIPTION_SEAT_USAGE.FETCHED',
   subscriptionUpdate: 'SUBSCRIPTION.UPDATED',
   superAdminDashboardGet: 'DASHBOARD.SUPER_ADMIN_RETRIEVED',
   superAdminWatchGet: 'SUPER_ADMIN_WATCH.RETRIEVED',
-  transferReviewDecide: 'TRANSFER_REVIEW.DECIDED',
-  transferReviewGet: 'TRANSFER_REVIEW.RETRIEVED',
-  transferReviewItemList: 'TRANSFER_REVIEW.ITEMS_LISTED',
-  transferReviewList: 'TRANSFER_REVIEW.LISTED',
   vendorGroupCreate: 'VENDOR_DICTIONARY.GROUP_CREATED',
   vendorGroupList: 'VENDOR_DICTIONARY.GROUPS_LISTED',
   vendorGroupUpdate: 'VENDOR_DICTIONARY.GROUP_UPDATED',
@@ -352,13 +367,11 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   vendorTaxProfileHistory: 'VENDOR_TAX_PROFILE.HISTORY_LISTED',
   vendorTaxProfileSet: 'VENDOR_TAX_PROFILE.DECLARED',
 };
-
 export const BODYLESS_RESPONSES: Readonly<Record<string, string>> = {
   'authLogout 204': 'Signed out: 204 No Content has no body (@RawResponse).',
+  'importTemplateGet 200': 'A file (xlsx or csv) sent as raw bytes with its own content type (@RawResponse).',
 };
-
 export const NO_EXAMPLE_RESPONSES: Readonly<Record<string, string>> = {};
-
 /**
  * The route-specific codes, in one file per owning module to keep each support file small (TEST-HARDEN.1); a module whose
  * routes do not fit one file has a second named by its area. An operationId listed twice is a mistake the inventory test reports.
@@ -369,15 +382,16 @@ const PARTS = [
   ROUTE_ERROR_CODES_CATALOG,
   ROUTE_ERROR_CODES_DATA_IMPORT,
   ROUTE_ERROR_CODES_DEVICES,
-  ROUTE_ERROR_CODES_FINANCE,
   ROUTE_ERROR_CODES_HEALTH,
   ROUTE_ERROR_CODES_IDENTITY_ACCESS,
   ROUTE_ERROR_CODES_LICENSING,
   ROUTE_ERROR_CODES_OPERATING_PARAMETERS,
   ROUTE_ERROR_CODES_ORGANIZATION,
+  ROUTE_ERROR_CODES_OPTIMIZATION,
   ROUTE_ERROR_CODES_PERSONNEL,
   ROUTE_ERROR_CODES_REQUESTS,
   ROUTE_ERROR_CODES_REQUESTS_SPEND,
+  ROUTE_ERROR_CODES_USAGE,
 ];
 export const ROUTE_ERROR_CODE_PARTS: readonly string[][] = PARTS.map((part) => Object.keys(part));
 export const ROUTE_ERROR_CODES: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> =

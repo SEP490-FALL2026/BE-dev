@@ -73,11 +73,43 @@ export class OrganizationReadApi {
     return this.departments.headedDepartment(employeeId, onDate ?? (await this.businessToday()));
   }
 
+  /** Every Unit Cost Center each of these departments ever had, in use or retired, by department id. */
+  getUnitCostCenterHistory(departmentIds: readonly string[], tx?: DbTx): Promise<Map<string, string[]>> {
+    return this.departments.unitCostCenterHistory(departmentIds, tx);
+  }
+
+  /** The Cost Center in use each of these departments is charged to, by department id (a department with none is absent). */
+  getUnitCostCenterIds(departmentIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    return this.departments.unitCostCenterIds(departmentIds, tx);
+  }
+
+  /** Whether somebody is named to head the department from a day after `today`: a successor, or the head of a department that starts later. */
+  hasHeadStartingAfter(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<boolean> {
+    return this.departments.hasHeadStartingAfter(departmentId, today, tx);
+  }
+
+  /** Who is to head a department that is not yet in effect, from the day it takes effect; null when nobody or when it is in effect (`QĐ-106k`). */
+  getUpcomingHeadOf(departmentId: string, today: BusinessDate, tx?: DbTx): Promise<string | null> {
+    return this.departments.upcomingHeadOf(departmentId, today, tx);
+  }
+
+  /**
+   * The departments not yet in effect that the employee is to head from the day they take effect, each with the day and the Cost Center
+   * in use when there is one: the head of a department made for next year works for it before it starts (`QĐ-106k`).
+   */
+  getUpcomingHeadedUnits(employeeId: string, today: BusinessDate, tx?: DbTx) {
+    return this.departments.upcomingHeadedUnits(employeeId, today, tx);
+  }
+
   /**
    * The periods in which the employee heads a department that have not ended on `onDate` (default today in the organization's
    * calendar), oldest first, each with the code of its department and `CURRENT` or `UPCOMING`. Empty when there is none. `tx` reads
    * in the caller's transaction (the revoke of `MANAGER` and the grant of `SPENDING_APPROVER` give the periods in their refusal).
    */
+  nextHeadPeriodOf(departmentId: string, after: BusinessDate, tx?: DbTx) {
+    return this.departments.nextHeadPeriodOf(departmentId, after, tx);
+  }
+
   async headPeriodsFrom(employeeId: string, onDate?: BusinessDate, tx?: DbTx): Promise<EmployeeHeadPeriod[]> {
     const day = onDate ?? (await this.businessToday(new Date(), tx));
     const periods = await this.departments.headPeriodsOf(employeeId, day, tx);
@@ -118,6 +150,15 @@ export class OrganizationReadApi {
     return this.employees.placementOn(employeeId, onDate ?? (await this.businessToday(new Date(), tx)), tx);
   }
 
+  /** The department of the employee's latest placement begun by `onDate`, ended or not: where a person who left last worked; null when they had none. */
+  async getLastPlacement(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ departmentId: string } | null> {
+    return this.employees.lastPlacementBy(employeeId, onDate, tx);
+  }
+
   /** The department of the employee on `onDate` and its IT Admin, named only while still working (`US-01-11` AC-4, AC-8). */
   async getItAdminInCharge(employeeId: string, onDate?: BusinessDate, tx?: DbTx): Promise<ItAdminInCharge | null> {
     const placement = await this.getEmployeePlacement(employeeId, onDate, tx);
@@ -148,6 +189,21 @@ export class OrganizationReadApi {
   /** Everyone placed in the department on `onDate` (default today), by employee id; null when it does not exist. */
   async getDepartmentMemberIds(departmentId: string, onDate?: BusinessDate, tx?: DbTx): Promise<string[] | null> {
     return this.departments.memberIdsOn(departmentId, onDate ?? (await this.businessToday(new Date(), tx)), tx);
+  }
+
+  /**
+   * Everyone placed in any of these departments on `onDate` (default today), each employee once, in one statement whatever the number of
+   * departments: what a reader of many departments needs instead of `getDepartmentMemberIds` for each. A department that does not exist
+   * adds nobody (where `getDepartmentMemberIds` answers null for it).
+   */
+  async getMemberIdsOfDepartments(
+    departmentIds: readonly string[],
+    onDate?: BusinessDate,
+    tx?: DbTx,
+  ): Promise<string[]> {
+    if (departmentIds.length === 0) return [];
+
+    return this.departments.memberIdsOfMany(departmentIds, onDate ?? (await this.businessToday(new Date(), tx)), tx);
   }
 
   /** Who heads each of these departments on `onDate`; a department nobody heads is absent. */
@@ -208,6 +264,14 @@ export class OrganizationReadApi {
     return this.employees.findManyByCodes(employeeCodes, tx);
   }
 
+  /**
+   * The people whose normalized work email is one of these, those who have left included (a vendor report still names them): only the code and
+   * the email, never the name (`US-08-04` AC-4). An email nobody has is simply absent.
+   */
+  getEmployeesByWorkEmails(normalizedEmails: readonly string[], tx?: DbTx) {
+    return this.employees.findManyByNormalizedEmails(normalizedEmails, tx);
+  }
+
   /** The domains of the work emails of its people: all the organization can tell of its domains (`OQ-A-22`). */
   getCompanyEmailDomains(tx?: DbTx): Promise<string[]> {
     return this.employees.workEmailDomains(tx);
@@ -226,6 +290,14 @@ export class OrganizationReadApi {
     excludeEmployeeIds: readonly string[] = [],
   ): Promise<EmployeeCandidate[]> {
     return this.employees.searchActive(search, onDate, limit, excludeEmployeeIds);
+  }
+
+  /** One page of the employees among `employeeIds` (code and name), by code, matched on code or name, with the total (one snapshot). */
+  getEmployeePageAmong(
+    employeeIds: readonly string[],
+    query: { search?: string | undefined; skip: number; take: number },
+  ): Promise<{ items: { id: string; employeeCode: string; fullName: string }[]; total: number }> {
+    return this.employees.pageAmong(employeeIds, query.search, query.skip, query.take);
   }
 
   getEmployeeProfile(employeeId: string, onDate: Date): Promise<EmployeeProfile | null> {
@@ -269,6 +341,14 @@ export class OrganizationReadApi {
   /** The notices a created or corrected employee record owes, to write with `NotificationsApi.notifyInApp` in the same transaction. */
   getProfileNotices(tx: DbTx, request: ProfileNoticeRequest): Promise<ProfileNotice[]> {
     return this.employees.profileNotices(tx, request);
+  }
+
+  /**
+   * The ids of the departments that are not stopped and take effect by the end of `year`, by id; `tx` reads in the caller's
+   * transaction (the budget cycle of that year divides among them).
+   */
+  getActiveDepartmentIds(year: number, tx?: DbTx): Promise<string[]> {
+    return this.departments.activeIds(year, tx);
   }
 
   /** The numbers and gaps of the onboarding checklist (US-02-04 AC-1, AC-6); with `tx`, in order in that transaction. */

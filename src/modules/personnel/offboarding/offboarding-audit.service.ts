@@ -31,6 +31,20 @@ export class OffboardingAuditService {
     );
   }
 
+  /** A change the system made on its own account (the lock of the mailbox written by the last K1 revocation, the closing of the case). */
+  async systemChanged(
+    tx: DbTx,
+    record: Pick<OffboardingRecord, 'id' | 'organizationId'>,
+    action: string,
+    before: Snapshot,
+    after: Snapshot,
+  ): Promise<void> {
+    await this.audit.record(
+      tx,
+      personnelSystemAuditEvent(record.organizationId, action, 'OffboardingCase', record.id, record.id, before, after),
+    );
+  }
+
   /** The person was told a departure was recorded about them (the call point of the notification channel of `g4-notification-delivery`). */
   async employeeInformed(tx: DbTx, actor: PersonnelActor, record: OffboardingRecord): Promise<void> {
     await this.audit.record(

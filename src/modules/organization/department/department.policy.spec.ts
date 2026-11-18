@@ -1,6 +1,8 @@
-import { DepartmentForbiddenError } from './department.errors';
+import { DepartmentForbiddenError, DepartmentItAdminLimitReachedError } from './department.errors';
 import {
+  IT_ADMIN_DEPARTMENT_LIMIT,
   ItAdminScopeFacts,
+  assertItAdminHasRoom,
   assertMayChangeOrganization,
   departmentListScope,
   departmentReadVerdict,
@@ -144,6 +146,20 @@ describe('department.policy (who may do what with departments, F13, QĐ-87a, QĐ
       expect(successorProblem({ ...facts, effectiveFrom: '2026-10-01', currentHeadEmployeeId: null })).toBe(
         'SUCCESSOR_DATE_NOT_FUTURE',
       );
+    });
+  });
+
+  describe('assertItAdminHasRoom (QĐ-110l: one IT Admin answers for at most four departments)', () => {
+    it('keeps the limit at four', () => {
+      expect(IT_ADMIN_DEPARTMENT_LIMIT).toBe(4);
+    });
+
+    it.each([[0], [1], [3]])('lets an IT Admin in charge of %i departments take one more', (inCharge) => {
+      expect(() => assertItAdminHasRoom(inCharge)).not.toThrow();
+    });
+
+    it.each([[4], [5], [9]])('refuses the department after an IT Admin already answers for %i', (inCharge) => {
+      expect(() => assertItAdminHasRoom(inCharge)).toThrow(DepartmentItAdminLimitReachedError);
     });
   });
 });

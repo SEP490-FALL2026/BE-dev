@@ -112,9 +112,11 @@ export class ReturnRequestQueryService {
         requestedBy: person(row.requestedByEmployeeId),
         department: { id: department.id, code: department.code, name: department.name },
         requestedOn: row.requestedOn,
+        // No handover is asked of anyone (`QĐ-110g`), not even on a return an older release wrote as required: only what was
+        // confirmed or flagged then is told, as history.
         handover: {
-          required: row.handoverRequired,
-          dueOn: row.handoverDueOn,
+          required: false,
+          dueOn: null,
           confirmed: row.handoverConfirmedAt !== null,
           flagged: row.handoverFlagged,
         },

@@ -19,6 +19,7 @@ import {
   SubscriptionResponseDto,
   UpdateSubscriptionBodyDto,
 } from './subscription.dto';
+import { withoutVendorAdminDetail } from './pool/subscription-pool.policy';
 import { SUBSCRIPTION_ERROR_EXAMPLES, toSubscriptionApiException } from './subscription.http-errors';
 import { SubscriptionChangeService } from './subscription-change.service';
 import { SubscriptionService } from './subscription.service';
@@ -41,20 +42,29 @@ const NOT_FOUND = {
   examples: [SUBSCRIPTION_ERROR_EXAMPLES.NOT_FOUND],
 } as const;
 const INVALID_UPDATE_NOTE =
-  ' An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested).';
+  ' An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.';
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
-    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.',
+    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), K4_PERPETUAL_ONLY (a K4 plan is bought once: only a perpetual purchase is written for it), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, while its workspace profile names fewer than two different IT Admins; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price).',
   examples: [
     VALIDATION_EXAMPLE,
     SUBSCRIPTION_ERROR_EXAMPLES.PLAN_NOT_FOUND,
-    SUBSCRIPTION_ERROR_EXAMPLES.OWNER_DEPARTMENT_INACTIVE,
     SUBSCRIPTION_ERROR_EXAMPLES.APPLICATION_RETIRED,
     SUBSCRIPTION_ERROR_EXAMPLES.PLAN_HAS_NO_SUBSCRIPTION,
     SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_NEEDS_LICENSED_APPLICATION,
     SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_HAS_NO_TERM,
     SUBSCRIPTION_ERROR_EXAMPLES.DATES_INVALID,
+    SUBSCRIPTION_ERROR_EXAMPLES.COMMITMENT_TERM_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.COMMITMENT_TERM_NOT_ALLOWED,
+    SUBSCRIPTION_ERROR_EXAMPLES.K1_MONTHLY_ONLY,
+    SUBSCRIPTION_ERROR_EXAMPLES.K4_PERPETUAL_ONLY,
+    SUBSCRIPTION_ERROR_EXAMPLES.BILLING_LONGER_THAN_COMMITMENT,
+    SUBSCRIPTION_ERROR_EXAMPLES.BILLING_CYCLE_UNSUPPORTED,
+    SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.VENDOR_ADMINS_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_NOT_IT_ADMIN,
+    SUBSCRIPTION_ERROR_EXAMPLES.PRICE_NOT_VND,
     SUBSCRIPTION_ERROR_EXAMPLES.MONEY_SCALE_EXCEEDED,
     SUBSCRIPTION_ERROR_EXAMPLES.MONEY_OUT_OF_RANGE,
     SUBSCRIPTION_ERROR_EXAMPLES.CURRENCY_NOT_SUPPORTED,
@@ -70,28 +80,36 @@ const INVALID_UPDATE = {
     SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_HAS_NO_TERM,
     SUBSCRIPTION_ERROR_EXAMPLES.DATES_INVALID,
     SUBSCRIPTION_ERROR_EXAMPLES.STILL_DRAFT,
+    SUBSCRIPTION_ERROR_EXAMPLES.COMMITMENT_TERM_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.COMMITMENT_TERM_NOT_ALLOWED,
+    SUBSCRIPTION_ERROR_EXAMPLES.K1_MONTHLY_ONLY,
+    SUBSCRIPTION_ERROR_EXAMPLES.K4_PERPETUAL_ONLY,
+    SUBSCRIPTION_ERROR_EXAMPLES.BILLING_LONGER_THAN_COMMITMENT,
+    SUBSCRIPTION_ERROR_EXAMPLES.BILLING_CYCLE_UNSUPPORTED,
+    SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.VENDOR_ADMINS_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_NOT_IT_ADMIN,
+    SUBSCRIPTION_ERROR_EXAMPLES.PRIMARY_NOT_ELIGIBLE,
+    SUBSCRIPTION_ERROR_EXAMPLES.PRICE_NOT_VND,
     SUBSCRIPTION_ERROR_EXAMPLES.MONEY_SCALE_EXCEEDED,
     SUBSCRIPTION_ERROR_EXAMPLES.MONEY_OUT_OF_RANGE,
     SUBSCRIPTION_ERROR_EXAMPLES.CURRENCY_NOT_SUPPORTED,
   ],
 } as const;
-/** Only where a unit price is converted (`FinanceApi.snapshotMoney`); the database key of `DB-02` normally rules it out. */
-const REPORTING_CURRENCY_CONFLICT = {
+/** Declaring or completing a subscription of a K2 or K4 plan that already has a live one, once the seat baseline is closed (R-E02, `QĐ-104k`(3)). */
+const DUPLICATE_PLAN_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
-    'A unit price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency). A fault of the configuration, not of the request: the database normally prevents it, and an operator has to correct the currency table.',
-  examples: [SUBSCRIPTION_ERROR_EXAMPLES.REPORTING_CURRENCY_NOT_SUPPORTED],
+    'The plan is a K2 or K4 plan, another subscription of it is live (a draft, or active and not continued by a later period, not ended) and the seat baseline is closed: add seats to that one or renew it instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). While the baseline is open the write is accepted and the answer says SHOULD_MERGE in warnings.',
+  examples: [SUBSCRIPTION_ERROR_EXAMPLES.DUPLICATE_PLAN],
 } as const;
 
-/** The update is the one route whose conflict is not only the configuration: a change that owes more needs a Cost Center. */
+/** The update is the one route whose conflict is not only the configuration: the loser of a race on the primary flag, or a stale edit. */
 const UPDATE_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
-    'The department that owns the subscription has no Cost Center in use yet and the change creates, raises or extends what is owed: a higher quantity, a later end or renewal date (or one where there was none), auto renewal switched on or a higher unit price (FINANCE.SETUP_INCOMPLETE, nothing is written). A price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency): a fault of the configuration, not of the request.',
-  examples: [
-    SUBSCRIPTION_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
-    SUBSCRIPTION_ERROR_EXAMPLES.REPORTING_CURRENCY_NOT_SUPPORTED,
-  ],
+    'The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire. When expectedUpdatedAt is sent and the subscription was changed since (by another edit, or by a seat bought for a grant), nothing is written (SUBSCRIPTION.STALE, details.currentUpdatedAt): read it again and redo the edit.',
+  examples: [SUBSCRIPTION_ERROR_EXAMPLES.PRIMARY_CONFLICT, SUBSCRIPTION_ERROR_EXAMPLES.STALE],
 } as const;
 
 const toWire = (view: SubscriptionView) => ({
@@ -99,6 +117,10 @@ const toWire = (view: SubscriptionView) => ({
   createdAt: view.createdAt.toISOString(),
   updatedAt: view.updatedAt.toISOString(),
 });
+
+/** What the caller reads: the vendor admins, the email and the note are the IT Admin's (SPEC P19); Finance reads the rest and the flags. */
+const toWireFor = (actor: AuthenticatedPrincipal, view: SubscriptionView) =>
+  toWire(actor.roles.includes('IT_ADMIN') ? view : withoutVendorAdminDetail(view));
 
 /**
  * The subscriptions and perpetual purchases of the plans (`US-04-03`, `US-04-05`). The IT Admin declares and changes
@@ -120,19 +142,19 @@ export class SubscriptionsController {
   @ApiSuccessResponse(SubscriptionPageResponseDto, {
     message: 'SUBSCRIPTION.LISTED',
     description:
-      'A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from.',
+      'A page of subscriptions by application, plan and creation, optionally filtered (planId finds the subscription to grant a seat from or to edit, as a plan has one subscription; a subscription has no owning department); warning=NO_ALERT_ANCHOR lists those with no date to alert from, mine=true those the caller answers for, expiry=SOON or EXPIRED those from the point of adjustment to the last day of their period, or past it (a plan by the month opens 7 days before its next payment day, a plan by the year 30 days before the deadline to cancel; a purchase made once never). Each row says the days left to the deadline, the seats of a shared pool (K2), who answers for it and the logo of the application. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
     examples: [VALIDATION_EXAMPLE],
   })
-  async list(@Query() query: ListSubscriptionsQueryDto) {
+  async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListSubscriptionsQueryDto) {
     try {
-      const page = await this.subscriptions.list(query);
+      const page = await this.subscriptions.list(query, actor.employeeId);
       const emptyState = page.items.length === 0 ? await this.subscriptions.emptyState() : null;
 
-      return { items: page.items.map(toWire), pagination: page.pagination, emptyState };
+      return { items: page.items.map((item) => toWireFor(actor, item)), pagination: page.pagination, emptyState };
     } catch (error) {
       throw toSubscriptionApiException(error);
     }
@@ -145,9 +167,9 @@ export class SubscriptionsController {
     status: HttpStatus.CREATED,
     message: 'SUBSCRIPTION.CREATED',
     description:
-      'The subscription is stored: a draft while its data is incomplete, with what is missing; the unit price keeps the conversion at the rate of the day it was recorded.',
+      'The subscription is stored: it has no owning department and a plan has one subscription; a K1 subscription is the shared record of the personal purchases of the plan, and each grant adds one seat to it. It is a draft while its data is incomplete, with what is missing; the unit price is in dong, and the price in the currency of the vendor is kept beside it when given.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, REPORTING_CURRENCY_CONFLICT)
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, DUPLICATE_PLAN_CONFLICT)
   async declare(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DeclareSubscriptionBodyDto) {
     try {
       return toWire(await this.subscriptions.declare(actor, body));
@@ -162,16 +184,16 @@ export class SubscriptionsController {
   @ApiSuccessResponse(SubscriptionResponseDto, {
     message: 'SUBSCRIPTION.FETCHED',
     description:
-      'The subscription with its derived notice deadline and source, alert dates, warning, tax profile and tax estimate.',
+      'The subscription with its derived notice deadline and source, alert dates, warning, tax profile and tax estimate. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is not a UUID (VALIDATION_ERROR).',
     examples: [VALIDATION_EXAMPLE],
   })
-  async get(@Param() params: SubscriptionIdParamDto) {
+  async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: SubscriptionIdParamDto) {
     try {
-      return toWire(await this.subscriptions.get(params.id));
+      return toWireFor(actor, await this.subscriptions.get(params.id));
     } catch (error) {
       throw toSubscriptionApiException(error);
     }
@@ -183,7 +205,7 @@ export class SubscriptionsController {
   @ApiSuccessResponse(SubscriptionResponseDto, {
     message: 'SUBSCRIPTION.UPDATED',
     description:
-      'The subscription as it is after the change; a new unit price is converted again at the rate of today; a change of nothing is answered the same and not audited. The plan, the kind and the owner department cannot change.',
+      'The subscription as it is after the change; a new unit price is in dong and nothing is converted; a change of nothing is answered the same and not audited. The plan and the kind cannot change.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_UPDATE, NOT_FOUND, UPDATE_CONFLICT)
   async update(
@@ -192,7 +214,10 @@ export class SubscriptionsController {
     @Body() body: UpdateSubscriptionBodyDto,
   ) {
     try {
-      return toWire(await this.changes.update(actor, params.id, body));
+      const { expectedUpdatedAt, ...change } = body;
+      const expected = expectedUpdatedAt === undefined ? undefined : new Date(expectedUpdatedAt);
+
+      return toWire(await this.changes.update(actor, params.id, change, expected));
     } catch (error) {
       throw toSubscriptionApiException(error);
     }
@@ -204,15 +229,20 @@ export class SubscriptionsController {
   @ApiSuccessResponse(SubscriptionResponseDto, {
     message: 'SUBSCRIPTION.COMPLETED',
     description:
-      'The draft becomes active once its data is whole; a price with no rate for its day is converted at the rate entered for that day. An active subscription is answered unchanged.',
+      'The draft becomes active once its data is whole; its unit price is in dong and nothing is converted. An active subscription is answered unchanged.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, REPORTING_CURRENCY_CONFLICT, {
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, DUPLICATE_PLAN_CONFLICT, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or the rate of its price day (SUBSCRIPTION.STILL_DRAFT, details.missing).',
+      'The id is invalid (VALIDATION_ERROR) or the subscription still lacks data (SUBSCRIPTION.STILL_DRAFT, details.missing; a price an earlier release left in another currency counts as missing until it is entered again in dong), or the shared-pool rules refuse it: COMMITMENT_TERM_REQUIRED, K1_MONTHLY_ONLY, K4_PERPETUAL_ONLY, RESPONSIBLE_REQUIRED, RESPONSIBLE_NOT_IT_ADMIN, VENDOR_ADMINS_REQUIRED.',
     examples: [
       VALIDATION_EXAMPLE,
       SUBSCRIPTION_ERROR_EXAMPLES.STILL_DRAFT,
+      SUBSCRIPTION_ERROR_EXAMPLES.COMMITMENT_TERM_REQUIRED,
+      SUBSCRIPTION_ERROR_EXAMPLES.K1_MONTHLY_ONLY,
+      SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_REQUIRED,
+      SUBSCRIPTION_ERROR_EXAMPLES.VENDOR_ADMINS_REQUIRED,
+      SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_NOT_IT_ADMIN,
       SUBSCRIPTION_ERROR_EXAMPLES.MONEY_OUT_OF_RANGE,
     ],
   })

@@ -24,9 +24,14 @@ export interface DepartmentRecord {
   /** The Cost Center Finance created for the department and that is in use; null while it has none (`QĐ-87d(1)`). */
   costCenter: { id: string; code: string; name: string; status: CostCenterStatus } | null;
   itAdmin: { employeeId: string; employeeCode: string; fullName: string; employeeStatus: EmployeeStatus } | null;
+  /** The day the department takes effect (`QĐ-104e(3)`): nobody is placed in it, and no head starts, before. */
+  effectiveFrom: BusinessDate;
   createdAt: Date;
   updatedAt: Date;
   deactivatedAt: Date | null;
+  /** The picture of the department in the storage (`QĐ-113c`); never put on the wire, only the signed link is. */
+  avatarObjectKey: string | null;
+  avatarContentType: string | null;
 }
 
 /** Who heads a department on a day, and since when. */
@@ -52,6 +57,8 @@ export interface DepartmentView extends DepartmentRecord {
   warnings: DepartmentWarning[];
   /** Whether the IT Admin named still holds the role on a usable account. Meaningful only when `itAdmin` is set. */
   itAdminUsable: boolean;
+  /** A signed link to the picture, good for 15 minutes; null when the department has none (`QĐ-113c`). */
+  avatarUrl: string | null;
 }
 
 export interface DepartmentProfileView extends DepartmentView {

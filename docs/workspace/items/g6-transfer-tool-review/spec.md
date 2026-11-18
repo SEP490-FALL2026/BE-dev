@@ -14,7 +14,7 @@ Khi một điều chuyển đổi phòng có hiệu lực, hệ thống so quy�
 ## Sizing decision
 
 - Container: G6 (nhóm giao việc, không phải ranh giới hạng mục).
-- Mode: `grouped-stories`.
+- Mode: `single-story`.
 - Outcome and owner: phiên rà soát công cụ ngoài bộ chuẩn của trưởng phòng mới và nguồn thu hồi _sau điều chuyển_; capability `personnel/transfer-review`.
 - Boundaries: một transaction mỗi lệnh trên `transfer_reviews`, `transfer_review_items` và (khi _không còn cần_) tác vụ thu hồi qua cổng của `licensing`; chỉ trưởng phòng hiệu lực của phòng nhận quyết; IT Admin chỉ đọc; không đổi giai đoạn hay Assignment.
 - Not larger: ghi điều chuyển, người chịu trách nhiệm tài khoản dịch vụ, xác nhận bàn giao dữ liệu và thực thi thu hồi đã có hạng mục riêng; hạng mục này chỉ mở phiên khi nhận sự kiện và ghi quyết định.
@@ -24,10 +24,11 @@ Khi một điều chuyển đổi phòng có hiệu lực, hệ thống so quy�
 
 ## Primary Story/AC
 
-| Story    | AC                     | Coverage | Phần còn lại thuộc                                                                                                                                                                                         |
-| -------- | ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-03-07 | AC-1→AC-9, AC-11→AC-15 | partial  | AC-10: `g3-downstream-finance-integration`; vế chi phí tính vào Cost Center của phòng nhận ở AC-3: `g6-downstream-integration`                                                                             |
-| US-07-05 | AC-9                   | partial  | AC-1→AC-5, AC-8, AC-11, AC-12, AC-15, AC-17→AC-19: `g6-revocation-by-grant-kind`; AC-13, AC-16: `g6-handover-confirmation`; AC-6, AC-7: `g4-device-dependent-features`; AC-10: `g6-downstream-integration` |
+| Story    | AC   | Coverage | Phần còn lại thuộc                                                                                                                                                                                         |
+| -------- | ---- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-07-05 | AC-9 | partial  | AC-1→AC-5, AC-8, AC-11, AC-12, AC-15, AC-17→AC-19: `g6-revocation-by-grant-kind`; AC-13, AC-16: `g6-handover-confirmation`; AC-6, AC-7: `g4-device-dependent-features`; AC-10: `g6-downstream-integration` |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-03-07` AC-1→AC-9, AC-11→AC-15 (partial) — Story `RETIRED` ở Docs `5bb2e6a` (`US-03-07` `QĐ-103h`); code đã merge là lịch sử, khóa ở scope map là `not affected`. Còn một Story nên `Mode` đổi `single-story`.
 
 ## Supporting references
 

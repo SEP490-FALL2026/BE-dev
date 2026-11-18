@@ -230,7 +230,7 @@ describe('what an IT Admin decides about a failed task, over HTTP (integration, 
     const full = await h
       .grant({ requestId: h.gate.grantable(e5, planId), subscriptionId: made.subscriptionId })
       .expect(409);
-    expect(second.status).toBe('QUEUED');
+    expect(second.status).toBe('IN_PROGRESS');
     expect(h.codeOf(full)).toBe('LICENSE_ASSIGNMENT.SEAT_CAPACITY');
   });
 

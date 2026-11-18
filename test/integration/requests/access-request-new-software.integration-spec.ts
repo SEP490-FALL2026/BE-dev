@@ -102,7 +102,8 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       ['no purpose', { purpose: undefined }],
       ['a homepage that is not a web address', { homepageUrl: 'miro.com' }],
       ['nobody to use it', { expectedUsers: 0 }],
-      ['no term', { termMonths: undefined }],
+      ['an end date, which is not asked any more', { expectedEndDate: '2027-03-31' }],
+      ['months that are not a whole number', { termMonths: 2.5 }],
       ['a Cost Center chosen by hand', { costCenterId: '00000000-0000-4000-8000-000000000001' }],
       ['an amount given by hand', { amount: { amount: '1', currency: 'USD' } }],
     ])('is not sent with %s, and nothing is written', async (_name, over) => {
@@ -114,10 +115,11 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       expect(await h.requestRows()).toBe(before);
     });
 
-    it('is given to the person the routing table names, as for any request', async () => {
+    it('BR-MF1-02 sends a head own proposal directly to IT assessment without a need assignee', async () => {
       const proposed = await h.proposed(head);
 
-      expect(proposed.needStep.assignee?.employeeId).toBe(boss.employeeId);
+      expect(proposed.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
+      expect(proposed.state).toBe('AWAITING_IT_ASSESSMENT');
     });
 
     it('takes no day the money is expected to go out: the person does not know it, and the budget year is worked out from today', async () => {
@@ -278,19 +280,36 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       ['an unknown field', { price: 3 }, 'VALIDATION_ERROR'],
       [
         'a negative price',
-        { quote: { unitPrice: { amount: '-1', currency: 'USD' }, billingCycle: 'MONTHLY', validFrom: '2026-01-01' } },
+        { quote: { unitPrice: { amount: '-1', currency: 'VND' }, billingCycle: 'MONTHLY', validFrom: '2026-01-01' } },
         'MONEY_OUT_OF_RANGE',
       ],
       [
-        'a currency that does not exist',
+        'a quote in another currency',
+        { quote: { unitPrice: { amount: '8.00', currency: 'USD' }, billingCycle: 'MONTHLY', validFrom: '2026-01-01' } },
+        'ASSESSMENT.QUOTE_PRICE_NOT_VND',
+      ],
+      [
+        'a quote in a currency that does not exist',
         { quote: { unitPrice: { amount: '1', currency: 'ZZZ' }, billingCycle: 'MONTHLY', validFrom: '2026-01-01' } },
+        'ASSESSMENT.QUOTE_PRICE_NOT_VND',
+      ],
+      [
+        'an original price in a currency that does not exist',
+        {
+          quote: {
+            unitPrice: { amount: '1', currency: 'VND' },
+            originalPrice: { amount: '1', currency: 'ZZZ' },
+            billingCycle: 'MONTHLY',
+            validFrom: '2026-01-01',
+          },
+        },
         'CURRENCY_NOT_SUPPORTED',
       ],
       [
         'a quote that ends before it begins',
         {
           quote: {
-            unitPrice: { amount: '1', currency: 'USD' },
+            unitPrice: { amount: '1', currency: 'VND' },
             billingCycle: 'MONTHLY',
             validFrom: '2026-02-01',
             validUntil: '2026-01-01',
@@ -300,7 +319,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       ],
       [
         'a billing cycle with no name for it',
-        { quote: { unitPrice: { amount: '1', currency: 'USD' }, billingCycle: 'OTHER', validFrom: '2026-01-01' } },
+        { quote: { unitPrice: { amount: '1', currency: 'VND' }, billingCycle: 'OTHER', validFrom: '2026-01-01' } },
         'VALIDATION_ERROR',
       ],
     ])('refuses %s', async (_name, body, code) => {
@@ -312,7 +331,6 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
     it.each([
       ['vendorId', { vendorId: '00000000-0000-4000-8000-000000000000' }],
       ['equivalentPlanId', { equivalentPlanId: '00000000-0000-4000-8000-000000000000' }],
-      ['proposedBusinessOwnerEmployeeId', { proposedBusinessOwnerEmployeeId: '00000000-0000-4000-8000-000000000000' }],
     ])('refuses a %s that does not exist', async (field, body) => {
       const proposed = await awaiting();
 
@@ -320,6 +338,33 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
 
       expect(h.codeOf(response)).toBe('ASSESSMENT.REFERENCE_NOT_FOUND');
       expect(h.detailsOf(response)).toEqual({ field });
+    });
+
+    it('R-44: keeps the price the vendor quoted in another currency beside the quote in dong, and answers it back', async () => {
+      const proposed = await awaiting();
+      const quote = {
+        unitPrice: { amount: '203200', currency: 'VND' },
+        originalPrice: { amount: '8.00', currency: 'USD' },
+        billingCycle: 'MONTHLY',
+        validFrom: '2026-01-01',
+      };
+
+      await save(proposed.id, { quote }).expect(200);
+
+      expect((await h.assessmentWire(proposed.id, itInCharge.account)).quote).toMatchObject({
+        unitPrice: { amount: '203200', currency: 'VND' },
+        originalPrice: { amount: '8.00', currency: 'USD' },
+      });
+      await save(proposed.id, { quote: { ...quote, originalPrice: undefined } }).expect(200);
+      expect((await h.assessmentWire(proposed.id, itInCharge.account)).quote).toMatchObject({ originalPrice: null });
+    });
+
+    it('BR-MF1-05 refuses the retired Business Owner field at validation instead of looking up its employee', async () => {
+      const proposed = await awaiting();
+      const response = await save(proposed.id, {
+        proposedBusinessOwnerEmployeeId: '00000000-0000-4000-8000-000000000000',
+      }).expect(422);
+      expect(h.codeOf(response)).toBe('VALIDATION_ERROR');
     });
 
     it('names the vendor of the proposal after a vendor of the catalog when no name is given', async () => {
@@ -336,6 +381,25 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
   });
 
   describe('completing it (AC-2, AC-3, AC-14)', () => {
+    it('QĐ-111an: refuses to complete an assessment whose stored quote is still in dollars (no rate could convert it): ASSESSMENT.QUOTE_PRICE_NOT_VND, nothing written', async () => {
+      const proposed = await awaiting();
+      await save(proposed.id, h.assessmentBody()).expect(200);
+      // As an earlier release left it when no exchange rate was entered for the currency of the quote.
+      await h.ctx.sql.query(
+        `UPDATE access_request_assessments SET quote_unit_price_minor = 800, quote_currency = 'USD' WHERE request_id = $1`,
+        [proposed.id],
+      );
+
+      const response = await complete(proposed.id).expect(422);
+
+      expect(h.codeOf(response)).toBe('ASSESSMENT.QUOTE_PRICE_NOT_VND');
+      expect(await stepsOf(proposed.id)).toMatchObject([
+        { kind: 'NEED', state: 'APPROVED' },
+        { kind: 'IT_ASSESSMENT', state: 'PENDING' },
+      ]);
+      expect((await h.assessmentWire(proposed.id, itInCharge.account)).status).toBe('DRAFT');
+    });
+
     it('prices the request from the quote, ends the step of the IT Admin and waits for the head to send it on', async () => {
       const proposed = await awaiting();
       await save(proposed.id, h.assessmentBody()).expect(200);
@@ -346,11 +410,10 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
         state: 'AWAITING_SPEND_SUBMISSION',
         pricing: {
           status: 'PRICED',
-          amount: { amount: '48.00', currency: 'USD' },
-          unitPrice: { amount: '8.00', currency: 'USD' },
+          amount: { amount: `${200000 * h.monthsOf(12)}`, currency: 'VND' },
+          unitPrice: { amount: '200000', currency: 'VND' },
           billingCycle: 'MONTHLY',
-          periodCount: 6,
-          bindingPeriodCount: 6,
+          months: h.monthsOf(12),
         },
       });
       expect(await stepsOf(proposed.id)).toMatchObject([
@@ -360,6 +423,77 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       expect(await h.assessmentWire(proposed.id, itInCharge.account)).toMatchObject({
         status: 'COMPLETED',
         completedBy: { employeeId: itInCharge.employeeId },
+      });
+    });
+
+    describe('B-R2 (QĐ-111i): the time of use the person gave is judged again by the kind of grant the IT Admin concludes', () => {
+      const termOf = async (id: string) =>
+        (
+          await h.ctx.sql.query<{ term_months: number | null }>(
+            `SELECT term_months FROM access_requests WHERE id = $1`,
+            [id],
+          )
+        ).rows[0].term_months;
+
+      it('refuses to complete a plan bought by the month (K1) for more than 9 months: 422 ASSESSMENT.TERM_NOT_FIT_KIND, nothing written', async () => {
+        // The proposal did not know the kind of plan, so it took 12 months (the rule of K2).
+        const proposed = await awaiting({ termMonths: 12 });
+        await save(proposed.id, h.assessmentBody({ provisioningType: 'K1' })).expect(200);
+
+        const refused = await complete(proposed.id).expect(422);
+
+        expect(h.codeOf(refused)).toBe('ASSESSMENT.TERM_NOT_FIT_KIND');
+        expect(h.detailsOf(refused)).toEqual({
+          provisioningType: 'K1',
+          termMonths: 12,
+          maxMonths: 9,
+          reason: 'TERM_MONTHS_OUT_OF_RANGE',
+        });
+        expect(await stateOf(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
+        expect(await termOf(proposed.id)).toBe(12);
+        expect((await h.assessmentWire(proposed.id, itInCharge.account)).status).toBe('DRAFT');
+      });
+
+      it('refuses a plan bought by the month (K1) when the proposal gave no months, and takes 9 months, the most it has', async () => {
+        const none = await awaiting();
+        const nine = await awaiting({ termMonths: 9 });
+        await save(none.id, h.assessmentBody({ provisioningType: 'K1' })).expect(200);
+        await save(nine.id, h.assessmentBody({ provisioningType: 'K1' })).expect(200);
+
+        const refused = await complete(none.id).expect(422);
+        const taken = await complete(nine.id).expect(200);
+
+        expect(h.codeOf(refused)).toBe('ASSESSMENT.TERM_NOT_FIT_KIND');
+        expect(h.detailsOf(refused)).toMatchObject({
+          provisioningType: 'K1',
+          termMonths: null,
+          reason: 'TERM_REQUIRED',
+        });
+        expect(h.dataOf<{ request: AccessRequestWire }>(taken).request.state).toBe('AWAITING_SPEND_SUBMISSION');
+        expect(await termOf(nine.id)).toBe(9);
+      });
+
+      it('a plan bought once (K4) asks no months: completing it clears them from the request, and the audit trail says so', async () => {
+        const proposed = await awaiting({ termMonths: 6 });
+        await save(proposed.id, h.assessmentBody({ provisioningType: 'K4' })).expect(200);
+
+        const done = h.dataOf<{ request: AccessRequestWire }>(await complete(proposed.id).expect(200)).request;
+
+        expect(done.state).toBe('AWAITING_SPEND_SUBMISSION');
+        expect(await termOf(proposed.id)).toBeNull();
+        const completed = (await h.auditEvents('ACCESS_REQUEST', proposed.id)).find(
+          (event) => event.action === 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
+        );
+        expect(completed?.after).toMatchObject({ termMonths: null, termMonthsCleared: 6 });
+      });
+
+      it('a plan of seats (K2) keeps the months the person gave', async () => {
+        const proposed = await awaiting({ termMonths: 12 });
+        await save(proposed.id, h.assessmentBody({ provisioningType: 'K2' })).expect(200);
+
+        await complete(proposed.id).expect(200);
+
+        expect(await termOf(proposed.id)).toBe(12);
       });
     });
 
@@ -388,12 +522,10 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
 
       await save(proposed.id, {
         quote: {
-          unitPrice: { amount: '8', currency: 'USD' },
+          unitPrice: { amount: '200000', currency: 'VND' },
           billingCycle: 'MONTHLY',
           validFrom: `${year}-01-01`,
           validUntil: `${year + 1}-12-31`,
-          commitmentMonths: 6,
-          paymentFrequency: 'MONTHLY',
         },
       }).expect(200);
       await complete(proposed.id).expect(200);
@@ -404,12 +536,10 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       const proposed = await awaiting();
       const quote = (validFrom: string, validUntil: string | null) => ({
         quote: {
-          unitPrice: { amount: '8', currency: 'USD' },
+          unitPrice: { amount: '200000', currency: 'VND' },
           billingCycle: 'MONTHLY',
           validFrom,
           validUntil,
-          commitmentMonths: 6,
-          paymentFrequency: 'MONTHLY',
         },
       });
 
@@ -423,89 +553,73 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       expect(await stateOf(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
     });
 
-    describe('a term of several billing cycles needs the way it is paid (AC-15)', () => {
+    describe('the amount of a quote is the months left of the year, as the amount of a plan of the catalog is (BR-MF1-06, QĐ-109)', () => {
       const monthly = {
-        unitPrice: { amount: '8', currency: 'USD' },
+        unitPrice: { amount: '200000', currency: 'VND' },
         billingCycle: 'MONTHLY',
         validFrom: '2026-01-01',
         validUntil: null,
       };
+      /** The months left of the calendar year of today, the month of today counted whole. */
+      const monthsLeft = 12 - Number(h.today().slice(5, 7)) + 1;
 
-      it('is not guessed to be one payment of the first year', async () => {
-        const proposed = await awaiting({ termMonths: 12 });
+      it('BR-MF1-06a: is the price of one person a month for the months left, with no schedule of payments to ask for', async () => {
+        const proposed = await awaiting();
         await save(proposed.id, h.assessmentBody({ quote: monthly })).expect(200);
-
-        const refused = await complete(proposed.id).expect(422);
-
-        expect(h.codeOf(refused)).toBe('ASSESSMENT.INCOMPLETE');
-        expect(missingOf(refused)).toEqual(['quote.paymentFrequency', 'quote.commitmentMonths']);
-        expect((await h.assessmentWire(proposed.id, itInCharge.account)).pricing.status).toBe('MISSING');
-        expect(await stateOf(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
-      });
-
-      it('with a contract of twelve months paid by the year binds the one payment of the term', async () => {
-        const proposed = await awaiting({ termMonths: 12 });
-        await save(
-          proposed.id,
-          h.assessmentBody({
-            quote: { ...monthly, commitmentMonths: 12, paymentFrequency: 'ANNUAL', firstPaymentOn: `${year}-11-01` },
-          }),
-        ).expect(200);
 
         const done = h.dataOf<{ request: AccessRequestWire }>(await complete(proposed.id).expect(200)).request;
 
         expect(done.pricing).toMatchObject({
           status: 'PRICED',
-          amount: { amount: '96.00', currency: 'USD' },
-          periodCount: 1,
-          bindingPeriodCount: 1,
-          firstDueOn: `${year}-11-01`,
-          lastDueOn: `${year}-11-01`,
+          kind: 'RECURRING',
+          months: monthsLeft,
+          amount: { amount: `${200000 * monthsLeft}`, currency: 'VND' },
         });
         expect(done).toMatchObject({ budgetYear: year });
       });
 
-      it('with a contract of six months paid by the quarter binds the first two payments and forecasts the rest of the year', async () => {
-        const proposed = await awaiting({ termMonths: 12 });
-        await save(
-          proposed.id,
-          h.assessmentBody({
-            quote: { ...monthly, commitmentMonths: 6, paymentFrequency: 'QUARTERLY', firstPaymentOn: `${year}-11-01` },
-          }),
-        ).expect(200);
+      it('BR-MF1-06c, R-39: counts the months of use the proposal asked for, each month that begins', async () => {
+        const proposed = await awaiting({ termMonths: 1 });
+        await save(proposed.id, h.assessmentBody({ quote: monthly })).expect(200);
 
         const done = h.dataOf<{ request: AccessRequestWire }>(await complete(proposed.id).expect(200)).request;
 
-        expect(done.pricing).toMatchObject({ status: 'PRICED', periodCount: 4, bindingPeriodCount: 2 });
+        expect(done.pricing).toMatchObject({ months: 1, amount: { amount: '200000', currency: 'VND' } });
       });
 
-      it('paid up front once is the whole term in one payment that binds', async () => {
-        const proposed = await awaiting({ termMonths: 12 });
-        await save(proposed.id, h.assessmentBody({ quote: { ...monthly, paymentFrequency: 'UPFRONT_ONCE' } })).expect(
-          200,
-        );
-
-        const done = h.dataOf<{ request: AccessRequestWire }>(await complete(proposed.id).expect(200)).request;
-
-        expect(done.pricing).toMatchObject({
-          amount: { amount: '96.00', currency: 'USD' },
-          periodCount: 1,
-          bindingPeriodCount: 1,
-        });
-      });
-
-      it('is refused when the payment is shorter than the billing cycle of the price', async () => {
-        const proposed = await awaiting({ termMonths: 12 });
+      it('BR-MF1-06d: a quarterly or an annual price is a third or a twelfth a month', async () => {
+        const quarterly = await awaiting({ termMonths: 1 });
         await save(
-          proposed.id,
+          quarterly.id,
           h.assessmentBody({
-            quote: { ...monthly, billingCycle: 'QUARTERLY', commitmentMonths: 12, paymentFrequency: 'MONTHLY' },
+            quote: { ...monthly, billingCycle: 'QUARTERLY', unitPrice: { amount: '600000', currency: 'VND' } },
+          }),
+        ).expect(200);
+        const annual = await awaiting({ termMonths: 1 });
+        await save(
+          annual.id,
+          h.assessmentBody({
+            quote: { ...monthly, billingCycle: 'ANNUAL', unitPrice: { amount: '2400000', currency: 'VND' } },
           }),
         ).expect(200);
 
-        const refused = await complete(proposed.id).expect(422);
+        const [first, second] = [
+          h.dataOf<{ request: AccessRequestWire }>(await complete(quarterly.id).expect(200)).request,
+          h.dataOf<{ request: AccessRequestWire }>(await complete(annual.id).expect(200)).request,
+        ];
 
-        expect(h.codeOf(refused)).toBe('ASSESSMENT.PAYMENT_FREQUENCY_INVALID');
+        expect(first.pricing).toMatchObject({ amount: { amount: '200000' } });
+        expect(second.pricing).toMatchObject({ amount: { amount: '200000' } });
+      });
+
+      it('takes no way of paying in the quote any more: the contract is not asked, only the price', async () => {
+        const proposed = await awaiting();
+        const refused = await save(
+          proposed.id,
+          h.assessmentBody({ quote: { ...monthly, commitmentMonths: 12, paymentFrequency: 'ANNUAL' } }),
+        ).expect(422);
+
+        expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
       });
     });
 
@@ -590,7 +704,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       expect(seen.costEstimate).toMatchObject({
         label: 'ESTIMATE_NO_PROFILE',
         basis: 'DEFAULT_NO_PROFILE',
-        preTax: { amount: '48.00', currency: 'USD' },
+        preTax: { amount: `${200000 * h.monthsOf(12)}`, currency: 'VND' },
       });
       expect(missing.map((item) => item.id)).toContain(vendor.id);
       expect(await stateOf(proposed.id)).toBe('AWAITING_SPEND_SUBMISSION');
@@ -636,28 +750,29 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       }
     });
 
-    it('is refused for a plan that does not exist, and one whose software has no Business Owner who works', async () => {
+    it('is refused for a plan that does not exist, and is not refused for software with no Business Owner or no responsible IT Admin (QĐ-111b, QĐ-111g)', async () => {
       const proposed = await decidedForSpend();
       const orphan = await h.plan('K5');
       await h.ctx.sql.query(
-        `UPDATE applications SET business_owner_employee_id = $2
+        `UPDATE applications SET business_owner_employee_id = NULL, responsible_it_admin_employee_id = NULL
           WHERE id = (SELECT application_id FROM plans WHERE id = $1)`,
-        [orphan, (await h.staff(design, `DES-GONE${(counter += 1)}`)).employeeId],
-      );
-      await h.ctx.sql.query(
-        `UPDATE employees SET status = 'TERMINATED'
-          WHERE id = (SELECT business_owner_employee_id FROM applications
-                       WHERE id = (SELECT application_id FROM plans WHERE id = $1))`,
         [orphan],
       );
 
       const missing = await h
         .linkPlan(proposed.id, '00000000-0000-4000-8000-000000000000', itInCharge.account)
         .expect(404);
-      const noOwner = await h.linkPlan(proposed.id, orphan, itInCharge.account).expect(409);
+      await h.linkPlan(proposed.id, orphan, itInCharge.account).expect(200);
 
       expect(h.codeOf(missing)).toBe('ACCESS_REQUEST.PLAN_NOT_FOUND');
-      expect(h.codeOf(noOwner)).toBe('ACCESS_REQUEST.BUSINESS_OWNER_REQUIRED');
+      const events = await h.auditEvents('ACCESS_REQUEST', proposed.id);
+      const linked = events.find((event) => event.action === 'ACCESS_REQUEST.CATALOG_LINKED');
+      expect(linked?.after).toMatchObject({
+        requestId: proposed.id,
+        planId: orphan,
+        responsibleItAdminEmployeeId: null,
+      });
+      expect(linked?.after).not.toHaveProperty('businessOwnerEmployeeId');
     });
 
     it('is the only way to a seat: no grant before the plan is linked, a grant after (AC-8)', async () => {

@@ -27,8 +27,6 @@ import { InstallationModule } from '../../src/modules/installation/installation.
 import { InspectionCliModule } from '../../src/modules/installation/inspect/inspection-cli.module';
 import { SeedCliModule } from '../../src/modules/installation/seed/seed-cli.module';
 import { MigrationPreflightCliModule } from '../../src/modules/installation/migration-preflight/migration-preflight-cli.module';
-import { SubscriptionOwnerAssignmentCliModule } from '../../src/modules/catalog/subscription-owner-assignment/subscription-owner-assignment-cli.module';
-import { AssignSubscriptionOwnerCliModule } from '../../src/cli/assign-subscription-owner/assign-subscription-owner-cli.module';
 import { AiPurgeCliModule } from '../../src/cli/ai-purge/ai-purge-cli.module';
 import { AiAssistPurgeCliModule } from '../../src/modules/ai-assist/purge/ai-assist-purge-cli.module';
 import { CostCenterDirectionRootCliModule } from '../../src/cli/cost-center-direction/cost-center-direction-cli.module';
@@ -60,14 +58,34 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'AuditModule: AuditApi',
   // G5 (ADR-0016): the budgets facade the check of a request reads the figures through, and registers its listener with.
   'BudgetsModule: BudgetsApi',
-  // The extension points the requests context binds (public/budgets.extension-points.ts): the change listeners and the release guard.
-  'BudgetsModule: BudgetChangeListeners',
+  // The worker prices and checks conversions through read-only contracts, without mounting the HTTP contexts.
+  'BudgetsReadFacadeModule: BudgetsReadApi',
+  'CatalogPricingFacadeModule: CatalogPricingApi',
+  // CT-1.1 (QĐ-111bf): the installation command makes the standard functional groups of a new organization through this facade.
+  'CatalogBootstrapFacadeModule: CatalogBootstrapApi',
+  // QĐ-112b: the installation writes the eight policies and their first versions through this one facade.
+  'PoliciesBootstrapFacadeModule: PoliciesBootstrapApi',
+  'PoliciesChecklistFacadeModule: PolicyChecklistApi',
+  // QĐ-111as: the point the modules that read import files add their columns to, so the library builds the template files from what the parsers read.
+  'PoliciesTemplateFacadeModule: ImportTemplateContributions',
+  // The extension points the requests context binds (public/budgets.extension-points.ts): what waits to be decided as spend, the release guard and the facts of a commitment request.
+  'BudgetsModule: PendingSpendContributions',
+  // QĐ-111ac: what a Cost Center carries into the year, added by the requests context from a dry run of the pass of 01/01.
+  'BudgetsModule: CarriedOverContributions',
   'BudgetsModule: CommitmentReleaseGuardHook',
   'BudgetsModule: CommitmentRequestFactsHook',
+  // PI-1.7: the purchase invoice behind an invoice of a commitment (its label and how it was paid), bound by the requests context.
+  'BudgetsModule: PurchaseInvoiceFactsHook',
   // G4 (ADR-0013): the catalog facade licensing reads the seat targets (subscription or internal plan) through.
   'CatalogModule: CatalogApi',
+  // B2D-01 (`US-04-13` AC-15): the usage module reads which applications rest on a contract through this facade, to show their sources at the contract.
+  'CatalogModule: CatalogContractApi',
+  // X-IT.2: what an IT Admin answers for in the catalog (subscriptions and applications), counted and handed over by the hand-over of personnel.
+  'CatalogModule: CatalogResponsibilityApi',
   // The extension point licensing binds its reader of occupied seats to (public/catalog.extension-points.ts).
   'CatalogModule: SeatOccupancyHook',
+  // The phase of the seat baseline licensing binds, so the rule against a second K2 or K4 subscription knows whether it is closed.
+  'CatalogModule: SeatBaselinePhaseHook',
   'CatalogModule: SubscriptionPeriodApi',
   // H8.3 (A4-10): the data-import facade; onboarding reads the latest people import through it.
   'DataImportModule: DataImportApi',
@@ -76,30 +94,38 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // The extension point the usage module binds the collector allowlist to (devices/public/devices.extension-points.ts).
   'DevicesModule: CollectorAllowlistHook',
   'DevicesModule: Symbol(DEVICE_CREDENTIAL_VERIFIER)', // port of src/infrastructure/security
-  // G3 (ADR-0013): the finance facade, money in and conversion snapshot out; the repos stay private.
+  // G3 (ADR-0013): the finance facade, money in and the snapshot of the same currency out; the repos stay private.
   'FinanceModule: FinanceApi',
-  // The audited exchange-rate use case the finance HTTP module serves; the raw ledger is not exported.
-  'FinanceModule: ExchangeRateService',
   'IdentityAccessFacadeModule: IdentityAccessApi',
   // D-S21 (qd93-remove-fallback-substitute-approvers): who can never ask for or be given access through a Request, one facade for every route that makes one.
   'IdentityAccessFacadeModule: RequestPartyEligibilityApi',
-  // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the handover
-  // duties of a departure, the open grant tasks of a person, the service account duties, and (G4, ADR-0013) the seat baseline the import reads and writes through.
+  // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the
+  // open grant tasks of a person, and (G4, ADR-0013) the seat baseline the import reads and writes through.
   'LicensingModule: LicensingApi',
   'LicensingModule: LicensingRenewalApi',
-  'LicensingModule: LicensingHandoverApi',
+  'LicensingModule: LicensingGhostSeatApi',
+  // qd103-vendor-usage-import: the seats and holders the usage import matches identities against, and the one door to the usage evidence the rules of wasted seats read.
+  'LicensingModule: LicensingUsageApi',
+  'UsageModule: UsageEvidenceApi',
+  'UsageModule: UsageOutOfProcessApi',
+  // qd103-ghost-seat-g3-g4: the extension point the rules of wasted seats bind to deny a recommendation when a report is confirmed.
+  'UsageModule: UsageImportListeners',
   'LicensingModule: LicensingOpenGrantsApi',
-  'LicensingModule: LicensingServiceAccountApi',
+  // IN-1.2 (QĐ-111c): the list of software of a department, which the link of a request to the catalog writes when the IT Admin ticks it (DS.4).
+  'LicensingModule: LicensingDepartmentToolsApi',
+  'OptimizationModule: OptimizationApi',
   'LicensingModule: LicensingSeatBaselineApi',
   // G8 (US-12-15): the counts of licensing the role overviews read.
   'LicensingModule: LicensingDashboardApi',
+  // P2-03: what the shared pool of a plan holds, which the queue of grants of requests shows beside each request.
+  'LicensingModule: LicensingPoolStockApi',
+  'LicensingModule: LicensingSeatMonthApi',
   // The extension points requests and personnel bind or add to (public/licensing.extension-points.ts).
   'LicensingModule: GrantRequestGateHook',
   'LicensingModule: RevocationListeners',
   'LicensingModule: RenewalHoldHook',
   'LicensingModule: RenewalFinancialContributions',
   'LicensingModule: RenewalUsageContributions',
-  'LicensingModule: ResponsibleDeadlineHook',
   'LicensingModule: SeatBaselineClosedListeners',
   // H5.5 (identity-access Wave B): the account contracts the API and the recovery command reach the account persistence
   // through; the persistence itself is declared once, here, because every graph needs it.
@@ -112,6 +138,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // QĐ-93d(3): where the grant of SPENDING_APPROVER asks the modules above it for the open work of a person; requests, budgets and
   // licensing add a check each from a `*.listener.ts`, so the one point the facade holds is injected by them.
   'IdentityAccessFacadeModule: SpendingApproverGrantChecks',
+  // QĐ-111ar: where `GET /me` asks the modules above it which policies the caller has not acknowledged; the library of policies adds the one
+  // source from a `*.listener.ts`, so the point the facade holds is injected by it.
+  'IdentityAccessFacadeModule: PendingPolicyAcknowledgements',
   'IdentityAccessFacadeModule: RoleGrantService',
   // H6.1: the read-only account contract of `ops:inspect`, declared only in the inspection graph.
   'IdentityAccessInspectionFacadeModule: IdentityAccessInspectionApi',
@@ -126,8 +155,6 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'InspectionCliModule: InstallationInspectionApi',
   // P28-01 (Prompt 29): the entry service of `pnpm ops:preflight`.
   'MigrationPreflightCliModule: MigrationPreflightApi',
-  // F02: the entry service of `pnpm ops:assign-subscription-owner`.
-  'SubscriptionOwnerAssignmentCliModule: SubscriptionOwnerAssignmentApi',
   // US-15-05: the entry service of `pnpm ops:ai-purge`.
   'AiAssistPurgeCliModule: AiPurgeApi',
   // F01: the service `pnpm ops:cost-center-direction` runs and the organization facade asks (whether the link is activated).
@@ -146,9 +173,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'NotificationsModule: EmailDeliveryApi',
   // G5 (FR-3.11): the inbox the routes of `NotificationsHttpModule` read, held once in the module that gives the notices.
   'NotificationsModule: InboxService',
+  // P5-B (A5): the extension point the owners of names (organization, catalog, requests) add their `NotificationNameSource` to (public/notifications.extension-points.ts).
+  'NotificationsModule: NotificationNameContributions',
   'OperatingParametersModule: OperatingParametersApi',
-  // B-01 (US-01-04): the extension point the budgets module binds its fiscal-year-start lock to.
-  'OperatingParametersModule: ParameterLockContributions',
   // G6 (ADR-0017): the extension point the flows that follow a personnel file (the owner of a service account) add their hooks to.
   'PersonnelModule: PersonnelFileHookContributions',
   // G6 (US-03-03): the days a person was on long leave, read by the rules of the recommendations of G7.
@@ -161,7 +188,10 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'OrganizationModule: OrganizationChangeListeners',
   'OrganizationModule: DepartmentUseContributions',
   'OrganizationModule: CostCenterUseContributions',
+  // QĐ-113e: what refers to the first placement of a person, told by requests and personnel.
+  'OrganizationModule: FirstPlacementUseContributions',
   'OrganizationModule: DepartmentServiceAccountReaderHook',
+  'OrganizationModule: DepartmentCreationWindowHook',
   'OrganizationModule: EmployeeAccountsHook',
   // G6 (ADR-0017): the writes of history (a placement and a head period written ahead of their day) the personnel context calls.
   'OrganizationModule: OrganizationHistoryApi',
@@ -189,6 +219,10 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'RequestsModule: RequestsAiSourceApi',
   // F43: the extension point the personnel context adds its listener of the outcome of a request to (public/requests.extension-points.ts).
   'RequestsModule: RequestOutcomeListeners',
+  // MF3-C.3 (QĐ-110q, R-49): the extension point the personnel context adds its answer to — a person in the grace of a transfer who holds the software asked for (public/requests.extension-points.ts).
+  'RequestsModule: TransferGraceHoldContributions',
+  // RC-1 (QĐ-111y, R-29): the extension point the review of the accounts at the vendor adds its listener to — a case of an invoice that differs closed as a suspicion (public/requests.extension-points.ts).
+  'RequestsModule: InvoiceDiscrepancyReferralListeners',
   // The two entry services of `pnpm ops:recover` (Q6; E7): the holder's own account, and the role transfer.
   'IdentityAccessRecoveryCliModule: HolderRecoveryApi',
   'IdentityAccessRecoveryCliModule: RoleTransferRecoveryApi',
@@ -563,8 +597,6 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
           SeedCliModule,
           IdentityAccessLocalSeedFacadeModule,
           MigrationPreflightCliModule,
-          SubscriptionOwnerAssignmentCliModule,
-          AssignSubscriptionOwnerCliModule,
           AiAssistPurgeCliModule,
           AiPurgeCliModule,
           CostCenterDirectionRootCliModule,
@@ -587,7 +619,6 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
       ['InspectionCliModule', InspectionCliModule, 1],
       ['SeedCliModule', SeedCliModule, 0],
       ['MigrationPreflightCliModule', MigrationPreflightCliModule, 1],
-      ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule, 0],
       ['AiPurgeCliModule', AiPurgeCliModule, 0],
       ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule, 0],
       ['RecordSuperAdminEventCliModule', RecordSuperAdminEventCliModule, 0],
@@ -641,28 +672,6 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
     }
     expect(moduleNames(graph)).toContain('InstallationConfigurationModule');
     expect(moduleNames(graph)).not.toContain('ConfigurationModule');
-    expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
-  });
-
-  // rule 1, F02
-  it('the owner-assignment graph loads the database settings, the organization and the audit facades only', () => {
-    const graph = collectGraph(AssignSubscriptionOwnerCliModule);
-
-    expect(controllersOf(graph)).toEqual([]);
-    for (const forbidden of [
-      NotificationsModule,
-      IdentityAccessModule,
-      IdentityAccessRecoveryCliModule,
-      QueueInfrastructureModule,
-    ]) {
-      expect({ forbidden: forbidden.name, mounted: graph.map((node) => node.module).includes(forbidden) }).toEqual({
-        forbidden: forbidden.name,
-        mounted: false,
-      });
-    }
-    expect(moduleNames(graph)).toContain('InstallationConfigurationModule');
-    expect(moduleNames(graph)).not.toContain('ConfigurationModule');
-    expect(moduleNames(graph)).not.toContain('CatalogModule');
     expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
   });
 
@@ -724,7 +733,6 @@ describe('the local seed graph', () => {
       // ops:seed writes its demo accounts through the same contract (one direct role, never a derived one).
       ['SeedCliModule', SeedCliModule, 1],
       ['MigrationPreflightCliModule', MigrationPreflightCliModule, 0],
-      ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule, 0],
       ['AiPurgeCliModule', AiPurgeCliModule, 0],
       ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule, 0],
       ['RecordSuperAdminEventCliModule', RecordSuperAdminEventCliModule, 0],

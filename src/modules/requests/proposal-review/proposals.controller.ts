@@ -15,21 +15,25 @@ import { AccessRequestResponseDto, RequestIdParamDto } from '../access-request/a
 import { AccessRequestQueryService } from '../request-view/access-request-query.service';
 import { toWire } from '../request-view/access-request.mapper';
 import {
+  AssessmentCompletionBodyDto,
   AssessmentPatchDto,
   AssessmentRejectionBodyDto,
   AssessmentResponseDto,
   CatalogLinkBodyDto,
+  CatalogLinkResponseDto,
   InternalRegistrationBodyDto,
   ProposalBodyDto,
 } from '../assessment/assessment.dto';
 import { ASSESSMENT_ERROR_EXAMPLES as EXAMPLES, toAssessmentApiException } from '../assessment/assessment.http-errors';
 import { AssessmentCompletionService } from '../assessment/assessment-completion.service';
 import { AssessmentQueryService } from '../assessment/assessment-query.service';
-import { AssessmentRejectionService } from '../assessment/assessment-rejection.service';
+import { AssessmentDecisionService } from '../assessment-decision/assessment-decision.service';
+import { CHECKLIST_ERROR_EXAMPLES, toChecklistApiException } from '../../policies/public/policy-checklist.http-errors';
 import { AssessmentService } from '../assessment/assessment.service';
-import { CatalogLinkService } from '../assessment/catalog-link.service';
+import { CatalogLinkService } from '../catalog-link/catalog-link.service';
 import { InternalRegistrationService } from '../assessment/internal-registration.service';
 import { ProposalService } from '../assessment/proposal.service';
+import { ACCESS_REQUEST_ERROR_EXAMPLES as ACCESS_EXAMPLES } from '../access-request/access-request.http-errors';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const IT_ONLY_DESCRIPTION =
@@ -70,7 +74,7 @@ export class ProposalsController {
     private readonly assessments: AssessmentService,
     private readonly assessmentReads: AssessmentQueryService,
     private readonly completions: AssessmentCompletionService,
-    private readonly rejections: AssessmentRejectionService,
+    private readonly decisions: AssessmentDecisionService,
     private readonly links: CatalogLinkService,
     private readonly registrations: InternalRegistrationService,
     private readonly queries: AccessRequestQueryService,
@@ -83,7 +87,7 @@ export class ProposalsController {
     status: HttpStatus.CREATED,
     message: 'ACCESS_REQUEST.PROPOSED',
     description:
-      'The request takes the third branch (the need, the assessment of the IT Admin, the spend decision, the grant) with no plan, and the assessment is opened for the IT Admin. The price is missing until the IT Admin records a quote.',
+      'The request takes the third branch (the need, the assessment of the IT Admin, the spend decision, the grant) with no plan, and the assessment is opened for the IT Admin. The price is missing until the IT Admin records a quote. From a department with no effective head the proposal waits at the need step for a head (waitingReason NO_DEPARTMENT_HEAD) and does not reach the IT Admin before its need is decided, because it is not yet known whether the software will be free or paid; the head of a department sends it without a need step.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -95,14 +99,28 @@ export class ProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
-      examples: [EXAMPLES.NO_DEPARTMENT, EXAMPLES.FINANCE_SETUP_INCOMPLETE],
+        'The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the catalog has this software already by its name or by the domain of its page, or has the plan asked for of the application named (ACCESS_REQUEST.SOFTWARE_IN_CATALOG: details.existing is the application with at most twenty of its plans and details.matchedBy says why; ask for it from the catalog instead), or the application named has left the catalog (ACCESS_REQUEST.APPLICATION_RETIRED). Nothing is written.',
+      examples: [
+        EXAMPLES.NO_DEPARTMENT,
+        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+        EXAMPLES.SOFTWARE_IN_CATALOG,
+        EXAMPLES.APPLICATION_RETIRED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). Nothing is written.',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.REQUEST_PARTY_INELIGIBLE],
+        'The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required; existingApplicationId and plannedPlanName go together. The application named does not exist (ASSESSMENT.REFERENCE_NOT_FOUND, details.field existingApplicationId). The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). A proposal counts as a request for new access: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). The kind of plan is not known yet, so the term takes 1 to 12 months or none (ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE); a contractor, a freelancer or an intern gives the months (ACCESS_REQUEST.TERM_REQUIRED, and TERM_LONG_TERM_NOT_ALLOWED for a right with no end), and one whose contract ended before today gets no access (ACCESS_REQUEST.TERM_CONTRACT_ENDED, details.contractEndDate). Nothing is written.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.EXISTING_APPLICATION_NOT_FOUND,
+        EXAMPLES.REQUEST_PARTY_INELIGIBLE,
+        ACCESS_EXAMPLES.OPEN_LIMIT_REACHED,
+        ACCESS_EXAMPLES.TERM_REQUIRED,
+        ACCESS_EXAMPLES.TERM_MONTHS_OUT_OF_RANGE,
+        ACCESS_EXAMPLES.TERM_LONG_TERM_NOT_ALLOWED,
+        ACCESS_EXAMPLES.TERM_CONTRACT_ENDED,
+      ],
     },
   )
   async propose(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: ProposalBodyDto) {
@@ -143,11 +161,12 @@ export class ProposalsController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, NOT_AWAITING_ASSESSMENT, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'A field is invalid (VALIDATION_ERROR), a vendor, plan or person it names does not exist (ASSESSMENT.REFERENCE_NOT_FOUND), or the quote runs backwards (ASSESSMENT.QUOTE_PERIOD_INVALID).',
+      'A field is invalid (VALIDATION_ERROR), a vendor, plan or person it names does not exist (ASSESSMENT.REFERENCE_NOT_FOUND), or the quote runs backwards (ASSESSMENT.QUOTE_PERIOD_INVALID) or is not in dong (ASSESSMENT.QUOTE_PRICE_NOT_VND; the price the vendor quoted in another currency goes in quote.originalPrice).',
     examples: [
       VALIDATION_EXAMPLE,
       EXAMPLES.REFERENCE_NOT_FOUND,
       EXAMPLES.QUOTE_PERIOD_INVALID,
+      EXAMPLES.QUOTE_PRICE_NOT_VND,
       EXAMPLES.MONEY_SCALE_EXCEEDED,
       EXAMPLES.MONEY_OUT_OF_RANGE,
       EXAMPLES.CURRENCY_NOT_SUPPORTED,
@@ -180,61 +199,89 @@ export class ProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), or a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE).',
+        'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE), or a short proposal names internal software, whose plans are free (ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN): add the plan to the catalog and reject the proposal as not eligible, naming that plan, for the person to ask for it from the catalog. The policy of the checklist was changed since the person was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
       examples: [
         EXAMPLES.NOT_AWAITING_ASSESSMENT,
         EXAMPLES.INTERNAL_COMPLETES_BY_REGISTRATION,
         EXAMPLES.CONTROL_LEVEL_UNCONTROLLABLE,
+        EXAMPLES.SHORT_PROPOSAL_FREE_PLAN,
+        CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), or the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, PAYMENT_FREQUENCY_INVALID, AMOUNT_TOO_LARGE). Nothing is written and the request stays with the IT Admin.',
+        'The checklist is missing, lacks an answer or names a question the policy does not have (POLICY.CHECKLIST_INCOMPLETE), or an answer is No, which locks the completion (POLICY.CHECKLIST_HAS_NO, with the questions answered No in details.items); the assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE, or QUOTE_PRICE_NOT_VND when the stored quote is not in dong: record it again in dong), or the time of use the person gave does not fit the kind of plan concluded (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: a plan bought by the month takes 1 to 9 months; reject the request for the person to propose again with months that fit). Nothing is written and the request stays with the IT Admin. A plan bought once takes no months: completing it clears any the person gave.',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.INCOMPLETE,
         EXAMPLES.QUOTE_NOT_IN_FORCE,
-        EXAMPLES.PAYMENT_FREQUENCY_INVALID,
         EXAMPLES.AMOUNT_TOO_LARGE,
+        EXAMPLES.QUOTE_PRICE_NOT_VND,
+        EXAMPLES.TERM_NOT_FIT_KIND,
+        CHECKLIST_ERROR_EXAMPLES.INCOMPLETE,
+        CHECKLIST_ERROR_EXAMPLES.HAS_NO,
       ],
     },
   )
-  async completeAssessment(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RequestIdParamDto) {
+  async completeAssessment(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: RequestIdParamDto,
+    @Body() body: AssessmentCompletionBodyDto,
+  ) {
     try {
-      const record = await this.completions.complete(actor, params.id);
+      const record = await this.completions.complete(actor, params.id, body);
 
       return { request: toWire(await this.queries.view(record)) };
     } catch (error) {
-      throw toAssessmentApiException(error);
+      throw toChecklistApiException(error) ?? toAssessmentApiException(error);
     }
   }
 
   @Post(':id/assessment/rejection')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'accessRequestAssessmentReject', summary: 'Refuse a proposal at the gate' })
+  @ApiOperation({
+    operationId: 'accessRequestAssessmentReject',
+    summary: 'Refuse a proposal at the gate, or send it back to its sender',
+  })
   @ApiSuccessResponse(AccessRequestResponseDto, {
     message: 'ACCESS_REQUEST.ASSESSMENT_REJECTED',
     description:
-      'The IT Admin concludes that a tool cannot be controlled, or that the software is not eligible for the catalog, with the reason that must go with it and an alternative when there is one. The request ends as refused by IT: no spend step, no snapshot, no commitment, and nothing is added to the catalog. The person who asked and the head read the reason and the alternative in the assessment.',
+      'With decision REJECT the IT Admin concludes that a tool cannot be controlled, or that the software is not eligible for the catalog, with the reason that must go with it and an alternative when there is one. The request ends as refused by IT: no spend step, no snapshot, no commitment, and nothing is added to the catalog. The person who asked and the head read the reason and the alternative in the assessment. With decision RETURN the proposal goes back to the person who asked, who adds what is missing and sends it again (POST /access-requests/{id}/resubmission): the request waits for its sender (AWAITING_REQUESTER_REVISION), the step of the IT Admin is closed and the assessment keeps what was filled in. Both carry the checklist of the policy in force at the step; the reason is typed or filled in from the questions answered No.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, NOT_AWAITING_ASSESSMENT, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description:
-      'The reason is missing or blank, or the kind is not one of the two (VALIDATION_ERROR); the alternative plan does not exist (ASSESSMENT.REFERENCE_NOT_FOUND). Nothing is written and the request stays with the IT Admin.',
-    examples: [VALIDATION_EXAMPLE, EXAMPLES.ALTERNATIVE_PLAN_NOT_FOUND],
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    IT_ONLY,
+    NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), or the policy of the checklist was changed since the person was shown it (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
+      examples: [
+        EXAMPLES.NOT_AWAITING_ASSESSMENT,
+        CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
+      ],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'A refusal has no kind, or an uncontrollable tool no alternative, or a refusal or a return has no reason and no answer No to give one (VALIDATION_ERROR, issues[0].path = reason); the checklist lacks an answer (POLICY.CHECKLIST_INCOMPLETE); the alternative plan does not exist (ASSESSMENT.REFERENCE_NOT_FOUND). Nothing is written and the request stays with the IT Admin.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.ALTERNATIVE_PLAN_NOT_FOUND, CHECKLIST_ERROR_EXAMPLES.INCOMPLETE],
+    },
+  )
   async rejectAssessment(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: RequestIdParamDto,
     @Body() body: AssessmentRejectionBodyDto,
   ) {
     try {
-      const record = await this.rejections.reject(actor, params.id, body);
+      const record = await this.decisions.decide(actor, params.id, body);
 
       return { request: toWire(await this.queries.view(record)) };
     } catch (error) {
-      throw toAssessmentApiException(error);
+      throw toChecklistApiException(error) ?? toAssessmentApiException(error);
     }
   }
 
@@ -247,7 +294,7 @@ export class ProposalsController {
   @ApiSuccessResponse(AccessRequestResponseDto, {
     message: 'ACCESS_REQUEST.INTERNAL_SOFTWARE_REGISTERED',
     description:
-      'The software the company built itself is registered in the catalog with its Business Owner and one plan granted by hand, and the request goes the way that has no spend: the IT Admin grants it. No vendor, contract, subscription, invoice, commitment or seat bought is made. With a payment (a quote in the body) the request keeps its spend step and waits for the head to send it on.',
+      'The software the company built itself is registered in the catalog, answered for by the IT Admin who registers it, with one plan granted by hand, and the request goes the way that has no spend: the IT Admin grants it. No vendor, contract, subscription, invoice, commitment or seat bought is made. With a payment (a quote in the body) the request keeps its spend step and waits for the head to send it on.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -262,18 +309,17 @@ export class ProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The Business Owner is missing or has left (APPLICATION.BUSINESS_OWNER_INVALID), the data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE and the others), or the body is invalid (VALIDATION_ERROR). Nothing is registered and the request stays with the IT Admin.',
+        'The data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE and the others, ASSESSMENT.QUOTE_PRICE_NOT_VND when it is not in dong), or the body is invalid (VALIDATION_ERROR). Nothing is registered and the request stays with the IT Admin.',
       examples: [
         VALIDATION_EXAMPLE,
-        EXAMPLES.BUSINESS_OWNER_INVALID,
         EXAMPLES.INCOMPLETE_DATA_SENSITIVITY,
         EXAMPLES.QUOTE_PERIOD_INVALID,
+        EXAMPLES.QUOTE_PRICE_NOT_VND,
         EXAMPLES.QUOTE_NOT_IN_FORCE,
-        EXAMPLES.PAYMENT_FREQUENCY_INVALID,
         EXAMPLES.AMOUNT_TOO_LARGE,
-        EXAMPLES.MONEY_SCALE_EXCEEDED,
-        EXAMPLES.MONEY_OUT_OF_RANGE,
-        EXAMPLES.CURRENCY_NOT_SUPPORTED,
+        EXAMPLES.SPEND_MONEY_SCALE_EXCEEDED,
+        EXAMPLES.SPEND_MONEY_OUT_OF_RANGE,
+        EXAMPLES.SPEND_CURRENCY_NOT_SUPPORTED,
       ],
     },
   )
@@ -294,30 +340,40 @@ export class ProposalsController {
   @Post(':id/catalog-link')
   @RequireRoles('IT_ADMIN')
   @ApiOperation({ operationId: 'accessRequestCatalogLink', summary: 'Link a proposal to its registered plan' })
-  @ApiSuccessResponse(AccessRequestResponseDto, {
+  @ApiSuccessResponse(CatalogLinkResponseDto, {
     message: 'ACCESS_REQUEST.CATALOG_LINKED',
     description:
-      'After the spending approver has decided the request, the IT Admin links it to the plan registered in the catalog, whose application must have a Business Owner who still works. The grant is possible only after this.',
+      'After the spending approver has decided the request, the IT Admin links it to the plan registered in the catalog; the plan may be one the catalog already had, when the IT Admin was told the software is there and the request goes on as a request for what the catalog has. The grant is possible only after this. With addToDepartmentList the application and the plan are also put in the list of software of the department of the request (departmentList.added is false when they were listed already); the list only guides, nothing it holds grants anything.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     // The link checks no assessor, so OWN_REQUEST is not reachable; a plan that does not exist is (PLAN_NOT_FOUND).
-    { status: HttpStatus.FORBIDDEN, description: IT_ONLY_DESCRIPTION, examples: [FORBIDDEN_EXAMPLE] },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: `${IT_ONLY_DESCRIPTION} With addToDepartmentList, the department of the request must be one the IT Admin is in charge of (DEPARTMENT.OUT_OF_SCOPE); nothing is written.`,
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.DEPARTMENT_OUT_OF_SCOPE],
+    },
     {
       status: HttpStatus.NOT_FOUND,
-      description: NOT_FOUND_DESCRIPTION,
-      examples: [EXAMPLES.NOT_FOUND, EXAMPLES.PLAN_NOT_FOUND],
+      description: `${NOT_FOUND_DESCRIPTION} Or the plan does not exist (ACCESS_REQUEST.PLAN_NOT_FOUND), or the department of the request does not (DEPARTMENT.NOT_FOUND).`,
+      examples: [EXAMPLES.NOT_FOUND, EXAMPLES.PLAN_NOT_FOUND, EXAMPLES.DEPARTMENT_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request is not waiting for its grant or is already linked (ACCESS_REQUEST.CATALOG_LINK_NOT_ALLOWED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED), or it has no Business Owner who works (ACCESS_REQUEST.BUSINESS_OWNER_REQUIRED).',
-      examples: [EXAMPLES.CATALOG_LINK_NOT_ALLOWED, EXAMPLES.APPLICATION_RETIRED, EXAMPLES.BUSINESS_OWNER_REQUIRED],
+        'The request is not waiting for its grant or is already linked (ACCESS_REQUEST.CATALOG_LINK_NOT_ALLOWED) or the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED).',
+      examples: [EXAMPLES.CATALOG_LINK_NOT_ALLOWED, EXAMPLES.APPLICATION_RETIRED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The body is invalid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
+      description:
+        'The body is invalid (VALIDATION_ERROR), or the plan is of another kind than the assessment concluded and the months of use the person gave do not fit it (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: link a plan of a kind that takes them, or reject the request for the person to propose again), or the proposal is a short one that names an application of the catalog and the plan belongs to another application (ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH, with details.expectedApplicationId: only the plan of that application was assessed; a proposal of software that is new links to any plan), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written. A plan bought once takes no months: linking it clears any the person gave.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.TERM_NOT_FIT_KIND,
+        EXAMPLES.CATALOG_LINK_APPLICATION_MISMATCH,
+        EXAMPLES.DEPARTMENT_SOFTWARE_NOT_IN_CATALOG,
+      ],
     },
   )
   async linkCatalogPlan(
@@ -326,9 +382,9 @@ export class ProposalsController {
     @Body() body: CatalogLinkBodyDto,
   ) {
     try {
-      const record = await this.links.link(actor, params.id, body.planId);
+      const linked = await this.links.link(actor, params.id, body);
 
-      return { request: toWire(await this.queries.view(record)) };
+      return { request: toWire(await this.queries.view(linked.request)), departmentList: linked.departmentList };
     } catch (error) {
       throw toAssessmentApiException(error);
     }

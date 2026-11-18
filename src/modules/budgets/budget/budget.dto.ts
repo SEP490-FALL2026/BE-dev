@@ -1,123 +1,135 @@
+import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
+import { responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { LINE_DESCRIPTION_MAX, REASON_MAX } from './budget.policy';
+import { REASON_MAX } from './budget.policy';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 /** An amount a person gives: always in the reporting currency, which the system knows (`QĐ-98`). */
 const money = z.strictObject({ amount: z.string().max(40) });
 const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
 const year = z.number().int().min(2000).max(2200);
-export const LINES_MAX = 200;
+/** The most files a `BM-10` names: one at least, the form of the template filled in (`QĐ-111ab`). */
+export const PROPOSAL_ATTACHMENTS_MAX = 10;
 
-/**
- * A line of a proposal or a version (`QĐ-82d`): what is bought, how much, where in the year it is bought, how long it
- * serves and how it repeats. The window, the service period and the cycle may be left out here so that a form that
- * lacks them is told which line and which fields (`US-06-10` AC-2), not simply refused.
- */
-const lineBodyShape = z.strictObject({
-  planId: z.uuid().optional(),
-  description: text(LINE_DESCRIPTION_MAX).optional(),
-  seats: z.number().int().min(1).max(100000).optional(),
-  amount: money,
-  note: text(REASON_MAX).optional(),
-});
-const lineBody = lineBodyShape
-  .refine((line) => line.planId !== undefined || line.description !== undefined, {
-    message: 'Give the plan or a description of the line.',
-    path: ['description'],
-  })
+const proposalAttachmentIds = z
+  .array(z.uuid())
+  .min(1)
+  .max(PROPOSAL_ATTACHMENTS_MAX)
+  .refine((ids) => new Set(ids).size === ids.length, { message: 'A document is named once.' })
   .meta({
-    description: 'A line is a plan or a description, the seats, the amount of the year and a note.',
+    uniqueItems: true,
+    description:
+      'The files of the proposal (the template of BM-10 filled in, and anything that explains it), uploaded first: one to ten.',
   });
+/** `BM-10` (`QĐ-111ab`): the files, one amount for the year and a note; there are no lines. */
+const proposalFigures = {
+  requestedAmount: money.meta({
+    description: 'The amount the head asks for the whole year, in the reporting currency.',
+  }),
+  note: text(REASON_MAX).optional().meta({ description: 'What the head says beside the amount, if anything.' }),
+  attachmentIds: proposalAttachmentIds,
+};
 
 export const proposalBodySchema = z.strictObject({
   year,
-  lines: z.array(lineBody).min(1).max(LINES_MAX),
-  attachmentIds: z
-    .array(z.uuid())
-    .max(20)
-    .refine((ids) => new Set(ids).size === ids.length, { message: 'A document is named once.' })
-    .meta({ uniqueItems: true })
-    .optional(),
+  costCenterId: z.uuid().optional().meta({
+    description:
+      'The Cost Center the work is for, when the person answers for more than one that year (a department they head and one that starts on 1 January).',
+  }),
+  ...proposalFigures,
 });
-export const resubmissionBodySchema = z.strictObject({
-  lines: z.array(lineBody).min(1).max(LINES_MAX),
-  attachmentIds: z
-    .array(z.uuid())
-    .max(20)
-    .refine((ids) => new Set(ids).size === ids.length, { message: 'A document is named once.' })
-    .meta({ uniqueItems: true })
-    .optional(),
-});
+export const resubmissionBodySchema = z.strictObject(proposalFigures);
 export const returnBodySchema = z.strictObject({ reason: text(REASON_MAX) });
 /**
- * The decision of the spending approver on a version (`US-06-11`): approve, refuse, or ask Finance to look again. A refusal
- * and a request to look again give their reason; an approval gives none. There is no way to change a figure here (`QĐ-82f`).
+ * The decision of the spending approver on a version (`US-06-11`, `QĐ-111ad`): approve it, or return it to Finance with the reason that
+ * must go with it; there is no refusal any more. An approval gives no reason. There is no way to change a figure here (`QĐ-82f`).
  */
 export const decisionBodySchema = z
   .strictObject({
-    decision: z.enum(['APPROVE', 'REJECT', 'REQUEST_CHANGES']),
+    decision: z.enum(['APPROVE', 'RETURN']),
     reason: text(REASON_MAX).optional(),
+    checklist: checklistBodySchema,
   })
   .superRefine((body, ctx) => {
-    if (body.decision !== 'APPROVE' && body.reason === undefined) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['reason'],
-        message: 'A refusal, or a request to look again, gives its reason.',
-      });
-    }
     if (body.decision === 'APPROVE' && body.reason !== undefined) {
       ctx.addIssue({ code: 'custom', path: ['reason'], message: 'An approval gives no reason.' });
     }
   })
   .meta({
     description:
-      'A refusal (REJECT) or a request to look again (REQUEST_CHANGES) gives its reason; an approval (APPROVE) gives none.',
+      'The checklist of the policy in force at this step, and the decision: APPROVE (no reason; locked while an answer is No) or RETURN to Finance (the reason, or the one the answers No give); REJECT and REQUEST_CHANGES are no longer decisions.',
   });
 
-const quarters = z.strictObject({ q1: money, q2: money, q3: money, q4: money });
 const versionFigures = {
-  base: money,
-  reserve: money,
+  base: money.meta({
+    description:
+      'The base of the year. Left out, it is filled in with what the Cost Center carries into the year (carriedOverNextYear).',
+  }),
+  reserve: money.meta({
+    description:
+      'The reserve as an amount; not with reservePercent. An amount that is not the default share of the base asks a reason when the version is sent.',
+  }),
+  reservePercent: z.number().int().min(0).max(100).meta({
+    description:
+      'The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given. A share that is not the default asks reserveReason when the version is sent.',
+  }),
   /** Why the reserve is not the default share of the base; asked when the version is sent (`US-06-09` AC-30). */
   reserveReason: text(REASON_MAX),
-  /** A forecast by quarter, never a limit: the four add up to the total or it is not saved (`US-06-09` AC-6). */
-  quarters: quarters.nullable(),
 };
-/** A first version of a Cost Center and year, built from the proposal that waits for Finance. */
-export const versionBodySchema = z.strictObject({
-  proposalId: z.uuid(),
-  base: versionFigures.base,
+/** The reserve is an amount or a share, not both (`QĐ-111ac`). */
+const oneReserve = (body: { reserve?: unknown; reservePercent?: unknown }, ctx: z.RefinementCtx) => {
+  if (body.reserve !== undefined && body.reservePercent !== undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['reservePercent'],
+      message: 'Give the reserve as an amount or as a share, not both.',
+    });
+  }
+};
+/** The figures Finance may give when a version is made: all optional, the base filled in with what is carried over. */
+const newVersionFigures = {
+  base: versionFigures.base.optional(),
   reserve: versionFigures.reserve.optional(),
+  reservePercent: versionFigures.reservePercent.optional(),
   reserveReason: versionFigures.reserveReason.optional(),
-  quarters: versionFigures.quarters.optional(),
+};
+/** A first version from the proposal that waits for Finance (`source` PROPOSAL, the default). */
+const proposalVersionBody = z.strictObject({
+  source: z.literal('PROPOSAL').optional(),
+  proposalId: z.uuid(),
+  ...newVersionFigures,
 });
+/** A first version built from the baseline (`source` BASELINE): the Cost Center and the year, and the figures Finance gives, if any. */
+const baselineVersionBody = z.strictObject({
+  source: z.literal('BASELINE'),
+  costCenterId: z.uuid(),
+  year: z.number().int().min(2000).max(2200),
+  ...newVersionFigures,
+});
+/**
+ * A first version of a Cost Center and year: from the proposal that waits for Finance (`source` PROPOSAL, the default), or from the
+ * baseline when the department has no proposal at the deadline (`source` BASELINE, `QĐ-111bb`). A field of the other source is a 422
+ * `unrecognized_keys`.
+ */
+export const versionBodySchema = z
+  .discriminatedUnion('source', [proposalVersionBody, baselineVersionBody])
+  .superRefine(oneReserve);
 export const versionPatchSchema = z
   .strictObject({
     base: versionFigures.base,
+    /** Why the base is changed: required when `base` differs from the one the draft has (`QĐ-100v`). */
+    baseReason: text(REASON_MAX),
     reserve: versionFigures.reserve,
+    reservePercent: versionFigures.reservePercent,
     /** `null` takes the reason away: the reserve is the default share again, or is sent with another reason. */
     reserveReason: versionFigures.reserveReason.nullable(),
-    quarters: versionFigures.quarters,
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
+  .superRefine(oneReserve)
   .meta({ minProperties: 1, description: 'Give at least one field.' });
-export const linePatchSchema = z
-  .strictObject({
-    description: text(LINE_DESCRIPTION_MAX),
-    planId: z.uuid().nullable(),
-    seats: z.number().int().min(1).max(100000).nullable(),
-    amount: money,
-    financeComment: text(REASON_MAX).nullable(),
-    adjustmentReason: text(REASON_MAX).nullable(),
-  })
-  .partial()
-  .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
-  .meta({ minProperties: 1, description: 'Give at least one field.' });
-export const addLinesBodySchema = z.strictObject({ lines: z.array(lineBody).min(1).max(LINES_MAX) });
 
 export const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -134,10 +146,17 @@ export const versionListQuerySchema = z.strictObject({
   ...pageQuery,
 });
 export const pageQuerySchema = z.strictObject(pageQuery);
-export const mineQuerySchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2200) });
-export const mineLinesQuerySchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2200), ...pageQuery });
+const mineCostCenter = z.uuid().optional().meta({
+  description:
+    'The Cost Center asked about, when the caller answers for more than one that year (a department they head and one that starts on 1 January).',
+});
+export const mineQuerySchema = z.strictObject({
+  year: z.coerce.number().int().min(2000).max(2200),
+  costCenterId: mineCostCenter,
+});
 export const mineVersionsQuerySchema = z.strictObject({
   year: z.coerce.number().int().min(2000).max(2200).optional(),
+  costCenterId: mineCostCenter,
   ...pageQuery,
 });
 export const budgetsQuerySchema = z.strictObject({
@@ -146,7 +165,6 @@ export const budgetsQuerySchema = z.strictObject({
 });
 export const budgetSummaryQuerySchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2200) });
 export const idParamSchema = z.strictObject({ id: z.uuid() });
-export const lineParamSchema = z.strictObject({ id: z.uuid(), position: z.coerce.number().int().positive() });
 
 export const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 const costCenterRef = z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() });
@@ -169,7 +187,9 @@ const proposalSchema = z.strictObject({
   successorOfProposalId: z.uuid().nullable(),
   /** The proposal that follows this one, if any. */
   successorProposalId: z.uuid().nullable(),
-  total: moneyView,
+  total: moneyView.meta({ description: 'The amount asked for: the same as requestedAmount.' }),
+  requestedAmount: moneyView.meta({ description: 'The amount the head asked for the whole year (BM-10).' }),
+  note: z.string().nullable().meta({ description: 'What the head wrote beside the amount; null when nothing.' }),
   submittedBy: employeeRef.nullable(),
   submittedAt: z.iso.datetime(),
   returned: z.strictObject({ reason: z.string(), by: employeeRef.nullable(), at: z.iso.datetime() }).nullable(),
@@ -189,34 +209,45 @@ const proposalSummarySchema = z.strictObject({
   total: moneyView,
   submittedAt: z.iso.datetime(),
 });
-const proposalLineSchema = z.strictObject({
-  position: z.number().int().positive(),
-  description: z.string(),
-  planId: z.uuid().nullable(),
-  seats: z.number().int().nullable(),
-  amount: moneyView,
-  note: z.string().nullable(),
-});
+/** Where a version stands (`QĐ-97b`: a version is never replaced, so `SUPERSEDED` is not one; the database refuses it). */
+const versionState = z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'EXPIRED']);
 const versionSchema = z.strictObject({
   id: z.uuid(),
   costCenter: costCenterRef,
   year: z.number().int(),
   number: z.number().int().positive(),
-  kind: z.enum(['INITIAL', 'REVISION']),
-  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
+  state: versionState,
   proposalId: z.uuid().nullable(),
   /** The refused version this one follows when it is made again from the same proposal; set by the system. */
   rejectedPredecessorId: z.uuid().nullable(),
   base: moneyView,
+  /** Why Finance moved the base, when it did (`QĐ-100v`). */
+  baseReason: z.string().nullable(),
+  /** Where the version came from: the head's proposal, or the baseline Finance built when nobody headed the department (`QĐ-100h`). */
+  origin: z.enum(['PROPOSAL', 'BASELINE_NO_HEAD', 'BASELINE_NO_PROPOSAL', 'ADJUSTMENT']),
   reserve: moneyView,
-  /** The share of the base the reserve defaults to when the version was made; null for a version made before `QĐ-98`. */
+  /** The share of the base the reserve was made with: the default of the organization, or the share Finance chose; null for a version made before `QĐ-98`. */
   reservePercent: z.number().int().nullable(),
-  /** The reserve the share gives for the base now; Finance sees it and may differ, with a reason. */
+  /** The reserve the default share of the organization gives for the base now; Finance sees it and may differ, with a reason (asked when the version is sent). */
   defaultReserve: moneyView.nullable(),
   reserveReason: z.string().nullable(),
   total: moneyView,
-  quarters: z.strictObject({ q1: moneyView, q2: moneyView, q3: moneyView, q4: moneyView }).nullable(),
   reason: z.string().nullable(),
+  carriedOverNextYear: moneyView.meta({
+    description:
+      'What the Cost Center carries into the year of the version: the amount the requests approved so far already saved for it (zero until the requests context tells it).',
+  }),
+  belowCarriedOver: z.boolean().meta({
+    description:
+      'The red flag: the budget of the department, the base and the reserve together (total), is below carriedOverNextYear. It never stops a sending or a decision.',
+  }),
+  carriedOverShortfall: moneyView.meta({
+    description:
+      'What the base and the reserve lack of carriedOverNextYear: zero when they cover it, the amount to tell with the red flag when they do not.',
+  }),
+  noProposalSubmitted: z.boolean().meta({
+    description: 'Finance built the version from the baseline because the department had no proposal at the deadline.',
+  }),
   /** Set while the version was sent and nobody who works holds the role of the spending approver: nobody else decides it (`QĐ-93d`(1)). */
   waitingReason: z.enum(['NO_SPENDING_APPROVER']).nullable(),
   /** The latest decision of the spending approver on it. */
@@ -244,28 +275,58 @@ const versionSummarySchema = z.strictObject({
   costCenter: costCenterRef,
   year: z.number().int(),
   number: z.number().int().positive(),
-  kind: z.enum(['INITIAL', 'REVISION']),
-  state: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
+  state: versionState,
   total: moneyView,
   createdAt: z.iso.datetime(),
   sentAt: z.iso.datetime().nullable(),
 });
-const versionLineSchema = z.strictObject({
-  position: z.number().int().positive(),
-  proposalPosition: z.number().int().positive().nullable(),
-  description: z.string(),
-  planId: z.uuid().nullable(),
-  seats: z.number().int().nullable(),
-  amount: moneyView,
-  financeComment: z.string().nullable(),
-  adjustmentReason: z.string().nullable(),
+/** The budget as it is read: the base of the approved version with the adjustments approved for it, the reserve as it is (`QĐ-111bh`). */
+const effectiveBudgetSchema = z.strictObject({
+  base: moneyView.meta({
+    description:
+      'The base of the approved version plus the adjustments approved for the year (what was received less what was given).',
+  }),
+  reserve: moneyView.meta({ description: 'The reserve of the approved version; an adjustment never changes it.' }),
+  total: moneyView.meta({
+    description: 'The effective base and the reserve together: what a request is checked against.',
+  }),
+  adjustment: moneyView.meta({
+    description:
+      'What the approved adjustments added to the base of the version; negative when more was given than received.',
+  }),
 });
-/** What a head of department sees of the budget of the department: the lines of the current budget, never what is left. */
+const budgetNumbersSchema = {
+  base: moneyView.nullable().meta({
+    description:
+      'The base of the approved version, before the adjustments (the base with them is effectiveBudget.base; the check of a request names that one `base`).',
+  }),
+  reserve: moneyView.nullable(),
+  total: moneyView
+    .nullable()
+    .meta({ description: 'The base and the reserve of the approved version, before the adjustments.' }),
+  effectiveBudget: effectiveBudgetSchema.nullable().meta({
+    description: 'Null when the Cost Center has no budget of the year. What is left below is worked out on this.',
+  }),
+  committed: moneyView,
+  spent: moneyView,
+  pendingSpend: moneyView,
+  remainingBase: moneyView.nullable(),
+  remainingWithReserve: moneyView.nullable(),
+  overBudget: z.boolean(),
+};
+/** The head reads their own figures and the state of the cycle of the year, without company totals. */
 const mineSchema = z.strictObject({
   costCenter: costCenterRef,
   year: z.number().int(),
   status: z.enum(['ACTIVE', 'NO_ACTIVE_BUDGET']),
-  total: moneyView.nullable(),
+  ...budgetNumbersSchema,
+  cycle: z
+    .strictObject({
+      submissionDeadline: responseBusinessDate,
+      decisionDeadline: responseBusinessDate,
+      status: z.enum(['DRAFT', 'OPEN', 'LOCKED']),
+    })
+    .nullable(),
   version: z.strictObject({ id: z.uuid(), number: z.number().int().positive() }).nullable(),
   /** The refusal of the spending approver when the latest version of the year was refused: the head reads why. */
   latestRefusal: z.strictObject({ reason: z.string(), at: z.iso.datetime() }).nullable(),
@@ -274,29 +335,28 @@ const mineSchema = z.strictObject({
 const tableRowSchema = z.strictObject({
   costCenter: costCenterRef,
   year: z.number().int(),
-  versionId: z.uuid(),
-  number: z.number().int().positive(),
-  /** The base of the current version, before the reserve. */
-  base: moneyView,
-  /** The reserve of the current version, kept apart from the base. */
-  reserve: moneyView,
-  total: moneyView,
-  /** What is held against the budget by the commitments attached to it. */
-  committed: moneyView,
-  /** What has become an expense, which a commitment is not any more (`FR-5.8`). */
-  spent: moneyView,
-  /** The budget less what is held and what is spent; negative when more was committed than the budget allows (`US-06-07` AC-3). */
-  remaining: moneyView,
+  status: z.enum(['ACTIVE', 'NO_BUDGET']),
+  versionId: z.uuid().nullable(),
+  number: z.number().int().positive().nullable(),
+  ...budgetNumbersSchema,
+  remaining: moneyView.nullable(),
   overCommitted: z.boolean(),
+  priorPeriodAdjustment: moneyView.meta({
+    description: 'Invoices of the commitment year recorded on or after local midnight on 1 January of the next year.',
+  }),
 });
 const summaryTotalSchema = z.strictObject({
   currency: z.string(),
   base: moneyView,
   reserve: moneyView,
   total: moneyView,
+  effectiveBudget: effectiveBudgetSchema,
   committed: moneyView,
   spent: moneyView,
   remaining: moneyView,
+  pendingSpend: moneyView,
+  remainingBase: moneyView,
+  remainingWithReserve: moneyView,
   costCenterCount: z.number().int().nonnegative(),
   /** The Cost Centers whose budget is less than what is held and spent against it. */
   overBudgetCount: z.number().int().nonnegative(),
@@ -304,71 +364,71 @@ const summaryTotalSchema = z.strictObject({
 /** The company-wide figures of a year, added up for each currency: Cost Centers of two currencies are never added together. */
 const budgetSummarySchema = z.strictObject({
   year: z.number().int(),
+  annualCeiling: moneyView.nullable(),
+  sharedPoolReserve: moneyView.nullable(),
   /** Keyed by currency code, empty when no Cost Center has a current budget for the year. */
   totals: z.record(z.string(), summaryTotalSchema),
   /** When the last invoice was recorded, which is when the spent figure was last brought up to date; null when none was. */
   lastInvoiceRecordedAt: z.iso.datetime().nullable(),
+  /** What the year cost the company: every invoice of the year, those of the shared pool included, whatever they are booked to (`MG-03`). Null when the year has no cycle currency to say it in. */
+  companySpent: moneyView.nullable(),
+  /** The line of the shared pool: the invoices of the pool of the year less the seat-months charged to departments; it counts against the pool reserve of the cycle. */
+  sharedPoolUnallocated: moneyView.nullable(),
+  /** Whether the line of the pool is more than the pool reserve of the cycle (Finance is warned); null when the cycle sets no reserve. */
+  sharedPoolOverReserve: z.boolean().nullable(),
+  /** The line "not allocated to a Cost Center": the seat-months of the year that fell to a department with no Cost Center yet (`SM1-05`); in no Cost Center and not in the line of the pool. */
+  seatMonthsWithoutCostCenter: moneyView.nullable(),
 });
 export const mineVersionSummarySchema = z.strictObject({
   id: z.uuid(),
   year,
   number: z.number().int().positive(),
-  state: z.enum(['SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'SUPERSEDED', 'EXPIRED']),
+  state: z.enum(['SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'EXPIRED']),
   sentAt: z.iso.datetime(),
-});
-const importSchema = z.strictObject({
-  added: z.number().int().nonnegative(),
-  rejected: z.number().int().nonnegative(),
-  errors: z.array(z.strictObject({ row: z.number().int().positive(), code: z.string() })),
+  base: moneyView.meta({
+    description: 'The base Finance set in the version, in the currency of the version.',
+  }),
+  reserve: moneyView.meta({ description: 'The reserve on top of the base.' }),
+  total: moneyView.meta({ description: 'Base plus reserve.' }),
 });
 
 export class BudgetProposalBodyDto extends createZodDto(proposalBodySchema) {}
 export class ResubmissionBodyDto extends createZodDto(resubmissionBodySchema) {}
 export class BudgetProposalReturnBodyDto extends createZodDto(returnBodySchema) {}
 export class DecisionBodyDto extends createZodDto(decisionBodySchema) {}
-export class VersionBodyDto extends createZodDto(versionBodySchema) {}
+/** A union is not a class to extend: the value makes the DTO of the route and the same name is the type of what it validates. */
+export const VersionBodyDto = Object.defineProperty(createZodDto(versionBodySchema), 'name', {
+  value: 'VersionBodyDto',
+});
+export type VersionBodyDto = z.infer<typeof versionBodySchema>;
 export class VersionPatchDto extends createZodDto(versionPatchSchema) {}
-export class LinePatchDto extends createZodDto(linePatchSchema) {}
-export class AddLinesBodyDto extends createZodDto(addLinesBodySchema) {}
 export class ProposalListQueryDto extends createZodDto(proposalListQuerySchema) {}
 export class VersionListQueryDto extends createZodDto(versionListQuerySchema) {}
 export class PageQueryDto extends createZodDto(pageQuerySchema) {}
 export class MineQueryDto extends createZodDto(mineQuerySchema) {}
-export class MineLinesQueryDto extends createZodDto(mineLinesQuerySchema) {}
 export class MineVersionsQueryDto extends createZodDto(mineVersionsQuerySchema) {}
 export class BudgetsQueryDto extends createZodDto(budgetsQuerySchema) {}
 export class BudgetSummaryQueryDto extends createZodDto(budgetSummaryQuerySchema) {}
 export class IdParamDto extends createZodDto(idParamSchema) {}
-export class LineParamDto extends createZodDto(lineParamSchema) {}
 
 export class ProposalResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ proposal: proposalSchema })),
 ) {}
 export class ProposalPageResponseDto extends createZodDto(page(proposalSummarySchema)) {}
-export class ProposalLinePageResponseDto extends createZodDto(page(proposalLineSchema)) {}
 export class VersionResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ version: versionSchema })),
 ) {}
 export class VersionPageResponseDto extends createZodDto(page(versionSummarySchema)) {}
-export class VersionLinePageResponseDto extends createZodDto(page(versionLineSchema)) {}
-export class LineResponseDto extends createZodDto(successEnvelopeSchema(z.strictObject({ line: versionLineSchema }))) {}
 export class MineResponseDto extends createZodDto(successEnvelopeSchema(z.strictObject({ budget: mineSchema }))) {}
-export class MineLinePageResponseDto extends createZodDto(page(versionLineSchema)) {}
 export class MineVersionPageResponseDto extends createZodDto(page(mineVersionSummarySchema)) {}
 export class BudgetTablePageResponseDto extends createZodDto(page(tableRowSchema)) {}
 export class BudgetSummaryResponseDto extends createZodDto(successEnvelopeSchema(budgetSummarySchema)) {}
-export class BudgetLineImportResponseDto extends createZodDto(
-  successEnvelopeSchema(z.strictObject({ result: importSchema })),
-) {}
 
 export type ProposalWire = z.infer<typeof proposalSchema>;
 export type ProposalSummaryWire = z.infer<typeof proposalSummarySchema>;
 export type VersionSummaryWire = z.infer<typeof versionSummarySchema>;
-export type ProposalLineWire = z.infer<typeof proposalLineSchema>;
 export type VersionWire = z.infer<typeof versionSchema>;
-export type VersionLineWire = z.infer<typeof versionLineSchema>;
 export type MineWire = z.infer<typeof mineSchema>;
 export type MineVersionSummaryWire = z.infer<typeof mineVersionSummarySchema>;
 export type TableRowWire = z.infer<typeof tableRowSchema>;
 export type BudgetSummaryWire = z.infer<typeof budgetSummarySchema>;
-export type ImportWire = z.infer<typeof importSchema>;

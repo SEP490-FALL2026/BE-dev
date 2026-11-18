@@ -17,10 +17,10 @@ const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: z.strin
 export const controlledWaitSchema = z.strictObject({
   requestId: z.uuid(),
   stepId: z.uuid(),
-  stepKind: z.enum(['NEED', 'FINANCE_REVIEW', 'SPEND_APPROVAL', 'IT_ASSESSMENT']),
+  stepKind: z.enum(['NEED', 'SPEND_APPROVAL', 'IT_ASSESSMENT']),
   waitingReason: z.enum(WAITING_REASON_CODES),
   configurationHint: z
-    .enum(['CONFIGURE_SPENDING_APPROVER', 'GRANT_FINANCE_ROLE', 'ASSIGN_DEPARTMENT_HEAD', 'NAME_IT_ADMIN_IN_CHARGE'])
+    .enum(['CONFIGURE_SPENDING_APPROVER', 'ASSIGN_DEPARTMENT_HEAD', 'NAME_IT_ADMIN_IN_CHARGE'])
     .nullable(),
   waitingSince: z.iso.datetime(),
   /** When the people who can put it right were told of this stretch of waiting; null until the pass that tells them. */

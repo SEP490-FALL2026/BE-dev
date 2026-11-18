@@ -74,21 +74,21 @@ describe('who may write and who may read the events of the personnel context (in
               employeeId: who.employeeId,
               toDepartmentId: fin.id,
               effectiveOn: h.day(20),
-              grounds: h.grounds,
+              groundsNote: h.groundsNote,
             }),
           () =>
             h.ctx.app.get(LeaveService, { strict: false }).start(actor, {
               employeeId: who.employeeId,
               startedOn: h.day(-1),
               approvedReturnOn: h.day(40),
-              grounds: h.grounds,
+              groundsNote: h.groundsNote,
             }),
           () =>
             h.ctx.app.get(OffboardingService, { strict: false }).record(actor, {
               employeeId: who.employeeId,
               lastWorkingDay: h.day(10),
               accessBlockMode: 'WITH_LAST_DAY',
-              grounds: h.grounds,
+              groundsNote: h.groundsNote,
             }),
         ];
         for (const attempt of attempts)
@@ -107,7 +107,7 @@ describe('who may write and who may read the events of the personnel context (in
           employeeId: h.sa.employeeId,
           toDepartmentId: fin.id,
           effectiveOn: h.day(20),
-          grounds: h.grounds,
+          groundsNote: h.groundsNote,
         }),
       );
 
@@ -149,13 +149,13 @@ describe('who may write and who may read the events of the personnel context (in
         employeeId: mine.employeeId,
         toDepartmentId: fin.id,
         effectiveOn: h.day(20),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
       outside = await h.recorded({
         employeeId: theirs.employeeId,
         toDepartmentId: fin.id,
         effectiveOn: h.day(20),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
       // the receiving department is not in the charge of this IT Admin either, so only the first one is theirs
       void outside;
@@ -174,12 +174,12 @@ describe('who may write and who may read the events of the personnel context (in
       expect(read).toMatchObject({
         id: wire.id,
         status: 'PENDING',
-        grounds: null,
+        groundsNote: null,
         headSuccessor: null,
         cancellation: null,
       });
       const full = h.dataOf<TransferWire>(await h.readTransfer(wire.id).expect(200));
-      expect(full.grounds).toMatchObject({ reference: h.grounds.reference });
+      expect(full.groundsNote).toBe(h.groundsNote);
     });
 
     it('does not see a transfer outside its charge (404, never a hint that it exists) and cannot read the list of moves (403)', async () => {
@@ -221,12 +221,7 @@ describe('who may write and who may read the events of the personnel context (in
             employeeId,
             startedOn: h.day(-1),
             approvedReturnOn: h.day(40),
-            grounds: {
-              type: 'APPROVED_APPLICATION',
-              reference: 'DN-07/2026',
-              issuer: 'HR Department',
-              issuedOn: '2026-05-25',
-            },
+            groundsNote: 'Đơn xin nghỉ dài hạn số DN-07/2026',
           })
           .expect(201),
       );
@@ -244,7 +239,7 @@ describe('who may write and who may read the events of the personnel context (in
           employeeId: mover.employeeId,
           toDepartmentId: into.id,
           effectiveOn: h.day(20),
-          grounds: h.grounds,
+          groundsNote: h.groundsNote,
         }),
         leave: await startedLeave(away.employeeId),
         notice: await h.sentNotice(

@@ -84,9 +84,7 @@ describe('mobile channel: sign in, list, act, inbox, sign out (e2e)', () => {
     expect(plans.items.map((plan) => plan.id)).toContain(planId);
     await get(`/api/v1/requestable-plans/${planId}`, employeeSession).expect(200);
 
-    const preview = await post('/api/v1/access-requests/preview', employeeSession, { planId, termMonths: 6 }).expect(
-      200,
-    );
+    const preview = await post('/api/v1/access-requests/preview', employeeSession, { planId }).expect(200);
     expect(h.dataOf<{ preview: { canSubmit: boolean } }>(preview).preview.canSubmit).toBe(true);
 
     const sent = await post('/api/v1/access-requests', employeeSession, h.form(planId)).expect(201);
@@ -124,10 +122,9 @@ describe('mobile channel: sign in, list, act, inbox, sign out (e2e)', () => {
     const colleagueSession = await signIn(colleague);
     const hidden = await get(`/api/v1/access-requests/${requestId}`, colleagueSession).expect(404);
     expect(h.codeOf(hidden)).toBe('ACCESS_REQUEST.NOT_FOUND');
-    await post(`/api/v1/access-requests/${requestId}/need-decision`, colleagueSession, { decision: 'APPROVE' }).expect(
-      404,
-    );
-    await post(`/api/v1/access-requests/${requestId}/need-decision`, headSession, { decision: 'APPROVE' }).expect(200);
+    const approve = h.checklists.withYes('1.2', { decision: 'APPROVE' });
+    await post(`/api/v1/access-requests/${requestId}/need-decision`, colleagueSession, approve).expect(404);
+    await post(`/api/v1/access-requests/${requestId}/need-decision`, headSession, approve).expect(200);
     await h.project();
 
     const notices = await inbox(employeeSession);

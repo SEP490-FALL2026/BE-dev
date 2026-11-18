@@ -32,19 +32,15 @@ export interface AssessmentFields {
 }
 
 export type QuoteCycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
-export type QuotePaymentFrequency = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'UPFRONT_ONCE';
 
 export interface Quote {
-  /** The price before tax of one person for one billing cycle. */
+  /** The price before tax of one person for one billing cycle, in dong (`QĐ-111an`). */
   unitPrice: Money;
+  /** The price the vendor quoted in another currency, only kept beside the price in dong (R-44); null when none is recorded. */
+  originalPrice: Money | null;
   billingCycle: QuoteCycle;
   validFrom: BusinessDate;
   validUntil: BusinessDate | null;
-  /** How many months the contract binds the company; null when the whole term is paid up front. */
-  commitmentMonths: number | null;
-  paymentFrequency: QuotePaymentFrequency | null;
-  /** The day of the first payment; the day the money is expected to go out when the quote does not say. */
-  firstPaymentOn: BusinessDate | null;
 }
 
 /** What the Employee declares when the software is not in the catalog (`US-05-06` AC-1). */
@@ -54,6 +50,8 @@ export interface ProposalRecord {
   purpose: string;
   dataDescription: string;
   expectedUsers: number;
+  /** Case B, short (`QĐ-111a`): the application of the catalog the software is already in, when only the plan asked for is missing; null when the whole is new. */
+  existingApplicationId: string | null;
 }
 
 /** The assessment as kept: the fields the rules judge and the ones that are only recorded. */
@@ -61,7 +59,6 @@ export interface AssessmentRecord extends AssessmentFields {
   status: 'DRAFT' | 'COMPLETED' | 'REJECTED';
   vendorId: string | null;
   equivalentPlanId: string | null;
-  proposedBusinessOwnerEmployeeId: string | null;
   controlRiskNote: string | null;
   rejectionKind: 'UNCONTROLLABLE' | 'NOT_ELIGIBLE' | null;
   rejectionReason: string | null;

@@ -86,7 +86,7 @@ describe('evaluateDays', () => {
     expect(verdicts.map((verdict) => verdict.reason)).toEqual([null, 'INVALID_COVERAGE']);
   });
 
-  it('refuses a whole day that carries a tool which was not on the allowlist that day', () => {
+  it('drops only the tool that was not on the allowlist that day and keeps the rows of the others', () => {
     const [verdict] = evaluateDays(
       input([
         {
@@ -99,7 +99,47 @@ describe('evaluateDays', () => {
       ]),
     );
 
+    expect(verdict.reason).toBeNull();
+    expect(verdict.rows.map((row) => row.tool)).toEqual(['CODEX']);
+  });
+
+  it('refuses the day with NOT_IN_ALLOWLIST when every tool of it was dropped', () => {
+    const [verdict] = evaluateDays(
+      input([
+        {
+          date: '2026-11-04',
+          tools: [{ tool: 'ANTIGRAVITY_CLI', coverage: 'PARTIAL', responses: 1, totalTokens: 1 }],
+        },
+      ]),
+    );
+
     expect(verdict).toMatchObject({ reason: 'NOT_IN_ALLOWLIST', rows: [] });
+  });
+
+  it('judges the coverage on what is left of the day, so a dropped tool cannot make it invalid', () => {
+    const verdicts = evaluateDays(
+      input([
+        {
+          date: '2026-11-04',
+          tools: [
+            day('2026-11-04', 'COVERED').tools[0],
+            { tool: 'ANTIGRAVITY_CLI', coverage: 'NOT_OBSERVABLE', responses: 5, totalTokens: 5 },
+          ],
+        },
+        {
+          date: '2026-11-03',
+          tools: [
+            day('2026-11-03', 'COVERED').tools[0],
+            { tool: 'ANTIGRAVITY_CLI', coverage: 'PARTIAL', responses: 1, totalTokens: 1 },
+          ],
+        },
+      ]),
+    );
+
+    // 11-04 lies whole inside the window: the bad coverage belonged to the dropped tool only. 11-03 is the day of the
+    // acknowledgement: the tool that stays says COVERED, which the window cannot support.
+    expect(verdicts.map((verdict) => verdict.reason)).toEqual([null, 'INVALID_COVERAGE']);
+    expect(verdicts[0].rows.map((row) => row.tool)).toEqual(['CODEX']);
   });
 
   it('judges the allowlist for each day on its own', () => {

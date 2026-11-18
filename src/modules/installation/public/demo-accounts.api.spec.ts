@@ -118,7 +118,7 @@ describe('DemoAccountsApi.describe', () => {
 });
 
 describe('DemoAccountsApi.create', () => {
-  const attribution = { operatorReference: 'DEMO_DATASET:shared-demo-v3:op', environment: 'LOCAL_TEST' } as const;
+  const attribution = { operatorReference: 'DEMO_DATASET:shared-demo-v4:op', environment: 'LOCAL_TEST' } as const;
   const two = specs.slice(0, 2);
 
   it('reads the employees once to plan, then again inside the write transaction of each account it creates', async () => {

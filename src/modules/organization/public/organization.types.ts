@@ -25,6 +25,8 @@ export interface CreateDepartmentInput {
   organizationId: string;
   code: string;
   name: string;
+  /** The day it takes effect; the installation names today in the calendar of the organization (`QĐ-104e(3)`). */
+  effectiveFrom?: string;
 }
 
 export interface CreateEmployeeWithPlacementInput {
@@ -34,6 +36,8 @@ export interface CreateEmployeeWithPlacementInput {
   workEmail?: string | null;
   employmentType: EmploymentType;
   hireDate: BusinessDate;
+  /** The last day of the contract of a person with a term (R-38); null or absent for none. */
+  contractEndDate?: BusinessDate | null;
   /**
    * The day the person becomes a member of the department (`QĐ-66ak`). Left out, it is the hire date: only
    * the installation command does that (`QĐ-67a`). Every path inside the application passes the day the person is
@@ -51,6 +55,8 @@ export interface OfficialFieldsPatch {
   workEmail?: string | null;
   employmentType?: EmploymentType;
   hireDate?: BusinessDate;
+  /** The last day of the contract of a person with a term, null to clear it (R-38). */
+  contractEndDate?: BusinessDate | null;
   /** Free text, null to clear it (`QĐ-87e`): its display form is what is stored. */
   jobTitle?: string | null;
 }
@@ -65,6 +71,8 @@ export interface EmployeeRecord {
   status: EmployeeStatus;
   workState: EmployeeWorkState;
   hireDate: BusinessDate;
+  /** The last day of the contract of a person with a term, when it is known (R-38): a time of use that runs past it is cut there. */
+  contractEndDate?: BusinessDate | null;
   /** The free-text title on the record (`QĐ-87e`); null when there is none. */
   jobTitle?: string | null;
 }
@@ -237,6 +245,8 @@ export interface DepartmentBrief {
   code: string;
   name: string;
   active: boolean;
+  /** The day the department takes effect (`QĐ-104e(3)`): nobody is placed in it, and no head starts, before. */
+  effectiveFrom: string;
   /** A retired Cost Center has no people (`US-04-09` AC-3), so a department charged to one takes nobody in. */
   costCenterActive: boolean;
 }
@@ -300,6 +310,14 @@ export interface CostCenterBrief {
 /** The placement of a person in force on a day, with the days it covers: the first day, and the last (exclusive) when it is to end. */
 export interface PlacementInForce {
   placementId: string;
+  departmentId: string;
+  validFrom: BusinessDate;
+  validTo: BusinessDate | null;
+}
+
+/** A stretch of days a person is placed in one department, `[validFrom, validTo)`, `validTo` null while it is open. */
+export interface EmployeePlacementSpan {
+  employeeId: string;
   departmentId: string;
   validFrom: BusinessDate;
   validTo: BusinessDate | null;

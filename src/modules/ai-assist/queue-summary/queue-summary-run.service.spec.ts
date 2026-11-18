@@ -262,6 +262,38 @@ describe('QueueSummaryRunService', () => {
     expect(finished).toEqual([]);
   });
 
+  it('records the answer after it finishes the call and before the audit event, all in one transaction', async () => {
+    const { repo, row } = await ran(GOOD);
+
+    const ended = repo.steps.slice(repo.steps.findIndex((entry) => entry.step === 'finish'));
+    expect(ended.map((entry) => entry.step)).toEqual(['finish', 'recordAnswered', 'audit:AI_INVOCATION.COMPLETED']);
+    expect(new Set(ended.map((entry) => entry.tx)).size).toBe(1);
+    expect(row.result).toMatchObject({ total: 2 });
+  });
+
+  it('records no answer for a call that did not answer, as a failed one', async () => {
+    const { repo, row } = await ran(() => new AiServiceUnavailableError(503, 'MODEL_LOADING'));
+
+    expect(row.status).toBe('FAILED');
+    expect(repo.steps.map((entry) => entry.step)).not.toContain('recordAnswered');
+    expect(row.result).toBeNull();
+  });
+
+  it('writes no answer and no event when it lost the race: the call was no longer RUNNING when it finished', async () => {
+    const { repo, row, finished } = await ran(GOOD, (world) => {
+      const finish = world.repo.finish.bind(world.repo);
+      jest.spyOn(world.repo, 'finish').mockImplementation((tx, id, outcome, at) => {
+        world.repo.rows.get(id)!.status = 'FAILED';
+
+        return finish(tx, id, outcome, at);
+      });
+    });
+
+    expect(repo.steps.map((entry) => entry.step)).not.toContain('recordAnswered');
+    expect(row.result).toBeNull();
+    expect(finished).toEqual([]);
+  });
+
   it('aborts the call under way when the module stops, and records it', async () => {
     const world = queueSummaryWorld();
     world.source.steps = [sourceStep(1)];

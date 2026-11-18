@@ -4,7 +4,7 @@
  * the step to nobody, so its step waits and is never in a queue; rows 3 and 4 (the approver of last resort, `QĐ-93c`) are not written
  * any more, and the migration that drops the old roles refuses a database that still has a pending step on one.
  */
-export const HELD_ROUTING_ROWS = [1, 2, 5, 9] as const;
+export const HELD_ROUTING_ROWS = [1, 5, 9] as const;
 
 /** The longest excerpt of the reason a row of the queue shows; the whole reason is read on the request. */
 export const REASON_EXCERPT_LENGTH = 200;

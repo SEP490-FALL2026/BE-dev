@@ -3,7 +3,7 @@ import type { AuditEventInput, AuditValue } from '../../audit/public/audit.types
 
 /** The audit event for a change made by `actor` (a user acting as themselves), correlated by their session. */
 export function accessRequestAuditEvent(
-  actor: AuthenticatedPrincipal,
+  actor: AuthenticatedPrincipal | null,
   organizationId: string,
   action: string,
   resourceType: string,
@@ -12,14 +12,14 @@ export function accessRequestAuditEvent(
 ): AuditEventInput {
   return {
     organizationId,
-    actorKind: 'USER',
-    actorAppUserId: actor.appUserId,
-    actorRoles: actor.roles,
+    actorKind: actor === null ? 'SYSTEM' : 'USER',
+    actorAppUserId: actor?.appUserId ?? null,
+    actorRoles: actor?.roles ?? [],
     action,
     resourceType,
     resourceId,
     before: null,
     after,
-    correlationId: actor.sessionId,
+    correlationId: actor?.sessionId ?? resourceId,
   };
 }

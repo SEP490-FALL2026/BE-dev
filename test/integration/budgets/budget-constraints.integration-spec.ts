@@ -5,6 +5,10 @@ const h = new BudgetHarness();
 const CHECK = '23514';
 const UNIQUE = '23505';
 const FOREIGN_KEY = '23503';
+const NOT_NULL = '23502';
+/** The casts a line column needs when it is sent as text. */
+const lineCast = (column: string): string =>
+  column === 'repeat_cycle' ? '::"BudgetRepeatCycle"' : column === 'line_type' ? '::"BudgetLineType"' : '';
 
 /** The SQLSTATE a rejected statement carries: the constraint, not the application, said no. */
 async function sqlState(text: string, values: unknown[] = []): Promise<string | null> {
@@ -73,7 +77,6 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
       reserve_minor: 20,
       total_minor: 80,
       currency: 'VND',
-      high_value_percent: 50,
       created_by_employee_id: employeeId,
       ...over,
     };
@@ -143,19 +146,18 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
       const row = {
         proposal_id: source.id,
         position: 1,
+        // BM-10 lines are ranked: the rank is required (QT 4.4) and given once in a proposal.
+        priority_rank: 1,
+        line_type: 'RENEW',
         description: 'Figma',
         amount_minor: 50,
-        window_from: '2027-03-01',
-        window_to: '2027-03-31',
-        service_period_months: 12,
-        repeat_cycle: 'ANNUAL',
         ...over,
       };
       const columns = Object.keys(row);
 
       return sqlState(
         `INSERT INTO budget_proposal_lines (${columns.join(', ')})
-         VALUES (${columns.map((column, index) => `$${index + 1}${column === 'repeat_cycle' ? '::"BudgetRepeatCycle"' : ''}`).join(', ')})`,
+         VALUES (${columns.map((column, index) => `$${index + 1}${lineCast(column)}`).join(', ')})`,
         columns.map((column) => (row as Record<string, unknown>)[column]),
       );
     };
@@ -168,12 +170,19 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
       ['a blank description', { description: ' ' }],
       ['no seats at all', { seats: 0 }],
       ['a negative amount', { amount_minor: -1 }],
-      ['a window that runs backwards', { window_from: '2027-04-01', window_to: '2027-03-01' }],
-      ['a service period of no months', { service_period_months: 0 }],
+      // G5-03 (RV-15): the purchase window, the service period and the repeat cycle are retired, never written again.
+      ['a purchase window (retired)', { window_from: '2027-03-01', window_to: '2027-03-31' }],
+      ['a service period (retired)', { service_period_months: 12 }],
+      ['a repeat cycle (retired)', { repeat_cycle: 'ANNUAL' }],
+      ['the validity of a quote (retired)', { quote_valid_until: '2027-03-31' }],
       ['a position that is not a position', { position: 0 }],
       ['a blank note', { note: ' ' }],
     ])('refuses %s', async (_name, over) => {
       expect(await line(over)).toBe(CHECK);
+    });
+
+    it('G5-03 refuses a line that names no kind: there is no default kind any more', async () => {
+      expect(await line({ line_type: null })).toBe(NOT_NULL);
     });
   });
 
@@ -196,7 +205,7 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
       expect(sameNumber.state).toBeNull();
     });
 
-    it('has one current version for a Cost Center and a year, and any number of replaced ones', async () => {
+    it('has one current version for a Cost Center and a year, and none that is replaced (QĐ-97b: SUPERSEDED is retired)', async () => {
       const sent = { sent_at: new Date(), sent_by_employee_id: employeeId };
       const current = await version({ state: 'APPROVED', ...sent });
       const another = await version({
@@ -216,20 +225,23 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
 
       expect(current.state).toBeNull();
       expect(another.state).toBe(UNIQUE);
-      expect(replaced.state).toBeNull();
+      // `budget_versions_no_superseded` (migration BM-10): a version is never replaced, so the state cannot be written any more.
+      expect(replaced.state).toBe(CHECK);
     });
 
     it.each([
       ['a total that is not the base and the reserve', { total_minor: 79 }],
       ['a negative reserve', { reserve_minor: -1, total_minor: 59 }],
-      ['a threshold over a hundred percent', { high_value_percent: 101 }],
+      // G5-03 (RV-15): the high-value thresholds and the reason of a revision are retired, never written again.
+      ['a high-value threshold (retired)', { high_value_percent: 50 }],
+      ['a high-value amount (retired)', { high_value_amount_minor: 1 }],
       ['quarters that do not add up to the total', { q1_minor: 20, q2_minor: 20, q3_minor: 20, q4_minor: 15 }],
       ['only some of the quarters', { q1_minor: 80 }],
       ['a first version with no proposal', { proposal_id: null }],
       ['a revision of nothing', { kind: 'REVISION', proposal_id: null }],
       ['a sent version that says it was not sent', { state: 'SENT' }],
       ['a draft that says it was sent', { sent_at: new Date(), sent_by_employee_id: employeeId }],
-      ['a blank reason', { reason: ' ' }],
+      ['a reason of a revision (retired)', { reason: 'Cut to the plan' }],
       ['a year that is not a year', { year: 27 }],
       ['a number that is not a number', { number: 0 }],
     ])('refuses %s', async (_name, over) => {
@@ -240,7 +252,7 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
       expect((await version({ q1_minor: 20, q2_minor: 20, q3_minor: 20, q4_minor: 20 })).state).toBeNull();
     });
 
-    it('refuses a sent revision that carries no reason, and takes it with one', async () => {
+    it('G5-03 refuses a revision, with or without a reason (QĐ-97b: a version is never revised)', async () => {
       const base = await version({ state: 'APPROVED', sent_at: new Date(), sent_by_employee_id: employeeId });
       const revision = {
         cost_center_id: base.costCenter,
@@ -254,7 +266,8 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
       };
 
       expect((await version(revision)).state).toBe(CHECK);
-      expect((await version({ ...revision, reason: 'Cut to the plan' })).state).toBeNull();
+      expect((await version({ ...revision, reason: 'Cut to the plan' })).state).toBe(CHECK);
+      expect(await sqlState(`UPDATE budget_versions SET kind = 'REVISION' WHERE id = $1`, [base.id])).toBe(CHECK);
     });
   });
 
@@ -264,18 +277,15 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
       const row = {
         version_id: source.id,
         position: 1,
+        line_type: 'RENEW',
         description: 'Figma',
         amount_minor: 50,
-        window_from: '2027-03-01',
-        window_to: '2027-03-31',
-        service_period_months: 12,
-        repeat_cycle: 'ANNUAL',
         ...over,
       };
       const columns = Object.keys(row);
       const state = await sqlState(
         `INSERT INTO budget_version_lines (${columns.join(', ')})
-         VALUES (${columns.map((column, index) => `$${index + 1}${column === 'repeat_cycle' ? '::"BudgetRepeatCycle"' : ''}`).join(', ')})`,
+         VALUES (${columns.map((column, index) => `$${index + 1}${lineCast(column)}`).join(', ')})`,
         columns.map((column) => (row as Record<string, unknown>)[column]),
       );
 
@@ -287,7 +297,9 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
       for (const over of [
         { description: ' ' },
         { amount_minor: -1 },
-        { window_from: '2027-05-01', window_to: '2027-04-01' },
+        // G5-03: a retired column is never written again.
+        { window_from: '2027-03-01', window_to: '2027-03-31' },
+        { repeat_cycle: 'ANNUAL' },
         { finance_comment: ' ' },
         { adjustment_reason: ' ' },
         { proposal_id: randomUUID() },
@@ -302,7 +314,25 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
       expect((await versionLine({ proposal_id: source.id, proposal_position: 3 })).state).toBe(FOREIGN_KEY);
     });
 
-    it('keeps the move of a window with its reason, and refuses one without or backwards', async () => {
+    it('G5-03 refuses a line that names no kind, and keeps an old window as it is while the rest of the line changes', async () => {
+      expect((await versionLine({ line_type: null })).state).toBe(NOT_NULL);
+
+      // A line written before the window was retired keeps it; the line stays editable, the window does not change any more.
+      const { versionId } = await versionLine();
+      await h.ctx.sql.query(
+        `ALTER TABLE budget_version_lines DISABLE TRIGGER budget_version_lines_retired_columns;
+         UPDATE budget_version_lines SET window_from = '2027-03-01', window_to = '2027-03-31' WHERE version_id = '${versionId}';
+         ALTER TABLE budget_version_lines ENABLE TRIGGER budget_version_lines_retired_columns;`,
+      );
+      expect(
+        await sqlState(`UPDATE budget_version_lines SET amount_minor = 60 WHERE version_id = $1`, [versionId]),
+      ).toBeNull();
+      expect(
+        await sqlState(`UPDATE budget_version_lines SET window_to = '2027-04-30' WHERE version_id = $1`, [versionId]),
+      ).toBe(CHECK);
+    });
+
+    it('G5-03 takes no move of a window any more (QĐ-97b), with or without a reason', async () => {
       const { versionId } = await versionLine();
       const change = (reason: string, after: [string, string]) =>
         sqlState(
@@ -312,7 +342,7 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
           [versionId, after[0], after[1], reason, employeeId],
         );
 
-      expect(await change('The purchase slipped', ['2027-06-01', '2027-06-30'])).toBeNull();
+      expect(await change('The purchase slipped', ['2027-06-01', '2027-06-30'])).toBe(CHECK);
       expect(await change('  ', ['2027-06-01', '2027-06-30'])).toBe(CHECK);
       expect(await change('Backwards', ['2027-07-01', '2027-06-30'])).toBe(CHECK);
     });

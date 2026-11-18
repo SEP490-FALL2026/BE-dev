@@ -188,10 +188,13 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       'currencyList',
       'deviceSessionGet',
       'employeeDashboardGet',
+      'ghostSeatOptimizationSummaryGet',
       'healthGetLiveness',
       'healthGetReadiness',
       'itAdminDashboardGet',
       'managerDashboardGet',
+      'meAvatarDelete',
+      'meDepartmentTransferGet',
       'meDepartureNoticeGet',
       'meGet',
       'monitoringNoticeCurrentGet',
@@ -266,8 +269,31 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
         })
         .map((operation) => operation.key);
 
-      expect(operations).toHaveLength(341);
+      // 344 at gói 7; 375 with MF-5 (ghost seats, usage), 381 with K4 withdrawal, the run by hand of G1–G4 and the four routes of the history; 378 with QĐ-111g (five Business Owner routes out, the responsibility transfer and the IT Admin list in); 374 with QĐ-110g (the four routes of the handover out); 375 with the flag of a machine account (P13) and 371 with QĐ-110m (the four routes of the service accounts out); 372 with MF2-G.1 (the lock of the mailbox for good, P28) and 371 with MF2-G.3 (the closing route of the IT Admin out, P4: the system closes the case); 366 with MF3-A.1 (the closing of a transfer and the four routes of the review of the new head out, P9); 367 with MF3-B.5 (the transfer of the person who asks while the grace lasts, P8); 369 with X-IT.3 (the hand-over of an IT Admin who leaves, P5: one route for a departure, one for a transfer). 372 with DS.2 (the list of software of a department: read, change, and the list of my department, P16 and P17); 376 with DS.3 (the proposals to add to it: propose, list, accept, reject, P18); 377 with RD.2 (the report of the SLA of the revocations, P22); 379 with RD.3 (the preview of a departure and of a transfer, P23); 376 with FX-2 (the list and the record of exchange rates and the setting of the reporting currency out); 378 with IN-1.3 (the count of the proposals waiting by department and the list of the assessments decided); 379 with IA-2.1 (the stock of the plans by what they give out); 383 with CO-1.2 (the list of contracts, the change of one, and the link and the unlink of a subscription); 384 with B2D-01 (the usage sources of the applications of a contract, for the IT Admin and Finance); 385 with US-1.2 (the series of the usage by period); 387 with US-1.3 (the software of one person and the detail of one software); 388 with US-1.4 (the history of the usage imports).
+      // 404 with the sixteen of lane B (PL-1, PL-3, PF-1: the policies, the template of an import file, the picture and the work phone);
+      // 398 once the six routes of the budget lines are gone (BG-2.3: a proposal is a file and an amount, a version one figure).
+      // 407 once lane A (PI-1, PI-2: purchase invoices) and lane B (PL-1, PL-3, PF-1, BG-2.3) are merged.
+      // 395 with PI-1.4 (the five routes of purchase invoices); 397 with PI-1.6 (Finance signs or returns one); 396 with PI-1.7 (Finance no longer records an invoice by hand); 397 with PI-2 (the periods that have no invoice); 400 with RC-1 (the cases of invoices that differ: list, read, close); 404 with RC-2 (the differences of the accounts at the vendors: list, decide; the cases outside the process: list, close).
+      // 414 once lane B (FIX-LB1…LB4) and lane A (RC-1, RC-2: discrepancies of invoices and of vendor accounts, out-of-process cases) are merged again.
+      // 418 with RV-1.3 (close a month, list the months closed, read one); 419 with RV-1.4 (sign one).
+      // 422 with AD-1.2 (ask for an adjustment, list them, decide one); 423 with RV-3.1 (a head explains a Cost Center of a quarter).
+      // 426 with FX-T9a (stop-collection requests: the holder asks, the IT Admin lists and completes).
+      // 429 with QĐ-113c/e (the picture of a department: put and delete; the first placement of an employee).
+      expect(operations).toHaveLength(429);
       expect(missing).toEqual([]);
+    });
+
+    it('QĐ-111an: says nothing of a rate, a conversion at a rate or a missing rate: every amount is in dong and nothing is converted', () => {
+      const STALE =
+        /RATE_MISSING|NO_RATE|EXCHANGE_RATE|exchange rate|at the rate|rate entered|rate missing|no rate for/i;
+      const stale: string[] = [];
+      visit(document, '#', (node, at) => {
+        for (const [key, value] of Object.entries(node)) {
+          if (typeof value === 'string' && STALE.test(value)) stale.push(`${at}/${key}`);
+        }
+      });
+
+      expect(stale).toEqual([]);
     });
 
     it('keeps the account lockout branch next to the global limit where both can answer 429', () => {
@@ -291,6 +317,56 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
         );
 
       expect(routeHandlersOf(app).filter((handler) => skips(handler.target) || skips(handler.controller))).toEqual([]);
+    });
+
+    it('says, on the two tables of wasted seats, which department the filter reads, with no internal code in the words', () => {
+      const departmentFilter = (path: string): string => {
+        const parameters = (document.paths[path]?.get?.parameters ?? []) as { name?: string; description?: string }[];
+
+        return parameters.find((parameter) => parameter.name === 'departmentId')?.description ?? '';
+      };
+      const recommendations = departmentFilter('/api/v1/ghost-seat-recommendations');
+      const seatStates = departmentFilter('/api/v1/ghost-seat-seat-states');
+
+      // The recommendations are filtered by the department that owned the seat when it was recommended, the seat states by where the holder is now.
+      expect(recommendations).toContain('owned the seat when it was recommended');
+      expect(recommendations).toContain('not where the holder is placed now');
+      expect(seatStates).toContain('placed in this department today');
+      expect(seatStates).toContain('not the department of a recommendation');
+      expect([recommendations, seatStates].filter((description) => INTERNAL_CODE.test(description))).toEqual([]);
+    });
+
+    it('B2B-03: says that SOON runs to the last day of the period and EXPIRED starts after it, not after the deadline to cancel', () => {
+      const wording: string[] = [];
+      visit(document, '#', (node) => {
+        const description = (node as { description?: unknown }).description;
+        if (typeof description === 'string' && /\bSOON\b/.test(description)) wording.push(description);
+      });
+      // The expiry filter of the list, the field of a row and the description of the list itself.
+      expect(wording.length).toBeGreaterThanOrEqual(3);
+      expect(
+        wording.filter((description) => !description.includes('last day') || /past the deadline/.test(description)),
+      ).toEqual([]);
+
+      const daysLeft: string[] = [];
+      visit(document, '#', (node, at) => {
+        const description = (node as { description?: unknown }).description;
+        if (at.endsWith('/daysLeft') && typeof description === 'string') daysLeft.push(description);
+      });
+      expect(daysLeft.length).toBeGreaterThan(0);
+      const kinds: string[] = [];
+      visit(document, '#', (node, at) => {
+        const description = (node as { description?: unknown }).description;
+        if (at.endsWith('/deadlineKind') && typeof description === 'string') kinds.push(description);
+      });
+      expect(kinds.length).toBeGreaterThan(0);
+      // Once EXPIRED the kind is the one of the last day: not only the renewal or the end day, also the payment day and the deadline itself.
+      expect(kinds.filter((description) => !/once EXPIRED, the last day of the period/.test(description))).toEqual([]);
+      expect(
+        daysLeft.filter(
+          (description) => !description.includes('once EXPIRED it counts from the last day of the period'),
+        ),
+      ).toEqual([]);
     });
 
     it('keeps the guard and unavailable codes the client already handles (Q8)', () => {

@@ -11,13 +11,14 @@ describe('draftPolicyJson (access_requests.policy of a draft)', () => {
     expect(draftPolicyJson.decode(JSON.parse(JSON.stringify(stored)))).toEqual(stored);
   });
 
-  it('reads an old draft without forwarding the retired project label', () => {
+  it('reads an old draft without forwarding the retired project label or the retired end date, and keeps the months of use (QĐ-111i)', () => {
     const policy = {
       draft: {
         kind: 'INDIVIDUAL',
         planId: '8a4d7c1e-2b3f-4c5d-9e6f-0a1b2c3d4e5f',
         businessReason: 'Work',
         termMonths: 3,
+        expectedEndDate: '2027-03-31',
         projectLabel: 'old',
       },
     };

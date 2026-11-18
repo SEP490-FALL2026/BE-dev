@@ -12,6 +12,7 @@ import {
 } from './contract.errors';
 import {
   LINK_TTL_SECONDS,
+  NEW_DOCUMENT_PURPOSES,
   assertAttachable,
   assertFileAllowed,
   assertMayChoosePurpose,
@@ -63,6 +64,19 @@ describe('who chooses which purpose of a file (US-04-04 AC-6, AC-9)', () => {
   });
 });
 
+describe('the purposes a new file may be declared with', () => {
+  it('US-04-04 AC-11: has no bank statement: a file kept before still reads as one, no new one is taken', () => {
+    expect(NEW_DOCUMENT_PURPOSES).toEqual([
+      'CONTRACT_ATTACHMENT',
+      'PURCHASE_DOCUMENT',
+      'TAX_PAYMENT_PROOF',
+      'SIGNATURE_RECORD',
+      'IMPORT_SOURCE',
+    ]);
+    expect(NEW_DOCUMENT_PURPOSES).not.toContain('COST_STATEMENT');
+  });
+});
+
 describe('the purposes that have somewhere to be attached today', () => {
   it('are the two that attach to a contract and the signed record that attaches to its signer', () => {
     expect(() => {
@@ -95,6 +109,17 @@ describe('what a file is attached to', () => {
     expect(() => {
       assertPurposeAttachesTo('CONTRACT_ATTACHMENT', 'SIGNER');
     }).toThrow(DocumentPurposeMismatchError);
+  });
+
+  it('attaches only a purchase document to the purchase invoice it came with (PI-1)', () => {
+    expect(() => {
+      assertPurposeAttachesTo('PURCHASE_DOCUMENT', 'PURCHASE_INVOICE');
+    }).not.toThrow();
+    for (const purpose of ['CONTRACT_ATTACHMENT', 'SIGNATURE_RECORD', 'COST_STATEMENT', 'TAX_PAYMENT_PROOF'] as const) {
+      expect(() => {
+        assertPurposeAttachesTo(purpose, 'PURCHASE_INVOICE');
+      }).toThrow(DocumentPurposeMismatchError);
+    }
   });
 });
 

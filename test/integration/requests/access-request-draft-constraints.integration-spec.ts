@@ -137,9 +137,7 @@ describe('the draft of a request (integration, PostgreSQL constraints)', () => {
         amount_currency: reportingCurrency,
         unit_price_minor: '100000',
         billing_cycle: 'MONTHLY',
-        expected_spend_on: '2026-11-01',
         budget_year: 2026,
-        payment_schedule: JSON.stringify([{ periodIndex: 1, amountMinor: '100000' }]),
       };
 
       expect((await insertRequest({ ...priced, cost_center_id: null })).refused).toEqual(
@@ -202,8 +200,9 @@ describe('the draft of a request (integration, PostgreSQL constraints)', () => {
         (requestId) =>
           refusal(
             `INSERT INTO request_budget_checks (id, organization_id, request_id, number, trigger, route, stale_cost_evidence,
-               plan_line_overdue, period_closed, off_plan, currency, binding_total_minor)
-             VALUES (gen_random_uuid(), $1, $2, 1, $3::"BudgetCheckTrigger", $4::"BudgetCheckRoute", false, false, false, false, $5, 1)`,
+               plan_line_overdue, period_closed, off_plan, currency, binding_total_minor, outcome)
+             VALUES (gen_random_uuid(), $1, $2, 1, $3::"BudgetCheckTrigger", $4::"BudgetCheckRoute", false, false, false, false, $5, 1,
+               'WITHIN_BASE')`,
             [h.seed.organizationId, requestId, checkTrigger, checkRoute, reportingCurrency],
           ),
       ],
@@ -265,7 +264,6 @@ describe('the draft of a request (integration, PostgreSQL constraints)', () => {
   });
 
   describe('a draft is judged by the price and group rules of a request when it is sent (F71)', () => {
-    const SCHEDULE = JSON.stringify([{ dueOn: '2027-01-05', amountMinor: '90', budgetYear: 2027 }]);
     // A function: the plan exists only once the suite has started.
     const priced = () => ({
       branch: 'PAID_IN_CATALOG',
@@ -275,8 +273,6 @@ describe('the draft of a request (integration, PostgreSQL constraints)', () => {
       amount_currency: 'USD',
       unit_price_minor: 15,
       billing_cycle: 'MONTHLY',
-      payment_schedule: SCHEDULE,
-      expected_spend_on: '2027-01-05',
       budget_year: 2027,
     });
 

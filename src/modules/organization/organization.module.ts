@@ -7,6 +7,7 @@ import { DepartmentHeadRepo } from './department/department-head.repo';
 import { DepartmentRepo } from './department/department.repo';
 import { DepartmentUseService } from './department/department-use.service';
 import { EmployeeRecordService } from './employee/employee-record.service';
+import { FirstPlacementUseService } from './employee/first-placement-correction/first-placement-use.service';
 import { EmployeeDepartureRepo } from './employee/employee-departure.repo';
 import { EmployeeRepo } from './employee/employee.repo';
 import { ImportLookupRepo } from './employee/import-lookup.repo';
@@ -19,9 +20,11 @@ import { OrganizationApi } from './public/organization.api';
 import { OrganizationReadApi } from './public/organization-read.api';
 import {
   CostCenterUseContributions,
+  DepartmentCreationWindowHook,
   DepartmentServiceAccountReaderHook,
   DepartmentUseContributions,
   EmployeeAccountsHook,
+  FirstPlacementUseContributions,
   OrganizationChangeListeners,
 } from './public/organization.extension-points';
 
@@ -42,7 +45,10 @@ import {
     DepartmentUseContributions,
     CostCenterUseContributions,
     DepartmentServiceAccountReaderHook,
+    DepartmentCreationWindowHook,
     EmployeeAccountsHook,
+    FirstPlacementUseContributions,
+    FirstPlacementUseService,
     OrganizationChangeService,
     AnnouncementRepo,
     OrganizationHistoryApi,
@@ -77,7 +83,10 @@ import {
     DepartmentUseContributions,
     CostCenterUseContributions,
     DepartmentServiceAccountReaderHook,
+    DepartmentCreationWindowHook,
     EmployeeAccountsHook,
+    FirstPlacementUseContributions,
+    FirstPlacementUseService,
   ],
 })
 export class OrganizationModule {}

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { HeldSeat } from './subscription-renewal.types';
+import type { HeldSeat, SeatsNeededFacts } from './subscription-renewal.types';
 
 interface RawSeat {
   assignment_id: string;
@@ -21,9 +21,9 @@ const OPEN_TASK_STATES = ['QUEUED', 'RETRY_SCHEDULED', 'IN_PROGRESS', 'FAILED'];
 const LIVE_REVOCATION_STATES = ['QUEUED', 'RETRY_SCHEDULED', 'IN_PROGRESS', 'FAILED', 'COMPLETED'];
 
 /**
- * The seats of a subscription as its renewal reads and carries them: who holds one, whether a revocation is under way and why,
- * whether a task is still open, and the carrying of the seats held on the first day of a new period to that period, each new seat
- * naming the one it continues (`QĐ-35c`). The database keeps the seats bought (INV-01) and the one seat of a person (INV-02).
+ * The seats of a subscription as its renewal reads them: who holds one, whether a revocation is under way and why, and whether a
+ * task is still open. Carrying the seats held on the first day of a new period to that period (`QĐ-35c`) is the work of
+ * `AssignmentRenewalService.carry`, the one writer of the carried seats. The database keeps the seats bought (INV-01).
  */
 @Injectable()
 export class SubscriptionRenewalSeatRepo {
@@ -41,7 +41,7 @@ export class SubscriptionRenewalSeatRepo {
              to_char(a.expected_end_date, 'YYYY-MM-DD') AS expected_end_date,
              (SELECT array_agg(DISTINCT r.source::text ORDER BY r.source::text)
                 FROM provisioning_tasks t JOIN provisioning_task_reasons r ON r.task_id = t.id
-               WHERE t.assignment_id = a.id AND t.kind = 'REVOKE'
+               WHERE t.assignment_id = a.id AND t.kind = 'REVOKE' AND r.withdrawn_at IS NULL
                  AND t.status::text = ANY(${LIVE_REVOCATION_STATES}::text[])) AS live_sources,
              EXISTS (SELECT 1 FROM provisioning_tasks t
                       WHERE t.assignment_id = a.id AND t.status::text = ANY(${OPEN_TASK_STATES}::text[])) AS has_open_task
@@ -78,37 +78,39 @@ export class SubscriptionRenewalSeatRepo {
   }
 
   /**
-   * Carries the seats to the new period in the caller's transaction: a new seat on the new subscription from its first day for
-   * each, naming the seat it continues and keeping its person, account, Cost Center and expected end; then each old seat ends that
-   * day, so no day has the person twice or not at all. Returns how many were carried.
+   * The seats of the subscription as the count of the seats its next period needs reads them (`SBF-20` §4.3), in one statement: the
+   * ones held past `renewalOn`, the ones in effect today that end by it, and the ones not ended today. The last day of a seat is the
+   * earlier of the day before `valid_until` and `expected_end_date` (none: it does not end); a seat with a revocation under way is
+   * counted only among the seats not ended today. The requests approved and waiting for their grant hold no seat yet: the module of
+   * requests counts them (`RenewalHold.approvedAwaitingGrantOfPlan`).
    */
-  async carry(
-    tx: DbTx,
-    input: {
-      assignmentIds: readonly string[];
-      nextSubscriptionId: string;
-      startDate: BusinessDate;
-      actorAppUserId: string;
-    },
-  ): Promise<number> {
-    if (input.assignmentIds.length === 0) return 0;
-    const ids = [...input.assignmentIds];
-    const inserted = await tx.$executeRaw`
-      INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
-             account_identifier, normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from,
-             valid_from_basis, valid_until, expected_end_date, predecessor_id, created_by_app_user_id)
-      SELECT gen_random_uuid(), a.organization_id, a.kind, 'RENEWAL_CARRY', a.plan_id, ${input.nextSubscriptionId}::uuid,
-             a.employee_id, a.account_identifier, a.normalized_account_identifier, a.reason, a.cost_center_id,
-             a.owning_department_id, ${input.startDate}::date, 'RECORDED',
-             CASE WHEN a.valid_until > ${input.startDate}::date THEN a.valid_until END, a.expected_end_date, a.id,
-             ${input.actorAppUserId}::uuid
-        FROM license_assignments a
-       WHERE a.id = ANY(${ids}::uuid[])
-       ORDER BY a.valid_from, a.id`;
-    await tx.$executeRaw`
-      UPDATE license_assignments SET valid_until = ${input.startDate}::date
-       WHERE id = ANY(${ids}::uuid[])`;
+  async seatsNeededFacts(
+    subscriptionId: string,
+    days: { today: BusinessDate; renewalOn: BusinessDate },
+    tx?: DbTx,
+  ): Promise<SeatsNeededFacts> {
+    const [row] = await (tx ?? this.prisma).$queryRaw<
+      { held_past_renewal: number; ending_ids: string[]; active_today: number }[]
+    >`
+      WITH seats AS (
+        SELECT a.id, a.valid_from, a.valid_until, LEAST(a.valid_until - 1, a.expected_end_date) AS last_day,
+               EXISTS (SELECT 1 FROM provisioning_tasks t JOIN provisioning_task_reasons r ON r.task_id = t.id
+                        WHERE t.assignment_id = a.id AND t.kind = 'REVOKE' AND r.withdrawn_at IS NULL
+                          AND t.status::text = ANY(${LIVE_REVOCATION_STATES}::text[])) AS being_taken_back
+          FROM license_assignments a
+         WHERE a.subscription_id = ${subscriptionId}::uuid AND a.failed_at IS NULL AND a.cancelled_at IS NULL)
+      SELECT count(*) FILTER (WHERE NOT being_taken_back AND (last_day IS NULL OR last_day > ${days.renewalOn}::date))::int
+               AS held_past_renewal,
+             COALESCE(array_agg(id::text ORDER BY valid_from, id) FILTER (
+               WHERE NOT being_taken_back AND last_day <= ${days.renewalOn}::date AND valid_from <= ${days.today}::date
+                 AND (valid_until IS NULL OR valid_until > ${days.today}::date)), '{}') AS ending_ids,
+             count(*) FILTER (WHERE valid_until IS NULL OR valid_until > ${days.today}::date)::int AS active_today
+        FROM seats`;
 
-    return inserted;
+    return {
+      heldPastRenewal: row.held_past_renewal,
+      endingAssignmentIds: row.ending_ids,
+      activeSeatsToday: row.active_today,
+    };
   }
 }

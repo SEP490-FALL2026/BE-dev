@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { unplacedEmployeeSql } from '../employee/employee.repo';
 import {
   parseSearchTerm,
@@ -104,6 +105,17 @@ async function fetchPlacementHistory(
 @Injectable()
 export class EmployeeDirectoryRepo {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** The full name of each of these employees, by id, in one read; an id that does not exist is absent (the notification text names a person by it). */
+  async namesOf(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).employee.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, fullName: true },
+    });
+
+    return new Map(rows.map((row) => [row.id, row.fullName]));
+  }
 
   /**
    * Reads a page of employees and the total count inside a single RepeatableRead snapshot (API-LIST-DETAIL.1).

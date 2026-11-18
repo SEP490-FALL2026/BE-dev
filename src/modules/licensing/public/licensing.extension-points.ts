@@ -7,13 +7,14 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { PendingRenewal } from './licensing-renewal.types';
 import type { RenewalFinancialReader, RenewalUsageReader } from './licensing-subscription-renewal.types';
-import type { SeatBaselineClosedHolder } from './licensing-seat-baseline.types';
-import type { PendingFileQuery, PendingPersonnelFile } from './licensing-service-account.types';
+import type { SeatBaselineClosedHolder } from './licensing.types';
 import type {
   GrantOutcome,
   GrantRequestAnswer,
   RevocationContext,
   RevocationReasonFacts,
+  GrantOutcomeFacts,
+  ProvisioningKind,
   RevocationTaskFacts,
 } from './licensing.types';
 
@@ -32,8 +33,38 @@ export interface GrantRequestGate {
    * the state of a request being carried out (what lets it be granted once). Any answer but `GRANTABLE` leaves it as it was.
    */
   claimForGrant(tx: DbTx, requestId: string, employeeId?: string): Promise<GrantRequestAnswer>;
-  /** Inside the transaction that completes or closes as failed the task of a grant: says how the request ended. */
-  reportOutcome(tx: DbTx, requestId: string, outcome: GrantOutcome, employeeId?: string): Promise<void>;
+  /**
+   * Inside the transaction that completes or closes as failed the task of a grant: says how the request ended. A completed grant also says
+   * what was granted (`facts`): from the pool or not, the kind, the day, the assignment.
+   */
+  reportOutcome(
+    tx: DbTx,
+    requestId: string,
+    outcome: GrantOutcome,
+    employeeId?: string,
+    facts?: GrantOutcomeFacts,
+  ): Promise<void>;
+  /**
+   * Inside the transaction in which the IT Admin completes the task of an extension (`BR-MF1-08d`): the renewal the task answers for is
+   * applied (the record that follows the old one is written) and the request ends, as the module of requests decides. `actor` is the IT
+   * Admin who completed it.
+   */
+  reportExtended(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void>;
+  /**
+   * Inside the transaction in which the IT Admin closes the failed task of an extension (`BR-MF1-08d`): the extension will not be done, so
+   * the renewal the task answers for fails as a failed grant does (what was held goes back) and the right keeps the end it had. A request
+   * that is not a renewal waiting for the task changes nothing. `actor` is the IT Admin who closed it.
+   */
+  reportExtensionFailed(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void>;
+  /**
+   * Inside the transaction of a grant that ended the right the request replaces (R-49): the money the old right still holds for the department
+   * they came from goes back from that day, the way a revocation gives it back (a commitment that gave back the day of the transfer gives nothing
+   * again). Nothing is revoked: the right was ended by the grant itself.
+   */
+  reportRightReplaced(
+    tx: DbTx,
+    input: { assignmentId: string; provisioningType: ProvisioningKind; endedOn: BusinessDate; now: Date },
+  ): Promise<void>;
   /** Whether the request waits for the IT Admin to close the task of its grant as cancelled: nothing else is decided on it. */
   isWithdrawing(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean>;
   /**
@@ -52,24 +83,37 @@ export class GrantRequestGateHook extends Hook<GrantRequestGate> {
 }
 
 /**
- * What a revocation tells the modules that extend it (`g6-handover-confirmation`, and the return of a seat of
- * `g5-return-and-renewal-requests`), in the transaction of each moment: they open their step when it opens (`OPENED`), may refuse
+ * What a revocation tells the modules that extend it (the return of a seat of `g5-return-and-renewal-requests`, the release of
+ * the money held for the seat, the ghost seat rule), in the transaction of each moment: they open their step when it opens (`OPENED`), may refuse
  * to let the work start or end by throwing at `BEFORE_WORK`, learn how the work ended (`AFTER_WORK`), and are told when the task
- * is closed as failed (`CLOSED_FAILED`). The status of the task says which moment of the work it is: before the task is taken it is
+ * is closed as failed (`CLOSED_FAILED`) or a source takes back one of its reasons (`REASON_WITHDRAWN`). The status of the task says which moment of the work it is: before the task is taken it is
  * `QUEUED` or `RETRY_SCHEDULED`, before it is completed `IN_PROGRESS`; after it is `IN_PROGRESS` or `COMPLETED`.
  */
 export type RevocationEvent =
   | {
       /**
        * A task was opened or a reason added to it. `reasons` are all the task has, the first first; `actor` is who asked for the
-       * revocation and `now` the instant the source gave (or the clock): the day a deadline counts from.
+       * revocation (null when the system did, on a rule) and `now` the instant the source gave (or the clock): the day a deadline counts from.
        */
       moment: 'OPENED';
       task: RevocationTaskFacts;
       reasons: readonly RevocationReasonFacts[];
       context: RevocationContext;
-      actor: AuthenticatedPrincipal;
+      actor: AuthenticatedPrincipal | null;
       now: Date;
+    }
+  | {
+      /**
+       * A source took back one of its reasons (`withdrawRevocationReason`). `remaining` are the reasons that still stand, the first first;
+       * `cancelled` is true when none stood and the task ended as cancelled (`task.status` is then `CANCELLED`).
+       */
+      moment: 'REASON_WITHDRAWN';
+      task: RevocationTaskFacts;
+      withdrawn: RevocationReasonFacts;
+      remaining: readonly RevocationReasonFacts[];
+      cancelled: boolean;
+      now: Date;
+      actor: AuthenticatedPrincipal;
     }
   | { moment: 'BEFORE_WORK'; task: RevocationTaskFacts; now: Date }
   | { moment: 'AFTER_WORK'; task: RevocationTaskFacts; now: Date; actor: AuthenticatedPrincipal }
@@ -83,8 +127,9 @@ export type RevocationEvent =
     };
 
 /**
- * The modules that extend a revocation, told in the order they were added and stopped at the first that throws. The handover
- * confirmation of licensing is added before the return of requests (licensing starts first); a test pins that order.
+ * The modules that extend a revocation, told in the order they were added and stopped at the first that throws. A test pins the
+ * order (`provisioning-revocation-read-contracts.integration-spec.ts`). No handover is confirmed any more (`QĐ-110g`), so no listener
+ * holds the work for it.
  */
 @Injectable()
 export class RevocationListeners extends Listeners<RevocationEvent, DbTx> {
@@ -104,6 +149,17 @@ export interface RenewalHold {
    * (`g6-time-limited-access`) keeps such an item waiting and shows where its request stands. A seat with none is absent.
    */
   pendingRenewalsOf(assignmentIds: readonly string[], tx?: DbTx): Promise<Map<string, PendingRenewal>>;
+  /**
+   * How many requests for the plan are not in a final state (a request of a person, of a group or to go on using, at any step): while
+   * one is open the renewal of a subscription of the plan is not cancelled (`QĐ-103e`).
+   */
+  openRequestsOfPlan(planId: string, tx?: DbTx): Promise<number>;
+  /**
+   * How many people the requests for the plan, approved in full, are still to be granted for: the request waits for the IT Admin to
+   * make the task of its grant, so no seat of a subscription holds it yet (`QĐ-103e`, `QĐ-103v`(2)). A request to go on using is not
+   * one (it is read through `pendingRenewalsOf`) and a grant whose task was made is read by the seat it holds.
+   */
+  approvedAwaitingGrantOfPlan(planId: string, tx?: DbTx): Promise<number>;
 }
 
 /** The renewals of requests that hold a seat (bound by requests). */
@@ -111,22 +167,6 @@ export interface RenewalHold {
 export class RenewalHoldHook extends Hook<RenewalHold> {
   constructor() {
     super('licensing.renewal-hold');
-  }
-}
-
-/**
- * The people who have a transfer that is not closed or a departure that is not closed, with the day each takes effect, earliest day
- * first (`US-03-08`): the day a person answering for a service account has to be replaced by. Implemented by the module of personnel.
- */
-export interface ResponsibleDeadlineProvider {
-  listPending(query: PendingFileQuery, tx?: DbTx): Promise<PendingPersonnelFile[]>;
-}
-
-/** The personnel files that bind the change of the person responsible for a service account (bound by personnel). */
-@Injectable()
-export class ResponsibleDeadlineHook extends Hook<ResponsibleDeadlineProvider> {
-  constructor() {
-    super('licensing.responsible-deadline');
   }
 }
 
@@ -143,8 +183,8 @@ export interface SeatBaselineClosedEvent {
 }
 
 /**
- * The modules told of the closing of the seat baseline (the personnel module opens the review after the installation, decided by the
- * head of the department of each holder); a listener that throws rolls the closing back. With none, closing tells nobody.
+ * The modules told of the closing of the seat baseline; a listener that throws rolls the closing back. With none, closing tells nobody.
+ * No module listens now: the review after the setup that personnel opened here went with the review after a transfer (`QĐ-110p`).
  */
 @Injectable()
 export class SeatBaselineClosedListeners extends Listeners<SeatBaselineClosedEvent, DbTx> {

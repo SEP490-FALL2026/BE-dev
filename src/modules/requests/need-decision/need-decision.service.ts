@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
+import type { ChecklistBody } from '../../policies/public/policy-checklist.types';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestDecisionRefusedError,
@@ -39,14 +41,38 @@ export class NeedDecisionService {
     private readonly audit: AuditApi,
     private readonly settings: RequestFactsService,
     private readonly effects: NeedDecisionEffects,
+    private readonly checklists: PolicyChecklistApi,
   ) {}
 
-  async decide(actor: AuthenticatedPrincipal, requestId: string, input: DecisionInput): Promise<AccessRequestRecord> {
+  /**
+   * Throws what the checklist refuses (`PolicyVersionChangedError`, `PolicyChecklistIncompleteError`, `PolicyChecklistHasNoError`,
+   * `PolicyDecisionReasonRequiredError`) after the errors of who may decide, and writes the answers with the decision (`QĐ-111ap`).
+   */
+  async decide(
+    actor: AuthenticatedPrincipal,
+    requestId: string,
+    input: DecisionInput & { checklist: ChecklistBody },
+  ): Promise<AccessRequestRecord> {
     return this.runner.run(async (tx) => {
       const request = await this.lockDecidable(tx, actor, requestId);
       const outcome = needDecisionOutcome({ branch: request.branch, routingRow: request.needStep.routingRow }, input);
+      const { verdict, reason } = await this.checklists.judge(tx, {
+        organizationId: request.organizationId,
+        stepCode: '1.2',
+        checklist: input.checklist,
+        decision: input.decision,
+        reason: input.reason,
+      });
       const decidedAt = new Date();
-      await this.writeDecision(tx, actor, request, { input, outcome, decidedAt });
+      await this.writeDecision(tx, actor, request, { reason, outcome, decidedAt });
+      await this.checklists.record(tx, {
+        organizationId: request.organizationId,
+        verdict,
+        decision: input.decision,
+        decidedByEmployeeId: actor.employeeId,
+        decidedAt,
+        subjects: [{ kind: 'ACCESS_REQUEST', id: request.id }],
+      });
 
       return this.effects.follow(tx, actor, request, outcome, decidedAt);
     });
@@ -80,11 +106,11 @@ export class NeedDecisionService {
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     request: AccessRequestRecord,
-    decided: { input: DecisionInput; outcome: NeedDecisionOutcome; decidedAt: Date },
+    decided: { reason: string | null; outcome: NeedDecisionOutcome; decidedAt: Date },
   ): Promise<void> {
-    const { input, outcome, decidedAt } = decided;
+    const { reason, outcome, decidedAt } = decided;
     const { needStep } = request;
-    const decision = outcome.approved ? 'APPROVED' : 'REJECTED';
+    const decision = outcome.approved ? 'APPROVED' : outcome.returned ? 'RETURNED' : 'REJECTED';
 
     await this.repo.recordNeedDecision(tx, {
       organizationId: request.organizationId,
@@ -96,7 +122,7 @@ export class NeedDecisionService {
         decision,
         decidedByEmployeeId: actor.employeeId,
         deciderRole: outcome.deciderRole,
-        reason: input.reason?.trim() || null,
+        reason,
         decidedAt,
       },
     });
@@ -105,7 +131,11 @@ export class NeedDecisionService {
       accessRequestAuditEvent(
         actor,
         request.organizationId,
-        outcome.approved ? 'ACCESS_REQUEST.NEED_APPROVED' : 'ACCESS_REQUEST.NEED_REJECTED',
+        outcome.approved
+          ? 'ACCESS_REQUEST.NEED_APPROVED'
+          : outcome.returned
+            ? 'ACCESS_REQUEST.NEED_RETURNED'
+            : 'ACCESS_REQUEST.NEED_REJECTED',
         'ACCESS_REQUEST_STEP',
         needStep.id,
         {
@@ -116,6 +146,7 @@ export class NeedDecisionService {
           deciderRole: outcome.deciderRole,
           departmentId: request.departmentId,
           requestState: outcome.requestState,
+          ...(outcome.returned ? { reason } : {}),
         },
       ),
     );

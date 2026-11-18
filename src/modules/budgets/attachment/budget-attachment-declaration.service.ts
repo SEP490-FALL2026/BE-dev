@@ -51,14 +51,14 @@ export class BudgetAttachmentDeclarationService {
     versionId: string,
     input: CreateBudgetAttachmentDto,
   ): Promise<DeclareAttachmentResult> {
-    const fiscalStart = await this.access.begin(actor);
+    this.access.begin(actor);
     const maxBytes = Number(await this.parameters.getValue('DOCUMENT_MAX_SIZE_MB')) * 1024 * 1024;
     const file = assertFileAllowed({ ...input, maxBytes });
 
     const objectKey = this.keys.create(PENDING_SCOPE);
 
     const created = await this.runner.run(async (tx) => {
-      const version = await this.access.lockEditable(tx, versionId, fiscalStart);
+      const version = await this.access.lockEditable(tx, versionId);
       await this.attachments.lockUploader(tx, actor.employeeId);
       const userUnattached = await this.attachments.countUnattachedByEmployee(tx, actor.employeeId);
       if (userUnattached >= MAX_USER_UNATTACHED_ATTACHMENTS) {
@@ -109,7 +109,7 @@ export class BudgetAttachmentDeclarationService {
     input: CreateBudgetAttachmentDto,
   ): Promise<DeclareAttachmentResult> {
     const today = await this.facts.today(new Date());
-    await this.facts.requireHeadedCostCenter(actor.employeeId, today);
+    await this.facts.requireHeadOfAnyUnit(actor.employeeId, today);
     const organizationId = await this.facts.organizationId();
 
     const maxBytes = Number(await this.parameters.getValue('DOCUMENT_MAX_SIZE_MB')) * 1024 * 1024;

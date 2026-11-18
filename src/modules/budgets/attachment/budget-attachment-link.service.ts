@@ -89,12 +89,12 @@ export class BudgetAttachmentLinkService {
     const today = await this.facts.today(new Date());
     const isFinance = actor.roles.includes('FINANCE');
     const isDecider = await this.facts.isSpendingApprover(actor.employeeId);
-    const headedCostCenterId = await this.facts.headedCostCenter(actor.employeeId, today);
+    const headedCostCenterIds = await this.facts.headedCostCenters(actor.employeeId, today);
 
     const view = budgetRecordView({
       isFinance,
       isDecider,
-      headedCostCenterId,
+      headedCostCenterIds,
       recordCostCenterId: proposal.costCenterId,
       versionSentAt: undefined,
     });
@@ -116,12 +116,12 @@ export class BudgetAttachmentLinkService {
     const today = await this.facts.today(new Date());
     const isFinance = actor.roles.includes('FINANCE');
     const isDecider = await this.facts.isSpendingApprover(actor.employeeId);
-    const headedCostCenterId = await this.facts.headedCostCenter(actor.employeeId, today);
+    const headedCostCenterIds = await this.facts.headedCostCenters(actor.employeeId, today);
 
     const view = budgetRecordView({
       isFinance,
       isDecider,
-      headedCostCenterId,
+      headedCostCenterIds,
       recordCostCenterId: version.costCenterId,
       versionSentAt: version.sentAt,
     });

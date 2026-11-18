@@ -3,7 +3,8 @@ import { FlowWorld } from '../support/flows/flow-world';
 /**
  * MF-1, F1-08 (the part of Wave 1): a Request for a group of at least two people goes through the need of the head, the spend of the
  * spending approver and the grant of the IT Admin line by line, without the client ever sending a date; and a contractor can be
- * granted, the Assignment carrying an end date worked out from the term of the Request (finding R1 of the review of steps 6 and 7).
+ * granted, the Assignment carrying an end date worked out from the term of the Request (finding R1 of the review of steps 6 and 7), or the end of
+ * the contract when that comes first for a person with a term (R-38).
  */
 describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấp từng dòng @MF1 @D1', () => {
   let world: FlowWorld;
@@ -50,6 +51,24 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     await world?.close();
   });
 
+  it('BR-MF1-02 HEAD_IN_GROUP từ chối trưởng phòng trong nhóm cho cả hai loại người gửi @MF1', async () => {
+    const before = await world.facts.count('access_requests');
+    const head = await world.facts.employeeId('NV-ENGH');
+    const colleague = await world.facts.employeeId('NV-DEV3');
+    for (const sender of ['NV-ENGH', 'NV-DEV2']) {
+      const response = await call().post(sender, '/group-requests', {
+        planId: figma,
+        businessReason: 'Nhóm có trưởng phòng',
+        lines: [{ employeeId: head }, { employeeId: colleague }],
+      });
+      expect(response.status).toBe(422);
+      expect(call().codeOf(response)).toBe('GROUP_REQUEST.LINES_REFUSED');
+      const details = call().detailsOf(response) as { lines: Array<{ employeeId: string; reason: string }> };
+      expect(details.lines).toContainEqual({ employeeId: head, reason: 'HEAD_IN_GROUP' });
+    }
+    expect(await world.facts.count('access_requests')).toBe(before);
+  });
+
   it('một người không phải nhóm: 422 TOO_FEW_LINES và không ghi gì #19 @B3', async () => {
     const before = await world.facts.count('access_requests');
     const dev2 = await world.facts.employeeId('NV-DEV2');
@@ -57,7 +76,6 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     const response = await call().post('NV-DEV2', '/group-requests', {
       planId: jira,
       businessReason: 'Một mình',
-      termMonths: 1,
       lines: [{ employeeId: dev2 }],
     });
 
@@ -72,7 +90,6 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     const sent = await call().post('NV-DEV2', '/group-requests', {
       planId: jira,
       businessReason: 'Cả nhóm cần Jira',
-      termMonths: 1,
       lines: [{ employeeId: dev2 }, { employeeId: dev3 }],
     });
     expect(sent.status).toBe(201);
@@ -106,7 +123,7 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     expect(await stateOf(id)).toBe('AWAITING_EXECUTION');
     expect(await world.facts.count('budget_commitments', 'request_id = $1', [id])).toBe(1);
 
-    const subscription = await call().subscriptionOf('Jira Standard', 'ENG');
+    const subscription = await call().subscriptionOf('Jira Standard');
     await grantLine(id, subscription, dev2);
     await grantLine(id, subscription, dev3);
 
@@ -116,27 +133,25 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
         WHERE a.employee_id = ANY($1::uuid[]) AND a.plan_id = $2 ORDER BY e.employee_code`,
       [[dev2, dev3], jira],
     );
-    const end = await oneMonthTerm();
+    // R-D01: the group named no end date, so the seats have none (a right has no end unless the sender gives one, QĐ-104a).
     expect(rows).toEqual([
-      { employee_code: 'NV-DEV2', expected_end_date: end },
-      { employee_code: 'NV-DEV3', expected_end_date: end },
+      { employee_code: 'NV-DEV2', expected_end_date: null },
+      { employee_code: 'NV-DEV3', expected_end_date: null },
     ]);
     expect(await world.facts.count('provisioning_tasks', "request_id = $1 AND status = 'COMPLETED'", [id])).toBe(2);
   });
 
-  it('nhà thầu được cấp quyền, Assignment có ngày kết thúc = hôm nay + thời hạn − 1 ngày (R1) #20 @B3', async () => {
-    const created = await call().post('NV-SA', '/employees', {
-      employeeCode: 'NV-CTR1',
-      fullName: 'Nguyễn Văn Thầu',
-      workEmail: 'thau.nguyen@saoviet.example',
-      employmentType: 'CONTRACTOR',
-      hireDate: call().today(),
-      departmentCode: 'ENG',
-      jobTitle: 'Lập trình viên hợp đồng',
-    });
-    expect(created.status).toBe(201);
+  it('nhà thầu được cấp quyền, Assignment bị cắt ở ngày hết hợp đồng (R-38) còn đồng nghiệp có ngày kết thúc = hôm nay + thời hạn − 1 ngày (R1) #20 @B3', async () => {
+    // NV-CTR1 is the contractor of Engineering the dataset already has (Jira, R16); no Figma, so a Request for it is not a duplicate.
     const [contractor, dev1] = [await world.facts.employeeId('NV-CTR1'), await world.facts.employeeId('NV-DEV1')];
+    // The dataset gives the contractor a contract that ends in 20 days, before the month the group asks for is over.
+    const { contractEnd } = await world.facts.one<{ contractEnd: string }>(
+      `SELECT to_char(contract_end_date, 'YYYY-MM-DD') AS "contractEnd" FROM employees WHERE id = $1`,
+      [contractor],
+    );
 
+    const end = await oneMonthTerm();
+    expect(contractEnd < end).toBe(true);
     const sent = await call().post('NV-ENGH', '/group-requests', {
       planId: figma,
       businessReason: 'Nhà thầu và một đồng nghiệp cần Figma',
@@ -157,16 +172,24 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     expect(decided.status).toBe(200);
     expect(await stateOf(id)).toBe('AWAITING_EXECUTION');
 
-    const subscription = await call().subscriptionOf('Figma Professional', 'ENG');
+    const subscription = await call().subscriptionOf('Figma Professional');
     await grantLine(id, subscription, contractor);
     await grantLine(id, subscription, dev1);
 
-    const rows = await world.facts.rows<{ employment_type: string; expected_end_date: string | null }>(
-      `SELECT e.employment_type::text, to_char(a.expected_end_date, 'YYYY-MM-DD') AS expected_end_date
+    const rows = await world.facts.rows<{
+      employee_code: string;
+      employment_type: string;
+      expected_end_date: string | null;
+    }>(
+      `SELECT e.employee_code, e.employment_type::text, to_char(a.expected_end_date, 'YYYY-MM-DD') AS expected_end_date
          FROM license_assignments a JOIN employees e ON e.id = a.employee_id
-        WHERE a.employee_id = $1 AND a.plan_id = $2`,
-      [contractor, figma],
+        WHERE a.employee_id = ANY($1::uuid[]) AND a.plan_id = $2 ORDER BY e.employee_code`,
+      [[contractor, dev1], figma],
     );
-    expect(rows).toEqual([{ employment_type: 'CONTRACTOR', expected_end_date: await oneMonthTerm() }]);
+    // The contractor is cut at the end of the contract; the colleague with no term keeps the whole month.
+    expect(rows).toEqual([
+      { employee_code: 'NV-CTR1', employment_type: 'CONTRACTOR', expected_end_date: contractEnd },
+      { employee_code: 'NV-DEV1', employment_type: 'STAFF', expected_end_date: end },
+    ]);
   });
 });

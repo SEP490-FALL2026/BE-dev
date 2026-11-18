@@ -54,6 +54,18 @@ export class FakeGrantGate implements GrantRequestGate {
     return Promise.resolve(false);
   }
 
+  reportExtended(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  reportExtensionFailed(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  reportRightReplaced(): Promise<void> {
+    return Promise.resolve();
+  }
+
   reportCancelled(): Promise<boolean> {
     return Promise.resolve(false);
   }
@@ -93,7 +105,7 @@ export interface TaskWire {
   requestId: string;
   assignmentId: string;
   beneficiary: { employeeId: string; employeeCode: string; fullName: string } | null;
-  plan: { planId: string; planName: string; provisioningType: string } | null;
+  plan: { planId: string; planName: string; provisioningType: string; preRevocationNote?: string | null } | null;
   subscriptionId: string | null;
   accountIdentifier: string;
   steps: { code: string; accountIdentifier?: string; adminIdentity?: string }[];
@@ -265,8 +277,19 @@ export class ProvisioningHarness extends SeatHarness {
   recordFailure = (taskId: string, kind: ProvisioningFailureKind, detail = `error of ${kind}`, now?: Date) =>
     this.ctx.app.get(LicensingApi).recordProvisioningFailure({ taskId, kind, detail, ...(now ? { now } : {}) });
 
-  /** A task of the connector: no connector exists, so a task by hand is moved to that channel the way G7 will make it. */
+  /**
+   * Gives the task back to the queue with nobody on it, as the product does. The grant takes the work for the IT Admin who presses it, so a task
+   * that nobody has worked is one that failed and was tried again: the retry returns it to the queue with the tries counted from zero.
+   */
+  async unclaimed(taskId: string, account: ApiAccount = this.it1): Promise<TaskWire> {
+    await this.fail(taskId, { reason: 'Put back in the queue' }, account).expect(200);
+
+    return this.dataOf<{ task: TaskWire }>(await this.retry(taskId, account).expect(200)).task;
+  }
+
+  /** A task of the connector: no connector exists, so a task by hand (back in the queue, as no person works a task of the connector) is moved to that channel the way G7 will make it. */
   async makeConnector(taskId: string): Promise<void> {
+    await this.unclaimed(taskId);
     await this.ctx.sql.query(`UPDATE provisioning_tasks SET channel = 'CONNECTOR' WHERE id = $1`, [taskId]);
   }
 

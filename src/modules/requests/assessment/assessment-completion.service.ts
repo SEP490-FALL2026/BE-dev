@@ -5,18 +5,20 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
-import { RequestFactsService } from '../access-request/request-facts.service';
 import type { AssessmentRecord, Quote } from '../access-request/assessment-record.types';
-import { SpendEntryService } from '../spend/spend-entry.service';
+import type { ChecklistBody } from '../../policies/public/policy-checklist.types';
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import {
+  AssessmentFreePlanError,
   AssessmentIncompleteError,
   AssessmentInternalByRegistrationError,
   AssessmentUncontrollableError,
 } from './assessment.errors';
-import { judgeCompletion } from './assessment.policy';
+import { assessmentScopeOf, judgeCompletion, type AssessmentScope } from './assessment.policy';
 import { AssessmentRepo } from './assessment.repo';
 import { AssessmentGate } from './assessment-gate.service';
 import { AssessmentPricingService } from './assessment-pricing.service';
+import { AssessmentTermFitService, type FittedTerm } from './assessment-term-fit.service';
 
 /**
  * Completing the assessment of a proposal (`US-05-06`, `US-01-12` AC-2): once it says all the minimum asks, the control level and a
@@ -31,29 +33,42 @@ export class AssessmentCompletionService {
     private readonly requests: AccessRequestRepo,
     private readonly assessments: AssessmentRepo,
     private readonly audit: AuditApi,
-    private readonly entry: SpendEntryService,
-    private readonly settings: RequestFactsService,
+    private readonly entry: SpendRoutingService,
     private readonly pricing: AssessmentPricingService,
+    private readonly termFit: AssessmentTermFitService,
   ) {}
 
   /**
-   * Throws AssessmentRefusedError, AssessmentIncompleteError, AssessmentInternalByRegistrationError,
-   * AssessmentUncontrollableError, AssessmentQuoteRefusedError and AccessRequestNotFoundError.
+   * Throws AssessmentRefusedError, AssessmentIncompleteError, AssessmentInternalByRegistrationError, AssessmentFreePlanError (a short proposal
+   * for a plan of internal software), AssessmentUncontrollableError, AssessmentTermNotFitError, AssessmentQuoteRefusedError and AccessRequestNotFoundError,
+   * and what the checklist of the step refuses (`QĐ-111ap`): a version left behind, answers missing, an answer No, which locks the completion.
    */
-  async complete(actor: AuthenticatedPrincipal, requestId: string): Promise<AccessRequestRecord> {
-    const { fiscalYearStartMonth } = await this.settings.settings();
-
+  async complete(
+    actor: AuthenticatedPrincipal,
+    requestId: string,
+    input: { checklist: ChecklistBody },
+  ): Promise<AccessRequestRecord> {
     return this.runner.run(async (tx) => {
       const request = await this.gate.lockProposal(tx, requestId);
       this.gate.requireAssessor(actor, request);
-      const assessment = await this.gate.requireAssessment(requestId, tx);
-      const quote = this.completableQuote(assessment);
+      const { assessment, proposal } = await this.gate.requireProposalFacts(tx, requestId);
+      const scope = assessmentScopeOf(proposal);
+      const quote = this.completableQuote(assessment, scope, await this.gate.namesInternalApplication(tx, proposal));
+      const { verdict } = await this.gate.judgeChecklist(tx, request, {
+        decision: 'COMPLETE',
+        checklist: input.checklist,
+      });
+      // A plan alone is never classified by the IT Admin (the application is in the catalog) and is always paid or licensed: a completed assessment says so.
+      const concluded: AssessmentRecord =
+        scope === 'PLAN_ONLY' ? { ...assessment, classification: 'PAID_LICENSED' } : assessment;
 
       const now = new Date();
-      const pricing = await this.pricing.priceCompleted(tx, request, quote, { now, fiscalYearStartMonth });
+      const fitted = await this.fitTerm(tx, request, concluded, now);
+      const pricing = await this.pricing.priceCompleted(tx, fitted.request, quote, { now });
       await this.requests.setPriced(tx, requestId, pricing, 'AWAITING_SPEND_SUBMISSION');
       const standsIn = await this.gate.finishStep(tx, requestId, actor, { now });
-      await this.assessments.complete(tx, requestId, actor.employeeId, now);
+      await this.assessments.complete(tx, requestId, actor.employeeId, now, concluded.classification);
+      await this.gate.keepChecklist(tx, actor, request, { verdict, decision: 'COMPLETE', decidedAt: now });
       await this.audit.record(
         tx,
         accessRequestAuditEvent(
@@ -62,7 +77,7 @@ export class AssessmentCompletionService {
           'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
           'ACCESS_REQUEST',
           requestId,
-          completedAuditDetail(requestId, assessment, pricing, standsIn),
+          completedAuditDetail(requestId, concluded, pricing, standsIn, fitted),
         ),
       );
 
@@ -70,9 +85,26 @@ export class AssessmentCompletionService {
     });
   }
 
+  /**
+   * The time of use of the proposal judged again by the kind of grant the IT Admin concluded (`QĐ-111i`, `AssessmentTermFitService`).
+   * Returns the request as it is priced from now on. Throws AssessmentTermNotFitError.
+   */
+  private async fitTerm(
+    tx: DbTx,
+    request: AccessRequestRecord,
+    concluded: AssessmentRecord,
+    now: Date,
+  ): Promise<FittedTerm> {
+    const kind = concluded.provisioningType;
+    if (kind === null) throw new Error(`The assessment of ${request.id} was completed with no kind of provisioning.`);
+
+    return this.termFit.fit(tx, request, kind, now);
+  }
+
   /** The quote that prices the request, when the assessment may be completed here; the errors say what stops it. */
-  private completableQuote(assessment: AssessmentRecord): Quote {
-    const verdict = judgeCompletion(assessment);
+  private completableQuote(assessment: AssessmentRecord, scope: AssessmentScope, internalApplication: boolean): Quote {
+    const verdict = judgeCompletion(assessment, scope, internalApplication);
+    if (verdict.kind === 'FREE_PLAN') throw new AssessmentFreePlanError();
     if (verdict.kind === 'INCOMPLETE') throw new AssessmentIncompleteError(verdict.missing);
     if (verdict.kind === 'INTERNAL_BY_REGISTRATION') throw new AssessmentInternalByRegistrationError();
     if (verdict.kind === 'UNCONTROLLABLE') throw new AssessmentUncontrollableError();
@@ -84,7 +116,7 @@ export class AssessmentCompletionService {
   private async enterSpend(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string): Promise<AccessRequestRecord> {
     const priced = await this.requests.findById(requestId, tx);
     if (!priced) throw new Error(`The request ${requestId} was not found after its assessment was completed.`);
-    await this.entry.enter(tx, actor, priced);
+    if (priced.routing?.mode === 'ONE_STEP') await this.entry.route(tx, actor, priced, 'SUBMISSION', new Date());
     const record = await this.requests.findById(requestId, tx);
     if (!record) throw new Error(`The request ${requestId} was not found after its assessment was completed.`);
 
@@ -98,6 +130,7 @@ function completedAuditDetail(
   assessment: AssessmentRecord,
   pricing: PricingRecord,
   actingForAssignee: boolean,
+  fitted: FittedTerm,
 ) {
   return {
     requestId,
@@ -108,9 +141,11 @@ function completedAuditDetail(
     equivalentPlanId: assessment.equivalentPlanId,
     amountMinor: pricing.amount?.amountMinor.toString() ?? null,
     amountCurrency: pricing.amount?.currency ?? null,
-    periods: pricing.schedule?.length ?? null,
-    bindingPeriods: pricing.schedule?.filter((period) => period.binding).length ?? null,
+    months: pricing.amountMonths,
     budgetYear: pricing.budgetYear,
+    // The time of use the request keeps, and the months a plan bought once cleared from it (`QĐ-111i`).
+    termMonths: fitted.request.termMonths,
+    termMonthsCleared: fitted.termMonthsCleared,
     actingForAssignee,
   };
 }

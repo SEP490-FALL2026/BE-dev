@@ -5,9 +5,14 @@ import type { TimingFacts } from './request-timing.policy';
 /** What the time of a request is measured from, with who may see the request. */
 export interface TimingSource {
   facts: TimingFacts;
+  id: string;
+  isGroup: boolean;
+  departmentId: string;
   requesterEmployeeId: string;
   beneficiaryEmployeeIds: string[];
   needStepAssigneeEmployeeId: string | null;
+  needStepAssigneeEmployeeIds: (string | null)[];
+  spendStepOpened: boolean;
 }
 
 /** Reads the moments a request already keeps, in one query: the request, its steps and the batches that held it. Reads only. */
@@ -20,6 +25,9 @@ export class RequestTimingRepo {
     const row = await this.prisma.accessRequest.findUnique({
       where: { id: requestId, state: { not: 'DRAFT' } },
       select: {
+        id: true,
+        type: true,
+        departmentId: true,
         state: true,
         submittedAt: true,
         grantCompletedAt: true,
@@ -40,9 +48,16 @@ export class RequestTimingRepo {
     const sentAt = row.batchItems.map((item) => item.batch.submittedAt.getTime());
 
     return {
+      id: row.id,
+      isGroup: row.type === 'GROUP_GRANT',
+      departmentId: row.departmentId,
       requesterEmployeeId: row.requesterEmployeeId,
       beneficiaryEmployeeIds: row.beneficiaries.map((beneficiary) => beneficiary.employeeId),
       needStepAssigneeEmployeeId: row.steps.find((step) => step.kind === 'NEED')?.assigneeEmployeeId ?? null,
+      needStepAssigneeEmployeeIds: row.steps
+        .filter((step) => step.kind === 'NEED')
+        .map((step) => step.assigneeEmployeeId),
+      spendStepOpened: row.steps.some((step) => step.kind === 'SPEND_APPROVAL'),
       facts: {
         requestState: row.state,
         submittedAt: row.submittedAt,

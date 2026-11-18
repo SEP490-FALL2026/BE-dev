@@ -3,7 +3,7 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 /**
- * The catalog as a person who asks for software reads it. Only what helps them pick is on the wire: no Business Owner, price,
+ * The catalog as a person who asks for software reads it. Only what helps them pick is on the wire: no responsible IT Admin, price,
  * amount, subscription, contract, seat count, key or workspace. Whether the department can price a plan is a status, never a
  * figure: the amount is the preview's to show.
  */
@@ -59,20 +59,32 @@ const requestableApplicationSummarySchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   kind,
+  logoUrl: z.string().nullable().meta({
+    description:
+      'The https link to the logo image, or null. It may be broken: show the first letter of the name when the image does not load.',
+  }),
   vendorName: z.string().nullable(),
-  functionalGroup: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
+  functionalGroup: z.strictObject({ id: z.uuid(), name: z.string() }),
   planCount: z.number().int().positive(),
   ...submission,
 });
 const requestableApplicationDetailSchema = requestableApplicationSummarySchema.extend({
-  dataSensitivity: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+  dataSensitivity: z.enum(['LOW', 'MEDIUM', 'HIGH']).nullable(),
 });
 
 const requestablePlanSummarySchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   provisioningType: z.enum(['K1', 'K2', 'K3', 'K4', 'K5']),
-  application: z.strictObject({ id: z.uuid(), name: z.string(), kind }),
+  application: z.strictObject({
+    id: z.uuid(),
+    name: z.string(),
+    kind,
+    logoUrl: z.string().nullable().meta({
+      description:
+        'The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.',
+    }),
+  }),
   price: z
     .strictObject({
       status: z.enum(['PRICED', 'MISSING', 'NOT_APPLICABLE']),
@@ -80,7 +92,7 @@ const requestablePlanSummarySchema = z.strictObject({
     })
     .meta({
       description:
-        'Whether the department of the caller can price the plan, never the price itself. A missing price does not stop the request: the preview says it cannot go on to the spend step until the plan is priced.',
+        'Whether the department of the caller can price the plan, never the price itself: a plan with a subscription that has a price, or with a reference price of its own, is priced; NO_PRICED_SUBSCRIPTION means neither exists. A missing price does not stop the request: the preview says it cannot go on to the spend step until the plan is priced.',
     }),
   ...submission,
 });

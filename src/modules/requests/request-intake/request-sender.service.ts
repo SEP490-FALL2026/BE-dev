@@ -1,3 +1,4 @@
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -14,9 +15,14 @@ import { AccessRequestNoDepartmentError } from '../access-request/access-request
 @Injectable()
 export class RequestSenderService {
   constructor(
+    private readonly spending: SpendRoutingService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly requestParties: RequestPartyEligibilityApi,
   ) {}
+
+  startOneStep(tx: DbTx, actor: AuthenticatedPrincipal, id: string, now: Date): Promise<void> {
+    return this.spending.start(tx, actor, id, now);
+  }
 
   /**
    * `beneficiaryEmployeeIds` are the people the Request is for besides the sender when it is not for the sender alone (the lines of a

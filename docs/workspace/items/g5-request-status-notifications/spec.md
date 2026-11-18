@@ -26,9 +26,11 @@ Người yêu cầu nhận thông báo ở mọi kết cục (cấp, từ chối
 
 | Story    | AC                     | Coverage | Phần còn lại thuộc                                                                                                 |
 | -------- | ---------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| US-05-15 | AC-1, AC-2, AC-4→AC-12 | full     | —                                                                                                                  |
+| US-05-15 | AC-1, AC-2, AC-4→AC-12 | partial  | re-pin 11/11/2026 — AC-9: `qd103-request-history-by-role`; AC-14: `qd103-request-single-step-routing` (`deferred`) |
 | US-05-06 | AC-5                   | partial  | AC-1→AC-4, AC-7, AC-8, AC-11→AC-15: `g5-it-assessment-of-new-software`; AC-10 (nhắc SLA): `g5-step-sla-and-alerts` |
 | US-05-18 | AC-3, AC-10, AC-11     | partial  | AC-1, AC-2, AC-4→AC-6, AC-8, AC-9: `g5-control-level-gate`; AC-7: `g3-downstream-finance-integration`              |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ `US-05-15` đổi `full` → `partial` vì Docs `5bb2e6a` thêm AC hoặc hạng mục khác cùng hiện thực khóa của Story này (scope map); phần đã code không đổi.
 
 ## Supporting references
 

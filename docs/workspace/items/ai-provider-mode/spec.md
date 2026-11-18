@@ -139,7 +139,7 @@ Planned khác passed. Bằng chứng ghi lệnh, revision và môi trường, kh
 ## Changes and acceptance
 
 - 09/11/2026: lập hạng mục (PLAN T1.0) và làm T1.1, T1.2. Chưa nghiệm thu; Owner chưa review.
-- 09/11/2026: làm T1.3 (migration `20261109100000_ai_provider_mode`) và T1.4 (chọn client theo chế độ). Chưa nghiệm thu; Owner chưa
+- 09/11/2026: làm T1.3 (migration `20261117120000_ai_provider_mode`) và T1.4 (chọn client theo chế độ). Chưa nghiệm thu; Owner chưa
   review.
 - 09/11/2026: làm T1.5 (`simulated` trên `GET` tóm tắt, `providerMode` trên nội dung Super Admin và trong audit `AI_INVOCATION.*`,
   log lần gọi lỗi có `httpStatus`/`serviceCode`, `openapi.json`, module card). Vế BE của AC-16, AC-17 đủ, kiểm chứng local (chưa

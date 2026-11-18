@@ -10,14 +10,14 @@ import { budgetAuditEvent } from '../budget/budget-facts.service';
 import { CommitmentRepo } from '../budget/commitment.repo';
 import { DecisionRepo } from '../budget/decision.repo';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
-import { BudgetChangeListeners } from '../public/budgets.extension-points';
+import { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import type { JudgedDecision } from './version-decision-judge.service';
 
 /**
  * Writes the decision of the spending approver on a version once it was judged (`US-06-11`): the version becomes the current budget of its
- * Cost Center and year and replaces the one that was current (INV-21), or is refused or sent back; the decision is a record that is never
- * changed; the commitments that waited for a budget are attached to an approved version (`US-06-07`); whoever waits on this budget and the
- * people concerned hear of it in the same transaction.
+ * Cost Center and year (INV-21: it is the only current one), or is refused or sent back; the decision is a record that is never
+ * changed; the commitments that waited for a budget are attached to an approved version (`US-06-07`), and what they bring to the use of the Cost Center is told against the new base
+ * as the version an adjustment makes does (`RV-2`, FIX-RV23 RV2-02); whoever waits on this budget and the people concerned hear of it in the same transaction.
  */
 @Injectable()
 export class VersionDecisionWriter {
@@ -26,8 +26,8 @@ export class VersionDecisionWriter {
     private readonly decisions: DecisionRepo,
     private readonly commitments: CommitmentRepo,
     private readonly notifier: BudgetNotifierService,
-    private readonly listeners: BudgetChangeListeners,
     private readonly audit: AuditApi,
+    private readonly thresholds: ThresholdAlertService,
   ) {}
 
   async write(
@@ -35,14 +35,13 @@ export class VersionDecisionWriter {
     actor: AuthenticatedPrincipal,
     judged: JudgedDecision,
     body: DecisionBodyDto,
+    now: Date,
   ): Promise<VersionRecord> {
-    const { version, siblings, today } = judged;
+    const { version, today } = judged;
     const id = version.id;
     const outcome = decisionOutcomeOf(body.decision);
-    const now = new Date();
-    const previous = outcome.decision === 'APPROVED' ? siblings.find((other) => other.state === 'APPROVED') : undefined;
-    // One current version at a time (INV-21): the one it replaces goes first, then this one becomes current.
-    if (previous) await this.versions.setState(tx, previous.id, 'SUPERSEDED');
+    // One current version at a time (INV-21) is kept by `BUDGET.CURRENT_EXISTS` before a version is sent: an approval replaces nothing
+    // (`QĐ-97b`, `QĐ-104e`(1)), so nothing is superseded and there is no previous total.
     await this.versions.setState(tx, id, outcome.state);
     await this.decisions.insert(tx, {
       organizationId: version.organizationId,
@@ -52,7 +51,7 @@ export class VersionDecisionWriter {
       deciderRole: 'SPENDING_APPROVER',
       reason: body.reason ?? null,
       totalMinor: version.totalMinor,
-      previousTotalMinor: previous?.totalMinor ?? null,
+      previousTotalMinor: null,
       currency: version.currency,
       decidedAt: now,
     });
@@ -67,22 +66,10 @@ export class VersionDecisionWriter {
         `BUDGET_VERSION.${outcome.decision}`,
         'BUDGET_VERSION',
         id,
-        versionDecidedDetail(version, previous, body.reason),
+        versionDecidedDetail(version, undefined, body.reason),
       ),
     );
     if (outcome.decision === 'APPROVED') await this.attachWaiting(tx, version, now);
-
-    // Whoever waits on this budget hears of it in the same transaction, after the commitments are attached (`US-06-13` AC-11).
-    const event = { costCenterId: version.costCenterId, year: version.year, versionId: id };
-    if (outcome.decision === 'APPROVED') {
-      await this.listeners.emit(tx, { kind: 'VERSION_APPROVED', actor, event });
-    } else {
-      await this.listeners.emit(tx, {
-        kind: 'VERSION_REFUSED',
-        actor,
-        event: { ...event, decision: outcome.decision },
-      });
-    }
 
     const record = await this.versions.findById(id, tx);
     if (!record) throw new BudgetVersionNotFoundError();
@@ -96,8 +83,12 @@ export class VersionDecisionWriter {
     return record;
   }
 
-  /** The commitments of the Cost Center and year that waited for a budget are attached to the version that was approved. */
+  /**
+   * The commitments of the Cost Center and year that waited for a budget are attached to the version that was approved. They count in the use of the Cost Center from this moment (the one change of the
+   * use an approval makes), so the threshold they cross is told here, in the same transaction and in the same way as in the approval of an adjustment that makes the first version (R-48).
+   */
   private async attachWaiting(tx: DbTx, version: VersionRecord, now: Date): Promise<void> {
+    const watch = await this.thresholds.watch(tx, [{ costCenterId: version.costCenterId, year: version.year }]);
     const attached = await this.commitments.attachWaiting(tx, {
       costCenterId: version.costCenterId,
       year: version.year,
@@ -120,5 +111,6 @@ export class VersionDecisionWriter {
         correlationId: version.id,
       });
     }
+    await this.thresholds.settle(tx, watch, now);
   }
 }

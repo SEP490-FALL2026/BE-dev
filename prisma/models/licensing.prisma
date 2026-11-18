@@ -9,6 +9,8 @@ enum AssignmentSource {
   REQUEST
   // The seat of a person carried from a subscription period to the period that renews it (QĐ-35c): names its predecessor.
   RENEWAL_CARRY
+  // A service-account seat ended and written again as the personal seat of an IT Admin flagged as a machine account (QĐ-110m).
+  MACHINE_ACCOUNT_CONVERSION
 }
 
 enum AssignmentDateBasis {
@@ -41,12 +43,20 @@ model LicenseAssignment {
   validFromBasis              AssignmentDateBasis @map("valid_from_basis")
   validUntil                  DateTime?           @map("valid_until") @db.Date
   expectedEndDate             DateTime?           @map("expected_end_date") @db.Date
+  // The day the task of the grant was completed: the day the right really begins (`BR-MF1-06a`); null until then and for a seat that was not granted by a task.
+  grantedOn                   DateTime?           @map("granted_on") @db.Date
   // Set once when the grant it was made for is closed as failed: the period is then empty, so no seat is taken.
   failedAt                    DateTime?           @map("failed_at") @db.Timestamptz(3)
   // Set once when the grant it was made for was cancelled because the request was withdrawn: the period is empty as well.
   cancelledAt                 DateTime?           @map("cancelled_at") @db.Timestamptz(3)
   predecessorId               String?             @map("predecessor_id") @db.Uuid
+  // The older right of the same person that the grant of this one ended the day it was given (R-49, MF3-C.4): the request asked again in the grace of a transfer.
+  replacesAssignmentId        String?             @map("replaces_assignment_id") @db.Uuid
   baselineImportId            String?             @map("baseline_import_id") @db.Uuid
+  // A personal seat of an IT Admin that is used for a machine account (QĐ-110m, R-9): INV-02 leaves it out, so the IT Admin keeps their own
+  // personal seat of the same subscription as well. `machineAccountNote` is the reason and is present exactly when the flag is on.
+  isMachineAccount            Boolean             @default(false) @map("is_machine_account")
+  machineAccountNote          String?             @map("machine_account_note")
   // A value, not a foreign key: the history outlives the account (as the audit trail does).
   createdByAppUserId          String              @map("created_by_app_user_id") @db.Uuid
   createdAt                   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -59,21 +69,28 @@ model LicenseAssignment {
   owningDepartment    Department?                       @relation("AssignmentOwningDepartment", fields: [owningDepartmentId], references: [id], onDelete: Restrict)
   predecessor         LicenseAssignment?                @relation("AssignmentChain", fields: [predecessorId], references: [id], onDelete: Restrict)
   successors          LicenseAssignment[]               @relation("AssignmentChain")
+  replaces            LicenseAssignment?                @relation("AssignmentReplaced", fields: [replacesAssignmentId], references: [id], onDelete: Restrict)
+  replacedBy          LicenseAssignment[]               @relation("AssignmentReplaced")
   baselineImport      SeatBaselineImport?               @relation(fields: [baselineImportId], references: [id], onDelete: Restrict)
   provisioningTasks   ProvisioningTask[]
+  poolGrantAvoidedCosts PoolGrantAvoidedCost[]
   returnRequests      ReturnRequest[]
   handoverDuties      HandoverDuty[]
   dutyNotices         ServiceAccountDutyNotice[]
   expiryReminders     AssignmentExpiryReminder[]
+  renewalWindows      AssignmentRenewalWindow[]
   renewalReleases     SubscriptionRenewalReleasedSeat[]
   saasIssues          SaasIssue[]
+  licenseKey          LicenseKey?
   transferReviewItems TransferReviewItem[]
   renewalRequests     AccessRequestRenewal[]            @relation("RenewalOf")
   renewalOfRequest    AccessRequestRenewal?             @relation("RenewalSuccessor")
+  replacedByRequests  AccessRequest[]                   @relation("RequestReplacesAssignment")
 
   @@index([subscriptionId])
   @@index([planId])
   @@index([employeeId])
+  @@index([replacesAssignmentId])
   @@index([baselineImportId])
   @@index([owningDepartmentId])
   @@map("license_assignments")
@@ -95,6 +112,8 @@ model SeatBaselineState {
 enum ProvisioningTaskKind {
   GRANT
   REVOKE
+  // The IT Admin extends a right whose renewal was approved (BR-MF1-08d): completed, it writes the record that follows the old one.
+  EXTEND
 }
 
 enum ProvisioningChannel {
@@ -119,6 +138,12 @@ enum ProvisioningFailureKind {
   AUTHENTICATION
   QUOTA_EXCEEDED
   NOT_DONE
+}
+
+enum ProvisioningPurchaseKind {
+  POOL_TOP_UP
+  KEY_PURCHASE
+  K1_SUBSCRIPTION
 }
 
 // One piece of work the IT team does to make a decision real: today the grant of a seat (US-07-01), by hand or through a
@@ -168,12 +193,24 @@ model ProvisioningTask {
   accessCutOn                  DateTime?                @map("access_cut_on") @db.Date
   accessEvidence               String?                  @map("access_evidence")
   completionNote               String?                  @map("completion_note")
-  createdByAppUserId           String                   @map("created_by_app_user_id") @db.Uuid
+  // The checklist the IT Admin ticked to complete the grant or the revocation of a K1 seat (variant and steps with their instants, QĐ-111az); NULL otherwise.
+  k1Checklist                  Json?                    @map("k1_checklist")
+  // A revocation asked not to be done before a day, and due by a day: read from the reasons that still stand (null: none asked).
+  dueOn                        DateTime?                @map("due_on") @db.Date
+  notBefore                    DateTime?                @map("not_before") @db.Date
+  // Purchase when provisioning from shared pool: reason to buy additional seats, when bought, what kind.
+  purchaseKind                 ProvisioningPurchaseKind? @map("purchase_kind")
+  purchaseReason               String?                  @map("purchase_reason")
+  purchasedAt                  DateTime?                @map("purchased_at") @db.Timestamptz(6)
+  // Who made the task: an account, or the system on a rule nobody decides in the moment (exactly one; a CHECK in the migration).
+  createdByAppUserId           String?                  @map("created_by_app_user_id") @db.Uuid
+  createdBySystem              Boolean                  @default(false) @map("created_by_system")
   createdAt                    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                    DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization        Organization             @relation(fields: [organizationId], references: [id])
   assignment          LicenseAssignment        @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  poolGrantAvoidedCost PoolGrantAvoidedCost?
   defaultResponsible  Employee?                @relation("TaskDefaultResponsible", fields: [defaultResponsibleEmployeeId], references: [id], onDelete: Restrict)
   reasons             ProvisioningTaskReason[]
   returnRequest       ReturnRequest?
@@ -201,6 +238,8 @@ enum RevocationSource {
   RE_EXECUTION
   // The review the new head makes after a transfer took the seat away (spec L.10). Read only here.
   POST_SETUP_REVIEW
+  // The holder moved to another department and the grace ran out without the seat being asked for again (QĐ-110p).
+  TRANSFER
 }
 
 enum RevocationCompletion {
@@ -208,6 +247,7 @@ enum RevocationCompletion {
   ALREADY_GONE
   RENEWAL_CANCELLED
   OFF_SYSTEM_REVOKED
+  KEY_DEACTIVATED
 }
 
 enum AccessState {
@@ -227,6 +267,12 @@ model ProvisioningTaskReason {
   referenceKind       String?          @map("reference_kind")
   referenceId         String?          @map("reference_id") @db.Uuid
   note                String?
+  // The timing the source gave (null: none), and the withdrawal of the reason (one change a reason takes, with its cause).
+  dueOn                  DateTime?     @map("due_on") @db.Date
+  notBefore              DateTime?     @map("not_before") @db.Date
+  withdrawnAt            DateTime?     @map("withdrawn_at") @db.Timestamptz(3)
+  withdrawnByAppUserId   String?       @map("withdrawn_by_app_user_id") @db.Uuid
+  withdrawCause          String?       @map("withdraw_cause")
   createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
 
   task      ProvisioningTask @relation(fields: [taskId], references: [id], onDelete: Restrict)
@@ -251,13 +297,13 @@ model LicenseKeyRevealWindow {
 enum LicenseKeyStatus {
   IN_STORE
   ASSIGNED
-  RETIRED
 }
 
 // A license key of a K4 purchase, kept only as ciphertext (QĐ-54b, US-04-12). The fingerprint is the HMAC of the key with a
 // stable secret: it finds a key that was imported twice and tells nothing of the key. The key never leaves in the clear
 // but by a reveal, which writes an audit event in the same transaction. Keys are never deleted; the vault holds them for
-// good and only their status moves (assigning and retiring belong to the device-dependent work).
+// good. A key is in the store or assigned to one assignment (QĐ-103d); a key withdrawn from the store (QĐ-103v, Q-10 B) stays in
+// the store, is never given out again, and the withdrawal is fixed once made (trigger license_key_guard).
 model LicenseKey {
   id                  String           @id @default(uuid()) @db.Uuid
   organizationId      String           @map("organization_id") @db.Uuid
@@ -270,9 +316,15 @@ model LicenseKey {
   // The importing account is a value, not a foreign key: the history outlives the account (as the audit trail does).
   importedByAppUserId String           @map("imported_by_app_user_id") @db.Uuid
   importedAt          DateTime         @default(now()) @map("imported_at") @db.Timestamptz(3)
+  // The assignment the key is given to while ASSIGNED (CHECK license_keys_assigned_has_assignment).
+  assignmentId         String?   @unique @map("assignment_id") @db.Uuid
+  withdrawnAt          DateTime? @map("withdrawn_at") @db.Timestamptz(3)
+  withdrawnByAppUserId String?   @map("withdrawn_by_app_user_id") @db.Uuid
+  withdrawalReason     String?   @map("withdrawal_reason")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  subscription Subscription       @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  assignment   LicenseAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, fingerprint])
   @@index([subscriptionId, status])
@@ -384,6 +436,23 @@ model AssignmentExpiryReminder {
   @@index([recipientEmployeeId, createdAt(sort: Desc), id])
   @@index([createdAt(sort: Desc), id])
   @@map("assignment_expiry_reminders")
+}
+
+// The window in which the holder may send the renewal of a right that ends on a day (BR-MF1-08a, QĐ-108b): recorded once when it
+// opens, with the number of days in force then, so a later change of the parameter reaches only the windows not yet open. A fact:
+// never changed or deleted (trigger). The organization is a value, as on the reminders.
+model AssignmentRenewalWindow {
+  assignmentId    String   @map("assignment_id") @db.Uuid
+  expectedEndDate DateTime @map("expected_end_date") @db.Date
+  organizationId  String   @map("organization_id") @db.Uuid
+  windowDays      Int      @map("window_days") @db.SmallInt
+  opensOn         DateTime @map("opens_on") @db.Date
+  openedAt        DateTime @default(now()) @map("opened_at") @db.Timestamptz(3)
+
+  assignment LicenseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+
+  @@id([assignmentId, expectedEndDate])
+  @@map("assignment_renewal_windows")
 }
 
 enum SaasIssueState {
@@ -503,6 +572,8 @@ enum RenewalChoice {
   RENEW
   REDUCE
   CANCEL
+  // The IT Admin raises the seats to the number the system counted (SBF-20).
+  INCREASE
 }
 
 enum RenewalState {
@@ -530,6 +601,9 @@ enum RenewalNoticeBasis {
   DECLARED
   INFERRED_UNCONFIRMED
   BY_END_DATE
+  // The milestone of a period with no declared deadline: the renewal date, or the next payment date of a monthly pack (SBF-20).
+  BY_RENEWAL_DATE
+  BY_PAYMENT_DATE
 }
 
 enum RenewalDeadlineOutcome {
@@ -540,7 +614,7 @@ enum RenewalDeadlineOutcome {
 model SubscriptionRenewal {
   id                          String                 @id @default(uuid()) @db.Uuid
   organizationId              String                 @map("organization_id") @db.Uuid
-  // At most one live (not STALE) case per period: a partial unique index in the migration 20261108300100.
+  // At most one live (not STALE) case per (subscription, notice_base_date): a partial unique index in the migration 20261117110100.
   subscriptionId              String                 @map("subscription_id") @db.Uuid
   state                       RenewalState           @default(PROPOSED)
   // The milestone the period was proposed against, as the catalog derived it then.
@@ -549,6 +623,9 @@ model SubscriptionRenewal {
   proposedChoice              RenewalChoice          @map("proposed_choice")
   proposedQuantity            Int?                   @map("proposed_quantity")
   proposalNote                String?                @map("proposal_note")
+  // The seats the system counted for the next period when the result was recorded; null on a case written before (SBF-20).
+  // Written at insert only: the trigger that freezes the proposal does not cover this column.
+  seatsNeeded                 Int?                   @map("seats_needed")
   // What the Business Owner said, as the IT Admin who proposes recorded it: an input, never a step.
   businessOwnerOpinion        String?                @map("business_owner_opinion")
   proposedByEmployeeId        String                 @map("proposed_by_employee_id") @db.Uuid
@@ -626,4 +703,107 @@ model SubscriptionDeadlineEvent {
 
   @@index([kind, recordedOn])
   @@map("subscription_deadline_events")
+}
+
+// Cost avoided when granting a seat from the shared pool (MF1-F, qd103-grant-from-shared-pool):
+// one row per task completed from the pool, grid value = price of the subscription had the seat been purchased instead.
+// Append-only: triggers block UPDATE/DELETE (QĐ-106e, R-E06).
+// No Prisma relations (queried by SQL raw to avoid circular dependencies during parallel worktree development).
+model PoolGrantAvoidedCost {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  provisioningTaskId String   @unique @map("provisioning_task_id") @db.Uuid
+  assignmentId       String   @map("assignment_id") @db.Uuid
+  requestId          String   @map("request_id") @db.Uuid
+  planId             String   @map("plan_id") @db.Uuid
+  // K2 (recurring) or K4 (one-time): the CHECK of the table holds nothing else.
+  provisioningType   String   @map("provisioning_type")
+  // Months of the cost (1 to 12 for K2; NULL for the one-time cost of a K4 key).
+  months             Int?     @db.SmallInt
+  // Unit price (per month for K2, total for K4), in minor currency units.
+  unitMinor          BigInt   @map("unit_minor")
+  // Total avoided cost = unitMinor x coalesce(months, 1): the CHECK of the table holds it.
+  amountMinor        BigInt   @map("amount_minor")
+  currency           String   @db.Char(3)
+  // The day the task was completed.
+  recordedOn         DateTime @map("recorded_on") @db.Date
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  provisioningTask ProvisioningTask  @relation(fields: [provisioningTaskId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  assignment       LicenseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  plan             Plan              @relation(fields: [planId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([organizationId], map: "pool_grant_avoided_costs_organization_id")
+  @@index([assignmentId], map: "pool_grant_avoided_costs_assignment_id")
+  @@index([requestId], map: "pool_grant_avoided_costs_request_id")
+  @@index([recordedOn], map: "pool_grant_avoided_costs_recorded_on")
+  @@map("pool_grant_avoided_costs")
+}
+
+enum DepartmentSoftwareProposalState {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+// The software of a department (QĐ-110s, QĐ-111c, DS.1): an application of the catalog, alone or with one of its plans, that the IT Admin in
+// charge lists so that the person who asks for software sees it first. It only guides, it grants nothing. One row for each place: the unique
+// index of the migration is NULLS NOT DISTINCT (an application alone counts once), which the model cannot say. A row is removed when the IT
+// Admin takes a place out; the audit trail keeps what was.
+model DepartmentSoftwareEntry {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  departmentId     String   @map("department_id") @db.Uuid
+  applicationId    String   @map("application_id") @db.Uuid
+  planId           String?  @map("plan_id") @db.Uuid
+  note             String?
+  // A value, not a foreign key: the history outlives the account.
+  addedByAppUserId String   @map("added_by_app_user_id") @db.Uuid
+  addedAt          DateTime @default(now()) @map("added_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  department   Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  application  Application  @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  plan         Plan?        @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  // NULLS NOT DISTINCT in the migration: the clause the model cannot say, so the migration and this line agree on the columns and the name.
+  @@unique([departmentId, applicationId, planId], map: "department_software_entries_place_key")
+  @@index([departmentId, addedAt(sort: Desc), id(sort: Desc)])
+  @@index([organizationId])
+  @@index([applicationId])
+  @@index([planId])
+  @@map("department_software_entries")
+}
+
+// The proposal of the head of a department to add a place of the catalog to its list (QĐ-110t): decided once by the IT Admin in charge, accepted
+// (the place goes in the list) or rejected with a reason, and kept. At most one is PENDING for a place: a partial unique index of the migration
+// (NULLS NOT DISTINCT, state = 'PENDING') that the model cannot say, so two proposals sent together leave one and a conflict for the other.
+model DepartmentSoftwareProposal {
+  id                   String                          @id @default(uuid(7)) @db.Uuid
+  organizationId       String                          @map("organization_id") @db.Uuid
+  departmentId         String                          @map("department_id") @db.Uuid
+  applicationId        String                          @map("application_id") @db.Uuid
+  planId               String?                         @map("plan_id") @db.Uuid
+  reason               String
+  state                DepartmentSoftwareProposalState @default(PENDING)
+  proposedByEmployeeId String                          @map("proposed_by_employee_id") @db.Uuid
+  proposedAt           DateTime                        @default(now()) @map("proposed_at") @db.Timestamptz(3)
+  // Set together when the IT Admin decides: who (a value, not a foreign key), when and, for a rejection, why.
+  decidedByAppUserId   String?                         @map("decided_by_app_user_id") @db.Uuid
+  decidedAt            DateTime?                       @map("decided_at") @db.Timestamptz(3)
+  decisionReason       String?                         @map("decision_reason")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  department   Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  application  Application  @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  plan         Plan?        @relation(fields: [planId], references: [id], onDelete: Restrict)
+  proposedBy   Employee     @relation("DepartmentSoftwareProposer", fields: [proposedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([departmentId, proposedAt(sort: Desc), id(sort: Desc)])
+  @@index([organizationId])
+  @@index([applicationId])
+  @@index([planId])
+  @@index([proposedByEmployeeId])
+  @@map("department_software_proposals")
 }

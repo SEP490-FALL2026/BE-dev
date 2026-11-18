@@ -4,15 +4,22 @@ import { ApiException } from '../../../infrastructure/http/errors/api.exception'
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { refuse, toOrganizationApiException } from '../organization.http-errors';
 import {
+  DepartmentAvatarFileRequiredError,
+  DepartmentAvatarInvalidError,
+  DepartmentAvatarTooLargeError,
+  DepartmentAvatarTypeUnsupportedError,
   DepartmentCodeTakenError,
   DepartmentCodeInvalidError,
   DepartmentForbiddenError,
   DepartmentInUseError,
   DepartmentInactiveError,
   DepartmentItAdminInvalidError,
+  DepartmentItAdminLimitReachedError,
   DepartmentNameInvalidError,
   DepartmentNotFoundError,
+  DepartmentNotYetEffectiveError,
   DepartmentOutOfScopeError,
+  DepartmentOutsideBudgetPeriodError,
   DepartmentUpdateEmptyError,
   HeadAssignmentError,
 } from '../department/department.errors';
@@ -41,6 +48,14 @@ export function toDepartmentApiException(error: unknown): unknown {
   if (error instanceof DepartmentCodeInvalidError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.CODE_INVALID', error.message);
   }
+  if (error instanceof DepartmentOutsideBudgetPeriodError) {
+    return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.OUTSIDE_BUDGET_PERIOD', error.message);
+  }
+  if (error instanceof DepartmentNotYetEffectiveError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.NOT_YET_EFFECTIVE', error.message, {
+      effectiveFrom: error.effectiveFrom,
+    });
+  }
   if (error instanceof DepartmentCodeTakenError) {
     return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.CODE_TAKEN', error.message);
   }
@@ -50,14 +65,29 @@ export function toDepartmentApiException(error: unknown): unknown {
   if (error instanceof DepartmentItAdminInvalidError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.IT_ADMIN_INVALID', error.message);
   }
+  if (error instanceof DepartmentItAdminLimitReachedError) {
+    return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.IT_ADMIN_LIMIT_REACHED', error.message, { limit: error.limit });
+  }
   if (error instanceof DepartmentUpdateEmptyError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.UPDATE_EMPTY', error.message);
   }
   if (error instanceof DepartmentInactiveError) {
     return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.INACTIVE', error.message);
   }
+  if (error instanceof DepartmentAvatarFileRequiredError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.AVATAR_FILE_REQUIRED', error.message);
+  }
+  if (error instanceof DepartmentAvatarTooLargeError) {
+    return refuse(HttpStatus.PAYLOAD_TOO_LARGE, 'DEPARTMENT.AVATAR_TOO_LARGE', error.message);
+  }
+  if (error instanceof DepartmentAvatarTypeUnsupportedError) {
+    return refuse(HttpStatus.UNSUPPORTED_MEDIA_TYPE, 'DEPARTMENT.AVATAR_TYPE_UNSUPPORTED', error.message);
+  }
+  if (error instanceof DepartmentAvatarInvalidError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `DEPARTMENT.AVATAR_${error.reason}`, error.message);
+  }
   if (error instanceof DepartmentInUseError) {
-    const { members, serviceAccounts, openWork, subscriptions } = error.groups;
+    const { members, serviceAccounts, openWork } = error.groups;
 
     return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.IN_USE', error.message, {
       members: members.items,
@@ -66,8 +96,6 @@ export function toDepartmentApiException(error: unknown): unknown {
       totalServiceAccounts: serviceAccounts.total,
       openWork: openWork.items,
       totalOpenWork: openWork.total,
-      subscriptions: subscriptions.items,
-      totalSubscriptions: subscriptions.total,
     });
   }
   if (error instanceof HeadAssignmentError) {
@@ -90,16 +118,23 @@ export const DEPARTMENT_ERROR_EXAMPLES = {
   DEPARTMENT_OUT_OF_SCOPE: example(new DepartmentOutOfScopeError()),
   DEPARTMENT_CODE_INVALID: example(new DepartmentCodeInvalidError()),
   DEPARTMENT_CODE_TAKEN: example(new DepartmentCodeTakenError('D01')),
+  DEPARTMENT_OUTSIDE_BUDGET_PERIOD: example(new DepartmentOutsideBudgetPeriodError()),
+  DEPARTMENT_NOT_YET_EFFECTIVE: example(new DepartmentNotYetEffectiveError('2027-01-01')),
   DEPARTMENT_NAME_INVALID: example(new DepartmentNameInvalidError()),
   DEPARTMENT_IT_ADMIN_INVALID: example(new DepartmentItAdminInvalidError()),
+  DEPARTMENT_IT_ADMIN_LIMIT_REACHED: example(new DepartmentItAdminLimitReachedError(4)),
   DEPARTMENT_UPDATE_EMPTY: example(new DepartmentUpdateEmptyError()),
   DEPARTMENT_INACTIVE: example(new DepartmentInactiveError()),
+  DEPARTMENT_AVATAR_FILE_REQUIRED: example(new DepartmentAvatarFileRequiredError()),
+  DEPARTMENT_AVATAR_TOO_LARGE: example(new DepartmentAvatarTooLargeError()),
+  DEPARTMENT_AVATAR_TYPE_UNSUPPORTED: example(new DepartmentAvatarTypeUnsupportedError()),
+  DEPARTMENT_AVATAR_EMPTY: example(new DepartmentAvatarInvalidError('EMPTY')),
+  DEPARTMENT_AVATAR_TYPE_MISMATCH: example(new DepartmentAvatarInvalidError('TYPE_MISMATCH')),
   DEPARTMENT_IN_USE: example(
     new DepartmentInUseError({
       members: { items: [{ employeeCode: 'E001', fullName: '<full-name>' }], total: 1 },
       serviceAccounts: { items: [], total: 0 },
       openWork: { items: [{ kind: 'ACCESS_REQUEST', id: '<request-id>', label: null }], total: 1 },
-      subscriptions: { items: [{ kind: 'SUBSCRIPTION', id: '<subscription-id>', label: null }], total: 1 },
     }),
   ),
   DEPARTMENT_HEAD_DATE_IN_PAST: example(new HeadAssignmentError('DATE_IN_PAST')),

@@ -1,81 +1,193 @@
-import { Injectable } from '@nestjs/common';
-import { addDays } from '../../../core/business-date';
+import { Injectable, Logger } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
-import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import type { PeriodAdjustment, RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
+import { describeForOperator } from '../../../infrastructure/observability/operator-error';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { RenewalUsageContributions } from '../public/licensing.extension-points';
-import { RenewalAlertsService } from './alerts/renewal-alerts.service';
+import {
+  candidateNotices,
+  dataQualityProblemsOf,
+  dueNotices,
+  type DueNoticeKind,
+} from './alerts/renewal-adjustment-alerts.policy';
+import { RenewalAlertsService, type AlertKind } from './alerts/renewal-alerts.service';
 import { RenewalDeadlineService } from './deadline/renewal-deadline.service';
-import { RenewalPartiesService } from './subscription-renewal-parties.service';
+import { existingCaseOf } from './record/renewal-record.policy';
+import { RenewalSeatsNeededService } from './seats-needed/renewal-seats-needed.service';
+import { RenewalPartiesService, type RenewalPeople } from './subscription-renewal-parties.service';
 import { SubscriptionRenewalRepo } from './subscription-renewal.repo';
+import type { DeadlineEventRecord, RenewalRecord } from './subscription-renewal.types';
 
-/**
- * How far back a pass still looks at a milestone that passed: a pass that did not run for that long (the API stopped) still flags
- * a late case and records a passed milestone; older periods are left alone rather than given an event long after.
- */
-const LOOKBACK_DAYS = 60;
+/** What one pass reads once and every period shares. */
+interface PassWorld {
+  organizationId: string;
+  today: BusinessDate;
+  cases: Map<string, RenewalRecord[]>;
+  /** The subscriptions the company recorded as cancelled: no alert, warning or event is made for them (`A1C-02`). */
+  ending: ReadonlySet<string>;
+  events: Map<string, DeadlineEventRecord>;
+  shared: Awaited<ReturnType<RenewalPartiesService['sharedPeople']>> | undefined;
+}
 
 export interface SweepResult {
   told: number;
-  flaggedLate: number;
   deadlineEvents: number;
+  /** The subscriptions whose period failed and were left for the next pass; the others were swept. */
+  failed: number;
 }
 
+const isAlert = (kind: DueNoticeKind): kind is AlertKind =>
+  kind === 'ADJUSTMENT_POINT' || kind === 'RED_ALERT' || kind === 'KEPT';
+
 /**
- * One pass over the periods whose milestone is near or just passed (`US-11-01`, `US-11-03`, `US-11-04`): the alerts due today, the
- * late flag of a decided case, the event of a milestone passed with no decision. Every step is idempotent (a person told once, a
- * flag set once, one event per period), so the pass may run again, on several instances, or after a failure.
+ * One pass over the subscriptions that have a point of adjustment (`SBF-20` §4.5, `US-11-01`, `US-11-04`): the IT Admin told the point came,
+ * the red alert of a plan by the year, the seats a plan by the month keeps, the incident or the end of a period whose renewal day passed with
+ * no outcome recorded, and the warning of contract data that gives no point. Every step is idempotent (a person told once, one event per
+ * period), so the pass may run again, on several instances, or after a failure. A subscription the company recorded as cancelled is passed
+ * over whole (`A1C-02`).
+ *
+ * A subscription whose period fails (a hook, a write) is logged by its id and the kind of the failure and counted in `failed`; the ones after it are
+ * still swept, and the next pass tries it again (as `SeatMonthSweeper` does, `O-2`).
+ *
+ * Known risk (R2-12): the catalog gives at most 500 subscriptions with no order, so past 500 pool subscriptions the later ones are never
+ * seen; the shared pool holds few. The seats a period needs are counted only for a period with something due today.
  */
 @Injectable()
 export class SubscriptionRenewalSweepService {
+  private readonly logger = new Logger(SubscriptionRenewalSweepService.name);
+
   constructor(
     private readonly periods: SubscriptionPeriodApi,
     private readonly repo: SubscriptionRenewalRepo,
     private readonly parties: RenewalPartiesService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly parameters: OperatingParametersApi,
-    private readonly usage: RenewalUsageContributions,
+    private readonly seatsNeeded: RenewalSeatsNeededService,
     private readonly alerts: RenewalAlertsService,
     private readonly deadlines: RenewalDeadlineService,
   ) {}
 
   async sweep(now: Date = new Date()): Promise<SweepResult> {
-    const result: SweepResult = { told: 0, flaggedLate: 0, deadlineEvents: 0 };
+    const result: SweepResult = { told: 0, deadlineEvents: 0, failed: 0 };
     const organization = await this.organizationReads.getOrganization();
     if (!organization) return result;
     const today = await this.organizationReads.businessToday(now);
-    const value = await this.parameters.getValue('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE');
-    const daysBefore = Array.isArray(value) ? value.filter((day): day is number => typeof day === 'number') : [];
-    const subjects = await this.periods.listRenewalSubjects({
-      from: addDays(today, -LOOKBACK_DAYS),
-      to: addDays(today, Math.max(0, ...daysBefore)),
-    });
+    const subjects = await this.periods.listAdjustmentSubjects();
     if (subjects.length === 0) return result;
     const ids = subjects.map((period) => period.subscriptionId);
-    const renewals = await this.repo.ofSubscriptions(ids);
-    const events = await this.repo.deadlineEventsOf(ids);
-    const shared = await this.parties.sharedPeople();
-    const usageAvailable = this.usage.all().length > 0;
-
+    const world: PassWorld = {
+      organizationId: organization.id,
+      today,
+      cases: await this.repo.ofSubscriptions(ids),
+      ending: await this.repo.endingAmong(ids),
+      events: await this.repo.deadlineEventsOf(ids),
+      shared: undefined,
+    };
     for (const period of subjects) {
-      const people = await this.parties.peopleOf(period, shared);
-      const renewal = renewals.get(period.subscriptionId) ?? null;
-      const base = { organizationId: organization.id, today, period, renewal, people };
-      result.told += await this.alerts.sendDue({ ...base, daysBefore, usageAvailable });
-      if (await this.deadlines.flagLateIfDue({ ...base, now, hasDeadlineEvent: events.has(period.subscriptionId) })) {
-        result.flaggedLate += 1;
-      }
-      if (
-        await this.deadlines.recordPassedMilestone({
-          ...base,
-          now,
-          hasDeadlineEvent: events.has(period.subscriptionId),
-        })
-      ) {
-        result.deadlineEvents += 1;
+      try {
+        const done = await this.sweepPeriod(period, world);
+        result.told += done.told;
+        result.deadlineEvents += done.deadlineEvents;
+      } catch (error) {
+        // Only the id and the kind of the failure are logged, never what the failing step held.
+        result.failed += 1;
+        this.logger.error(
+          `Renewal sweep of subscription ${period.subscriptionId} failed: ${describeForOperator(error)}`,
+        );
       }
     }
 
     return result;
+  }
+
+  /** What the pass does for one period: the warnings of its data, then, when something is due today, its alerts and its event. */
+  private async sweepPeriod(period: RenewalPeriodFacts, world: PassWorld): Promise<SweepResult> {
+    const done: SweepResult = { told: 0, deadlineEvents: 0, failed: 0 };
+    if (world.ending.has(period.subscriptionId)) return done;
+    const { adjustment } = period;
+    const problems = dataQualityProblemsOf(adjustment);
+    const eventRecorded = world.events.has(period.subscriptionId);
+    const hasCase =
+      adjustment !== null && existingCaseOf(world.cases.get(period.subscriptionId) ?? [], adjustment.deadline) !== null;
+    const candidates =
+      adjustment === null ? [] : candidateNotices(adjustment, world.today, hasCase, period.autoRenew, eventRecorded);
+    if (problems.length === 0 && candidates.length === 0) return done;
+
+    // Finance, the spending approver and the Super Admin are read once, and only when a period has something to tell.
+    world.shared ??= await this.parties.sharedPeople();
+    const people = await this.parties.peopleOf(period, world.shared);
+    for (const problem of problems) {
+      done.told += await this.alerts.dataQualityWarning({
+        organizationId: world.organizationId,
+        period,
+        itAdmin: people.itAdmin,
+        problem,
+      });
+    }
+    if (adjustment === null || candidates.length === 0) return done;
+
+    // The seats are counted only now, for a period with something due (R2-12).
+    const counts = await this.seatsNeeded.countFor({
+      subscriptionId: period.subscriptionId,
+      planId: period.planId,
+      vendorMinimumSeats: period.vendorMinimumSeats,
+      isPrimaryForPlan: period.isPrimaryForPlan,
+      renewalOn: adjustment.end,
+      today: world.today,
+    });
+    const due = dueNotices(
+      adjustment,
+      world.today,
+      hasCase,
+      counts.activeSeatsToday > 0,
+      period.purchasedQuantity,
+      counts.target,
+      period.autoRenew,
+      eventRecorded,
+    );
+    const written = await this.write(due, { world, period, adjustment, people, seatsNeeded: counts.seatsNeeded });
+    done.told += written.told;
+    done.deadlineEvents += written.deadlineEvents;
+
+    return done;
+  }
+
+  /** Writes the notices due: the alerts, and the event of the renewal day passed. */
+  private async write(
+    due: readonly DueNoticeKind[],
+    at: {
+      world: PassWorld;
+      period: RenewalPeriodFacts;
+      adjustment: PeriodAdjustment;
+      people: RenewalPeople;
+      seatsNeeded: number;
+    },
+  ): Promise<SweepResult> {
+    const { world, period, adjustment, people } = at;
+    const done: SweepResult = { told: 0, deadlineEvents: 0, failed: 0 };
+    const kinds = due.filter(isAlert);
+    if (kinds.length > 0) {
+      done.told = await this.alerts.sendDue({
+        organizationId: world.organizationId,
+        period,
+        adjustment,
+        seatsNeeded: at.seatsNeeded,
+        people,
+        kinds,
+      });
+    }
+    const ended = due.find((kind) => kind === 'AUTO_RENEWAL_INCIDENT' || kind === 'EXPIRY_MARKED');
+    if (ended === 'AUTO_RENEWAL_INCIDENT' || ended === 'EXPIRY_MARKED') {
+      const recorded = await this.deadlines.recordPassedRenewalDay({
+        organizationId: world.organizationId,
+        today: world.today,
+        period,
+        adjustment,
+        kind: ended,
+        people,
+      });
+      if (recorded) done.deadlineEvents = 1;
+    }
+
+    return done;
   }
 }

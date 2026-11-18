@@ -1,4 +1,4 @@
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v4/installation';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -6,8 +6,9 @@ import type { AddressInfo, Server } from 'node:net';
 import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
 import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
 import type { FetchLike } from '../../../src/cli/seed/demo-api-client';
-import { SHARED_DEMO_V3 } from '../../../src/cli/seed/fixture/shared-demo-v3';
+import { SHARED_DEMO_V4 } from '../../../src/cli/seed/fixture/shared-demo-v4';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
+import { SeedStorage } from '../../support/flows/seed-storage';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
 import { PgRelay } from '../../support/pg-relay';
 
@@ -24,9 +25,11 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
   const ONE_WAY_DELAY_MS = 50;
   /** Generous: one demo account's transaction needs at most about 18; the old single transaction needed about 165. */
   const MAX_STATEMENTS_PER_TRANSACTION = 40;
-  const demoAccounts = SHARED_DEMO_V3.people.filter((person) => person.account !== null).length;
+  const demoAccounts = SHARED_DEMO_V4.people.filter((person) => person.account !== null).length;
   const secrets = { superAdminPassword: SEED_PASSWORD, demoAccountPassword: 'a demo password for the tests' };
 
+  // The bytes the seed puts at upload links land in the storage the application reads (BM-10, files of a version).
+  const seedStorage = new SeedStorage();
   let ctx: HttpTestApp;
   let relay: PgRelay;
   let demo: INestApplicationContext;
@@ -35,7 +38,7 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
 
   const args = (mode: 'plan' | 'apply'): SeedCommandArguments => ({
     mode,
-    fixture: 'shared-demo-v3',
+    fixture: 'shared-demo-v4',
     apiUrl: baseUrl,
     operator: 'TEST-A04',
     environment: 'LOCAL_TEST',
@@ -66,7 +69,7 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
 
   async function heldAdvisoryLocks(): Promise<number> {
     const { rows } = await ctx.sql.query<{ n: string }>(
-      `WITH k AS (SELECT hashtextextended('seed:shared-demo-v3:apply', 0) AS v)
+      `WITH k AS (SELECT hashtextextended('seed:shared-demo-v4:apply', 0) AS v)
        SELECT count(*) AS n FROM pg_locks, k
         WHERE locktype = 'advisory' AND granted AND objsubid = 1
           AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
@@ -81,13 +84,14 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
     );
     const created = await ctx.sql.query<{ n: string }>(
       `SELECT count(*) AS n FROM audit_events WHERE action = 'DEMO_DATASET.ACCOUNT_CREATED' AND operator_reference = $1`,
-      ['DEMO_DATASET:shared-demo-v3:TEST-A04'],
+      ['DEMO_DATASET:shared-demo-v4:TEST-A04'],
     );
     return { accounts: Number(accounts.rows[0].n), created: Number(created.rows[0].n) };
   }
 
   beforeAll(async () => {
-    ctx = await createHttpTestApp();
+    await seedStorage.start();
+    ctx = await createHttpTestApp({ providerOverrides: [seedStorage.override] });
     baseUrl = `http://127.0.0.1:${((ctx.app.getHttpServer() as unknown as Server).address() as AddressInfo).port}`;
 
     const direct = new URL(ctx.database.url);
@@ -124,6 +128,7 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
     await demo?.close();
     await relay?.stop();
     await ctx?.close();
+    await seedStorage.stop();
   });
 
   beforeEach(() => {
@@ -140,7 +145,10 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
     expect(first.exitCode).toBe(0);
     expect(statements.length).toBeGreaterThan(demoAccounts * 4);
     expect(largestTransaction(statements)).toBeLessThanOrEqual(MAX_STATEMENTS_PER_TRANSACTION);
-    expect(await demoAccountRows()).toEqual({ accounts: demoAccounts, created: demoAccounts });
+    expect(await demoAccountRows()).toEqual({
+      accounts: demoAccounts + SHARED_DEMO_V4.accountStates.invited.length,
+      created: demoAccounts,
+    });
     expect(await heldAdvisoryLocks()).toBe(0);
   }, 600000);
 
@@ -155,7 +163,10 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
         notPresent: again.steps.filter((s) => s.status !== 'present'),
       }).toEqual({ attempt, exitCode: 2, notPresent: [] });
       expect(largestTransaction(statements)).toBeLessThanOrEqual(MAX_STATEMENTS_PER_TRANSACTION);
-      expect(await demoAccountRows()).toEqual({ accounts: demoAccounts, created: demoAccounts });
+      expect(await demoAccountRows()).toEqual({
+        accounts: demoAccounts + SHARED_DEMO_V4.accountStates.invited.length,
+        created: demoAccounts,
+      });
       expect(await heldAdvisoryLocks()).toBe(0);
     }
   }, 600000);

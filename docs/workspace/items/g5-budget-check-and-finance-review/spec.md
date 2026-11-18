@@ -27,8 +27,9 @@ Khi một Request có chi phí được trình, hệ thống kiểm ngân sách 
 | Story    | AC         | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                                                                     |
 | -------- | ---------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-06-12 | AC-1→AC-19 | partial  | AC-1, AC-4, AC-5, AC-8→AC-10, AC-14, AC-15, AC-19 vế QĐ-96→QĐ-100 và AC-20, AC-23, AC-24: `qd96-100-budget-check-three-outcomes`; AC-11 vế năm: `qd96-100-request-year-without-spend-date`; AC-18 vế thời hạn: `qd96-100-request-term-limit`; AC-25: `qd96-100-remove-finance-review-path`; AC-26: `qd96-100-budget-visibility-qd100p` |
-| US-06-13 | AC-1→AC-13 | full     | —                                                                                                                                                                                                                                                                                                                                      |
 | US-06-09 | AC-17      | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-16, AC-18→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-10, AC-21: `g5-budget-version-decision`; AC-12: `g3-downstream-finance-integration`                                                                                              |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-06-13` AC-1→AC-13 (full) — Story `RETIRED` ở Docs `5bb2e6a` (`US-06-13` `QĐ-97c`); code đã merge là lịch sử, khóa ở scope map là `not affected`.
 
 ## Supporting references
 

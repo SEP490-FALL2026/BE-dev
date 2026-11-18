@@ -36,7 +36,10 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
   const get = (path: string, account: ApiAccount, label?: Label) =>
     request(h.server()).get(`/api/v1${path}`).set(headers(account, label));
   const decide = (id: string, body: object, account: ApiAccount, label?: Label) =>
-    request(h.server()).post(`/api/v1/access-requests/${id}/need-decision`).set(headers(account, label)).send(body);
+    request(h.server())
+      .post(`/api/v1/access-requests/${id}/need-decision`)
+      .set(headers(account, label))
+      .send(h.checklists.withYes('1.2', body));
   const sentBy = async (unit: Unit, planId: string, extra: Record<string, unknown> = {}) => {
     counter += 1;
     const member = await h.staff(unit.department, `${unit.department.code}-M${counter}`, 'EMPLOYEE');
@@ -80,6 +83,7 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
       expect(read).toMatchObject({
         businessReason: 'The project needs a wiki',
         termMonths: 1,
+        expectedEndDate: null,
         pricing: { status: 'PRICED' },
         needStep: { state: 'PENDING', assignee: { employeeId: design.head.employeeId } },
       });
@@ -152,10 +156,11 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
         design.head.account,
       ).expect(422);
 
-      expect(h.codeOf(long)).toBe('VALIDATION_ERROR');
+      // An end date past a year from today is refused as the domain says it (`US-05-23` AC-9); the confirmation in words is a field that is gone.
+      expect(h.codeOf(long)).toBe('ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE');
       expect(h.codeOf(confirmed)).toBe('VALIDATION_ERROR');
       expect(await records(r1.id)).toEqual([]);
-      expect((await wire(r1.id, design.head.account)).termMonths).toBe(12);
+      expect(await wire(r1.id, design.head.account)).toMatchObject({ termMonths: 12, expectedEndDate: null });
     });
   });
 
@@ -180,10 +185,10 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
   });
 
   describe("a step that is not, or no longer, the head's (AC-5, AC-6)", () => {
-    it("gives the head no decision on the request they sent themselves: the step is the spending approver's (AC-5)", async () => {
+    it('gives the head no decision on the request they sent themselves: it is one-step and has no need step to decide (AC-5, BR-MF1-02)', async () => {
       const own = await h.sent(design.head, internal);
 
-      expect(own.needStep).toMatchObject({ routingRow: 2, assignee: { employeeId: h.boss.employeeId } });
+      expect(own.needStep).toMatchObject({ routingRow: 2, state: 'NOT_REQUIRED', assignee: null });
       const refused = await decide(own.id, { decision: 'APPROVE' }, design.head.account).expect(403);
       expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.OWN_REQUEST');
       expect(await records(own.id)).toEqual([]);

@@ -65,7 +65,6 @@ model Organization {
   plans                              Plan[]
   vendorTaxProfiles                  VendorTaxProfile[]
   subscriptions                      Subscription[]
-  subscriptionOwnerAssignments       SubscriptionOwnerAssignment[]
   costCenterDepartmentLinks          CostCenterDepartmentLink[]
   costCenterDirectionActivation      CostCenterDirectionActivation?
   seatBaselineImports                SeatBaselineImport[]
@@ -73,6 +72,7 @@ model Organization {
   subscriptionRenewals               SubscriptionRenewal[]
   subscriptionDeadlineEvents         SubscriptionDeadlineEvent[]
   provisioningTasks                  ProvisioningTask[]
+  poolGrantAvoidedCosts              PoolGrantAvoidedCost[]
   returnRequests                     ReturnRequest[]
   handoverDuties                     HandoverDuty[]
   accessRequests                     AccessRequest[]
@@ -82,10 +82,13 @@ model Organization {
   congestionIncidents                CongestionIncident[]
   requestBudgetChecks                RequestBudgetCheck[]
   spendBatches                       SpendBatch[]
+  requestReserveConfirmations        RequestReserveConfirmation[]
   requestSupplements                 RequestSupplement[]
   budgetProposals                    BudgetProposal[]
+  budgetCycles                       BudgetCycle[]
   budgetVersions                     BudgetVersion[]
   budgetCommitments                  BudgetCommitment[]
+  yearStartCommitmentRuns            YearStartCommitmentRun[]
   invoices                           Invoice[]
   applicationRetirementConfirmations ApplicationRetirementConfirmation[]
   contracts                          Contract[]
@@ -102,6 +105,10 @@ model Organization {
   employeeLeaves                     EmployeeLeave[]
   offboardingCases                   OffboardingCase[]
   personnelNotices                   PersonnelNotice[]
+  planUsageRates                     PlanUsageRate[]
+  itAdminHandovers                   ItAdminHandover[]
+  departmentSoftwareEntries          DepartmentSoftwareEntry[]
+  departmentSoftwareProposals        DepartmentSoftwareProposal[]
 
   @@map("organizations")
 }
@@ -146,9 +153,17 @@ model Department {
   createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   deactivatedAt       DateTime?        @map("deactivated_at") @db.Timestamptz(3)
+  // The day the department takes effect (QĐ-104e(3)): one made in the budgeting period takes effect on 1 January of the next year.
+  // The application always names it (the installation too, in the calendar of the organization); the default is only for plain SQL.
+  effectiveFrom       DateTime         @default(dbgenerated("CURRENT_DATE")) @map("effective_from") @db.Date
+  // The picture of the department (QĐ-113c): the key in the object storage, its type and when it was set; all three null or none.
+  avatarObjectKey     String?          @map("avatar_object_key")
+  avatarContentType   String?          @map("avatar_content_type")
+  avatarUpdatedAt     DateTime?        @map("avatar_updated_at") @db.Timestamptz(3)
 
   organization            Organization                  @relation(fields: [organizationId], references: [id])
   costCenters             CostCenter[]                  @relation("CostCenterDepartment")
+  budgetCeilings          BudgetDepartmentCeiling[]     @relation("BudgetDepartmentCeilingDepartment")
   costCenterLinks         CostCenterDepartmentLink[]
   itAdmin                 Employee?                     @relation("DepartmentItAdmin", fields: [itAdminEmployeeId], references: [id], onDelete: Restrict)
   placements              EmployeePlacement[]
@@ -158,6 +173,8 @@ model Department {
   returnRequests          ReturnRequest[]
   handoverDuties          HandoverDuty[]
   accessRequests          AccessRequest[]
+  softwareEntries         DepartmentSoftwareEntry[]
+  softwareProposals       DepartmentSoftwareProposal[]
   approvalRecords         ApprovalRecord[]
   spendBatches            SpendBatch[]
   transfersFrom           DepartmentTransfer[]          @relation("TransferFromDepartment")
@@ -168,8 +185,6 @@ model Department {
   noticesTargeting        PersonnelNotice[]             @relation("NoticeTargetDepartment")
   noticesSent             PersonnelNotice[]             @relation("NoticeSenderDepartment")
   // The subscriptions the department owns (QĐ-89a) and the assignments that gave existing ones their owner.
-  ownedSubscriptions      Subscription[]                @relation("SubscriptionOwnerDepartment")
-  ownerAssignments        SubscriptionOwnerAssignment[]
   heldNotifications       HeldDepartmentNotification[]
 
   @@unique([organizationId, code])
@@ -247,6 +262,8 @@ model Employee {
   jobTitle            String?           @map("job_title")
   employmentType      EmploymentType    @map("employment_type")
   hireDate            DateTime          @map("hire_date") @db.Date
+  // The last day of the contract of a contractor, a freelancer or an intern, when it is known (R-38, INV-07): a time of use that would run past it is cut here.
+  contractEndDate      DateTime?         @map("contract_end_date") @db.Date
   status              EmployeeStatus    @default(ACTIVE)
   workState           EmployeeWorkState @default(WORKING) @map("work_state")
   createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -257,10 +274,14 @@ model Employee {
   appUser                         AppUser?
   itAdminOf                       Department[]                        @relation("DepartmentItAdmin")
   headPeriods                     DepartmentHeadPeriod[]
-  ownedApplications               Application[]
+  ownedApplications               Application[]                       @relation("ApplicationLegacyBusinessOwner")
+  applicationsInCharge            Application[]                       @relation("ApplicationResponsibleItAdmin")
   workspacePrimaryOwnerOf         PlanWorkspaceProfile[]              @relation("WorkspacePrimaryOwner")
   workspaceEmergencyHolderOf      PlanWorkspaceProfile[]              @relation("WorkspaceEmergencyHolder")
   workspaceMemberships            PlanWorkspaceAdmin[]                @relation("WorkspaceMember")
+  itAdminHandoversReceived        ItAdminHandover[]                   @relation("ItAdminHandoverReceiver")
+  departmentSoftwareProposals     DepartmentSoftwareProposal[]        @relation("DepartmentSoftwareProposer")
+  subscriptionsInCharge           Subscription[]                      @relation("SubscriptionResponsibleItAdmin")
   planTermOpinions                PlanTermOpinion[]
   applicationBusinessOwners       ApplicationBusinessOwner[]
   licenseAssignments              LicenseAssignment[]
@@ -288,9 +309,12 @@ model Employee {
   requestBudgetChecksRun          RequestBudgetCheck[]                @relation("RequestBudgetCheckRanBy")
   spendBatchesSubmitted           SpendBatch[]                        @relation("SpendBatchSubmitter")
   spendDecisionsGiven             SpendDecision[]                     @relation("SpendDecisionDecider")
+  reserveConfirmationsGiven       RequestReserveConfirmation[]        @relation("ReserveConfirmationConfirmer")
   budgetQuestionsAsked            BudgetInformationRequest[]          @relation("BudgetInformationAsker")
   commitmentReleases              BudgetCommitmentRelease[]           @relation("CommitmentReleaser")
   invoicesRecorded                Invoice[]                           @relation("InvoiceRecorder")
+  budgetCyclesOpened              BudgetCycle[]                       @relation("BudgetCycleOpener")
+  budgetCyclesPublished           BudgetCycle[]                       @relation("BudgetCyclePublisher")
   budgetQuestionsAnswered         BudgetInformationRequest[]          @relation("BudgetInformationAnswerer")
   stepSlaRemindersHeld            StepSlaReminder[]                   @relation("StepSlaReminderHolder")
   stepSlaRemindersReceived        StepSlaReminderRecipient[]          @relation("StepSlaReminderRecipient")

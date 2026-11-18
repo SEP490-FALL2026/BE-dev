@@ -43,7 +43,7 @@ export class SupplementQueryService {
 
     return Promise.all(
       records.map(async (record): Promise<SupplementWire> => {
-        const money = await this.wireView.formatter(record.currency);
+        const money = await this.wireView.formatter(record.currency ?? 'VND');
         const changedBy = people.get(record.changedByEmployeeId);
         if (!changedBy) throw new Error('A supplementary file points at a missing person.');
 
@@ -52,8 +52,9 @@ export class SupplementQueryService {
           reason: record.reason,
           changedBy,
           createdAt: record.createdAt.toISOString(),
-          budgetYear: { before: record.beforeBudgetYear, after: record.afterBudgetYear },
-          amount: { before: money(record.beforeAmountMinor), after: money(record.afterAmountMinor) },
+          expectedEndDate: { before: record.beforeExpectedEndDate, after: record.afterExpectedEndDate },
+          budgetYear: { before: record.beforeBudgetYear ?? 0, after: record.afterBudgetYear ?? 0 },
+          amount: { before: money(record.beforeAmountMinor ?? 0n), after: money(record.afterAmountMinor ?? 0n) },
           droppedCount: (dropped.get(record.number) ?? []).length,
         };
       }),

@@ -2,19 +2,21 @@ import request from 'supertest';
 import { PgRelay } from '../../support/pg-relay';
 import { QueryCounter, dataStatements } from '../../support/query-count';
 import { SeatHarness } from '../../support/seat-baseline-harness';
+import { intakeBodyOf } from '../../support/application-body';
 
 const h = new SeatHarness();
 const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
 
 const SUMMARY_KEYS = [
-  'businessOwner',
-  'businessOwnerReplacementRequired',
   'dataSensitivity',
   'functionalGroup',
   'id',
   'isCommunicationService',
   'kind',
+  'logoUrl',
   'name',
+  'needsResponsible',
+  'responsibleItAdmin',
   'status',
   'updatedAt',
   'usageCollectionDefault',
@@ -54,15 +56,16 @@ describe('catalog read contracts (integration, real PostgreSQL)', () => {
       await request(h.server())
         .post('/api/v1/applications')
         .set(as())
-        .send({
-          name,
-          kind: 'SAAS',
-          vendorName: `${name} Inc`,
-          dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: h.businessOwner,
-          communication: { ...NO, note: 'n'.repeat(1000) },
-          domains: domains(`${counter_}`),
-        })
+        .send(
+          intakeBodyOf({
+            name,
+            kind: 'SAAS',
+            vendorName: `${name} Inc`,
+            dataSensitivity: 'LOW',
+            communication: { ...NO, note: 'n'.repeat(1000) },
+            domains: domains(`${counter_}`),
+          }),
+        )
         .expect(201),
     );
   };
@@ -83,7 +86,6 @@ describe('catalog read contracts (integration, real PostgreSQL)', () => {
       expect(detail).toMatchObject({
         id: first.id,
         domains: expect.any(Array) as unknown,
-        communication: expect.objectContaining({ note: 'n'.repeat(1000) }) as unknown,
         dictionaryServiceLineId: null,
       });
       expect(Object.keys(detail)).toEqual(expect.arrayContaining(SUMMARY_KEYS));
@@ -121,15 +123,16 @@ describe('catalog read contracts (integration, real PostgreSQL)', () => {
           await request(h.server())
             .post('/api/v1/applications')
             .set(as())
-            .send({
-              name: `Similar ${index}`,
-              kind: 'SAAS',
-              vendorName: `Similar Vendor ${index}`,
-              dataSensitivity: 'LOW',
-              businessOwnerEmployeeId: h.businessOwner,
-              communication: NO,
-              functionalGroupId: group.id,
-            })
+            .send(
+              intakeBodyOf({
+                name: `Similar ${index}`,
+                kind: 'SAAS',
+                vendorName: `Similar Vendor ${index}`,
+                dataSensitivity: 'LOW',
+                communication: NO,
+                functionalGroupId: group.id,
+              }),
+            )
             .expect(201),
         );
         if (index === 0) first = created.id;
@@ -143,50 +146,7 @@ describe('catalog read contracts (integration, real PostgreSQL)', () => {
       expect(detail.similarTotal).toBe(21);
     }, 120_000);
 
-    it('pages the history of Business Owners', async () => {
-      const application = await declare('Owner History');
-      await sql().query(
-        `INSERT INTO application_business_owners (id, application_id, employee_id, assigned_at, ended_at)
-         SELECT gen_random_uuid(), $1, $2, now() - (n || ' minutes')::interval, now() - (n || ' minutes')::interval + interval '30 seconds'
-           FROM generate_series(1, 25) AS n`,
-        [application.id, h.businessOwner],
-      );
-
-      const page = h.dataOf<{ items: unknown[]; pagination: { page: number; pageSize: number; totalItems: number } }>(
-        await request(h.server())
-          .get(`/api/v1/applications/${application.id}/business-owners?page=2&pageSize=10`)
-          .set(as())
-          .expect(200),
-      );
-
-      expect(page.items).toHaveLength(10);
-      expect(page.pagination).toMatchObject({ page: 2, pageSize: 10, totalItems: 26 });
-    }, 60_000);
-
-    it('answers the newest 50 opinions on a plan with their total, and pages all of them on their own route', async () => {
-      const planId = await h.plan('K2', 'PER_SEAT');
-      await sql().query(
-        `INSERT INTO plan_term_opinions (id, plan_id, business_owner_employee_id, opinion, recorded_by_app_user_id, recorded_at)
-         SELECT gen_random_uuid(), $1, $2, 'opinion ' || n, $3, now() - (n || ' minutes')::interval
-           FROM generate_series(1, 60) AS n`,
-        [planId, h.businessOwner, h.it1.appUserId],
-      );
-
-      const terms = h.dataOf<{ opinions: { opinion: string }[]; opinionTotal: number }>(
-        await request(h.server()).get(`/api/v1/plans/${planId}/terms`).set(as()).expect(200),
-      );
-      const second = h.dataOf<{ items: { opinion: string }[]; pagination: { totalItems: number } }>(
-        await request(h.server()).get(`/api/v1/plans/${planId}/term-opinions?page=2&pageSize=50`).set(as()).expect(200),
-      );
-
-      expect(terms.opinions).toHaveLength(50);
-      expect(terms.opinions[0].opinion).toBe('opinion 1');
-      expect(terms.opinionTotal).toBe(60);
-      expect(second.items).toHaveLength(10);
-      expect(second.pagination.totalItems).toBe(60);
-    }, 60_000);
-
-    it('lists at most 50 of what holds an application and of its confirmations, counts the rest and answers the same when retiring is refused', async () => {
+    it('lists at most 50 of what holds an application, counts the rest and answers the same when retiring is refused', async () => {
       await h.crowd('LDSIX', 120);
       const subscriptionId = await h.subscription(200, 'K2');
       const { plan_id: planId } = (
@@ -195,12 +155,6 @@ describe('catalog read contracts (integration, real PostgreSQL)', () => {
       const { application_id: applicationId } = (
         await sql().query<{ application_id: string }>(`SELECT application_id FROM plans WHERE id = $1`, [planId])
       ).rows[0];
-      const owner = (
-        await sql().query<{ business_owner_employee_id: string }>(
-          `SELECT business_owner_employee_id FROM applications WHERE id = $1`,
-          [applicationId],
-        )
-      ).rows[0].business_owner_employee_id;
       await sql().query(
         `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
            account_identifier, normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id)
@@ -209,19 +163,8 @@ describe('catalog read contracts (integration, real PostgreSQL)', () => {
            FROM employees e WHERE e.employee_code LIKE 'LDSIX%'`,
         [h.seed.organizationId, planId, subscriptionId],
       );
-      await sql().query(
-        `INSERT INTO application_retirement_confirmations (id, organization_id, application_id, business_owner_employee_id, note,
-           recorded_by_app_user_id, recorded_at)
-         SELECT gen_random_uuid(), $1, $2, $3, 'confirmation ' || n, $4, now() - (n || ' minutes')::interval
-           FROM generate_series(1, 60) AS n`,
-        [h.seed.organizationId, applicationId, owner, h.it1.appUserId],
-      );
-
       const view = h.dataOf<{
         retirement: {
-          confirmed: boolean;
-          confirmations: unknown[];
-          confirmationTotal: number;
           canRetire: boolean;
           blockers: {
             assignments: unknown[];
@@ -235,10 +178,8 @@ describe('catalog read contracts (integration, real PostgreSQL)', () => {
         await request(h.server()).get(`/api/v1/applications/${applicationId}/retirement`).set(as()).expect(200),
       ).retirement;
 
-      expect(view.confirmed).toBe(true);
       expect(view.canRetire).toBe(false);
-      expect(view.confirmations).toHaveLength(50);
-      expect(view.confirmationTotal).toBe(60);
+      expect(view).not.toHaveProperty('confirmations');
       expect(view.blockers.assignments).toHaveLength(50);
       expect(view.blockers.assignmentTotal).toBe(120);
       expect(view.blockers.assignmentsByPlan).toEqual([

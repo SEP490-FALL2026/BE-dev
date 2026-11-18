@@ -1,7 +1,26 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '../../generated/prisma/client';
 import { DbTx } from '../../infrastructure/database/transaction-runner';
 import { auditEventAfterJson, auditEventBeforeJson } from './audit-event-payload.json';
-import { AuditCursor, AuditEventInput, AuditEventSlice } from './public/audit.types';
+import {
+  AuditCursor,
+  AuditEventInput,
+  AuditEventSlice,
+  AuditResourceRef,
+  ResourceEventQuery,
+  ResourceEventSlice,
+} from './public/audit.types';
+
+interface ResourceRow {
+  id: string;
+  occurred_at: Date;
+  action: string;
+  actor_kind: ResourceEventSlice['actorKind'];
+  actor_app_user_id: string | null;
+  actor_roles: string[];
+  /** The JSON as PostgreSQL returns it; `auditEventAfterJson` says what it is. */
+  after: unknown;
+}
 
 interface SliceRow {
   id: string;
@@ -78,6 +97,52 @@ export class AuditRepo {
       actorAppUserId: row.actor_app_user_id,
       after: auditEventAfterJson.decode(row.after),
     }));
+  }
+
+  /**
+   * The events of these resources and actions, oldest first, one page and the count for the same filter. With `onlySubject`, an event
+   * whose `after` names another subject under one of the keys is left out in SQL, so the page and the total agree. Reads only, in the
+   * caller's transaction, one statement after the other (R2).
+   */
+  async pageOfResources(
+    tx: DbTx,
+    resources: readonly AuditResourceRef[],
+    query: ResourceEventQuery,
+  ): Promise<{ rows: ResourceEventSlice[]; total: number }> {
+    if (resources.length === 0 || query.actions.length === 0) return { rows: [], total: 0 };
+    const types = resources.map((resource) => resource.type);
+    const ids = resources.map((resource) => resource.id);
+    const actions = [...query.actions];
+    const keys = [...(query.onlySubject?.keys ?? [])];
+    const subject = query.onlySubject?.subject ?? null;
+    const where = Prisma.sql`
+       (resource_type, resource_id) IN (SELECT t, i FROM unnest(${types}::text[], ${ids}::text[]) AS r(t, i))
+       AND action = ANY(${actions}::text[])
+       AND (${subject}::text IS NULL OR NOT EXISTS (
+             SELECT 1 FROM unnest(${keys}::text[]) AS k(key)
+              WHERE after ->> k.key IS NOT NULL AND after ->> k.key <> ${subject}::text))`;
+    const [counted] = await tx.$queryRaw<
+      { total: number }[]
+    >`SELECT count(*)::int AS total FROM audit_events WHERE ${where}`;
+    const rows = await tx.$queryRaw<ResourceRow[]>`
+      SELECT id, occurred_at, action, actor_kind, actor_app_user_id, actor_roles, after
+        FROM audit_events
+       WHERE ${where}
+       ORDER BY occurred_at, id
+      OFFSET ${query.skip}::int LIMIT ${query.take}::int`;
+
+    return {
+      total: counted?.total ?? 0,
+      rows: rows.map((row) => ({
+        id: row.id,
+        occurredAt: row.occurred_at,
+        action: row.action,
+        actorKind: row.actor_kind,
+        actorAppUserId: row.actor_app_user_id,
+        actorRoles: row.actor_roles,
+        after: auditEventAfterJson.decode(row.after),
+      })),
+    };
   }
 
   /** How many events each of these actions has; an action with none is absent from the map. */

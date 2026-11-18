@@ -23,6 +23,24 @@ enum BudgetRepeatCycle {
   ONE_TIME
 }
 
+// Line type (BM-10): what a proposal line is for
+enum BudgetLineType {
+  RENEW
+  CHANGE
+  NEW
+  CANCEL
+}
+
+// Where a version came from (QĐ-100h): the proposal of the head, or the baseline Finance built when nobody headed the department at the deadline.
+enum BudgetVersionOrigin {
+  PROPOSAL
+  BASELINE_NO_HEAD
+  // A department that submitted no BM-10 by the deadline: Finance built the version from the baseline (QĐ-111bb). New versions of that kind use this; BASELINE_NO_HEAD stays for those written before.
+  BASELINE_NO_PROPOSAL
+  // A change of the budget in the year (QĐ-111ag), used from AD-1.
+  ADJUSTMENT
+}
+
 enum BudgetVersionKind {
   // The first version of a Cost Center and year, built from a proposal.
   INITIAL
@@ -59,7 +77,10 @@ model BudgetProposal {
   // The proposal this one follows when the version made from that one was refused and the need changed (QĐ-92c(2)): a
   // proposal is a resubmission OR a successor, and has at most one successor. Set by the system, never by a client.
   successorOfProposalId String?             @unique @map("successor_of_proposal_id") @db.Uuid
+  // The amount the head asks for (BM-10 = files + one amount + a note, QD-111ab); a proposal sent before kept the sum of its lines here.
   totalMinor            BigInt              @map("total_minor")
+  // What the head wrote beside the amount (1 to 1000 characters), or nothing.
+  note                  String?
   currency              String              @db.Char(3)
   // Values, not foreign keys: the history outlives the account.
   submittedByEmployeeId String              @map("submitted_by_employee_id") @db.Uuid
@@ -102,12 +123,17 @@ model BudgetProposalLine {
   repeatCycle         BudgetRepeatCycle? @map("repeat_cycle")
   quoteValidUntil     DateTime?          @map("quote_valid_until") @db.Date
   note                String?
+  lineType            BudgetLineType     @map("line_type")
+  zbb                 Json?
+  priorityRank        Int                @map("priority_rank")
+  overCeilingMinor    BigInt?            @map("over_ceiling_minor")
 
   proposal     BudgetProposal      @relation(fields: [proposalId], references: [id], onDelete: Restrict)
   plan         Plan?               @relation("BudgetProposalLinePlan", fields: [planId], references: [id], onDelete: Restrict)
   versionLines BudgetVersionLine[]
 
   @@id([proposalId, position])
+  @@unique([proposalId, priorityRank])
   @@map("budget_proposal_lines")
 }
 
@@ -125,6 +151,9 @@ model BudgetVersion {
   // The version that was current when this revision was made.
   basedOnVersionId      String?            @map("based_on_version_id") @db.Uuid
   baseMinor             BigInt             @map("base_minor")
+  // Why Finance moved the base (QĐ-100v); set when a draft's base is changed.
+  baseReason            String?            @map("base_reason")
+  origin                BudgetVersionOrigin @default(PROPOSAL)
   reserveMinor          BigInt             @map("reserve_minor")
   // The share of the base the reserve defaults to, as it stood when the version was made; null before QĐ-98 (no reason is asked then).
   reservePercent        Int?               @map("reserve_percent") @db.SmallInt
@@ -170,6 +199,7 @@ model BudgetVersion {
   decisions           BudgetVersionDecision[]
   attachedCommitments BudgetCommitment[]          @relation("BudgetCommitmentAttached")
   attachments         BudgetAttachment[]
+  adjustmentsMade     BudgetAdjustment[]          @relation("BudgetAdjustmentVersion")
 
   @@unique([costCenterId, year, number])
   @@index([costCenterId, year, state])
@@ -197,6 +227,9 @@ model BudgetVersionLine {
   financeComment      String?            @map("finance_comment")
   // Why Finance changed what the proposal said; required when it differs from the line it adjusts.
   adjustmentReason    String?            @map("adjustment_reason")
+  lineType            BudgetLineType     @map("line_type")
+  zbb                 Json?
+  priorityRank        Int?               @map("priority_rank")
 
   version      BudgetVersion             @relation(fields: [versionId], references: [id], onDelete: Restrict)
   proposalLine BudgetProposalLine?       @relation(fields: [proposalId, proposalPosition], references: [proposalId, position], onDelete: Restrict)
@@ -241,6 +274,13 @@ enum CommitmentState {
   EXPENSED
 }
 
+// Where a commitment came from: the approval of the spending approver (US-06-04), or the pass made on 01/01 for a request whose right goes on
+// into the new year or that was approved and not yet granted (FR-5.8(6), QĐ-109a).
+enum CommitmentOrigin {
+  APPROVAL
+  YEAR_START
+}
+
 // Why money held for a request went back to the budget (US-06-06, US-05-08 AC-5, US-05-17 AC-10).
 enum CommitmentReleaseReason {
   REQUEST_CANCELLED
@@ -248,6 +288,14 @@ enum CommitmentReleaseReason {
   GRANT_FAILED
   PARTICIPANT_WITHDRAWN
   REMAINDER
+  // The right was taken back: what its days after the end of the right would have cost goes back (`RV-07`, `M-06`).
+  REVOKED
+  // A K2 right granted after its commitment began: what the days before the grant would have cost goes back (`M-10`).
+  LATE_GRANT
+  // A K4 key was given from the pool: the price held is not spent (`QĐ-106d`).
+  GRANTED_FROM_POOL
+  // The holder moved to another department: what the seat would cost from the day the transfer takes effect goes back (`QĐ-111bg`).
+  TRANSFER_EFFECTIVE
 }
 
 // The electronic record of the decision of the spending approver on a version (US-06-11 AC-1): who, in which role, what,
@@ -298,6 +346,12 @@ model BudgetCommitment {
   appliedMinor      BigInt          @default(0) @map("applied_minor")
   // The check the decision of the spending approver kept, which is the snapshot this commitment was made on (US-06-04 AC-1).
   snapshotCheckId   String?         @map("snapshot_check_id") @db.Uuid
+  // `APPROVAL` for the commitment of a decision; `YEAR_START` for the one made on 01/01, which no check backs (`snapshotCheckId` is null).
+  origin            CommitmentOrigin @default(APPROVAL)
+  // What one seat costs a month, rounded up, when the commitment was made: what the release by day takes from. Null before it was kept.
+  seatMonthlyMinor  BigInt?         @map("seat_monthly_minor")
+  // What the seat-months gave back so far (SM1-06): the sum of the reversals of the commitment, moving with `appliedMinor`; the guard of the table accepts a lower `appliedMinor` only by exactly this.
+  seatMonthReversedMinor BigInt     @default(0) @map("seat_month_reversed_minor")
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -309,6 +363,8 @@ model BudgetCommitment {
   snapshotCheck   RequestBudgetCheck?       @relation(fields: [snapshotCheckId], references: [id], onDelete: Restrict)
   releases        BudgetCommitmentRelease[]
   invoices        Invoice[]
+  seatMonths      SeatMonthCharge[]
+  seatMonthReversals BudgetCommitmentSeatMonthReversal[]
 
   @@unique([requestId, year])
   @@index([costCenterId, year, state])
@@ -348,7 +404,8 @@ enum InvoiceMatchResult {
 model Invoice {
   id                    String             @id @default(uuid(7)) @db.Uuid
   organizationId        String             @map("organization_id") @db.Uuid
-  commitmentId          String             @map("commitment_id") @db.Uuid
+  // Null for an invoice booked to a subscription, to a Cost Center, to a case of SBF-07a or to the line not allocated (the CHECK `invoices_place_check` keeps one of the five).
+  commitmentId          String?            @map("commitment_id") @db.Uuid
   vendorId              String             @map("vendor_id") @db.Uuid
   number                String
   issuedOn              DateTime           @map("issued_on") @db.Date
@@ -364,15 +421,29 @@ model Invoice {
   note                  String?
   recordedByEmployeeId  String             @map("recorded_by_employee_id") @db.Uuid
   recordedAt            DateTime           @map("recorded_at") @db.Timestamptz(3)
+  // The first day of the month the invoice pays for (PI-1, QĐ-111w); null for the invoices of before, whose year is the one of their commitment.
+  serviceMonth          DateTime?          @map("service_month") @db.Date
+  // The purchase invoice the IT Admin submitted and Finance signed (a value of the requests context); null for an invoice recorded by hand.
+  purchaseInvoiceId     String?            @unique @map("purchase_invoice_id") @db.Uuid
+  subscriptionId        String?            @map("subscription_id") @db.Uuid
+  // Where an invoice with no commitment is booked (R-51: the department that held the right in the service month).
+  costCenterId          String?            @map("cost_center_id") @db.Uuid
+  outOfProcessCaseId    String?            @map("out_of_process_case_id") @db.Uuid
+  // The line of the Cost Center not allocated (QĐ-104k(4), FX3-01): why the invoice belongs to no Cost Center and the department of the user it is shown with.
+  // Both null for any other invoice; the CHECK `invoices_unallocated_check` keeps them together and the invoice with no other place.
+  unallocatedReason     String?            @map("unallocated_reason")
+  departmentId          String?            @map("department_id") @db.Uuid
 
   organization   Organization     @relation(fields: [organizationId], references: [id])
-  commitment     BudgetCommitment @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+  commitment     BudgetCommitment? @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
   vendor         Vendor           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   currencyRecord Currency         @relation("InvoiceCurrency", fields: [currency], references: [code], onDelete: Restrict)
   recordedBy     Employee         @relation("InvoiceRecorder", fields: [recordedByEmployeeId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, vendorId, number])
   @@index([commitmentId, recordedAt])
+  @@index([costCenterId, serviceMonth])
+  @@index([subscriptionId, serviceMonth])
   @@map("invoices")
 }
 
@@ -455,4 +526,246 @@ model BudgetAttachment {
   @@index([status, createdAt])
   @@index([uploadedByEmployeeId, status, createdAt], map: "budget_attachments_uploaded_by_status_created_at_idx")
   @@map("budget_attachments")
+}
+
+/// The budget cycle of a year (QĐ-103i, BR-MF4-01, QĐ-111z): the deadlines, the annual ceiling of the software budget and the shared-pool
+/// reserve. It is a draft while `openedAt` is NULL (Finance edits or deletes it freely), open from then until the submission deadline, and
+/// locked after it. `publishedAt`, `publishedByEmployeeId`, `firstPublishedAt` and the ceilings of the departments are no longer written
+/// (QĐ-111aa); the columns stay for the cycles written before.
+model BudgetCycle {
+  id                    String    @id @default(uuid(7)) @db.Uuid
+  organizationId        String    @map("organization_id") @db.Uuid
+  year                  Int
+  submissionDeadline    DateTime  @map("submission_deadline") @db.Date
+  decisionDeadline      DateTime  @map("decision_deadline") @db.Date
+  annualCeilingMinor    BigInt    @map("annual_ceiling_minor")
+  sharedPoolReserveMinor BigInt?  @map("shared_pool_reserve_minor")
+  currency              String    @db.Char(3)
+  priorities            String?
+  openedByEmployeeId    String?   @map("opened_by_employee_id") @db.Uuid
+  openedAt              DateTime? @map("opened_at") @db.Timestamptz(3)
+  publishedByEmployeeId String?   @map("published_by_employee_id") @db.Uuid
+  publishedAt           DateTime? @map("published_at") @db.Timestamptz(3)
+  firstPublishedAt      DateTime? @map("first_published_at") @db.Timestamptz(3)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization   Organization              @relation(fields: [organizationId], references: [id])
+  currencyRecord Currency                  @relation("BudgetCycleCurrency", fields: [currency], references: [code], onDelete: Restrict)
+  openedBy       Employee?                 @relation("BudgetCycleOpener", fields: [openedByEmployeeId], references: [id], onDelete: Restrict)
+  publishedBy    Employee?                 @relation("BudgetCyclePublisher", fields: [publishedByEmployeeId], references: [id], onDelete: Restrict)
+  ceilings       BudgetDepartmentCeiling[]
+
+  @@unique([organizationId, year])
+  @@map("budget_cycles")
+}
+
+/// The ceiling of one department in a cycle (FR-5.16(2)): the commitments already signed, the seats planned at their monthly price and
+/// the priority items; `totalMinor` is their sum. `publishedTotalMinor` is the total the head was told at the last publication.
+model BudgetDepartmentCeiling {
+  cycleId                String  @map("cycle_id") @db.Uuid
+  departmentId           String  @map("department_id") @db.Uuid
+  signedCommitmentsMinor BigInt  @map("signed_commitments_minor")
+  plannedSeatsMinor      BigInt  @map("planned_seats_minor")
+  priorityMinor          BigInt  @map("priority_minor")
+  totalMinor             BigInt  @map("total_minor")
+  publishedTotalMinor    BigInt? @map("published_total_minor")
+  explanation            String?
+
+  cycle      BudgetCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  department Department  @relation("BudgetDepartmentCeilingDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
+
+  @@id([cycleId, departmentId])
+  @@map("budget_department_ceilings")
+}
+
+/// What one seat of a K2 pool cost one department in one month that has ended (SM-1, QĐ-103k, QĐ-111bg): the days the seat was held in that
+/// department over the days of the month, times the price of a month, one row for each seat, month and department. The rows of a subscription and
+/// a month are replaced together until a review period signs the month, so the table is not evidence in itself. `costCenterId` is null for a
+/// department that has no Cost Center yet (shown as the line "not allocated to a Cost Center"); `commitmentId` and `appliedMinor` say what of
+/// the amount took the commitment of the seat down. The ids of other contexts are values, not foreign keys.
+model SeatMonthCharge {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  subscriptionId    String   @map("subscription_id") @db.Uuid
+  assignmentId      String   @map("assignment_id") @db.Uuid
+  employeeId        String   @map("employee_id") @db.Uuid
+  departmentId      String   @map("department_id") @db.Uuid
+  costCenterId      String?  @map("cost_center_id") @db.Uuid
+  // The first day of the month.
+  month             DateTime @db.Date
+  days              Int      @db.SmallInt
+  daysInMonth       Int      @map("days_in_month") @db.SmallInt
+  monthlyPriceMinor BigInt   @map("monthly_price_minor")
+  amountMinor       BigInt   @map("amount_minor")
+  commitmentId      String?  @map("commitment_id") @db.Uuid
+  appliedMinor      BigInt   @default(0) @map("applied_minor")
+  computedAt        DateTime @map("computed_at") @db.Timestamptz(3)
+
+  commitment BudgetCommitment? @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+
+  @@unique([assignmentId, month, departmentId])
+  @@index([subscriptionId, month])
+  @@index([costCenterId, month])
+  @@index([commitmentId])
+  @@map("seat_month_charges")
+}
+
+/// FIX-SM1 SM1-03: the mark that one subscription was charged for one month that has ended (written in the same transaction as its seat-month rows),
+/// so the sweeper charges the subscriptions of a month that have no mark and a failure in the middle of a pass never loses the ones after it. A month
+/// charged on request charges every subscription again. The ids of other contexts are values, not foreign keys.
+model SeatMonthRun {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  subscriptionId String   @map("subscription_id") @db.Uuid
+  // The first day of the month.
+  month          DateTime @db.Date
+  rows           Int
+  completedAt    DateTime @map("completed_at") @db.Timestamptz(3)
+
+  @@unique([subscriptionId, month])
+  @@index([month])
+  @@map("seat_month_runs")
+}
+
+/// RV-1 (QĐ-111ae, R-2): the close of a month. A picture of the figures of each Cost Center that has an effective budget of the year, and of the company, taken when Finance
+/// closes a month that has ended; the figures are never changed (a trigger), a late invoice is a change after the picture. `kind` is QUARTER for March, June and September;
+/// `state` moves SNAPSHOT, AWAITING_EXPLANATIONS (RV-3), SIGNED, forward only. The ids of other contexts are values, not foreign keys.
+model BudgetReviewPeriod {
+  id                         String    @id @default(uuid(7)) @db.Uuid
+  organizationId             String    @map("organization_id") @db.Uuid
+  year                       Int
+  month                      Int
+  kind                       String
+  state                      String    @default("SNAPSHOT")
+  currency                   String    @db.Char(3)
+  snapshotByEmployeeId       String    @map("snapshot_by_employee_id") @db.Uuid
+  snapshotAt                 DateTime  @map("snapshot_at") @db.Timestamptz(3)
+  signedByEmployeeId         String?   @map("signed_by_employee_id") @db.Uuid
+  signedAt                   DateTime? @map("signed_at") @db.Timestamptz(3)
+  note                       String?
+  // What the company spent in the year up to the close, the shared pool in it (MG-03), and the line of the pool against the reserve of the cycle.
+  companySpentMinor          BigInt    @map("company_spent_minor")
+  sharedPoolUnallocatedMinor BigInt    @map("shared_pool_unallocated_minor")
+  sharedPoolReserveMinor     BigInt?   @map("shared_pool_reserve_minor")
+  annualCeilingMinor         BigInt?   @map("annual_ceiling_minor")
+  // RV-3: the last day the heads of departments are asked to explain a quarter by (the fifth working day from the close); null for a month and for a quarter closed before RV-3.
+  explanationsDueOn          DateTime? @map("explanations_due_on") @db.Date
+
+  lines BudgetReviewLine[]
+
+  @@unique([organizationId, year, month])
+  @@index([year, month])
+  @@map("budget_review_periods")
+}
+
+/// RV-1: one Cost Center in a period: its effective budget, what it spent, held, had waiting for the spend decision, what was left, the difference k of its invoices, the price
+/// increase already known, the forecast of the end of the year, the pace and the light. All figure columns are refused to every UPDATE (a trigger).
+model BudgetReviewLine {
+  id                 String  @id @default(uuid(7)) @db.Uuid
+  periodId           String  @map("period_id") @db.Uuid
+  costCenterId       String  @map("cost_center_id") @db.Uuid
+  baseMinor          BigInt  @map("base_minor")
+  reserveMinor       BigInt  @map("reserve_minor")
+  // Through the end of the month closed, by the month each invoice or seat-month pays for (FIX-RV1 RV1-03); what was already recorded for later months is `spentAfterMonthMinor`.
+  spentMinor         BigInt  @map("spent_minor")
+  spentAfterMonthMinor BigInt @default(0) @map("spent_after_month_minor")
+  committedMinor     BigInt  @map("committed_minor")
+  pendingSpendMinor  BigInt  @map("pending_spend_minor")
+  remainingMinor     BigInt  @map("remaining_minor")
+  // The price in the commitments of what the invoices of a commitment took down (their `applied`; named for what it held before FIX-RV1): the basis of k.
+  invoiceNetMinor    BigInt  @map("invoice_net_minor")
+  invoiceActualMinor BigInt  @map("invoice_actual_minor")
+  variancePpm        BigInt  @map("variance_ppm")
+  priceIncreaseMinor BigInt  @map("price_increase_minor")
+  forecastMinor      BigInt  @map("forecast_minor")
+  paceBasisPoints    BigInt? @map("pace_basis_points")
+  light              String
+  // RV-3 (QĐ-111ah, R-10, R-17): the explanation the head of the department gives of a yellow, red or under line of a quarter. `explanationStatus`: NOT_REQUIRED, PENDING (asked), EXPLAINED,
+  // UNEXPLAINED or NO_HEAD (what a PENDING line becomes when Finance signs, with or without a head to ask). The figures above never change; these move only while the period waits for them (a trigger).
+  explanationStatus           String    @default("NOT_REQUIRED") @map("explanation_status")
+  explanationCause            String?   @map("explanation_cause")
+  explanationPersistence      String?   @map("explanation_persistence")
+  explanationAction           String?   @map("explanation_action")
+  explanationNeedsAmountMinor BigInt?   @map("explanation_needs_amount_minor")
+  explanationNeedsNote        String?   @map("explanation_needs_note")
+  explainedByEmployeeId       String?   @map("explained_by_employee_id") @db.Uuid
+  explainedAt                 DateTime? @map("explained_at") @db.Timestamptz(3)
+
+  period BudgetReviewPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+
+  @@unique([periodId, costCenterId])
+  @@index([costCenterId])
+  @@map("budget_review_lines")
+}
+
+/// FIX-SM1 SM1-06: what a seat-month gave back to a commitment when the month was charged again (the seat was taken back, its days moved, the department changed
+/// Cost Center). Append-only: the database refuses to change or remove a row, and refuses to lower `applied_minor` of a commitment by anything but what these rows
+/// add up to (`seat_month_reversed_minor`). The ids of other contexts are values, not foreign keys.
+model BudgetCommitmentSeatMonthReversal {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  commitmentId   String   @map("commitment_id") @db.Uuid
+  subscriptionId String   @map("subscription_id") @db.Uuid
+  assignmentId   String   @map("assignment_id") @db.Uuid
+  departmentId   String   @map("department_id") @db.Uuid
+  // The first day of the month.
+  month          DateTime @db.Date
+  amountMinor    BigInt   @map("amount_minor")
+  // `RECALCULATED` or `SEAT_NOT_ASKED`.
+  reason         String
+  createdAt      DateTime @map("created_at") @db.Timestamptz(3)
+
+  commitment BudgetCommitment @relation(fields: [commitmentId], references: [id], onDelete: Restrict, map: "bcsmr_commitment_id_fkey")
+
+  @@index([commitmentId], map: "bcsmr_commitment_idx")
+  @@index([subscriptionId, month], map: "bcsmr_subscription_month_idx")
+  @@map("budget_commitment_seat_month_reversals")
+}
+
+/// AD-1 (QĐ-111ag, QĐ-111bh, C-1): an adjustment of the budget in the year, one record and four kinds. Finance makes it, the spending approver decides it. It is added to or taken
+/// from the BASE of a Cost Center (the reserve stays); CEILING_REDUCTION lowers the annual ceiling of the cycle. A Cost Center with no version of the year that is given money gets
+/// one when the adjustment is approved (R-48), named in `createdVersionId`, so that the amount is counted once. What it asks for never changes and it is never removed (a trigger).
+/// The ids of the Cost Centers are values of another context, not foreign keys. `kind`: SUPPLEMENT, TRANSFER, RETURN, CEILING_REDUCTION. `state`: PENDING, APPROVED, REJECTED.
+model BudgetAdjustment {
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  organizationId      String    @map("organization_id") @db.Uuid
+  year                Int
+  kind                String
+  fromCostCenterId    String?   @map("from_cost_center_id") @db.Uuid
+  toCostCenterId      String?   @map("to_cost_center_id") @db.Uuid
+  amountMinor         BigInt    @map("amount_minor")
+  currency            String    @db.Char(3)
+  reason              String
+  // COST_CENTER_CHANGE: a department moved to another Cost Center in the year; the transfer is not held to the forecast of the end of the year (R-40).
+  transferReason      String?   @map("transfer_reason")
+  state               String    @default("PENDING")
+  createdByEmployeeId String    @map("created_by_employee_id") @db.Uuid
+  createdAt           DateTime  @map("created_at") @db.Timestamptz(3)
+  decidedByEmployeeId String?   @map("decided_by_employee_id") @db.Uuid
+  decidedAt           DateTime? @map("decided_at") @db.Timestamptz(3)
+  decisionReason      String?   @map("decision_reason")
+  createdVersionId    String?   @map("created_version_id") @db.Uuid
+
+  createdVersion BudgetVersion? @relation("BudgetAdjustmentVersion", fields: [createdVersionId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, year, state])
+  @@index([toCostCenterId, year])
+  @@index([fromCostCenterId, year])
+  @@map("budget_adjustments")
+}
+
+/// RV-2 (QĐ-111af, R-5, R-28): an alert of 80 or 100 percent of the base of a budget that was told. One row for each CROSSING of a Cost Center, a year and a threshold (`episode`: 1 for the first, one more than
+/// the last read under the lock of the budget year; FIX-RV23 RV2-01): the use that goes over and stays is told once, the use that goes back under and over again is told again, whatever the base. `baseMinor` is
+/// the EFFECTIVE base the use went over, what was told. Written `ON CONFLICT DO NOTHING` (MAJ-10). The id of the Cost Center is a value of another context, not a foreign key.
+model BudgetThresholdAlert {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  costCenterId String   @map("cost_center_id") @db.Uuid
+  year         Int
+  threshold    Int
+  episode      Int      @default(1)
+  baseMinor    BigInt   @map("base_minor")
+  createdAt    DateTime @map("created_at") @db.Timestamptz(3)
+
+  @@unique([costCenterId, year, threshold, episode], map: "budget_threshold_alerts_episode_key")
+  @@map("budget_threshold_alerts")
 }

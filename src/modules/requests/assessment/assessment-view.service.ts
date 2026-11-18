@@ -5,7 +5,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import type { AssessmentRecord, ProposalRecord, Quote } from '../access-request/assessment-record.types';
-import { judgeCompletion } from './assessment.policy';
+import { assessmentScopeOf, judgeCompletion } from './assessment.policy';
 import { AssessmentStepRepo, type AssessmentStepRecord } from './assessment-step.repo';
 import { PricingViewService } from '../request-view/pricing-view.service';
 import type { AssessmentWire } from './assessment.dto';
@@ -26,30 +26,20 @@ export class AssessmentViewService {
     const step = await this.steps.find(request.id, tx);
     if (!proposal) throw new Error(`The proposal ${request.id} has no declaration.`);
 
-    const peopleIds = [
-      step?.assigneeEmployeeId,
-      assessment.proposedBusinessOwnerEmployeeId,
-      assessment.completedByEmployeeId,
-      assessment.rejectedByEmployeeId,
-    ].filter((id): id is string => id !== null && id !== undefined);
-    const planIds = [assessment.equivalentPlanId, assessment.alternativePlanId].filter(
-      (id): id is string => id !== null,
+    const { person, plans } = await this.namesOf(step, assessment, tx);
+    const [existing] = await this.catalog.getCollectorApplications(
+      proposal.existingApplicationId ? [proposal.existingApplicationId] : [],
+      tx,
     );
-    const people = await this.organizationReads.getEmployees([...new Set(peopleIds)], tx);
-    const plans = planIds.length > 0 ? await this.catalog.getPlanSummaries(planIds) : [];
     const priceView = await this.pricing.view(request.pricing);
     const costEstimate = await this.pricing.costEstimate(request.pricing, assessment.vendorId, tx);
     const quote = assessment.quote ? await this.quoteView(assessment.quote) : null;
-    const person = (id: string | null | undefined) => {
-      const found = id ? people.find((candidate) => candidate.id === id) : undefined;
-
-      return found ? { employeeId: found.id, employeeCode: found.employeeCode, fullName: found.fullName } : null;
-    };
 
     return {
       requestId: request.id,
       status: assessment.status,
-      proposal: toProposalWire(proposal),
+      proposal: proposalWire(proposal, existing),
+      scope: assessmentScopeOf(proposal),
       step: step && toStepWire(step, person(step.assigneeEmployeeId)),
       classification: assessment.classification,
       vendor: { vendorId: assessment.vendorId, name: assessment.vendorName },
@@ -64,11 +54,10 @@ export class AssessmentViewService {
       dataSensitivity: assessment.dataSensitivity,
       opinion: assessment.opinionStatus && { status: assessment.opinionStatus, note: assessment.opinionNote },
       equivalentTool: toolOf(plans, assessment.equivalentPlanId),
-      proposedBusinessOwner: person(assessment.proposedBusinessOwnerEmployeeId),
       controlLevel: assessment.controlLevel,
       controlRiskNote: assessment.controlRiskNote,
       quote,
-      complete: judgeCompletion(assessment).kind === 'OK',
+      complete: judgeCompletion(assessment, assessmentScopeOf(proposal), existing?.kind === 'INTERNAL').kind === 'OK',
       pricing: priceView,
       costEstimate,
       completedBy: person(assessment.completedByEmployeeId),
@@ -86,15 +75,34 @@ export class AssessmentViewService {
     };
   }
 
+  /** The people and the plans of the catalog the assessment names, read once: `person` gives the reference of one of them. */
+  private async namesOf(step: AssessmentStepRecord | null, assessment: AssessmentRecord, tx?: DbTx) {
+    const peopleIds = [
+      step?.assigneeEmployeeId,
+      assessment.completedByEmployeeId,
+      assessment.rejectedByEmployeeId,
+    ].filter((id): id is string => id !== null && id !== undefined);
+    const planIds = [assessment.equivalentPlanId, assessment.alternativePlanId].filter(
+      (id): id is string => id !== null,
+    );
+    const people = await this.organizationReads.getEmployees([...new Set(peopleIds)], tx);
+    const plans = planIds.length > 0 ? await this.catalog.getPlanSummaries(planIds) : [];
+    const person = (id: string | null | undefined) => {
+      const found = id ? people.find((candidate) => candidate.id === id) : undefined;
+
+      return found ? { employeeId: found.id, employeeCode: found.employeeCode, fullName: found.fullName } : null;
+    };
+
+    return { person, plans };
+  }
+
   private async quoteView(quote: Quote): Promise<NonNullable<AssessmentWire['quote']>> {
     return {
       unitPrice: await this.pricing.moneyView(quote.unitPrice),
+      originalPrice: quote.originalPrice ? await this.pricing.moneyView(quote.originalPrice) : null,
       billingCycle: quote.billingCycle,
       validFrom: quote.validFrom,
       validUntil: quote.validUntil,
-      commitmentMonths: quote.commitmentMonths,
-      paymentFrequency: quote.paymentFrequency,
-      firstPaymentOn: quote.firstPaymentOn,
     };
   }
 }
@@ -109,11 +117,18 @@ const toolOf = (
   return found ? { planId: found.planId, planName: found.planName, applicationName: found.applicationName } : null;
 };
 
-const toProposalWire = (proposal: ProposalRecord): AssessmentWire['proposal'] => ({ ...proposal });
+/** The declaration, with the application the person named by name (`existingApplication`): what a short proposal is set against. */
+const proposalWire = (
+  proposal: ProposalRecord,
+  existing: { id: string; name: string } | undefined,
+): AssessmentWire['proposal'] => ({
+  ...proposal,
+  existingApplication: existing ? { id: existing.id, name: existing.name } : null,
+});
 
 const toStepWire = (
   step: AssessmentStepRecord,
-  assignee: AssessmentWire['proposedBusinessOwner'],
+  assignee: NonNullable<AssessmentWire['step']>['assignee'],
 ): NonNullable<AssessmentWire['step']> => ({
   state: step.state,
   assignee,

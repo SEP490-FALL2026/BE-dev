@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
-import { SHARED_DEMO_V3 } from '../../../src/cli/seed/fixture/shared-demo-v3';
+import { SHARED_DEMO_V4 } from '../../../src/cli/seed/fixture/shared-demo-v4';
 import { bodyOf } from '../api-body';
 import { FLOW_DEMO_PASSWORD, FLOW_SUPER_ADMIN_EMAIL, FLOW_SUPER_ADMIN_PASSWORD } from './flow-template';
 
@@ -28,10 +28,10 @@ export class FlowActors {
   /** The login email of a person of the dataset, or of the Super Admin. */
   emailOf(code: string): string {
     if (code === SUPER_ADMIN) return FLOW_SUPER_ADMIN_EMAIL;
-    const person = SHARED_DEMO_V3.people.find((candidate) => candidate.code === code);
+    const person = SHARED_DEMO_V4.people.find((candidate) => candidate.code === code);
     if (!person) throw new Error(`The dataset has no person ${code}.`);
 
-    return `${person.email}@${SHARED_DEMO_V3.emailDomain}`;
+    return `${person.email}@${SHARED_DEMO_V4.emailDomain}`;
   }
 
   /** Signs the person in (again) through the real route and keeps the tokens. */

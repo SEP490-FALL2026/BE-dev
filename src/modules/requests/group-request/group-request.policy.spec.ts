@@ -17,7 +17,8 @@ const person = (over: Partial<LineFacts> = {}): LineFacts => ({
   hireDate: '2026-01-05',
   holdsAccess: false,
   hasOpenRequest: false,
-  isHeadOwnLine: false,
+  isDepartmentHead: false,
+  termRefusal: null,
   spendingApprover: false,
   ...over,
 });
@@ -109,6 +110,19 @@ describe('what each person named must have (US-05-17 AC-2, AC-8, AC-12, AC-15)',
     expect(check([person({ employmentType: 'INTERN' })])).toEqual([]);
   });
 
+  it('T-R38, INV-07: refuses on their own line a person with a term when the group gives no months or no end, and nobody else', () => {
+    const refused = check([
+      person({ employeeId: 'staff' }),
+      person({ employeeId: 'intern', employmentType: 'INTERN', termRefusal: 'TERM_LONG_TERM_NOT_ALLOWED' }),
+      person({ employeeId: 'contractor', employmentType: 'CONTRACTOR', termRefusal: 'TERM_REQUIRED' }),
+    ]);
+
+    expect(refused).toEqual([
+      { employeeId: 'intern', reason: 'TERM_LONG_TERM_NOT_ALLOWED' },
+      { employeeId: 'contractor', reason: 'TERM_REQUIRED' },
+    ]);
+  });
+
   it('gives the first reason of a person in the order a caller should learn it', () => {
     const many = person({ employeeId: 'x', departmentId: 'P-ENG', active: false, workEmail: null, holdsAccess: true });
 
@@ -137,10 +151,23 @@ describe('what each person named must have (US-05-17 AC-2, AC-8, AC-12, AC-15)',
     ]);
   });
 
-  it("asks no email and no end day of the head in their own line, as it does of a head's own request", () => {
-    const own = person({ isHeadOwnLine: true, workEmail: null, employmentType: 'INTERN' });
+  it('BR-MF1-01h QĐ-106g: lists GH-2 with the other refused lines, after GH-1', () => {
+    const refused = check([
+      person({ employeeId: 'a', openLimitReached: true }),
+      person({ employeeId: 'c', hasOpenRequest: true, openLimitReached: true }),
+      person({ employeeId: 'd' }),
+    ]);
 
-    expect(check([own])).toEqual([]);
-    expect(check([{ ...own, active: false }])).toEqual([{ employeeId: 'e1', reason: 'NOT_ACTIVE' }]);
+    expect(refused).toEqual([
+      { employeeId: 'a', reason: 'OPEN_LIMIT_REACHED' },
+      { employeeId: 'c', reason: 'HAS_OPEN_REQUEST' },
+    ]);
+  });
+
+  it('BR-MF1-02: rejects the current head in a group before contact checks', () => {
+    const own = person({ isDepartmentHead: true, workEmail: null, employmentType: 'INTERN' });
+
+    expect(check([own])).toEqual([{ employeeId: 'e1', reason: 'HEAD_IN_GROUP' }]);
+    expect(check([{ ...own, active: false }])).toEqual([{ employeeId: 'e1', reason: 'HEAD_IN_GROUP' }]);
   });
 });

@@ -1,10 +1,4 @@
-import { isCommunicationService, type CommunicationAnswers } from './application.policy';
-import type {
-  ApplicationChanges,
-  ApplicationCommunication,
-  ApplicationRecord,
-  DataSensitivity,
-} from './application.types';
+import type { ApplicationChanges, ApplicationRecord, DataSensitivity } from './application.types';
 
 export const snapshot = (application: ApplicationRecord) => ({
   name: application.name,
@@ -13,76 +7,42 @@ export const snapshot = (application: ApplicationRecord) => ({
   dictionaryServiceLineId: application.dictionaryServiceLineId,
   domains: application.domains,
   dataSensitivity: application.dataSensitivity,
-  businessOwnerEmployeeId: application.businessOwnerEmployeeId,
+  logoUrl: application.logoUrl,
+  responsibleItAdminEmployeeId: application.responsibleItAdminEmployeeId,
   functionalGroupId: application.functionalGroup?.id ?? null,
-  personToPersonMessaging: application.communication.personToPersonMessaging,
-  callsOrMeetings: application.communication.callsOrMeetings,
-  mailbox: application.communication.mailbox,
-  isCommunicationService: application.communication.isCommunicationService,
-  communicationNote: application.communication.note,
   status: application.status,
 });
 
 export const sameList = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && a.every((value, index) => value === b[index]);
 
-export function mergeCommunication(
-  current: ApplicationCommunication,
-  change: Partial<CommunicationAnswers> & { note?: string | null },
-  note: string | null | undefined,
-): ApplicationCommunication {
-  const answers = {
-    personToPersonMessaging: change.personToPersonMessaging ?? current.personToPersonMessaging,
-    callsOrMeetings: change.callsOrMeetings ?? current.callsOrMeetings,
-    mailbox: change.mailbox ?? current.mailbox,
-  };
-
-  return {
-    ...answers,
-    isCommunicationService: isCommunicationService(answers),
-    note: note === undefined ? current.note : note,
-  };
-}
-
-export function sameCommunication(a: ApplicationCommunication, b: ApplicationCommunication): boolean {
-  return (
-    a.personToPersonMessaging === b.personToPersonMessaging &&
-    a.callsOrMeetings === b.callsOrMeetings &&
-    a.mailbox === b.mailbox &&
-    a.note === b.note
-  );
-}
-
 /**
  * What an update of an application changes (`US-04-01`, `US-04-02`): each field the update gives that differs from what the application has.
- * `cleaned` is what the name, the domains and the note became once cleaned. Nothing is checked here: the references (the Business Owner,
- * the functional group, the dictionary line) are judged by the caller, in that order, for the ones that changed.
+ * `cleaned` is what the name and the domains became once cleaned. Nothing is checked here: the references (the functional group,
+ * the dictionary line) are judged by the caller, in that order, for the ones that changed.
  */
 export function applicationChangesOf(
-  current: Pick<
-    ApplicationRecord,
-    'name' | 'domains' | 'dataSensitivity' | 'businessOwnerEmployeeId' | 'dictionaryServiceLineId' | 'communication'
-  > & { functionalGroup: { id: string } | null },
-  input: {
-    dataSensitivity?: DataSensitivity;
-    businessOwnerEmployeeId?: string;
-    functionalGroupId?: string | null;
-    dictionaryServiceLineId?: string | null;
-    communication?: Partial<CommunicationAnswers> & { note?: string | null };
+  current: Pick<ApplicationRecord, 'name' | 'domains' | 'dataSensitivity' | 'dictionaryServiceLineId' | 'logoUrl'> & {
+    functionalGroup: { id: string } | null;
   },
-  cleaned: { name?: string; domains?: string[]; note?: string | null },
+  input: {
+    dataSensitivity?: DataSensitivity | null;
+    logoUrl?: string | null;
+    functionalGroupId?: string;
+    dictionaryServiceLineId?: string | null;
+  },
+  cleaned: { name?: string; domains?: string[] },
 ): ApplicationChanges {
   return {
     ...scalarChangesOf(current, input, cleaned),
     ...referenceChangesOf(current, input),
-    ...communicationChangeOf(current, input, cleaned.note),
   };
 }
 
-/** The name, the domains and the sensitivity of the data. */
+/** The name, the domains, the sensitivity of the data (null says it is not rated) and the logo (null removes it). */
 function scalarChangesOf(
-  current: Pick<ApplicationRecord, 'name' | 'domains' | 'dataSensitivity'>,
-  input: { dataSensitivity?: DataSensitivity },
+  current: Pick<ApplicationRecord, 'name' | 'domains' | 'dataSensitivity' | 'logoUrl'>,
+  input: { dataSensitivity?: DataSensitivity | null; logoUrl?: string | null },
   cleaned: { name?: string; domains?: string[] },
 ): ApplicationChanges {
   const changes: ApplicationChanges = {};
@@ -91,28 +51,22 @@ function scalarChangesOf(
   if (input.dataSensitivity !== undefined && input.dataSensitivity !== current.dataSensitivity) {
     changes.dataSensitivity = input.dataSensitivity;
   }
+  if (input.logoUrl !== undefined && input.logoUrl !== current.logoUrl) changes.logoUrl = input.logoUrl;
 
   return changes;
 }
 
-/** The Business Owner, the functional group and the dictionary line: what the application refers to. */
+/** The functional group and the dictionary line: what the application refers to. */
 function referenceChangesOf(
-  current: Pick<ApplicationRecord, 'businessOwnerEmployeeId' | 'dictionaryServiceLineId'> & {
+  current: Pick<ApplicationRecord, 'dictionaryServiceLineId'> & {
     functionalGroup: { id: string } | null;
   },
   input: {
-    businessOwnerEmployeeId?: string;
-    functionalGroupId?: string | null;
+    functionalGroupId?: string;
     dictionaryServiceLineId?: string | null;
   },
 ): ApplicationChanges {
   const changes: ApplicationChanges = {};
-  if (
-    input.businessOwnerEmployeeId !== undefined &&
-    input.businessOwnerEmployeeId !== current.businessOwnerEmployeeId
-  ) {
-    changes.businessOwnerEmployeeId = input.businessOwnerEmployeeId;
-  }
   if (input.functionalGroupId !== undefined && input.functionalGroupId !== (current.functionalGroup?.id ?? null)) {
     changes.functionalGroupId = input.functionalGroupId;
   }
@@ -124,16 +78,4 @@ function referenceChangesOf(
   }
 
   return changes;
-}
-
-/** The answers about communication and the note, merged with what the application has, when they differ. */
-function communicationChangeOf(
-  current: Pick<ApplicationRecord, 'communication'>,
-  input: { communication?: Partial<CommunicationAnswers> & { note?: string | null } },
-  note: string | null | undefined,
-): ApplicationChanges {
-  if (input.communication === undefined) return {};
-  const merged = mergeCommunication(current.communication, input.communication, note);
-
-  return sameCommunication(merged, current.communication) ? {} : { communication: merged };
 }

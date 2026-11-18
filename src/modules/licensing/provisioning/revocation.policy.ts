@@ -1,6 +1,7 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import {
   AssignmentNotOpenError,
+  ProvisioningTaskNotBeforeError,
   ProvisioningTaskStateError,
   RevocationCompletionError,
   RevocationRefusedError,
@@ -10,12 +11,14 @@ import {
   REVOCATION_SOURCES,
   type AccessState,
   type AssignmentKind,
+  type KeyDisposition,
   type ProvisioningKind,
   type ProvisioningTaskKind,
   type ProvisioningTaskStatus,
   type RevocationCompletion,
   type RevocationSource,
 } from '../public/licensing.types';
+import type { K1ChecklistClaim } from './k1-checklist/provisioning-k1-checklist.policy';
 import { cleanEvidence } from './provisioning.policy';
 
 /** The longest note a completion or a reason keeps; the DTO bounds the request with it. */
@@ -33,8 +36,7 @@ export function assertRevocationSource(source: string | undefined): RevocationSo
 /**
  * Whether the seat may be revoked, judged in this order: it is a personal one (a service account is answered for by a person
  * and is not among the rights a departure takes away), it is still open, and its kind of provisioning has a revocation (K1,
- * K2, K5; K3 is specified only and K4 waits for the company devices). Throws RevocationRefusedError and
- * AssignmentNotOpenError.
+ * K2, K4 whose key goes back to the store, K5; K3 is specified only). Throws RevocationRefusedError and AssignmentNotOpenError.
  */
 export function assertRevocable(input: {
   kind: AssignmentKind;
@@ -43,14 +45,17 @@ export function assertRevocable(input: {
 }): void {
   if (input.kind === 'SERVICE') throw new RevocationRefusedError('ASSIGNMENT_IS_SERVICE_ACCOUNT');
   if (!input.open) throw new AssignmentNotOpenError();
-  if (input.provisioningType === 'K3' || input.provisioningType === 'K4') {
-    throw new RevocationRefusedError('TYPE_NOT_SUPPORTED', input.provisioningType);
-  }
+  if (input.provisioningType === 'K3') throw new RevocationRefusedError('TYPE_NOT_SUPPORTED', input.provisioningType);
 }
 
 /** A revocation is completed as one, and the completion of a grant is not for it. Throws ProvisioningTaskStateError. */
 export function assertRevocationTask(kind: ProvisioningTaskKind): void {
   if (kind !== 'REVOKE') throw new ProvisioningTaskStateError('NOT_REVOCATION');
+}
+
+/** A revocation with a day not before is not taken or completed before it (`US-10-07` AC-18): the day it can be is told. Throws ProvisioningTaskNotBeforeError. */
+export function assertNotBefore(notBefore: BusinessDate | null, today: BusinessDate): void {
+  if (notBefore !== null && today < notBefore) throw new ProvisioningTaskNotBeforeError(notBefore);
 }
 
 export function assertNotRevocationTask(kind: ProvisioningTaskKind): void {
@@ -73,6 +78,8 @@ export function completionsFor(type: ProvisioningKind): RevocationCompletion[] {
       return ['RENEWAL_CANCELLED'];
     case 'K2':
       return ['ACCOUNT_REMOVED', 'ALREADY_GONE'];
+    case 'K4':
+      return ['KEY_DEACTIVATED'];
     case 'K5':
       return ['OFF_SYSTEM_REVOKED'];
     default:
@@ -88,6 +95,12 @@ export interface CompletionInput {
   accessState?: AccessState | undefined;
   accessCutOn?: BusinessDate | undefined;
   accessEvidence?: string | undefined;
+  /** K4 only, required: where the key goes (`QĐ-111p`). */
+  keyDisposition?: KeyDisposition | undefined;
+  /** K4 only, with `WITHDRAW`: why the key is withdrawn from the store. */
+  withdrawalReason?: string | undefined;
+  /** K1 only, required: the steps the IT Admin ticked (`QĐ-111az`); judged by the checklist of the task, not by `planCompletion`. */
+  k1Checklist?: K1ChecklistClaim | undefined;
 }
 
 /** What is stored of a completion and the day the assignment ends because of it. */
@@ -110,6 +123,38 @@ const blankToNull = (raw: string | undefined): string | null => {
 
 function fail(problem: RevocationCompletionProblem): never {
   throw new RevocationCompletionError(problem);
+}
+
+/** What becomes of the key of a K4 seat whose revocation is completed. */
+export interface KeyReturnPlan {
+  disposition: KeyDisposition;
+  withdrawalReason: string | null;
+}
+
+/**
+ * Where the key of the seat goes (`US-07-05` AC-6, AC-7, `QĐ-103d`, `QĐ-111p`): only a K4 seat has one, and the IT Admin must say it: back
+ * to the store, or withdrawn from it (a key that may not move to another device), which needs a reason. Null for any other kind, which
+ * names neither. A K4 seat granted before the key pool holds no key: nothing is asked and nothing is recorded about one, whatever was sent
+ * (Owner 12/11/2026). Throws RevocationCompletionError (`KEY_DISPOSITION_REQUIRED`, `COMPLETION_NOT_ALLOWED`, `WITHDRAWAL_REASON_REQUIRED`).
+ */
+export function planKeyReturn(input: CompletionInput, type: ProvisioningKind, holdsKey: boolean): KeyReturnPlan | null {
+  if (type !== 'K4') {
+    if (input.keyDisposition !== undefined || input.withdrawalReason !== undefined) fail('COMPLETION_NOT_ALLOWED');
+
+    return null;
+  }
+  if (!holdsKey) return null;
+  const disposition = input.keyDisposition;
+  if (disposition === undefined) fail('KEY_DISPOSITION_REQUIRED');
+  const withdrawalReason = blankToNull(input.withdrawalReason);
+  if (disposition === 'RETURN_TO_STORE') {
+    if (withdrawalReason !== null) fail('COMPLETION_NOT_ALLOWED');
+
+    return { disposition, withdrawalReason: null };
+  }
+  if (withdrawalReason === null) fail('WITHDRAWAL_REASON_REQUIRED');
+
+  return { disposition, withdrawalReason };
 }
 
 /** The day a seat ends at the earliest: its period is never empty, so a seat that began today ends tomorrow (`QĐ` of the spec). */

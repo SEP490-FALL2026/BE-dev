@@ -18,13 +18,15 @@ const after = { dueOn: '2026-11-10' };
  */
 describe('licensingAuditEvent', () => {
   it('is the USER with their account, their roles and their session when nobody else is named', () => {
-    expect(licensingAuditEvent(actor, 'org-1', 'HANDOVER_DUTY.OPENED', 'HandoverDuty', 'duty-1', null, after)).toEqual({
+    expect(
+      licensingAuditEvent(actor, 'org-1', 'LICENSE_ASSIGNMENT.CREATED', 'LicenseAssignment', 'duty-1', null, after),
+    ).toEqual({
       organizationId: 'org-1',
       actorKind: 'USER',
       actorAppUserId: 'account-1',
       actorRoles: ['SUPER_ADMIN'],
-      action: 'HANDOVER_DUTY.OPENED',
-      resourceType: 'HandoverDuty',
+      action: 'LICENSE_ASSIGNMENT.CREATED',
+      resourceType: 'LicenseAssignment',
       resourceId: 'duty-1',
       before: null,
       after,
@@ -36,8 +38,8 @@ describe('licensingAuditEvent', () => {
     const event = licensingAuditEvent(
       actor,
       'org-1',
-      'HANDOVER_DUTY.DUE_CHANGED',
-      'HandoverDuty',
+      'LICENSE_ASSIGNMENT.DATE_CHANGED',
+      'LicenseAssignment',
       'duty-1',
       after,
       after,
@@ -53,8 +55,8 @@ describe('licensingAuditEvent', () => {
       actorKind: 'OPERATOR',
       actorAppUserId: null,
       actorRoles: [],
-      action: 'HANDOVER_DUTY.DUE_CHANGED',
-      resourceType: 'HandoverDuty',
+      action: 'LICENSE_ASSIGNMENT.DATE_CHANGED',
+      resourceType: 'LicenseAssignment',
       resourceId: 'duty-1',
       before: after,
       after: { dueOn: '2026-11-10', ticket: 'R-2026-001', mode: 'departure-change' },
@@ -69,12 +71,28 @@ describe('licensingAuditEvent', () => {
     const operator = { ticketId: 'ticket-row-1', ticketRef: 'R-2026-001' };
 
     expect(
-      licensingAuditEvent(actor, 'org-1', 'HANDOVER_DUTY.CANCELLED', 'HandoverDuty', 'duty-1', null, after, operator)
-        .after,
+      licensingAuditEvent(
+        actor,
+        'org-1',
+        'LICENSE_ASSIGNMENT.CANCELLED',
+        'LicenseAssignment',
+        'duty-1',
+        null,
+        after,
+        operator,
+      ).after,
     ).toEqual(after);
     expect(
-      licensingAuditEvent(actor, 'org-1', 'HANDOVER_DUTY.CANCELLED', 'HandoverDuty', 'duty-1', null, null, operator)
-        .after,
+      licensingAuditEvent(
+        actor,
+        'org-1',
+        'LICENSE_ASSIGNMENT.CANCELLED',
+        'LicenseAssignment',
+        'duty-1',
+        null,
+        null,
+        operator,
+      ).after,
     ).toBeNull();
   });
 });

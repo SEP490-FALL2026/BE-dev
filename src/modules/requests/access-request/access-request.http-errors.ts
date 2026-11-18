@@ -6,14 +6,17 @@ import {
   requestPartyRefusalBody,
 } from '../../identity-access/public/request-party.errors';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { termRuleOf } from '../../../core/term-limit';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   AccessRequestAlreadyHoldsAccessError,
+  AccessRequestOpenLimitReachedError,
+  AccessRequestOpenRequestExistsError,
   AccessRequestEmployeeRequiredError,
   AccessRequestNotDraftError,
   AccessRequestRoleRequiredError,
   AccessRequestSuperAdminCannotRequestError,
-  AccessRequestTermBeyondLimitError,
+  AccessRequestTermRefusedError,
   AccessRequestGroupUsesLinesError,
   AccessRequestApplicationRetiredError,
   AccessRequestDecisionRefusedError,
@@ -22,6 +25,8 @@ import {
   AccessRequestWithdrawalRefusedError,
   AccessRequestNoDepartmentError,
   AccessRequestNotFoundError,
+  AccessRequestNotRequesterError,
+  AccessRequestNotAwaitingRevisionError,
   AccessRequestNotPriceableError,
   AccessRequestPlanNotFoundError,
 } from './access-request.errors';
@@ -29,9 +34,22 @@ import {
 const refuse = (status: HttpStatus, code: string, message: string): ApiException =>
   new ApiException(status, { code, message });
 
+/** What the client needs to act on a refused time of use: the contract end, or the most months the kind of plan takes. */
+function termDetailsOf(error: AccessRequestTermRefusedError): { details?: Record<string, unknown> } {
+  if (error.reason === 'TERM_CONTRACT_ENDED') return { details: { contractEndDate: error.contractEndDate } };
+  if (error.reason !== 'TERM_MONTHS_OUT_OF_RANGE') return {};
+  const { maxMonths } = termRuleOf(error.kind ?? 'K2');
+
+  return { details: { maxMonths, ...(error.kind === null ? {} : { provisioningType: error.kind }) } };
+}
+
 /** Maps the errors of the request routes to their HTTP answers; a database that cannot answer is a 503. */
 export function toAccessRequestApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  if (error instanceof AccessRequestNotRequesterError)
+    return refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.NOT_REQUESTER', error.message);
+  if (error instanceof AccessRequestNotAwaitingRevisionError)
+    return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_AWAITING_REVISION', error.message);
 
   if (error instanceof AccessRequestNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'ACCESS_REQUEST.NOT_FOUND', error.message);
@@ -47,7 +65,11 @@ export function toAccessRequestApiException(error: unknown): unknown {
   }
   // The department has no Cost Center in use yet (`QĐ-87d(1)`): Finance creates it first. Nothing was written.
   if (error instanceof FinanceSetupIncompleteError) {
-    return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'FINANCE.SETUP_INCOMPLETE',
+      message: error.message,
+      details: { departmentId: error.departmentId },
+    });
   }
 
   // The spending approver, whatever the route, is no party of a Request (`D-S21`): one code, one body.
@@ -72,11 +94,11 @@ export function toAccessRequestApiException(error: unknown): unknown {
     );
   }
 
-  if (error instanceof AccessRequestTermBeyondLimitError) {
+  if (error instanceof AccessRequestTermRefusedError) {
     return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
-      code: 'ACCESS_REQUEST.TERM_BEYOND_LIMIT',
+      code: `ACCESS_REQUEST.${error.reason}`,
       message: error.message,
-      details: { maxMonths: error.maxMonths, endsBy: error.endsBy },
+      ...termDetailsOf(error),
     });
   }
   if (error instanceof AccessRequestAlreadyHoldsAccessError) {
@@ -84,6 +106,20 @@ export function toAccessRequestApiException(error: unknown): unknown {
       code: 'ACCESS_REQUEST.ALREADY_HOLDS_ACCESS',
       message: error.message,
       details: { assignment: error.held },
+    });
+  }
+  if (error instanceof AccessRequestOpenRequestExistsError) {
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'ACCESS_REQUEST.OPEN_REQUEST_EXISTS',
+      message: error.message,
+      details: { requestId: error.requestId },
+    });
+  }
+  if (error instanceof AccessRequestOpenLimitReachedError) {
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+      code: 'ACCESS_REQUEST.OPEN_LIMIT_REACHED',
+      message: error.message,
+      details: { limit: error.limit, resetsOn: error.resetsOn },
     });
   }
   if (error instanceof AccessRequestNotAssigneeError) {
@@ -143,10 +179,15 @@ const cancellation = (reason: ConstructorParameters<typeof AccessRequestCancella
 
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
 export const ACCESS_REQUEST_ERROR_EXAMPLES = {
+  NOT_AWAITING_REVISION: example(new AccessRequestNotAwaitingRevisionError()),
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
-  TERM_BEYOND_LIMIT: example(new AccessRequestTermBeyondLimitError(12, '2026-12-31')),
+  TERM_REQUIRED: example(new AccessRequestTermRefusedError('TERM_REQUIRED')),
+  TERM_MONTHS_OUT_OF_RANGE: example(new AccessRequestTermRefusedError('TERM_MONTHS_OUT_OF_RANGE', null, 'K1')),
+  TERM_NOT_ASKED: example(new AccessRequestTermRefusedError('TERM_NOT_ASKED')),
+  TERM_LONG_TERM_NOT_ALLOWED: example(new AccessRequestTermRefusedError('TERM_LONG_TERM_NOT_ALLOWED')),
+  TERM_CONTRACT_ENDED: example(new AccessRequestTermRefusedError('TERM_CONTRACT_ENDED', '2026-10-31')),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({
@@ -169,6 +210,8 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
       validUntil: null,
     }),
   ),
+  OPEN_REQUEST_EXISTS: example(new AccessRequestOpenRequestExistsError('<request-id>')),
+  OPEN_LIMIT_REACHED: example(new AccessRequestOpenLimitReachedError(10, '2026-11-16')),
   NOT_ASSIGNEE: example(new AccessRequestNotAssigneeError()),
   EMPLOYEE_REQUIRED: example(new AccessRequestEmployeeRequiredError()),
   GROUP_USES_LINES: example(new AccessRequestGroupUsesLinesError()),
@@ -180,6 +223,12 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   WITHDRAWAL_ALREADY_ENDED: withdrawal('ALREADY_ENDED'),
   WITHDRAWAL_PENDING: withdrawal('WITHDRAWAL_PENDING'),
   GRANT_RUNNING: withdrawal('GRANT_RUNNING'),
+  WITHDRAWAL_AFTER_DECISION: example(
+    new AccessRequestWithdrawalRefusedError('WITHDRAWAL_AFTER_DECISION', {
+      scope: 'REQUEST',
+      state: 'AWAITING_SPEND_DECISION',
+    }),
+  ),
   GRANT_COMPLETED: example(
     new AccessRequestWithdrawalRefusedError('GRANT_COMPLETED', { assignmentId: '<assignment-id>' }),
   ),
@@ -190,3 +239,12 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   BENEFICIARY_NOT_TRANSFERRED: cancellation('BENEFICIARY_NOT_TRANSFERRED'),
   EVIDENCE_REQUIRED: cancellation('EVIDENCE_REQUIRED'),
 } as const;
+
+/** The five answers of a time of use that is refused, for the routes that take one (`QĐ-111i`, `INV-07`). */
+export const TERM_ERROR_EXAMPLES = [
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_REQUIRED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_MONTHS_OUT_OF_RANGE,
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_NOT_ASKED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_LONG_TERM_NOT_ALLOWED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_CONTRACT_ENDED,
+] as const;

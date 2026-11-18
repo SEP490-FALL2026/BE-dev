@@ -10,7 +10,7 @@ import {
   type StartLeaveFacts,
 } from './leave.policy';
 
-const GROUNDS = { type: 'LEAVE_APPROVAL', reference: 'DN-05/2026', issuer: 'HR Department', issuedOn: '2026-05-25' };
+const NOTE = 'Đơn xin nghỉ dài hạn số DN-05/2026 của HR';
 
 const start = (over: Partial<StartLeaveFacts> = {}): StartLeaveFacts => ({
   today: '2026-06-02',
@@ -18,7 +18,7 @@ const start = (over: Partial<StartLeaveFacts> = {}): StartLeaveFacts => ({
   approvedReturnOn: '2026-09-01',
   hireDate: '2025-01-02',
   employee: { status: 'ACTIVE', workState: 'WORKING' },
-  grounds: GROUNDS,
+  groundsNote: NOTE,
   ...over,
 });
 
@@ -55,20 +55,15 @@ describe('the start of a long leave (US-03-03 AC-5)', () => {
 
   it.each([
     ['no basis', undefined, 'GROUNDS_REQUIRED'],
-    ['a basis without the issuer', { ...GROUNDS, issuer: '' }, 'GROUNDS_INCOMPLETE'],
-    ['the code of a notice', { ...GROUNDS, reference: 'BM09-2026-000123' }, 'GROUNDS_IS_NOTICE'],
-  ])('refuses %s', (_name, grounds, code) => {
-    expect(startLeaveRefusal(start({ grounds }))?.code).toBe(code);
-  });
-
-  it('names what the basis lacks', () => {
-    expect(startLeaveRefusal(start({ grounds: { ...GROUNDS, reference: ' ' } }))?.details).toEqual({
-      missing: ['reference'],
-    });
+    ['a blank box', '   ', 'GROUNDS_REQUIRED'],
+    ['a box of 501 characters', 'a'.repeat(501), 'GROUNDS_TOO_LONG'],
+    ['the code of a notice', 'BM09-2026-000123', 'GROUNDS_IS_NOTICE'],
+  ])('refuses %s', (_name, groundsNote, code) => {
+    expect(startLeaveRefusal(start({ groundsNote }))?.code).toBe(code);
   });
 
   it('judges only the facts of the leave: who may record it (the Super Admin, never about themselves) is the service policy, not asked here', () => {
-    expect(startLeaveRefusal(start({ grounds: undefined }))?.code).toBe('GROUNDS_REQUIRED');
+    expect(startLeaveRefusal(start({ groundsNote: undefined }))?.code).toBe('GROUNDS_REQUIRED');
     expect(Object.keys(start())).not.toContain('selfMode');
   });
 });
@@ -79,7 +74,7 @@ const change = (over: Partial<ChangeReturnDateFacts> = {}): ChangeReturnDateFact
   startedOn: '2026-06-01',
   approvedReturnOn: '2026-09-01',
   newApprovedReturnOn: '2026-09-30',
-  grounds: GROUNDS,
+  groundsNote: NOTE,
   ...over,
 });
 
@@ -94,8 +89,8 @@ describe('a new day of return (US-03-03 AC-8)', () => {
     ['the same day', { newApprovedReturnOn: '2026-09-01' }, 'RETURN_DATE_INVALID'],
     ['a day not after the start', { newApprovedReturnOn: '2026-06-01', today: '2026-05-01' }, 'RETURN_DATE_INVALID'],
     ['a day before today', { newApprovedReturnOn: '2026-08-19' }, 'RETURN_DATE_IN_PAST'],
-    ['no new basis', { grounds: undefined }, 'GROUNDS_REQUIRED'],
-    ['a notice as the basis', { grounds: { ...GROUNDS, reference: 'BM09-2026-000001' } }, 'GROUNDS_IS_NOTICE'],
+    ['no new basis', { groundsNote: undefined }, 'GROUNDS_REQUIRED'],
+    ['a notice as the basis', { groundsNote: 'BM09-2026-000001' }, 'GROUNDS_IS_NOTICE'],
   ])('refuses %s', (_name, over, code) => {
     expect(changeReturnDateRefusal(change(over))?.code).toBe(code);
   });
@@ -107,18 +102,26 @@ const back = (over: Partial<ConfirmReturnFacts> = {}): ConfirmReturnFacts => ({
   startedOn: '2026-06-01',
   approvedReturnOn: '2026-09-01',
   returnedOn: '2026-09-01',
-  grounds: undefined,
+  groundsNote: undefined,
   ...over,
 });
 
-describe('the return of a person (US-03-03 AC-7, AC-8)', () => {
-  it('needs no document on the approved day', () => {
-    expect(confirmReturnRefusal(back())).toBeNull();
+describe('the return of a person (US-03-03 AC-7, AC-8, R-32)', () => {
+  it('needs the basis on the approved day too: the box is prefilled from the leave, may be edited, and is kept (P26)', () => {
     expect(isOnSchedule('2026-09-01', '2026-09-01')).toBe(true);
+    expect(confirmReturnRefusal(back())?.code).toBe('GROUNDS_REQUIRED');
+    expect(confirmReturnRefusal(back({ groundsNote: '   ' }))?.code).toBe('GROUNDS_REQUIRED');
+    expect(confirmReturnRefusal(back({ groundsNote: NOTE }))).toBeNull();
   });
 
-  it('judges neither a missing nor a wrong basis on the approved day', () => {
-    expect(confirmReturnRefusal(back({ grounds: { type: '', reference: 'BM09-2026-000001' } }))).toBeNull();
+  it('judges a wrong basis on the approved day as on any other: too long, or the code of a notice', () => {
+    expect(confirmReturnRefusal(back({ groundsNote: 'BM09-2026-000001' }))?.code).toBe('GROUNDS_IS_NOTICE');
+    expect(confirmReturnRefusal(back({ groundsNote: 'x'.repeat(501) }))?.code).toBe('GROUNDS_TOO_LONG');
+  });
+
+  it('judges the day before the basis: a leave that ended or a day that cannot be is refused whatever the basis', () => {
+    expect(confirmReturnRefusal(back({ status: 'ENDED' }))?.code).toBe('NOT_ACTIVE');
+    expect(confirmReturnRefusal(back({ returnedOn: '2026-09-02' }))?.code).toBe('RETURN_DATE_INVALID');
   });
 
   it.each([
@@ -127,7 +130,7 @@ describe('the return of a person (US-03-03 AC-7, AC-8)', () => {
   ])('needs a basis when the person comes back %s', (_name, over) => {
     expect(isOnSchedule(over.returnedOn, '2026-09-01')).toBe(false);
     expect(confirmReturnRefusal(back(over))?.code).toBe('GROUNDS_REQUIRED');
-    expect(confirmReturnRefusal(back({ ...over, grounds: GROUNDS }))).toBeNull();
+    expect(confirmReturnRefusal(back({ ...over, groundsNote: NOTE }))).toBeNull();
   });
 
   it.each([

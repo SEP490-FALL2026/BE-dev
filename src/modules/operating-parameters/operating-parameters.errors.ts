@@ -1,9 +1,3 @@
-import type { ParameterLockReason } from './public/operating-parameters.extension-points';
-
-const PARAMETER_LOCK_TEXT: Record<ParameterLockReason, string> = {
-  BUDGET_VERSION_EXISTS: 'a budget version already exists',
-};
-
 export class ParameterNotFoundError extends Error {
   constructor(readonly key: string) {
     super(`There is no operating parameter ${key}.`);
@@ -21,17 +15,6 @@ export class ParameterValueInvalidError extends Error {
   ) {
     super(`The value is not allowed for ${key}: ${problem}.`);
     this.name = 'ParameterValueInvalidError';
-  }
-}
-
-/** A budget version exists, so the month the fiscal year begins stays as it is (US-01-04 AC-8). Nothing was changed. */
-export class ParameterLockedError extends Error {
-  constructor(
-    readonly key: string,
-    readonly reason: ParameterLockReason,
-  ) {
-    super(`The value of ${key} can no longer change: ${PARAMETER_LOCK_TEXT[reason]}.`);
-    this.name = 'ParameterLockedError';
   }
 }
 
@@ -63,12 +46,10 @@ export class NonWorkingDateReasonInvalidError extends Error {
   }
 }
 
-export type ReportingCurrencyLock = 'EXCHANGE_RATE' | 'CONVERTED_PRICE';
-
-/** A rate is recorded or a subscription has a converted price: the reporting currency is locked (US-01-04 AC-9). */
-export class ReportingCurrencyLockedError extends Error {
-  constructor(readonly reason: ReportingCurrencyLock) {
-    super('The reporting currency is locked: values were already recorded in it.');
-    this.name = 'ReportingCurrencyLockedError';
+/** The parameter is set by another role: the Super Admin sets its own and Finance sets Finance's (`QĐ-103z`(1)). */
+export class ParameterNotYoursError extends Error {
+  constructor(readonly key: string) {
+    super(`The parameter ${key} is not set by your role.`);
+    this.name = 'ParameterNotYoursError';
   }
 }

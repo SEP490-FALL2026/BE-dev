@@ -72,7 +72,6 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       kind,
       ...(kind === 'INTERNAL' ? {} : { vendorName: `${name} Vendor` }),
       dataSensitivity: 'MEDIUM',
-      businessOwnerEmployeeId: h.businessOwner,
       communication: NO,
     });
     const planId = await declarePlan(h.ctx, h.it1.accessToken, {
@@ -81,16 +80,19 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       provisioningType: kind === 'INTERNAL' ? 'K5' : 'K1',
       ...(kind === 'INTERNAL' ? {} : { pricingModel: 'PER_SEAT', controlLevel: 'FULL' }),
     });
-    for (const { departmentId, cycle } of pricedFor) {
-      await declareSubscription(h.ctx, h.it1.accessToken, {
-        ownerDepartmentId: departmentId,
+    for (const { cycle } of pricedFor) {
+      const subscriptionId = await declareSubscription(h.ctx, h.it1.accessToken, {
         planId,
         kind: 'TERM',
         unitPrice: { amount: '1000000', currency: 'VND' },
-        billingCycle: cycle ?? 'MONTHLY',
+        // A new write takes only MONTHLY or ANNUAL: a cycle that cannot be counted in months is data written earlier.
+        billingCycle: cycle === 'OTHER' ? 'MONTHLY' : (cycle ?? 'MONTHLY'),
         startDate: '2026-01-05',
         purchasedQuantity: 10,
       });
+      if (cycle === 'OTHER') {
+        await h.ctx.sql.query(`UPDATE subscriptions SET billing_cycle = 'OTHER' WHERE id = $1`, [subscriptionId]);
+      }
     }
 
     return { applicationId, planId };
@@ -143,7 +145,6 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       kind: 'SAAS',
       vendorName: 'Sel Planless Vendor',
       dataSensitivity: 'LOW',
-      businessOwnerEmployeeId: h.businessOwner,
       communication: NO,
     });
   }, 300000);
@@ -197,6 +198,9 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
     });
 
     it('answers the detail of an application and of a plan with the fields a requester may see', async () => {
+      await h.ctx.sql.query(`UPDATE applications SET logo_url = 'https://cdn.example.com/sel.png' WHERE id = $1`, [
+        licensed.applicationId,
+      ]);
       const application = h.dataOf<Record<string, unknown>>(
         await call(`/api/v1/requestable-applications/${licensed.applicationId}`, designer).expect(200),
       );
@@ -208,8 +212,10 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
         id: licensed.applicationId,
         name: 'Sel Autodesk',
         kind: 'LICENSED',
+        logoUrl: 'https://cdn.example.com/sel.png',
         vendorName: 'Sel Autodesk Vendor',
-        functionalGroup: null,
+        // QĐ-111d: an application declared with no group stands in Khác.
+        functionalGroup: { id: expect.any(String) as unknown, name: 'Khác' },
         planCount: 1,
         costsMoney: true,
         canSubmit: true,
@@ -220,7 +226,12 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
         id: licensed.planId,
         name: 'Sel Autodesk Plan',
         provisioningType: 'K1',
-        application: { id: licensed.applicationId, name: 'Sel Autodesk', kind: 'LICENSED' },
+        application: {
+          id: licensed.applicationId,
+          name: 'Sel Autodesk',
+          kind: 'LICENSED',
+          logoUrl: 'https://cdn.example.com/sel.png',
+        },
         costsMoney: true,
         price: { status: 'PRICED', missingReason: null },
         canSubmit: true,
@@ -232,6 +243,23 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
     });
   });
 
+  describe('the logo of an application in what a person searches (CT-1.L2)', () => {
+    it('is the link the IT Admin pasted, or null, in the list of requestable applications', async () => {
+      await h.ctx.sql.query(`UPDATE applications SET logo_url = 'https://cdn.example.com/logo.png' WHERE id = $1`, [
+        saas.applicationId,
+      ]);
+
+      const found = h.dataOf<{ items: { id: string; logoUrl: string | null }[] }>(
+        await call('/api/v1/requestable-applications?pageSize=100', designer).expect(200),
+      );
+
+      expect(found.items.find((item) => item.id === saas.applicationId)?.logoUrl).toBe(
+        'https://cdn.example.com/logo.png',
+      );
+      expect(found.items.find((item) => item.id === internal.applicationId)?.logoUrl).toBeNull();
+    });
+  });
+
   describe('whether each plan can be priced and sent, as the preview judges it', () => {
     it.each([
       ['paid SaaS priced by the department', () => saas, 'PRICED', null],
@@ -239,7 +267,8 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       ['internal software', () => internal, 'NOT_APPLICABLE', null],
       ['paid software nobody prices', () => unpriced, 'MISSING', 'NO_PRICED_SUBSCRIPTION'],
       ['paid software billed in a cycle that is not counted', () => otherCycle, 'MISSING', 'CYCLE_UNKNOWN'],
-      ['paid software only another department prices', () => pricedElsewhere, 'MISSING', 'NO_PRICED_SUBSCRIPTION'],
+      // BR-MF1-07 (S1-02): the plan has a price whichever department owns the subscription that gives it.
+      ['paid software only another department has a subscription of', () => pricedElsewhere, 'PRICED', null],
     ])('%s', async (_name, which, status, missingReason) => {
       const row = await planRow(designer, which().planId);
       const preview = await h.previewed(designer, which().planId);
@@ -249,12 +278,10 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       expect(row.canSubmit).toBe(true);
     });
 
-    it('prices a plan by the department of the caller: the other department sees its own subscription', async () => {
+    it('BR-MF1-07: prices a plan by its main subscription whichever department asks: the other department sees the same price (S1-02)', async () => {
+      // Rewritten from "by the department of the caller": the pool of a plan is the plan's, so is its price.
       expect((await planRow(outsider, pricedElsewhere.planId)).price.status).toBe('PRICED');
-      expect((await planRow(outsider, saas.planId)).price).toEqual({
-        status: 'MISSING',
-        missingReason: 'NO_PRICED_SUBSCRIPTION',
-      });
+      expect((await planRow(outsider, saas.planId)).price).toEqual({ status: 'PRICED', missingReason: null });
     });
 
     it('lets a department with no Cost Center pick paid software but not send it, as the preview refuses it, and still send internal software', async () => {
@@ -414,8 +441,9 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       const plans = await plansFor(designer, `applicationId=${picked?.id ?? ''}`);
       const plan = await planRow(designer, plans.items[0].id);
 
-      const preview = await h.previewed(designer, plan.id);
-      const sent = await h.sent(designer, plan.id);
+      // A plan bought by the month (K1) asks for its time of use; internal software (K5) takes one too (`QĐ-111i`).
+      const preview = await h.previewed(designer, plan.id, { termMonths: 3 });
+      const sent = await h.sent(designer, plan.id, { termMonths: 3 });
 
       expect(plan.id).toBe(planId);
       expect(preview).toMatchObject({ branch, canSubmit: true, pricing: { status: pricing } });

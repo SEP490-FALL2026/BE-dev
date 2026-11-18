@@ -49,6 +49,51 @@ const parse = (mode: string, ...rest: string[]) => parseSuperAdminEventArguments
 const refused = (args: readonly string[]) => () => parseSuperAdminEventArguments(args);
 
 describe('the arguments of ops:record-super-admin-event', () => {
+  describe('the basis in one box (QĐ-110a, QĐ-111bd)', () => {
+    const ONE_BOX = COMMON.slice(0, COMMON.indexOf('--basis-type'));
+    const note = 'QĐ nghỉ việc số 12/2026 của Giám đốc, 20/10/2026';
+
+    it.each(SUPER_ADMIN_EVENT_MODES)('parses %s with --basis alone, kept as written', (mode) => {
+      const parsed = parseSuperAdminEventArguments([
+        mode,
+        ...ONE_BOX,
+        '--basis',
+        `  ${note} `,
+        ...MODE_ARGUMENTS[mode],
+      ]);
+
+      expect(parsed).toMatchObject({ help: false, command: { context: { basis: { note } }, parameters: { mode } } });
+    });
+
+    it('refuses a blank --basis, and no basis at all', () => {
+      expect(refused(['departure-record', ...ONE_BOX, '--basis', '  ', ...MODE_ARGUMENTS['departure-record']])).toThrow(
+        /--basis is required/,
+      );
+      expect(refused(['departure-record', ...ONE_BOX, ...MODE_ARGUMENTS['departure-record']])).toThrow(/--basis-type/);
+    });
+
+    it('refuses --basis together with a part of the four', () => {
+      expect(refused(['departure-record', ...COMMON, '--basis', note, ...MODE_ARGUMENTS['departure-record']])).toThrow(
+        /not both/,
+      );
+    });
+
+    it('keeps the four parts for an event from a notice: --from-notice refuses --basis', () => {
+      expect(
+        refused([
+          'departure-record',
+          ...ONE_BOX,
+          '--basis',
+          note,
+          ...MODE_ARGUMENTS['departure-record'],
+          '--from-notice',
+          ID,
+        ]),
+      ).toThrow(/--from-notice takes the basis in four parts/);
+      expect(() => parse('departure-record', ...MODE_ARGUMENTS['departure-record'], '--from-notice', ID)).not.toThrow();
+    });
+  });
+
   it('refuses a kind of basis outside the list every personnel operation takes (L6)', () => {
     const args = ['transfer-cancel', ...COMMON, ...MODE_ARGUMENTS['transfer-cancel']];
     const at = args.indexOf('--basis-type') + 1;
@@ -85,6 +130,15 @@ describe('the arguments of ops:record-super-admin-event', () => {
     expect(parseSuperAdminEventArguments(['--help'])).toEqual({ help: true });
     expect(parseSuperAdminEventArguments(['leave-start', '--help'])).toEqual({ help: true });
     for (const mode of SUPER_ADMIN_EVENT_MODES) expect(SUPER_ADMIN_EVENT_USAGE).toContain(mode);
+  });
+
+  it('says in the usage that a head who departs or is moved cannot be recorded with --successor-none, and that an abrupt departure is of today', () => {
+    expect(SUPER_ADMIN_EVENT_USAGE).toContain(
+      '--successor-none, or none at all, is refused with PERSONNEL.SUCCESSOR_REQUIRED',
+    );
+    expect(SUPER_ADMIN_EVENT_USAGE).toContain('for a transfer (transfer-record, transfer-reschedule)');
+    expect(SUPER_ADMIN_EVENT_USAGE).not.toContain('A transfer still accepts --successor-none');
+    expect(SUPER_ADMIN_EVENT_USAGE).toContain('its --last-working-day must be today');
   });
 
   describe('profile-correct, the tenth mode', () => {

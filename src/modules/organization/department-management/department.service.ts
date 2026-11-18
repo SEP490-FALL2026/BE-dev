@@ -1,24 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeDisplayName } from '../../../core/display-name';
-import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { organizationAuditEvent } from '../organization-audit-event.mapper';
 import { OrganizationContextService } from '../organization-context.service';
-import { EmployeeRecordService } from '../employee/employee-record.service';
 import { DepartmentUseService } from '../department/department-use.service';
-import { DepartmentServiceAccountReaderHook } from '../public/organization.extension-points';
-import { EmployeeAccountsHook } from '../public/organization.extension-points';
+import {
+  DepartmentCreationWindowHook,
+  DepartmentServiceAccountReaderHook,
+} from '../public/organization.extension-points';
+import { DepartmentItAdminService } from './department-it-admin.service';
 import {
   DepartmentCodeInvalidError,
   DepartmentInUseError,
   DepartmentInactiveError,
-  DepartmentItAdminInvalidError,
   DepartmentNameInvalidError,
   DepartmentNotFoundError,
+  DepartmentOutsideBudgetPeriodError,
   DepartmentUpdateEmptyError,
 } from '../department/department.errors';
-import { lockAndReadEmployee, requireOrganization } from './department-facts.service';
+import { requireOrganization } from './department-facts.service';
 import { assertMayChangeOrganization } from '../department/department.policy';
 import { DepartmentRepo } from '../department/department.repo';
 import { isDepartmentCodeValid } from '../public/organization-code.policy';
@@ -46,10 +48,10 @@ export class DepartmentService {
   constructor(
     private readonly repo: DepartmentRepo,
     private readonly context: OrganizationContextService,
-    private readonly employees: EmployeeRecordService,
     private readonly use: DepartmentUseService,
     private readonly serviceAccounts: DepartmentServiceAccountReaderHook,
-    private readonly employeeAccounts: EmployeeAccountsHook,
+    private readonly itAdmins: DepartmentItAdminService,
+    private readonly creationWindow: DepartmentCreationWindowHook,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -57,7 +59,9 @@ export class DepartmentService {
   /**
    * Creates a department with no Cost Center and returns its id: Finance creates the Cost Center for it afterwards, and it is
    * never changed by renaming the department or changing its head (AC-4). Throws
-   * DepartmentForbiddenError, DepartmentNameInvalidError, DepartmentItAdminInvalidError or DepartmentCodeTakenError.
+   * DepartmentForbiddenError, DepartmentNameInvalidError, DepartmentItAdminInvalidError, DepartmentCodeTakenError or
+   * DepartmentOutsideBudgetPeriodError: a department is made only while the budget cycle of the next year was never published, and
+   * takes effect on 1 January of that year (`QĐ-104e(3)`); with no cycle at all (the installation) it takes effect today.
    */
   async create(
     actor: AuthenticatedPrincipal,
@@ -76,7 +80,12 @@ export class DepartmentService {
     const organization = await requireOrganization(this.context);
 
     return this.runner.run(async (tx) => {
-      if (input.itAdminEmployeeId) await this.assertUsableItAdmin(tx, input.itAdminEmployeeId);
+      if (input.itAdminEmployeeId) await this.itAdmins.assertUsable(tx, input.itAdminEmployeeId);
+      const today = await this.context.businessToday(new Date(), tx);
+      // Read in this transaction, the cycle `FOR SHARE`: a publication made at the same time waits for this department, or this waits for it.
+      const window = await this.creationWindow.get().windowOn(tx, organization.id, today);
+      if (window.kind === 'CLOSED') throw new DepartmentOutsideBudgetPeriodError();
+      const effectiveFrom = window.kind === 'OPEN' ? window.effectiveFrom : today;
 
       const created = await this.repo.insert(tx, {
         organizationId: organization.id,
@@ -84,6 +93,7 @@ export class DepartmentService {
         name,
         functionDescription,
         itAdminEmployeeId: input.itAdminEmployeeId ?? null,
+        effectiveFrom,
       });
       await this.audit.record(
         tx,
@@ -92,6 +102,7 @@ export class DepartmentService {
           name,
           function: functionDescription,
           itAdminEmployeeId: input.itAdminEmployeeId ?? null,
+          effectiveFrom,
         }),
       );
 
@@ -136,7 +147,7 @@ export class DepartmentService {
         after.function = functionDescription;
       }
       if (input.itAdminEmployeeId !== undefined && input.itAdminEmployeeId !== (current.itAdmin?.employeeId ?? null)) {
-        if (input.itAdminEmployeeId !== null) await this.assertUsableItAdmin(tx, input.itAdminEmployeeId);
+        if (input.itAdminEmployeeId !== null) await this.itAdmins.assertUsable(tx, input.itAdminEmployeeId);
         changes.itAdminEmployeeId = input.itAdminEmployeeId;
         before.itAdminEmployeeId = current.itAdmin?.employeeId ?? null;
         after.itAdminEmployeeId = input.itAdminEmployeeId;
@@ -154,7 +165,7 @@ export class DepartmentService {
   /**
    * Retires a department. Refused while anything keeps it in use, and the refusal lists each group with its first things and
    * its total (AC-19, `QĐ-90e`, `QĐ-86c`): the people in it, the service accounts it owns, the open work (Requests not over,
-   * personnel events waiting, open tasks) and the subscriptions and purchases it owns that still owe a payment. What the
+   * personnel events waiting, open tasks). A subscription has no owning department (`QĐ-113g`) and never keeps one in use. What the
    * department was, who headed it and what was charged to it stay as they were. Already retired ⟹ the same answer. Throws
    * DepartmentForbiddenError, DepartmentNotFoundError or DepartmentInUseError.
    */
@@ -172,7 +183,7 @@ export class DepartmentService {
       // A service account is owned by the department, not held by a member: it stays until its chain ends (`QĐ-86c`).
       const accounts = await this.serviceAccounts.get().ownedBy(id, today, IN_USE_LISTED, tx);
       const use = await this.use.readDepartment(id, today, IN_USE_LISTED, tx);
-      if (members.total > 0 || accounts.total > 0 || use.openWork.total > 0 || use.subscriptions.total > 0) {
+      if (members.total > 0 || accounts.total > 0 || use.openWork.total > 0) {
         throw new DepartmentInUseError({
           members: {
             items: members.items.map((member) => ({ employeeCode: member.employeeCode, fullName: member.fullName })),
@@ -180,7 +191,6 @@ export class DepartmentService {
           },
           serviceAccounts: accounts,
           openWork: use.openWork,
-          subscriptions: use.subscriptions,
         });
       }
 
@@ -198,13 +208,6 @@ export class DepartmentService {
         ),
       );
     });
-  }
-
-  private async assertUsableItAdmin(tx: DbTx, employeeId: string) {
-    const employee = await lockAndReadEmployee(this.employees, tx, employeeId);
-    if (!employee || employee.status !== 'ACTIVE') throw new DepartmentItAdminInvalidError();
-    const account = await this.employeeAccounts.get().inspectEmployeeAccount(tx, employeeId);
-    if (!account.usable || !account.roles.includes('IT_ADMIN')) throw new DepartmentItAdminInvalidError();
   }
 
   private requireName(raw: string): string {

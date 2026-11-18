@@ -2,7 +2,7 @@
 
 - Phụ trách: AI/dev được Owner giao implement suite; người nhận tiếp quản spec/plan/test-plan và evidence.
 - Thiết kế ban đầu bởi: AI (lượt "FE nối 5 main flow", 05/11/2026) theo
-  [BRIEF](../../../reviews/qd96-100-alignment-2026-11-05/fe-batch/BRIEF.md) và yêu cầu Owner cùng ngày.
+  BRIEF (nhật ký review đã xóa 11/11/2026 — xem git history) và yêu cầu Owner cùng ngày.
 - Thiết kế: `draft`. Owner review: chưa review. Peer review: chưa có.
 - Nguồn: Docs `3d73a7f` + thay đổi chưa commit 05/11/2026 (`Requiments/Quy trình và chính sách theo main flow.md` 53 bước,
   `Reviews/main-flows-api-contract-review-2026-11-05/README.md` bản đồ bước → API, `QĐ-96`→`QĐ-101`), BE `808318a4`

@@ -19,6 +19,13 @@ export class FunctionalGroupNotFoundError extends Error {
   }
 }
 
+export class FunctionalGroupFixedError extends Error {
+  constructor() {
+    super('The groups Liên lạc and Khác are fixed: they are not renamed or switched off.');
+    this.name = 'FunctionalGroupFixedError';
+  }
+}
+
 export class FunctionalGroupUpdateEmptyError extends Error {
   constructor() {
     super('The update names no field to change.');

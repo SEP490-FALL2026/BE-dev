@@ -1,3 +1,4 @@
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -10,7 +11,7 @@ import {
 } from '../../organization/public/organization.errors';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { PersonnelFileHooks } from '../event-notice/personnel-file-hooks.service';
-import { groundsSnapshot, normalizedGrounds } from '../personnel-grounds.policy';
+import { groundsSnapshot, normalizedGroundsNote } from '../personnel-grounds.policy';
 import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferRefusedError } from './transfer.errors';
@@ -47,6 +48,7 @@ export class TransferChangeWriter {
     private readonly audit: AuditApi,
     private readonly hooks: PersonnelFileHooks,
     private readonly notifier: PersonnelNotifier,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** Moves the day: judged on the new day and on who follows the head, then the periods go back and are written again. */
@@ -61,9 +63,12 @@ export class TransferChangeWriter {
     const periodStart = (await this.history.getPlacementStart(tx, held.closesPlacementId)) ?? today;
     const handover = held.headHandover;
     const chosen: SuccessorChoice | undefined = input.successor ?? previousSuccessorChoice(handover);
+    // The destination takes nobody in before the day it takes effect, whatever day the transfer is moved to (`QĐ-104e(3)`).
+    const destination = await this.organizationReads.getDepartmentBrief(held.toDepartmentId, tx);
     const refusal = rescheduleRefusal({
       ...this.pendingFacts(held, today, periodStart, input),
       newEffectiveOn,
+      destinationEffectiveFrom: destination?.effectiveFrom ?? null,
       successor: await this.guard.successorFacts(tx, {
         required: handover !== null,
         chosen,
@@ -72,10 +77,10 @@ export class TransferChangeWriter {
         day: newEffectiveOn,
       }),
     });
-    if (refusal) this.guard.refuse(refusal);
+    if (refusal) this.guard.refuse(refusal, held.fromDepartmentId);
 
     const { moved, record } = await this.rewritePeriods(tx, held, { newEffectiveOn, chosen });
-    const grounds = normalizedGrounds(input.grounds ?? {});
+    const grounds = normalizedGroundsNote(input.groundsNote ?? '');
     await this.transfers.insertChange(tx, {
       transferId: held.id,
       kind: 'RESCHEDULED',
@@ -149,7 +154,7 @@ export class TransferChangeWriter {
     if (held.headHandover) {
       await this.history.undoScheduledHeadHandover(tx, held.headHandover);
     }
-    const grounds = normalizedGrounds(input.grounds ?? {});
+    const grounds = normalizedGroundsNote(input.groundsNote ?? '');
     const reason = input.reason.trim();
     const { appUserId, ticketId } = actorColumns(actor);
     const record = await this.transfers.cancel(tx, held.id, { appUserId, ticketId, reason });
@@ -208,7 +213,7 @@ export class TransferChangeWriter {
       today,
       periodStart,
       reason: input.reason,
-      grounds: input.grounds,
+      groundsNote: input.groundsNote,
     };
   }
 
@@ -264,7 +269,7 @@ export class TransferChangeWriter {
     held: TransferRecord,
     snapshots: {
       before: { [key: string]: string | null };
-      after: { [key: string]: string | null | { [key: string]: string } };
+      after: { [key: string]: string | null | { [key: string]: string | null } };
     },
   ): Promise<void> {
     await this.audit.record(

@@ -87,7 +87,7 @@ describe('the demo dataset step runner', () => {
 
   it('prints one line per step and the counts', () => {
     const text = formatDemoReport({
-      fixture: 'shared-demo-v3',
+      fixture: 'shared-demo-v4',
       mode: 'apply',
       organization: 'Acme',
       today: '2026-10-30',

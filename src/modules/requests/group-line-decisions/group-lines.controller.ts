@@ -1,3 +1,5 @@
+import { SPEND_ERROR_EXAMPLES } from '../spend/spend.http-errors';
+import { CHECKLIST_ERROR_EXAMPLES } from '../../policies/public/policy-checklist.http-errors';
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
@@ -60,7 +62,7 @@ export class GroupLinesController {
   @ApiSuccessResponse(LinesResponseDto, {
     message: 'GROUP_REQUEST.LINES_LISTED',
     description:
-      'The people of a request for a group in the order they were named, each with the state of their own, the step that holds them, what each costs, what was decided for them at the need and the spend, the share of the commitment they stand for once approved, and how and why they ended. The sender, whoever holds a step and an IT Admin see every person; a person the request is for sees only their own line.',
+      'The people of a request for a group in the order they were named, each with the state of their own, the step that holds them, what each costs, what was decided for them at the need and the spend, the share of the commitment they stand for once approved, and how and why they ended. The sender, whoever holds a step, the head today of its department, an IT Admin, a spending approver once a spend step was opened on it and Finance once its spend was approved see every person; a person the request is for sees only their own line, and the Super Admin none.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -85,7 +87,7 @@ export class GroupLinesController {
   @ApiSuccessResponse(GroupResponseDto, {
     message: 'GROUP_REQUEST.NEED_DECIDED',
     description:
-      'The person who holds a need step decides all the people of that step at once, approving some and refusing others, each refusal with its reason. A person who holds a seat of the plan since the request was sent is not approved. The step gets its electronic approval record and each person a decision of their own. When no person waits for a need any more the request is priced again for those who remain and goes on to be sent as spend, or ends when every person was refused.',
+      'The person who holds a need step answers one checklist of the policy in force for the whole group and decides all the people of that step at once, approving some and refusing others, each refusal with its reason (or the reason taken from the answers No); with an answer No nobody can be approved, and the group can be sent back to its sender as a whole (RETURN for every person), who adds what is missing and sends it again. A person who holds a seat of the plan since the request was sent is not approved. The step gets its electronic approval record and each person a decision of their own. When no person waits for a need any more the request is priced again for those who remain and goes on to be sent as spend, or ends when every person was refused.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -99,14 +101,24 @@ export class GroupLinesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), or a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched.',
-      examples: [GROUP_REQUEST_ERROR_EXAMPLES.NEED_STEP_NOT_PENDING, GROUP_REQUEST_ERROR_EXAMPLES.LINE_HOLDS_ACCESS],
+        'The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched; or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED), or has no version in force at the step (POLICY.NOT_IN_FORCE).',
+      examples: [
+        GROUP_REQUEST_ERROR_EXAMPLES.NEED_STEP_NOT_PENDING,
+        GROUP_REQUEST_ERROR_EXAMPLES.LINE_HOLDS_ACCESS,
+        CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal without its reason, a person twice); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who). Nothing is saved.',
-      examples: [VALIDATION_EXAMPLE, GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH],
+        'The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from (issues[0].path = reason), a person twice, a group sent back in part); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO). Nothing is saved.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH,
+        CHECKLIST_ERROR_EXAMPLES.INCOMPLETE,
+        CHECKLIST_ERROR_EXAMPLES.HAS_NO,
+      ],
     },
   )
   async decideNeed(
@@ -117,6 +129,7 @@ export class GroupLinesController {
     try {
       const record = await this.needs.decide(actor, params.id, {
         lines: body.lines,
+        checklist: body.checklist,
       });
 
       return { request: toWire(await this.queries.view(record)) };
@@ -131,7 +144,7 @@ export class GroupLinesController {
   @ApiSuccessResponse(ApprovalDetailResponseDto, {
     message: 'SPEND_APPROVAL.LINES_DECIDED',
     description:
-      'The person the spend step is given to decides all the people whose need is confirmed at once, approving some and refusing others, each refusal with its reason. The request is checked again on the people approved and the decision is made on that check, which is kept with it; a request that has less money than it costs in a year of the budget, or none, cannot be approved. One commitment is held for each year, the sum of the part of the people approved, and each person stands for a share of it. A request that turned out to be an exception since it was sent goes back to Finance, and one whose data is at fault goes back to its head; nobody is decided then.',
+      'The person the spend step is given to answers one checklist for the group and decides all the people whose need is confirmed at once (or sends the whole group back to its head, RETURN), approving some and refusing others, each refusal with its reason. The request is checked again on the people approved and the decision is made on that check, which is kept with it; a request that has less money than it costs in a year of the budget, or none, cannot be approved. One commitment is held for each year, the sum of the part of the people approved, and each person stands for a share of it. A request that does not pass the check again, or whose data is at fault, goes back to its head; nobody is decided then.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -145,23 +158,27 @@ export class GroupLinesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).',
+        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again on the people approved and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD or SPEND.RECHECKED_RETURNED_TO_REQUESTER for a one-step request, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED), or the commitment of the approval could not be held (BUDGET.COMMITMENT_NOT_HOLDABLE, BUDGET.COMMITMENT_EXISTS: a safety net after the check of the budget; nothing was decided).',
       examples: [
         GROUP_REQUEST_ERROR_EXAMPLES.NO_SPEND_STEP,
-        GROUP_REQUEST_ERROR_EXAMPLES.REVIEWER_IS_APPROVER,
         GROUP_REQUEST_ERROR_EXAMPLES.NOT_CHECKABLE,
-        GROUP_REQUEST_ERROR_EXAMPLES.RECHECKED_NEEDS_FINANCE_REVIEW,
         GROUP_REQUEST_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_HEAD,
+        SPEND_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_REQUESTER,
+        SPEND_ERROR_EXAMPLES.COMMITMENT_NOT_HOLDABLE,
+        SPEND_ERROR_EXAMPLES.COMMITMENT_EXISTS,
+        CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+        CHECKLIST_ERROR_EXAMPLES.NOT_IN_FORCE,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal without its reason); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); a year of the budget has less money than the request costs, or none (SPEND.OVERRIDE_REQUIRED, with the years): it cannot be approved.',
+        'The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from (issues[0].path = reason), a group sent back in part); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO).',
       examples: [
         VALIDATION_EXAMPLE,
         GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH,
-        GROUP_REQUEST_ERROR_EXAMPLES.OVERRIDE_REQUIRED,
+        CHECKLIST_ERROR_EXAMPLES.INCOMPLETE,
+        CHECKLIST_ERROR_EXAMPLES.HAS_NO,
       ],
     },
   )
@@ -172,7 +189,7 @@ export class GroupLinesController {
   ) {
     try {
       const result = await this.spends.decide(actor, params.id, body);
-      if (result.status === 'BOUNCED') throw toRecheckedApiException(result);
+      if (result.status === 'BOUNCED') throw toRecheckedApiException(result.reasons, result.to, result.overBy);
 
       return { spendApproval: await this.approvals.detail(actor, params.id) };
     } catch (error) {
@@ -186,7 +203,7 @@ export class GroupLinesController {
   @ApiSuccessResponse(GroupResponseDto, {
     message: 'GROUP_REQUEST.LINE_WITHDRAWN',
     description:
-      'The sender withdraws one person while their seat is not real; the head of the department does too, with a reason, in the stages the head acts on. Before the spend nothing is held, and the request is priced again for those who remain. Once the spend is approved the share of that person goes back to the budget and nobody else’s does; a task nobody has worked is cancelled with its assignment (never failed), and when the grant had failed the person waits until the IT Admin cancels the task. The other people are not touched.',
+      'The sender withdraws one person only while their line still awaits the need, or while the request is sent back to add what is missing; after any decision the way back is a return once granted. The head of the department does too, with a reason, in the stages the head acts on. Before the spend nothing is held, and the request is priced again for those who remain. Once the spend is approved the share of that person goes back to the budget and nobody else’s does; a task nobody has worked is cancelled with its assignment (never failed), and when the grant had failed the person waits until the IT Admin cancels the task. The other people are not touched.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -200,8 +217,9 @@ export class GroupLinesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'Nothing is left to withdraw (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin (ACCESS_REQUEST.WITHDRAWAL_PENDING), the task of the grant is being worked (ACCESS_REQUEST.GRANT_RUNNING), or the seat is real and the way back is a return (ACCESS_REQUEST.GRANT_COMPLETED). Nothing changes.',
+        'A decision was already taken on the person (ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION), nothing is left to withdraw (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin (ACCESS_REQUEST.WITHDRAWAL_PENDING), the task of the grant is being worked (ACCESS_REQUEST.GRANT_RUNNING), or the seat is real and the way back is a return (ACCESS_REQUEST.GRANT_COMPLETED). Nothing changes.',
       examples: [
+        GROUP_REQUEST_ERROR_EXAMPLES.WITHDRAWAL_AFTER_DECISION,
         GROUP_REQUEST_ERROR_EXAMPLES.WITHDRAWAL_ALREADY_ENDED,
         GROUP_REQUEST_ERROR_EXAMPLES.WITHDRAWAL_PENDING,
         GROUP_REQUEST_ERROR_EXAMPLES.GRANT_RUNNING,

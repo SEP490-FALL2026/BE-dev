@@ -1,6 +1,7 @@
-import request from 'supertest';
+import { bookPurchaseInvoice } from '../../support/book-purchase-invoice';
 import { GroupHarness } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 const h = new GroupHarness();
 
@@ -9,14 +10,18 @@ const h = new GroupHarness();
  * share of the person can reach into what the invoice made an expense. The withdrawal gives back only what is still held, and
  * does not fail because the share is more than that.
  */
+afterEach(() => jest.restoreAllMocks());
+
 describe('a person of a group leaves after an invoice was recorded over PostgreSQL (US-06-06 AC-9, US-05-17 AC-10)', () => {
   let paid: string;
+  let vendorId: string;
   let counter = 0;
 
   beforeAll(async () => {
     await h.start();
     await h.withApprover();
     paid = await h.planOf(await h.subscription(100));
+    vendorId = (await h.vendorOf(paid)).id;
   }, 240000);
 
   afterAll(async () => {
@@ -38,11 +43,14 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
 
     return { u, people, id, commitmentId: commitment.id, amount: BigInt(commitment.amount_minor) };
   };
-  const invoice = (commitmentId: string, netMinor: bigint) =>
-    request(h.server())
-      .post(`/api/v1/budget-commitments/${commitmentId}/invoices`)
-      .set(h.as(h.finance))
-      .send({ number: `GRP-${commitmentId}`, issuedOn: '2026-11-03', netAmount: { amount: netMinor.toString() } });
+  /** The invoice of a purchase for the request, booked into its commitment as the signature of Finance books it (`PI-1`). */
+  const invoice = (approvedRequest: { u: Unit; id: string; commitmentId: string }, netMinor: bigint) =>
+    bookPurchaseInvoice(h, vendorId, {
+      requestId: approvedRequest.id,
+      chargedCostCenterId: approvedRequest.u.department.unitId,
+      number: `GRP-${approvedRequest.commitmentId}`,
+      netMinor,
+    });
   const commitmentRow = async (id: string) =>
     (
       await h.ctx.sql.query<{ state: string; released_minor: string; applied_minor: string }>(
@@ -61,9 +69,11 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
     (await h.shares(id)).filter((row) => row.employee_id === employeeId).every((row) => row.released_at !== null);
 
   it('gives back only what is still held when the share is more, and the commitment becomes an expense', async () => {
+    // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+    liftWithdrawalAfterDecisionRefusal();
     const { u, people, id, commitmentId, amount } = await approved();
     const net = (amount * 9n) / 10n;
-    await invoice(commitmentId, net).expect(201);
+    expect((await invoice({ u, id, commitmentId }, net)).booking).toBe('COMMITMENT');
 
     await h.withdrawLine(id, people[3].employeeId, {}, u.head.account).expect(200);
 
@@ -81,8 +91,10 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
   });
 
   it('is not refused when the invoice already took the whole commitment: nothing goes back and the line still ends', async () => {
+    // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+    liftWithdrawalAfterDecisionRefusal();
     const { u, people, id, commitmentId, amount } = await approved();
-    await invoice(commitmentId, amount).expect(201);
+    expect((await invoice({ u, id, commitmentId }, amount)).booking).toBe('COMMITMENT');
 
     await h.withdrawLine(id, people[0].employeeId, {}, u.head.account).expect(200);
 
@@ -93,9 +105,11 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
   });
 
   it('gives back the share in full when the invoice took less than what is left over', async () => {
+    // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+    liftWithdrawalAfterDecisionRefusal();
     const { u, people, id, commitmentId, amount } = await approved();
     const net = amount / 10n;
-    await invoice(commitmentId, net).expect(201);
+    expect((await invoice({ u, id, commitmentId }, net)).booking).toBe('COMMITMENT');
 
     await h.withdrawLine(id, people[1].employeeId, {}, u.head.account).expect(200);
 
@@ -107,9 +121,11 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
   });
 
   it('gives back what is left of the commitment when the whole request is withdrawn after an invoice', async () => {
+    // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+    liftWithdrawalAfterDecisionRefusal();
     const { u, id, commitmentId, amount } = await approved();
     const net = (amount * 6n) / 10n;
-    await invoice(commitmentId, net).expect(201);
+    expect((await invoice({ u, id, commitmentId }, net)).booking).toBe('COMMITMENT');
 
     await h.withdrawRequest(id, { reason: 'The project was cancelled' }, u.head.account).expect(200);
 

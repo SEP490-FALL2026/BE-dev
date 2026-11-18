@@ -12,6 +12,121 @@ export class ContractNameRequiredError extends Error {
   }
 }
 
+/** A contract that is made names its vendor (`US-04-13` AC-5). */
+export class ContractVendorRequiredError extends Error {
+  constructor() {
+    super('A contract needs a vendor.');
+    this.name = 'ContractVendorRequiredError';
+  }
+}
+
+/** A contract that is made names the day from which it is in effect; the day to which it is may be left empty. */
+export class ContractEffectiveFromRequiredError extends Error {
+  constructor() {
+    super('A contract needs the day from which it is in effect.');
+    this.name = 'ContractEffectiveFromRequiredError';
+  }
+}
+
+export type ContractEffectiveRangeProblem = 'TO_BEFORE_FROM' | 'TO_WITHOUT_FROM';
+
+/** The days of a contract do not make a period: the end is before the beginning, or there is an end and no beginning. */
+export class ContractEffectiveRangeError extends Error {
+  constructor(readonly problem: ContractEffectiveRangeProblem) {
+    super(
+      problem === 'TO_BEFORE_FROM'
+        ? 'The day a contract ends is before the day it begins.'
+        : 'A contract with an end needs the day it begins.',
+    );
+    this.name = 'ContractEffectiveRangeError';
+  }
+}
+
+/** A change of a contract is made for a reason (`US-04-13` AC-8). */
+export class ContractReasonRequiredError extends Error {
+  constructor() {
+    super('A change of a contract needs a reason.');
+    this.name = 'ContractReasonRequiredError';
+  }
+}
+
+export class ContractUpdateEmptyError extends Error {
+  constructor() {
+    super('The change names no field of the contract.');
+    this.name = 'ContractUpdateEmptyError';
+  }
+}
+
+/** The vendor named does not exist in the catalog. */
+export class ContractVendorNotFoundError extends Error {
+  constructor() {
+    super('The vendor does not exist.');
+    this.name = 'ContractVendorNotFoundError';
+  }
+}
+
+/** Another contract of the organization has this number, read the way numbers are compared (`US-04-13` AC-4). */
+export class ContractNumberTakenError extends Error {
+  constructor() {
+    super('Another contract has this number.');
+    this.name = 'ContractNumberTakenError';
+  }
+}
+
+/** A contract with subscriptions linked keeps its vendor (`US-04-13` AC-8). */
+export class ContractVendorLockedError extends Error {
+  constructor() {
+    super('The vendor of a contract with subscriptions linked does not change.');
+    this.name = 'ContractVendorLockedError';
+  }
+}
+
+/** The subscription does not exist. */
+export class ContractSubscriptionNotFoundError extends Error {
+  constructor() {
+    super('The subscription does not exist.');
+    this.name = 'ContractSubscriptionNotFoundError';
+  }
+}
+
+/** Only a subscription of a shared stock (K2 or K4) rests on a contract (`QĐ-111t`). */
+export class ContractSubscriptionKindNotAllowedError extends Error {
+  constructor(readonly provisioningType: string) {
+    super('Only a subscription of a shared stock (K2 or K4) rests on a contract.');
+    this.name = 'ContractSubscriptionKindNotAllowedError';
+  }
+}
+
+/** The contract has no vendor yet (an old one, a name only), so nothing can be linked to it until it has one. */
+export class ContractIncompleteError extends Error {
+  constructor() {
+    super('The contract has no vendor yet: fill it in before linking a subscription.');
+    this.name = 'ContractIncompleteError';
+  }
+}
+
+export class ContractSubscriptionVendorMismatchError extends Error {
+  constructor() {
+    super('The vendor of the subscription is not the vendor of the contract.');
+    this.name = 'ContractSubscriptionVendorMismatchError';
+  }
+}
+
+/** A subscription rests on at most one contract: on this one or on another. */
+export class ContractSubscriptionAlreadyLinkedError extends Error {
+  constructor(readonly contractId: string) {
+    super('The subscription rests on a contract already.');
+    this.name = 'ContractSubscriptionAlreadyLinkedError';
+  }
+}
+
+export class ContractSubscriptionNotLinkedError extends Error {
+  constructor() {
+    super('The subscription is not linked to this contract.');
+    this.name = 'ContractSubscriptionNotLinkedError';
+  }
+}
+
 /** The person may not choose this purpose for a file: each purpose belongs to the roles that file it. */
 export class DocumentPurposeForbiddenError extends Error {
   constructor() {

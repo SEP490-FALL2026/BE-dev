@@ -81,7 +81,7 @@ export function addDays(day: string, days: number): string {
 }
 
 /** The year of `today` (the budget year the dataset works in) and its last day. */
-export function yearOf(ctx: DemoRunContext): { year: number; lastDay: string } {
+export function yearOf(ctx: Pick<DemoRunContext, 'today'>): { year: number; lastDay: string } {
   const year = Number(ctx.today.slice(0, 4));
 
   return { year, lastDay: `${year}-12-31` };

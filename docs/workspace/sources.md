@@ -2,20 +2,60 @@
 
 BRD sở hữu nghiệp vụ; US dẫn xuất phạm vi/AC; sổ quyết định ghi thay đổi nghiệp vụ. ARCHITECTURE/ADR của BE sở hữu cách hiện thực, không ghi đè yêu cầu.
 
-| Nguồn      | Vị trí nhận diện trong bộ tài liệu dự án                                                 | Link chia sẻ / revision                                                                                                                                                                                                                  |
-| ---------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BRD        | Docs/Requiments/BRD - HỆ THỐNG QUẢN TRỊ BẢN QUYỀN PHẦN MỀM & TỐI ƯU CHI PHÍ CÔNG NGHỆ.md | v3.36 `S-2026-10-12b`; v3.39 `S-2026-10-14b` = Docs `3341ea0`; v3.42 Docs `73e7379`; v3.45 `S-2026-10-18` (chưa commit); v3.46 Docs `9416fe0`; **v3.53** Docs `72e1480`                                                                  |
-| Phạm vi    | Docs/Requiments/Định nghĩa phạm vi & nghiệp vụ.md                                        | v1.24 `S-2026-10-12b`; v1.27 `S-2026-10-14b` = Docs `3341ea0`; v1.30 `73e7379`; v1.31 `S-2026-10-18`; v1.31 Docs `9416fe0`; **v1.34** Docs `72e1480`                                                                                     |
-| US         | Docs/BE-UserStory/src/ (canonical), sinh ra user-stories-and-epics.md và epics/          | v0.15 (`QĐ-67`) `S-2026-10-12b`; v0.15 (`QĐ-73`) `3341ea0`; v0.15 (`QĐ-77`, 150 mã, 1 428 AC) `73e7379`; v0.15 (`QĐ-80`, 150 mã, 144 đang dùng, 1 433 AC) `S-2026-10-18`; **v0.15 (`QĐ-86`, 157 mã, 147 đang dùng, 1 549 AC)** `72e1480` |
-| Quyết định | Docs/Decisions/project-decisions.md                                                      | QĐ-01 → QĐ-67 `S-2026-10-12b`; → QĐ-73 `3341ea0`; → QĐ-77 `73e7379`; → QĐ-80 `S-2026-10-18` (chưa commit); → QĐ-81 Docs `9416fe0`; **→ QĐ-86** Docs `72e1480`                                                                            |
-| Conceptual | Docs/ERD/CONCEPTUAL ERD - DANH SÁCH ENTITY.md                                            | v5.1 (21 · 42), không đổi, `S-2026-10-12b`; v5.1 (21 · 42 · 20 bất biến), nội dung đồng bộ 17/10/2026, `S-2026-10-18`; **v5.1 (21 · 42 · 21 bất biến)**, đồng bộ 22/10/2026, Docs `72e1480`                                              |
+| Nguồn      | Vị trí nhận diện trong bộ tài liệu dự án                                                 | Link chia sẻ / revision                                                                                                                                                                                                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BRD        | Docs/Requiments/BRD - HỆ THỐNG QUẢN TRỊ BẢN QUYỀN PHẦN MỀM & TỐI ƯU CHI PHÍ CÔNG NGHỆ.md | v3.36 `S-2026-10-12b`; v3.39 `S-2026-10-14b` = Docs `3341ea0`; v3.42 Docs `73e7379`; v3.45 `S-2026-10-18` (chưa commit); v3.46 Docs `9416fe0`; v3.53 Docs `72e1480`; **v4.11** Docs `5bb2e6a`                                                                                                 |
+| Phạm vi    | Docs/Requiments/Định nghĩa phạm vi & nghiệp vụ.md                                        | v1.24 `S-2026-10-12b`; v1.27 `S-2026-10-14b` = Docs `3341ea0`; v1.30 `73e7379`; v1.31 `S-2026-10-18`; v1.31 Docs `9416fe0`; v1.34 Docs `72e1480`; **v2.9** Docs `5bb2e6a`                                                                                                                     |
+| US         | Docs/BE-UserStory/src/ (canonical), sinh ra user-stories-and-epics.md và epics/          | v0.15 (`QĐ-67`) `S-2026-10-12b`; v0.15 (`QĐ-73`) `3341ea0`; v0.15 (`QĐ-77`, 150 mã, 1 428 AC) `73e7379`; v0.15 (`QĐ-80`, 150 mã, 144 đang dùng, 1 433 AC) `S-2026-10-18`; v0.15 (`QĐ-86`, 157 mã, 147 đang dùng, 1 549 AC) `72e1480`; **`QĐ-109`, 183 mã, 154 đang dùng, 1 864 AC** `5bb2e6a` |
+| Quyết định | Docs/Decisions/project-decisions.md                                                      | QĐ-01 → QĐ-67 `S-2026-10-12b`; → QĐ-73 `3341ea0`; → QĐ-77 `73e7379`; → QĐ-80 `S-2026-10-18` (chưa commit); → QĐ-81 Docs `9416fe0`; → QĐ-86 Docs `72e1480`; **→ QĐ-109** Docs `5bb2e6a`                                                                                                        |
+| Conceptual | Docs/ERD/CONCEPTUAL ERD - DANH SÁCH ENTITY.md                                            | v5.1 (21 · 42), không đổi, `S-2026-10-12b`; v5.1 (21 · 42 · 20 bất biến), nội dung đồng bộ 17/10/2026, `S-2026-10-18`; **v5.1 (21 · 42 · 21 bất biến)**, đồng bộ 22/10/2026, Docs `72e1480`                                                                                                   |
 
 Vị trí trên chỉ để nhận diện tài liệu, không bắt contributor có thư mục cạnh checkout BE. Mỗi spec pin revision thực sự dùng.
 Spec G0/G1/G2 giữ nguồn đã pin khi thiết kế; tác động của `QĐ-74` → `QĐ-80` lên chúng ghi ở
 [baseline-impact-and-remediation-2026-10-17](items/baseline-impact-and-remediation-2026-10-17/spec.md); tác động của `QĐ-82` → `QĐ-86` lên G0–G4 ghi ở
 [business-baseline-impact-2026-10-22](items/business-baseline-impact-2026-10-22/spec.md).
 
-## Commit Docs `72e1480` (22/10/2026, tới `QĐ-86`) — pin hiện hành cho hạng mục mới
+## Commit Docs `5bb2e6a` (09/11/2026, tới `QĐ-109`) — pin của scope map G1–G10 (re-pin 11/11/2026)
+
+Docs `main` `5bb2e6a6b7dc5a6f8350bbb7f5568863f36ec5bd` (09/11/2026, _docs(decisions): QĐ-109 — chốt câu mở sau audit lại
+MF-1/MF-4, sửa lệch Docs D-01…D-25_) là commit đầu tiên chứa `QĐ-109a` (`git log -S"QĐ-109a" -- Decisions/project-decisions.md`).
+Kiểm ngày 11/11/2026 (Docs HEAD lúc kiểm `8480e79`; `git diff 5bb2e6a HEAD -- BE-UserStory` rỗng, working tree `BE-UserStory`
+sạch): sổ quyết định `QĐ-01` → `QĐ-109`, BRD **v4.11**, Phạm vi **v2.9**, User Stories — **183** mã Story, **154** đang dùng
+(`BASELINED` 146, `RESEARCH-DEPENDENT` 3, `DEFERRED` 5; `RETIRED` 29), **1 864** AC đang dùng (bảng _Số đếm hiện hành_ của
+`user-stories-and-epics.md`; đếm lại từ `BE-UserStory/src/EP-*.md` bằng script đọc của lượt re-pin, khớp).
+
+Scope map G1–G10 của [roadmap](../roadmap.md) pin commit này từ 11/11/2026 ([C3](../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md));
+spec `qd103-*` pin Docs `9c7f386` (giữa hai commit chỉ EP-05, EP-06, EP-12 đổi, thêm AC, không đánh số lại AC cũ). Hash dưới
+là SHA-256 của `git show 5bb2e6a:<tệp>`, chuẩn hóa LF, bỏ BOM.
+
+| Tệp (tính từ gốc Docs)                                                              | SHA-256 (LF, không BOM)                                            |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Decisions/project-decisions.md                                                      | `36d4f019461ead3d8774ffafbd721bb487872eea85d53c4b3532ec8b564a0a63` |
+| Requiments/BRD - HỆ THỐNG QUẢN TRỊ BẢN QUYỀN PHẦN MỀM & TỐI ƯU CHI PHÍ CÔNG NGHỆ.md | `89dbf778aa6bfc3f22dede4c9603bde06224ab39e5bb49c704e507322e3f56ee` |
+| Requiments/Định nghĩa phạm vi & nghiệp vụ.md                                        | `4632e4fad470bcb0db5fbb57777d5f20d92214138f31697cbf5b5eb040d0b047` |
+| BE-UserStory/user-stories-and-epics.md                                              | `9dd7d4010cc619005d7dad3630b2cdb51123f58327a2a50ac31ca1e9d96017b5` |
+| BE-UserStory/tools/build_us.py                                                      | `3c2a8a5d0b71d36359863b5c18c8b5ef7d7e0914c0b0cdc33ede3bc693bc9921` |
+| BE-UserStory/tools/us_tools.py                                                      | `15c2abb088dd278980c2c0ee8b8912d144292a3c41d20142c7506b8f17846261` |
+| BE-UserStory/src/00-head.md                                                         | `de7775f33eed76e350e1d6ec6f4b338f4c8ab50f4b3e1136033410a3d48cbc6c` |
+| BE-UserStory/src/99-tail.md                                                         | `d020b4233b5748c843234597abcf46a828ae4a01bba7c32a8398f1a067e9b509` |
+| BE-UserStory/src/EP-01.md                                                           | `493161674130ef38a2aef39032a0729c9a3254c1bbb493e370188b584db7135b` |
+| BE-UserStory/src/EP-02.md                                                           | `ce0814a8f1de41caed2f40b4ded73e3599f0c53fa73d0ace330524ab32a89aad` |
+| BE-UserStory/src/EP-03.md                                                           | `e844608eb3ed2c06fc7fa89c4236cf89dc2c67a4777276ddf2f5d33e0659ab5b` |
+| BE-UserStory/src/EP-04.md                                                           | `2e55f70f89952f9b2147db4cf6b9c54f43f3405908136fef0a915fe7261df4ab` |
+| BE-UserStory/src/EP-05.md                                                           | `ccd8ed23e7f8c39325580978dcd2d090b872f83e5cb7fcd7c817a800337209ba` |
+| BE-UserStory/src/EP-06.md                                                           | `1d28b3315bdb8398c2dfb87f0aca5a2bc53857ec06d9a4dae61a20f6355ce9ef` |
+| BE-UserStory/src/EP-07.md                                                           | `5f427ea5524f57762aa96c537a213b62edb2536c51020ab0fbb0bf7c6885ed10` |
+| BE-UserStory/src/EP-08.md                                                           | `484ca78760e42c9cc6e7b21304a524a5b0535a952672a8885822659c3c62fea6` |
+| BE-UserStory/src/EP-09.md                                                           | `d65d1cbe9780859725d876676124f3ce95471418d3a08f0a791b1f7cd86b291e` |
+| BE-UserStory/src/EP-10.md                                                           | `641fa48eb021e8d11d4f671b0ee932d99514ae9998425c14570e8f70062cfe83` |
+| BE-UserStory/src/EP-11.md                                                           | `86f8047c470fbf6611f65d885cc97b01f2988264d903d5db6aa2643d1efe7cc8` |
+| BE-UserStory/src/EP-12.md                                                           | `39036ceb2292ccb84fd348c0a57c6fe40ddc8c5c11048604f334fe4be489d16a` |
+| BE-UserStory/src/EP-13.md                                                           | `b0b9824d31afdf01cca0b7457e7bca50f8f59fe0fb4ea38f44324acfff4e4fbe` |
+| BE-UserStory/src/EP-14.md                                                           | `3ae80631b4a3fcf0f1c15f0052021cc7c1a134fa61852397df4b5e68ff564827` |
+| BE-UserStory/src/EP-15.md                                                           | `b6cb2114863e61992961b08a0fcd5acb646db793da0d2cbd71783cd5231aca99` |
+| BE-UserStory/src/EP-16.md                                                           | `6bb2edf793c3809fcd6880a742f3d91d75f414ac51c898b4da45e69e66453728` |
+
+## Commit Docs `72e1480` (22/10/2026, tới `QĐ-86`) — pin hạng mục mới tới 22/10/2026
 
 Docs `main` `72e1480dd6efa7a8e34ba344aa5b44f09a169dc5` (22/10/2026, _update docs_) là commit đầu tiên chứa `QĐ-86a`
 (`git log -S"QĐ-86a" -- Decisions/project-decisions.md`); working tree Docs sạch lúc kiểm. Kiểm ngày 22/10/2026: sổ

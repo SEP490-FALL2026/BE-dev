@@ -1,3 +1,5 @@
+import { LicenseKeyStateError } from './license-key.errors';
+
 /** The most keys one batch holds; the DTO bounds the request with it. */
 export const MAX_KEYS_PER_BATCH = 1000;
 
@@ -62,4 +64,30 @@ export function warningOf(input: { purchased: number | null; usableKeys: number 
   if (input.purchased === null) return 'QUANTITY_UNKNOWN';
 
   return input.usableKeys === input.purchased ? null : 'KEY_COUNT_DIFFERS';
+}
+
+/** The longest reason a withdrawal keeps (CHECK `license_keys_withdrawal_reason`); the DTO bounds the request with it. */
+export const WITHDRAWAL_REASON_MAX_LENGTH = 500;
+
+/** What the rules of the pool read of a key. */
+export interface KeyState {
+  subscriptionId: string;
+  status: 'IN_STORE' | 'ASSIGNED';
+  withdrawnAt: Date | null;
+}
+
+/**
+ * Whether a key may be given to the seat of a grant (`BR-MF1-09`, `QĐ-103d`): a free key of the store, not withdrawn, of the purchase the
+ * seat sits on. Throws LicenseKeyStateError.
+ */
+export function assertAssignable(key: KeyState, seatSubscriptionId: string | null): void {
+  if (key.withdrawnAt !== null) throw new LicenseKeyStateError('WITHDRAWN');
+  if (key.status !== 'IN_STORE') throw new LicenseKeyStateError('NOT_IN_STORE');
+  if (key.subscriptionId !== seatSubscriptionId) throw new LicenseKeyStateError('SUBSCRIPTION_MISMATCH');
+}
+
+/** Whether a key may be withdrawn from the store (`QĐ-103v`, Q-10 B): only a free key, once. Throws LicenseKeyStateError. */
+export function assertWithdrawable(key: KeyState): void {
+  if (key.withdrawnAt !== null) throw new LicenseKeyStateError('ALREADY_WITHDRAWN');
+  if (key.status === 'ASSIGNED') throw new LicenseKeyStateError('ASSIGNED');
 }

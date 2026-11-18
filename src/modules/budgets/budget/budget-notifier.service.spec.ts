@@ -159,7 +159,11 @@ describe('the notices of the budget loops that may be kept for a department with
   });
 
   describe('BudgetFactsService.currentHeadOfLocked', () => {
-    const organization = { lockDepartmentShared: jest.fn(), getDepartmentHeads: jest.fn() };
+    const organization = {
+      lockDepartmentShared: jest.fn(),
+      getDepartmentHeads: jest.fn(),
+      getUpcomingHeadOf: jest.fn().mockResolvedValue(null),
+    };
 
     async function support(): Promise<BudgetFactsService> {
       const moduleRef = await Test.createTestingModule({
@@ -198,6 +202,20 @@ describe('the notices of the budget loops that may be kept for a department with
 
       expect(await (await support()).currentHeadOfLocked('dep-1', TODAY, tx)).toBeNull();
       expect(organization.lockDepartmentShared).toHaveBeenCalledTimes(1);
+    });
+
+    it('answers the person who is to head a department that is not yet in effect when nobody heads it today (QĐ-106k)', async () => {
+      organization.getDepartmentHeads.mockResolvedValue(new Map());
+      organization.getUpcomingHeadOf.mockResolvedValueOnce('coming-head');
+
+      expect(await (await support()).currentHeadOfLocked('dep-1', TODAY, tx)).toBe('coming-head');
+    });
+
+    it('prefers the head of today to the one who is coming', async () => {
+      organization.getDepartmentHeads.mockResolvedValue(new Map([['dep-1', { employeeId: 'head-1' }]]));
+      organization.getUpcomingHeadOf.mockResolvedValueOnce('coming-head');
+
+      expect(await (await support()).currentHeadOfLocked('dep-1', TODAY, tx)).toBe('head-1');
     });
   });
 });

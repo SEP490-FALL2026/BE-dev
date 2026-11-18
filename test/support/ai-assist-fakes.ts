@@ -8,9 +8,11 @@ import { AiServiceClients } from '../../src/modules/ai-assist/ai-service/ai-serv
 import { SimulatedAiServiceClient } from '../../src/modules/ai-assist/ai-service/ai-service-simulated-client.service';
 import { AiServiceClient } from '../../src/modules/ai-assist/ai-service/ai-service.types';
 import type {
+  QueueContext,
   QueueSummaryServiceRequest,
   QueueSummaryServiceResponse,
 } from '../../src/modules/ai-assist/ai-service/ai-service.types';
+import type { AiInvocationHistoryStore } from '../../src/modules/ai-assist/invocation/invocation-history-store.types';
 import type { AiInvocationRepo } from '../../src/modules/ai-assist/invocation/invocation.repo';
 import type {
   InvocationKey,
@@ -35,13 +37,18 @@ import type { AiSourceStep } from '../../src/modules/requests/public/requests.ty
  */
 
 export const ORGANIZATION_ID = '0a000000-0000-4000-8000-000000000001';
-const TX = { fake: 'transaction' } as unknown as DbTx;
 
-/** A row of `ai_invocations` with its content, as the fake keeps it. */
+/** A row of `ai_invocations` with its content, as the fake keeps it; `context` stays null until `recordAdmitted` writes it. */
 export interface FakeInvocationRow extends InvocationRecord {
   finishedAt: Date | null;
-  context: NewInvocation['context'];
+  context: QueueContext | null;
   outcome: InvocationOutcome | null;
+}
+
+/** One call to the fake store or to the audit trail, with the transaction it was given, in the order made. */
+export interface FakeStep {
+  step: string;
+  tx: DbTx;
 }
 
 const KEPT = new Set(['PENDING', 'RUNNING', 'COMPLETED']);
@@ -56,10 +63,21 @@ const sameKey = (row: FakeInvocationRow, key: InvocationKey & { sourceRevision: 
 const stuck = (row: FakeInvocationRow, startedBefore: Date) =>
   LIVE.has(row.status) && (row.startedAt ?? row.createdAt).getTime() < startedBefore.getTime();
 
-export class FakeInvocationRepo implements Pick<AiInvocationRepo, keyof AiInvocationRepo> {
+/**
+ * The store of the calls and, in the same object, the store of their content (`AiInvocationHistoryStore`): the specs pass it for both
+ * constructor parameters, as the one PostgreSQL schema holds both.
+ */
+export class FakeInvocationRepo
+  implements
+    Pick<AiInvocationRepo, keyof AiInvocationRepo>,
+    Pick<AiInvocationHistoryStore, 'recordAdmitted' | 'recordAnswered'>
+{
   readonly rows = new Map<string, FakeInvocationRow>();
+  /** The writes of a use case in the order made, with their transaction: `finish`, `recordAdmitted`, `recordAnswered`, `audit:…`. */
+  readonly steps: FakeStep[] = [];
 
-  insert(_tx: DbTx, input: NewInvocation): Promise<{ id: string }> {
+  insert(tx: DbTx, input: NewInvocation): Promise<{ id: string }> {
+    this.steps.push({ step: 'insert', tx });
     if (KEPT.has(input.status) && [...this.rows.values()].some((row) => KEPT.has(row.status) && sameKey(row, input))) {
       return Promise.reject(
         new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
@@ -84,11 +102,36 @@ export class FakeInvocationRepo implements Pick<AiInvocationRepo, keyof AiInvoca
       startedAt: null,
       finishedAt: input.status === 'FAILED' ? input.at : null,
       result: null,
-      context: input.context,
+      context: null,
       outcome: null,
     });
 
     return Promise.resolve({ id });
+  }
+
+  recordAdmitted(tx: DbTx, call: Parameters<AiInvocationHistoryStore['recordAdmitted']>[1]): Promise<void> {
+    this.steps.push({ step: 'recordAdmitted', tx });
+    const row = this.rows.get(call.invocationId);
+    if (!row) return Promise.reject(new Error('recordAdmitted: the call was never inserted'));
+    row.context = call.context;
+
+    return Promise.resolve();
+  }
+
+  recordAnswered(tx: DbTx, call: Parameters<AiInvocationHistoryStore['recordAnswered']>[1]): Promise<void> {
+    this.steps.push({ step: 'recordAnswered', tx });
+    const row = this.rows.get(call.invocationId);
+    if (!row) return Promise.reject(new Error('recordAnswered: the call was never inserted'));
+    row.result = call.answer.result;
+
+    return Promise.resolve();
+  }
+
+  /** The first `count` steps by name and in how many transactions they ran: a use case that admits a call runs them in one. */
+  firstSteps(count: number): { steps: string[]; transactions: number } {
+    const first = this.steps.slice(0, count);
+
+    return { steps: first.map((entry) => entry.step), transactions: new Set(first.map((entry) => entry.tx)).size };
   }
 
   findLive(key: InvocationKey & { sourceRevision: string }): Promise<LiveInvocation | null> {
@@ -122,16 +165,11 @@ export class FakeInvocationRepo implements Pick<AiInvocationRepo, keyof AiInvoca
     return Promise.resolve(true);
   }
 
-  finish(_tx: DbTx, id: string, outcome: InvocationOutcome, at: Date): Promise<boolean> {
+  finish(tx: DbTx, id: string, outcome: InvocationOutcome, at: Date): Promise<boolean> {
+    this.steps.push({ step: 'finish', tx });
     const row = this.rows.get(id);
     if (!row || row.status !== 'RUNNING') return Promise.resolve(false);
-    Object.assign(row, {
-      status: outcome.status,
-      errorCode: outcome.errorCode,
-      finishedAt: at,
-      result: outcome.content?.result ?? null,
-      outcome,
-    });
+    Object.assign(row, { status: outcome.status, errorCode: outcome.errorCode, finishedAt: at, outcome });
 
     return Promise.resolve(true);
   }
@@ -276,10 +314,14 @@ export function queueSummaryWorld() {
     ['AI_ACCESS_REQUEST_SUMMARY_ENABLED', 'ON'],
     ['AI_PROVIDER_MODE', 'MODEL'],
   ]);
-  const runner = { run: <T>(work: (tx: DbTx) => Promise<T>) => work(TX) } as unknown as TransactionRunner;
+  // One transaction object per run, so a spec can tell whether two writes shared one.
+  const runner = {
+    run: <T>(work: (tx: DbTx) => Promise<T>) => work({ fake: 'transaction' } as unknown as DbTx),
+  } as unknown as TransactionRunner;
   const audit = {
-    record: (_tx: DbTx, event: AuditEventInput) => {
+    record: (tx: DbTx, event: AuditEventInput) => {
       events.push(event);
+      repo.steps.push({ step: `audit:${event.action}`, tx });
 
       return Promise.resolve();
     },
@@ -292,8 +334,9 @@ export function queueSummaryWorld() {
   } as unknown as OrganizationReadApi;
   const facade = source as unknown as RequestsAiSourceApi;
   const fakeRepo = repo as unknown as AiInvocationRepo;
-  const runs = new QueueSummaryRunService(runner, fakeRepo, facade, audit, clients);
-  const service = new QueueSummaryService(runner, fakeRepo, facade, parameters, organizations, audit, clients, runs);
+  const history = repo as unknown as AiInvocationHistoryStore;
+  const runs = new QueueSummaryRunService(runner, fakeRepo, history, facade, audit, clients);
+  const service = new QueueSummaryService(runner, fakeRepo, history, facade, parameters, organizations, audit, runs);
 
   return { service, runs, repo, source, ai, simulated, events, switches };
 }

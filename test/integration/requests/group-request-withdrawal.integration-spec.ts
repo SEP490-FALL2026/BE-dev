@@ -1,7 +1,11 @@
 import { GroupHarness } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 const h = new GroupHarness();
+const M = 1_000_000;
+/** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 
 interface TaskWire {
   id: string;
@@ -10,6 +14,8 @@ interface TaskWire {
 interface Refused {
   error: { code: string; details?: { assignmentId?: string; employeeIds?: string[] } };
 }
+
+afterEach(() => jest.restoreAllMocks());
 
 describe('withdrawing one person of a request for a group, or what is left of it, over PostgreSQL (US-05-17 AC-10, US-05-08)', () => {
   let subscriptionId: string;
@@ -76,6 +82,8 @@ describe('withdrawing one person of a request for a group, or what is left of it
 
   describe('before the spend there is no money to give back (AC-10)', () => {
     it('ends the line of the person and prices the request again for those who remain, and the others are decided as they were', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const u = await unit();
       const [e1, e2, e3] = await h.colleagues(u, 3);
       const id = await h.groupWaiting(u, paid, [e1, e2, e3]);
@@ -88,7 +96,7 @@ describe('withdrawing one person of a request for a group, or what is left of it
       const request = h.dataOf<{ request: { state: string; pricing: { amount: { amount: string } } } }>(
         await h.fetch(id, u.head.account).expect(200),
       ).request;
-      expect(request.pricing.amount.amount).toBe('24000000');
+      expect(request.pricing.amount.amount).toBe(String(2 * M * monthsLeft));
       expect(await h.commitments(id)).toEqual([]);
       const all = [e1, e2, e3].map((p) => ({ employeeId: p.employeeId, decision: 'APPROVE' }));
       expect(h.codeOf(await h.decideSpendLines(id, { lines: all }, h.boss.account).expect(422))).toBe(
@@ -119,6 +127,8 @@ describe('withdrawing one person of a request for a group, or what is left of it
 
   describe('once the spend is approved the share of the person goes back and nobody else’s does (AC-10)', () => {
     it('gives back exactly the share of the person withdrawn: the example of three million of twelve', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(4);
       const [, , , e4] = people;
       const share = await shareOf(id, e4.employeeId);
@@ -138,8 +148,11 @@ describe('withdrawing one person of a request for a group, or what is left of it
     });
 
     it('cancels the task and the assignment of a person nobody has worked, as cancelled and never as failed', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(3);
-      await granted(id, people[2].employeeId);
+      // Nobody has worked it: the grant takes the work for whoever presses it, so this is a task put back in the queue after a failure.
+      await h.unclaimed((await granted(id, people[2].employeeId)).id);
 
       await h.withdrawLine(id, people[2].employeeId, {}, u.head.account).expect(200);
 
@@ -151,6 +164,8 @@ describe('withdrawing one person of a request for a group, or what is left of it
     });
 
     it('refuses while the task is being worked and when the seat is real, saying where the seat is', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(3);
       const running = await granted(id, people[0].employeeId);
       const finished = await granted(id, people[1].employeeId);
@@ -164,10 +179,13 @@ describe('withdrawing one person of a request for a group, or what is left of it
       expect(h.codeOf(real)).toBe('ACCESS_REQUEST.GRANT_COMPLETED');
       expect((real.body as Refused).error.details?.assignmentId).toEqual(expect.any(String));
       expect(await h.lineStates(id)).toEqual(['EXECUTING', 'COMPLETED', 'APPROVED']);
-      expect(await releases(id)).toEqual([]);
+      // The refusals give nothing back; the K2 seat that was granted gave back its days before the grant (M-10, LATE_GRANT).
+      expect((await releases(id)).filter((row) => row.reason !== 'LATE_GRANT')).toEqual([]);
     });
 
     it('lets the line wait for the IT Admin when the grant had failed, and ends it, giving back the share, when the task is cancelled', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(2);
       const task = await granted(id, people[0].employeeId);
       await failed(task.id);
@@ -189,6 +207,8 @@ describe('withdrawing one person of a request for a group, or what is left of it
     });
 
     it('is the right of the sender, not of the person withdrawn nor of a stranger', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const u = await unit();
       const [e1, e2, e3] = await h.colleagues(u, 3);
       const id = h.dataOf<{ request: { id: string } }>(
@@ -210,24 +230,29 @@ describe('withdrawing one person of a request for a group, or what is left of it
 
   describe('the whole request when a person has a seat already (AC-10)', () => {
     it('withdraws every person who has not ended, keeps the one who was granted, and gives back what the others held', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(3);
       const [e1, e2, e3] = people;
       const done = await granted(id, e1.employeeId);
       await completed(done.id);
-      await granted(id, e2.employeeId);
+      await h.unclaimed((await granted(id, e2.employeeId)).id);
       const others = [...(await shareOf(id, e2.employeeId)), ...(await shareOf(id, e3.employeeId))];
 
       await h.withdrawRequest(id, { reason: 'The rest are not needed' }, u.head.account).expect(200);
 
       expect(await h.lineStates(id)).toEqual(['COMPLETED', 'WITHDRAWN', 'WITHDRAWN']);
       expect(await h.state(id)).toBe('COMPLETED');
-      const given = await releases(id);
+      // M-10: the seat granted first gave back its days before the grant (LATE_GRANT); the withdrawal gives back the others' shares.
+      const given = (await releases(id)).filter((row) => row.reason !== 'LATE_GRANT');
       expect(given.every((row) => row.reason === 'REQUEST_WITHDRAWN')).toBe(true);
       expect(sum(given)).toBe(sum(others));
       expect((await taskStatuses(id)).map((task) => task.status).sort()).toEqual(['CANCELLED', 'COMPLETED']);
     });
 
     it('refuses the whole when a task is being worked, and changes nothing', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(3);
       const task = await granted(id, people[0].employeeId);
       await worked(task.id);

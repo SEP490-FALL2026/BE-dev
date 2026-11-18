@@ -32,6 +32,16 @@ export interface SeatOccupancyReader {
     day: BusinessDate,
     tx?: DbTx,
   ): Promise<ReadonlySet<string>>;
+  /**
+   * For each of these subscriptions, the seats it holds from `day` on (the most assignments held on any day from then, as the database counts a
+   * new seat) and how many of the assignments not ended are held by a right whose revocation is still open: one read for any number of
+   * them. A subscription nobody holds a seat of is absent.
+   */
+  seatsOfSubscriptions(
+    subscriptionIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<ReadonlyMap<string, { occupied: number; inRevocation: number }>>;
 }
 
 /**
@@ -43,5 +53,22 @@ export interface SeatOccupancyReader {
 export class SeatOccupancyHook extends Hook<SeatOccupancyReader> {
   constructor() {
     super('catalog.seat-occupancy');
+  }
+}
+
+/** Where the installation of the organization stands, as far as the rules of the catalog that only bind after it need to know. */
+export interface SeatBaselinePhase {
+  /** True once the seat baseline of the organization is closed: from then on a second subscription of a K2 or K4 plan is refused (`QĐ-104k`(3)). */
+  isClosed(tx: DbTx, organizationId: string): Promise<boolean>;
+}
+
+/**
+ * The phase of the seat baseline, bound by `licensing`. While it is open a duplicate subscription of a shared-pool plan is only warned
+ * about; once closed it is refused. Unbound, the catalog takes the baseline as closed, so nothing is let through by accident.
+ */
+@Injectable()
+export class SeatBaselinePhaseHook extends Hook<SeatBaselinePhase> {
+  constructor() {
+    super('catalog.seat-baseline-phase');
   }
 }

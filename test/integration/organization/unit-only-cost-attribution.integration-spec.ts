@@ -9,7 +9,8 @@ import {
   provisionDisposableDatabase,
 } from '../../support/disposable-database';
 import { pretendBusinessToday } from '../../support/pretend-today';
-import { AssignmentWire, SeatHarness } from '../../support/seat-baseline-harness';
+import { SeatHarness } from '../../support/seat-baseline-harness';
+import { legacyServiceAccount } from '../../support/legacy-service-account';
 
 const MIGRATIONS = join(process.cwd(), 'prisma', 'migrations');
 const UNIT_ONLY = '_cost_centers_unit_only';
@@ -194,6 +195,7 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
           .send({ code, name: `Department ${code}` })
           .then(created),
       );
+      await h.ctx.sql.query(`UPDATE departments SET effective_from = DATE '2020-01-01' WHERE id = $1`, [made.id]);
       await h.costCenterFor(made.id);
 
       return made;
@@ -214,52 +216,24 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
           })
           .then(created),
       ).id;
-    const bot = (code: string, identifier: string) => ({
-      employee_code: code,
-      account_identifier: identifier,
-      kind: 'service',
-      reason: 'CI pipeline',
-    });
-    const change = (id: string, body: object) =>
-      request(h.server()).post(`/api/v1/license-assignments/${id}/responsible-changes`).set(h.as(h.it1)).send(body);
     const deactivate = (id: string) =>
       request(h.server())
         .post(`/api/v1/departments/${id}/deactivate`)
         .set({ Authorization: `Bearer ${h.admin}` });
 
-    it('keeps a service account in the department that owns it: the person who takes over must be in that department', async () => {
-      today('2026-12-01');
-      const ops = await department('P-UO1');
-      const subscriptionId = await h.subscription(10, 'K2', ops.id);
-      const other = await department('P-UO2');
-      const owner = await enter(ops.code, 'UO-OWN');
-      const colleague = await enter(ops.code, 'UO-COL');
-      const stranger = await enter(other.code, 'UO-STR');
-      await h.written({ subscriptionId }, [bot('UO-OWN', 'uo-bot')]);
-      const original = (await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' }))[0];
-      expect(original).toMatchObject({ employeeId: owner, owningDepartmentId: ops.id });
-      today('2026-12-10');
-
-      const refused = await change(original.id, { employeeId: stranger, effectiveFrom: '2026-12-15' }).expect(422);
-      const accepted = await change(original.id, { employeeId: colleague, effectiveFrom: '2026-12-15' }).expect(200);
-
-      expect(h.codeOf(refused)).toBe('LICENSE_ASSIGNMENT.RESPONSIBLE_INVALID');
-      expect(h.detailsOf(refused)).toEqual({ problem: 'OUTSIDE_OWNING_DEPARTMENT' });
-      const { created: next } = h.dataOf<{ created: AssignmentWire }>(accepted);
-      expect(next).toMatchObject({
-        employeeId: colleague,
-        owningDepartmentId: ops.id,
-        costCenterId: original.costCenterId,
-      });
-    });
-
     it('refuses to retire a department while it owns an open service account, naming it, and retires it once the account has ended', async () => {
       today('2026-12-01');
       const ops = await department('P-UO3');
-      const subscriptionId = await h.subscription(10, 'K2', ops.id);
+      const subscriptionId = await h.subscription(10, 'K2');
       const owner = await enter(ops.code, 'UO-OWN3');
-      await h.written({ subscriptionId }, [bot('UO-OWN3', 'uo3-bot')]);
-      const service = (await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' }))[0];
+      // A service account of the earlier releases, written by SQL (nothing writes one any more).
+      const serviceId = await legacyServiceAccount(h.ctx.sql, {
+        subscriptionId,
+        employeeId: owner,
+        identifier: 'uo3-bot',
+        departmentId: ops.id,
+      });
+      const service = { id: serviceId };
       // The placement began on the day the person was entered; nobody is a member any more: only the service account keeps the department in use.
       await h.ctx.sql.query(`UPDATE employee_placements SET valid_to = valid_from + 1 WHERE employee_id = $1`, [owner]);
 
@@ -272,26 +246,8 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
         serviceAccounts: [{ assignmentId: service.id, accountIdentifier: 'uo3-bot' }],
       });
       await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = '2026-12-10' WHERE id = $1`, [service.id]);
-      // The subscription the department owns keeps it in use until its term is over (QĐ-90e).
-      await h.ctx.sql.query(`UPDATE subscriptions SET end_date = '2026-12-10' WHERE id = $1`, [subscriptionId]);
       today('2026-12-20');
       await deactivate(ops.id).expect(200);
-    });
-
-    it('takes no new service account into a department that was retired meanwhile', async () => {
-      today('2026-12-01');
-      const ops = await department('P-UO4');
-      const subscriptionId = await h.subscription(10, 'K2', ops.id);
-      const owner = await enter(ops.code, 'UO-OWN4');
-      await h.ctx.sql.query(`UPDATE employee_placements SET valid_to = valid_from + 1 WHERE employee_id = $1`, [owner]);
-      await h.ctx.sql.query(`UPDATE departments SET status = 'INACTIVE', deactivated_at = now() WHERE id = $1`, [
-        ops.id,
-      ]);
-
-      const preview = await h.preview({ subscriptionId }, [bot('UO-OWN4', 'uo4-bot')]);
-
-      expect(preview.summary).toMatchObject({ valid: 0 });
-      expect(await h.assignmentsOf({ subscriptionId })).toEqual([]);
     });
   });
 });

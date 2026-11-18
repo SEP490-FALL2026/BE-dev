@@ -2,17 +2,20 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
+import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { RequestPartyEligibilityApi } from '../../../identity-access/public/request-party-eligibility.api';
 import { EmployeeNotFoundError } from '../../../organization/public/organization.errors';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import {
   ProvisioningBeneficiaryDepartedError,
   ProvisioningBeneficiaryNotStartedError,
+  ProvisioningContractEndedError,
   ProvisioningResponsibleInvalidError,
   ProvisioningResponsibleNotInDepartmentError,
 } from '../../public/licensing.errors';
 import type { AssignmentHolder, ServiceAccountGrant } from '../../public/licensing.types';
 import { chooseAccount } from '../provisioning.policy';
+import { beneficiaryGrantRefusal } from './provisioning-grant.policy';
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 
 /** The holder of the assignment of a grant, and whether the IT Admin who grants answers for it themselves (null: the rule does not apply). */
@@ -32,11 +35,41 @@ export class ProvisioningHolderService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly frame: ProvisioningTaskFrame,
     private readonly requestParties: RequestPartyEligibilityApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /**
+   * No task to grant begins for a beneficiary who has left, nor from the day a departure blocks their access although they are not marked
+   * left yet (`QĐ-77f`, `QĐ-110d`); a task already being worked is not touched. The grant and the claim of a queued task both ask it, in the
+   * transaction of the act. Throws ProvisioningBeneficiaryDepartedError.
+   */
+  async requireCanBegin(tx: DbTx, requestId: string, employee: { id: string; status: string }): Promise<void> {
+    const reason = beneficiaryGrantRefusal({
+      status: employee.status,
+      accessBlocked: employee.status === 'ACTIVE' && (await this.identity.isAccessBlocked(employee.id, tx)),
+    });
+    if (reason) throw new ProvisioningBeneficiaryDepartedError(requestId, reason);
+  }
+
+  /**
+   * The same for the claim of a task that is queued: the beneficiary is held `FOR SHARE` first, as the grant holds them, so a departure that
+   * blocks them in another transaction either finishes before the block is read here or waits for this one. Throws
+   * ProvisioningBeneficiaryDepartedError.
+   */
+  async requireCanBeginTask(tx: DbTx, requestId: string, employeeId: string): Promise<void> {
+    try {
+      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
+    } catch (error) {
+      if (error instanceof EmployeeNotFoundError) return;
+      throw error;
+    }
+    const employee = await this.organizationReads.getEmployee(employeeId, tx);
+    if (employee) await this.requireCanBegin(tx, requestId, employee);
+  }
+
+  /**
    * Throws EmployeeNotFoundError, ProvisioningBeneficiaryDepartedError, ProvisioningBeneficiaryNotStartedError,
-   * ProvisioningPersonalAccountError and ProvisioningAnotherItAdminNeededError (an IT Admin does not queue the grant of their own
+   * ProvisioningContractEndedError, ProvisioningPersonalAccountError and ProvisioningAnotherItAdminNeededError (an IT Admin does not queue the grant of their own
    * request while another usable IT Admin can, `QĐ-77m`).
    */
   async personal(
@@ -46,9 +79,15 @@ export class ProvisioningHolderService {
   ): Promise<GrantHolder> {
     await this.organizationReads.lockEmployeeForShare(tx, input.employeeId);
     const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
-    if (!employee || employee.status !== 'ACTIVE') throw new ProvisioningBeneficiaryDepartedError(input.requestId);
+    if (!employee) throw new ProvisioningBeneficiaryDepartedError(input.requestId);
+    await this.requireCanBegin(tx, input.requestId, employee);
     if (employee.hireDate > input.today) {
       throw new ProvisioningBeneficiaryNotStartedError(input.requestId, employee.hireDate);
+    }
+    // A person with a term whose contract ended before today has no day left for a seat to run (`INV-07`, R-38): the day the contract ends is still one.
+    const contractEnd = employee.contractEndDate ?? null;
+    if (employee.employmentType !== 'STAFF' && contractEnd !== null && contractEnd < input.today) {
+      throw new ProvisioningContractEndedError(input.requestId, contractEnd);
     }
 
     const mode = await this.frame.selfExecutionMode(actor, input.employeeId, tx);

@@ -32,9 +32,6 @@ const REQUESTS_CONTROLLER_IMPORTED: Record<string, string> = {
     'handles the drafts of a person who leaves (`request-draft-departure.service`): both are the use case of draft itself',
   'group-request-submission':
     'sending a group draft runs the use case of this capability (`group-request.service`) from `draft/request-draft-submit.service.ts`',
-  'service-account-request':
-    'sending a service-account draft runs its use case (`service-account-request.service`, dto and http-errors) from ' +
-    '`draft/request-draft-submit.service.ts`',
   'line-closure':
     'closing the request of a person who left runs the closing of the group lines (`group-line-closure.service`, `.policy`) from ' +
     '`cancellation/departure-cancellation.service.ts`',
@@ -293,13 +290,7 @@ describe('an errors file does not import the policy of another capability (spec 
  * one area imports is that area's concept and belongs in its folder. The few that stay in `core` are listed with the reason; the
  * list only shrinks, and an entry that is no longer true fails like a new file.
  */
-const CORE_PRIMITIVES_OF_ONE_AREA: Readonly<Record<string, string>> = {
-  'core/money/convert.ts':
-    'The exact integer conversion of `Money` at a `ScaledRate` into the reporting currency: the last primitive of the money family, ' +
-    'whose other files (`money.ts`, `rate.ts`, `money.errors.ts`, `tax-estimate.ts`) catalog, finance and requests share. Only the ' +
-    'finance facade records a conversion (G3, ADR-0013), and the rounding rule and the range limits are read beside the types they ' +
-    'are made of.',
-};
+const CORE_PRIMITIVES_OF_ONE_AREA: Readonly<Record<string, string>> = {};
 
 /** The core files that fewer than two areas import and are not listed as primitives, each with who imports it. */
 function coreFilesOfFewerThanTwoAreas(

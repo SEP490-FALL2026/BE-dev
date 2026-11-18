@@ -38,8 +38,9 @@ Hoàn tất các vế AC của nhóm điều chuyển, nghỉ việc, quyền c�
 | US-03-01 | AC-1                       | partial  | AC-1 (vế điều chuyển và Cost Center suy ra), AC-2, AC-4→AC-8, AC-11, AC-13→AC-16, AC-18→AC-24: `g6-transfer-record`; AC-9: `g6-service-account-handover`; AC-12: `g3-downstream-finance-integration`                                                                                 |
 | US-03-03 | AC-1→AC-3                  | partial  | AC-4, AC-5, AC-7, AC-8: `g6-long-leave`; AC-6: `g6-offboarding-record`                                                                                                                                                                                                               |
 | US-03-04 | AC-3, AC-6, AC-16, AC-21   | partial  | vế danh sách quyền, thu hồi và hồ sơ của các AC này: `g6-offboarding-record`; AC-11, AC-13, AC-27, AC-28: `g6-leaver-role-and-workspace-duties`; AC-17: `g6-service-account-handover`; AC-24, AC-25: `g6-leaver-request-closure`; vế K4 của AC-16 chờ `g4-device-dependent-features` |
-| US-03-07 | AC-3                       | partial  | AC-1, AC-2, AC-3 (vế quyết định), AC-4→AC-9, AC-11→AC-15: `g6-transfer-tool-review`; AC-10: `g3-downstream-finance-integration`                                                                                                                                                      |
 | US-07-05 | AC-10, AC-12, AC-13, AC-15 | partial  | AC-1→AC-5, AC-8, AC-11, AC-12 (vế tác vụ và Assignment), AC-15 (vế quyền còn), AC-17→AC-19: `g6-revocation-by-grant-kind`; AC-13 (vế giữ gỡ), AC-16: `g6-handover-confirmation`; AC-9: `g6-transfer-tool-review`; AC-6, AC-7: `g4-device-dependent-features`                         |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-03-07` AC-3 (partial) — Story `RETIRED` ở Docs `5bb2e6a` (`US-03-07` `QĐ-103h`); code đã merge là lịch sử, khóa ở scope map là `not affected`.
 
 ## Supporting references
 

@@ -209,8 +209,8 @@ describe('the budget lifecycle structure over rows of the old path (integration,
         await sqlState(
           sql,
           `INSERT INTO budget_versions (id, organization_id, cost_center_id, year, number, kind, state, proposal_id, base_minor, reserve_minor,
-              total_minor, currency, high_value_percent, created_by_employee_id)
-           VALUES (gen_random_uuid(), $1, $2, 2027, 2, 'INITIAL', 'DRAFT', $3, 700, 0, 700, 'VND', 20, $4)`,
+              total_minor, currency, created_by_employee_id)
+           VALUES (gen_random_uuid(), $1, $2, 2027, 2, 'INITIAL', 'DRAFT', $3, 700, 0, 700, 'VND', $4)`,
           [world.organizationId, world.costCenters.ops, next, employee()],
         ),
       ).toBeNull();
@@ -297,8 +297,8 @@ describe('the budget lifecycle structure over rows of the old path (integration,
       sqlState(
         sql,
         `INSERT INTO budget_versions (id, organization_id, cost_center_id, year, number, kind, state, proposal_id, rejected_predecessor_id,
-            base_minor, reserve_minor, total_minor, currency, high_value_percent, created_by_employee_id)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5::"BudgetVersionKind", 'DRAFT', $6, $7, 500, 0, 500, 'VND', 20, $8)`,
+            base_minor, reserve_minor, total_minor, currency, created_by_employee_id)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5::"BudgetVersionKind", 'DRAFT', $6, $7, 500, 0, 500, 'VND', $8)`,
         [
           world.organizationId,
           overrides.costCenter ?? world.costCenters.eng,

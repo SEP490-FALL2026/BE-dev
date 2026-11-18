@@ -39,7 +39,6 @@ describe('first placement (integration)', () => {
     const requestBody = {
       planId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11',
       businessReason: 'A valid business reason',
-      termMonths: 1,
     };
     const denied = await h.api().post('/api/v1/access-requests').set(h.as(account)).send(requestBody).expect(422);
     expect(h.errorOf(denied)).toMatchObject({ code: 'REQUEST_PARTY.INELIGIBLE', details: { reason: 'UNPLACED' } });
@@ -47,7 +46,7 @@ describe('first placement (integration)', () => {
       .api()
       .post('/api/v1/access-requests/preview')
       .set(h.as(account))
-      .send({ planId: requestBody.planId, termMonths: 1 })
+      .send({ planId: requestBody.planId })
       .expect(422);
     expect(h.errorOf(previewDenied)).toMatchObject({
       code: 'REQUEST_PARTY.INELIGIBLE',

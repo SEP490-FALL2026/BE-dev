@@ -16,17 +16,23 @@ const SECTION_KEYS = {
     'needApprovals',
     'spendQueue',
     'spending',
-    'transferReviews',
   ],
   itAdmin: [
     'cancellationDeadlines',
+    'departures',
     'discrepancies',
+    'ghostSeats',
     'grantTasks',
     'licenseKeys',
+    'missingInvoicePeriods',
     'offboardingHandovers',
+    'outOfProcessRevocationsDue',
+    'plansBelowVendorAdminMinimum',
     'revocationTasks',
     'saasIssues',
+    'seatsReturned',
     'termsToReview',
+    'transfers',
     'unconfirmedDevices',
   ],
   superAdmin: [
@@ -36,9 +42,22 @@ const SECTION_KEYS = {
     'congestion',
     'departmentsWithoutHead',
     'departmentsWithoutItAdmin',
+    'departures',
     'personnelNotices',
+    'plansBelowVendorAdminMinimum',
+    'seatsReturned',
     'superAdminRole',
+    'transfers',
   ],
+};
+
+/** Every operation a section names, however deep the sections are grouped (the progress of the departures is a group of sections). */
+const operationsNamedBy = (node: unknown): string[] => {
+  if (typeof node !== 'object' || node === null) return [];
+  const { sourceOperationId } = node as { sourceOperationId?: unknown };
+  if (typeof sourceOperationId === 'string') return [sourceOperationId];
+
+  return Object.values(node).flatMap(operationsNamedBy);
 };
 
 const missing = (reason: string): SectionWire => ({
@@ -87,10 +106,10 @@ describe('role overviews (integration, real PostgreSQL)', () => {
     e1 = await h.employeeIn(des.department, 'D-E1');
     e2 = await h.employeeIn(eng.department, 'G-E2');
     e3 = await h.employeeIn(des.department, 'D-E3');
-    const figma = await h.subscription(10, 'K2', des.department.id);
-    const notion = await h.subscription(10, 'K1', des.department.id);
-    const engTool = await h.subscription(10, 'K2', eng.department.id);
-    const office = await h.subscription(10, 'K4', des.department.id);
+    const figma = await h.subscription(10, 'K2');
+    const notion = await h.subscription(10, 'K1');
+    const engTool = await h.subscription(10, 'K2');
+    const office = await h.subscription(10, 'K4');
     seats.e1Figma = await h.rightOf(e1, 'D-E1', { subscriptionId: figma });
     seats.e1Notion = await h.rightOf(e1, 'D-E1', { subscriptionId: notion }, h.inDays(5));
     seats.e2Tool = await h.rightOf(e2, 'G-E2', { subscriptionId: engTool });
@@ -110,7 +129,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
     await h.recordedCase(await h.employeeIn(des.department, 'D-LV', []));
     await h.recordedCase(await h.employeeIn(eng.department, 'G-LV', []));
 
-    // A transfer into P-DES (opens a review for H1) and one into P-ENG (for H2).
+    // A transfer into P-DES and one into P-ENG: the overview of a head counts nothing of them (no review of the new head, QĐ-110p).
     const toDes = await h.employeeIn(eng.department, 'G-MV', []);
     await h.rightOf(toDes, 'G-MV', { subscriptionId: engTool });
     await h.moveToday(toDes, des.department);
@@ -134,7 +153,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
     await request(h.server())
       .post('/api/v1/access-requests/drafts')
       .set(h.as(e1.account))
-      .send({ kind: 'INDIVIDUAL', planId: k5Plan, businessReason: 'Design the new brand', termMonths: 6 })
+      .send({ kind: 'INDIVIDUAL', planId: k5Plan, businessReason: 'Design the new brand' })
       .expect(201);
     await h.sent(des.head, await h.plan('K5'));
   }, 300000);
@@ -144,6 +163,23 @@ describe('role overviews (integration, real PostgreSQL)', () => {
   });
 
   describe('the Employee overview', () => {
+    it('BR-MF1-02/07: counts a request awaiting requester revision as open and removes it only when withdrawn', async () => {
+      const person = await h.employeeIn(des.department, 'D-REVISION');
+      const sent = await h.sent(person, await h.plan('K5'));
+      await h.ctx.sql.query(`UPDATE access_requests SET state = 'AWAITING_REQUESTER_REVISION' WHERE id = $1`, [
+        sent.id,
+      ]);
+
+      expect((await overviewOf(OVERVIEW_PATHS.employee, person.account)).sections.requests).toEqual(
+        countedAs(1, 'meAccessRequestList'),
+      );
+      expect(await h.totalOf('/api/v1/me/access-requests', person.account, { view: 'open' })).toBe(1);
+      await h.withdrawRequest(sent.id, { reason: 'No longer needed' }, person.account).expect(200);
+      expect((await overviewOf(OVERVIEW_PATHS.employee, person.account)).sections.requests).toEqual(
+        countedAs(0, 'meAccessRequestList'),
+      );
+    });
+
     // US-12-15 AC-2: the software held (K1 to K5), the right about to end, the reports and the open requests.
     it('counts the rights and reports of the caller as their own lists show them', async () => {
       const overview = await overviewOf(OVERVIEW_PATHS.employee, e1.account);
@@ -208,15 +244,8 @@ describe('role overviews (integration, real PostgreSQL)', () => {
           'departmentToolsInUse',
         ),
       );
-      expect(overview.sections.transferReviews).toEqual(
-        countedAs(
-          await h.totalOf('/api/v1/transfer-reviews', des.head.account, { status: 'OPEN' }),
-          'transferReviewList',
-        ),
-      );
-      expect(overview.sections.transferReviews.count).toBe(1);
       expect(overview.sections.spending).toEqual(missing('FINANCE_FIGURES_NOT_DELIVERED'));
-      expect(overview.sections.ghostSeats).toEqual(missing('USAGE_DATA_NOT_DELIVERED'));
+      expect(overview.sections.ghostSeats).toEqual(countedAs(0, 'ghostSeatQueueList'));
       expect(overview.sections.needApprovals).toEqual(
         countedAs(await h.totalOf('/api/v1/need-decisions', des.head.account), 'needDecisionList'),
       );
@@ -235,7 +264,6 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       const ofEng = await overviewOf(OVERVIEW_PATHS.manager, eng.head.account);
 
       expect(ofEng.department?.code).toBe('P-ENG');
-      expect(ofEng.sections.transferReviews.count).toBe(1);
       expect(ofEng.sections.departmentSoftware.count).toBe(
         await h.totalOf(`/api/v1/departments/${eng.department.id}/tools-in-use`, eng.head.account),
       );
@@ -248,7 +276,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
   });
 
   describe('the IT Admin overview', () => {
-    // US-12-15 AC-4: the work in the IT Admin's charge and the departments in their scope; devices and discrepancies have no source.
+    // US-12-15 AC-4: the work in the IT Admin's charge and the departments in their scope; devices have no source; the discrepancies are the open findings of the vendor usage import.
     it('counts the work of IT1 as the queues show it to IT1', async () => {
       const overview = await overviewOf(OVERVIEW_PATHS.itAdmin, it1);
       const sections = overview.sections;
@@ -269,8 +297,17 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       );
       expect(sections.offboardingHandovers.count).toBe(1);
       expect(sections.licenseKeys).toEqual(countedAs(2, 'licenseKeyList'));
-      expect(sections.unconfirmedDevices).toEqual(missing('DEVICE_REGISTRY_NOT_DELIVERED'));
-      expect(sections.discrepancies).toEqual(missing('USAGE_DATA_NOT_DELIVERED'));
+      expect(sections.unconfirmedDevices).toEqual(
+        countedAs(await h.totalOf('/api/v1/devices', it1, { state: 'AWAITING_ACKNOWLEDGEMENT' }), 'deviceList'),
+      );
+      // PI-2: the periods whose invoice is five working days late, counted as the list of them totals for this IT Admin.
+      expect(sections.missingInvoicePeriods).toEqual(
+        countedAs(
+          await h.totalOf('/api/v1/purchase-invoices/missing-periods', it1),
+          'purchaseInvoiceMissingPeriodList',
+        ),
+      );
+      expect(sections.discrepancies).toEqual(countedAs(0, 'usageNoAssignmentFindingList'));
       expect(sections.cancellationDeadlines).toMatchObject({
         state: 'AT_SOURCE',
         sourceOperationId: 'subscriptionList',
@@ -353,7 +390,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       await overviewOf(OVERVIEW_PATHS.manager, des.head.account),
       await overviewOf(OVERVIEW_PATHS.itAdmin, it1),
       await overviewOf(OVERVIEW_PATHS.superAdmin, h.sa),
-    ].flatMap((overview) => Object.values(overview.sections).flatMap((section) => section.sourceOperationId ?? []));
+    ].flatMap((overview) => operationsNamedBy(overview.sections));
 
     expect(named.length).toBeGreaterThan(20);
     expect(named.filter((id) => !documented.has(id))).toEqual([]);

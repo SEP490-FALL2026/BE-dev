@@ -11,7 +11,7 @@ import type { VersionRecord } from './version.repo';
 interface Notice {
   organizationId: string;
   code: InAppNotificationCode;
-  subject: { type: 'BUDGET_PROPOSAL' | 'BUDGET_VERSION'; id: string };
+  subject: { type: 'BUDGET_PROPOSAL' | 'BUDGET_VERSION' | 'BUDGET_CYCLE'; id: string };
   params: Record<string, InAppParamValue>;
   eventKey: string;
 }
@@ -113,6 +113,20 @@ export class BudgetNotifierService {
       subject: { type: 'BUDGET_PROPOSAL', id: proposal.id },
       params: { costCenterId: proposal.costCenterId, departmentId, year: proposal.year },
       eventKey: `BUDGET_PROPOSAL_TASK_ASSIGNED:${proposal.id}`,
+    });
+  }
+
+  /**
+   * A person became the head of a department whose first version Finance built from the baseline and which is still in progress
+   * (`QĐ-106k`): they are told it exists, once for each version.
+   */
+  async baselineVersionHeadAssigned(tx: DbTx, version: VersionRecord, headEmployeeId: string): Promise<void> {
+    await this.tell(tx, headEmployeeId, {
+      organizationId: version.organizationId,
+      code: 'BUDGET_BASELINE_VERSION_HEAD_ASSIGNED',
+      subject: { type: 'BUDGET_VERSION', id: version.id },
+      params: { versionId: version.id, costCenterId: version.costCenterId, year: version.year },
+      eventKey: `BUDGET_BASELINE_VERSION_HEAD_ASSIGNED:${version.id}`,
     });
   }
 
@@ -249,6 +263,49 @@ export class BudgetNotifierService {
   }
 
   /** Nobody is told for a role nobody holds; the same person and event key write once. */
+  /**
+   * The cycle of a year opened: the head of each department of the year hears the deadline and which form to fill in (`templateKind`: the
+   * file of the form `BM-10` is downloaded from the import templates), with the baseline of the department one call away (`US-06-15` AC-1, QT 4.1).
+   */
+  async cycleOpened(
+    tx: DbTx,
+    cycle: { id: string; organizationId: string; year: number; submissionDeadline: BusinessDate },
+    heads: readonly (string | null)[],
+  ): Promise<void> {
+    for (const head of new Set(heads)) {
+      await this.tell(tx, head, {
+        organizationId: cycle.organizationId,
+        code: 'BUDGET_CYCLE_OPENED',
+        subject: { type: 'BUDGET_CYCLE', id: cycle.id },
+        params: {
+          cycleId: cycle.id,
+          year: cycle.year,
+          submissionDeadline: cycle.submissionDeadline,
+          templateKind: 'budget-proposal',
+        },
+        eventKey: `BUDGET_CYCLE_OPENED:${cycle.id}:${head}`,
+      });
+    }
+  }
+
+  /** The submission deadline of an open cycle moved: each head hears the new day and the one before; the same day told twice is written once (`US-06-15` AC-21). */
+  async cycleDeadlineMoved(
+    tx: DbTx,
+    cycle: { id: string; organizationId: string; year: number },
+    moved: { submissionDeadline: BusinessDate; previousSubmissionDeadline: BusinessDate },
+    heads: readonly (string | null)[],
+  ): Promise<void> {
+    for (const head of new Set(heads)) {
+      await this.tell(tx, head, {
+        organizationId: cycle.organizationId,
+        code: 'BUDGET_CYCLE_DEADLINE_MOVED',
+        subject: { type: 'BUDGET_CYCLE', id: cycle.id },
+        params: { cycleId: cycle.id, year: cycle.year, ...moved },
+        eventKey: `BUDGET_CYCLE_DEADLINE_MOVED:${cycle.id}:${moved.submissionDeadline}:${head}`,
+      });
+    }
+  }
+
   private async tell(tx: DbTx, recipientEmployeeId: string | null, notice: Notice): Promise<void> {
     if (recipientEmployeeId === null) return;
     await this.notifications.notifyInApp(tx, {

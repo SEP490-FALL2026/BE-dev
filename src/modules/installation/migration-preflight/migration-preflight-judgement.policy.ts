@@ -88,23 +88,30 @@ export function judgeConversion(history: PreflightHistory, facts: ConversionFact
 /**
  * The contract gates, judged beside the conversion, as the FINAL release reads them: the
  * expansion and the data an operator records are prerequisites of its migrations, so each one that is not met blocks.
- * Subscription owner department: a database before the expansion migration that holds a subscription
- * blocks (deploy the compatibility release and assign first); after it, a subscription with no owner department and no
- * valid assignment blocks, whatever created it (the operator, a recovered old image, a late row), because the migration
- * of this release would refuse to run over it.
  */
 export function judgeContractGates(facts: ContractGateFacts): {
   blockers: PreflightBlocker[];
   information: PreflightInformation[];
 } {
-  const owner = judgeSubscriptionOwner(facts.subscriptionOwner);
   const direction = judgeCostCenterDirection(facts.costCenterDirection);
   const returns = judgeLegacyReturns(facts.legacyReturns);
 
   return {
-    blockers: [...owner.blockers, ...direction.blockers, ...judgeRetiredKinds(facts.retiredKinds), ...returns.blockers],
-    information: [...owner.information, ...direction.information, ...returns.information],
+    blockers: [...direction.blockers, ...judgeRetiredKinds(facts.retiredKinds), ...returns.blockers],
+    information: [...direction.information, ...returns.information, ...judgeServiceAccountsInForce(facts.retiredKinds)],
   };
+}
+
+/**
+ * A service account still in force is information, never a blocker (review of X-SA): the conversion migration keeps the rows it cannot
+ * convert yet, so on every database that holds one the deploy that converts it must be allowed to run, and a blocker would stop the
+ * very release that fixes it. It is listed on every run, by id, until the last one is converted or ended (the guide
+ * `service-account-conversion.md`), so the cleanup release that drops the kind finds none.
+ */
+function judgeServiceAccountsInForce(facts: ContractGateFacts['retiredKinds']): PreflightInformation[] {
+  return [...facts.serviceAccountIds]
+    .sort(compare)
+    .map((assignmentId): PreflightInformation => ({ code: 'SERVICE_ACCOUNT_STILL_IN_FORCE', assignmentId }));
 }
 
 /**
@@ -180,24 +187,6 @@ function judgeRetiredKinds(facts: ContractGateFacts['retiredKinds']): PreflightB
       .sort(compare)
       .map((moveId): PreflightBlocker => ({ code: 'SERVICE_ACCOUNT_MOVE_PENDING', moveId })),
   ];
-}
-
-function judgeSubscriptionOwner(facts: ContractGateFacts['subscriptionOwner']): {
-  blockers: PreflightBlocker[];
-  information: PreflightInformation[];
-} {
-  const { schema, subscriptionIds } = facts;
-  const ids = [...subscriptionIds].sort(compare);
-  const blockers: PreflightBlocker[] = [];
-  if (schema === 'ABSENT') {
-    for (const subscriptionId of ids) blockers.push({ code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED', subscriptionId });
-  } else if (schema === 'READY') {
-    for (const subscriptionId of ids) blockers.push({ code: 'SUBSCRIPTION_OWNER_UNASSIGNED', subscriptionId });
-  } else if (schema === 'PARTIAL') {
-    blockers.push({ code: 'SUBSCRIPTION_OWNER_SCHEMA_PARTIAL' });
-  }
-
-  return { blockers, information: [] };
 }
 
 /**
@@ -289,13 +278,9 @@ function rowOf(blocker: PreflightBlocker): string {
       return `${blocker.versionId} ${blocker.costCenter}`;
     case 'DEPARTMENT_CHARGED_TO_COMPANY':
       return blocker.department;
-    case 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED':
-    case 'SUBSCRIPTION_OWNER_UNASSIGNED':
-      return blocker.subscriptionId;
     case 'COST_CENTER_DIRECTION_EXPANSION_REQUIRED':
     case 'COST_CENTER_DIRECTION_NOT_ACTIVATED':
       return blocker.organizationId;
-    case 'SUBSCRIPTION_OWNER_SCHEMA_PARTIAL':
     case 'COST_CENTER_DIRECTION_SCHEMA_PARTIAL':
       return '';
     case 'COST_CENTER_UNLINKED':

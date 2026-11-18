@@ -6,19 +6,19 @@ describe('requests over HTTP: registering internal software (integration, real P
   let design: Department;
   let head: Person;
   let designer: Person;
-  let owner: Person; // a Business Owner who works
   let gone: Person; // one who has left
   let itAdmin: Person; // the IT Admin in charge of design
   let ownIt: Person; // an IT Admin of design who asks for software themselves
   let counter = 0;
   const year = Number(h.today().slice(0, 4));
+  /** The months left of the calendar year of today, the month of today counted whole (`BR-MF1-06a`). */
+  const monthsLeft = 12 - Number(h.today().slice(5, 7)) + 1;
 
   beforeAll(async () => {
     await h.start();
     design = await h.departmentWithUnit('P-DES');
     head = await h.staff(design, 'DES-H1');
     designer = await h.staff(design, 'DES-E1');
-    owner = await h.staff(design, 'DES-BO');
     gone = await h.staff(design, 'DES-GONE');
     ownIt = await h.staff(design, 'DES-IT3', 'IT_ADMIN');
     itAdmin = { employeeId: h.it1.employeeId, account: h.it1 };
@@ -54,10 +54,11 @@ describe('requests over HTTP: registering internal software (integration, real P
     return proposed;
   };
   const register = (id: string, body: object, account = itAdmin.account) => h.registerInternal(id, body, account);
-  const asOwner = (extra: Record<string, unknown> = {}) => ({ businessOwnerEmployeeId: owner.employeeId, ...extra });
+  /** RV-26 (P2-05): the IT Admin no longer names a Business Owner when registering; the legacy column takes the requester. */
+  const asOwner = (extra: Record<string, unknown> = {}) => ({ ...extra });
 
   describe('the way with no spend (US-05-20 AC-3, AC-5)', () => {
-    it('registers the software with its Business Owner and a plan granted by hand, and sends the request to the IT Admin', async () => {
+    it('registers the software, answered for by the IT Admin who registers it (QĐ-111g), with a plan granted by hand, and sends the request to the IT Admin', async () => {
       const proposed = await classified();
 
       const done = h.dataOf<{ request: AccessRequestWire }>(await register(proposed.id, asOwner()).expect(200)).request;
@@ -76,17 +77,22 @@ describe('requests over HTTP: registering internal software (integration, real P
         vendor_id: string | null;
         type: string;
         model: string | null;
+        group_key: string | null;
       }>(
-        `SELECT a.kind, a.business_owner_employee_id AS owner, a.vendor_id, p.provisioning_type AS type, p.pricing_model AS model
-           FROM plans p JOIN applications a ON a.id = p.application_id WHERE p.id = $1`,
+        `SELECT a.kind, a.responsible_it_admin_employee_id AS owner, a.vendor_id, p.provisioning_type AS type, p.pricing_model AS model,
+                g.system_key AS group_key
+           FROM plans p JOIN applications a ON a.id = p.application_id
+           LEFT JOIN functional_groups g ON g.id = a.functional_group_id WHERE p.id = $1`,
         [done.plan?.planId],
       );
       expect(registered.rows[0]).toEqual({
         kind: 'INTERNAL',
-        owner: owner.employeeId,
+        owner: itAdmin.employeeId,
         vendor_id: null,
         type: 'K5',
         model: null,
+        // QĐ-111d, CT-1.5: every road that makes an application puts it in a group; this one names none, so it stands in Khác.
+        group_key: 'OTHER',
       });
     });
 
@@ -129,8 +135,8 @@ describe('requests over HTTP: registering internal software (integration, real P
         status: 'COMPLETED',
         classification: 'INTERNAL',
         step: { state: 'APPROVED' },
-        proposedBusinessOwner: { employeeId: owner.employeeId },
       });
+      expect(wire).not.toHaveProperty('proposedBusinessOwner');
       await h.saveAssessment(proposed.id, { sso: true }, itAdmin.account).expect(409);
     });
 
@@ -141,27 +147,24 @@ describe('requests over HTTP: registering internal software (integration, real P
       const events = await h.auditEvents('ACCESS_REQUEST', proposed.id);
       const registered = events.find((event) => event.action === 'ACCESS_REQUEST.INTERNAL_SOFTWARE_REGISTERED');
 
-      expect(registered?.after).toMatchObject({ businessOwnerEmployeeId: owner.employeeId, withSpend: false });
+      // RV-26: the entry names the application and the plan, and no Business Owner any more.
+      expect(registered?.after).toMatchObject({ withSpend: false });
+      expect(Object.keys(registered?.after ?? {})).toEqual(expect.arrayContaining(['applicationId', 'planId']));
+      expect(registered?.after).not.toHaveProperty('businessOwnerEmployeeId');
     });
   });
 
-  describe('a Business Owner is required (AC-4, AC-9)', () => {
+  describe('RV-26: the Business Owner is no longer a field of the registration (AC-4, AC-9, QĐ-104)', () => {
     it.each([
-      [
-        'has left the company',
-        () => ({ businessOwnerEmployeeId: gone.employeeId }),
-        422,
-        'APPLICATION.BUSINESS_OWNER_INVALID',
-      ],
-      ['is not named', () => ({}), 422, 'VALIDATION_ERROR'],
+      ['has left the company', () => ({ businessOwnerEmployeeId: gone.employeeId }), 422, 'VALIDATION_ERROR'],
       [
         'does not exist',
         () => ({ businessOwnerEmployeeId: '00000000-0000-4000-8000-000000000000' }),
         422,
-        'APPLICATION.BUSINESS_OWNER_INVALID',
+        'VALIDATION_ERROR',
       ],
     ])(
-      'refuses a Business Owner who %s, registers nothing and keeps the request with the IT Admin',
+      'refuses the retired field naming a Business Owner who %s, registers nothing and keeps the request with the IT Admin',
       async (_name, body, status, code) => {
         const proposed = await classified();
         const before = await catalogRows();
@@ -277,13 +280,34 @@ describe('requests over HTTP: registering internal software (integration, real P
 
   describe('when the grant itself needs a payment (AC-10)', () => {
     const quote = (over: Record<string, unknown> = {}) => ({
-      unitPrice: { amount: '8', currency: 'USD' },
+      unitPrice: { amount: '200000', currency: 'VND' },
       billingCycle: 'MONTHLY',
       validFrom: `${year}-01-01`,
       validUntil: null,
-      commitmentMonths: 6,
-      paymentFrequency: 'MONTHLY',
       ...over,
+    });
+
+    it('FIX-E-R1: names quote.unitPrice, the field of the body, in the money errors of the assessment quote it saves', async () => {
+      const proposed = await classified();
+      const saved = (amount: string) =>
+        h.saveAssessment(proposed.id, { quote: quote({ unitPrice: { amount, currency: 'VND' } }) }, itAdmin.account);
+
+      expect(h.detailsOf(await saved('1.5').expect(422))).toEqual({ allowedDecimals: 0, path: 'quote.unitPrice' });
+      expect(h.detailsOf(await saved('-1').expect(422))).toEqual({ path: 'quote.unitPrice' });
+      expect(h.detailsOf(await saved('abc').expect(422))).toEqual({
+        issues: [{ code: 'invalid_format', path: 'quote.unitPrice.amount' }],
+      });
+    });
+
+    it('FIX-E-R1: names spend.quote.unitPrice, the field of the body, in the money errors of the quote', async () => {
+      const proposed = await classified();
+
+      const refused = await register(
+        proposed.id,
+        asOwner({ spend: { quote: quote({ unitPrice: { amount: '1.5', currency: 'VND' } }) } }),
+      ).expect(422);
+
+      expect(h.detailsOf(refused)).toEqual({ allowedDecimals: 0, path: 'spend.quote.unitPrice' });
     });
 
     it('registers the software without a spending approver, and keeps the spend step with the amount of the quote', async () => {
@@ -296,7 +320,11 @@ describe('requests over HTTP: registering internal software (integration, real P
       expect(done).toMatchObject({
         branch: 'NEW_SOFTWARE',
         state: 'AWAITING_SPEND_SUBMISSION',
-        pricing: { status: 'PRICED', amount: { amount: '48.00', currency: 'USD' }, bindingPeriodCount: 6 },
+        pricing: {
+          status: 'PRICED',
+          amount: { amount: `${200000 * monthsLeft}`, currency: 'VND' },
+          months: monthsLeft,
+        },
         policy: { hasSpendStep: true },
       });
       expect(done.plan?.planId).toBeTruthy();

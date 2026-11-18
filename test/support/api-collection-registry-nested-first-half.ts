@@ -1,4 +1,20 @@
 import { ROLE_GRANTS, type NestedArrayEntry } from './api-collection-registry';
+import { NESTED_ARRAYS_G9 } from './api-collection-registry-nested-g9';
+import { NESTED_ARRAYS_CO1 } from './api-collection-registry-nested-co1';
+import { NESTED_ARRAYS_PL1 } from './api-collection-registry-nested-pl1';
+import { NESTED_ARRAYS_IA1 } from './api-collection-registry-nested-ia1';
+import { NESTED_ARRAYS_K1CL } from './api-collection-registry-nested-k1cl';
+import { NESTED_ARRAYS_MF3B } from './api-collection-registry-nested-mf3b';
+import { NESTED_ARRAYS_RD } from './api-collection-registry-nested-rd';
+import { NESTED_ARRAYS_PI1 } from './api-collection-registry-nested-pi1';
+import { NESTED_ARRAYS_RC1 } from './api-collection-registry-nested-rc1';
+import { NESTED_ARRAYS_RC2 } from './api-collection-registry-nested-rc2';
+import { NESTED_ARRAYS_SM1 } from './api-collection-registry-nested-sm1';
+import { NESTED_ARRAYS_US1 } from './api-collection-registry-nested-us1';
+import { NESTED_ARRAYS_W2 } from './api-collection-registry-nested-w2';
+import { NESTED_ARRAYS_W3 } from './api-collection-registry-nested-w3';
+import { NESTED_ARRAYS_W6 } from './api-collection-registry-nested-w6';
+import { NESTED_ARRAYS_XIT } from './api-collection-registry-nested-xit';
 
 /**
  * Every array below `data` other than a collection's own array (Prompt 09B, LD-R2-RV-02), in the order of the recursive
@@ -71,9 +87,9 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     findings: [],
     owner: 'g2-operating-parameters',
     businessMaximum: {
-      maxItems: 5,
+      maxItems: 3,
       source:
-        'the longest int-list in parameter-definitions.ts (RENEWAL_ALERT_DAYS_BEFORE_DEADLINE, length 1–5), enforced by validateParameterValue',
+        'the longest int-list in parameter-definitions.ts (DETECTION_THRESHOLD_DAYS, length 3–3), enforced by validateParameterValue',
     },
     rationale: 'A value is a list only for an int-list definition.',
     removeWhen: 'Review when an int-list definition, its length or the value validation changes.',
@@ -84,8 +100,9 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     findings: [],
     owner: 'g2-operating-parameters',
     businessMaximum: {
-      maxItems: 5,
-      source: 'the int-list defaults in parameter-definitions.ts (3 and 2 values, within the same length limits)',
+      maxItems: 3,
+      source:
+        'the int-list default in parameter-definitions.ts (DETECTION_THRESHOLD_DAYS, 3 values, within the same length limit)',
     },
     rationale: 'A default is a list only for an int-list definition.',
     removeWhen: 'Review when an int-list definition or its default changes.',
@@ -109,9 +126,9 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     findings: [],
     owner: 'g2-operating-parameters',
     businessMaximum: {
-      maxItems: 5,
+      maxItems: 3,
       source:
-        'the longest int-list in parameter-definitions.ts (RENEWAL_ALERT_DAYS_BEFORE_DEADLINE, length 1–5), enforced by validateParameterValue',
+        'the longest int-list in parameter-definitions.ts (DETECTION_THRESHOLD_DAYS, length 3–3), enforced by validateParameterValue',
     },
     rationale: 'A past value is a list only for an int-list definition.',
     removeWhen: 'Review when an int-list definition, its length or the value validation changes.',
@@ -335,4 +352,21 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
     rationale: 'The first similar approved applications of the functional group.',
     removeWhen: 'Review when SIMILAR_APPLICATION_LIMIT changes.',
   },
+  // The arrays of the answers of the wave W2 (their own file: this one is at the line limit of the support files).
+  ...NESTED_ARRAYS_W2,
+  ...NESTED_ARRAYS_W3,
+  ...NESTED_ARRAYS_G9,
+  ...NESTED_ARRAYS_W6,
+  ...NESTED_ARRAYS_K1CL,
+  ...NESTED_ARRAYS_MF3B,
+  ...NESTED_ARRAYS_XIT,
+  ...NESTED_ARRAYS_RD,
+  ...NESTED_ARRAYS_IA1,
+  ...NESTED_ARRAYS_CO1,
+  ...NESTED_ARRAYS_PL1,
+  ...NESTED_ARRAYS_PI1,
+  ...NESTED_ARRAYS_RC1,
+  ...NESTED_ARRAYS_RC2,
+  ...NESTED_ARRAYS_SM1,
+  ...NESTED_ARRAYS_US1,
 ];

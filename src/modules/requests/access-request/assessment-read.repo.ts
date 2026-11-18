@@ -20,12 +20,13 @@ function toQuote(row: Row): Quote | null {
 
   return {
     unitPrice: { amountMinor: row.quoteUnitPriceMinor, currency: row.quoteCurrency },
+    originalPrice:
+      row.quoteOriginalUnitPriceMinor !== null && row.quoteOriginalCurrency !== null
+        ? { amountMinor: row.quoteOriginalUnitPriceMinor, currency: row.quoteOriginalCurrency }
+        : null,
     billingCycle: row.quoteBillingCycle,
     validFrom: fromDateColumn(row.quoteValidFrom),
     validUntil: row.quoteValidUntil ? fromDateColumn(row.quoteValidUntil) : null,
-    commitmentMonths: row.commitmentMonths,
-    paymentFrequency: row.paymentFrequency,
-    firstPaymentOn: row.firstPaymentOn ? fromDateColumn(row.firstPaymentOn) : null,
   };
 }
 
@@ -47,7 +48,6 @@ function toRecord(row: Row): AssessmentRecord {
     opinionStatus: row.opinionStatus,
     opinionNote: row.opinionNote,
     equivalentPlanId: row.equivalentPlanId,
-    proposedBusinessOwnerEmployeeId: row.proposedBusinessOwnerEmployeeId,
     controlLevel: row.controlLevel,
     controlRiskNote: row.controlRiskNote,
     rejectionKind: row.rejectionKind,
@@ -72,7 +72,14 @@ export class AssessmentReadRepo {
   async findProposal(requestId: string, tx?: DbTx): Promise<ProposalRecord | null> {
     const row = await (tx ?? this.prisma).accessRequestProposal.findUnique({
       where: { requestId },
-      select: { softwareName: true, homepageUrl: true, purpose: true, dataDescription: true, expectedUsers: true },
+      select: {
+        softwareName: true,
+        homepageUrl: true,
+        purpose: true,
+        dataDescription: true,
+        expectedUsers: true,
+        existingApplicationId: true,
+      },
     });
 
     return row;

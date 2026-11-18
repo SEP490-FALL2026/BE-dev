@@ -26,8 +26,8 @@ describe('the version after a refusal and the successor of a proposal (integrati
     await h.stop();
   });
 
-  const refuse = (id: string) =>
-    h.decideVersion(id, { decision: 'REJECT', reason: 'The reserve is too high' }, boss.account);
+  /** Refused before refusal left the decision (QĐ-111ad): the state and the record older data holds. */
+  const refuse = (id: string) => h.refusedBefore(id, boss.account);
   /** A department with a proposal and the first version made from it, sent and refused. */
   const refused = async () => {
     counter += 1;
@@ -35,7 +35,7 @@ describe('the version after a refusal and the successor of a proposal (integrati
     const proposal = await h.budgetProposed(u.head, u.department.unitId);
     const version = await h.built(proposal.id);
     await h.sendVersion(version.id).expect(200);
-    await refuse(version.id).expect(200);
+    await refuse(version.id);
 
     return { ...u, proposal, version };
   };
@@ -62,7 +62,7 @@ describe('the version after a refusal and the successor of a proposal (integrati
       const next = h.dataOf<{ version: VersionWire }>(await h.createVersion(body(r.proposal.id)).expect(201)).version;
       const giveBack = await h.giveBack(r.proposal.id, { reason: 'Add the quotes' }, h.finance).expect(409);
 
-      expect(next).toMatchObject({ number: 2, kind: 'INITIAL', state: 'DRAFT', rejectedPredecessorId: r.version.id });
+      expect(next).toMatchObject({ number: 2, state: 'DRAFT', rejectedPredecessorId: r.version.id });
       expect(h.codeOf(giveBack)).toBe('BUDGET.PROPOSAL_CANNOT_RETURN');
       expect((await proposalOf(r.proposal.id)).state).toBe('REVIEWED');
     });
@@ -85,7 +85,7 @@ describe('the version after a refusal and the successor of a proposal (integrati
       const r = await refused();
       const v2 = h.dataOf<{ version: VersionWire }>(await h.createVersion(body(r.proposal.id)).expect(201)).version;
       await h.sendVersion(v2.id).expect(200);
-      await refuse(v2.id).expect(200);
+      await refuse(v2.id);
 
       const third = h.dataOf<{ version: VersionWire }>(await h.createVersion(body(r.proposal.id)).expect(201)).version;
 

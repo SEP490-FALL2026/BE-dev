@@ -1,5 +1,5 @@
 import { checkPasswordPolicy } from '../../modules/identity-access/public/password.policy';
-import { INSTALLATION } from './fixture/shared-demo-v3/installation';
+import { INSTALLATION } from './fixture/shared-demo-v4/installation';
 import type { Readable } from 'node:stream';
 
 /**

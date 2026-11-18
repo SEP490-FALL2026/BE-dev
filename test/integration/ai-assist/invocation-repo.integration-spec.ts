@@ -3,6 +3,7 @@ import { PrismaService } from '../../../src/infrastructure/database/prisma.servi
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../src/infrastructure/database/unique-violation';
 import { AiInvocationContentRepo } from '../../../src/modules/ai-assist/invocation/invocation-content.repo';
+import type { QueueContext } from '../../../src/modules/ai-assist/ai-service/ai-service.types';
 import { AiInvocationRepo } from '../../../src/modules/ai-assist/invocation/invocation.repo';
 import type { InvocationOutcome, NewInvocation } from '../../../src/modules/ai-assist/invocation/invocation.types';
 import {
@@ -13,7 +14,7 @@ import {
 } from '../../support/disposable-database';
 import { testConfig } from '../../support/test-config';
 
-const CONTEXT: NewInvocation['context'] = {
+const CONTEXT: QueueContext = {
   generatedAt: '2026-11-04T09:00:00.000Z',
   requests: [
     {
@@ -61,6 +62,7 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
   let prisma: PrismaService;
   let runner: TransactionRunner;
   let repo: AiInvocationRepo;
+  let store: AiInvocationContentRepo;
   const organizationId = randomUUID();
 
   beforeAll(async () => {
@@ -70,6 +72,7 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
     prisma = new PrismaService(config);
     runner = new TransactionRunner(prisma, config);
     repo = new AiInvocationRepo(prisma);
+    store = new AiInvocationContentRepo(prisma);
   }, 240000);
 
   afterAll(async () => {
@@ -84,18 +87,40 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
     feature: 'ACCESS_REQUEST_QUEUE_SUMMARY',
     providerMode: 'MODEL',
     sourceRevision: 'a'.repeat(64),
-    context: CONTEXT,
     status: 'PENDING',
     errorCode: null,
     at: new Date(),
     ...overrides,
   });
 
+  /** The call to `recordAnswered` for a call of `input` that answered as `OUTCOME` says. */
+  const answered = (invocationId: string, input: NewInvocation) => ({
+    invocationId,
+    organizationId: input.organizationId,
+    context: CONTEXT,
+    answer: OUTCOME.content as NonNullable<InvocationOutcome['content']>,
+    at: new Date(),
+  });
+
+  /** What the service does when it admits a call: the call and its content row, in one transaction. */
+  const insertWithContent = (input: NewInvocation, context: QueueContext = CONTEXT): Promise<{ id: string }> =>
+    runner.run(async (tx) => {
+      const inserted = await repo.insert(tx, input);
+      await store.recordAdmitted(tx, {
+        invocationId: inserted.id,
+        organizationId: input.organizationId,
+        context,
+        at: input.at,
+      });
+
+      return inserted;
+    });
+
   it('keeps one call per queue revision, refused in the words the service recognises', async () => {
     const input = call();
-    const { id } = await runner.run((tx) => repo.insert(tx, input));
+    const { id } = await insertWithContent(input);
 
-    const second = await runner.run((tx) => repo.insert(tx, input)).catch((error: unknown) => error);
+    const second = await insertWithContent(input).catch((error: unknown) => error);
 
     expect(isUniqueViolation(second, 'ai_invocations_active_per_revision', 'source_revision')).toBe(true);
     await expect(repo.findLive(input)).resolves.toEqual({ id, status: 'PENDING' });
@@ -105,12 +130,13 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
 
   it('runs a call and records its end with the metadata and the content, once', async () => {
     const input = call();
-    const { id } = await runner.run((tx) => repo.insert(tx, input));
+    const { id } = await insertWithContent(input);
 
     await expect(repo.markRunning(id, new Date())).resolves.toBe(true);
     await expect(repo.markRunning(id, new Date())).resolves.toBe(false);
     await expect(runner.run((tx) => repo.finish(tx, id, OUTCOME, new Date()))).resolves.toBe(true);
     await expect(runner.run((tx) => repo.finish(tx, id, OUTCOME, new Date()))).resolves.toBe(false);
+    await runner.run((tx) => store.recordAnswered(tx, answered(id, input)));
 
     const row = await prisma.aiInvocation.findUniqueOrThrow({ where: { id }, include: { content: true } });
     expect(row).toMatchObject({
@@ -132,9 +158,47 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
     await expect(repo.findLive(input)).resolves.toEqual({ id, status: 'COMPLETED' });
   });
 
+  it('finish changes the status and the metadata only: it leaves the content row as it was admitted', async () => {
+    const input = call();
+    const { id } = await insertWithContent(input);
+    await repo.markRunning(id, new Date());
+
+    await expect(runner.run((tx) => repo.finish(tx, id, OUTCOME, new Date()))).resolves.toBe(true);
+
+    const content = await prisma.aiInvocationContent.findUniqueOrThrow({ where: { invocationId: id } });
+    expect(content).toMatchObject({
+      context: CONTEXT,
+      promptText: null,
+      rawResponse: null,
+      parsed: null,
+      result: null,
+    });
+  });
+
+  it('recordAnswered writes the prompt, the raw response, the parsed answer and the result, and keeps the context', async () => {
+    const input = call();
+    const { id } = await insertWithContent(input);
+
+    await runner.run((tx) => store.recordAnswered(tx, answered(id, input)));
+
+    const content = await prisma.aiInvocationContent.findUniqueOrThrow({ where: { invocationId: id } });
+    expect(content).toMatchObject({
+      context: CONTEXT,
+      promptText: 'the prompt',
+      rawResponse: '{"items":[]}',
+      parsed: OUTCOME.content?.parsed,
+      result: OUTCOME.content?.result,
+    });
+    await expect(runner.run((tx) => store.find(tx, id))).resolves.toMatchObject({
+      invocationId: id,
+      promptText: 'the prompt',
+      result: OUTCOME.content?.result,
+    });
+  });
+
   it('reads no call whose content was purged, and keeps the call itself', async () => {
     const input = call();
-    const { id } = await runner.run((tx) => repo.insert(tx, input));
+    const { id } = await insertWithContent(input);
     await expect(repo.findOwned(id, input.actorAppUserId)).resolves.toMatchObject({ id });
 
     await prisma.aiInvocationContent.delete({ where: { invocationId: id } });
@@ -143,9 +207,9 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
     await expect(prisma.aiInvocation.findUnique({ where: { id } })).resolves.toMatchObject({ id });
   });
 
-  it('takes a call stuck for too long for FAILED, and a run that ends after that writes nothing', async () => {
+  it('takes a call stuck for too long for FAILED, and a finish after that is refused', async () => {
     const input = call({ at: new Date(Date.now() - 300_000) });
-    const { id } = await runner.run((tx) => repo.insert(tx, input));
+    const { id } = await insertWithContent(input);
     await repo.markRunning(id, new Date(Date.now() - 200_000));
     const cutoff = new Date(Date.now() - 150_000);
 
@@ -156,26 +220,24 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
 
     const row = await prisma.aiInvocation.findUniqueOrThrow({ where: { id }, include: { content: true } });
     expect(row).toMatchObject({ status: 'FAILED', errorCode: 'AI.PROVIDER_TIMEOUT', promptTokens: null });
-    expect(row.content?.promptText).toBeNull();
+    // That a late run then writes no content is pinned over HTTP on PostgreSQL: queue-summary-failures, 'its late COMPLETED end changes nothing'.
     // A failed call no longer holds the revision: the next one may be recorded.
     await expect(repo.findLive(input)).resolves.toBeNull();
-    await expect(runner.run((tx) => repo.insert(tx, call({ actorAppUserId: input.actorAppUserId })))).resolves.toEqual({
+    await expect(insertWithContent(call({ actorAppUserId: input.actorAppUserId }))).resolves.toEqual({
       id: expect.any(String) as unknown,
     });
   });
 
   it('leaves a recent run alone, and records a call that failed at once with its end', async () => {
     const input = call();
-    const { id } = await runner.run((tx) => repo.insert(tx, input));
+    const { id } = await insertWithContent(input);
     await repo.markRunning(id, new Date());
 
     await expect(runner.run((tx) => repo.stuckOf(tx, input, new Date(Date.now() - 150_000)))).resolves.toEqual([]);
-    const failed = await runner.run((tx) =>
-      repo.insert(
-        tx,
-        call({ status: 'FAILED', errorCode: 'AI.SOURCE_UNREADABLE', context: { ...CONTEXT, requests: [] } }),
-      ),
-    );
+    const failed = await insertWithContent(call({ status: 'FAILED', errorCode: 'AI.SOURCE_UNREADABLE' }), {
+      ...CONTEXT,
+      requests: [],
+    });
     await expect(prisma.aiInvocation.findUniqueOrThrow({ where: { id: failed.id } })).resolves.toMatchObject({
       status: 'FAILED',
       errorCode: 'AI.SOURCE_UNREADABLE',
@@ -186,15 +248,15 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
   it('keeps one call per queue revision and mode: the other mode is a call of its own, read back with its mode', async () => {
     const model = call();
     const simulated: NewInvocation = { ...model, providerMode: 'SIMULATED' };
-    const first = await runner.run((tx) => repo.insert(tx, model));
-    const second = await runner.run((tx) => repo.insert(tx, simulated));
+    const first = await insertWithContent(model);
+    const second = await insertWithContent(simulated);
 
     await expect(repo.findLive(model)).resolves.toEqual({ id: first.id, status: 'PENDING' });
     await expect(repo.findLive(simulated)).resolves.toEqual({ id: second.id, status: 'PENDING' });
-    const again = await runner.run((tx) => repo.insert(tx, simulated)).catch((error: unknown) => error);
+    const again = await insertWithContent(simulated).catch((error: unknown) => error);
     expect(isUniqueViolation(again, 'ai_invocations_active_per_revision', 'source_revision')).toBe(true);
     await expect(repo.findOwned(second.id, model.actorAppUserId)).resolves.toMatchObject({ providerMode: 'SIMULATED' });
-    await expect(runner.run((tx) => new AiInvocationContentRepo(prisma).find(tx, second.id))).resolves.toMatchObject({
+    await expect(runner.run((tx) => store.find(tx, second.id))).resolves.toMatchObject({
       invocationId: second.id,
       organizationId,
       providerMode: 'SIMULATED',
@@ -204,10 +266,7 @@ describe('AiInvocationRepo (integration, real PostgreSQL)', () => {
   it('gives the stuck calls of the person in every mode, each with its mode', async () => {
     const model = call({ at: new Date(Date.now() - 300_000) });
     const simulated: NewInvocation = { ...model, providerMode: 'SIMULATED', sourceRevision: 'b'.repeat(64) };
-    const ids = [
-      (await runner.run((tx) => repo.insert(tx, model))).id,
-      (await runner.run((tx) => repo.insert(tx, simulated))).id,
-    ];
+    const ids = [(await insertWithContent(model)).id, (await insertWithContent(simulated)).id];
 
     const stuck = await runner.run((tx) => repo.stuckOf(tx, model, new Date(Date.now() - 150_000)));
 

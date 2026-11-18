@@ -33,6 +33,15 @@ describe('installationInputSchema', () => {
     expect(issues({ ...valid(), reportingCurrency: 'vnd' })).toEqual([expect.stringContaining('reportingCurrency')]);
   });
 
+  it.each(['USD', 'MYR', 'EUR'])(
+    'QĐ-111an, R-4: refuses %s, the reporting currency is dong and nothing else is installed',
+    (currency) => {
+      expect(issues({ ...valid(), reportingCurrency: currency })).toEqual([
+        'reportingCurrency: must be VND: every amount is in dong and nothing is converted',
+      ]);
+    },
+  );
+
   it.each(['Chưa phân loại', 'unclassified', 'TBD', 'N/A', 'placeholder'])(
     'rejects the stand-in %p for the department name',
     (value) => {

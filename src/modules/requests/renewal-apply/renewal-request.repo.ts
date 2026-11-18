@@ -2,12 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { PendingRenewal } from '../../licensing/public/licensing-renewal.types';
 
 export interface NewRenewalDetail {
   requestId: string;
   assignmentId: string;
   previousExpectedEndDate: BusinessDate;
-  newExpectedEndDate: BusinessDate;
+  newExpectedEndDate: BusinessDate | null;
   consecutiveMonths: number;
 }
 
@@ -29,7 +30,7 @@ export class RenewalRequestRepo {
         requestId: input.requestId,
         assignmentId: input.assignmentId,
         previousExpectedEndDate: toDateColumn(input.previousExpectedEndDate),
-        newExpectedEndDate: toDateColumn(input.newExpectedEndDate),
+        newExpectedEndDate: input.newExpectedEndDate === null ? null : toDateColumn(input.newExpectedEndDate),
         consecutiveMonths: input.consecutiveMonths,
       },
     });
@@ -49,11 +50,11 @@ export class RenewalRequestRepo {
     return open > 0;
   }
 
-  /** The request that has not ended of each of these seats, in one read (a seat has at most one: a second is refused under the lock of the seat). */
-  async pendingOf(
-    assignmentIds: readonly string[],
-    tx?: DbTx,
-  ): Promise<Map<string, { requestId: string; state: string }>> {
+  /**
+   * The request that has not ended of each of these seats, in one read (a seat has at most one: a second is refused under the lock of the
+   * seat), and whether it was approved: the IT Admin has then still to extend the right (`AWAITING_EXECUTION`).
+   */
+  async pendingOf(assignmentIds: readonly string[], tx?: DbTx): Promise<Map<string, PendingRenewal>> {
     if (assignmentIds.length === 0) return new Map();
     const rows = await (tx ?? this.prisma).accessRequestRenewal.findMany({
       where: { assignmentId: { in: [...assignmentIds] }, request: { state: { notIn: [...ENDED_STATES] } } },
@@ -61,6 +62,11 @@ export class RenewalRequestRepo {
       orderBy: { requestId: 'asc' },
     });
 
-    return new Map(rows.map((row) => [row.assignmentId, { requestId: row.requestId, state: row.request.state }]));
+    return new Map(
+      rows.map((row) => [
+        row.assignmentId,
+        { requestId: row.requestId, state: row.request.state, approved: row.request.state === 'AWAITING_EXECUTION' },
+      ]),
+    );
   }
 }

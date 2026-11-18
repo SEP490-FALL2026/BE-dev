@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { CatalogOnboardingFacts, PlanSummary } from '../public/catalog.types';
 import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
 import { PlanFactsService } from '../plan/plan-facts.service';
@@ -17,8 +18,8 @@ export class OnboardingFactsService {
   ) {}
 
   /** The plans with these ids by name, with their application. */
-  planSummaries(ids: readonly string[]): Promise<PlanSummary[]> {
-    return this.plans.summaries(ids);
+  planSummaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
+    return this.plans.summaries(ids, tx);
   }
 
   async read(): Promise<CatalogOnboardingFacts> {

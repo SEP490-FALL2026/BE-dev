@@ -1,6 +1,7 @@
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { EmployeeEmailTakenError, EmployeeOpenSeatNeedsEndError } from '../../organization/public/organization.errors';
 import { LeaveRefusedError } from '../leave/leave.errors';
+import { SUCCESSOR_REQUIRED_CODE } from '../personnel-access.http-errors';
 import { NoticeRefusedError } from '../notice/notice.errors';
 import { OffboardingRefusedError } from '../offboarding/offboarding.errors';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
@@ -20,14 +21,19 @@ function reasonOf(details: unknown): string | undefined {
   return typeof reason === 'string' && /^[A-Z][A-Z_]*$/.test(reason) ? reason : undefined;
 }
 
+/** The word of a refusal of a transfer or a departure: a head who leaves without an employee to follow has one word for both (`QĐ-110h`). */
+function wordOf(prefix: string, error: { code: string }): string {
+  return error.code === 'SUCCESSOR_REQUIRED' ? SUCCESSOR_REQUIRED_CODE : `${prefix}.${error.code}`;
+}
+
 export function refusalOf(error: unknown): SuperAdminEventRefusedError | null {
   if (error instanceof SuperAdminEventRefusedError) return error;
   if (error instanceof PersonnelAccessRefusedError) return new SuperAdminEventRefusedError('SUBJECT_NOT_SUPER_ADMIN');
   if (error instanceof TransferRefusedError)
-    return new SuperAdminEventRefusedError(`DEPARTMENT_TRANSFER.${error.code}`, reasonOf(error.details));
+    return new SuperAdminEventRefusedError(wordOf('DEPARTMENT_TRANSFER', error), reasonOf(error.details));
   if (error instanceof LeaveRefusedError) return new SuperAdminEventRefusedError(`LONG_LEAVE.${error.code}`);
   if (error instanceof OffboardingRefusedError)
-    return new SuperAdminEventRefusedError(`OFFBOARDING_CASE.${error.code}`, reasonOf(error.details));
+    return new SuperAdminEventRefusedError(wordOf('OFFBOARDING_CASE', error), reasonOf(error.details));
   if (error instanceof NoticeRefusedError) return new SuperAdminEventRefusedError(`PERSONNEL_NOTICE.${error.code}`);
   // A race the database refused after the check of the correction of the record: the same words as the check.
   if (error instanceof EmployeeEmailTakenError) return new SuperAdminEventRefusedError('PROFILE.WORK_EMAIL_TAKEN');

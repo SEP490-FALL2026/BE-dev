@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import request from 'supertest';
 import { Client } from 'pg';
+import { ANNUAL_WINDOW_DAYS_MAX } from '../../../src/modules/catalog/subscription/subscription-windows.service';
 import { OperatingParametersApi } from '../../../src/modules/operating-parameters/public/operating-parameters.api';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
@@ -104,17 +107,25 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
 
       expect(parameters.get('APPROVAL_SLA_WORKING_DAYS')).toMatchObject({ value: 2, isDefault: true, changedAt: null });
       expect(parameters.get('ACTIVITY_WINDOW_MINUTES')?.value).toBe(5);
-      expect(parameters.get('FISCAL_YEAR_START_MONTH')?.value).toBe(1);
+      expect(parameters.has('FISCAL_YEAR_START_MONTH')).toBe(false);
       expect(parameters.get('SPEND_SUBMISSION_WAIT_WORKING_DAYS')?.value).toBe(2);
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
       expect([...parameters.keys()].filter((key) => /HIGH_VALUE/.test(key))).toEqual([]);
-      expect(parameters.get('TRANSFER_REVIEW_WORKING_DAYS')?.value).toBe(5);
+      // The review of the new head after a transfer is gone with its parameter (QĐ-110p); the grace takes its place.
+      expect(parameters.has('TRANSFER_REVIEW_WORKING_DAYS')).toBe(false);
       expect(parameters.get('PERSONNEL_NOTICE_REVIEW_WORKING_DAYS')?.value).toBe(2);
       expect(parameters.get('SAAS_ISSUE_RESPONSE_WORKING_DAYS')?.value).toBe(1);
       expect(parameters.get('SAAS_ISSUE_REOPEN_WORKING_DAYS')?.value).toBe(5);
-      expect(parameters.get('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS')?.value).toBe(1);
+      expect(parameters.get('DEPARTURE_REVOCATION_WORKING_DAYS')?.value).toBe(1);
+      // The two parameters of the handover are gone with the handover (QĐ-110g).
+      expect(parameters.has('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS')).toBe(false);
+      expect(parameters.has('HANDOVER_SHORT_DEADLINE_WORKING_DAYS')).toBe(false);
       expect(parameters.get('DETECTION_THRESHOLD_DAYS')?.value).toEqual([30, 60, 90]);
-      expect(parameters.get('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE')?.value).toEqual([15, 7]);
+      // The alerts of a subscription follow its point of adjustment now (S20-T9a): the list of days is gone, three parameters set the point (S20-T9b).
+      expect(parameters.has('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE')).toBe(false);
+      expect(parameters.get('SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY')).toMatchObject({ value: 7, isDefault: true });
+      expect(parameters.get('SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL')).toMatchObject({ value: 30, isDefault: true });
+      expect(parameters.get('SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL')).toMatchObject({ value: 7, isDefault: true });
       expect(parameters.get('RULE_SCHEDULE_G1_G2')?.value).toBe('DAILY');
       expect(parameters.get('RULE_SCHEDULE_G3_G4')?.value).toBe('WEEKLY');
       for (const parameter of parameters.values()) {
@@ -131,22 +142,28 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'APPROVAL_SLA_WORKING_DAYS',
         'BACKLOG_ALERT_THRESHOLD',
         'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
-        'FISCAL_YEAR_START_MONTH',
+        'REQUEST_OPEN_NEW_LIMIT',
+        'RENEWAL_WINDOW_DAYS',
         'FORECAST_ERROR_THRESHOLD_PERCENT',
         'BUDGET_RESERVE_DEFAULT_PERCENT',
-        'TRANSFER_REVIEW_WORKING_DAYS',
         'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
-        'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
-        'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
+        'DEPARTURE_REVOCATION_WORKING_DAYS',
+        'TRANSFER_GRACE_WORKING_DAYS',
+        'TRANSFER_GRACE_REMINDER_WORKING_DAYS',
         'PROVISIONING_RETRY_COUNT',
         'SAAS_ISSUE_RESPONSE_WORKING_DAYS',
         'SAAS_ISSUE_REOPEN_WORKING_DAYS',
         'INVITATION_REMINDER_DAYS',
         'INVITATION_WITHDRAW_DAYS',
         'DOCUMENT_MAX_SIZE_MB',
-        'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
+        'SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY',
+        'SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL',
+        'SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL',
         'ACTIVITY_WINDOW_MINUTES',
         'DETECTION_THRESHOLD_DAYS',
+        'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
+        'GHOST_SEAT_DECISION_WORKING_DAYS',
+        'GHOST_SEAT_REVOCATION_GRACE_DAYS',
         'RULE_SCHEDULE_G1_G2',
         'RULE_SCHEDULE_G3_G4',
         'AI_ENABLED',
@@ -172,8 +189,8 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         unit: 'working days',
         unitLabel: 'ngày làm việc',
       });
-      expect(byKey.get('TRANSFER_REVIEW_WORKING_DAYS')).toMatchObject({
-        label: 'Hạn rà soát quyền sau điều chuyển',
+      expect(byKey.get('TRANSFER_GRACE_WORKING_DAYS')).toMatchObject({
+        label: 'Thời gian ân hạn quyền cũ sau điều chuyển',
         group: 'PERSONNEL',
         groupLabel: 'Nhân sự và bàn giao',
       });
@@ -226,24 +243,24 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       await setParameter('APPROVAL_SLA_WORKING_DAYS', 2).expect(200);
     });
 
-    it('changes the hand-over review deadline from 5 to 3 working days, and records 5 → 3 (AC-12)', async () => {
-      const response = await setParameter('TRANSFER_REVIEW_WORKING_DAYS', 3).expect(200);
+    it('changes the deadline to answer a SaaS issue again from 5 to 3 working days, and records 5 → 3 (AC-12)', async () => {
+      const response = await setParameter('SAAS_ISSUE_REOPEN_WORKING_DAYS', 3).expect(200);
 
       expect((response.body as { message: string }).message).toBe('PARAMETER.SET');
       expect((response.body as { data: ParameterWire }).data).toMatchObject({ value: 3, default: 5, isDefault: false });
-      expect(await auditFor('TRANSFER_REVIEW_WORKING_DAYS')).toEqual([
+      expect(await auditFor('SAAS_ISSUE_REOPEN_WORKING_DAYS')).toEqual([
         { action: 'PARAMETER.CHANGED', before: { value: 5 }, after: { value: 3 } },
       ]);
       // What is created after the change reads the new value; the service other modules call is the same one.
-      await expect(ctx.app.get(OperatingParametersApi).getValue('TRANSFER_REVIEW_WORKING_DAYS')).resolves.toBe(3);
+      await expect(ctx.app.get(OperatingParametersApi).getValue('SAAS_ISSUE_REOPEN_WORKING_DAYS')).resolves.toBe(3);
     });
 
     it('keeps the history, newest first, and closes the value it replaces', async () => {
-      await setParameter('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS', 2).expect(200);
-      await setParameter('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS', 4).expect(200);
+      await setParameter('TRANSFER_GRACE_WORKING_DAYS', 2).expect(200);
+      await setParameter('TRANSFER_GRACE_WORKING_DAYS', 4).expect(200);
 
       const history = await request(server())
-        .get('/api/v1/operating-parameters/ABRUPT_DEPARTURE_HOLD_WORKING_DAYS/history')
+        .get('/api/v1/operating-parameters/TRANSFER_GRACE_WORKING_DAYS/history')
         .set(asAdmin())
         .expect(200);
 
@@ -256,7 +273,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         [4, true],
         [2, false],
       ]);
-      expect((await rows('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS')).filter((row) => row.valid_to === null)).toHaveLength(1);
+      expect((await rows('TRANSFER_GRACE_WORKING_DAYS')).filter((row) => row.valid_to === null)).toHaveLength(1);
     });
 
     it('answers the same value with the parameter and records nothing', async () => {
@@ -284,8 +301,6 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
     it.each([
       ['a number sent as text', 'APPROVAL_SLA_WORKING_DAYS', '3', 'WRONG_TYPE'],
       ['zero days', 'APPROVAL_SLA_WORKING_DAYS', 0, 'OUT_OF_RANGE'],
-      ['a month that does not exist', 'FISCAL_YEAR_START_MONTH', 13, 'OUT_OF_RANGE'],
-      ['month zero', 'FISCAL_YEAR_START_MONTH', 0, 'OUT_OF_RANGE'],
       ['no days to wait', 'SPEND_SUBMISSION_WAIT_WORKING_DAYS', 0, 'OUT_OF_RANGE'],
       ['thresholds that do not rise', 'DETECTION_THRESHOLD_DAYS', [90, 60, 30], 'OUT_OF_RANGE'],
     ])('refuses %s and leaves the value as it was', async (_name, key, value, problem) => {
@@ -297,9 +312,8 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect((await list()).get(key)).toEqual(before);
     });
 
-    it('sets the retry count, the reminder and the withdrawal, and the short deadline, and refuses a withdrawal before the reminder (AC-13)', async () => {
+    it('sets the retry count, the reminder and the withdrawal, and refuses a withdrawal before the reminder (AC-13)', async () => {
       await setParameter('PROVISIONING_RETRY_COUNT', 5).expect(200);
-      await setParameter('HANDOVER_SHORT_DEADLINE_WORKING_DAYS', 2).expect(200);
       await setParameter('INVITATION_REMINDER_DAYS', 4).expect(200);
       await setParameter('INVITATION_WITHDRAW_DAYS', 20).expect(200);
 
@@ -310,12 +324,46 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect(errorOf(refusedReminder).details).toMatchObject({ problem: 'INCONSISTENT' });
       const parameters = await list();
       expect(parameters.get('PROVISIONING_RETRY_COUNT')?.value).toBe(5);
-      expect(parameters.get('HANDOVER_SHORT_DEADLINE_WORKING_DAYS')?.value).toBe(2);
       expect(parameters.get('INVITATION_REMINDER_DAYS')?.value).toBe(4);
       expect(parameters.get('INVITATION_WITHDRAW_DAYS')?.value).toBe(20);
       expect((await auditFor('PROVISIONING_RETRY_COUNT'))[0]).toMatchObject({
         before: { value: 3 },
         after: { value: 5 },
+      });
+    });
+
+    it('keeps the days of the point of adjustment within 1–28, 1–180 and 1–90, and a change reaches only the periods that begin after it (S20-T9b, FR-1.4, FR-8.2, QĐ-106h)', async () => {
+      const service = ctx.app.get(OperatingParametersApi);
+      const cases = [
+        ['SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY', 7, 28, 14],
+        ['SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL', 30, 180, 45],
+        ['SUBSCRIPTION_RED_ALERT_DAYS_ANNUAL', 7, 90, 10],
+      ] as const;
+      const beforeAny = new Date(Date.now() - 60_000);
+
+      for (const [key, standard, max, chosen] of cases) {
+        for (const refused of [0, max + 1]) {
+          expect(errorOf(await setParameter(key, refused).expect(422)).details).toMatchObject({
+            key,
+            problem: 'OUT_OF_RANGE',
+          });
+        }
+        expect(errorOf(await setParameter(key, 7.5).expect(422)).details).toMatchObject({ problem: 'WRONG_TYPE' });
+        await setParameter(key, max).expect(200);
+        const atMax = new Date();
+        await setParameter(key, chosen).expect(200);
+        const [first, second, third] = await service.getValuesAt(key, [
+          beforeAny,
+          atMax,
+          new Date(Date.now() + 60_000),
+        ]);
+
+        // A period that began before the change keeps the value it began with; one that begins after reads the new one.
+        expect([first, second, third]).toEqual([standard, max, chosen]);
+        expect((await list()).get(key)).toMatchObject({ value: chosen, isDefault: false });
+      }
+      expect((await list()).get('SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL')?.constraints).toMatchObject({
+        max: ANNUAL_WINDOW_DAYS_MAX,
       });
     });
 
@@ -372,6 +420,74 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect((await list()).get(key)).toMatchObject({ value: 'OFF' });
     });
 
+    it('does not return the month the fiscal year began in, and the migration closes a stored value without deleting it (QĐ-104e(1))', async () => {
+      await ctx.sql.query(
+        `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
+         VALUES (gen_random_uuid(), $1, 'FISCAL_YEAR_START_MONTH', '4'::jsonb, now() - interval '1 day')`,
+        [seed.organizationId],
+      );
+      const migration = readFileSync(
+        join(
+          __dirname,
+          '..',
+          '..',
+          '..',
+          'prisma',
+          'migrations',
+          '20261108500000_drop_fiscal_year_start_month',
+          'migration.sql',
+        ),
+        'utf8',
+      );
+
+      await ctx.sql.query(migration);
+
+      expect((await list()).has('FISCAL_YEAR_START_MONTH')).toBe(false);
+      const rows = (
+        await ctx.sql.query<{ valid_to: Date | null }>(
+          `SELECT valid_to FROM parameter_values WHERE key = 'FISCAL_YEAR_START_MONTH'`,
+        )
+      ).rows;
+      expect(rows).toHaveLength(1);
+      expect(rows[0].valid_to).not.toBeNull();
+    });
+
+    it('does not return the two thresholds of the zero-based-budget explanation, and the migration closes a stored value without deleting it (QĐ-111ab)', async () => {
+      await ctx.sql.query(
+        `INSERT INTO parameter_values (id, organization_id, key, value, valid_from)
+         VALUES (gen_random_uuid(), $1, 'BUDGET_ZBB_KPI3_BELOW_PERCENT', '60'::jsonb, now() - interval '1 day'),
+                (gen_random_uuid(), $1, 'BUDGET_ZBB_PRICE_INCREASE_PERCENT', '10'::jsonb, now() - interval '1 day')`,
+        [seed.organizationId],
+      );
+      const migration = readFileSync(
+        join(
+          __dirname,
+          '..',
+          '..',
+          '..',
+          'prisma',
+          'migrations',
+          '20261117100000_drop_zbb_parameters',
+          'migration.sql',
+        ),
+        'utf8',
+      );
+
+      await ctx.sql.query(migration);
+      await ctx.sql.query(migration);
+
+      const parameters = await list();
+      expect(parameters.has('BUDGET_ZBB_KPI3_BELOW_PERCENT')).toBe(false);
+      expect(parameters.has('BUDGET_ZBB_PRICE_INCREASE_PERCENT')).toBe(false);
+      const rows = (
+        await ctx.sql.query<{ valid_to: Date | null }>(
+          `SELECT valid_to FROM parameter_values WHERE key LIKE 'BUDGET_ZBB_%'`,
+        )
+      ).rows;
+      expect(rows).toHaveLength(2);
+      expect(rows.every((row) => row.valid_to !== null)).toBe(true);
+    });
+
     it('starts the source of the AI answers at the simulation, lets the Super Admin choose the model with an audit, and takes nothing else', async () => {
       const key = 'AI_PROVIDER_MODE';
 
@@ -424,14 +540,31 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       const parameters = await list();
 
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
-      expect(parameters.size).toBe(24);
+      // 27 before GH-1/2/3 and the renewal window (REQUEST_OPEN_NEW_LIMIT, PAID_SOFTWARE_FLAG_THRESHOLD, RENEWAL_WINDOW_DAYS), less the
+      // threshold of GH-3 that went with it (PAID_SOFTWARE_FLAG_THRESHOLD, QĐ-111h), then the three of MF-2 and MF-3 (DEPARTURE_REVOCATION_WORKING_DAYS, TRANSFER_GRACE_WORKING_DAYS, TRANSFER_GRACE_REMINDER_WORKING_DAYS), less the
+      // two of the handover that went (ABRUPT_DEPARTURE_HOLD_WORKING_DAYS, HANDOVER_SHORT_DEADLINE_WORKING_DAYS, QĐ-110g) and the deadline of the
+      // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p), less the two ZBB thresholds that went with the
+      // zero-based-budget explanation of a line (QĐ-111ab) and the list of alert days before the deadline (RENEWAL_ALERT_DAYS_BEFORE_DEADLINE,
+      // S20-T9a), plus the three of the point of adjustment (S20-T9b),
+      // then AI_PROVIDER_MODE (QĐ-102f).
+      expect(parameters.size).toBe(30);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {
-      for (const key of ['NO_SUCH_PARAMETER', 'TIME_ZONE', 'REPORTING_CURRENCY', 'BUDGET_PERIOD_KIND']) {
+      for (const key of [
+        'NO_SUCH_PARAMETER',
+        'TIME_ZONE',
+        'REPORTING_CURRENCY',
+        'BUDGET_PERIOD_KIND',
+        'FISCAL_YEAR_START_MONTH',
+      ]) {
         expect(errorOf(await setParameter(key, 'x').expect(404)).code).toBe('PARAMETER.NOT_FOUND');
       }
       await request(server()).get('/api/v1/operating-parameters/NO_SUCH_PARAMETER/history').set(asAdmin()).expect(404);
+      await request(server())
+        .get('/api/v1/operating-parameters/FISCAL_YEAR_START_MONTH/history')
+        .set(asAdmin())
+        .expect(404);
       const organization = await ctx.sql.query('SELECT time_zone FROM organizations');
       expect(organization.rows).toEqual([{ time_zone: ORG_TIME_ZONE }]);
     });

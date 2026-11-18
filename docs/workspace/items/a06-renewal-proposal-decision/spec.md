@@ -19,7 +19,7 @@ cam kết ngân sách. Kiểm bằng `POST /subscription-renewals` → `POST /su
 ## Sizing decision
 
 - Container: G8 (nhóm giao việc, không phải ranh giới hạng mục).
-- Mode: `grouped-stories`.
+- Mode: `technical-enabler`.
 - Outcome and owner: một hồ sơ gia hạn đi từ đề xuất tới quyết định; capability `licensing/subscription-renewal` (nhóm
   `proposal/`, `decision/`), đọc kỳ subscription qua `SubscriptionPeriodApi` của catalog.
 - Boundaries: bảng `subscription_renewals`, `subscription_renewal_released_seats`; route `POST /subscription-renewals`,
@@ -36,10 +36,11 @@ cam kết ngân sách. Kiểm bằng `POST /subscription-renewals` → `POST /su
 
 ## Primary Story/AC
 
-| Story    | AC                                                      | Coverage | Phần còn lại thuộc                                                                                                                                                                                                              |
-| -------- | ------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-11-02 | AC-1→AC-6, AC-9, AC-10, AC-13→AC-15, AC-17→AC-20, AC-22 | partial  | vế số liệu ngân sách của AC-4, AC-5, vế dự báo `L1` của AC-9, vế hỏi–đáp Finance của AC-14, AC-7, AC-11, AC-12, AC-16, AC-21: `a06-renewal-open-inputs`; vế `G3`/`G4` và hoạt động cuối của AC-20: `a06-renewal-usage-evidence` |
-| US-11-05 | AC-1→AC-8, AC-15, AC-17                                 | partial  | vế checklist ngay trong hồ sơ của AC-2: `a06-renewal-open-inputs`; vế số liệu sử dụng của AC-4: `a06-renewal-usage-evidence`; AC-9→AC-14: `a06-renewal-execution-chain`; AC-16, AC-18: `a06-renewal-open-inputs`                |
+| Story | AC              | Coverage | Phần còn lại thuộc                                                           |
+| ----- | --------------- | -------- | ---------------------------------------------------------------------------- |
+| —     | Story `RETIRED` | n/a      | US-11-02, US-11-05 `RETIRED`; thay bởi `qd103-subscription-adjustment-point` |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-11-02` AC-1→AC-6, AC-9, AC-10, AC-13→AC-15, AC-17→AC-20, AC-22 (partial); `US-11-05` AC-1→AC-8, AC-15, AC-17 (partial) — Story `RETIRED` ở Docs `5bb2e6a` (`US-11-02` `QĐ-94c`(1), `US-11-05` `QĐ-103e`, `QĐ-103q`); code đã merge là lịch sử, khóa ở scope map là `not affected`. Không còn Story nào nên `Mode` đổi `technical-enabler` (dòng `n/a` nêu hạng mục thay thế).
 
 ## Supporting references
 

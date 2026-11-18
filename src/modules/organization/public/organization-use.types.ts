@@ -18,15 +18,17 @@ export interface UseGroup {
   total: number;
 }
 
-export type DepartmentUseGroupName = 'OPEN_WORK' | 'SUBSCRIPTIONS';
+export type DepartmentUseGroupName = 'OPEN_WORK';
 export type CostCenterUseGroupName = 'REQUESTS' | 'COMMITMENTS';
 
 export interface DepartmentUse {
   openWork: UseGroup;
-  subscriptions: UseGroup;
 }
 
 export interface CostCenterUse {
   requests: UseGroup;
   commitments: UseGroup;
 }
+
+/** What refers to the first placement of a person, so it can no longer be corrected (`QĐ-113e`). */
+export type FirstPlacementUse = 'REQUEST' | 'TRANSFER' | 'HEAD_PERIOD' | 'OFFBOARDING';

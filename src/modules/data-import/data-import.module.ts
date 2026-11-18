@@ -13,6 +13,8 @@ import { EmployeeImportRowValidationService } from './employee-import/row-valida
 import { SeatBaselineImportRepo } from './seat-baseline-import/seat-baseline-import.repo';
 import { SeatBaselineImportService } from './seat-baseline-import/seat-baseline-import.service';
 import { SeatBaselineImportsController } from './seat-baseline-import/seat-baseline-imports.controller';
+import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
+import { DataImportTemplateListener } from './data-import-template.listener';
 
 /**
  * Importing files through the one framework of upload, preview and confirmation (`US-02-01`); the people file is the
@@ -20,9 +22,17 @@ import { SeatBaselineImportsController } from './seat-baseline-import/seat-basel
  * only through the facade of the `organization` module and assignments only through that of `licensing`.
  */
 @Module({
-  imports: [DatabaseModule, AuditModule, OrganizationModule, LicensingModule, NotificationsModule],
+  imports: [
+    PoliciesTemplateFacadeModule,
+    DatabaseModule,
+    AuditModule,
+    OrganizationModule,
+    LicensingModule,
+    NotificationsModule,
+  ],
   controllers: [EmployeeImportsController, SeatBaselineImportsController],
   providers: [
+    DataImportTemplateListener,
     EmployeeImportRepo,
     EmployeeImportRowValidationService,
     EmployeeImportPreviewService,

@@ -24,6 +24,7 @@ const REASONS = ['Thiết kế bộ nhận diện mới', 'Làm mẫu giao diệ
  */
 describe('the AI summary of the queue of a head (integration, real HTTP to a stand-in AI service, real PostgreSQL)', () => {
   let internal: string;
+  let paid: string;
   let applicationName: string;
   let superAdmin: ApiAccount;
 
@@ -32,9 +33,20 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
     h.dataOf<{ items: unknown[] }>(
       await request(h.server()).get('/api/v1/need-decisions').query({ pageSize: 100 }).set(h.as(account)).expect(200),
     ).items;
-  const sendAll = async (unit: Unit, reasons: readonly string[]): Promise<AccessRequestWire[]> => {
+  const sendAll = async (
+    unit: Unit,
+    reasons: readonly string[],
+    options: { plan?: string; termMonths?: number } = {},
+  ): Promise<AccessRequestWire[]> => {
     const sent: AccessRequestWire[] = [];
-    for (const reason of reasons) sent.push(await h.sent(unit.member, internal, { businessReason: reason }));
+    for (const reason of reasons) {
+      sent.push(
+        await h.sent(unit.member, options.plan ?? internal, {
+          businessReason: reason,
+          ...(options.termMonths === undefined ? {} : { termMonths: options.termMonths }),
+        }),
+      );
+    }
 
     return sent;
   };
@@ -48,6 +60,7 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
     await h.start();
     await h.withApprover();
     internal = await h.plan('K5');
+    paid = await h.planOf(await h.subscription(100));
     [{ applicationName }] = await h.ctx.app.get(CatalogApi, { strict: false }).getPlanSummaries([internal]);
     await h.switchAll('ON');
     superAdmin = {
@@ -153,7 +166,7 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
           softwareName: applicationName,
           beneficiaryDisplayName: member,
           reason: REASONS[index],
-          requestedDurationLabel: `${one.termMonths} tháng`,
+          requestedDurationLabel: null,
           estimatedCostRef: null,
         })),
       );
@@ -327,7 +340,7 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
     const view = await h.summarize(u.head.account);
 
     expect(view.lines.map((line) => line.requestId)).toEqual([sent[1].id]);
-    expect(view.lines[0].summary).toContain(`Thời hạn ${sent[1].termMonths} tháng.`);
+    expect(view.lines[0].summary).toContain('Thời hạn .');
     const content = h.dataOf<{ result: { rejections: unknown[] } }>(await h.content(view.invocationId).expect(200));
     expect(content.result.rejections).toEqual([{ code: 'INVENTED_NUMBER', sourceRef: 'R001' }]);
   });
@@ -398,7 +411,8 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
 
   it('AC-12: R3 approved, R2 withdrawn and R1 handed to the next head after composing: their lines go, the record stays', async () => {
     const u = await h.unit();
-    const [r1, r2, r3] = await sendAll(u, REASONS);
+    // Paid requests: free internal software does not wait for the next head, it goes to the IT Admin when the head leaves (QĐ-111bc).
+    const [r1, r2, r3] = await sendAll(u, REASONS, { plan: paid, termMonths: 1 });
     const view = await h.summarize(u.head.account);
     expect(view.lines.map((line) => line.requestId)).toEqual([r1.id, r2.id, r3.id]);
     const reread = async () => h.dataOf<SummaryWire>(await h.read(u.head.account, view.invocationId).expect(200));

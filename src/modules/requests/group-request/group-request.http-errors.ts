@@ -24,11 +24,11 @@ import {
   GroupRequestLinesMismatchError,
   GroupRequestLinesRefusedError,
   GroupRequestPlanNotEligibleError,
-  GroupRequestTermBeyondLimitError,
   GroupRequestTooFewLinesError,
   GroupRequestTooManyLinesError,
   GroupSupplementDropRefusedError,
 } from './group-request.errors';
+import { toChecklistApiException } from '../../policies/public/policy-checklist.http-errors';
 
 /**
  * Maps the errors of the request for a group to their HTTP answers. The rest are those of the request and of the spend decision,
@@ -36,6 +36,8 @@ import {
  */
 export function toGroupRequestApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  const checklist = toChecklistApiException(error);
+  if (checklist) return checklist;
 
   if (error instanceof GroupRequestPlanNotEligibleError) {
     return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
@@ -49,13 +51,6 @@ export function toGroupRequestApiException(error: unknown): unknown {
       code: 'GROUP_REQUEST.TOO_MANY_LINES',
       message: error.message,
       details: { max: error.max },
-    });
-  }
-  if (error instanceof GroupRequestTermBeyondLimitError) {
-    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
-      code: 'GROUP_REQUEST.TERM_BEYOND_LIMIT',
-      message: error.message,
-      details: { maxMonths: error.maxMonths, endsBy: error.endsBy },
     });
   }
   if (error instanceof GroupRequestTooFewLinesError) {
@@ -122,10 +117,9 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
     new RequestPartyIneligibleError({ reason: 'SPENDING_APPROVER', party: 'REQUESTER', employeeIds: [PERSON] }),
   ),
   SUPER_ADMIN_CANNOT_REQUEST: example(new AccessRequestSuperAdminCannotRequestError()),
-  PLAN_NOT_ELIGIBLE: example(new GroupRequestPlanNotEligibleError('KIND_NOT_MULTI_SEAT')),
+  PLAN_NOT_ELIGIBLE: example(new GroupRequestPlanNotEligibleError('NOT_PAID_SOFTWARE')),
   TOO_MANY_LINES: example(new GroupRequestTooManyLinesError(GROUP_EMPLOYEE_MAX)),
   TOO_FEW_LINES: example(new GroupRequestTooFewLinesError(GROUP_LINES_MIN)),
-  TERM_BEYOND_LIMIT: example(new GroupRequestTermBeyondLimitError(12, '2026-12-31')),
   DUPLICATE_LINE: example(new GroupRequestDuplicateLineError([PERSON])),
   LINES_REFUSED: example(new GroupRequestLinesRefusedError([{ employeeId: PERSON, reason: 'OUTSIDE_DEPARTMENT' }])),
   REQUEST_NOT_FOUND: example(new AccessRequestNotFoundError()),
@@ -143,16 +137,14 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   SPEND_OWN_REQUEST: example(new SpendDecisionRefusedError('OWN_REQUEST')),
   NO_SPEND_STEP: example(new SpendDecisionRefusedError('NO_SPEND_STEP')),
   NOT_CHECKABLE: example(new SpendDecisionRefusedError('NOT_CHECKABLE')),
-  REVIEWER_IS_APPROVER: example(new SpendDecisionRefusedError('REVIEWER_IS_APPROVER')),
-  OVERRIDE_REQUIRED: example(new SpendDecisionRefusedError('OVERRIDE_REQUIRED', [2026])),
-  OVERRIDE_MISMATCH: example(new SpendDecisionRefusedError('OVERRIDE_MISMATCH', [2026])),
-  OVERRIDE_NOT_NEEDED: example(new SpendDecisionRefusedError('OVERRIDE_NOT_NEEDED')),
-  RECHECKED_NEEDS_FINANCE_REVIEW: example(toRecheckedApiException({ to: 'FINANCE_REVIEW' })),
-  RECHECKED_RETURNED_TO_HEAD: example(toRecheckedApiException({ to: 'HEAD', reason: 'STALE_COST_EVIDENCE' })),
+  RECHECKED_RETURNED_TO_HEAD: example(toRecheckedApiException(['OVER_RESERVE'])),
   NOT_REQUESTER: example(new AccessRequestWithdrawalRefusedError('NOT_REQUESTER')),
   WITHDRAWAL_ALREADY_ENDED: example(new AccessRequestWithdrawalRefusedError('ALREADY_ENDED')),
   WITHDRAWAL_PENDING: example(new AccessRequestWithdrawalRefusedError('WITHDRAWAL_PENDING')),
   GRANT_RUNNING: example(new AccessRequestWithdrawalRefusedError('GRANT_RUNNING', { employeeIds: [PERSON] })),
+  WITHDRAWAL_AFTER_DECISION: example(
+    new AccessRequestWithdrawalRefusedError('WITHDRAWAL_AFTER_DECISION', { scope: 'LINE', state: 'APPROVED' }),
+  ),
   GRANT_COMPLETED: example(
     new AccessRequestWithdrawalRefusedError('GRANT_COMPLETED', { assignmentId: '<assignment-id>' }),
   ),
@@ -160,6 +152,9 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   SUPPLEMENT_NOT_IN_QUEUE: example(new SpendSupplementRefusedError('NOT_IN_QUEUE')),
   SUPPLEMENT_NOT_PRICED: example(new SpendSupplementRefusedError('NOT_PRICED')),
   SUPPLEMENT_NO_CHANGE: example(new SpendSupplementRefusedError('NO_CHANGE')),
+  SUPPLEMENT_TERM_NOT_REDUCED: example(new SpendSupplementRefusedError('TERM_NOT_REDUCED')),
+  SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE: example(new SpendSupplementRefusedError('TERM_MONTHS_OUT_OF_RANGE')),
+  SUPPLEMENT_TERM_NOT_ASKED: example(new SpendSupplementRefusedError('TERM_NOT_ASKED')),
   NOT_PRICEABLE: example(new AccessRequestNotPriceableError()),
   LINE_NOT_DROPPABLE: example(new GroupSupplementDropRefusedError('LINE_NOT_DROPPABLE', [PERSON])),
   CANNOT_DROP_LAST_LINE: example(new GroupSupplementDropRefusedError('CANNOT_DROP_LAST_LINE')),

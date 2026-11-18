@@ -1,24 +1,15 @@
-import { checkSupplement, entryFor, supplementAuditDetail, supplementChangeOf } from './spend-submission.policy';
+import { checkSupplement, stopReasonOf, supplementAuditDetail, supplementChangeOf } from './spend-submission.policy';
 
-describe('where an approved request goes (US-06-14 AC-8)', () => {
-  it('is the queue of the head when the head decided the need', () => {
-    expect(entryFor({ deciderRole: 'MANAGER' })).toBe('HEAD_QUEUE');
-  });
-
-  it('is straight to the check when the spending approver decided it in the place of the head who sent it', () => {
-    expect(entryFor({ deciderRole: 'SPENDING_APPROVER' })).toBe('DIRECT');
-  });
-
-  it('is straight to the check for a need decided before QĐ-93 by the fallback approver, who had no queue', () => {
-    expect(entryFor({ deciderRole: 'FALLBACK_APPROVER' })).toBe('DIRECT');
-  });
-});
-
-describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16)', () => {
+describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16; L2-38)', () => {
   const facts = {
     state: 'AWAITING_SPEND_SUBMISSION',
     priced: true,
   };
+  const term = (requested: number, current: number | null, kind: 'K1' | 'K2' | 'K4' | 'K5' = 'K2') => ({
+    requested,
+    current,
+    kind,
+  });
 
   it('leaves people of a group out of a request back in the queue', () => {
     expect(checkSupplement({ ...facts, leavesPeopleOut: true })).toBeNull();
@@ -31,34 +22,70 @@ describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16)', () =>
     },
   );
 
-  it('is not for a request with no price, nor to the same day', () => {
+  it('is not for a request with no price, nor for a file that changes nothing', () => {
     expect(checkSupplement({ ...facts, priced: false })).toBe('NOT_PRICED');
     expect(checkSupplement({ ...facts })).toBe('NO_CHANGE');
   });
+
+  it('L2-38, QĐ-111i: shortens the time of use to fewer months, and gives an end to a right that had none', () => {
+    expect(checkSupplement({ ...facts, term: term(3, 6) })).toBeNull();
+    expect(checkSupplement({ ...facts, term: term(12, null) })).toBeNull();
+  });
+
+  it('L2-38: refuses a time of use that is not shorter than the one the request has', () => {
+    expect(checkSupplement({ ...facts, term: term(6, 6) })).toBe('TERM_NOT_REDUCED');
+    expect(checkSupplement({ ...facts, term: term(9, 6) })).toBe('TERM_NOT_REDUCED');
+  });
+
+  it('QĐ-111i: follows the kind of the plan: a plan bought once asks no months, and K1 takes 1 to 9', () => {
+    expect(checkSupplement({ ...facts, term: term(3, null, 'K4') })).toBe('TERM_NOT_ASKED');
+    expect(checkSupplement({ ...facts, term: term(9, 12, 'K1') })).toBeNull();
+    expect(checkSupplement({ ...facts, term: term(10, 12, 'K1') })).toBe('TERM_MONTHS_OUT_OF_RANGE');
+    expect(checkSupplement({ ...facts, term: term(12, null, 'K5') })).toBeNull();
+  });
+
+  it('L2-38: a request of an older release that carries an end date takes only months that end sooner than that day', () => {
+    const older = (requested: number) => ({
+      requested,
+      current: null,
+      kind: 'K2' as const,
+      endDate: { today: '2026-11-10', end: '2027-03-31' },
+    });
+
+    expect(checkSupplement({ ...facts, term: older(3) })).toBeNull();
+    expect(checkSupplement({ ...facts, term: older(5) })).toBe('TERM_NOT_REDUCED');
+    expect(checkSupplement({ ...facts, term: older(6) })).toBe('TERM_NOT_REDUCED');
+    expect(checkSupplement({ ...facts, term: older(13) })).toBe('TERM_MONTHS_OUT_OF_RANGE');
+  });
+
+  it('QĐ-111i: refuses a time of use that is not 1 to 12 whole months', () => {
+    expect(checkSupplement({ ...facts, term: term(0, null) })).toBe('TERM_MONTHS_OUT_OF_RANGE');
+    expect(checkSupplement({ ...facts, term: term(13, null) })).toBe('TERM_MONTHS_OUT_OF_RANGE');
+  });
 });
 
-describe('what a supplementary file changes, and what it says (QĐ-82n, US-06-14 AC-13, AC-15)', () => {
+describe('what a supplementary file changes, and what it says (QĐ-82n, US-06-14 AC-13, AC-15, P1-06)', () => {
   const before = {
     status: 'PRICED' as const,
-    expectedSpendOn: '2026-11-01',
+    expectedEndDate: null,
     budgetYear: 2026,
     amount: { amountMinor: 1000n, currency: 'VND' },
   };
   const after = {
     status: 'PRICED' as const,
-    expectedSpendOn: '2027-01-15',
-    budgetYear: 2027,
-    amount: { amountMinor: 1200n, currency: 'VND' },
+    expectedEndDate: '2026-12-31',
+    budgetYear: 2026,
+    amount: { amountMinor: 800n, currency: 'VND' },
   };
 
-  it('puts what the request was beside what it became: the day, the year, the amount and the currency it keeps', () => {
+  it('puts what the request was beside what it became: the end date, the year, the amount and the currency it keeps', () => {
     expect(supplementChangeOf(before, after)).toEqual({
-      beforeExpectedSpendOn: '2026-11-01',
-      afterExpectedSpendOn: '2027-01-15',
+      beforeExpectedEndDate: null,
+      afterExpectedEndDate: '2026-12-31',
       beforeBudgetYear: 2026,
-      afterBudgetYear: 2027,
+      afterBudgetYear: 2026,
       beforeAmountMinor: 1000n,
-      afterAmountMinor: 1200n,
+      afterAmountMinor: 800n,
       currency: 'VND',
     });
   });
@@ -66,10 +93,8 @@ describe('what a supplementary file changes, and what it says (QĐ-82n, US-06-14
   it.each([
     ['is not priced again', { ...after, status: 'MISSING' as const }, before],
     ['has no amount again', { ...after, amount: null }, before],
-    ['has no day again', { ...after, expectedSpendOn: null }, before],
     ['has no year again', { ...after, budgetYear: null }, before],
     ['had no amount', after, { ...before, amount: null }],
-    ['had no day', after, { ...before, expectedSpendOn: null }],
     ['had no year', after, { ...before, budgetYear: null }],
   ])('is not a change that can be recorded when the request %s', (_label, repriced, original) => {
     expect(supplementChangeOf(original, repriced)).toBeNull();
@@ -81,25 +106,36 @@ describe('what a supplementary file changes, and what it says (QĐ-82n, US-06-14
         'req-1',
         {
           number: 2,
-          beforeExpectedSpendOn: '2026-11-01',
-          afterExpectedSpendOn: '2027-01-15',
+          beforeExpectedEndDate: null,
+          afterExpectedEndDate: '2026-12-31',
           beforeBudgetYear: 2026,
-          afterBudgetYear: 2027,
+          afterBudgetYear: 2026,
           beforeAmountMinor: 1000n,
-          afterAmountMinor: 1200n,
+          afterAmountMinor: 800n,
         },
         ['emp-3'],
       ),
     ).toEqual({
       requestId: 'req-1',
       number: 2,
-      before: '2026-11-01',
-      after: '2027-01-15',
+      beforeExpectedEndDate: null,
+      afterExpectedEndDate: '2026-12-31',
       beforeBudgetYear: 2026,
-      afterBudgetYear: 2027,
+      afterBudgetYear: 2026,
       beforeAmountMinor: '1000',
-      afterAmountMinor: '1200',
+      afterAmountMinor: '800',
       droppedEmployeeIds: ['emp-3'],
     });
+  });
+});
+
+describe('QĐ-111an, R-4: the stop reason of a batch item an older release made is read with the reasons that exist now', () => {
+  it('reads a request that stopped for want of a rate as the missing price it comes to, and leaves the other reasons as they were', () => {
+    expect(['RATE_MISSING', 'PRICE_MISSING', 'OVER_RESERVE', null].map(stopReasonOf)).toEqual([
+      'PRICE_MISSING',
+      'PRICE_MISSING',
+      'OVER_RESERVE',
+      null,
+    ]);
   });
 });

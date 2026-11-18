@@ -207,6 +207,23 @@ describe('the AI summary when the AI is off or failing (integration, real HTTP t
       await expectQueuesUnchanged();
     });
 
+    it('an answer of the stub runner of the AI service is never a MODEL answer: FAILED AI.PROVIDER_UNAVAILABLE, no lines, no result kept (QĐ-102f)', async () => {
+      h.ai.reply((call) => ({ ...faithfulAnswer(call), modelId: 'stub' }));
+
+      const view = await summarizeFailing(design.head.account);
+
+      expect(view).toMatchObject({
+        status: 'FAILED',
+        errorCode: 'AI.PROVIDER_UNAVAILABLE',
+        lines: [],
+        simulated: false,
+      });
+      const row = await h.invocationRow(view.invocationId);
+      expect(row).toMatchObject({ status: 'FAILED', error_code: 'AI.PROVIDER_UNAVAILABLE', provider_mode: 'MODEL' });
+      expect((await h.contentRow(view.invocationId))?.prompt_text).toBeNull();
+      await expectQueuesUnchanged();
+    });
+
     it('the spending approver C1 under a service that is down: FAILED, and the spend queue unchanged', async () => {
       h.ai.reply(() => ({ kind: 'reset' }));
 

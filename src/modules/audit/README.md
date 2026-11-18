@@ -16,7 +16,11 @@ licensing, operating-parameters, organization, personnel, requests
   - `readSince(tx, cursor, { upTo, actions, limit })` — đọc tuần tự theo cursor cho bên tiêu thụ nội bộ (bộ chiếu trạng
     thái Request vào hộp thư, `requests/status/request-status-projector.service.ts`); không có route HTTP.
   - `countByAction(tx, actions)` — chỉ đếm số sự kiện của từng action (kể cả 0), không trả payload.
-- `public/audit.types.ts` — `AuditEventInput`, `StoredAuditEvent`, `AuditEventSlice`, `AuditCursor`, `AuditValue`.
+  - `pageOfResources(tx, resources, { actions, onlySubject, skip, take })` — một trang sự kiện của các tài nguyên (cũ trước), chỉ các action
+    module sở hữu cho phép, không trả `before`; `onlySubject` bỏ sự kiện nêu chủ thể khác trong `after` (dòng thời gian Request,
+    `requests/request-history/request-events.service.ts`). Không phải Audit Trail: Audit Trail vẫn chỉ Super Admin.
+- `public/audit.types.ts` — `AuditEventInput`, `StoredAuditEvent`, `AuditEventSlice`, `AuditCursor`, `AuditValue`, `AuditResourceRef`,
+  `ResourceEventSlice`, `ResourceEventQuery`.
 - Lỗi: `UnsafeAuditPayloadError` ở `audit.errors.ts` (lỗi lập trình, không tới client).
 
 ## Bảng sở hữu

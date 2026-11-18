@@ -40,7 +40,7 @@ export type ReturnableProblem =
   | 'NOT_OPEN'
   /** The right of a service account is answered for by a person and is not returned like a seat (`US-03-08`). */
   | 'SERVICE_ACCOUNT'
-  /** K3 is not granted yet and K4 is a key tied to a device (`g4-device-dependent-features`). */
+  /** K3 is not granted yet; a K4 key goes back to the store like any seat (`QĐ-103d`). */
   | 'PLAN_NOT_SUPPORTED'
   /** The grant was not carried out: a seat that is not real is withdrawn, not returned (`US-05-08`). */
   | 'GRANT_NOT_COMPLETED';
@@ -54,7 +54,7 @@ export function checkReturnable(facts: {
 }): ReturnableProblem | null {
   if (!facts.open) return 'NOT_OPEN';
   if (facts.kind === 'SERVICE') return 'SERVICE_ACCOUNT';
-  if (facts.provisioningType === 'K3' || facts.provisioningType === 'K4') return 'PLAN_NOT_SUPPORTED';
+  if (facts.provisioningType === 'K3') return 'PLAN_NOT_SUPPORTED';
   if (facts.grant === 'NOT_COMPLETED') return 'GRANT_NOT_COMPLETED';
 
   return null;
@@ -97,30 +97,6 @@ export function mayReadReturn(facts: {
   );
 }
 
-/**
- * Whether the person may confirm the handover of the data of a return (`US-05-13` AC-6, `QĐ-62f`): only the person who sent it, while the
- * revocation is awaited, for a plan whose removal loses data, and once. The first that is wrong, in the order a caller should learn it.
- */
-export function handoverConfirmRefusal(
-  actorEmployeeId: string,
-  found: {
-    requestedByEmployeeId: string;
-    state: string;
-    handoverRequired: boolean;
-    handoverConfirmedAt: Date | null;
-  },
-): 'NOT_REQUESTER' | 'NOT_AWAITING' | 'HANDOVER_NOT_REQUIRED' | 'HANDOVER_ALREADY_CONFIRMED' | null {
-  if (actorEmployeeId !== found.requestedByEmployeeId) return 'NOT_REQUESTER';
-  if (found.state !== 'AWAITING_REVOCATION') return 'NOT_AWAITING';
-  if (!found.handoverRequired) return 'HANDOVER_NOT_REQUIRED';
-  if (found.handoverConfirmedAt !== null) return 'HANDOVER_ALREADY_CONFIRMED';
-
-  return null;
-}
-
-/** Whether the handover is confirmed by its deadline: there is none, or today is not after it. */
-export const handoverOnTime = (dueOn: string | null, today: string): boolean => dueOn === null || today <= dueOn;
-
 /** What the audit entry `RETURN_REQUEST.SUBMITTED` says: who, which seat and which task; the reason is never in it. */
 export function returnSubmittedDetail(created: {
   id: string;
@@ -132,8 +108,6 @@ export function returnSubmittedDetail(created: {
   departmentId: string;
   revocationTaskId: string;
   revocationTaskCreated: boolean;
-  handoverRequired: boolean;
-  handoverDueOn: string | null;
   originRequestId: string | null;
 }): { [key: string]: string | boolean | null } {
   return {
@@ -146,8 +120,6 @@ export function returnSubmittedDetail(created: {
     departmentId: created.departmentId,
     revocationTaskId: created.revocationTaskId,
     revocationTaskCreated: created.revocationTaskCreated,
-    handoverRequired: created.handoverRequired,
-    handoverDueOn: created.handoverDueOn,
     originRequestId: created.originRequestId,
   };
 }

@@ -51,7 +51,6 @@ describe('operating parameter routes (e2e, no database)', () => {
 
   it.each([
     ['an IT Admin', ['IT_ADMIN'], []],
-    ['the finance officer', ['FINANCE'], []],
     ['an employee', ['EMPLOYEE'], []],
     ['a department head, whose role is derived', [], ['MANAGER']],
     ['the spending approver, whose role is derived', [], ['SPENDING_APPROVER']],
@@ -61,6 +60,22 @@ describe('operating parameter routes (e2e, no database)', () => {
         .set('Authorization', bearer(principal([...direct, ...derived])))
         .expect(403);
       expect({ route, code: bodyOf(response).error.code }).toEqual({ route, code: 'AUTHORIZATION.FORBIDDEN' });
+    }
+  });
+
+  it('refuses the finance officer on the non-working dates and on the parameters it does not set (QĐ-103z(1))', async () => {
+    const finance = { Authorization: bearer(principal(['FINANCE'])) };
+    const refused = ROUTES.filter(
+      ([route]) =>
+        route.includes('non-working-dates') ||
+        route === 'PUT /operating-parameters/{key}' ||
+        route === 'GET /operating-parameters/{key}/history',
+    );
+    expect(refused.length).toBeGreaterThan(3);
+
+    for (const [route, call] of refused) {
+      const response = await call(app.getHttpServer()).set(finance).send({ value: 3 });
+      expect({ route, status: response.status }).toEqual({ route, status: 403 });
     }
   });
 

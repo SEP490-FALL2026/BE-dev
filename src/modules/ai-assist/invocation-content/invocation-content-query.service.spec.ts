@@ -2,7 +2,7 @@ import type { DbTx, TransactionRunner } from '../../../infrastructure/database/t
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { AuditEventInput } from '../../audit/public/audit.types';
-import type { AiInvocationContentRepo } from '../invocation/invocation-content.repo';
+import type { AiInvocationHistoryStore } from '../invocation/invocation-history-store.types';
 import type { InvocationContentRecord } from '../invocation/invocation.types';
 import { InvocationContentNotFoundError } from './invocation-content.errors';
 import { InvocationContentQueryService } from './invocation-content-query.service';
@@ -49,7 +49,7 @@ function world(found: InvocationContentRecord | null = RECORD) {
   const run = jest.fn(<T>(work: (tx: DbTx) => Promise<T>) => work(TX));
   const service = new InvocationContentQueryService(
     { run } as unknown as TransactionRunner,
-    repo as unknown as AiInvocationContentRepo,
+    repo as unknown as AiInvocationHistoryStore,
     audit as unknown as AuditApi,
   );
 

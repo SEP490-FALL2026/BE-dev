@@ -58,7 +58,7 @@ describe('the notices of the personnel context (integration, real PostgreSQL)', 
         employeeId: who.employeeId,
         toDepartmentId: fin.id,
         effectiveOn: h.day(20),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
 
       const rows = await noticesOf('PERSONNEL_EVENT_RECORDED', wire.id);
@@ -71,7 +71,7 @@ describe('the notices of the personnel context (integration, real PostgreSQL)', 
         });
         expect(Object.keys(row.params).sort()).toEqual(['departmentId', 'effectiveOn', 'employeeId', 'eventKind']);
       }
-      await h.cancelTransfer(wire.id, { reason: 'No longer needed', grounds: h.grounds }).expect(200);
+      await h.cancelTransfer(wire.id, { reason: 'No longer needed', groundsNote: h.groundsNote }).expect(200);
       expect(recipients(await noticesOf('PERSONNEL_EVENT_RECORDED', wire.id))).toHaveLength(6);
     });
 
@@ -83,7 +83,7 @@ describe('the notices of the personnel context (integration, real PostgreSQL)', 
         employeeId: who.employeeId,
         toDepartmentId: des.id,
         effectiveOn: h.day(20),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
 
       expect([response.status, h.codeOf(response)]).toEqual([422, 'DEPARTMENT_TRANSFER.NO_CHANGE']);
@@ -97,12 +97,7 @@ describe('the notices of the personnel context (integration, real PostgreSQL)', 
         employeeId: who.employeeId,
         startedOn: h.day(-1),
         approvedReturnOn: h.day(40),
-        grounds: {
-          type: 'APPROVED_APPLICATION',
-          reference: 'DN-05/2026',
-          issuer: 'HR Department',
-          issuedOn: '2026-05-25',
-        },
+        groundsNote: 'Đơn xin nghỉ dài hạn số DN-05/2026',
       });
 
       expect(leave.status).toBe(201);
@@ -116,7 +111,7 @@ describe('the notices of the personnel context (integration, real PostgreSQL)', 
       const who = await worker();
 
       const wire = h.dataOf<CaseWire>(
-        await h.recordCase(h.body(who, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.day(-1) })).expect(201),
+        await h.recordCase(h.body(who, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.today() })).expect(201),
       );
 
       const rows = await noticesOf('ABRUPT_DEPARTURE_RECORDED', wire.id);

@@ -1,16 +1,19 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import {
+  declareSubscriptionBodySchema,
+  updateSubscriptionBodySchema,
+} from '../../../src/modules/catalog/subscription/subscription.dto';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 const VALID_SUBSCRIPTION = {
   planId: ID,
-  ownerDepartmentId: ID,
   kind: 'TERM',
   purchasedQuantity: 100,
-  unitPrice: { amount: '1200.00', currency: 'USD' },
+  unitPrice: { amount: '1200000', currency: 'VND' },
   billingCycle: 'ANNUAL',
   startDate: '2026-01-01',
   renewalDate: '2026-12-31',
@@ -86,14 +89,27 @@ describe('subscription routes (e2e, no database)', () => {
   describe('validation', () => {
     const asIt = () => ({ Authorization: bearer(principal(['IT_ADMIN'])) });
 
+    it('QĐ-113g: takes a POST with no owner department, a K1 one too; the body is strict, so the field is refused', () => {
+      expect(declareSubscriptionBodySchema.safeParse(VALID_SUBSCRIPTION).success).toBe(true);
+      expect(declareSubscriptionBodySchema.safeParse({ ...VALID_SUBSCRIPTION, ownerDepartmentId: ID }).success).toBe(
+        false,
+      );
+    });
+
+    it('QĐ-111an: takes the price a vendor quoted in another currency beside the price in dong, and a PATCH takes it away with null', () => {
+      const original = { amount: '48.00', currency: 'USD' };
+
+      expect(declareSubscriptionBodySchema.safeParse({ ...VALID_SUBSCRIPTION, originalPrice: original }).success).toBe(
+        true,
+      );
+      expect(updateSubscriptionBodySchema.safeParse({ originalPrice: original }).success).toBe(true);
+      expect(updateSubscriptionBodySchema.safeParse({ originalPrice: null }).success).toBe(true);
+    });
+
     it.each([
       ['no plan', without(VALID_SUBSCRIPTION, 'planId')],
       ['a plan that is not a uuid', { ...VALID_SUBSCRIPTION, planId: 'P' }],
-      [
-        'no owner department (F02: the department that owns the purchase is required)',
-        without(VALID_SUBSCRIPTION, 'ownerDepartmentId'),
-      ],
-      ['an owner department that is not a uuid', { ...VALID_SUBSCRIPTION, ownerDepartmentId: 'D' }],
+      ['an owner department, which a subscription has none of', { ...VALID_SUBSCRIPTION, ownerDepartmentId: ID }],
       ['an owner department that is null', { ...VALID_SUBSCRIPTION, ownerDepartmentId: null }],
       ['no kind', without(VALID_SUBSCRIPTION, 'kind')],
       ['a kind that is not one', { ...VALID_SUBSCRIPTION, kind: 'LEASE' }],
@@ -104,6 +120,13 @@ describe('subscription routes (e2e, no database)', () => {
       ['a price amount that is a JSON number', { ...VALID_SUBSCRIPTION, unitPrice: { amount: 1200, currency: 'USD' } }],
       ['a price without a currency (US-04-05 AC-3)', { ...VALID_SUBSCRIPTION, unitPrice: { amount: '1200.00' } }],
       ['a price currency in lower case', { ...VALID_SUBSCRIPTION, unitPrice: { amount: '1', currency: 'usd' } }],
+      ['an original price that is a JSON number', { ...VALID_SUBSCRIPTION, originalPrice: 48 }],
+      ['an original price without a currency', { ...VALID_SUBSCRIPTION, originalPrice: { amount: '48.00' } }],
+      ['an original price that is null', { ...VALID_SUBSCRIPTION, originalPrice: null }],
+      [
+        'an original price with an amount in minor units',
+        { ...VALID_SUBSCRIPTION, originalPrice: { amountMinor: '4800', currency: 'USD' } },
+      ],
       ['a billing cycle that is not one', { ...VALID_SUBSCRIPTION, billingCycle: 'WEEKLY' }],
       ['a date that is not real', { ...VALID_SUBSCRIPTION, startDate: '2026-02-30' }],
       ['a date written the wrong way', { ...VALID_SUBSCRIPTION, endDate: '31/12/2026' }],
@@ -123,7 +146,7 @@ describe('subscription routes (e2e, no database)', () => {
 
     it.each([
       ['a plan', { planId: ID }],
-      ['an owner department, which never changes once the subscription has it', { ownerDepartmentId: ID }],
+      ['an owner department, which a subscription has none of', { ownerDepartmentId: ID }],
       ['a kind', { kind: 'PERPETUAL' }],
       ['a status', { status: 'ACTIVE' }],
       ['a null price', { unitPrice: null }],

@@ -5,6 +5,8 @@ import { LicensingRenewalApi } from '../../../src/modules/licensing/public/licen
 import { ApiAccount, createActivatedAccount } from '../../support/api-accounts';
 import { RevocationHarness } from '../../support/revocation-harness';
 import { changeRoleTo } from '../../support/builders/account.builder';
+import { legacyServiceAccount } from '../../support/legacy-service-account';
+import { k1Checklist } from '../../support/k1-checklist';
 
 const h = new RevocationHarness();
 
@@ -115,9 +117,9 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     await enter(finance.code, 'F-1');
 
     // Figma and GitHub belong to design, Slack to finance; a person of one department holds a seat on a subscription of the other (F22).
-    figmaSubscription = await h.subscription(10, 'K2', design.id);
-    githubSubscription = await h.subscription(10, 'K1', design.id);
-    const slackSubscription = await h.subscription(10, 'K2', finance.id);
+    figmaSubscription = await h.subscription(10, 'K2');
+    githubSubscription = await h.subscription(10, 'K1');
+    const slackSubscription = await h.subscription(10, 'K2');
     const person = (code: string, prefix = '') => ({
       employee_code: code,
       account_identifier: `${prefix}${code.toLowerCase()}@acme.vn`,
@@ -129,10 +131,15 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
       person('F-1'),
       { ...person('D-6'), granted_on: '2025-01-01' },
     ]);
-    await h.written({ subscriptionId: githubSubscription }, [
-      person('D-4'),
-      { employee_code: 'D-5', account_identifier: 'ci-bot', kind: 'service', reason: 'CI' },
-    ]);
+    await h.written({ subscriptionId: githubSubscription }, [person('D-4')]);
+    // A service account of the earlier releases, written by SQL: it stays readable in the tools a department uses.
+    const d5 = await h.ctx.sql.query<{ id: string }>(`SELECT id FROM employees WHERE employee_code = 'D-5'`);
+    await legacyServiceAccount(h.ctx.sql, {
+      subscriptionId: githubSubscription,
+      employeeId: d5.rows[0].id,
+      identifier: 'ci-bot',
+      reason: 'CI',
+    });
     await h.written({ subscriptionId: slackSubscription }, [person('F-1', 'slack-'), person('D-1', 'slack-')]);
     // Internal software has no subscription, so no owner: the seat of a member of finance on it is read through the member.
     await h.written({ planId: await h.plan('K5') }, [person('F-1', 'portal-')]);
@@ -142,30 +149,32 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     await h.stop();
   });
 
-  it('AC-13, F22: lists exactly the seats on the subscriptions the department owns and the service accounts it owns, whoever holds them, and none of another department', async () => {
+  // Rewritten for QĐ-103d (the pool of seats is every department's): a seat carries the department of its holder, not the one that owns the
+  // subscription, so a department's tools are the seats its people hold (and the service accounts it owns), on any subscription.
+  it('AC-13, F22: lists exactly the seats the people of the department hold, on any subscription, and the service accounts it owns, and none of another department', async () => {
     const result = await toolsOf(design.id);
 
     expect(result.pagination.totalItems).toBe(7);
-    // F1 is a person of finance who holds a seat of the subscription of design: it is design's seat, listed once.
+    // D1 holds a seat of Figma and one of Slack (finance's subscription): both are design's. F1, a person of finance, is not listed.
     expect(result.items.map((item) => item.employeeCode).sort()).toEqual([
+      'D-1',
       'D-1',
       'D-2',
       'D-3',
       'D-4',
       'D-5',
       'D-6',
-      'F-1',
     ]);
-    expect(result.items.find((item) => item.employeeCode === 'F-1')).toMatchObject({
+    expect(result.items.find((item) => item.employeeCode === 'D-2')).toMatchObject({
       kind: 'PERSONAL',
       holderStatus: 'ACTIVE',
     });
     expect(result.items.find((item) => item.employeeCode === 'D-5')).toMatchObject({
       kind: 'SERVICE',
-      source: 'BASELINE',
+      source: 'REQUEST',
       holderStatus: 'ACTIVE',
     });
-    expect(result.summary.map((entry) => entry.seats).sort()).toEqual([2, 5]);
+    expect(result.summary.map((entry) => entry.seats).sort()).toEqual([1, 2, 4]);
     expect(result.items[0]).toEqual(
       expect.objectContaining({
         application: { id: expect.any(String) as unknown, name: expect.any(String) as unknown },
@@ -176,15 +185,14 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     expect(JSON.stringify(result)).not.toContain('ci-bot');
   });
 
-  it('F22: groups by the owner of the seat, not by the department of the holder: a person of design on a subscription of finance is the tool of finance', async () => {
+  it('F22: groups by the department of the holder (QĐ-103d): a person of design on a subscription of finance is a tool of design, not of finance', async () => {
     const result = await toolsOf(finance.id);
 
-    // The Slack seats of F1 and D1 (a person of design), and the seat of F1 on internal software.
+    // The three seats of F1 (Figma, Slack, internal software); the Slack seat of D1 is design's.
     expect(result.pagination.totalItems).toBe(3);
-    expect(result.items.map((item) => item.employeeCode).sort()).toEqual(['D-1', 'F-1', 'F-1']);
+    expect(result.items.map((item) => item.employeeCode).sort()).toEqual(['F-1', 'F-1', 'F-1']);
     expect(result.items.every((item) => item.kind === 'PERSONAL')).toBe(true);
-    // The seat of D1 on Slack is not design's: design lists D1 once, for Figma.
-    expect((await toolsOf(design.id)).items.filter((item) => item.employeeCode === 'D-1')).toHaveLength(1);
+    expect((await toolsOf(design.id)).items.filter((item) => item.employeeCode === 'D-1')).toHaveLength(2);
   });
 
   /**
@@ -198,7 +206,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
 
     beforeAll(async () => {
       trm = await department('P-TRM');
-      trmSubscription = await h.subscription(20, 'K1', trm.id);
+      trmSubscription = await h.subscription(20, 'K1');
     });
 
     /** A person of the department with a seat from long ago on its K1 subscription; extra columns of the file go with it. */
@@ -246,6 +254,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
           evidence: 'đã hủy',
           paidThroughOn: h.inDays(10),
           accessState: 'UNTIL_PAID_END',
+          k1Checklist: k1Checklist('DEPARTURE'),
         })
         .expect(200);
 
@@ -279,42 +288,6 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
       expect(await validUntilOf(renewing)).toBe(h.inDays(5));
       const renewed = (await itemsOfTrm()).find((item) => item.assignmentId === renewing);
       expect(renewed).toMatchObject({ employeeCode: 'TR-RNW', terminating: false, terminatingUntil: null });
-      expect(await terminatingCodes()).toEqual(['TR-CNL']);
-    });
-
-    it('does not tell a service account whose person responsible changes on a later day', async () => {
-      const first = await enter(trm.code, 'TR-BOT1');
-      const next = await enter(trm.code, 'TR-BOT2');
-      await h.written({ subscriptionId: trmSubscription }, [
-        {
-          employee_code: 'TR-BOT1',
-          account_identifier: 'ci-trm',
-          kind: 'service',
-          reason: 'CI',
-          granted_on: '2026-01-05',
-        },
-      ]);
-      const bot = (await h.assignmentsOf({ subscriptionId: trmSubscription, kind: 'SERVICE' })).find(
-        (assignment) => assignment.employeeId === first,
-      );
-      if (!bot) throw new Error('no service account of TR-BOT1');
-
-      await request(h.server())
-        .post(`/api/v1/license-assignments/${bot.id}/responsible-changes`)
-        .set(h.as(h.it1))
-        .send({ employeeId: next, effectiveFrom: h.inDays(7) })
-        .expect(200);
-
-      expect(await validUntilOf(bot.id)).toBe(h.inDays(7));
-      const items = await itemsOfTrm();
-      expect(items.find((item) => item.assignmentId === bot.id)).toMatchObject({
-        kind: 'SERVICE',
-        employeeCode: 'TR-BOT1',
-        terminating: false,
-        terminatingUntil: null,
-      });
-      // The next record begins in a week: it holds nothing today and is not listed.
-      expect(items.map((item) => item.employeeCode)).not.toContain('TR-BOT2');
       expect(await terminatingCodes()).toEqual(['TR-CNL']);
     });
   });

@@ -14,6 +14,7 @@ import {
   ProvisioningAnotherItAdminNeededError,
   ProvisioningBeneficiaryDepartedError,
   ProvisioningBeneficiaryNotStartedError,
+  ProvisioningContractEndedError,
   ProvisioningEvidenceRequiredError,
   ProvisioningPersonalAccountError,
   ProvisioningReasonRequiredError,
@@ -21,6 +22,7 @@ import {
   ProvisioningResponsibleNotInDepartmentError,
   ProvisioningSubscriptionError,
   ProvisioningTaskAlreadyManualError,
+  ProvisioningTaskNotBeforeError,
   ProvisioningTaskNotFoundError,
   ProvisioningTaskNotManualError,
   ProvisioningTaskStateError,
@@ -32,9 +34,21 @@ import {
   SeatQuantityUnknownError,
   SeatSubscriptionDraftError,
   SeatTargetNotFoundError,
+  LicenseKeyNotFoundError,
 } from '../public/licensing.errors';
+import type { K1ChecklistExpectation } from '../public/licensing.types';
 import { toLicensingApiException } from '../licensing.http-errors';
-import { ProvisioningItAdminRequiredError } from './provisioning.errors';
+import {
+  PurchaseNotAllowedError,
+  PurchaseNotApplicableError,
+  PurchaseReasonRequiredError,
+} from '../shared-pool/shared-pool.errors';
+import { LicenseKeyStateError } from '../license-key/license-key.errors';
+import {
+  ProvisioningItAdminRequiredError,
+  ProvisioningK1ChecklistError,
+  ProvisioningKeyError,
+} from './provisioning.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });
@@ -95,7 +109,14 @@ export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof ProvisioningBeneficiaryDepartedError) {
     return refuse(CONFLICT, 'PROVISIONING.BENEFICIARY_DEPARTED', error.message, {
       requestId: error.requestId,
+      cause: error.reason,
       nextStep: 'CANCEL_REQUEST',
+    });
+  }
+  if (error instanceof ProvisioningContractEndedError) {
+    return refuse(CONFLICT, 'PROVISIONING.CONTRACT_ENDED', error.message, {
+      requestId: error.requestId,
+      contractEndDate: error.contractEndDate,
     });
   }
   if (error instanceof ProvisioningBeneficiaryNotStartedError) {
@@ -113,6 +134,9 @@ export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof ProvisioningTaskAlreadyManualError) {
     return refuse(CONFLICT, 'PROVISIONING_TASK.ALREADY_MANUAL', error.message);
   }
+  if (error instanceof ProvisioningTaskNotBeforeError) {
+    return refuse(CONFLICT, 'PROVISIONING_TASK.NOT_BEFORE', error.message, { notBefore: error.notBefore });
+  }
   if (error instanceof ProvisioningTaskStateError) {
     return refuse(CONFLICT, `PROVISIONING_TASK.${error.problem}`, error.message);
   }
@@ -123,7 +147,13 @@ export function toProvisioningApiException(error: unknown): unknown {
     return refuse(UNPROCESSABLE, 'PROVISIONING_TASK.REASON_REQUIRED', error.message);
   }
   if (error instanceof RevocationCompletionError) {
-    return refuse(UNPROCESSABLE, `REVOCATION.${error.problem}`, error.message);
+    // A refused K1 checklist tells the variant the server worked out and the steps it expects of this task.
+    return refuse(
+      UNPROCESSABLE,
+      `REVOCATION.${error.problem}`,
+      error.message,
+      error.expected ? { variant: error.expected.variant, codes: error.expected.codes } : undefined,
+    );
   }
   if (error instanceof RevocationRefusedError) {
     if (error.problem === 'SOURCE_REQUIRED') return refuse(UNPROCESSABLE, 'REVOCATION.SOURCE_REQUIRED', error.message);
@@ -139,6 +169,32 @@ export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof ProvisioningAnotherItAdminNeededError) {
     return refuse(HttpStatus.FORBIDDEN, 'PROVISIONING.ANOTHER_IT_ADMIN_NEEDED', error.message);
   }
+  if (error instanceof PurchaseNotApplicableError) {
+    return refuse(UNPROCESSABLE, 'PROVISIONING.PURCHASE_NOT_APPLICABLE', error.message);
+  }
+  if (error instanceof PurchaseNotAllowedError) {
+    return refuse(CONFLICT, 'PROVISIONING.PURCHASE_NOT_ALLOWED', error.message, {
+      freeSeats: error.freeSeats,
+      subscriptionIds: error.subscriptionIds,
+    });
+  }
+  if (error instanceof PurchaseReasonRequiredError) {
+    return refuse(UNPROCESSABLE, 'PROVISIONING.PURCHASE_REASON_REQUIRED', error.message);
+  }
+  if (error instanceof ProvisioningKeyError)
+    return refuse(UNPROCESSABLE, `PROVISIONING.${error.problem}`, error.message);
+  if (error instanceof ProvisioningK1ChecklistError) {
+    // A refused checklist of a K1 grant tells the variant and the two steps the server expects; another kind of grant has none to tell.
+    return refuse(
+      UNPROCESSABLE,
+      `PROVISIONING.${error.problem}`,
+      error.message,
+      error.expected ? { variant: error.expected.variant, codes: error.expected.codes } : undefined,
+    );
+  }
+  if (error instanceof LicenseKeyNotFoundError)
+    return refuse(HttpStatus.NOT_FOUND, 'LICENSE_KEY.NOT_FOUND', error.message);
+  if (error instanceof LicenseKeyStateError) return refuse(CONFLICT, `LICENSE_KEY.${error.problem}`, error.message);
   // The same answer as the role guard of the route: the policy of the work refuses what the guard would have refused.
   if (error instanceof ProvisioningItAdminRequiredError) return new ApiException(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR);
 
@@ -146,6 +202,25 @@ export function toProvisioningApiException(error: unknown): unknown {
 }
 
 const example = (error: Error) => errorExampleOf(toProvisioningApiException(error));
+
+/** What a refused K1 checklist of a person who leaves tells the client: the variant and the six steps, the lock of the mailbox last. */
+const K1_DEPARTURE_EXPECTED: K1ChecklistExpectation = {
+  variant: 'DEPARTURE',
+  codes: [
+    'MAILBOX_PASSWORD_RESET',
+    'SOFTWARE_FORGOT_PASSWORD',
+    'SESSIONS_SIGNED_OUT',
+    'RENEWAL_DISABLED',
+    'EVIDENCE_RECORDED',
+    'MAILBOX_LOCKED',
+  ],
+};
+
+/** What a refused checklist of the grant of a K1 seat tells the client: the variant and the two steps, in their order. */
+const K1_GRANT_EXPECTED: K1ChecklistExpectation = {
+  variant: 'GRANT',
+  codes: ['COMPANY_EMAIL_REGISTERED', 'NO_PERSONAL_DEVICE_MFA'],
+};
 
 /**
  * The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). Since G5
@@ -160,12 +235,14 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   ANOTHER_IT_ADMIN_NEEDED: example(new ProvisioningAnotherItAdminNeededError()),
   NOT_CLAIMABLE: example(new ProvisioningTaskStateError('NOT_CLAIMABLE')),
   NOT_IN_PROGRESS: example(new ProvisioningTaskStateError('NOT_IN_PROGRESS')),
+  NOT_MANUAL: example(new ProvisioningTaskNotManualError()),
   IS_REVOCATION: example(new ProvisioningTaskStateError('IS_REVOCATION')),
   NOT_REVOCATION: example(new ProvisioningTaskStateError('NOT_REVOCATION')),
   NOT_FAILED: example(new ProvisioningTaskStateError('NOT_FAILED')),
   WITHDRAWAL_PENDING: example(new ProvisioningTaskStateError('WITHDRAWAL_PENDING')),
   NO_WITHDRAWAL: example(new ProvisioningTaskStateError('NO_WITHDRAWAL')),
   NOT_TERMINATING: example(new ProvisioningTaskStateError('NOT_TERMINATING')),
+  NOT_BEFORE: example(new ProvisioningTaskNotBeforeError('2026-11-08')),
   ALREADY_MANUAL: example(new ProvisioningTaskAlreadyManualError()),
   BENEFICIARY_DEPARTED: example(new ProvisioningBeneficiaryDepartedError('<request-id>')),
   COMPLETION_NOT_ALLOWED: example(new RevocationCompletionError('COMPLETION_NOT_ALLOWED')),
@@ -173,22 +250,45 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   PAID_THROUGH_REQUIRED: example(new RevocationCompletionError('PAID_THROUGH_REQUIRED')),
   ACCESS_STATE_REQUIRED: example(new RevocationCompletionError('ACCESS_STATE_REQUIRED')),
   ACCESS_STATE_INVALID: example(new RevocationCompletionError('ACCESS_STATE_INVALID')),
+  WITHDRAWAL_REASON_REQUIRED: example(new RevocationCompletionError('WITHDRAWAL_REASON_REQUIRED')),
+  KEY_DISPOSITION_REQUIRED: example(new RevocationCompletionError('KEY_DISPOSITION_REQUIRED')),
+  K1_CHECKLIST_INCOMPLETE: example(new RevocationCompletionError('K1_CHECKLIST_INCOMPLETE', K1_DEPARTURE_EXPECTED)),
+  K1_CHECKLIST_OUT_OF_ORDER: example(new RevocationCompletionError('K1_CHECKLIST_OUT_OF_ORDER', K1_DEPARTURE_EXPECTED)),
+  GRANT_K1_CHECKLIST_INCOMPLETE: example(
+    new ProvisioningK1ChecklistError('K1_CHECKLIST_INCOMPLETE', K1_GRANT_EXPECTED),
+  ),
+  GRANT_K1_CHECKLIST_OUT_OF_ORDER: example(
+    new ProvisioningK1ChecklistError('K1_CHECKLIST_OUT_OF_ORDER', K1_GRANT_EXPECTED),
+  ),
+  GRANT_K1_CHECKLIST_NOT_ALLOWED: example(new ProvisioningK1ChecklistError('K1_CHECKLIST_NOT_ALLOWED')),
+  KEY_REQUIRED: example(new ProvisioningKeyError('KEY_REQUIRED')),
+  KEY_NOT_APPLICABLE: example(new ProvisioningKeyError('KEY_NOT_APPLICABLE')),
+  KEY_NOT_FOUND: example(new LicenseKeyNotFoundError()),
+  KEY_NOT_IN_STORE: example(new LicenseKeyStateError('NOT_IN_STORE')),
+  KEY_WITHDRAWN: example(new LicenseKeyStateError('WITHDRAWN')),
+  KEY_SUBSCRIPTION_MISMATCH: example(new LicenseKeyStateError('SUBSCRIPTION_MISMATCH')),
 } as const;
 
 /** The refusals of the grant of a seat, by status, after the request gate of G5 (`US-07-01`). */
 export const PROVISIONING_GRANT_EXAMPLES = {
-  NOT_FOUND: [PROVISIONING_ERROR_EXAMPLES.REQUEST_NOT_FOUND, example(new SeatTargetNotFoundError('SUBSCRIPTION'))],
+  NOT_FOUND: [
+    PROVISIONING_ERROR_EXAMPLES.REQUEST_NOT_FOUND,
+    example(new SeatTargetNotFoundError('SUBSCRIPTION')),
+    example(new EmployeeNotFoundError('<employee-id>')),
+  ],
   CONFLICT: [
     example(new GrantRequestRefusedError('NOT_APPROVED')),
     example(new GrantRequestRefusedError('ENDED')),
     example(new GrantRequestRefusedError('NOT_IN_CATALOG')),
     example(new GrantRequestRefusedError('BOUNDARY_NOT_CHECKED')),
     example(new ProvisioningResponsibleNotInDepartmentError()),
-    example(new ProvisioningTypeNotSupportedError('K4')),
+    example(new ProvisioningTypeNotSupportedError('K3')),
     PROVISIONING_ERROR_EXAMPLES.BENEFICIARY_DEPARTED,
     example(new ProvisioningBeneficiaryNotStartedError('<request-id>', '2026-01-01')),
+    example(new ProvisioningContractEndedError('<request-id>', '2026-01-01')),
     example(new SeatApplicationRetiredError()),
-    example(new AssignmentConflictError('SEAT_CAPACITY', 0)),
+    example(new AssignmentConflictError('SEAT_CAPACITY', 0, 2)),
+    example(new PurchaseNotAllowedError(2, ['<subscription-id>'])),
   ],
   UNPROCESSABLE: [
     example(new GrantRequestRefusedError('BENEFICIARY_REQUIRED')),
@@ -202,14 +302,16 @@ export const PROVISIONING_GRANT_EXAMPLES = {
         employeeIds: ['<employee-id>'],
       }),
     ),
-    example(new ProvisioningSubscriptionError('REQUIRED')),
     example(new ProvisioningSubscriptionError('NOT_ALLOWED')),
     example(new ProvisioningSubscriptionError('PLAN_MISMATCH')),
+    example(new ProvisioningSubscriptionError('NOT_GRANTABLE')),
+    example(new ProvisioningSubscriptionError('NEXT_PERIOD_SEATS')),
     example(new SeatQuantityUnknownError()),
     example(new SeatSubscriptionDraftError(['START_DATE'])),
     example(new AssignmentConflictError('OVERLAP', 0)),
     example(new AssignmentConflictError('IDENTIFIER_IN_USE', 0)),
     example(new AssignmentConflictError('EXPECTED_END_REQUIRED', 0)),
-    example(new AssignmentConflictError('SUBSCRIPTION_DEPARTMENT_MISMATCH', 0)),
+    example(new PurchaseNotApplicableError()),
+    example(new PurchaseReasonRequiredError()),
   ],
 } as const;

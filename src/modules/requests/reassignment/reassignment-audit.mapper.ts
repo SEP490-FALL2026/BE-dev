@@ -1,5 +1,5 @@
 import type { AuditEventInput, AuditValue } from '../../audit/public/audit.types';
-import type { OperatorAuditActor } from '../../licensing/public/licensing-handover.types';
+import type { OperatorAuditActor } from '../../licensing/public/licensing.types';
 
 /**
  * The audit event of a change the system made to who holds a step: nobody acted, an event of the organization or a role did,

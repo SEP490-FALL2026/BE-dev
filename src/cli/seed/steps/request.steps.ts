@@ -1,31 +1,28 @@
 import { as, listAll, tag } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoRequestScenario } from '../fixture/demo-fixture.types';
-import { nextScenarioAction, ScenarioAction } from './scenario-path';
+import { grantTaskStatus, perform, type RequestWire } from './request-actions';
+import { nextScenarioAction, reachedTarget, type ScenarioPosition } from './scenario-path';
 
-export interface RequestWire {
-  id: string;
-  state: string;
-  businessReason?: string | null;
-  proposal?: { purpose: string } | null;
-  plan?: { planId: string } | null;
-  department: { code: string };
-  policy: { hasSpendStep: boolean };
-  needStep: { assignee: { employeeCode: string } | null } | null;
-}
+export type { RequestWire } from './request-actions';
 
-const MAX_TURNS = 8;
+const MAX_TURNS = 10;
 
-function departmentOf(ctx: DemoRunContext, code: string) {
-  const department = ctx.fixture.departments.find((candidate) => candidate.code === code);
-  if (!department) throw new Error(`The request belongs to a department the fixture does not declare: ${code}`);
+/**
+ * The time of use of a request as the body carries it (`QĐ-111i`, RQ-2): the months it asks for, never a date (`expectedEndDate` is a 422).
+ * No months: the field is left out, which is a right with no end for a plan of seats or internal software of a staff member, and nothing for a
+ * plan bought once.
+ */
+export const termBody = (termMonths: number | null): { termMonths?: number } =>
+  termMonths === null ? {} : { termMonths };
 
-  return department;
-}
+/** Who reads the request: its requester, unless the scenario names another because the requester can no longer sign in (C-2). */
+const readerOf = (scenario: DemoRequestScenario): string => scenario.readAs ?? scenario.requester;
 
 /**
  * The request of a scenario, found from what the API itself recorded: every request its requester sent is an Audit Trail
- * event (written in the transaction that sent it), and the request carries the scenario's tag at the start of its text.
+ * event (written in the transaction that sent it), and the request carries the scenario's tag at the start of its text. It is read by
+ * `readAs` when the scenario names one, so a requester whose access is blocked is never signed in for it (C-2).
  */
 export async function findScenarioRequest(
   ctx: DemoRunContext,
@@ -36,12 +33,13 @@ export async function findScenarioRequest(
   const events = await listAll<{ resourceId: string }>(
     ctx,
     ctx.superAdminEmail,
-    `/audit-events?actorAppUserId=${appUserId}&action=ACCESS_REQUEST.SUBMITTED&resourceType=ACCESS_REQUEST`,
+    `/audit-events?actorAppUserId=${appUserId}&resourceType=ACCESS_REQUEST&action=ACCESS_REQUEST.SUBMITTED`,
   );
-  const requester = await as(ctx, scenario.requester);
+  if (events.length === 0) return null;
+  const reader = await as(ctx, readerOf(scenario));
   const marker = tag(ctx, scenario.key);
   for (const id of new Set(events.map((event) => event.resourceId))) {
-    const data = await ctx.api.call<{ request?: RequestWire }>(requester, 'GET', `/access-requests/${id}`);
+    const data = await ctx.api.call<{ request?: RequestWire }>(reader, 'GET', `/access-requests/${id}`);
     const texts = [data.request?.businessReason, data.request?.proposal?.purpose];
     if (data.request && texts.some((text) => text?.startsWith(marker))) {
       ctx.ids.requests.set(scenario.key, id);
@@ -52,23 +50,74 @@ export async function findScenarioRequest(
   return null;
 }
 
+/** The free text a scenario sends as its reason or purpose: the tag that finds it again, then the business reason (never the developer's `summary`). */
+export const requestTextOf = (ctx: DemoRunContext, scenario: DemoRequestScenario): string =>
+  `${tag(ctx, scenario.key)} ${scenario.reason}`;
+
 async function submit(ctx: DemoRunContext, scenario: DemoRequestScenario): Promise<RequestWire> {
   const requester = await as(ctx, scenario.requester);
-  const text = `${tag(ctx, scenario.key)} ${scenario.summary}`;
-  const created = scenario.proposal
-    ? await ctx.api.call<{ request: RequestWire }>(requester, 'POST', '/access-requests/proposals', {
-        ...scenario.proposal,
-        purpose: text,
-        termMonths: scenario.termMonths,
-      })
-    : await ctx.api.call<{ request: RequestWire }>(requester, 'POST', '/access-requests', {
-        planId: ctx.ids.plans.get(scenario.plan ?? ''),
-        businessReason: text,
-        termMonths: scenario.termMonths,
-      });
+  const text = requestTextOf(ctx, scenario);
+  const planId = ctx.ids.plans.get(scenario.plan ?? '');
+  let created: { request: RequestWire };
+  if (scenario.proposal) {
+    const { existingApplication, ...proposal } = scenario.proposal;
+    created = await ctx.api.call(requester, 'POST', '/access-requests/proposals', {
+      ...proposal,
+      ...(existingApplication ? { existingApplicationId: ctx.ids.applications.get(existingApplication) } : {}),
+      purpose: text,
+      ...termBody(scenario.termMonths),
+    });
+  } else if (scenario.beneficiaries) {
+    created = await ctx.api.call(requester, 'POST', '/group-requests', {
+      planId,
+      lines: scenario.beneficiaries.map((code) => ({ employeeId: ctx.ids.employees.get(code) })),
+      businessReason: text,
+      ...termBody(scenario.termMonths),
+    });
+  } else {
+    created = await ctx.api.call(requester, 'POST', '/access-requests', {
+      planId,
+      businessReason: text,
+      ...termBody(scenario.termMonths),
+    });
+  }
   ctx.ids.requests.set(scenario.key, created.request.id);
 
   return created.request;
+}
+
+/**
+ * Where the request stands on its path: its state and, besides it, the stage of its spend step, or for a request being granted the status of
+ * its grant task (read only when the scenario goes on from there, which is a call to the task list).
+ */
+async function positionOf(
+  ctx: DemoRunContext,
+  scenario: DemoRequestScenario,
+  request: RequestWire,
+): Promise<ScenarioPosition> {
+  const needsTask = request.state === 'EXECUTING' && scenario.target === 'FAILED';
+
+  return {
+    state: request.state,
+    stage: needsTask ? await grantTaskStatus(ctx, scenario, request) : (request.spend?.stage ?? null),
+  };
+}
+
+/** Why the request cannot go on towards its scenario, or null when it can. */
+function obstacleOf(ctx: DemoRunContext, scenario: DemoRequestScenario, request: RequestWire): string | null {
+  if (scenario.plan && request.plan && request.plan.planId !== ctx.ids.plans.get(scenario.plan))
+    return `Request ${scenario.key} đã có nhưng cho gói khác fixture`;
+
+  return null;
+}
+
+const describePosition = (request: RequestWire): string =>
+  `${request.state}${request.spend ? `/${request.spend.stage}` : ''}`;
+
+async function reload(ctx: DemoRunContext, scenario: DemoRequestScenario, id: string): Promise<RequestWire> {
+  const reader = await as(ctx, readerOf(scenario));
+
+  return (await ctx.api.call<{ request: RequestWire }>(reader, 'GET', `/access-requests/${id}`)).request;
 }
 
 async function scenarioStep(ctx: DemoRunContext, scenario: DemoRequestScenario): Promise<StepOutcome> {
@@ -80,11 +129,14 @@ async function scenarioStep(ctx: DemoRunContext, scenario: DemoRequestScenario):
     moved = true;
   }
   for (let turn = 0; turn < MAX_TURNS; turn++) {
-    if (scenario.plan && request.plan && request.plan.planId !== ctx.ids.plans.get(scenario.plan))
-      return { status: 'conflict', detail: `Request ${scenario.key} đã có nhưng cho gói khác fixture` };
-    if (request.state === scenario.target) return { status: moved ? 'done' : 'present', detail: `${request.state}` };
-    const action = nextScenarioAction(request.state, scenario.target);
-    if (!action) return { status: 'conflict', detail: `đang ở ${request.state}, không tới được ${scenario.target}` };
+    const obstacle = obstacleOf(ctx, scenario, request);
+    if (obstacle) return { status: 'conflict', detail: obstacle };
+    const position = await positionOf(ctx, scenario, request);
+    if (reachedTarget(position, scenario))
+      return { status: moved ? 'done' : 'present', detail: describePosition(request) };
+    const action = nextScenarioAction(position, scenario);
+    if (!action)
+      return { status: 'conflict', detail: `đang ở ${describePosition(request)}, không tới được ${scenario.target}` };
     if (ctx.mode === 'plan') return { status: 'planned', detail: `${request.state} → ${action}` };
     await perform(ctx, scenario, request, action);
     moved = true;
@@ -94,102 +146,14 @@ async function scenarioStep(ctx: DemoRunContext, scenario: DemoRequestScenario):
   return { status: 'conflict', detail: `không tới được ${scenario.target} sau ${MAX_TURNS} bước` };
 }
 
-async function reload(ctx: DemoRunContext, scenario: DemoRequestScenario, id: string): Promise<RequestWire> {
-  const requester = await as(ctx, scenario.requester);
-
-  return (await ctx.api.call<{ request: RequestWire }>(requester, 'GET', `/access-requests/${id}`)).request;
-}
-
-async function perform(
-  ctx: DemoRunContext,
-  scenario: DemoRequestScenario,
-  request: RequestWire,
-  action: ScenarioAction,
-): Promise<void> {
-  const department = departmentOf(ctx, request.department.code);
-  switch (action) {
-    case 'NEED_APPROVE':
-    case 'NEED_REJECT':
-      return decideNeed(ctx, scenario, request, action === 'NEED_APPROVE');
-    case 'WITHDRAW':
-      return withdraw(ctx, scenario, request);
-    case 'SUBMIT_BATCH':
-      return post(ctx, department.head, '/spend-batches', { requestIds: [request.id] });
-    case 'APPROVE_SPEND':
-      return post(ctx, ctx.fixture.approvalRoles.SPENDING_APPROVER, `/access-requests/${request.id}/spend-approval`, {
-        decision: 'APPROVE',
-      });
-    case 'GRANT':
-      return post(ctx, department.itAdmin, '/provisioning-tasks', {
-        requestId: request.id,
-        subscriptionId: ctx.ids.subscriptions.get(scenario.grantFrom ?? ''),
-      });
-    case 'COMPLETE_TASK':
-      return completeGrant(ctx, department.itAdmin, request.id, scenario);
-  }
-}
-
-async function post(ctx: DemoRunContext, code: string | null, path: string, body: unknown): Promise<void> {
-  if (!code) throw new Error(`No demo person acts at ${path}: the fixture leaves that role empty`);
-  await ctx.api.call(await as(ctx, code), 'POST', path, body);
-}
-
-async function decideNeed(ctx: DemoRunContext, scenario: DemoRequestScenario, request: RequestWire, approve: boolean) {
-  const assignee = request.needStep?.assignee?.employeeCode ?? null;
-  if (!assignee || !ctx.fixture.people.some((person) => person.code === assignee)) {
-    throw new Error(
-      `The need step of ${scenario.key} is held by somebody outside the dataset (${assignee ?? 'nobody'})`,
-    );
-  }
-  const body = approve
-    ? { decision: 'APPROVE' }
-    : { decision: 'REJECT', reason: `${tag(ctx, scenario.key)} Chưa cần trong quý này.` };
-  await post(ctx, assignee, `/access-requests/${request.id}/need-decision`, body);
-}
-
-async function withdraw(ctx: DemoRunContext, scenario: DemoRequestScenario, request: RequestWire): Promise<void> {
-  await post(ctx, scenario.requester, `/access-requests/${request.id}/withdraw`, {
-    reason: `${tag(ctx, scenario.key)} Không còn cần.`,
-  });
-}
-
-interface TaskRow {
-  id: string;
-  kind: string;
-  status: string;
-  requestId: string | null;
-}
-
-async function completeGrant(
-  ctx: DemoRunContext,
-  admin: string | null,
-  requestId: string,
-  scenario: DemoRequestScenario,
-) {
-  if (!admin) throw new Error(`No IT Admin of the dataset carries out ${scenario.key}`);
-  const email = await as(ctx, admin);
-  const tasks = await listAll<TaskRow>(ctx, email, '/provisioning-tasks?scope=ALL');
-  const task = tasks.find(
-    (row) => row.requestId === requestId && row.kind === 'GRANT' && ['QUEUED', 'IN_PROGRESS'].includes(row.status),
-  );
-  if (!task) throw new Error(`The grant task of ${scenario.key} is neither queued nor in progress`);
-  if (task.status === 'QUEUED') await ctx.api.call(email, 'POST', `/provisioning-tasks/${task.id}/claim`);
-  await ctx.api.call(email, 'POST', `/provisioning-tasks/${task.id}/complete`, {
-    evidence: `${tag(ctx, scenario.key)} Đã thêm email công ty vào workspace.`,
-  });
-}
-
-const BASE_NEEDS = ['catalog.subscriptions', 'org.heads', 'org.approval-roles', 'org.it-admins'];
+const BASE_NEEDS = ['catalog.baseline-close', 'org.heads', 'org.approval-roles', 'org.it-admins', 'assets.keys'];
 
 export function requestSteps(scenarios: readonly DemoRequestScenario[]): DemoStep[] {
   return scenarios.map((scenario) => ({
     key: `requests.${scenario.key}`,
     title: `Request ${scenario.key} → ${scenario.target}: ${scenario.summary}`,
-    // A request that is checked against the budget of the year waits for that budget; the others do not.
-    needs:
-      scenario.target === 'COMPLETED' || scenario.target === 'AWAITING_SPEND_DECISION'
-        ? [...BASE_NEEDS, 'budget.year']
-        : BASE_NEEDS,
+    // A request checked against the budget waits for the budget of the year; the others do not.
+    needs: ['budget.year', ...BASE_NEEDS],
     run: (ctx) => scenarioStep(ctx, scenario),
   }));
 }

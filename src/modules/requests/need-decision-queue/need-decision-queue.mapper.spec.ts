@@ -45,7 +45,7 @@ const lookups = (extra: Partial<NeedQueueLookups> = {}): NeedQueueLookups => ({
   ]),
   plans: [{ planId: 'plan-1', planName: 'Team', applicationName: 'Wiki' }] as unknown as NeedQueueLookups['plans'],
   departments: [
-    { id: 'dep-1', code: 'P-DES', name: 'Design', active: true, costCenterActive: true },
+    { id: 'dep-1', code: 'P-DES', name: 'Design', active: true, effectiveFrom: '2026-01-01', costCenterActive: true },
   ] as NeedQueueLookups['departments'],
   units: new Map([['VND', 0]]),
   due: new Map([['step-1', '2026-10-05']]),
@@ -74,15 +74,15 @@ describe('a row of the queue of the need steps', () => {
       department: { id: 'dep-1', code: 'P-DES', name: 'Design' },
       businessReasonExcerpt: 'The project needs a wiki',
       termMonths: 6,
+      expectedEndDate: null,
       pricing: { status: 'PRICED', amount: { amount: '123456', currency: 'VND' } },
-      samePersonAsSpend: false,
     });
     expect(JSON.stringify(item)).not.toMatch(/remaining|committed|spent|held|primaryCode|toolset|standard/i);
+    expect(item).not.toHaveProperty('samePersonAsSpend');
   });
 
   it.each([
     [1, 'MANAGER'],
-    [2, 'SPENDING_APPROVER'],
     [5, 'MANAGER'],
     [9, 'MANAGER'],
   ])('names the role of the holder from the row %i of the routing table: %s', (routingRow, role) => {
@@ -129,6 +129,16 @@ describe('a row of the queue of the need steps', () => {
 
     expect(needQueueItemOf(row({ request: renewal }), lookups())).toMatchObject({
       termMonths: 3,
+    });
+  });
+
+  it('QĐ-104a: reads the day the right ends as the sender chose it, and none for a right with no end', () => {
+    const ended = row({ request: { termMonths: null, expectedEndDate: new Date('2026-12-31T00:00:00Z') } });
+
+    expect(needQueueItemOf(ended, lookups())).toMatchObject({ termMonths: null, expectedEndDate: '2026-12-31' });
+    expect(needQueueItemOf(row({ request: { termMonths: null } }), lookups())).toMatchObject({
+      termMonths: null,
+      expectedEndDate: null,
     });
   });
 

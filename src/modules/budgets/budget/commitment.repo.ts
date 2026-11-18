@@ -4,10 +4,14 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type {
   CommittedAmount,
+  HeldAmount,
   CommitmentHoldInput,
   CommitmentReleaseReason,
   HeldCommitment,
+  RequestCommitment,
+  SeatCommitment,
 } from '../public/budgets.types';
+import { BudgetCommitmentNotHoldableError } from '../public/budgets.errors';
 import { BudgetYearLockRepo } from './budget-year-lock.repo';
 import { InvoiceRepo } from './invoice.repo';
 import type { CommitmentRow } from './commitment-release.policy';
@@ -61,15 +65,20 @@ export class CommitmentRepo {
   }
 
   /**
-   * Holds the amount of each year for the request, one commitment for each year (`INV-16`): attached to the current budget of
-   * the year when there is one, and waiting for one with the reason *no budget* when there is not (`US-06-07` AC-1). The
-   * database refuses a second commitment for the same request and year.
+   * Holds the amount of each year for the request, one commitment for each year (`INV-16`), attached to the approved version of the
+   * year; with no version it refuses (`BudgetCommitmentNotHoldableError`), unless the caller is the one that makes the commitment on 01/01
+   * (`allowUnattached`), which waits for a budget with the reason *no budget* (`US-06-07` AC-1). The database refuses a second commitment
+   * for the same request and year.
    *
    * The budget of each Cost Center and year is locked first, the earliest year first, after the row of the request the caller
    * holds: what the decision of a version attaches and what is held here never read the current budget at the same moment,
    * so a commitment never waits for a budget that was approved while it was being made.
    */
-  async hold(tx: DbTx, input: CommitmentHoldInput): Promise<HeldCommitment[]> {
+  async hold(
+    tx: DbTx,
+    input: CommitmentHoldInput,
+    options: { allowUnattached: boolean } = { allowUnattached: false },
+  ): Promise<HeldCommitment[]> {
     await this.yearLock.lock(
       tx,
       input.costCenterId,
@@ -81,6 +90,9 @@ export class CommitmentRepo {
         where: { costCenterId: input.costCenterId, year: item.year, state: 'APPROVED' },
         select: { id: true },
       });
+      // No commitment is made without an approved version of the year (`FR-5.8a`), but the one made on 01/01 (`allowUnattached`).
+      if (!current && !options.allowUnattached)
+        throw new BudgetCommitmentNotHoldableError('NO_APPROVED_BUDGET', item.year);
       const created = await tx.budgetCommitment.create({
         data: {
           organizationId: input.organizationId,
@@ -94,6 +106,7 @@ export class CommitmentRepo {
           attachedAt: current ? input.now : null,
           unattachedReason: current ? null : 'NO_BUDGET',
           snapshotCheckId: input.snapshotCheckId,
+          seatMonthlyMinor: input.seatMonthlyMinor ?? null,
         },
         select: { id: true },
       });
@@ -113,7 +126,7 @@ export class CommitmentRepo {
    * release queues behind an invoice that is being recorded on one of them and reads it as it stands then, and two releases of the
    * same request queue the same way. An invoice takes no other lock than its own commitment, so no circle is made with the year.
    */
-  async lockOfRequest(tx: DbTx, requestId: string): Promise<CommitmentOfRequest[]> {
+  async lockOfRequest(tx: DbTx, requestId: string): Promise<LockedCommitmentOfRequest[]> {
     await tx.$queryRaw`SELECT id FROM budget_commitments WHERE request_id = ${requestId}::uuid ORDER BY year FOR UPDATE`;
     const rows = await tx.budgetCommitment.findMany({ where: { requestId }, orderBy: { year: 'asc' } });
 
@@ -126,7 +139,133 @@ export class CommitmentRepo {
       state: row.state,
       organizationId: row.organizationId,
       costCenterId: row.costCenterId,
+      origin: row.origin,
+      seatMonthlyMinor: row.seatMonthlyMinor,
+      attachedVersionId: row.attachedVersionId,
     }));
+  }
+
+  /**
+   * The commitments still held of these requests, for the years from `fromYear`, with their rows locked: the requests in order of id and the
+   * years of each earliest first, as `lockOfRequest` takes them, so two releases queue and never wait for each other in a circle.
+   */
+  async lockSeatCommitmentsOf(tx: DbTx, requestIds: readonly string[], fromYear: number): Promise<SeatCommitment[]> {
+    const found: (Omit<SeatCommitment, 'transferReleases'> & { id: string })[] = [];
+    for (const requestId of [...new Set(requestIds)].sort()) {
+      for (const row of await this.lockOfRequest(tx, requestId)) {
+        if (row.state !== 'HELD' || row.year < fromYear) continue;
+        found.push({
+          id: row.id,
+          requestId,
+          year: row.year,
+          origin: row.origin,
+          seatMonthlyMinor: row.seatMonthlyMinor,
+          heldMinor: row.amountMinor - row.releasedMinor - row.appliedMinor,
+        });
+      }
+    }
+    // The ledger is read under the locks just taken: a release of the transfer in this transaction, or one that committed before them, is seen.
+    const transferReleases = await this.transferReleasesOf(
+      tx,
+      found.map((item) => item.id),
+    );
+
+    return found.map(({ id, ...commitment }) => ({ ...commitment, transferReleases: transferReleases.get(id) ?? [] }));
+  }
+
+  /** For each of these commitments, the references of its releases for the day a transfer took effect; a commitment with none is absent. */
+  private async transferReleasesOf(tx: DbTx, commitmentIds: readonly string[]): Promise<Map<string, string[]>> {
+    const byCommitment = new Map<string, string[]>();
+    if (commitmentIds.length === 0) return byCommitment;
+    const rows = await tx.budgetCommitmentRelease.findMany({
+      where: { commitmentId: { in: [...commitmentIds] }, reason: 'TRANSFER_EFFECTIVE' },
+      select: { commitmentId: true, reasonText: true },
+    });
+    for (const row of rows) {
+      if (row.reasonText === null) continue;
+      byCommitment.set(row.commitmentId, [...(byCommitment.get(row.commitmentId) ?? []), row.reasonText]);
+    }
+
+    return byCommitment;
+  }
+
+  /** The commitments, among these, that already gave money back for this reason and reference. */
+  async releasedFor(
+    tx: DbTx,
+    commitmentIds: readonly string[],
+    by: { reason: CommitmentReleaseReason; reference: string },
+  ): Promise<Set<string>> {
+    if (commitmentIds.length === 0) return new Set();
+    const rows = await tx.budgetCommitmentRelease.findMany({
+      where: { commitmentId: { in: [...commitmentIds] }, reason: by.reason, reasonText: by.reference },
+      select: { commitmentId: true },
+    });
+
+    return new Set(rows.map((row) => row.commitmentId));
+  }
+
+  /** The requests, among these, that hold a commitment for the year already, whatever its state: one request holds one for a year (`INV-16`). */
+  async requestsHoldingYear(tx: DbTx, requestIds: readonly string[], year: number): Promise<Set<string>> {
+    if (requestIds.length === 0) return new Set();
+    const rows = await tx.budgetCommitment.findMany({
+      where: { requestId: { in: [...requestIds] }, year },
+      select: { requestId: true },
+    });
+
+    return new Set(rows.map((row) => row.requestId));
+  }
+
+  /**
+   * Holds the commitment of 01/01 of one request for the year (`FR-5.8`(6)): attached to the approved version of the Cost Center and year when there
+   * is one, waiting for a budget with the reason *no budget* when there is not (`FR-5.8a`, the one exception), never backed by a check. The
+   * lock of the Cost Center and year comes first, as in `hold`, so a version approved at the same moment either attaches it or is read here.
+   * Null, with nothing written, when the approved version is in another currency than the amount: the totals of a budget never add two.
+   */
+  async holdYearStart(
+    tx: DbTx,
+    input: {
+      organizationId: string;
+      requestId: string;
+      costCenterId: string;
+      year: number;
+      amountMinor: bigint;
+      currency: string;
+      seatMonthlyMinor: bigint;
+      now: Date;
+    },
+  ): Promise<(HeldCommitment & { costCenterId: string }) | null> {
+    await this.yearLock.lock(tx, input.costCenterId, [input.year]);
+    const current = await tx.budgetVersion.findFirst({
+      where: { costCenterId: input.costCenterId, year: input.year, state: 'APPROVED' },
+      select: { id: true, currency: true },
+    });
+    if (current && current.currency !== input.currency) return null;
+    const created = await tx.budgetCommitment.create({
+      data: {
+        organizationId: input.organizationId,
+        requestId: input.requestId,
+        costCenterId: input.costCenterId,
+        year: input.year,
+        amountMinor: input.amountMinor,
+        currency: input.currency,
+        state: 'HELD',
+        origin: 'YEAR_START',
+        seatMonthlyMinor: input.seatMonthlyMinor,
+        attachedVersionId: current?.id ?? null,
+        attachedAt: current ? input.now : null,
+        unattachedReason: current ? null : 'NO_BUDGET',
+        snapshotCheckId: null,
+      },
+      select: { id: true },
+    });
+
+    return {
+      id: created.id,
+      year: input.year,
+      amountMinor: input.amountMinor,
+      attachedVersionId: current?.id ?? null,
+      costCenterId: input.costCenterId,
+    };
   }
 
   /** One commitment with its row locked, so that two releases of it queue. */
@@ -221,6 +360,41 @@ export class CommitmentRepo {
     if (changed.count !== 1) throw new Error(`The commitment ${row.id} changed while an invoice was applied to it.`);
   }
 
+  /**
+   * Gives back to a commitment what seat-months applied and apply no more (`SM1-06`): the reversals are written first (`SeatMonthRepo.insertReversals`), then
+   * `applied_minor` goes down by exactly their sum and the running total `seat_month_reversed_minor` goes up by it, and the commitment is held again; the guard of
+   * the table refuses any other decrease. The caller holds the lock of the row.
+   */
+  async giveBackApplied(tx: DbTx, row: CommitmentRow, returnMinor: bigint): Promise<void> {
+    if (returnMinor === 0n) return;
+    const changed = await tx.budgetCommitment.updateMany({
+      where: { id: row.id, releasedMinor: row.releasedMinor, appliedMinor: row.appliedMinor },
+      data: {
+        appliedMinor: row.appliedMinor - returnMinor,
+        seatMonthReversedMinor: { increment: returnMinor },
+        state: 'HELD',
+      },
+    });
+    if (changed.count !== 1) throw new Error(`The commitment ${row.id} changed while a seat-month gave back to it.`);
+  }
+
+  /** The commitments of the request, the oldest year first, with what is left of each to be invoiced against; locks nothing. */
+  async ofRequest(requestId: string, tx?: DbTx): Promise<RequestCommitment[]> {
+    const rows = await (tx ?? this.prisma).budgetCommitment.findMany({
+      where: { requestId },
+      orderBy: { year: 'asc' },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      year: row.year,
+      costCenterId: row.costCenterId,
+      state: row.state,
+      amountMinor: row.amountMinor,
+      remainingMinor: row.state === 'HELD' ? row.amountMinor - row.releasedMinor - row.appliedMinor : 0n,
+    }));
+  }
+
   /** What went back to the budget from one commitment, the oldest first. */
   async pageReleases(commitmentId: string, skip: number, take: number) {
     const where = { commitmentId };
@@ -252,15 +426,36 @@ export class CommitmentRepo {
     return rows.map((row) => row.year);
   }
 
-  /** What each of the requests was committed for, one entry for each commitment, in one read. */
-  async amountsOfRequests(requestIds: readonly string[]): Promise<CommittedAmount[]> {
+  /** What each of the requests was committed for, one entry for each commitment, in one read (in `tx` when given: a commitment made in it is seen). */
+  async amountsOfRequests(requestIds: readonly string[], tx?: DbTx): Promise<CommittedAmount[]> {
     if (requestIds.length === 0) return [];
 
-    return this.prisma.budgetCommitment.findMany({
+    return (tx ?? this.prisma).budgetCommitment.findMany({
       where: { requestId: { in: [...requestIds] } },
       select: { requestId: true, amountMinor: true, currency: true },
       orderBy: [{ requestId: 'asc' }, { year: 'asc' }],
     });
+  }
+
+  /**
+   * What each of the requests still holds (the amount less what went back and what became an expense), for the commitments that are held,
+   * in one read that locks nothing: for a preview of what closing the requests would free.
+   */
+  async heldOfRequests(requestIds: readonly string[], tx?: DbTx): Promise<HeldAmount[]> {
+    if (requestIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).budgetCommitment.findMany({
+      where: { requestId: { in: [...requestIds] }, state: 'HELD' },
+      select: { requestId: true, amountMinor: true, releasedMinor: true, appliedMinor: true, currency: true },
+      orderBy: [{ requestId: 'asc' }, { year: 'asc' }],
+    });
+
+    return rows
+      .map((row) => ({
+        requestId: row.requestId,
+        currency: row.currency,
+        heldMinor: row.amountMinor - row.releasedMinor - row.appliedMinor,
+      }))
+      .filter((row) => row.heldMinor > 0n);
   }
 
   /** Whether the request holds any commitment: Finance reads such a request from the commitment (`US-06-09` AC-2). */
@@ -274,6 +469,10 @@ export class CommitmentRepo {
     attached?: boolean;
     year?: number;
     costCenterId?: string;
+    /** Only the commitments of these Cost Centers (a head reads those of the department they head); an empty list is none. */
+    costCenterIds?: readonly string[];
+    /** Only what is still held: the long-term commitments of the quarterly review (`QĐ-111aj`), of the `year` asked for. */
+    heldOnly?: boolean;
     requestId?: string;
     state?: 'HELD' | 'RELEASED' | 'EXPENSED';
     skip: number;
@@ -286,15 +485,17 @@ export class CommitmentRepo {
       ...(filter.costCenterId ? { costCenterId: filter.costCenterId } : {}),
       ...(filter.requestId ? { requestId: filter.requestId } : {}),
       ...(filter.id ? { id: filter.id } : {}),
+      ...(filter.costCenterIds ? { AND: [{ costCenterId: { in: [...filter.costCenterIds] } }] } : {}),
     };
+    const longTerm = filter.heldOnly ? { state: 'HELD' as const } : {};
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.budgetCommitment.findMany({
-        where,
+        where: { AND: [where, longTerm] },
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: filter.skip,
         take: filter.take,
       }),
-      this.prisma.budgetCommitment.count({ where }),
+      this.prisma.budgetCommitment.count({ where: { AND: [where, longTerm] } }),
     ]);
 
     return { rows, total };
@@ -310,6 +511,7 @@ export class CommitmentRepo {
   async totals(
     pairs: readonly { costCenterId: string; year: number }[],
     tx?: DbTx,
+    includeUnattached = false,
   ): Promise<Map<string, CommitmentTotals>> {
     const totals = new Map<string, CommitmentTotals>();
     if (pairs.length === 0) return totals;
@@ -323,7 +525,7 @@ export class CommitmentRepo {
       by: ['costCenterId', 'year'],
       where: {
         state: 'HELD',
-        attachedVersionId: { not: null },
+        ...(includeUnattached ? {} : { attachedVersionId: { not: null } }),
         OR: pairs.map((pair) => ({ costCenterId: pair.costCenterId, year: pair.year })),
       },
       _sum: { amountMinor: true, releasedMinor: true, appliedMinor: true },
@@ -335,6 +537,49 @@ export class CommitmentRepo {
     for (const [key, spent] of await this.invoices.spentOf(pairs, tx)) entry(key).spent += spent;
 
     return totals;
+  }
+
+  /**
+   * The commitments still held in these Cost Centers and years that know what one seat costs a month, with what each still holds: what the review of the
+   * price increase already known reads (`RV-1`, `R-52`). A commitment of a price that is not by the month has no seat price and is not here.
+   */
+  async heldWithSeatPrice(
+    pairs: readonly { costCenterId: string; year: number }[],
+    tx?: DbTx,
+  ): Promise<HeldWithSeatPrice[]> {
+    if (pairs.length === 0) return [];
+    const rows = await (tx ?? this.prisma).budgetCommitment.findMany({
+      where: {
+        state: 'HELD',
+        seatMonthlyMinor: { gt: 0n },
+        OR: pairs.map((pair) => ({ costCenterId: pair.costCenterId, year: pair.year })),
+      },
+      select: {
+        costCenterId: true,
+        year: true,
+        requestId: true,
+        amountMinor: true,
+        releasedMinor: true,
+        appliedMinor: true,
+        seatMonthlyMinor: true,
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.flatMap((row) => {
+      const heldMinor = row.amountMinor - row.releasedMinor - row.appliedMinor;
+      return heldMinor > 0n && row.seatMonthlyMinor !== null
+        ? [
+            {
+              costCenterId: row.costCenterId,
+              year: row.year,
+              requestId: row.requestId,
+              heldMinor,
+              seatMonthlyMinor: row.seatMonthlyMinor,
+            },
+          ]
+        : [];
+    });
   }
 
   /**
@@ -363,6 +608,23 @@ export class CommitmentRepo {
 export interface CommitmentOfRequest extends CommitmentRow {
   organizationId: string;
   costCenterId: string;
+}
+
+/** A commitment of a request as `lockOfRequest` reads it: with where it came from and what one seat costs a month in it. */
+export interface LockedCommitmentOfRequest extends CommitmentOfRequest {
+  origin: 'APPROVAL' | 'YEAR_START';
+  seatMonthlyMinor: bigint | null;
+  /** The version it is attached to; null while it waits for a budget (R-48). */
+  attachedVersionId: string | null;
+}
+
+/** A commitment still held that knows what one seat costs a month, with what it still holds. */
+export interface HeldWithSeatPrice {
+  costCenterId: string;
+  year: number;
+  requestId: string;
+  heldMinor: bigint;
+  seatMonthlyMinor: bigint;
 }
 
 /** What a commitment total says about the budget of a Cost Center and year. */

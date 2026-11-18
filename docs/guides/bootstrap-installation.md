@@ -91,7 +91,7 @@ nano .env.bootstrap
 - Người giữ Super Admin: `BOOTSTRAP_ADMIN_CODE`, `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL`,
   `BOOTSTRAP_ADMIN_HIRE_DATE`, `BOOTSTRAP_ADMIN_PASSWORD`.
 - Căn cứ vận hành được ghi audit: `BOOTSTRAP_OPERATOR_REFERENCE`.
-- Tùy chọn: `BOOTSTRAP_CURRENCY` (mặc định VND), `BOOTSTRAP_LOGIN_EMAIL` (mặc định email công việc),
+- Tùy chọn: `BOOTSTRAP_CURRENCY` (chỉ nhận VND, cũng là mặc định), `BOOTSTRAP_LOGIN_EMAIL` (mặc định email công việc),
   `BOOTSTRAP_ADMIN_TYPE` (mặc định STAFF). Môi trường do wrapper cố định là `SHARED`.
 
 Múi giờ tổ chức không thay đổi được sau cài đặt; ngày vào làm theo `YYYY-MM-DD`, không ở tương lai. Dùng giá trị thực,
@@ -115,7 +115,7 @@ cùng quyền `600`. Bảng dưới mô tả [template rỗng](../../.env.bootst
 | `BOOTSTRAP_ADMIN_HIRE_DATE`    | Bắt buộc                               | Ngày vào làm của nhân viên, định dạng `YYYY-MM-DD`, là ngày hợp lệ và không sau ngày hiện tại theo múi giờ tổ chức. Không phải ngày hết hạn tài khoản.                                                                                              |
 | `BOOTSTRAP_OPERATOR_REFERENCE` | Bắt buộc                               | Mã/tham chiếu ticket hoặc phê duyệt cho thao tác cài đặt, được ghi vào Audit Trail để truy vết operator. Không phải mật khẩu, token hoặc tài khoản mới; tối đa 100 ký tự sau trim.                                                                  |
 | `BOOTSTRAP_ADMIN_PASSWORD`     | Bắt buộc                               | Mật khẩu đăng nhập ban đầu của Super Admin. Nhập mật khẩu gốc, không tự hash trước; CLI kiểm chính sách rồi hash trước khi ghi DB. Từ 12–128 ký tự sau chuẩn hóa Unicode NFC, không bằng email đăng nhập; giữ khoảng trắng và phân biệt hoa/thường. |
-| `BOOTSTRAP_CURRENCY`           | Tùy chọn; `VND`                        | Đồng tiền báo cáo của tổ chức; mã 3 chữ hoa và phải có trong danh mục tiền tệ của bản cài đặt. Không tự tạo tỷ giá hoặc dữ liệu ngân sách.                                                                                                          |
+| `BOOTSTRAP_CURRENCY`           | Tùy chọn; `VND`                        | Đồng tiền báo cáo của tổ chức: chỉ nhận `VND` (mã khác bị lệnh cài đặt từ chối), và `VND` phải có trong danh mục tiền tệ của bản cài đặt. Không có tỷ giá.                                                                                          |
 | `BOOTSTRAP_LOGIN_EMAIL`        | Tùy chọn; dùng `BOOTSTRAP_ADMIN_EMAIL` | Email dùng để đăng nhập tài khoản Super Admin. Có thể khác email công việc; nếu điền thì đăng nhập bằng giá trị này, không phải mã nhân viên.                                                                                                       |
 | `BOOTSTRAP_ADMIN_TYPE`         | Tùy chọn; `STAFF`                      | Loại nhân sự: `STAFF`, `CONTRACTOR`, `FREELANCER` hoặc `INTERN`. Không phải role/phân quyền; tài khoản do bootstrap tạo vẫn giữ vai `SUPER_ADMIN`.                                                                                                  |
 

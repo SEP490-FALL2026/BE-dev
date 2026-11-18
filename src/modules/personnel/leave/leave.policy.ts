@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import { groundsRefusal, type GroundsInput } from '../personnel-grounds.policy';
+import { groundsNoteRefusal } from '../personnel-grounds.policy';
 
 /**
  * What the policy of a long leave refuses, as a semantic code (`LONG_LEAVE.<code>` on the wire) and the facts a person needs to
@@ -12,12 +12,11 @@ export interface LeaveRefusal {
 
 export type WorkStateFact = 'WORKING' | 'ON_LONG_LEAVE' | 'HANDING_OVER' | 'LEFT';
 
-/** The basis of a day: whole, and not the code of a notice (`US-03-03` AC-5, AC-8; `QĐ-77a`). */
-export function leaveGroundsRefusal(grounds: GroundsInput | undefined | null): LeaveRefusal | null {
-  const refused = groundsRefusal(grounds);
-  if (!refused) return null;
+/** The basis of a day: one box of words, filled, no longer than 500 characters, and not the code of a notice (`US-03-03` AC-5, AC-8; `QĐ-110a`). */
+export function leaveGroundsRefusal(groundsNote: string | undefined | null): LeaveRefusal | null {
+  const refused = groundsNoteRefusal(groundsNote);
 
-  return { code: refused.reason, ...('missing' in refused ? { details: { missing: refused.missing } } : {}) };
+  return refused ? { code: refused.reason } : null;
 }
 
 export interface StartLeaveFacts {
@@ -26,7 +25,7 @@ export interface StartLeaveFacts {
   approvedReturnOn: BusinessDate;
   hireDate: BusinessDate;
   employee: { status: 'ACTIVE' | 'TERMINATED'; workState: WorkStateFact };
-  grounds: GroundsInput | undefined;
+  groundsNote: string | undefined;
 }
 
 /**
@@ -43,7 +42,7 @@ export function startLeaveRefusal(facts: StartLeaveFacts): LeaveRefusal | null {
     return { code: 'RETURN_DATE_INVALID', details: { reason: 'NOT_AFTER_START' } };
   }
 
-  return leaveGroundsRefusal(facts.grounds);
+  return leaveGroundsRefusal(facts.groundsNote);
 }
 
 export interface LeaveFacts {
@@ -55,7 +54,7 @@ export interface LeaveFacts {
 
 export interface ChangeReturnDateFacts extends LeaveFacts {
   newApprovedReturnOn: BusinessDate;
-  grounds: GroundsInput | undefined;
+  groundsNote: string | undefined;
 }
 
 /** Whether the approved day of return may move (`US-03-03` AC-8): a new day that is not the same, not behind, with a new basis. */
@@ -69,28 +68,29 @@ export function changeReturnDateRefusal(facts: ChangeReturnDateFacts): LeaveRefu
   }
   if (facts.newApprovedReturnOn < facts.today) return { code: 'RETURN_DATE_IN_PAST' };
 
-  return leaveGroundsRefusal(facts.grounds);
+  return leaveGroundsRefusal(facts.groundsNote);
 }
 
 export interface ConfirmReturnFacts extends LeaveFacts {
   returnedOn: BusinessDate;
-  grounds: GroundsInput | undefined;
+  groundsNote: string | undefined;
 }
 
-/** Whether the return was on the day that was approved, which needs no new document (`US-03-03` AC-7). */
+/** Whether the return was on the day that was approved (`US-03-03` AC-7): it only tells the history whether the person came back as planned. */
 export const isOnSchedule = (returnedOn: BusinessDate, approvedReturnOn: BusinessDate): boolean =>
   returnedOn === approvedReturnOn;
 
 /**
- * Whether the person may be recorded back (`US-03-03` AC-7, AC-8): from the day the leave began to today. On the approved day no
- * document is needed; on any other day, earlier or later, a new basis is.
+ * Whether the person may be recorded back (`US-03-03` AC-7, AC-8): from the day the leave began to today, with the basis in its box
+ * (`QĐ-111bd`, R-32): on the approved day too, since the box is filled from what the leave already says and the Super Admin may edit it, and
+ * what is sent is what is kept. Whether the day is the approved one only decides the `onSchedule` the history shows.
  */
 export function confirmReturnRefusal(facts: ConfirmReturnFacts): LeaveRefusal | null {
   if (facts.status !== 'ACTIVE') return { code: 'NOT_ACTIVE' };
   if (facts.returnedOn < facts.startedOn) return { code: 'RETURN_DATE_INVALID', details: { reason: 'BEFORE_START' } };
   if (facts.returnedOn > facts.today) return { code: 'RETURN_DATE_INVALID', details: { reason: 'IN_FUTURE' } };
 
-  return isOnSchedule(facts.returnedOn, facts.approvedReturnOn) ? null : leaveGroundsRefusal(facts.grounds);
+  return leaveGroundsRefusal(facts.groundsNote);
 }
 
 /** A leave past the day it was due back is only to be reminded about; the state of the person never moves by the calendar (`AC-4`). */

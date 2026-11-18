@@ -7,6 +7,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
+import { FirstPlacementCorrectionError } from './employee.errors';
 import {
   EmployeeCodeTakenError,
   EmployeeEmailTakenError,
@@ -22,6 +23,7 @@ import {
   EmployeeRecord,
   EmployeeWorkState,
   OfficialFieldsPatch,
+  EmployeePlacementSpan,
   PlacementInForce,
   ScheduledStructureChange,
   StructureChangeInput,
@@ -38,6 +40,7 @@ function toEmployeeRecord(row: {
   status: EmployeeRecord['status'];
   workState: EmployeeWorkState;
   hireDate: Date;
+  contractEndDate: Date | null;
   jobTitle: string | null;
 }): EmployeeRecord {
   return {
@@ -50,7 +53,28 @@ function toEmployeeRecord(row: {
     status: row.status,
     workState: row.workState,
     hireDate: fromDateColumn(row.hireDate),
+    contractEndDate: row.contractEndDate ? fromDateColumn(row.contractEndDate) : null,
     jobTitle: row.jobTitle,
+  };
+}
+
+/** The columns a correction of the official fields writes: only the fields it gives. */
+function officialFieldsData(patch: OfficialFieldsPatch): Prisma.EmployeeUpdateInput {
+  return {
+    ...(patch.fullName !== undefined ? { fullName: patch.fullName } : {}),
+    ...(patch.workEmail !== undefined
+      ? {
+          workEmail: patch.workEmail,
+          normalizedWorkEmail: patch.workEmail === null ? null : normalizeEmail(patch.workEmail),
+        }
+      : {}),
+    ...(patch.employmentType !== undefined ? { employmentType: patch.employmentType } : {}),
+    ...(patch.hireDate !== undefined ? { hireDate: toDateColumn(patch.hireDate) } : {}),
+    ...(patch.contractEndDate !== undefined
+      ? { contractEndDate: patch.contractEndDate === null ? null : toDateColumn(patch.contractEndDate) }
+      : {}),
+    // The display form (T-12) whoever calls; an empty one clears the title.
+    ...(patch.jobTitle !== undefined ? { jobTitle: normalizeDisplayName(patch.jobTitle ?? '') || null } : {}),
   };
 }
 
@@ -111,6 +135,7 @@ export class EmployeeRepo {
           jobTitle: normalizeDisplayName(input.jobTitle ?? '') || null,
           employmentType: input.employmentType,
           hireDate: toDateColumn(input.hireDate),
+          contractEndDate: input.contractEndDate ? toDateColumn(input.contractEndDate) : null,
           status: 'ACTIVE',
         },
         select: { id: true },
@@ -136,22 +161,7 @@ export class EmployeeRepo {
   /** Changes the official fields of the employee whose row the caller holds `FOR UPDATE`; the unique email is the last word. */
   async updateOfficialFields(tx: DbTx, employeeId: string, patch: OfficialFieldsPatch): Promise<void> {
     try {
-      await tx.employee.update({
-        where: { id: employeeId },
-        data: {
-          ...(patch.fullName !== undefined ? { fullName: patch.fullName } : {}),
-          ...(patch.workEmail !== undefined
-            ? {
-                workEmail: patch.workEmail,
-                normalizedWorkEmail: patch.workEmail === null ? null : normalizeEmail(patch.workEmail),
-              }
-            : {}),
-          ...(patch.employmentType !== undefined ? { employmentType: patch.employmentType } : {}),
-          ...(patch.hireDate !== undefined ? { hireDate: toDateColumn(patch.hireDate) } : {}),
-          // The display form (T-12) whoever calls; an empty one clears the title.
-          ...(patch.jobTitle !== undefined ? { jobTitle: normalizeDisplayName(patch.jobTitle ?? '') || null } : {}),
-        },
-      });
+      await tx.employee.update({ where: { id: employeeId }, data: officialFieldsData(patch) });
     } catch (error) {
       if (isUniqueViolation(error, 'normalized_work_email')) throw new EmployeeEmailTakenError();
       // The trigger of migration 20261023110000 (INV-07 from the side of the person).
@@ -180,6 +190,27 @@ export class EmployeeRepo {
         validFrom: toDateColumn(input.effectiveFrom),
       },
     });
+  }
+
+  /** Every placement of the person, oldest first. */
+  async placementsOf(tx: DbTx, employeeId: string) {
+    const rows = await tx.employeePlacement.findMany({
+      where: { employeeId },
+      orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((r) => ({ id: r.id, departmentId: r.departmentId, validFrom: fromDateColumn(r.validFrom) }));
+  }
+
+  /** Changes the department and/or the first day in place; the triggers allow it only for the first placement not yet in effect (`QĐ-113e`). */
+  async correctFirstPlacement(tx: DbTx, id: string, to: { departmentId?: string; effectiveFrom?: BusinessDate }) {
+    const validFrom = to.effectiveFrom ? toDateColumn(to.effectiveFrom) : undefined;
+    // The trigger refused (`object_not_in_prerequisite_state`): the placement took effect, got a second one or was told since it was read.
+    await tx.employeePlacement
+      .update({ where: { id }, data: { departmentId: to.departmentId, validFrom } })
+      .catch((error: unknown) => {
+        throw readSqlState(error) === '55000' ? new FirstPlacementCorrectionError('ALREADY_EFFECTIVE') : error;
+      });
   }
 
   async scheduledFirstPlacement(
@@ -321,6 +352,32 @@ export class EmployeeRepo {
       : null;
   }
 
+  /** The placements of these employees that touch `[from, to)`, by employee then first day, in one read (a day nobody was placed is just not covered). */
+  async placementsBetween(
+    employeeIds: readonly string[],
+    from: BusinessDate,
+    to: BusinessDate,
+    tx?: DbTx,
+  ): Promise<EmployeePlacementSpan[]> {
+    if (employeeIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).employeePlacement.findMany({
+      where: {
+        employeeId: { in: [...employeeIds] },
+        validFrom: { lt: toDateColumn(to) },
+        OR: [{ validTo: null }, { validTo: { gt: toDateColumn(from) } }],
+      },
+      select: { employeeId: true, departmentId: true, validFrom: true, validTo: true },
+      orderBy: [{ employeeId: 'asc' }, { validFrom: 'asc' }],
+    });
+
+    return rows.map((row) => ({
+      employeeId: row.employeeId,
+      departmentId: row.departmentId,
+      validFrom: fromDateColumn(row.validFrom),
+      validTo: row.validTo ? fromDateColumn(row.validTo) : null,
+    }));
+  }
+
   /** The first day of a placement, or null when it does not exist. */
   async placementStart(tx: DbTx, placementId: string): Promise<BusinessDate | null> {
     const rows = await tx.$queryRaw<{ valid_from: Date }[]>`
@@ -369,12 +426,51 @@ export class EmployeeRepo {
     return row;
   }
 
+  /** The department of the latest placement begun by `onDate`, ended or not: where a person who left last worked. */
+  async lastPlacementIdsBy(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ departmentId: string } | null> {
+    return (tx ?? this.prisma).employeePlacement.findFirst({
+      where: { employeeId, validFrom: { lte: toDateColumn(onDate) } },
+      orderBy: [{ validFrom: 'desc' }, { id: 'desc' }],
+      select: { departmentId: true },
+    });
+  }
+
   /** The employees with these codes, as far as they exist; unlocked, for the import judgement that names people by code. */
   async findEmployeesByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {
     if (employeeCodes.length === 0) return [];
     const rows = await (tx ?? this.prisma).employee.findMany({ where: { employeeCode: { in: [...employeeCodes] } } });
 
     return rows.map(toEmployeeRecord);
+  }
+
+  /** The people whose normalized work email is one of these, those who left included: a vendor report names people who have left. */
+  async findEmployeesByNormalizedEmails(
+    normalizedEmails: readonly string[],
+    tx?: DbTx,
+  ): Promise<
+    {
+      id: string;
+      employeeCode: string;
+      workEmail: string;
+      normalizedWorkEmail: string;
+      status: EmployeeRecord['status'];
+    }[]
+  > {
+    if (normalizedEmails.length === 0) return [];
+    const rows = await (tx ?? this.prisma).employee.findMany({
+      where: { normalizedWorkEmail: { in: [...normalizedEmails] } },
+      select: { id: true, employeeCode: true, workEmail: true, normalizedWorkEmail: true, status: true },
+    });
+
+    return rows.flatMap((row) =>
+      row.workEmail !== null && row.normalizedWorkEmail !== null
+        ? [{ ...row, workEmail: row.workEmail, normalizedWorkEmail: row.normalizedWorkEmail }]
+        : [],
+    );
   }
 
   /** The distinct, lower-case domains of the work emails of everyone the organization has ever employed. */
@@ -444,6 +540,39 @@ export class EmployeeRepo {
       department: row.department,
       unplaced: row.unplaced,
     }));
+  }
+
+  /**
+   * One page of the employees among `employeeIds`, by code, matched on code or name, and how many match (API-LIST-DETAIL.1): the page and
+   * the total share one snapshot (RepeatableRead). Literal match as in `searchActiveEmployees`; the ids travel as ONE uuid[] parameter.
+   */
+  async pageAmong(
+    employeeIds: readonly string[],
+    search: string | undefined,
+    skip: number,
+    take: number,
+  ): Promise<{ items: { id: string; employeeCode: string; fullName: string }[]; total: number }> {
+    const term = search?.trim();
+    const pattern = term ? `%${escapeLikePattern(term)}%` : null;
+    const ids = [...employeeIds];
+    const where = Prisma.sql`e.id = ANY(${ids}::uuid[])
+         AND (${pattern}::text IS NULL OR e.employee_code ILIKE ${pattern} OR e.full_name ILIKE ${pattern})`;
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.$queryRaw<{ id: string; employee_code: string; full_name: string }[]>`
+          SELECT e.id, e.employee_code, e.full_name FROM employees e WHERE ${where}
+           ORDER BY e.employee_code, e.id OFFSET ${skip} LIMIT ${take}`;
+        const [{ total }] = await tx.$queryRaw<{ total: number }[]>`
+          SELECT count(*)::int AS total FROM employees e WHERE ${where}`;
+
+        return {
+          items: rows.map((row) => ({ id: row.id, employeeCode: row.employee_code, fullName: row.full_name })),
+          total,
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
   /** Name, department and job title at `onDate` (a date-column value) for /me. */

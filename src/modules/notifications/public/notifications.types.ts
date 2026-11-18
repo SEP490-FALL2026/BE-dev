@@ -51,6 +51,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'REQUEST_SUBMITTED',
   'REQUEST_NEED_APPROVED',
   'REQUEST_REJECTED',
+  // A step sent the request back to its sender to add what is missing and send it again (`QĐ-111ap`, R-24).
+  'REQUEST_RETURNED',
   'REQUEST_IT_REJECTED',
   'REQUEST_SPEND_APPROVED',
   'REQUEST_GRANTED',
@@ -86,6 +88,7 @@ export const IN_APP_NOTIFICATION_CODES = [
   'PERSONNEL_NOTICE_OVERDUE',
   'ABRUPT_DEPARTURE_RECORDED',
   'ROLE_HOLDER_LEAVING',
+  // Read only (`QĐ-110p`): nothing writes it since the new head reviews nothing after a transfer; a notice already in an inbox still reads.
   'TRANSFER_REVIEW_DUE',
   'IT_ADMIN_SELF_EXECUTED',
   // The budget loops (`US-12-15` AC-24): ids, years and the reason the people concerned already read; no figure.
@@ -93,31 +96,135 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_PROPOSAL_SUBMITTED',
   'BUDGET_PROPOSAL_RETURNED',
   'BUDGET_VERSION_DECIDED',
+  // Not given any more (Finance has no review of a request, `QĐ-97c`): the codes stay so that a notice already in an inbox still reads.
   'REQUEST_FINANCE_REVIEW_OPENED',
   'REQUEST_RETURNED_BY_FINANCE',
   'REQUEST_AWAITING_BUDGET',
   'REQUEST_BUDGET_VERSION_ENDED',
+  // The check of the budget of a request (`BR-MF1-06g`, `BR-MF1-07c`): it uses the reserve and waits for the head, it is blocked, it went back at the decision.
+  'REQUEST_RESERVE_CONFIRMATION_NEEDED',
+  'REQUEST_BUDGET_BLOCKED',
+  'REQUEST_RETURNED_AT_DECISION',
   'BUDGET_VERSION_CLOSED_UNAPPROVED',
   'BUDGET_PROPOSAL_CLOSED_YEAR_END',
   'BUDGET_PROPOSAL_TASK_ASSIGNED',
   'BUDGET_PROPOSAL_TASK_WAITING',
+  'BUDGET_CYCLE_OPENED',
+  // The submission deadline of an open cycle moved, with a reason kept in the Audit Trail (`QĐ-111z`, `US-06-15` AC-21).
+  'BUDGET_CYCLE_DEADLINE_MOVED',
+  // No longer sent (`QĐ-111aa`: there is no ceiling of a department to publish); notices written before it stay readable.
+  'BUDGET_DEPARTMENT_CEILING_PUBLISHED',
+  // The deadlines of the cycle (`QĐ-103i`, `R-I05`): a head who has not proposed, the departments nobody heads, how many departments have
+  // not proposed, the versions still waiting after the decision deadline, a department with no Cost Center yet, and a head named after a
+  // version was built from the baseline.
+  'BUDGET_PROPOSAL_DEADLINE_REMINDER',
+  'BUDGET_NO_HEAD_AT_DEADLINE',
+  'BUDGET_SUBMISSION_DEADLINE_PASSED',
+  'BUDGET_DECISION_DEADLINE_REMINDER',
+  'BUDGET_COST_CENTER_SETUP_DUE',
+  'BUDGET_BASELINE_VERSION_HEAD_ASSIGNED',
+  // The budget of the year after is not approved yet for a Cost Center (`QĐ-111am`, B-4): told to Finance and the spending approver on 01/12 and then every Monday
+  // until a version is approved. The Cost Center and the year only.
+  'BUDGET_NEXT_YEAR_MISSING',
+  // The close of the month of the review (`QĐ-111ae`, R-47): Finance is asked on the fifth working day to close the month before; the spending approver is told, when Finance signs
+  // the month, the summary with the table of lights (the number of Cost Centers of each light, never a figure); Finance is warned when the line of the shared pool is above its
+  // reserve (`QĐ-104i`). The year and month, the period and the counts only.
+  'BUDGET_REVIEW_DUE',
+  'BUDGET_REVIEW_SUMMARY',
+  'BUDGET_SHARED_POOL_OVER_RESERVE',
+  // The use of the budget of a Cost Center reached 80 or 100 percent of its base (`QĐ-111af`, RV-2): told once each time to the head of the department and Finance; the Cost Center, the year and the threshold, never a figure.
+  'BUDGET_THRESHOLD_REACHED',
+  // The head of a department is reminded to explain a Cost Center of a quarterly review (`QĐ-111ah`, B-7): on the due day and every Monday until they explain or Finance signs; the period, the Cost Center and the due day, never a figure.
+  'BUDGET_REVIEW_EXPLANATION_DUE',
+  // The head of a department is asked to explain a Cost Center of a quarterly review the day Finance closes the quarter (`QĐ-111ah`, US-12-21 AC-4): the period, the Cost Center, the due day and the light, never a figure.
+  'BUDGET_REVIEW_EXPLANATION_REQUESTED',
+  // An adjustment of the budget in the year (`QĐ-111ag`): the spending approver is asked to decide it; Finance who made it and the head of each Cost Center it concerns are told how it was decided. The id, the year and the kind, never a figure.
+  'BUDGET_ADJUSTMENT_REQUESTED',
+  'BUDGET_ADJUSTMENT_DECIDED',
   // The alerts of the rights (`a03-license-inbox-alerts`, `FR-5.14`): a right about to end, a handover not confirmed, a service
   // account whose person leaves, a person who left and keeps a K1 access to the end of the paid period. Ids, codes and days only.
+  // The codes of the handover and of the service account are read only (`QĐ-110g`, `QĐ-110m`): nothing writes one any more, a row of
+  // an inbox that holds one still reads.
   'LICENSE_EXPIRY_REMINDER',
+  // The window of the renewal of a right opened (BR-MF1-08a): told once to the holder and the head of their department.
+  'RENEWAL_WINDOW_OPENED',
   'HANDOVER_CONFIRMATION_DUE',
   'HANDOVER_CONFIRMATION_OVERDUE',
   'SERVICE_ACCOUNT_RESPONSIBLE_DUE',
   'SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE',
   'LEAVER_K1_ACCESS_RUNS_ON',
-  // The renewal of a subscription (EP-11): the milestones, the quality of the contract data, the case and its deadline.
+  // A seat still held by a person who left (`G2`, `US-10-01` AC-2): told once to the IT Admin in charge.
+  'GHOST_SEAT_G2_DETECTED',
+  // The queue of the head of the department (`qd103-ghost-seat-manager-decision`, `FR-4.12`): new recommendations (one a week), the same told to
+  // the IT Admin in charge for the action tier, a decision past due, a department with no head, a reclaim the IT Admin returned, an exemption ending.
+  'GHOST_SEAT_NEW',
+  'GHOST_SEAT_ACTION_TIER',
+  'GHOST_SEAT_DECISION_OVERDUE',
+  'GHOST_SEAT_WAITING_FOR_HEAD',
+  'GHOST_SEAT_RETURNED',
+  'GHOST_SEAT_EXEMPTION_ENDING',
+  // The revocation of a seat that is coming, told to the person who holds it, and one that no longer applies (`BR-MF5-04`, `US-10-06` AC-2).
+  'REVOCATION_UPCOMING',
+  'REVOCATION_CANCELLED',
+  // The renewal of a subscription (EP-11): the point of adjustment and its red alert, the quality of the contract data, the case and its deadline.
   'SUBSCRIPTION_RENEWAL_ALERT',
+  'SUBSCRIPTION_RENEWAL_RED_ALERT',
+  'SUBSCRIPTION_RENEWAL_KEPT',
   'SUBSCRIPTION_RENEWAL_DATA_QUALITY',
-  'SUBSCRIPTION_BUSINESS_OWNER_LEFT',
   'SUBSCRIPTION_RENEWAL_PROPOSED',
   'SUBSCRIPTION_RENEWAL_DECIDED',
   'SUBSCRIPTION_RENEWAL_LATE',
+  // The result of the adjustment of a subscription recorded by the IT Admin (`QĐ-106i`(3), `SBF-20`): told to Finance, and to the IT Admin in charge when another recorded it.
+  'SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED',
   'SUBSCRIPTION_AUTO_RENEWAL_INCIDENT',
   'SUBSCRIPTION_EXPIRY_MARKED',
+  // The usage of an application is tracked from a vendor report (`qd103-vendor-usage-import`, `US-08-05` AC-2): told to each person who holds it.
+  'USAGE_TRACKING_NOTICE',
+  // Every vendor report of an application is older than a week, so no seat of it can be judged unused (`qd103-ghost-seat-g3-g4`, `Q-91`): told once to the IT Admin.
+  'USAGE_SOURCE_STALE',
+  // MF-2 and MF-3 and what goes with them (`QĐ-110`, `QĐ-111`): a revocation past its day, a person blocked and the account not locked in
+  // time, the grace of a transfer (begun, ending, the rights being taken back), a request cancelled because its beneficiary is gone, the
+  // list of software of a department, the vendor admins of a plan below the minimum, a department nobody heads, seats added to a pool
+  // subscription, and the handover of an IT Admin's responsibilities that waits. Ids, days and counts only.
+  'REVOCATION_OVERDUE',
+  'DEPARTURE_ACCESS_BLOCKED',
+  'ACCOUNT_LOCK_OVERDUE',
+  'TRANSFER_GRACE_STARTED',
+  'TRANSFER_GRACE_ENDING',
+  'TRANSFER_RIGHTS_REVOKING',
+  'REQUEST_CANCELLED_BENEFICIARY_GONE',
+  // The grant of a request of that person is being carried out, so the system did not close it: the IT Admin checks the vendor and closes it.
+  'REQUEST_BENEFICIARY_GONE_IT_CHECK',
+  // A purchase invoice waits for Finance to sign the money out (`QĐ-111u`); and, for the IT Admin who submitted it, Finance signed it or returned it with a reason.
+  'PURCHASE_INVOICE_SUBMITTED',
+  'PURCHASE_INVOICE_CONFIRMED',
+  'PURCHASE_INVOICE_RETURNED',
+  'DEPARTMENT_SOFTWARE_PROPOSED',
+  'DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED',
+  'VENDOR_ADMINS_BELOW_MINIMUM',
+  'DEPARTMENT_WITHOUT_HEAD',
+  'SUBSCRIPTION_SEATS_INCREASED',
+  'IT_ADMIN_HANDOVER_PENDING',
+  // The IT Admin who took everything a leaving IT Admin answered for is told how many subscriptions and applications are theirs now (`QĐ-110j`, SPEC P5).
+  'IT_ADMIN_HANDOVER_RECEIVED',
+  // A handover cancelled after its last working day left revocation tasks in progress with no reason of the departure: the IT Admin closes
+  // them by what happened at the provider (`QĐ-110c`, MF2-C).
+  'DEPARTURE_REVOCATION_IT_CLOSE',
+  // A new version of a policy is in force (`QĐ-111bi`): told once to each account of a role it applies to, with the code, the number and whether it asks to be acknowledged again.
+  'POLICY_PUBLISHED',
+  // A batch of spend requests that opened at least one step for the spending approver: one notice for each batch and each approver (`FR-3.21`, `Q-5A-1`).
+  'SPEND_BATCH_SUBMITTED',
+  // The reports of errors in SaaS rights (`FR-2.15`): the IT Admin it is given to is told when it is sent and, once, when its day to be taken up passed; the report is told of when its state changes.
+  'SAAS_ISSUE_SUBMITTED',
+  'SAAS_ISSUE_RESPONSE_OVERDUE',
+  'SAAS_ISSUE_STATE_CHANGED',
+  // A case outside the process closed as a report only: the person it is about and the head of their department are told (`SBF-07a`, `QĐ-103m`).
+  'OUT_OF_PROCESS_CASE_REPORTED',
+  // A difference with a vendor was opened (`SBF-08`): the IT Admin in charge of the application, or every IT Admin who can act, is told once for each report, invoice or batch of the collector.
+  'VENDOR_ACCOUNT_DISCREPANCY_OPENED',
+  // A holder asked to stop the collection of a machine (`US-09-04`, E1): the IT Admin in charge, or every IT Admin who can act, is told once, and once more when the request passed its day.
+  'DEVICE_STOP_REQUESTED',
+  'DEVICE_STOP_REQUEST_OVERDUE',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

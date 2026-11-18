@@ -1,5 +1,9 @@
 import type { BusinessDate } from '../../../core/business-date';
-import { DepartmentForbiddenError, type HeadAssignmentProblem } from './department.errors';
+import {
+  DepartmentForbiddenError,
+  DepartmentItAdminLimitReachedError,
+  type HeadAssignmentProblem,
+} from './department.errors';
 
 /**
  * Who may do what with departments, decided in the service so no route is the only thing between a caller and the data.
@@ -10,6 +14,17 @@ import { DepartmentForbiddenError, type HeadAssignmentProblem } from './departme
 /** Changing a department, its head, its successor or its IT Admin in charge, the Super Admin alone. Throws DepartmentForbiddenError. */
 export function assertMayChangeOrganization(roles: readonly string[]): void {
   if (!roles.includes('SUPER_ADMIN')) throw new DepartmentForbiddenError();
+}
+
+/** How many active departments one IT Admin answers for at most (`QĐ-110l`, `FR-3.17`). */
+export const IT_ADMIN_DEPARTMENT_LIMIT = 4;
+
+/**
+ * Whether an IT Admin who already answers for `inCharge` active departments may take one more (`QĐ-110l`): four is the most.
+ * Throws DepartmentItAdminLimitReachedError.
+ */
+export function assertItAdminHasRoom(inCharge: number): void {
+  if (inCharge >= IT_ADMIN_DEPARTMENT_LIMIT) throw new DepartmentItAdminLimitReachedError(IT_ADMIN_DEPARTMENT_LIMIT);
 }
 
 /**

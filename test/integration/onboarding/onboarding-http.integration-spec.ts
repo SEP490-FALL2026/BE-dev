@@ -8,6 +8,7 @@ import {
   seedInstallation,
 } from '../../support/http-test-app';
 import { changeRoleTo } from '../../support/builders/account.builder';
+import { intakeBodyOf } from '../../support/application-body';
 
 interface Step {
   step: number;
@@ -247,21 +248,23 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
   });
 
   it('follows the data: an application, a plan and a subscription make steps 2 and 3 done and the seat step ready (AC-1)', async () => {
-    const owner = (await insertEmployeeFixture(ctx.app, seed, { code: 'E-OB-OWN', email: 'ob-owner@acme.vn' }))
-      .employeeId;
+    await insertEmployeeFixture(ctx.app, seed, { code: 'E-OB-OWN', email: 'ob-owner@acme.vn' });
     const application = await request(server())
       .post('/api/v1/applications')
       .set(as(it1))
-      .send({
-        name: 'Figma',
-        kind: 'SAAS',
-        vendorName: 'Figma Inc',
-        dataSensitivity: 'LOW',
-        businessOwnerEmployeeId: owner,
-        communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
-      })
+      .send(
+        intakeBodyOf({
+          name: 'Figma',
+          kind: 'SAAS',
+          vendorName: 'Figma Inc',
+          dataSensitivity: 'LOW',
+          communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
+        }),
+      )
       .expect(201);
     expect((await steps())[1]).toMatchObject({ status: 'DONE', reasons: [], facts: { applications: 1 } });
+    // QĐ-111f: the application is made with its first plan.
+    expect((await steps())[2]).toMatchObject({ facts: { plans: 1, subscriptions: 0 } });
     expect((await steps())[3]).toMatchObject({ status: 'BLOCKED', reasons: ['STEP_3_INCOMPLETE'] });
 
     const plan = await request(server())
@@ -275,13 +278,12 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
         controlLevel: 'FULL',
       })
       .expect(201);
-    expect((await steps())[2]).toMatchObject({ status: 'INCOMPLETE', facts: { plans: 1, subscriptions: 0 } });
+    expect((await steps())[2]).toMatchObject({ status: 'INCOMPLETE', facts: { plans: 2, subscriptions: 0 } });
 
     await request(server())
       .post('/api/v1/subscriptions')
       .set(as(it1))
       .send({
-        ownerDepartmentId: seed.departmentId,
         planId: (plan.body as { data: { id: string } }).data.id,
         kind: 'TERM',
         purchasedQuantity: 100,
@@ -289,7 +291,7 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
       .expect(201);
 
     const [, , contracts, seats] = await steps();
-    expect(contracts).toMatchObject({ status: 'DONE', reasons: [], facts: { plans: 1, subscriptions: 1 } });
+    expect(contracts).toMatchObject({ status: 'DONE', reasons: [], facts: { plans: 2, subscriptions: 1 } });
     expect(seats).toEqual({
       step: 4,
       key: 'SEAT_BASELINE',

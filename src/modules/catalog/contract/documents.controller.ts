@@ -156,7 +156,11 @@ export class DocumentsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: ROLES.description, examples: [FORBIDDEN_EXAMPLE] },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: `${ROLES.description} The uploader who no longer holds a role that may choose the purpose of the file is refused too (DOCUMENT.PURPOSE_FORBIDDEN).`,
+      examples: [FORBIDDEN_EXAMPLE, CONTRACT_ERROR_EXAMPLES.PURPOSE_FORBIDDEN],
+    },
     {
       status: HttpStatus.NOT_FOUND,
       description:

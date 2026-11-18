@@ -4,7 +4,12 @@ import { Contributions } from '../../../core/extension/contributions';
 import { Hook } from '../../../core/extension/hook';
 import { Listeners } from '../../../core/extension/listeners';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { CostCenterUseGroupName, DepartmentUseGroupName, UseGroup } from './organization-use.types';
+import type {
+  CostCenterUseGroupName,
+  DepartmentUseGroupName,
+  FirstPlacementUse,
+  UseGroup,
+} from './organization-use.types';
 import type { OrganizationChange } from './organization.types';
 
 // The points the organization opens for the modules above it (`core/extension`): they bind or add to them from a
@@ -32,7 +37,7 @@ export class OrganizationChangeListeners extends Listeners<OrganizationChange, D
 
 /**
  * Tells one kind of thing that keeps a department in use: the Requests and personnel events that are not over and the tasks that
- * are open (`OPEN_WORK`), or the subscriptions and purchases that still owe a payment (`SUBSCRIPTIONS`). The module that holds the
+ * are open (`OPEN_WORK`). The module that holds the
  * fact adds it when it starts; several may tell the same group.
  */
 export interface DepartmentUseReader {
@@ -136,5 +141,45 @@ export interface EmployeeAccounts {
 export class EmployeeAccountsHook extends Hook<EmployeeAccounts> {
   constructor() {
     super('organization.employee-accounts');
+  }
+}
+
+/**
+ * Whether a department may be made today, from the budget cycles (`QĐ-104e(3)`, `R-I10`): `OPEN` while the cycle of the next year was
+ * never published, with the day the new department takes effect (1 January of that year); `CLOSED` otherwise (a department made in
+ * the middle of the year would have no budget); `NO_CYCLE_YET` while the organization has no cycle at all (the installation).
+ */
+export type DepartmentCreationWindow =
+  { kind: 'OPEN'; effectiveFrom: BusinessDate } | { kind: 'CLOSED' } | { kind: 'NO_CYCLE_YET' };
+
+/** What the organization asks of the budget cycles when a department is made, read in the transaction of the creation. */
+export interface DepartmentCreationWindowReader {
+  windowOn(tx: DbTx, organizationId: string, today: BusinessDate): Promise<DepartmentCreationWindow>;
+}
+
+/**
+ * The reader of the window a department may be made in, bound by `budgets`. Only the API makes departments and it loads `budgets`;
+ * the installation creates its first department by another door and never asks.
+ */
+@Injectable()
+export class DepartmentCreationWindowHook extends Hook<DepartmentCreationWindowReader> {
+  constructor() {
+    super('organization.department-creation-window');
+  }
+}
+
+/**
+ * Tells whether something refers to the person and so to their first placement (`QĐ-113e`): a Request they made or are beneficiary of, a
+ * transfer, a departure. The module that holds the fact adds it when it starts; null means nothing of its kind.
+ */
+export interface FirstPlacementUseReader {
+  read(employeeId: string, tx: DbTx): Promise<Exclude<FirstPlacementUse, 'HEAD_PERIOD'> | null>;
+}
+
+/** What keeps the first placement of a person from being corrected, told by the modules that hold the facts (the head periods are the organization's own). */
+@Injectable()
+export class FirstPlacementUseContributions extends Contributions<FirstPlacementUseReader> {
+  constructor() {
+    super('organization.first-placement-use-readers');
   }
 }

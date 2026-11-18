@@ -3,21 +3,27 @@ import { Page, pageOf } from '../../../core/application/pagination';
 
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCostCenterNotFoundError, BudgetVersionNotFoundError } from './budget.errors';
-import { defaultReserveOf, versionWaitingReason } from './budget.policy';
+import {
+  belowCarriedOver,
+  carriedOverShortfall,
+  defaultReserveOf,
+  versionWaitingReason,
+  type VersionStateName,
+} from './budget.policy';
 import { BudgetFactsService } from './budget-facts.service';
 import { DecisionRepo, type DecisionRecord } from './decision.repo';
-import { VersionLineRepo, type VersionLineRecord } from './version-line.repo';
+import { CarriedOverContributions } from '../public/budgets.extension-points';
 import { VersionRepo, type VersionRecord, type VersionState } from './version.repo';
-import type { VersionLineWire, VersionSummaryWire, VersionWire } from './budget.dto';
+import type { VersionSummaryWire, VersionWire } from './budget.dto';
 
 /** A version and its lines as a reader sees them: amounts in the currency of the version, people and Cost Centers by name. */
 @Injectable()
 export class VersionViewService {
   constructor(
     private readonly versions: VersionRepo,
-    private readonly lineRepo: VersionLineRepo,
     private readonly decisions: DecisionRepo,
     private readonly facts: BudgetFactsService,
+    private readonly carried: CarriedOverContributions,
   ) {}
 
   async require(id: string): Promise<VersionRecord> {
@@ -48,37 +54,6 @@ export class VersionViewService {
     return pageOf((await this.wires(items)).map(summaryOf), total, query.page, query.pageSize);
   }
 
-  async lines(
-    actor: AuthenticatedPrincipal,
-    id: string,
-    query: { page: number; pageSize: number },
-  ): Promise<Page<VersionLineWire>> {
-    await this.facts.requireVersionReader(actor);
-    const version = await this.require(id);
-    const { items, total } = await this.lineRepo.pageLines(id, (query.page - 1) * query.pageSize, query.pageSize);
-
-    return pageOf(await this.lineWires(version.currency, items), total, query.page, query.pageSize);
-  }
-
-  async lineWire(version: VersionRecord, line: VersionLineRecord): Promise<VersionLineWire> {
-    return (await this.lineWires(version.currency, [line]))[0];
-  }
-
-  async lineWires(currency: string, lines: readonly VersionLineRecord[]): Promise<VersionLineWire[]> {
-    const money = await this.facts.formatter(currency);
-
-    return lines.map((line) => ({
-      position: line.position,
-      proposalPosition: line.proposalPosition,
-      description: line.description,
-      planId: line.planId,
-      seats: line.seats,
-      amount: money(line.amountMinor),
-      financeComment: line.financeComment,
-      adjustmentReason: line.adjustmentReason,
-    }));
-  }
-
   async wire(version: VersionRecord): Promise<VersionWire> {
     return (await this.wires([version]))[0];
   }
@@ -96,34 +71,38 @@ export class VersionViewService {
       ...versions.map((version) => version.createdByEmployeeId),
       ...[...latest.values()].map((decision) => decision.decidedByEmployeeId),
     ]);
+    const carriedOver = await this.carriedOverOf(versions);
+    // The reserve the default share of the organization gives, which a reserve that differs from asks its reason when sent.
+    const defaultPercent = await this.facts.reserveDefaultPercent();
 
     return Promise.all(
       versions.map(async (version) => {
         const money = await this.facts.formatter(version.currency);
         const costCenter = centers.get(version.costCenterId);
         if (!costCenter) throw new BudgetCostCenterNotFoundError();
-        const [q1, q2, q3, q4] = version.quarters ?? [];
 
         return {
           id: version.id,
           costCenter,
           year: version.year,
           number: version.number,
-          kind: version.kind,
-          state: version.state,
+          state: wireStateOf(version.state),
           proposalId: version.proposalId,
           rejectedPredecessorId: version.rejectedPredecessorId,
           base: money(version.baseMinor),
           reserve: money(version.reserveMinor),
           reservePercent: version.reservePercent,
           defaultReserve:
-            version.reservePercent === null ? null : money(defaultReserveOf(version.baseMinor, version.reservePercent)),
+            version.reservePercent === null ? null : money(defaultReserveOf(version.baseMinor, defaultPercent)),
+          carriedOverNextYear: money(carriedOver(version)),
+          belowCarriedOver: belowCarriedOver(version, carriedOver(version)),
+          carriedOverShortfall: money(carriedOverShortfall(version, carriedOver(version))),
+          // The version Finance built from the baseline: the department had no proposal, or no head to send one (the older kind, `QĐ-104f`).
+          noProposalSubmitted: version.origin === 'BASELINE_NO_PROPOSAL' || version.origin === 'BASELINE_NO_HEAD',
           reserveReason: version.reserveReason,
+          baseReason: version.baseReason,
+          origin: version.origin,
           total: money(version.totalMinor),
-          quarters:
-            q1 === undefined || q2 === undefined || q3 === undefined || q4 === undefined
-              ? null
-              : { q1: money(q1), q2: money(q2), q3: money(q3), q4: money(q4) },
           reason: version.reason,
           waitingReason: versionWaitingReason(version.state, approver),
           decision: toDecisionWire(latest.get(version.id), people),
@@ -136,6 +115,17 @@ export class VersionViewService {
         };
       }),
     );
+  }
+
+  /** What each Cost Center carries into the year of each version (`QĐ-111ac`): one ask of the contexts for each year on the page. */
+  private async carriedOverOf(versions: readonly VersionRecord[]): Promise<(version: VersionRecord) => bigint> {
+    const byYear = new Map<number, Map<string, bigint>>();
+    for (const year of new Set(versions.map((version) => version.year))) {
+      const ids = [...new Set(versions.filter((version) => version.year === year).map((one) => one.costCenterId))];
+      byYear.set(year, await this.carried.totals(ids, year));
+    }
+
+    return (version) => byYear.get(version.year)?.get(version.costCenterId) ?? 0n;
   }
 }
 
@@ -157,9 +147,12 @@ const summaryOf = (version: VersionWire): VersionSummaryWire => ({
   costCenter: version.costCenter,
   year: version.year,
   number: version.number,
-  kind: version.kind,
   state: version.state,
   total: version.total,
   createdAt: version.createdAt,
   sentAt: version.sentAt,
 });
+
+/** The database refuses `SUPERSEDED` (`budget_versions_no_superseded`), so a version read from it never stands there. */
+const wireStateOf = (state: VersionStateName): Exclude<VersionStateName, 'SUPERSEDED'> =>
+  state as Exclude<VersionStateName, 'SUPERSEDED'>;

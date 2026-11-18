@@ -1,7 +1,6 @@
 import type { z } from 'zod';
 import { groupBodySchema } from '../group-request/group-request.dto';
-import { serviceAccountSubmitSchema } from '../service-account-request/service-account-request.dto';
-import { COMMITMENT_MONTHS_MAX, submitBodySchema, TERM_MONTHS_MAX } from '../access-request/access-request.dto';
+import { submitBodySchema } from '../access-request/access-request.dto';
 import type { DraftSaveBody } from './request-draft.dto';
 import { draftPolicyJson, RETIRED_DRAFT_BODY_KEYS, type DraftPolicy } from '../request-draft/request-draft-policy.json';
 import { beneficiaryCountOf } from '../request-draft/request-draft.policy';
@@ -15,8 +14,7 @@ import type { DraftRow } from '../request-draft/request-draft.repo';
  */
 export type DraftContent =
   | { kind: 'INDIVIDUAL'; body: z.infer<typeof submitBodySchema> }
-  | { kind: 'GROUP'; body: z.infer<typeof groupBodySchema> }
-  | { kind: 'SERVICE_ACCOUNT'; body: z.infer<typeof serviceAccountSubmitSchema> };
+  | { kind: 'GROUP'; body: z.infer<typeof groupBodySchema> };
 
 /** The JSON a draft keeps in `policy.draft`: the kind and the body, side by side. */
 export function toContentJson(body: DraftSaveBody): DraftPolicy['draft'] {
@@ -31,15 +29,8 @@ export function contentOf(row: Pick<DraftRow, 'id' | 'policy'>): DraftContent {
   if (Array.isArray(body.lines)) {
     for (const line of body.lines as Record<string, unknown>[]) delete line.expectedEndDate;
   }
-  // A draft saved when a term could be longer than a year is still read; sending it is refused by the limit (`QĐ-98`).
-  const oldTerm = typeof body.termMonths === 'number' ? body.termMonths : undefined;
-  const longTerm =
-    oldTerm !== undefined && oldTerm > TERM_MONTHS_MAX && oldTerm <= COMMITMENT_MONTHS_MAX ? oldTerm : undefined;
-  if (longTerm !== undefined) body.termMonths = TERM_MONTHS_MAX;
-  const content = parseContent(row.id, kind, body);
-  if (longTerm !== undefined) content.body.termMonths = longTerm;
-
-  return content;
+  // A draft saved with a term in months keeps no term: the right has no end unless the draft is saved again with an end date (`QĐ-104a`).
+  return parseContent(row.id, kind, body);
 }
 
 function parseContent(id: string, kind: string, body: Record<string, unknown>): DraftContent {
@@ -48,8 +39,6 @@ function parseContent(id: string, kind: string, body: Record<string, unknown>): 
       return { kind, body: submitBodySchema.parse(body) };
     case 'GROUP':
       return { kind, body: groupBodySchema.parse(body) };
-    case 'SERVICE_ACCOUNT':
-      return { kind, body: serviceAccountSubmitSchema.parse(body) };
     default:
       throw new Error(`The draft ${id} is of the unknown kind ${kind}.`);
   }

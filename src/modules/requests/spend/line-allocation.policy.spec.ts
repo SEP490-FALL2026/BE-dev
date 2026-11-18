@@ -1,5 +1,11 @@
-import type { PaymentPeriod } from '../access-request/pricing.policy';
-import { allocateEvenly, scaledPricing, scaleSchedule, shareToRelease, sharesOf } from './line-allocation.policy';
+import {
+  allocateEvenly,
+  lineAmountsOf,
+  scaledPricing,
+  scaleAmount,
+  shareToRelease,
+  sharesOf,
+} from './line-allocation.policy';
 
 const sum = (values: readonly bigint[]) => values.reduce((total, value) => total + value, 0n);
 
@@ -63,43 +69,32 @@ describe('dividing the cost of a year among the people of a group (US-05-17 AC-9
   });
 });
 
-describe('the payments of a request for the people that stay (US-06-14 AC-13, US-05-17 AC-9)', () => {
-  const period = (dueOn: string, amountMinor: bigint, budgetYear = 2026): PaymentPeriod => ({
-    dueOn,
-    amountMinor,
-    budgetYear,
-    binding: true,
-  });
-  const schedule = [period('2026-11-01', 75n), period('2026-12-01', 75n), period('2027-01-01', 75n, 2027)];
-
-  it('lays the payments out for fewer people, in whole minor units, keeping the days, years and whether they bind', () => {
-    expect(scaleSchedule(schedule, 5, 4)).toEqual([
-      period('2026-11-01', 60n),
-      period('2026-12-01', 60n),
-      period('2027-01-01', 60n, 2027),
-    ]);
+describe('the amount of a request for the people that stay (US-06-14 AC-13, US-05-17 AC-9)', () => {
+  it('is the same share of the amount for fewer people', () => {
+    expect(scaleAmount(225n, 5, 4)).toBe(180n);
   });
 
-  it('is the same schedule for the same people', () => {
-    expect(scaleSchedule(schedule, 5, 5)).toEqual(schedule);
+  it('is the same amount for the same people', () => {
+    expect(scaleAmount(225n, 5, 5)).toBe(225n);
   });
 
-  it('is nothing when the payments do not divide: they were not made for that many people', () => {
-    expect(scaleSchedule([period('2026-11-01', 74n)], 5, 4)).toBeNull();
+  it('rounds a part of a minor unit up: a price that does not divide is paid in full (TẠM CHỌN)', () => {
+    expect(scaleAmount(74n, 5, 4)).toBe(60n);
+    expect(scaleAmount(75n, 4, 3)).toBe(57n);
   });
 
   it('is nothing for no people or for more people than it was made for', () => {
-    expect(scaleSchedule(schedule, 5, 0)).toBeNull();
-    expect(scaleSchedule(schedule, 5, 6)).toBeNull();
+    expect(scaleAmount(225n, 5, 0)).toBeNull();
+    expect(scaleAmount(225n, 5, 6)).toBeNull();
   });
 });
 
 describe('what goes back when one person leaves a request (US-05-17 AC-10)', () => {
   it('is what they held and had not given back', () => {
     const shares = [
-      { budgetYear: 2026, amountMinor: 3n, releasedAt: null },
-      { budgetYear: 2027, amountMinor: 1n, releasedAt: null },
-      { budgetYear: 2028, amountMinor: 9n, releasedAt: new Date('2026-10-24T00:00:00Z') },
+      { budgetYear: 2026, amountMinor: 3n, held: true, releasedAt: null },
+      { budgetYear: 2027, amountMinor: 1n, held: true, releasedAt: null },
+      { budgetYear: 2028, amountMinor: 9n, held: true, releasedAt: new Date('2026-10-24T00:00:00Z') },
     ];
 
     expect(shareToRelease(shares)).toEqual([
@@ -108,31 +103,68 @@ describe('what goes back when one person leaves a request (US-05-17 AC-10)', () 
     ]);
     expect(shareToRelease([])).toEqual([]);
   });
+
+  it('QĐ-111k: never includes the part of the year after that is only kept for 01/01: no commitment holds it yet', () => {
+    const shares = [
+      { budgetYear: 2026, amountMinor: 1_200_000n, held: true, releasedAt: null },
+      { budgetYear: 2027, amountMinor: 4_200_000n, held: false, releasedAt: null },
+    ];
+
+    expect(shareToRelease(shares)).toEqual([{ year: 2026, amountMinor: 1_200_000n }]);
+  });
+});
+
+describe('what each person of a group costs this year and the year after, each for their own end (QĐ-111j, QĐ-111k, R-38)', () => {
+  const monthly = (amountMinor: bigint) => ({
+    unitPrice: { amountMinor, currency: 'VND' },
+    billingCycle: 'MONTHLY' as const,
+    checkDate: '2026-11-10',
+  });
+
+  it('prices a person cut at the end of a contract for their own months and the others for theirs: 600.000 a month, K1 of 9 months from 10/11/2026', () => {
+    // A term of 9 months from 10/11 ends 09/08/2027; the intern's contract ends 31/01/2027.
+    const amounts = lineAmountsOf({ ...monthly(600_000n), ends: ['2027-08-09', '2027-01-31', '2027-08-09'] });
+
+    expect(amounts).toEqual([
+      { current: 1_200_000n, next: 4_200_000n },
+      { current: 1_200_000n, next: 600_000n },
+      { current: 1_200_000n, next: 4_200_000n },
+    ]);
+  });
+
+  it('prices a right with no end for twelve months of the year after, and a person cut inside the year for nothing of it', () => {
+    expect(lineAmountsOf({ ...monthly(375_000n), ends: [null, '2026-12-05'] })).toEqual([
+      { current: 750_000n, next: 4_500_000n },
+      { current: 375_000n, next: 0n },
+    ]);
+  });
+
+  it('divides what people who end the same day cost among them, the remainder to the first, so the parts add up to what they cost together', () => {
+    // 1 000 a year, three people for one month: 1 000 / 12 over three people is 250 together, not 84 each.
+    const amounts = lineAmountsOf({
+      unitPrice: { amountMinor: 1_000n, currency: 'VND' },
+      billingCycle: 'ANNUAL',
+      checkDate: '2026-12-01',
+      ends: ['2026-12-31', '2026-12-31', '2026-12-31'],
+    });
+
+    expect(amounts?.map((line) => line.current)).toEqual([84n, 83n, 83n]);
+  });
+
+  it('is nothing when the price cannot be counted by the month', () => {
+    expect(lineAmountsOf({ ...monthly(1_000n), billingCycle: 'OTHER', ends: [null] })).toBeNull();
+  });
 });
 
 describe('what a request for a group costs once only the people approved are left (US-05-17 AC-9, US-06-01 AC-15)', () => {
-  const period = (amountMinor: bigint, budgetYear: number): PaymentPeriod => ({
-    dueOn: `${budgetYear}-01-15`,
-    amountMinor,
-    budgetYear,
-    binding: true,
-  });
-  const pricing = {
-    amount: { amountMinor: 900n, currency: 'VND' },
-    schedule: [period(600n, 2026), period(300n, 2027)],
-  };
+  const pricing = { amount: { amountMinor: 900n, currency: 'VND' } };
 
-  it('scales the schedule to the people who remain and adds the periods up in the currency of the price', () => {
-    expect(scaledPricing(pricing, 3, 2)).toEqual({
-      amount: { amountMinor: 600n, currency: 'VND' },
-      schedule: [period(400n, 2026), period(200n, 2027)],
-    });
+  it('scales the amount to the people who remain, in the currency of the price', () => {
+    expect(scaledPricing(pricing, 3, 2)).toEqual({ amount: { amountMinor: 600n, currency: 'VND' } });
   });
 
-  it('changes nothing when everybody is approved, when there is no schedule or amount, or when the schedule does not divide', () => {
+  it('changes nothing when everybody is approved or when there is no amount', () => {
     expect(scaledPricing(pricing, 3, 3)).toBeNull();
-    expect(scaledPricing({ ...pricing, schedule: null }, 3, 2)).toBeNull();
-    expect(scaledPricing({ ...pricing, amount: null }, 3, 2)).toBeNull();
-    expect(scaledPricing({ ...pricing, schedule: [period(100n, 2026)] }, 3, 2)).toBeNull();
+    expect(scaledPricing({ amount: null }, 3, 2)).toBeNull();
   });
 });

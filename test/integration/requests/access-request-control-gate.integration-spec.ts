@@ -59,7 +59,11 @@ describe('requests over HTTP: the gate of the assessment (integration, real Post
       const proposed = await awaiting();
 
       const done = h.dataOf<{ request: AccessRequestWire }>(
-        await reject(proposed.id, { kind: 'UNCONTROLLABLE', reason: 'No admin page and no member export' }).expect(200),
+        await reject(proposed.id, {
+          kind: 'UNCONTROLLABLE',
+          reason: 'No admin page and no member export',
+          alternativeNote: 'Use the company whiteboard',
+        }).expect(200),
       ).request;
 
       expect(done.state).toBe('IT_REJECTED');
@@ -73,7 +77,7 @@ describe('requests over HTTP: the gate of the assessment (integration, real Post
         rejection: {
           kind: 'UNCONTROLLABLE',
           reason: 'No admin page and no member export',
-          alternative: { plan: null, note: null },
+          alternative: { plan: null, note: 'Use the company whiteboard' },
           rejectedBy: { employeeId: itAdmin.employeeId },
         },
       });
@@ -109,7 +113,11 @@ describe('requests over HTTP: the gate of the assessment (integration, real Post
   describe('what follows a refusal (AC-3, AC-9, AC-10)', () => {
     it('has no spend step, no snapshot or commitment, and the spending approver never sees it', async () => {
       const proposed = await awaiting();
-      await reject(proposed.id, { kind: 'UNCONTROLLABLE', reason: 'Cannot be controlled' }).expect(200);
+      await reject(proposed.id, {
+        kind: 'UNCONTROLLABLE',
+        reason: 'Cannot be controlled',
+        alternativeNote: 'Use the company whiteboard',
+      }).expect(200);
 
       expect((await stepsOf(proposed.id)).map((step) => step.kind)).toEqual(['NEED', 'IT_ASSESSMENT']);
       await h.assessmentOf(proposed.id, boss.account).expect(404);
@@ -138,14 +146,25 @@ describe('requests over HTTP: the gate of the assessment (integration, real Post
       }
     });
 
-    it('gives only the reason when there is no alternative (AC-10)', async () => {
+    it('C1-17, L2-34: refuses a tool that cannot be controlled with no alternative; a note with no plan is enough (AC-10)', async () => {
       const proposed = await awaiting();
 
-      await reject(proposed.id, { kind: 'UNCONTROLLABLE', reason: 'Nothing comparable can be controlled' }).expect(200);
+      const refused = await reject(proposed.id, {
+        kind: 'UNCONTROLLABLE',
+        reason: 'Nothing comparable can be controlled',
+      }).expect(422);
+      expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
+      expect(await stateOf(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
+
+      await reject(proposed.id, {
+        kind: 'UNCONTROLLABLE',
+        reason: 'Nothing comparable can be controlled',
+        alternativeNote: 'Ask again when a controllable tool exists',
+      }).expect(200);
 
       expect((await assessmentOf(proposed.id)).rejection).toMatchObject({
         reason: 'Nothing comparable can be controlled',
-        alternative: { plan: null, note: null },
+        alternative: { plan: null, note: 'Ask again when a controllable tool exists' },
       });
     });
 
@@ -165,7 +184,11 @@ describe('requests over HTTP: the gate of the assessment (integration, real Post
 
     it('cannot be granted, linked to the catalog, completed or refused again', async () => {
       const proposed = await awaiting();
-      await reject(proposed.id, { kind: 'UNCONTROLLABLE', reason: 'No admin page' }).expect(200);
+      await reject(proposed.id, {
+        kind: 'UNCONTROLLABLE',
+        reason: 'No admin page',
+        alternativeNote: 'Use the company whiteboard',
+      }).expect(200);
 
       const grant = await h.grant({ requestId: proposed.id });
       const link = await h.linkPlan(proposed.id, await h.plan('K5'), itAdmin.account);
@@ -253,7 +276,11 @@ describe('requests over HTTP: the gate of the assessment (integration, real Post
     it('has no gate for software already in the catalog', async () => {
       const sent = await h.sent(designer, await h.plan('K2'));
 
-      const response = await reject(sent.id, { kind: 'UNCONTROLLABLE', reason: 'Not here' }).expect(404);
+      const response = await reject(sent.id, {
+        kind: 'UNCONTROLLABLE',
+        reason: 'Not here',
+        alternativeNote: 'Use the company whiteboard',
+      }).expect(404);
 
       expect(h.codeOf(response)).toBe('ACCESS_REQUEST.NOT_FOUND');
       expect((await stepsOf(sent.id)).map((step) => step.kind)).toEqual(['NEED']);
@@ -266,8 +293,16 @@ describe('requests over HTTP: the gate of the assessment (integration, real Post
     ])('is not refused by %s', async (_name, who) => {
       const proposed = await awaiting();
 
-      await reject(proposed.id, { kind: 'UNCONTROLLABLE', reason: 'No' }, who().account).expect(403);
-      await reject(proposed.id, { kind: 'UNCONTROLLABLE', reason: 'No' }, h.finance).expect(403);
+      await reject(
+        proposed.id,
+        { kind: 'UNCONTROLLABLE', reason: 'No', alternativeNote: 'Use the company whiteboard' },
+        who().account,
+      ).expect(403);
+      await reject(
+        proposed.id,
+        { kind: 'UNCONTROLLABLE', reason: 'No', alternativeNote: 'Use the company whiteboard' },
+        h.finance,
+      ).expect(403);
       expect(await stateOf(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
     });
 
@@ -276,8 +311,16 @@ describe('requests over HTTP: the gate of the assessment (integration, real Post
       await h.decide(own.id, { decision: 'APPROVE' }, head.account).expect(200);
       const waiting = await h.proposed(designer, { softwareName: 'Waiting whiteboard' });
 
-      const ownRefusal = await reject(own.id, { kind: 'UNCONTROLLABLE', reason: 'No' }, ownIt.account).expect(403);
-      const early = await reject(waiting.id, { kind: 'UNCONTROLLABLE', reason: 'No' }).expect(409);
+      const ownRefusal = await reject(
+        own.id,
+        { kind: 'UNCONTROLLABLE', reason: 'No', alternativeNote: 'Use the company whiteboard' },
+        ownIt.account,
+      ).expect(403);
+      const early = await reject(waiting.id, {
+        kind: 'UNCONTROLLABLE',
+        reason: 'No',
+        alternativeNote: 'Use the company whiteboard',
+      }).expect(409);
 
       expect(h.codeOf(ownRefusal)).toBe('ACCESS_REQUEST.OWN_REQUEST');
       expect(h.codeOf(early)).toBe('ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT');

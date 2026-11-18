@@ -25,9 +25,9 @@ export class AccessBlockRepo {
       : null;
   }
 
-  async findMany(employeeIds: readonly string[]): Promise<Map<string, AccessBlockRecord>> {
+  async findMany(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, AccessBlockRecord>> {
     if (employeeIds.length === 0) return new Map();
-    const rows = await this.prisma.employeeAccessBlock.findMany({
+    const rows = await (tx ?? this.prisma).employeeAccessBlock.findMany({
       where: { employeeId: { in: [...new Set(employeeIds)] } },
       select: { employeeId: true, blockedFrom: true, cause: true, releasable: true, sourceCaseId: true },
     });

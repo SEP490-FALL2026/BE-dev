@@ -18,7 +18,7 @@ const facts = {
 
 const args = (mode: 'plan' | 'apply'): SeedCommandArguments => ({
   mode,
-  fixture: 'shared-demo-v3',
+  fixture: 'shared-demo-v4',
   apiUrl: 'http://slm-api:4000',
   operator: 'CHG-1',
   environment: 'SHARED',

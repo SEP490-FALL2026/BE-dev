@@ -65,15 +65,17 @@ describe('requests (integration, PostgreSQL constraints)', () => {
       ? '::"AccessRequestBranch"'
       : column === 'state'
         ? '::"AccessRequestState"'
-        : column === 'policy' || column === 'payment_schedule'
-          ? '::jsonb'
-          : column === 'cancel_cause'
-            ? '::"AccessRequestCancelCause"'
-            : column === 'pricing_status'
-              ? '::"AccessRequestPricingStatus"'
-              : column === 'billing_cycle'
-                ? '::"BillingCycle"'
-                : '';
+        : column === 'price_kind'
+          ? '::"AccessRequestPriceKind"'
+          : column === 'policy' || column === 'payment_schedule'
+            ? '::jsonb'
+            : column === 'cancel_cause'
+              ? '::"AccessRequestCancelCause"'
+              : column === 'pricing_status'
+                ? '::"AccessRequestPricingStatus"'
+                : column === 'billing_cycle'
+                  ? '::"BillingCycle"'
+                  : '';
 
   const insertStep = (requestId: string, over: Record<string, unknown> = {}) => {
     const row = {
@@ -123,7 +125,6 @@ describe('requests (integration, PostgreSQL constraints)', () => {
   });
 
   describe('the amount: each state of a price carries exactly what it means (US-05-02 AC-1, AC-4)', () => {
-    const SCHEDULE = JSON.stringify([{ dueOn: '2027-01-05', amountMinor: '90', budgetYear: 2027 }]);
     const priced = {
       branch: 'PAID_IN_CATALOG',
       pricing_status: 'PRICED',
@@ -131,15 +132,12 @@ describe('requests (integration, PostgreSQL constraints)', () => {
       amount_currency: 'USD',
       unit_price_minor: 15,
       billing_cycle: 'MONTHLY',
-      payment_schedule: SCHEDULE,
-      expected_spend_on: '2027-01-05',
       budget_year: 2027,
     };
     const missing = {
       branch: 'PAID_IN_CATALOG',
       pricing_status: 'MISSING',
       price_missing_reason: 'NO_PRICED_SUBSCRIPTION',
-      expected_spend_on: '2027-01-05',
       budget_year: 2027,
     };
 
@@ -151,22 +149,19 @@ describe('requests (integration, PostgreSQL constraints)', () => {
 
     it.each([
       ['internal software that carries an amount', { amount_minor: 1, amount_currency: 'USD' }],
-      ['internal software that carries a spend day', { expected_spend_on: '2027-01-05', budget_year: 2027 }],
+      ['internal software that carries a budget year', { budget_year: 2027 }],
       ['paid software with no price status', { branch: 'PAID_IN_CATALOG' }],
       ['a priced request with no amount', { ...priced, amount_minor: null }],
       ['a priced request with a negative amount', { ...priced, amount_minor: -1 }],
       ['a priced request with no unit price', { ...priced, unit_price_minor: null }],
       ['a priced request with no currency', { ...priced, amount_currency: null }],
-      ['a priced request with no payment schedule', { ...priced, payment_schedule: null }],
-      ['a priced request with an empty payment schedule', { ...priced, payment_schedule: JSON.stringify([]) }],
-      ['a priced request whose schedule is not a list', { ...priced, payment_schedule: JSON.stringify({}) }],
       ['a priced request with no budget year', { ...priced, budget_year: null }],
       ['a priced request that names a missing reason', { ...priced, price_missing_reason: 'NO_PRICED_SUBSCRIPTION' }],
       ['internal software marked as priced', { ...priced, branch: 'INTERNAL_FREE' }],
       ['a missing price with no reason', { ...missing, price_missing_reason: null }],
       ['a missing price with a blank reason', { ...missing, price_missing_reason: '  ' }],
       ['a missing price that carries an amount', { ...missing, amount_minor: 1, amount_currency: 'USD' }],
-      ['a missing price with no spend day', { ...missing, expected_spend_on: null }],
+      ['a missing price with no budget year', { ...missing, budget_year: null }],
     ])('refuses %s', async (_name, over) => {
       expect((await insertRequest(over)).state).toBe(CHECK);
     });
@@ -182,7 +177,6 @@ describe('requests (integration, PostgreSQL constraints)', () => {
       plan_id: null,
       pricing_status: 'MISSING',
       price_missing_reason: 'AWAITING_QUOTE',
-      expected_spend_on: '2027-01-05',
       budget_year: 2027,
     };
 
@@ -249,7 +243,6 @@ describe('requests (integration, PostgreSQL constraints)', () => {
         plan_id: null,
         pricing_status: 'MISSING',
         price_missing_reason: 'AWAITING_QUOTE',
-        expected_spend_on: '2027-01-05',
         budget_year: 2027,
       });
 
@@ -437,9 +430,9 @@ describe('requests (integration, PostgreSQL constraints)', () => {
         `INSERT INTO access_requests
            (id, organization_id, type, branch, state, plan_id, requester_employee_id, department_id, cost_center_id,
             business_reason, term_months, policy, created_by_app_user_id, pricing_status, price_missing_reason,
-            expected_spend_on, budget_year)
+            budget_year)
          VALUES ($1, $2, 'GROUP_GRANT', 'PAID_IN_CATALOG', 'PENDING', $3, $4, $5, $6, 'Design', 6,
-                 '{"version":1}'::jsonb, $7, 'MISSING', 'NO_PRICED_SUBSCRIPTION', '2026-10-24', 2026)`,
+                 '{"version":1}'::jsonb, $7, 'MISSING', 'NO_PRICED_SUBSCRIPTION', 2026)`,
         [requestId, h.seed.organizationId, planId, person.employeeId, department.id, department.unitId, randomUUID()],
       );
       await h.ctx.sql.query(
@@ -618,6 +611,66 @@ describe('requests (integration, PostgreSQL constraints)', () => {
       expect(await sqlState(`UPDATE approval_records SET reason = 'x' WHERE step_id = $1`, [stepId])).toBe('23001');
       expect(await sqlState(`DELETE FROM approval_records WHERE step_id = $1`, [stepId])).toBe('23001');
       expect(await sqlState(`TRUNCATE approval_records`)).toBe('23001');
+    });
+  });
+
+  describe('one amount for one year (BR-MF1-06, BR-MF1-07, QĐ-109)', () => {
+    const recurring = {
+      branch: 'PAID_IN_CATALOG',
+      pricing_status: 'PRICED',
+      amount_minor: 4000,
+      amount_currency: 'USD',
+      unit_price_minor: 2000,
+      billing_cycle: 'MONTHLY',
+      budget_year: 2026,
+      price_kind: 'RECURRING',
+    };
+
+    it('BR-MF1-06a: takes a request with no term in months, and the months of the year the amount covers (0 to 12)', async () => {
+      expect((await insertRequest({ ...recurring, term_months: null, amount_months: 2 })).state).toBeNull();
+      expect((await insertRequest({ ...recurring, term_months: null, amount_months: 0 })).state).toBeNull();
+      expect((await insertRequest({ ...recurring, term_months: null, amount_months: 12 })).state).toBeNull();
+    });
+
+    it('BR-MF1-06a: refuses more than twelve months, a negative count and a kind of price that does not exist', async () => {
+      expect((await insertRequest({ ...recurring, amount_months: 13 })).state).toBe(CHECK);
+      expect((await insertRequest({ ...recurring, amount_months: -1 })).state).toBe(CHECK);
+      expect((await insertRequest({ ...recurring, price_kind: 'WEEKLY' })).state).toBe('22P02');
+    });
+
+    it('BR-MF1-07: takes a one-time price with no months and no payment schedule', async () => {
+      const oneTime = { ...recurring, price_kind: 'ONE_TIME', billing_cycle: 'OTHER', amount_months: null };
+
+      expect((await insertRequest(oneTime)).state).toBeNull();
+    });
+
+    it('QĐ-109: refuses a payment schedule or a day the money goes out on a new row, and on a change that sets one', async () => {
+      const SCHEDULE = JSON.stringify([{ dueOn: '2026-11-10', amountMinor: '4000', budgetYear: 2026 }]);
+
+      expect((await insertRequest({ ...recurring, payment_schedule: SCHEDULE })).state).toBe(CHECK);
+      expect((await insertRequest({ ...recurring, expected_spend_on: '2026-11-10' })).state).toBe(CHECK);
+
+      const { id } = await insertRequest(recurring);
+      expect(await sqlState(`UPDATE access_requests SET expected_spend_on = '2026-11-10' WHERE id = $1`, [id])).toBe(
+        CHECK,
+      );
+      expect(
+        await sqlState(`UPDATE access_requests SET payment_schedule = $2::jsonb WHERE id = $1`, [id, SCHEDULE]),
+      ).toBe(CHECK);
+      expect(await sqlState(`UPDATE access_requests SET state = 'REJECTED' WHERE id = $1`, [id])).toBeNull();
+    });
+
+    it('QĐ-109: a supplementary file does not keep the day the money goes out any more', async () => {
+      const { id } = await insertRequest(recurring);
+      const insertSupplement = (over: string) =>
+        sqlState(
+          `INSERT INTO request_supplements (id, organization_id, request_id, number, reason, changed_by_employee_id, ${over})
+           VALUES ($4, $1, $2, 1, 'Shorter', $3, '2026-11-10')`,
+          [h.seed.organizationId, id, person.employeeId, randomUUID()],
+        );
+
+      expect(await insertSupplement('before_expected_spend_on')).toBe(CHECK);
+      expect(await insertSupplement('after_expected_end_date')).toBeNull();
     });
   });
 });

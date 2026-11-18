@@ -17,6 +17,8 @@ import {
   DeviceIdParamDto,
   DeviceListQueryDto,
   DevicePageResponseDto,
+  DeviceRegistrationListQueryDto,
+  DeviceRegistrationPageResponseDto,
   HolderChangeBodyDto,
   RetirementBodyDto,
 } from './registry.dto';
@@ -87,7 +89,7 @@ export class RegistryController {
   @ApiSuccessResponse(DevicePageResponseDto, {
     message: 'DEVICE.LISTED',
     description:
-      'A page of machines ordered by asset code, each with its holder and the state of collection; filter by holder, by state or by a search on the asset code and the hostname.',
+      'A page of machines ordered by asset code, each with its holder, the state of collection and the last time an intake from it was accepted; filter by holder, by state or by a search on the asset code and the hostname.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ADMIN_READS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -97,6 +99,26 @@ export class RegistryController {
   async list(@Query() query: DeviceListQueryDto) {
     try {
       return await this.queries.list(query);
+    } catch (error) {
+      throw toRegistryApiException(error);
+    }
+  }
+
+  @Get(':id/registrations')
+  @ApiOperation({ operationId: 'deviceRegistrationList', summary: 'List who held a company machine' })
+  @ApiSuccessResponse(DeviceRegistrationPageResponseDto, {
+    message: 'DEVICE_REGISTRATION.LISTED',
+    description:
+      'A page of the registrations of the machine, the newest first (the open one, then the ones that ended): the holder, the days, how each ended, whether it was signed and acknowledged, and the last time an intake was accepted.',
+  })
+  @ApiErrorResponses(...AUTH_ERRORS, IT_ADMIN_READS, DEVICE_NOT_FOUND, {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description: 'The id or the query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
+  })
+  async registrations(@Param() params: DeviceIdParamDto, @Query() query: DeviceRegistrationListQueryDto) {
+    try {
+      return await this.queries.registrations(params.id, query);
     } catch (error) {
       throw toRegistryApiException(error);
     }

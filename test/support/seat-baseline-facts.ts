@@ -43,11 +43,6 @@ export const facts = (over: Partial<SeatFacts> = {}): SeatFacts => ({
     ['T2', { id: 'e-contractor', status: 'ACTIVE', employmentType: 'CONTRACTOR', hireDate: HIRED }],
     ['T3', { id: 'e-freelancer', status: 'ACTIVE', employmentType: 'FREELANCER', hireDate: HIRED }],
   ]),
-  costCenters: new Map([
-    ['CC-DES', { id: 'cc-des', kind: 'UNIT', status: 'ACTIVE' }],
-    ['CC-OLD', { id: 'cc-old', kind: 'UNIT', status: 'INACTIVE' }],
-    ['CC-A', { id: 'cc-a', kind: 'UNIT', status: 'ACTIVE' }],
-  ]),
   companyDomains: ['congty.vn'],
   existing: [],
   ...over,

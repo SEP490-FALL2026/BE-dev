@@ -15,13 +15,6 @@ export class BudgetVersionNotFoundError extends Error {
   }
 }
 
-export class BudgetLineNotFoundError extends Error {
-  constructor() {
-    super('The line does not exist.');
-    this.name = 'BudgetLineNotFoundError';
-  }
-}
-
 /** The Cost Center does not exist, or is not a Unit a department is charged to. */
 export class BudgetCostCenterNotFoundError extends Error {
   constructor() {
@@ -35,6 +28,17 @@ export class BudgetNotYourCostCenterError extends Error {
   constructor() {
     super('Only the head of the department proposes a budget for its Cost Center.');
     this.name = 'BudgetNotYourCostCenterError';
+  }
+}
+
+/** The person heads a department now and another one that starts next year: the Cost Center the work is for must be named. */
+export class BudgetCostCenterRequiredError extends Error {
+  constructor(
+    /** The Cost Centers (in use) the person answers for that year: the ones to choose from. */
+    readonly costCenterIds: readonly string[] = [],
+  ) {
+    super('The person answers for more than one Cost Center for that year: name the one the work is for.');
+    this.name = 'BudgetCostCenterRequiredError';
   }
 }
 
@@ -54,14 +58,6 @@ export class BudgetCurrencyError extends Error {
   ) {
     super(`Budgets are kept in ${reporting}, not ${currency}.`);
     this.name = 'BudgetCurrencyError';
-  }
-}
-
-/** The request already holds a commitment for the year: one for each year (`INV-16`, `US-06-04` AC-3). */
-export class BudgetCommitmentExistsError extends Error {
-  constructor(readonly year: number) {
-    super(`The request already holds a commitment for the year ${year}.`);
-    this.name = 'BudgetCommitmentExistsError';
   }
 }
 
@@ -86,7 +82,10 @@ export class BudgetCommitmentRefusedError extends Error {
 
 /** The Cost Center and year already have a proposal that waits or is being reviewed (`US-06-10` AC-1). */
 export class BudgetProposalOpenError extends Error {
-  constructor() {
+  constructor(
+    /** The proposal that waits or is being reviewed; null when two writers met at the index and the loser does not know it. */
+    readonly proposalId: string | null = null,
+  ) {
     super('The Cost Center already has a proposal for this year that is waiting or being reviewed.');
     this.name = 'BudgetProposalOpenError';
   }
@@ -116,7 +115,10 @@ export class BudgetVersionNotEditableError extends Error {
 
 /** The Cost Center and year already have a version being built or waiting for a decision. */
 export class BudgetVersionInFlightError extends Error {
-  constructor() {
+  constructor(
+    /** The version that is not decided; null when two writers met at the index and the loser does not know it. */
+    readonly versionId: string | null = null,
+  ) {
     super('The Cost Center already has a version for this year that is not decided.');
     this.name = 'BudgetVersionInFlightError';
   }
@@ -124,17 +126,12 @@ export class BudgetVersionInFlightError extends Error {
 
 /** A first version is built from a proposal only while there is no current budget (`INV-21`). */
 export class BudgetCurrentExistsError extends Error {
-  constructor() {
+  constructor(
+    /** The current version; null when two writers met at the index and the loser does not know it. */
+    readonly versionId: string | null = null,
+  ) {
     super('The Cost Center already has a current budget for this year.');
     this.name = 'BudgetCurrentExistsError';
-  }
-}
-
-/** The forecast by quarter does not add up to the total of the version; it is not saved (`US-06-09` AC-6). */
-export class BudgetQuartersMismatchError extends Error {
-  constructor() {
-    super('The four quarters do not add up to the total of the version.');
-    this.name = 'BudgetQuartersMismatchError';
   }
 }
 
@@ -178,11 +175,11 @@ export class BudgetNotAHistoryReaderError extends Error {
   }
 }
 
-/** A line names a plan the catalog does not have (F37): nothing was written. */
-export class BudgetPlanNotFoundError extends Error {
-  constructor(readonly planIds: readonly string[]) {
-    super('A line names a plan that does not exist.');
-    this.name = 'BudgetPlanNotFoundError';
+/** A version is sent with one file at least that explains it (`QĐ-111ac`): it has none. */
+export class BudgetVersionAttachmentRequiredError extends Error {
+  constructor() {
+    super('A version is sent with one file at least that explains it.');
+    this.name = 'BudgetVersionAttachmentRequiredError';
   }
 }
 
@@ -194,37 +191,126 @@ export class BudgetVersionNumberTakenError extends Error {
   }
 }
 
-/** The file of lines cannot be read at all (`US-06-09` AC-3). */
-export class BudgetImportFileInvalidError extends Error {
+/** The budget cycle of the year does not exist (`QĐ-103i`). */
+export class BudgetCycleNotFoundError extends Error {
+  constructor() {
+    super('The budget cycle of that year does not exist.');
+    this.name = 'BudgetCycleNotFoundError';
+  }
+}
+
+/** A year has one budget cycle. */
+export class BudgetCycleExistsError extends Error {
+  constructor(readonly year: number) {
+    super(`The budget cycle of ${year} already exists.`);
+    this.name = 'BudgetCycleExistsError';
+  }
+}
+
+/** The cycle of a year before the current one is read, never opened or changed (`QĐ-82l`(4), B7). */
+export class BudgetCycleYearPastError extends Error {
+  constructor(readonly year: number) {
+    super(`The year ${year} has passed: its budget cycle can only be read.`);
+    this.name = 'BudgetCycleYearPastError';
+  }
+}
+
+export class BudgetCycleDeadlinesInvalidError extends Error {
+  constructor() {
+    super('The decision deadline cannot be before the submission deadline.');
+    this.name = 'BudgetCycleDeadlinesInvalidError';
+  }
+}
+
+/** Moving the submission deadline of an open cycle, or changing its annual ceiling or shared-pool reserve, is entered with the reason (`US-06-15` AC-8, AC-21). */
+export class BudgetCycleReasonRequiredError extends Error {
+  constructor() {
+    super(
+      'Moving the submission deadline, or changing the annual ceiling or the shared-pool reserve of an open cycle, needs the reason.',
+    );
+    this.name = 'BudgetCycleReasonRequiredError';
+  }
+}
+
+/** The cycle is locked: its submission deadline has passed, and a locked cycle is never opened again (`QĐ-111z`, `R-14`). */
+export class BudgetCycleLockedError extends Error {
+  constructor(readonly year: number) {
+    super(`The budget cycle of ${year} is locked: its submission deadline has passed.`);
+    this.name = 'BudgetCycleLockedError';
+  }
+}
+
+/** Only a draft cycle is deleted (`QĐ-111z`). */
+export class BudgetCycleNotDraftError extends Error {
+  constructor(readonly year: number) {
+    super(`The budget cycle of ${year} was opened: only a draft is deleted.`);
+    this.name = 'BudgetCycleNotDraftError';
+  }
+}
+
+/** The cycle was opened already (`QĐ-111z`). */
+export class BudgetCycleAlreadyOpenError extends Error {
+  constructor(readonly year: number) {
+    super(`The budget cycle of ${year} is open already.`);
+    this.name = 'BudgetCycleAlreadyOpenError';
+  }
+}
+
+/** The submission deadline is before today: a cycle is not opened with it, and an open one is not moved to it (`QĐ-111z`). */
+export class BudgetCycleDeadlinePassedError extends Error {
+  constructor() {
+    super('The submission deadline is before today.');
+    this.name = 'BudgetCycleDeadlinePassedError';
+  }
+}
+
+/** The department head proposes only once Finance opened the cycle of the year (`QĐ-111z`, was `Q-02`). */
+export class BudgetCycleNotOpenError extends Error {
+  constructor(readonly year: number) {
+    super(`The budget cycle of ${year} is not open yet.`);
+    this.name = 'BudgetCycleNotOpenError';
+  }
+}
+
+/** The versions of the year (this one included) add up to more than the annual ceiling less the shared-pool reserve (`R-I06`, `QĐ-103i`). */
+export class BudgetOverAnnualCeilingError extends Error {
   constructor(
-    readonly reason: 'NOT_CSV' | 'MISSING_COLUMNS' | 'RETIRED_COLUMNS' | 'EMPTY' | 'TOO_MANY_ROWS',
-    readonly detail?: string,
+    readonly gapMinor: bigint,
+    readonly availableMinor: bigint,
   ) {
-    super(`The file cannot be read: ${reason}.`);
-    this.name = 'BudgetImportFileInvalidError';
+    super('The versions of the year add up to more than the annual ceiling less the shared-pool reserve.');
+    this.name = 'BudgetOverAnnualCeilingError';
   }
 }
 
-/** The invoice of this vendor with this number was already recorded (`US-12-02` AC-11). */
-export class InvoiceDuplicateError extends Error {
-  constructor() {
-    super('An invoice with this number from this vendor was already recorded.');
-    this.name = 'InvoiceDuplicateError';
+/** A version of the year is in another currency than the cycle: the annual check cannot add them up. */
+export class BudgetCycleCurrencyMismatchError extends Error {
+  constructor(
+    readonly cycleCurrency: string,
+    readonly versionCurrency: string,
+  ) {
+    super('A version of the year is not in the currency of the budget cycle.');
+    this.name = 'BudgetCycleCurrencyMismatchError';
   }
 }
 
-/** The vendor of the commitment cannot be told from its request, and an invoice is not recorded without one. */
-export class InvoiceVendorUnknownError extends Error {
+/** Finance changed the base of a version without saying why (`QĐ-100v`). */
+export class BudgetBaseReasonRequiredError extends Error {
   constructor() {
-    super('The vendor of the software behind the commitment cannot be told, so an invoice cannot be recorded for it.');
-    this.name = 'InvoiceVendorUnknownError';
+    super('Say why the base is changed.');
+    this.name = 'BudgetBaseReasonRequiredError';
   }
 }
 
-/** The commitment was released: no spend that was approved is left to be invoiced against it. */
-export class InvoiceCommitmentReleasedError extends Error {
-  constructor() {
-    super('The commitment was released, so no invoice is recorded against it.');
-    this.name = 'InvoiceCommitmentReleasedError';
+/** Why a version cannot be built from the baseline (`QĐ-100h`): the reasons of `details.reason`, in the order they are checked. */
+export type BaselineVersionRefusal = 'CYCLE_NOT_OPEN' | 'DEPARTMENT_NOT_IN_CYCLE' | 'BEFORE_DEADLINE' | 'HAS_PROPOSAL';
+
+/** A version cannot be built from the baseline: the cycle, the day, the head or the proposal does not allow it (`QĐ-100h`). */
+export class BudgetBaselineVersionNotAllowedError extends Error {
+  constructor(readonly reason: BaselineVersionRefusal) {
+    super(
+      'A version is built from the baseline only after the deadline, for a department nobody heads and nobody proposed for.',
+    );
+    this.name = 'BudgetBaselineVersionNotAllowedError';
   }
 }

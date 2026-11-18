@@ -24,9 +24,11 @@ Khi Business Owner của một ứng dụng chuyển _đã nghỉ việc_, ứng
 
 ## Primary Story/AC
 
-| Story    | AC        | Coverage | Phần còn lại thuộc |
-| -------- | --------- | -------- | ------------------ |
-| US-04-06 | AC-1→AC-6 | full     | —                  |
+| Story    | AC        | Coverage | Phần còn lại thuộc                                                           |
+| -------- | --------- | -------- | ---------------------------------------------------------------------------- |
+| US-04-06 | AC-1→AC-6 | partial  | re-pin 11/11/2026 — AC-7, AC-8: `g3-business-owner-replacement` (`deferred`) |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ `US-04-06` đổi `full` → `partial` vì Docs `5bb2e6a` thêm AC hoặc hạng mục khác cùng hiện thực khóa của Story này (scope map); phần đã code không đổi.
 
 ## Supporting references
 

@@ -35,11 +35,11 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
     await h.stop();
   });
 
-  const waiting = async (lines?: object[]) => {
+  const waiting = async (amount?: number, year?: number) => {
     counter += 1;
     const u = await h.departmentWithHead(`P-LG${counter}`);
 
-    return { ...u, proposal: await h.budgetProposed(u.head, u.department.unitId, lines) };
+    return { ...u, proposal: await h.budgetProposed(u.head, u.department.unitId, amount, year) };
   };
   const deactivate = (costCenterId: string) =>
     request(h.server()).post(`/api/v1/cost-centers/${costCenterId}/deactivate`).set(h.as(h.finance)).expect(200);
@@ -52,10 +52,7 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       await deactivate(u.department.unitId);
       const before = await count('budget_proposals');
 
-      const bare = await h.submitProposal(
-        h.proposalBody(u.department.unitId, [{ description: 'incomplete', amount: h.money(1) }]),
-        u.head.account,
-      );
+      const bare = await h.submitProposal(h.proposalBody(u.department.unitId, 1), u.head.account);
       const unknown = await h.submitProposal(h.proposalBody(randomUUID()), u.head.account);
 
       expect([bare.status, unknown.status]).toEqual([409, 409]);
@@ -88,7 +85,7 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       await deactivate(w.department.unitId);
       const before = await count('budget_proposals');
 
-      const again = await h.resubmit(w.proposal.id, { lines: [h.line()] }, w.head.account);
+      const again = await h.resubmit(w.proposal.id, h.bm10(50_000_000), w.head.account);
 
       expect(again.status).toBe(409);
       expect(h.codeOf(again)).toBe('FINANCE.SETUP_INCOMPLETE');
@@ -105,8 +102,8 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       const route = 'SPEND_APPROVAL';
       const check = await h.ctx.sql.query<{ id: string }>(
         `INSERT INTO request_budget_checks (id, organization_id, request_id, number, trigger, route, stale_cost_evidence, plan_line_overdue,
-                                            period_closed, off_plan, currency, binding_total_minor)
-         VALUES (gen_random_uuid(), $1, $2, 1, $3::"BudgetCheckTrigger", $4::"BudgetCheckRoute", false, false, false, false, $5, 1) RETURNING id`,
+                                            period_closed, off_plan, currency, binding_total_minor, outcome)
+         VALUES (gen_random_uuid(), $1, $2, 1, $3::"BudgetCheckTrigger", $4::"BudgetCheckRoute", false, false, false, false, $5, 1, 'WITHIN_BASE') RETURNING id`,
         [h.seed.organizationId, requestId, trigger, route, h.reporting],
       );
 
@@ -117,7 +114,8 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
         snapshotCheckId: check.rows[0].id,
         currency: h.reporting,
         now: new Date(),
-        items: [{ year: h.next, amountMinor: 1_000_000n }],
+        // A commitment is held for the current year only (FR-5.8, BR-MF1-07d), so the race of this block is run in the current year.
+        items: [{ year: h.year, amountMinor: 1_000_000n }],
       };
     };
     const attachedTo = async (requestId: string) =>
@@ -135,14 +133,18 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       const input = await heldFor(costCenterId);
       const runner = h.ctx.app.get(TransactionRunner, { strict: false });
       const budgets = h.ctx.app.get(BudgetsApi, { strict: false });
-      const hold = () => runner.run((tx) => budgets.holdForRequest(tx, h.principalOf(h.finance, ['FINANCE']), input));
+      // A hold that arrives before any version of the year is approved is refused (FR-5.8a): it answers the error, it does not hang.
+      const hold = () =>
+        runner
+          .run((tx) => budgets.holdForRequest(tx, h.principalOf(h.finance, ['FINANCE']), input))
+          .catch((error: unknown) => error);
       const decide = () =>
         h.decideVersion(versionId, { decision: 'APPROVE' }, boss.account).then((response) => response);
       const holder = new Client({ connectionString: h.ctx.database.url });
       await holder.connect();
       await holder.query('BEGIN');
       await holder.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
-        budgetYearLockKey(costCenterId, h.next),
+        budgetYearLockKey(costCenterId, h.year),
       ]);
       const started: Partial<Record<'HOLD' | 'DECISION', Promise<unknown>>> = {};
       const second = first === 'HOLD' ? 'DECISION' : 'HOLD';
@@ -161,54 +163,60 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
     };
     /** The hold and the decision of a FIRST version meet at the lock of the Cost Center and year. */
     const meet = async (first: 'HOLD' | 'DECISION') => {
-      const w = await waiting();
+      const w = await waiting(undefined, h.year);
       const version = await h.built(w.proposal.id);
       await h.sendVersion(version.id).expect(200);
 
       return { version, requestId: (await queueBoth(first, w.department.unitId, version.id)).requestId };
     };
 
-    it('holds the commitment first and the decision then attaches it: no commitment waits for a budget that was approved', async () => {
-      const { version, requestId } = await meet('HOLD');
+    // Rewritten for FR-5.8a: a commitment is never made without an approved version, so a hold that comes first is refused and writes
+    // nothing (it used to wait for a budget and be attached by the decision). The decision still goes through.
+    it('FR-5.8a: a hold that comes before the decision is refused and writes nothing: no commitment waits for a budget', async () => {
+      const { requestId } = await meet('HOLD');
 
-      expect(await attachedTo(requestId)).toEqual([{ attached_version_id: version.id, unattached_reason: null }]);
+      expect(await attachedTo(requestId)).toEqual([]);
     });
 
-    it('decides first and the commitment is attached at once', async () => {
+    it('FR-5.8: decides first and the commitment is held at once on the approved version', async () => {
       const { version, requestId } = await meet('DECISION');
 
       expect(await attachedTo(requestId)).toEqual([{ attached_version_id: version.id, unattached_reason: null }]);
     });
   });
 
-  describe('a revision that an older release left (B-M2, QĐ-97b)', () => {
-    /** A version of the older kind: the revision is gone from the API, but the row may still be in a database. */
-    const asRevision = (versionId: string) =>
-      h.ctx.sql.query(
-        `UPDATE budget_versions SET kind = 'REVISION', reason = 'Left by an older release', based_on_version_id = id, proposal_id = NULL WHERE id = $1`,
-        [versionId],
-      );
+  // Rewritten for G5-03 (RV-15): a revision can no longer be in a database (20261109104000 refuses to run over one, and
+  // `budget_versions_initial_only` refuses a new one), so a version is never turned into one; it stays a first version that goes on.
+  describe('a revision (B-M2, QĐ-97b)', () => {
+    /** What an older release wrote: a version turned into a revision. */
+    const asRevision = async (versionId: string): Promise<string | null> => {
+      try {
+        await h.ctx.sql.query(
+          `UPDATE budget_versions SET kind = 'REVISION', reason = 'Left by an older release', based_on_version_id = id, proposal_id = NULL WHERE id = $1`,
+          [versionId],
+        );
 
-    it('is not sent: 409 BUDGET.VERSION_NOT_EDITABLE', async () => {
+        return null;
+      } catch (error) {
+        return (error as { code?: string }).code ?? 'unknown';
+      }
+    };
+
+    it('G5-03 cannot be written: the database refuses it, and the draft is still sent as a first version', async () => {
       const w = await waiting();
       const draft = await h.built(w.proposal.id);
-      await asRevision(draft.id);
 
-      const refused = await h.sendVersion(draft.id).expect(409);
-
-      expect(h.codeOf(refused)).toBe('BUDGET.VERSION_NOT_EDITABLE');
-      expect(await count(`budget_versions WHERE id = '${draft.id}' AND state = 'DRAFT'`)).toBe(1);
+      expect(await asRevision(draft.id)).toBe('23514');
+      expect(await count(`budget_versions WHERE id = '${draft.id}' AND kind = 'INITIAL'`)).toBe(1);
+      await h.sendVersion(draft.id).expect(200);
     });
 
-    it('is not decided: 409 BUDGET.VERSION_NOT_EDITABLE, and the version stays sent', async () => {
+    it('G5-03 cannot be written over a sent version either: it stays sent and is decided', async () => {
       const w = await waiting();
       const draft = await h.built(w.proposal.id);
       await h.sendVersion(draft.id).expect(200);
-      await asRevision(draft.id);
 
-      const refused = await h.decideVersion(draft.id, { decision: 'APPROVE' }, boss.account).expect(409);
-
-      expect(h.codeOf(refused)).toBe('BUDGET.VERSION_NOT_EDITABLE');
+      expect(await asRevision(draft.id)).toBe('23514');
       expect(await count(`budget_versions WHERE id = '${draft.id}' AND state = 'SENT'`)).toBe(1);
     });
   });
@@ -217,22 +225,15 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
     it('is detached and stays a draft: it is neither changed nor sent nor deleted, and a new version can be made', async () => {
       const w = await waiting();
       const draft = await h.built(w.proposal.id);
-      const csv = ['cost_center_code,description,amount', `${draft.costCenter.code},Imported,1000`].join('\n');
 
       await h.withdraw(w.proposal.id, w.head.account).expect(200);
 
       const wire = h.dataOf<{ version: VersionWire }>(await h.versionOf(draft.id).expect(200)).version;
       expect(wire).toMatchObject({ state: 'DRAFT' });
       expect(wire.detachedAt).not.toBeNull();
-      const refused = [
-        await h.updateVersion(draft.id, { base: h.money(1) }),
-        await h.updateLine(draft.id, 1, { financeComment: 'late' }),
-        await h.addLines(draft.id, [h.line()]),
-        await h.importLines(draft.id, csv),
-        await h.sendVersion(draft.id),
-      ];
+      const refused = [await h.updateVersion(draft.id, { base: h.money(1) }), await h.sendVersion(draft.id)];
       expect(refused.map((response) => [response.status, h.codeOf(response)])).toEqual(
-        Array.from({ length: 5 }, () => [409, 'BUDGET.VERSION_NOT_EDITABLE']),
+        Array.from({ length: 2 }, () => [409, 'BUDGET.VERSION_NOT_EDITABLE']),
       );
       expect(await count(`budget_versions WHERE id = '${draft.id}'`)).toBe(1);
       // The head sends a new proposal, and Finance makes a version from it: the detached draft does not count as the one in progress.
@@ -254,7 +255,7 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
 
       await h.giveBack(w.proposal.id, { reason: 'Add the quotes' }, h.finance).expect(200);
       const again = h.dataOf<{ proposal: ProposalWire }>(
-        await h.resubmit(w.proposal.id, { lines: [h.line()] }, w.head.account).expect(201),
+        await h.resubmit(w.proposal.id, h.bm10(50_000_000), w.head.account).expect(201),
       ).proposal;
 
       expect(h.codeOf(await h.sendVersion(draft.id).expect(409))).toBe('BUDGET.VERSION_NOT_EDITABLE');
@@ -264,43 +265,12 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
     });
   });
 
-  describe('the answers that were a 500 (F37, F39)', () => {
-    it('refuses a plan that does not exist, on a proposal and on a line: 422 BUDGET.PLAN_NOT_FOUND', async () => {
-      const w = await waiting();
-      const draft = await h.built(w.proposal.id);
-      const stranger = randomUUID();
-      const before = await count('budget_proposals');
-
-      const proposal = await h.submitProposal(
-        h.proposalBody(w.department.unitId, [h.line({ planId: stranger })], h.next + 1),
-        w.head.account,
-      );
-      const added = await h.addLines(draft.id, [h.line({ planId: stranger })]);
-      const adjusted = await h.updateLine(draft.id, 1, { planId: stranger, adjustmentReason: 'Another plan' });
-
-      expect([proposal.status, added.status, adjusted.status]).toEqual([422, 422, 422]);
-      expect([proposal, added, adjusted].map((response) => h.codeOf(response))).toEqual(
-        Array(3).fill('BUDGET.PLAN_NOT_FOUND'),
-      );
-      expect(await count('budget_proposals')).toBe(before);
-    });
-
-    it('takes a plan the catalog has', async () => {
-      const w = await waiting();
-
-      await h
-        .submitProposal(
-          h.proposalBody(w.department.unitId, [h.line({ planId: await h.plan('K5') })], h.next + 1),
-          w.head.account,
-        )
-        .expect(201);
-    });
-
+  describe('the answers that were a 500 (F39)', () => {
     it('answers a collision of the number of the next version with 409 BUDGET.VERSION_NUMBER_TAKEN, not a version in progress', async () => {
       const w = await waiting();
       const first = await h.built(w.proposal.id);
       await h.sendVersion(first.id).expect(200);
-      await h.decideVersion(first.id, { decision: 'REJECT', reason: 'Too high' }, boss.account).expect(200);
+      await h.refusedBefore(first.id, boss.account, 'Too high');
       // Another writer took number 2 first: this one reads the number the version it follows has.
       const numbers = jest
         .spyOn(h.ctx.app.get(VersionRepo, { strict: false }), 'nextNumber')
@@ -328,7 +298,9 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       const versions = h.ctx.app.get(VersionService, { strict: false });
 
       await expect(proposals.giveBack(head, w.proposal.id, 'No')).rejects.toBeInstanceOf(BudgetNotFinanceError);
-      await expect(versions.update(head, version.id, { quarters: null })).rejects.toBeInstanceOf(BudgetNotFinanceError);
+      await expect(versions.update(head, version.id, { reserveReason: null })).rejects.toBeInstanceOf(
+        BudgetNotFinanceError,
+      );
       await expect(versions.send(head, version.id)).rejects.toBeInstanceOf(BudgetNotFinanceError);
       expect(await count(`budget_proposals WHERE id = '${w.proposal.id}' AND state = 'SUBMITTED'`)).toBe(1);
     });

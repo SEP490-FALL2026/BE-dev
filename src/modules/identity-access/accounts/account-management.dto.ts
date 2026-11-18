@@ -13,7 +13,11 @@ export const requestedRoleSchema = appRoleSchema;
 
 export const createAppUserBodySchema = z.strictObject({
   employeeId: z.uuid(),
-  loginEmail: z.string().max(254).optional(),
+  loginEmail: z.string().max(254).optional().meta({
+    deprecated: true,
+    description:
+      'Deprecated, to be removed: the account always logs in with the work email of the employee. Omit it. When sent, it must equal the work email (case aside), otherwise the answer is 422 APP_USER.LOGIN_EMAIL_NOT_WORK_EMAIL.',
+  }),
   role: requestedRoleSchema.default('EMPLOYEE'),
 });
 

@@ -3,6 +3,11 @@ import { businessDateAt, toDateColumn, type BusinessDate } from '../../../core/b
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccountRecordService } from '../accounts/account-record.service';
+import {
+  PendingPolicyAcknowledgements,
+  type PendingPolicyAcknowledgement,
+} from '../public/identity-access.extension-points';
+import { ProfileQueryService, type SelfServiceProfile } from '../profile/profile-query.service';
 import type { AppRole } from '../public/identity-access.types';
 
 export interface MeView {
@@ -20,6 +25,19 @@ export interface MeView {
   roles: AppRole[];
   /** The department the caller heads today when they hold MANAGER; null otherwise. */
   managerScope: { departmentId: string; departmentCode: string; departmentName: string } | null;
+  /** The departments not yet in effect the caller, holding the MANAGER grant, is to head from the day they take effect (`QĐ-106k`). */
+  upcomingUnits: {
+    departmentId: string;
+    departmentCode: string;
+    departmentName: string;
+    effectiveFrom: string;
+    costCenterId: string | null;
+  }[];
+  /** The policies in force the caller owes an acknowledgement of; the interface asks before the dashboard (`QĐ-111ar`). */
+  pendingPolicyAcknowledgements: PendingPolicyAcknowledgement[];
+  /** The picture as a link that expires, and the work phone, which the person edits themselves (`QĐ-111at`). */
+  avatar: SelfServiceProfile['avatar'];
+  workPhone: SelfServiceProfile['workPhone'];
 }
 
 @Injectable()
@@ -27,6 +45,8 @@ export class MeService {
   constructor(
     private readonly accounts: AccountRecordService,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly policies: PendingPolicyAcknowledgements,
+    private readonly profile: ProfileQueryService,
   ) {}
 
   /** The caller's own identity, granted roles and Manager scope. Roles come from the principal resolved this request. */
@@ -50,7 +70,24 @@ export class MeService {
       employee: profile,
       roles,
       managerScope: await this.managerScopeOf(principal, day),
+      upcomingUnits: await this.upcomingUnitsOf(principal, day),
+      pendingPolicyAcknowledgements: await this.pendingPoliciesOf(principal, roles),
+      ...(await this.profile.viewOf(principal.appUserId)),
     };
+  }
+
+  /**
+   * The policies the caller owes an acknowledgement of, from every module that knows some. The roles asked about are the ones granted
+   * (`roles` of this answer), the same list the interface shows. Nothing here stops any other route.
+   */
+  private async pendingPoliciesOf(
+    principal: AuthenticatedPrincipal,
+    roles: readonly AppRole[],
+  ): Promise<PendingPolicyAcknowledgement[]> {
+    const reader = { appUserId: principal.appUserId, employeeId: principal.employeeId, roles };
+    const lists = await Promise.all(this.policies.all().map((source) => source.pendingFor(reader)));
+
+    return lists.flat();
   }
 
   /**
@@ -63,5 +100,36 @@ export class MeService {
     const brief = headed ? await this.organizationReads.getDepartmentBrief(headed.departmentId) : null;
 
     return brief ? { departmentId: brief.id, departmentCode: brief.code, departmentName: brief.name } : null;
+  }
+
+  /**
+   * The departments not yet in effect that the caller, holding the MANAGER grant, is to head from the day they take effect, with the
+   * Cost Center Finance made for each: what the screen of the proposal (`BM-10`) needs before the department starts (`QĐ-106k`). The
+   * role MANAGER is not effective for them (`managerScope` stays null); the budget routes judge the work by these units.
+   */
+  private async upcomingUnitsOf(
+    principal: AuthenticatedPrincipal,
+    day: BusinessDate,
+  ): Promise<MeView['upcomingUnits']> {
+    if (!principal.directRoles.includes('MANAGER')) return [];
+    const units = await this.organizationReads.getUpcomingHeadedUnits(principal.employeeId, day);
+    const briefs = await this.organizationReads.getDepartmentBriefs(units.map((unit) => unit.departmentId));
+    const byId = new Map(briefs.map((brief) => [brief.id, brief]));
+
+    return units.flatMap((unit) => {
+      const brief = byId.get(unit.departmentId);
+
+      return brief
+        ? [
+            {
+              departmentId: brief.id,
+              departmentCode: brief.code,
+              departmentName: brief.name,
+              effectiveFrom: unit.effectiveFrom,
+              costCenterId: unit.costCenter?.id ?? null,
+            },
+          ]
+        : [];
+    });
   }
 }

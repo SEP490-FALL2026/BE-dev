@@ -7,9 +7,10 @@ import {
   RevocationListeners,
   type GrantRequestGate,
 } from '../../public/licensing.extension-points';
-import { WITHDRAWAL_CANCEL_REASON } from '../../public/licensing.types';
-import { assertDecidable, assertHandOffAllowed } from '../failure.policy';
+import { NO_LONGER_APPLIES, WITHDRAWAL_CANCEL_REASON } from '../../public/licensing.types';
+import { assertCancellable, assertDecidable, assertHandOffAllowed } from '../failure.policy';
 import { cleanFailureReason } from '../provisioning.policy';
+import { ProvisioningTaskReasonRepo } from '../provisioning-task-reason.repo';
 import { toRevocationFacts, type ProvisioningTaskRecord } from '../provisioning-task.types';
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { ProvisioningTaskViewService, type TaskView } from '../provisioning-task-view.service';
@@ -34,6 +35,7 @@ export class ProvisioningDecisionService {
     private readonly assignments: AssignmentService,
     private readonly gate: GrantRequestGateHook,
     private readonly revocation: RevocationListeners,
+    private readonly reasons: ProvisioningTaskReasonRepo,
   ) {}
 
   /** Puts the failed task back in the queue of its channel. Throws ProvisioningTaskNotFoundError, ProvisioningTaskStateError. */
@@ -82,7 +84,7 @@ export class ProvisioningDecisionService {
   /**
    * Closes the failed task for good, with the reason. A grant becomes a failed assignment and its seat is free again; the
    * request, its commitment and the notice to the requester are for the modules that own them, which read the audit
-   * event. Throws ProvisioningReasonRequiredError and the errors of `retry`.
+   * event. An extension (`EXTEND`) ends its renewal as failed and leaves the right as it was, with its old end. Throws ProvisioningReasonRequiredError and the errors of `retry`.
    */
   async closeFailed(actor: AuthenticatedPrincipal, id: string, input: { reason: string }): Promise<TaskView> {
     const reason = cleanFailureReason(input.reason);
@@ -100,6 +102,11 @@ export class ProvisioningDecisionService {
             requestId: locked.requestId,
             now,
           });
+        }
+        // An extension that will not be done: the renewal it answers for fails and the right it would extend keeps its end
+        // (`BR-MF1-08d`); the assignment is the right itself, so it is neither failed nor freed here.
+        if (locked.kind === 'EXTEND' && locked.requestId !== null) {
+          await this.gate.get().reportExtensionFailed(tx, actor, locked.requestId, now);
         }
         await this.repo.markClosedFailed(tx, locked.id, actor.appUserId, reason, now);
         if (locked.kind === 'REVOKE') {
@@ -138,8 +145,9 @@ export class ProvisioningDecisionService {
    */
   async cancel(actor: AuthenticatedPrincipal, id: string): Promise<TaskView> {
     const task = await this.frame.work(actor, id, {
-      check: (locked) => assertDecidable(locked.status),
+      check: (locked) => assertCancellable(locked.status, locked.kind),
       write: async ({ tx, task: locked, organizationId, now }) => {
+        if (locked.kind === 'REVOKE') return this.cancelRevocation(tx, actor, locked, now);
         if (
           locked.kind !== 'GRANT' ||
           locked.requestId === null ||
@@ -169,6 +177,33 @@ export class ProvisioningDecisionService {
     });
 
     return (await this.views.views([task]))[0];
+  }
+
+  /**
+   * A revocation that no reason asks for any more (its source took the reason back while the work was under way, `US-07-05` AC-22) is
+   * closed as cancelled by the IT Admin: its assignment stays as it was. While a reason stands it is not this decision. Throws
+   * ProvisioningTaskStateError (`NO_WITHDRAWAL`).
+   */
+  private async cancelRevocation(
+    tx: Parameters<GrantRequestGate['isWithdrawing']>[0],
+    actor: AuthenticatedPrincipal,
+    locked: ProvisioningTaskRecord,
+    now: Date,
+  ) {
+    if ((await this.reasons.listOf([locked.id], tx)).length > 0) throw new ProvisioningTaskStateError('NO_WITHDRAWAL');
+    await this.repo.markCancelled(tx, locked.id, actor.appUserId, NO_LONGER_APPLIES, now);
+
+    return {
+      action: 'CANCELLED',
+      after: {
+        status: 'CANCELLED' as const,
+        taskKind: locked.kind,
+        requestId: null,
+        failureKind: locked.failureKind,
+        closeReason: NO_LONGER_APPLIES,
+        assignmentStillOpen: true,
+      },
+    };
   }
 
   /**

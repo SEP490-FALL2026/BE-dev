@@ -14,6 +14,15 @@ import { HeadPeriodRecord } from '../organization-structure.types';
 export class DepartmentHeadRepo {
   constructor(private readonly prisma: PrismaService) {}
 
+  async nextPeriod(departmentId: string, after: BusinessDate, tx?: DbTx) {
+    const row = await (tx ?? this.prisma).departmentHeadPeriod.findFirst({
+      where: { departmentId, validFrom: { gt: toDateColumn(after) }, employee: { status: 'ACTIVE' } },
+      orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
+      select: { employeeId: true, validFrom: true },
+    });
+    return row ? { employeeId: row.employeeId, validFrom: fromDateColumn(row.validFrom) } : null;
+  }
+
   /** Who heads each department on `onDate`, for the departments asked about. */
   async currentHeads(
     departmentIds: string[],

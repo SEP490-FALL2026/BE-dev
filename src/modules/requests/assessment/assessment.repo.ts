@@ -29,9 +29,8 @@ const QUOTE_CLEARED = {
   quoteBillingCycle: null,
   quoteValidFrom: null,
   quoteValidUntil: null,
-  commitmentMonths: null,
-  paymentFrequency: null,
-  firstPaymentOn: null,
+  quoteOriginalUnitPriceMinor: null,
+  quoteOriginalCurrency: null,
 } satisfies Prisma.AccessRequestAssessmentUncheckedUpdateInput;
 
 function quoteColumns(quote: Quote | null): Prisma.AccessRequestAssessmentUncheckedUpdateInput {
@@ -43,9 +42,8 @@ function quoteColumns(quote: Quote | null): Prisma.AccessRequestAssessmentUnchec
     quoteBillingCycle: quote.billingCycle,
     quoteValidFrom: toDateColumn(quote.validFrom),
     quoteValidUntil: quote.validUntil ? toDateColumn(quote.validUntil) : null,
-    commitmentMonths: quote.commitmentMonths,
-    paymentFrequency: quote.paymentFrequency,
-    firstPaymentOn: quote.firstPaymentOn ? toDateColumn(quote.firstPaymentOn) : null,
+    quoteOriginalUnitPriceMinor: quote.originalPrice?.amountMinor ?? null,
+    quoteOriginalCurrency: quote.originalPrice?.currency ?? null,
   };
 }
 
@@ -54,10 +52,29 @@ function quoteColumns(quote: Quote | null): Prisma.AccessRequestAssessmentUnchec
 export class AssessmentRepo {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Writes what the Employee declared and opens the assessment, empty, for the IT Admin (`US-05-06` AC-1). */
-  async open(tx: DbTx, requestId: string, proposal: ProposalRecord): Promise<void> {
+  /**
+   * Writes what the Employee declared and opens the assessment for the IT Admin (`US-05-06` AC-1): empty, but for a short proposal (`QĐ-111a`), which
+   * starts with what is already known, the plan asked for and the vendor of the application, so the IT Admin assesses the plan alone.
+   */
+  async open(
+    tx: DbTx,
+    requestId: string,
+    proposal: ProposalRecord,
+    known: { plannedPlanName: string; vendor: { id: string; name: string } | null } | null = null,
+  ): Promise<void> {
     await tx.accessRequestProposal.create({ data: { requestId, ...proposal } });
-    await tx.accessRequestAssessment.create({ data: { requestId } });
+    await tx.accessRequestAssessment.create({
+      data: {
+        requestId,
+        ...(known
+          ? {
+              plannedPlanName: known.plannedPlanName,
+              vendorId: known.vendor?.id ?? null,
+              vendorName: known.vendor?.name ?? null,
+            }
+          : {}),
+      },
+    });
   }
 
   /** Writes the fields given and who saved them; the others stay as they were. */
@@ -102,10 +119,22 @@ export class AssessmentRepo {
     });
   }
 
-  async complete(tx: DbTx, requestId: string, employeeId: string, now: Date): Promise<void> {
+  /** Completes the assessment; `classification` is written with it (a completed assessment always has one). */
+  async complete(
+    tx: DbTx,
+    requestId: string,
+    employeeId: string,
+    now: Date,
+    classification: 'INTERNAL' | 'PAID_LICENSED' | null,
+  ): Promise<void> {
     await tx.accessRequestAssessment.update({
       where: { requestId },
-      data: { status: 'COMPLETED', completedByEmployeeId: employeeId, completedAt: now },
+      data: {
+        status: 'COMPLETED',
+        completedByEmployeeId: employeeId,
+        completedAt: now,
+        ...(classification !== null ? { classification } : {}),
+      },
     });
   }
 }

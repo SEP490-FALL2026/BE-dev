@@ -6,6 +6,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { AssignmentService } from '../assignment/assignment.service';
 import { SeatBaselineClosedError } from '../public/licensing.errors';
 import { SeatBaselineClosedListeners } from '../public/licensing.extension-points';
+import type { SeatBaselineClosedHolder } from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { SeatBaselineRepo } from './seat-baseline.repo';
 
@@ -47,7 +48,8 @@ export class SeatBaselineService {
 
       const closedAt = await this.repo.close(tx, organization.id, actor.appUserId);
       const closedOn = await this.organizationReads.businessToday(closedAt, tx);
-      const holders = await this.assignments.baselineHoldersOfOtherDepartments(tx, closedOn);
+      // The pool is shared by every department (`QĐ-103d`), so no seat is held in another department's subscription to review (`QĐ-89e`).
+      const holders: SeatBaselineClosedHolder[] = [];
       await this.audit.record(
         tx,
         licensingAuditEvent(

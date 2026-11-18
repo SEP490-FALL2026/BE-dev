@@ -16,7 +16,7 @@ export function submissionEvents(
     organizationId: string;
     requestId: string;
     planId: string;
-    termMonths: number;
+    termMonths: number | null;
     state: string;
     judged: GroupJudgement;
     planned: readonly PlannedNeedStep<{ employeeId: string }>[];
@@ -45,10 +45,10 @@ export function submissionEvents(
       hasSpendStep: hasSpendStep(policy),
       slaWorkingDays: policy.slaWorkingDays,
       pricingStatus: pricing.status,
+      priceSource: pricing.priceSource ?? null,
       amountMinor: pricing.amount?.amountMinor.toString() ?? null,
       amountCurrency: pricing.amount?.currency ?? null,
       budgetYear: pricing.budgetYear,
-      expectedSpendOn: pricing.expectedSpendOn,
       delegated: judged.senderIsHead,
     }),
     ...planned.map((entry, index) => {
@@ -71,7 +71,6 @@ export function submissionEvents(
           assigneeEmployeeId: step.assigneeEmployeeId,
           role: entry.confirmedBySending ? 'MANAGER' : null,
           waitingReason: step.waitingReason,
-          samePersonAsSpend: false,
           requesterEmployeeId: actor.employeeId,
           beneficiaryEmployeeIds: entry.lines.map((line) => line.employeeId),
           type: 'GROUP_GRANT',

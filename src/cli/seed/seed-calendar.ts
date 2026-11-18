@@ -5,8 +5,6 @@ export interface CalendarFacts {
   mode: 'plan' | 'apply';
   /** The business day of the organization, `YYYY-MM-DD`. */
   today: string;
-  /** The operating parameter `FISCAL_YEAR_START_MONTH`. */
-  fiscalYearStartMonth: number;
   /** The year this fixture was first applied in on this database (from its audit events); null when never applied. */
   datasetYear: number | null;
 }
@@ -22,12 +20,6 @@ export function businessYearOf(occurredAt: string, timeZone: string): number {
 /** Why the calendar does not allow this run, or null. */
 export function calendarRefusal(facts: CalendarFacts): string | null {
   const year = Number(facts.today.slice(0, 4));
-  if (facts.fiscalYearStartMonth !== 1) {
-    return (
-      `The fixture assumes a fiscal year from January to December; this installation starts it in month ` +
-      `${facts.fiscalYearStartMonth} (FISCAL_YEAR_START_MONTH). Nothing written.`
-    );
-  }
   if (facts.datasetYear !== null && facts.datasetYear !== year) {
     return (
       `The dataset was applied in ${facts.datasetYear}; its subscriptions and budget belong to that year and this is ` +

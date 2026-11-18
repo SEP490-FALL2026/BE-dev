@@ -4,7 +4,7 @@
 - Thiết kế ban đầu bởi: AI (agent C-SPEC-TL) theo giao việc Owner (05/11/2026).
 - Thiết kế: `draft`. Owner review: chưa review.
 - Nguồn: Docs `3d73a7f` (`QĐ-96d`, `QĐ-96f`, `QĐ-66h`, `QĐ-62n`, `QĐ-75f`, `QĐ-55a`; BRD `FR-1.10`; `US-04-01`, `US-04-02`,
-  `US-04-04`, `US-04-03` chỉ tham chiếu), BE `3e4553b9`. Tracker `docs/reviews/qd96-100-alignment-2026-11-05/`: L-713, L-715;
+  `US-04-04`, `US-04-03` chỉ tham chiếu), BE `3e4553b9`. Tracker `docs/reviews/qd96-100-alignment-2026-11-05/` (nhật ký review đã xóa 11/11/2026 — xem git history): L-713, L-715;
   S-22; Owner Q-10(3) = 3a. Báo cáo `api-fields/V3-CATALOG-API.md` §2.2, 2.4, 2.5, 2.8.
 - Nhóm roadmap: không thuộc G — bó finding `qd96-100-alignment` (Track L). Tách từ #27 `qd96-100-catalog-licensing-api-fields`
   (ITEMS mục 1 gợi ý tách `-catalog-`/`-licensing-`); phần licensing ở `qd96-100-licensing-api-fields`.

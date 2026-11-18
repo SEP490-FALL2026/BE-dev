@@ -9,6 +9,7 @@ import type { OrganizationChange } from '../../organization/public/organization.
 import { RequestDraftDepartureService } from '../draft/request-draft-departure.service';
 import type { ReassignmentTrigger } from '../step-routing/reassignment.policy';
 import { StepReassignmentRepo } from '../step-routing/step-reassignment.repo';
+import { DepartmentWithoutHeadNotice } from './department-without-head-notice.service';
 import { StepReassignmentService } from './step-reassignment.service';
 
 /**
@@ -29,6 +30,7 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
     private readonly reassignment: StepReassignmentService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly drafts: RequestDraftDepartureService,
+    private readonly withoutHead: DepartmentWithoutHeadNotice,
     private readonly changes: OrganizationChangeListeners,
   ) {}
 
@@ -43,6 +45,8 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
     if (concerned === null) return;
 
     const waiting = await this.repo.waitingRequestIds(tx);
+    // Both the requests the change concerns and the ones that wait may take locks: take their union first, globally sorted, before any mutates a subset.
+    await this.repo.lockIds(tx, [...concerned.requestIds, ...waiting]);
     await this.reassignment.reconcileRequests(
       tx,
       [...concerned.requestIds, ...waiting],
@@ -50,6 +54,8 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
       change.id,
       new Date(),
     );
+    // A department left without a head keeps its paid requests waiting for one (`QĐ-110i`) and the Super Admin is told; free internal software already went on to the IT Admin in the reconciliation above (`QĐ-111bc`).
+    if (change.kind === 'HEAD_PERIOD_END') await this.withoutHead.tellIfLeftWithoutHead(tx, change, new Date());
   }
 
   /** The requests the change may concern and the event it is; null for a change that moves no step. */

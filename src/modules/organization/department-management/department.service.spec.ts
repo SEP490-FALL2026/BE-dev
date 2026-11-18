@@ -6,14 +6,20 @@ import { EmployeeNotFoundError } from '../public/organization.errors';
 import { OrganizationContextService } from '../organization-context.service';
 import { EmployeeRecordService } from '../employee/employee-record.service';
 import { DepartmentUseService } from '../department/department-use.service';
-import { DepartmentServiceAccountReaderHook } from '../public/organization.extension-points';
+import {
+  DepartmentCreationWindowHook,
+  DepartmentServiceAccountReaderHook,
+} from '../public/organization.extension-points';
 import { EmployeeAccountsHook, type EmployeeAccounts } from '../public/organization.extension-points';
 import {
   DepartmentForbiddenError,
   DepartmentInUseError,
   DepartmentItAdminInvalidError,
+  DepartmentItAdminLimitReachedError,
+  DepartmentOutsideBudgetPeriodError,
 } from '../department/department.errors';
 import { DepartmentRepo } from '../department/department.repo';
+import { DepartmentItAdminService } from './department-it-admin.service';
 import { DepartmentService } from './department.service';
 
 const principal = (role: string): AuthenticatedPrincipal => ({
@@ -31,7 +37,7 @@ const containing = (fields: object): unknown => expect.objectContaining(fields);
 /**
  * The department use cases through their public methods with in-memory collaborators: who may (the policy runs in the service,
  * whatever the controller let through), the employee look-up behind the IT Admin check (it goes through the
- * organization facade, locks the employee `FOR SHARE` before reading it in the same transaction, turns only a missing employee
+ * organization facade, locks the employee `FOR UPDATE` before reading and counting in the same transaction, turns only a missing employee
  * into "none" and lets every other error through), and what keeps a department from being retired (`QĐ-90e`).
  */
 describe('DepartmentService', () => {
@@ -43,7 +49,7 @@ describe('DepartmentService', () => {
   const organization = {
     getOrganization: jest.fn(),
     businessToday: jest.fn(),
-    lockEmployeeForShare: jest.fn(),
+    lockEmployee: jest.fn(),
     getEmployee: jest.fn(),
     ownedBy: jest.fn(),
     getDepartmentUse: jest.fn(),
@@ -54,8 +60,10 @@ describe('DepartmentService', () => {
     insert: jest.fn(),
     members: jest.fn(),
     deactivate: jest.fn(),
+    countActiveInChargeOf: jest.fn(),
   };
   const identity = { inspectEmployeeAccount: jest.fn() };
+  const creationWindow = { windowOn: jest.fn() };
   const audit = { record: jest.fn() };
   const runner = { run: jest.fn((work: (transaction: unknown) => Promise<unknown>) => work(tx)) };
 
@@ -63,6 +71,7 @@ describe('DepartmentService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         DepartmentService,
+        DepartmentItAdminService,
         { provide: DepartmentRepo, useValue: departments },
         {
           provide: OrganizationContextService,
@@ -71,7 +80,7 @@ describe('DepartmentService', () => {
         {
           provide: EmployeeRecordService,
           useValue: {
-            lock: (tx: unknown, id: string) => organization.lockEmployeeForShare(tx, id) as Promise<void>,
+            lock: (tx: unknown, id: string, mode: string) => organization.lockEmployee(tx, id, mode) as Promise<void>,
             find: organization.getEmployee,
           },
         },
@@ -89,6 +98,7 @@ describe('DepartmentService', () => {
             return hook;
           },
         },
+        { provide: DepartmentCreationWindowHook, useValue: { get: () => creationWindow } },
         { provide: AuditApi, useValue: audit },
         { provide: TransactionRunner, useValue: runner },
       ],
@@ -101,10 +111,10 @@ describe('DepartmentService', () => {
     jest.clearAllMocks();
     organization.getOrganization.mockResolvedValue({ id: 'org-1' });
     organization.businessToday.mockResolvedValue('2026-10-19');
-    organization.lockEmployeeForShare.mockResolvedValue(undefined);
+    organization.lockEmployee.mockResolvedValue(undefined);
     organization.getEmployee.mockResolvedValue(activeEmployee);
     organization.ownedBy.mockResolvedValue(noGroup);
-    organization.getDepartmentUse.mockResolvedValue({ openWork: noGroup, subscriptions: noGroup });
+    organization.getDepartmentUse.mockResolvedValue({ openWork: noGroup });
     departments.lock.mockResolvedValue({
       id: 'dep-1',
       name: 'Design',
@@ -113,6 +123,8 @@ describe('DepartmentService', () => {
       itAdmin: null,
     });
     departments.insert.mockResolvedValue('dep-new');
+    departments.countActiveInChargeOf.mockResolvedValue(0);
+    creationWindow.windowOn.mockResolvedValue({ kind: 'NO_CYCLE_YET' });
     departments.members.mockResolvedValue(noGroup);
     identity.inspectEmployeeAccount.mockResolvedValue({ usable: true, roles: ['IT_ADMIN'] });
   });
@@ -152,6 +164,42 @@ describe('DepartmentService', () => {
       );
     });
 
+    it('takes effect on 1 January of the next year when the cycle of that year is open, and today at the installation (R-I10)', async () => {
+      const departmentService = await service();
+      creationWindow.windowOn.mockResolvedValueOnce({ kind: 'OPEN', effectiveFrom: '2027-01-01' });
+
+      await departmentService.create(superAdmin, { code: 'P-NEXT', name: 'Next' });
+      await departmentService.create(superAdmin, { code: 'P-FIRST', name: 'First' });
+
+      expect(departments.insert).toHaveBeenNthCalledWith(
+        1,
+        tx,
+        expect.objectContaining({ effectiveFrom: '2027-01-01' }),
+      );
+      expect(departments.insert).toHaveBeenNthCalledWith(
+        2,
+        tx,
+        expect.objectContaining({ effectiveFrom: '2026-10-19' }),
+      );
+      expect(creationWindow.windowOn).toHaveBeenCalledWith(tx, 'org-1', '2026-10-19');
+      expect(audit.record).toHaveBeenNthCalledWith(
+        1,
+        tx,
+        expect.objectContaining({ after: containing({ effectiveFrom: '2027-01-01' }) }),
+      );
+    });
+
+    it('makes nothing outside the budgeting period, and records nothing', async () => {
+      creationWindow.windowOn.mockResolvedValue({ kind: 'CLOSED' });
+
+      await expect((await service()).create(superAdmin, { code: 'P-LATE', name: 'Late' })).rejects.toBeInstanceOf(
+        DepartmentOutsideBudgetPeriodError,
+      );
+
+      expect(departments.insert).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
+    });
+
     it('records the basis with a change, and nothing for a change that changes nothing', async () => {
       const departmentService = await service();
 
@@ -173,7 +221,7 @@ describe('DepartmentService', () => {
 
   describe('employee look-up', () => {
     it('refuses an IT Admin in charge who is not an employee, without reading or writing anything else', async () => {
-      organization.lockEmployeeForShare.mockRejectedValue(new EmployeeNotFoundError('emp-missing'));
+      organization.lockEmployee.mockRejectedValue(new EmployeeNotFoundError('emp-missing'));
       const departmentService = await service();
 
       await expect(
@@ -185,24 +233,64 @@ describe('DepartmentService', () => {
 
     it('lets an error other than a missing employee through unchanged', async () => {
       const outage = new Error('connection reset');
-      organization.lockEmployeeForShare.mockRejectedValue(outage);
+      organization.lockEmployee.mockRejectedValue(outage);
       const departmentService = await service();
 
       await expect(departmentService.update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-it' })).rejects.toBe(outage);
       expect(departments.update).not.toHaveBeenCalled();
     });
 
-    it('locks a usable IT Admin for share, then reads it, in the same transaction, before saving the change', async () => {
+    it('locks a usable IT Admin for update, then reads it, in the same transaction, before saving the change', async () => {
       const departmentService = await service();
 
       await departmentService.update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-it' });
 
-      expect(organization.lockEmployeeForShare).toHaveBeenCalledWith(tx, 'emp-it');
+      expect(organization.lockEmployee).toHaveBeenCalledWith(tx, 'emp-it', 'UPDATE');
       expect(organization.getEmployee).toHaveBeenCalledWith('emp-it', tx);
-      expect(organization.lockEmployeeForShare.mock.invocationCallOrder[0]).toBeLessThan(
+      expect(organization.lockEmployee.mock.invocationCallOrder[0]).toBeLessThan(
         organization.getEmployee.mock.invocationCallOrder[0],
       );
       expect(departments.update).toHaveBeenCalledWith(tx, 'dep-1', { itAdminEmployeeId: 'emp-it' }, expect.any(Date));
+    });
+  });
+
+  describe('one IT Admin answers for at most four departments (QĐ-110l, US-01-11)', () => {
+    it('refuses to name an IT Admin who already answers for four departments, on a change, and writes nothing', async () => {
+      departments.countActiveInChargeOf.mockResolvedValue(4);
+
+      await expect(
+        (await service()).update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-it' }),
+      ).rejects.toBeInstanceOf(DepartmentItAdminLimitReachedError);
+
+      expect(departments.update).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
+    });
+
+    it('refuses the same on creating a department, and creates nothing', async () => {
+      departments.countActiveInChargeOf.mockResolvedValue(4);
+
+      await expect(
+        (await service()).create(superAdmin, { code: 'P-NEW', name: 'New', itAdminEmployeeId: 'emp-it' }),
+      ).rejects.toBeInstanceOf(DepartmentItAdminLimitReachedError);
+
+      expect(departments.insert).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
+    });
+
+    it('does not count again when the IT Admin is taken off or the department keeps the one it has', async () => {
+      departments.lock.mockResolvedValue({
+        id: 'dep-1',
+        name: 'Design',
+        functionDescription: null,
+        status: 'ACTIVE',
+        itAdmin: { employeeId: 'emp-it' },
+      });
+      const departmentService = await service();
+
+      await departmentService.update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-it', name: 'Brand' });
+      await departmentService.update(superAdmin, 'dep-1', { itAdminEmployeeId: null });
+
+      expect(departments.countActiveInChargeOf).not.toHaveBeenCalled();
     });
   });
 
@@ -241,15 +329,6 @@ describe('DepartmentService', () => {
         () =>
           organization.getDepartmentUse.mockResolvedValue({
             openWork: { items: items('ACCESS_REQUEST', 1), total: 1 },
-            subscriptions: noGroup,
-          }),
-      ],
-      [
-        'a subscription that owes a payment',
-        () =>
-          organization.getDepartmentUse.mockResolvedValue({
-            openWork: noGroup,
-            subscriptions: { items: items('SUBSCRIPTION', 1), total: 1 },
           }),
       ],
     ])('refuses while it still has %s, and retires nothing', async (_name, arrange) => {
@@ -260,7 +339,7 @@ describe('DepartmentService', () => {
       expect(audit.record).not.toHaveBeenCalled();
     });
 
-    it('lists each group with its first twenty and the total, all four at once', async () => {
+    it('lists each group with its first twenty and the total, all three at once', async () => {
       departments.members.mockResolvedValue({ items: [{ employeeCode: 'E1', fullName: 'A' }], total: 41 });
       organization.ownedBy.mockResolvedValue({
         items: [{ assignmentId: 'a-1', accountIdentifier: 'ci-bot' }],
@@ -268,7 +347,6 @@ describe('DepartmentService', () => {
       });
       organization.getDepartmentUse.mockResolvedValue({
         openWork: { items: items('ACCESS_REQUEST', 20), total: 57 },
-        subscriptions: { items: items('SUBSCRIPTION', 2), total: 2 },
       });
 
       const refusal: unknown = await (await service()).deactivate(superAdmin, 'dep-1').catch((error: unknown) => error);
@@ -279,7 +357,6 @@ describe('DepartmentService', () => {
       expect(groups.serviceAccounts.total).toBe(3);
       expect(groups.openWork.items).toHaveLength(20);
       expect(groups.openWork.total).toBe(57);
-      expect(groups.subscriptions.total).toBe(2);
       // Every list is asked for at most twenty, inside the transaction that holds the department.
       expect(organization.getDepartmentUse).toHaveBeenCalledWith('dep-1', '2026-10-19', 20, tx);
       expect(departments.members).toHaveBeenCalledWith(tx, 'dep-1', '2026-10-19', { skip: 0, take: 20 });

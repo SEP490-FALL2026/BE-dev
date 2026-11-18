@@ -92,6 +92,15 @@ describe('RequestsAiSourceApi: the open steps a person holds (integration, real 
       expect(total).toBe(steps.length);
     });
 
+    it('gives no months for a request of use for as long as wanted, which keeps none (the column is empty, not zero)', async () => {
+      const u = await unit();
+      const sent = await h.sent(u.member, internal);
+
+      const step = (await open(u.head)).steps.find((one) => one.requestId === sent.id);
+
+      expect(step).toMatchObject({ stepKind: 'NEED_APPROVAL', termMonths: null });
+    });
+
     it('agrees with the queue of the need steps of the head, step for step', async () => {
       await h.sent(design.member, internal, { termMonths: 1 });
       const queue = await queuePage('/api/v1/need-decisions', design.head.account);
@@ -117,7 +126,7 @@ describe('RequestsAiSourceApi: the open steps a person holds (integration, real 
   });
 
   describe('what the spending approver reads', () => {
-    it('gives the approver their spend step with its cost and the need step of the request a head sent for themselves', async () => {
+    it('gives the approver their spend step with its cost, and no need step of the request a head sent for themselves (MF1-D)', async () => {
       const spendRequest = await h.waitingForApprover(design, plan, { amount: 1_234_567 });
       const own = await h.sent(design.head, internal, { termMonths: 2, businessReason: 'The head needs the tool' });
       const spendStep = await pendingSpendStepOf(spendRequest);
@@ -142,17 +151,10 @@ describe('RequestsAiSourceApi: the open steps a person holds (integration, real 
         amount: expect.any(String) as string,
         currency: expect.any(String) as string,
       });
-      expect(steps.find((one) => one.requestId === own.id)).toEqual<AiSourceStep>({
-        stepId: own.needStep.id,
-        requestId: own.id,
-        stepKind: 'NEED_APPROVAL',
-        assignedAt: new Date(own.needStep.assignedAt as string),
-        softwareName: internalApplicationName,
-        beneficiaryDisplayName: await fullNameOf(design.head),
-        reason: 'The head needs the tool',
-        termMonths: 2,
-        estimatedCost: null,
-      });
+      // MF1-D (BR-MF1-02): the own request of a head goes one step; its need step is not required and the approver holds none.
+      expect(own.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
+      expect(steps.find((one) => one.requestId === own.id)).toBeUndefined();
+      expect(internalApplicationName.length).toBeGreaterThan(0);
     });
 
     it('is the union of the two queues of the approver, and nothing else', async () => {
@@ -166,7 +168,8 @@ describe('RequestsAiSourceApi: the open steps a person holds (integration, real 
       );
       expect(total).toBe(needQueue.pagination.totalItems + spendQueue.pagination.totalItems);
       expect(spendQueue.items.length).toBeGreaterThan(0);
-      expect(needQueue.items.length).toBeGreaterThan(0);
+      // MF1-D: the approver holds no need step any more (the own request of a head goes one step).
+      expect(needQueue.items.length).toBe(0);
     });
   });
 
@@ -225,23 +228,22 @@ describe('RequestsAiSourceApi: the open steps a person holds (integration, real 
       expect(none).toEqual({ steps: [], total: 4 });
     });
 
-    it('orders the need steps and the spend steps of one person together by when each was given', async () => {
-      const spendRequest = await h.waitingForApprover(design, plan, { amount: 2_000_000 });
-      const spendStep = await pendingSpendStepOf(spendRequest);
-      const own = await h.sent(design.head, internal, { termMonths: 1 });
-      // The newer need step is given first, then the spend step a moment later: the kinds interleave.
+    it('orders the open steps of one person by when each was given, the step id breaking no tie here (MF1-D: the approver holds spend steps only)', async () => {
+      const first = await pendingSpendStepOf(await h.waitingForApprover(design, plan, { amount: 2_000_000 }));
+      const second = await pendingSpendStepOf(await h.waitingForApprover(design, plan, { amount: 3_000_000 }));
+      // The newer step is given first: the order is the time each was given, not the time each was made.
       await h.ctx.sql.query(`UPDATE access_request_steps SET assigned_at = '2020-01-01T00:00:00Z' WHERE id = $1`, [
-        own.needStep.id,
+        second.id,
       ]);
       await h.ctx.sql.query(`UPDATE access_request_steps SET assigned_at = '2020-01-01T00:00:01Z' WHERE id = $1`, [
-        spendStep.id,
+        first.id,
       ]);
 
       const { steps } = await open(h.boss);
 
       expect(steps.slice(0, 2).map((step) => [step.stepId, step.stepKind])).toEqual([
-        [own.needStep.id, 'NEED_APPROVAL'],
-        [spendStep.id, 'SPEND_APPROVAL'],
+        [second.id, 'SPEND_APPROVAL'],
+        [first.id, 'SPEND_APPROVAL'],
       ]);
       const keys = steps.map((step) => `${step.assignedAt.toISOString()} ${step.stepId}`);
       expect(keys).toEqual([...keys].sort());
@@ -299,7 +301,8 @@ describe('RequestsAiSourceApi: the open steps a person holds (integration, real 
 
     it('drops a step handed over to the next head, which the next head now holds', async () => {
       const u = await unit();
-      const sent = await h.sent(u.member, internal, { termMonths: 1 });
+      // A paid request: free internal software does not wait for the next head, it goes to the IT Admin (QĐ-111bc).
+      const sent = await h.sent(u.member, plan, { termMonths: 1 });
       expect(await api.stillHeldBy(u.head.employeeId, [sent.needStep.id])).toEqual(new Set([sent.needStep.id]));
       number += 1;
       const successor = await h.staff(u.department, `${u.department.code}-S${number}`);

@@ -25,10 +25,12 @@ export function grantAnswerFor(
     beneficiaryEmployeeIds: readonly string[];
     planId: string | null;
     expectedEndDate: string | null;
-    termMonths: number;
+    termMonths: number | null;
     departmentId: string;
     costCenterId: string | null;
     serviceAccount: ServiceAccountRecord | null;
+    /** The right of the person this request replaces (R-49); only a request of one person sent in the grace of a transfer has one. */
+    replacesAssignmentId?: string | null;
     lines?: readonly { employeeId: string; state: LineState; expectedEndDate: string | null }[];
   },
   employeeId?: string,
@@ -49,9 +51,11 @@ export function grantAnswerFor(
           planId,
           departmentId: request.departmentId,
           expectedEndDate,
-          termMonths: request.termMonths,
-          // Free internal software has no end by term; anything that costs money ends with its term.
-          termBound: request.branch !== 'INTERNAL_FREE',
+          termMonths: request.termMonths ?? 0,
+          // A right ends with the months of use the request asked for, counted from the day it is granted, or with the day an older request
+          // named (`QĐ-111i`); free internal software takes months too (K5 asks 1 to 12), and with none it has no end.
+          termBound: expectedEndDate !== null || (request.termMonths ?? 0) > 0,
+          replacesAssignmentId: request.replacesAssignmentId ?? null,
         };
       }
       if (serviceAccount.boundaryState !== 'ACCEPTED') return { status: 'BOUNDARY_NOT_CHECKED' };
@@ -64,7 +68,7 @@ export function grantAnswerFor(
         employeeId: serviceAccount.responsibleEmployeeId,
         planId,
         expectedEndDate,
-        termMonths: request.termMonths,
+        termMonths: request.termMonths ?? 0,
         termBound: false,
         serviceAccount: {
           purpose: serviceAccount.purpose,
@@ -79,9 +83,8 @@ export function grantAnswerFor(
     case 'PENDING':
     case 'WAITING_CONTROLLED':
     case 'AWAITING_IT_ASSESSMENT':
+    case 'AWAITING_REQUESTER_REVISION':
     case 'AWAITING_SPEND_SUBMISSION':
-    case 'AWAITING_FINANCE_REVIEW':
-    case 'AWAITING_BUDGET':
     case 'AWAITING_SPEND_DECISION':
       return { status: 'NOT_APPROVED' };
     case 'REJECTED':
@@ -101,7 +104,7 @@ function groupAnswerFor(
     state: AccessRequestState;
     planId: string | null;
     departmentId: string;
-    termMonths: number;
+    termMonths: number | null;
     lines?: readonly { employeeId: string; state: LineState; expectedEndDate: string | null }[];
   },
   employeeId: string | undefined,
@@ -124,9 +127,10 @@ function groupAnswerFor(
         planId: request.planId,
         departmentId: request.departmentId,
         expectedEndDate: line.expectedEndDate,
-        termMonths: request.termMonths,
-        // A request for a group is only for paid software.
-        termBound: true,
+        termMonths: request.termMonths ?? 0,
+        // A request for a group is only for paid software; its seat ends with the day the line names (`QĐ-104a`), and a group made before that
+        // ends with its term in months.
+        termBound: line.expectedEndDate !== null || (request.termMonths ?? 0) > 0,
       };
     default:
       return { status: 'ENDED' };

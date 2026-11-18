@@ -30,7 +30,7 @@ import {
   isStorageObjectMissing as isNotFound,
   SIGNATURE_PREFIX_BYTES,
   mayOpen,
-  type DocumentPurpose,
+  type NewDocumentPurpose,
 } from './contract.policy';
 import { ContractRepo } from './contract.repo';
 import { DocumentRepo, type DocumentRecord } from './document.repo';
@@ -79,7 +79,7 @@ export class DocumentService {
    */
   async create(
     actor: AuthenticatedPrincipal,
-    input: { fileName: string; contentType: string; sizeBytes: number; purpose: DocumentPurpose },
+    input: { fileName: string; contentType: string; sizeBytes: number; purpose: NewDocumentPurpose },
   ): Promise<{ document: DocumentRecord; upload: UploadInstructions }> {
     assertMayChoosePurpose(input.purpose, actor.roles);
     assertPurposeAvailable(input.purpose);
@@ -321,6 +321,72 @@ export class DocumentService {
         { status: 'READY', signerEmployeeId: input.signerEmployeeId },
       ),
     );
+  }
+
+  /**
+   * Attaches the purchase documents that come with a purchase invoice (`PI-1`) to it, in the transaction of the caller: only files of the
+   * purpose `PURCHASE_DOCUMENT` that the person who submits it uploaded and that are uploaded and not yet attached; the rows are locked in order of id.
+   * Throws DocumentNotFoundError, DocumentPurposeMismatchError, DocumentAlreadyAttachedError and DocumentNotReadyToAttachError.
+   */
+  async attachPurchaseDocuments(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { documentIds: readonly string[]; purchaseInvoiceId: string },
+  ): Promise<void> {
+    const organization = await this.requireOrganization();
+    const now = new Date();
+    for (const documentId of [...input.documentIds].sort()) {
+      const locked = await this.documents.lock(tx, documentId);
+      if (!locked || locked.uploadedByAppUserId !== actor.appUserId) throw new DocumentNotFoundError();
+      assertPurposeAttachesTo(locked.purpose, 'PURCHASE_INVOICE');
+      assertAttachable(locked.status);
+      await this.documents.markAttachedToPurchaseInvoice(tx, locked.id, input.purchaseInvoiceId, now);
+      await this.audit.record(
+        tx,
+        catalogAuditEvent(
+          actor,
+          organization.id,
+          'DOCUMENT.ATTACHED',
+          'DocumentAttachment',
+          locked.id,
+          { status: locked.status },
+          { status: 'READY', purchaseInvoiceId: input.purchaseInvoiceId },
+        ),
+      );
+    }
+  }
+
+  /**
+   * Attaches the proofs of payment a case outside the process (`SBF-07a`) was closed with to it, in the transaction of the caller: only files of the
+   * purpose `PURCHASE_DOCUMENT` that the person who closes it uploaded and that are uploaded and not yet attached; the rows are locked in order of id.
+   * Throws DocumentNotFoundError, DocumentPurposeMismatchError, DocumentAlreadyAttachedError and DocumentNotReadyToAttachError.
+   */
+  async attachOutOfProcessCaseDocuments(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { documentIds: readonly string[]; outOfProcessCaseId: string },
+  ): Promise<void> {
+    const organization = await this.requireOrganization();
+    const now = new Date();
+    for (const documentId of [...input.documentIds].sort()) {
+      const locked = await this.documents.lock(tx, documentId);
+      if (!locked || locked.uploadedByAppUserId !== actor.appUserId) throw new DocumentNotFoundError();
+      assertPurposeAttachesTo(locked.purpose, 'OUT_OF_PROCESS_CASE');
+      assertAttachable(locked.status);
+      await this.documents.markAttachedToOutOfProcessCase(tx, locked.id, input.outOfProcessCaseId, now);
+      await this.audit.record(
+        tx,
+        catalogAuditEvent(
+          actor,
+          organization.id,
+          'DOCUMENT.ATTACHED',
+          'DocumentAttachment',
+          locked.id,
+          { status: locked.status },
+          { status: 'READY', outOfProcessCaseId: input.outOfProcessCaseId },
+        ),
+      );
+    }
   }
 
   /** A file as the person may see it; one they may not see is as if it did not exist. Throws DocumentNotFoundError. */

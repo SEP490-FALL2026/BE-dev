@@ -26,11 +26,12 @@ Người duyệt chi quyết phiên bản ngân sách mà Finance đã gửi: du
 
 ## Primary Story/AC
 
-| Story    | AC               | Coverage | Phần còn lại thuộc                                                                                                                                                                                                              |
-| -------- | ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-06-07 | AC-3, AC-4, AC-6 | partial  | AC-1, AC-2, AC-5, AC-7: `g5-commitment-creation`                                                                                                                                                                                |
-| US-06-09 | AC-10, AC-21     | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-12: `g3-downstream-finance-integration`; AC-24→AC-26: `qd93-budget-record-attachments` |
-| US-06-11 | AC-1→AC-10       | partial  | AC-11: `qd93-budget-record-attachments`; AC-12: `qd93-remove-fallback-substitute-approvers`                                                                                                                                     |
+| Story    | AC           | Coverage | Phần còn lại thuộc                                                                                                                                                                                                              |
+| -------- | ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-09 | AC-10, AC-21 | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-2, AC-4, AC-9: `g5-commitment-creation`; AC-12: `g3-downstream-finance-integration`; AC-24→AC-26: `qd93-budget-record-attachments` |
+| US-06-11 | AC-1→AC-10   | partial  | AC-11: `qd93-budget-record-attachments`; AC-12: `qd93-remove-fallback-substitute-approvers`                                                                                                                                     |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-06-07` AC-3, AC-4, AC-6 (partial) — Story `RETIRED` ở Docs `5bb2e6a` (`US-06-07` `QĐ-103f`); code đã merge là lịch sử, khóa ở scope map là `not affected`.
 
 ## Supporting references
 

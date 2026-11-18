@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { monthsBeginningIn, termRunOf } from '../../../src/core/term-limit';
 import { AccessRequestWire, Department, Person, RequestHarness } from '../../support/request-harness';
 
 const h = new RequestHarness();
@@ -40,12 +41,23 @@ describe('requests over HTTP: the preview before sending (integration, real Post
 
   describe('paid software that has a price (AC-1, AC-3)', () => {
     it('shows the amount, the chain with who holds each step, and the time of every step', async () => {
+      const today = h.today();
+      const { end } = termRunOf({ start: today, months: 6, contractEndDate: null });
+      // BR-MF1-06, R-39: the months that begin this year, to the end of the 6 months at the latest.
+      const months = monthsBeginningIn({ start: today, end, year: Number(today.slice(0, 4)) });
       const preview = await h.previewed(designer, paidPlan, { termMonths: 6 });
 
       expect(preview).toMatchObject({
         branch: 'PAID_IN_CATALOG',
         termMonths: 6,
-        pricing: { status: 'PRICED', amount: { amount: '6000000', currency: 'VND' }, periodCount: 6 },
+        termRefusal: null,
+        pricing: {
+          status: 'PRICED',
+          kind: 'RECURRING',
+          months,
+          amount: { amount: String(1_000_000 * months), currency: 'VND' },
+        },
+        annualVendorAmount: { amount: '12000000', currency: 'VND' },
         spendSubmission: 'ALLOWED',
         canSubmit: true,
         totalExpectedWorkingDays: 8,
@@ -74,28 +86,35 @@ describe('requests over HTTP: the preview before sending (integration, real Post
       expect(kinds(full)).toContain('SPEND_APPROVAL');
     });
 
-    it('says that a Finance review may be added later, and shows no budget figure at all', async () => {
+    it('QĐ-97c: says no step may be added later (Finance has no review), and shows no budget figure at all', async () => {
       const preview = await h.previewed(designer, paidPlan);
 
-      expect(preview.possibleExtraSteps).toEqual([{ kind: 'FINANCE_REVIEW', beforeStep: 'SPEND_APPROVAL' }]);
+      expect(preview).not.toHaveProperty('possibleExtraSteps');
       expect(Object.keys(preview).sort()).toEqual(
         [
           'plan',
           'branch',
           'termMonths',
+          'termRefusal',
           'department',
           'costCenter',
-          'termLimit',
+          'annualVendorAmount',
           'existingAccess',
           'blockedBy',
           'canSubmit',
           'budgetYear',
           'pricing',
+          // QĐ-113a: `SUBSCRIPTION` or `PLAN_REFERENCE` for a priced request, null otherwise.
+          'priceSource',
+          'cost',
           'costEstimate',
           'spendSubmission',
           'chain',
-          'possibleExtraSteps',
           'totalExpectedWorkingDays',
+          // GH-1/2/3 (BR-MF1-01): how many requests are open, how many paid applications, whether a reason is needed.
+          'limits',
+          // P10 (QĐ-110q): `TRANSFER_GRACE` when the person holds the software from before a transfer in its grace; null otherwise.
+          'limitExemption',
         ].sort(),
       );
     });
@@ -111,7 +130,6 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         costEstimate: null,
         budgetYear: null,
         spendSubmission: 'NOT_NEEDED',
-        possibleExtraSteps: [],
       });
       expect(preview.chain.map((step) => [step.kind, step.assignee?.employeeId ?? null])).toEqual([
         ['NEED', head.employeeId],
@@ -148,36 +166,42 @@ describe('requests over HTTP: the preview before sending (integration, real Post
     });
   });
 
-  describe('a term over twelve months (AC-4)', () => {
-    it('is refused by the body (422), and a year or less shows the limit of the plan', async () => {
-      const edge = await h.previewed(designer, paidPlan, { termMonths: 12 });
+  describe('a time of use the plan does not take (QĐ-111i)', () => {
+    it('says so in the preview (canSubmit false, the reason) and refuses the sending with the same code (422)', async () => {
+      const over = await h.previewed(designer, paidPlan, { termMonths: 13 });
       const short = await h.previewed(designer, paidPlan, { termMonths: 6 });
 
-      const over = await h.previewRequest({ planId: paidPlan, termMonths: 13 }, designer.account).expect(422);
-      expect(h.codeOf(over)).toBe('VALIDATION_ERROR');
-      expect(edge.termLimit.maxMonths).toBe(12);
-      expect(edge.canSubmit).toBe(true);
-      expect(kinds(edge)).toEqual(kinds(short));
+      const sent = await h.submit(h.form(paidPlan, { termMonths: 13 }), designer.account);
+
+      expect([sent.status, h.codeOf(sent)]).toEqual([422, 'ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE']);
+      expect(over).toMatchObject({ canSubmit: false, termRefusal: 'TERM_MONTHS_OUT_OF_RANGE' });
+      expect(short).toMatchObject({ canSubmit: true, termRefusal: null });
+      expect(kinds(over)).toEqual(kinds(short));
     });
   });
 
   describe('the routing table (AC-5)', () => {
-    it('a head asking for themselves: the spending approver', async () => {
+    it('MF1-D: a head asking for themselves goes one step, straight to the spending approver', async () => {
       const preview = await h.previewed(head, paidPlan);
       const sent = await h.sent(head, paidPlan);
 
-      expect(preview.chain[0]).toMatchObject({
-        kind: 'NEED',
-        assignee: { employeeId: boss.employeeId },
-        explanation: 'HEAD_ASKS_FOR_SELF',
-      });
-      expect(sent.needStep.assignee?.employeeId).toBe(boss.employeeId);
+      // One-step routing (BR-MF1-02): no need step; the first step of the chain is the spend step of the approver.
+      expect(preview.chain[0]).toMatchObject({ kind: 'SPEND_APPROVAL', assignee: { employeeId: boss.employeeId } });
+      expect(sent.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' });
+      expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
     });
 
-    it('a member of a department with no head: waits for the head, naming nobody and saying why', async () => {
+    it('QĐ-110i: a member of a department with no head waits at the need step: nobody takes it in place of a head, and the chain shown is the chain made', async () => {
       const preview = await h.previewed(newcomer, paidPlan);
       const sent = await h.sent(newcomer, paidPlan);
 
+      // The need step stays in the chain, waiting for a head (R-43, MF1-X); no one-step route is offered to an employee.
+      expect(preview.chain.map((step) => step.kind)).toEqual([
+        'NEED',
+        'SPEND_SUBMISSION',
+        'SPEND_APPROVAL',
+        'IT_EXECUTION',
+      ]);
       expect(preview.chain[0]).toMatchObject({
         kind: 'NEED',
         role: 'MANAGER',
@@ -185,7 +209,9 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         explanation: 'WAITS_FOR_DEPARTMENT_HEAD',
         waitingReason: 'NO_DEPARTMENT_HEAD',
       });
-      // The chain shown is the chain made (AC-11): nobody takes the step in place of a head.
+      // The chain shown is the chain made (AC-11).
+      expect(sent.routing).toEqual({ mode: 'VIA_HEAD', oneStepReason: null });
+      expect(sent.state).toBe('WAITING_CONTROLLED');
       expect(sent.needStep).toMatchObject({
         state: 'WAITING',
         assignee: null,
@@ -206,7 +232,6 @@ describe('requests over HTTP: the preview before sending (integration, real Post
       const sent = await h.sent(designer, paidPlan);
 
       expect(Object.keys(preview)).not.toContain('outsideStandard');
-      expect(preview.termLimit.maxMonths).toBe(12);
       expect([old.status, h.codeOf(old)]).toEqual([422, 'VALIDATION_ERROR']);
       expect([bare.status, h.codeOf(bare)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(await h.requestRows()).toBe(rows + 1);
@@ -285,14 +310,16 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         .items.map((item) => item.id);
 
     it('with no tax profile uses the default, says so, still shows the price, and Finance sees the vendor to declare (AC-12)', async () => {
+      // The amount is the price of the months left of the year, up to the 10 months asked for (`BR-MF1-06`).
+      const net = String(1_000_000 * h.monthsOf(10));
       const preview = await h.previewed(designer, plan, { termMonths: 10 });
-      const route = h.dataOf<Record<string, string>>(await estimateRoute('10000000').expect(200));
+      const route = h.dataOf<Record<string, string>>(await estimateRoute(net).expect(200));
 
-      expect(preview.pricing).toMatchObject({ status: 'PRICED', amount: { amount: '10000000' } });
+      expect(preview.pricing).toMatchObject({ status: 'PRICED', amount: { amount: net } });
       expect(preview.costEstimate).toMatchObject({
         label: 'ESTIMATE_NO_PROFILE',
         basis: 'DEFAULT_NO_PROFILE',
-        preTax: { amount: '10000000', currency: 'VND' },
+        preTax: { amount: net, currency: 'VND' },
         tax: { amount: route.taxAmount },
         estimatedCost: { amount: route.estimatedCost },
       });
@@ -309,15 +336,17 @@ describe('requests over HTTP: the preview before sending (integration, real Post
 
       const preview = await h.previewed(designer, plan, { termMonths: 10 });
 
+      // 10 % deducted and 5 % not, of the price of the months counted (`BR-MF1-06`): in units of 1 000 000 × months a part is exact.
+      const net = 1_000_000 * h.monthsOf(10);
       expect(preview.costEstimate).toMatchObject({
         label: 'ESTIMATE',
         basis: 'PROFILE',
-        preTax: { amount: '10000000', currency: 'VND' },
-        tax: { amount: '1500000' },
-        deductibleTax: { amount: '1000000' },
-        nonDeductibleTax: { amount: '500000' },
-        estimatedCost: { amount: '10500000' },
-        totalPayable: { amount: '11500000' },
+        preTax: { amount: String(net), currency: 'VND' },
+        tax: { amount: String(net * 0.15) },
+        deductibleTax: { amount: String(net * 0.1) },
+        nonDeductibleTax: { amount: String(net * 0.05) },
+        estimatedCost: { amount: String(net * 1.05) },
+        totalPayable: { amount: String(net * 1.15) },
       });
       expect(await missingForFinance()).not.toContain(vendor.id);
     });
@@ -415,9 +444,9 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         .expect(401);
       for (const body of [
         {},
-        { planId: paidPlan },
-        { planId: 'x', termMonths: 6 },
-        { planId: paidPlan, termMonths: 0 },
+        { planId: 'x' },
+        { planId: paidPlan, expectedEndDate: 'next month' },
+        { planId: paidPlan, expectedEndDate: '2027-13-45' },
       ]) {
         expect(h.codeOf(await h.previewRequest(body, designer.account).expect(422))).toBe('VALIDATION_ERROR');
       }

@@ -5,8 +5,14 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentEndService } from '../assignment/assignment-end.service';
 import { SeatTargetNotFoundError } from '../public/licensing.errors';
-import type { OpenedRevocation, OpenRevocationInput } from '../public/licensing.types';
+import {
+  isSystemActor,
+  type OpenedRevocation,
+  type OpenRevocationInput,
+  type SystemActor,
+} from '../public/licensing.types';
 import { assertRevocable, assertRevocationSource, isOpenAssignment } from './revocation.policy';
+import { assertTiming } from './revocation-open.policy';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
 import { ProvisioningTaskReasonRepo } from './provisioning-task-reason.repo';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
@@ -18,7 +24,8 @@ import { RevocationTaskFactory } from './revocation-task-factory.service';
  * transfer review, an expiry, a reduced or cancelled subscription...) calls it in its own transaction, and nothing else makes a
  * revocation. A seat has one live task however many reasons ask for it (`QĐ-64a`): the first reason opens it and the others
  * are rows beside it. Asking again for the same source and reference changes nothing. The assignment stays whole until the task
- * is done, so the seat is not given back by being asked for. Locks in the order of whoever works the task: the task, the
+ * is done, so the seat is not given back by being asked for. A source may ask that the work is not done before a day (`timing`,
+ * `BR-MF5-04`) and that the holder is told (`notice`); the task carries what the reasons that stand ask. Locks in the order of whoever works the task: the task, the
  * subscription, the assignment.
  */
 @Injectable()
@@ -39,8 +46,13 @@ export class RevocationService {
    * AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError and ProvisioningAnotherItAdminNeededError (an IT
    * Admin who asks for their own seat while another IT Admin can).
    */
-  async open(tx: DbTx, actor: AuthenticatedPrincipal, input: OpenRevocationInput): Promise<OpenedRevocation> {
+  async open(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal | SystemActor,
+    input: OpenRevocationInput,
+  ): Promise<OpenedRevocation> {
     const source = assertRevocationSource(input.source);
+    const timing = assertTiming(input.timing);
     const now = input.now ?? new Date();
     const referenceId = input.decision.referenceId ?? null;
 
@@ -72,6 +84,8 @@ export class RevocationService {
       source,
       input,
       selfExecuted,
+      timing,
+      plan: { planId: plan.planId, applicationId: plan.applicationId },
       now,
     });
 
@@ -79,8 +93,12 @@ export class RevocationService {
   }
 
   /** The rule of the IT Admin who is the one revoked (`QĐ-77m`); a person who is not an IT Admin is never restricted by it. */
-  private async selfExecuted(tx: DbTx, actor: AuthenticatedPrincipal, holderEmployeeId: string): Promise<boolean> {
-    if (!actor.roles.includes('IT_ADMIN')) return false;
+  private async selfExecuted(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal | SystemActor,
+    holderEmployeeId: string,
+  ): Promise<boolean> {
+    if (isSystemActor(actor) || !actor.roles.includes('IT_ADMIN')) return false;
 
     return (await this.frame.selfExecutionMode(actor, holderEmployeeId, tx)) === 'ALLOW_SELF_EXECUTED';
   }

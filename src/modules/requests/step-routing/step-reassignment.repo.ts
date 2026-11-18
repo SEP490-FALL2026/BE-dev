@@ -3,14 +3,14 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { requestPolicyJson } from '../access-request/access-request.json';
-import type { ReassignableStepKind } from './reassignment.policy';
+import type { NeedNotRequiredReason, ReassignableStepKind } from './reassignment.policy';
 
 /** An open step as the reassignment reads it, with what the table of its kind needs to run again. */
 export interface ReassignableStep {
   id: string;
   kind: ReassignableStepKind;
   sequence: number;
-  state: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CLOSED';
+  state: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CLOSED' | 'NOT_REQUIRED';
   assigneeEmployeeId: string | null;
   waitingReason: string | null;
   routingRow: number;
@@ -83,19 +83,51 @@ function toRequest(row: RequestRow): ReassignableRequest {
     chainHasSpendStep: requestPolicyJson.decode(row.policy).chain.includes('SPEND_APPROVAL'),
     beneficiaryEmployeeIds: row.beneficiaries.map((beneficiary) => beneficiary.employeeId),
     lines: row.lines,
-    steps: row.steps,
+    // The review of Finance no longer exists: a step of that kind is a closed old one and is never looked at again (`QĐ-97c`).
+    steps: row.steps.filter(
+      (step): step is typeof step & { kind: ReassignableStepKind } => step.kind !== 'FINANCE_REVIEW',
+    ),
   };
 }
 
 /**
  * The reads that name the requests an event may concern, the lock on them, and the one write of who holds an open step when
  * the organization or an approval role changed (`FR-3.16`). It writes the holder columns of `access_request_steps` and the
- * state of the request that follows from them, and nothing else of either: the decisions, the records and the chain stay with
- * the repositories of the capabilities that own them.
+ * state of the request that follows from them, and nothing else of either, but for the one case that ends the need step: free
+ * internal software in a department with no head goes in one step, so the routing columns and the chain of the request change with
+ * it (`endNeedStepNotRequired`). The decisions and the records stay with the repositories of the capabilities that own them.
  */
 @Injectable()
 export class StepReassignmentRepo {
   constructor(private readonly prisma: PrismaService) {}
+
+  async lockIds(tx: DbTx, ids: readonly string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await tx.$queryRaw`SELECT id FROM access_requests WHERE id = ANY(${[...new Set(ids)].sort()}::uuid[]) ORDER BY id FOR UPDATE`;
+  }
+
+  async oneStepPendingIds(): Promise<string[]> {
+    const rows = await this.prisma.accessRequest.findMany({
+      where: {
+        routingMode: 'ONE_STEP',
+        state: { in: ['PENDING', 'WAITING_CONTROLLED', 'AWAITING_SPEND_SUBMISSION'] },
+        steps: { none: { kind: 'SPEND_APPROVAL', state: { in: ['PENDING', 'WAITING'] } } },
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  /** How many requests sent for the department have their need step waiting for a head: what the Super Admin is told when the department is left without one. */
+  countWaitingForHead(tx: DbTx, departmentId: string): Promise<number> {
+    return tx.accessRequest.count({
+      where: {
+        departmentId,
+        steps: { some: { kind: 'NEED', state: 'WAITING', waitingReason: 'NO_DEPARTMENT_HEAD' } },
+      },
+    });
+  }
 
   // --- which requests an event may concern ---------------------------------------------------------------
 
@@ -231,17 +263,39 @@ export class StepReassignmentRepo {
     await tx.accessRequestStep.update({ where: { id: stepId }, data: { waitingReason: reason } });
   }
 
+  /**
+   * Ends the need step without a decision and marks the request as one-step, the way a request sent into a department with no head is
+   * written (`access-request.repo.ts`): the step is `NOT_REQUIRED` with no holder and no reason, the request carries the one-step reason
+   * and its chain has no need step. The creation time of the step stays. The caller then starts the one-step route and holds the lock.
+   */
+  async endNeedStepNotRequired(
+    tx: DbTx,
+    requestId: string,
+    stepId: string,
+    routingRow: number,
+    oneStepReason: NeedNotRequiredReason,
+  ): Promise<void> {
+    await tx.accessRequestStep.update({
+      where: { id: stepId },
+      data: { state: 'NOT_REQUIRED', assigneeEmployeeId: null, assignedAt: null, waitingReason: null, routingRow },
+    });
+    const { policy } = await tx.accessRequest.findUniqueOrThrow({ where: { id: requestId }, select: { policy: true } });
+    const current = requestPolicyJson.decode(policy);
+    await tx.accessRequest.update({
+      where: { id: requestId },
+      data: {
+        routingMode: 'ONE_STEP',
+        oneStepReason,
+        policy: requestPolicyJson.encode({ ...current, chain: current.chain.filter((kind) => kind !== 'NEED') }),
+      },
+    });
+  }
+
   /** When the step began its present stretch of waiting, as the database set it when the step went to WAITING. */
   async waitingSinceOf(tx: DbTx, stepId: string): Promise<Date | null> {
     const row = await tx.accessRequestStep.findUnique({ where: { id: stepId }, select: { waitingSince: true } });
 
     return row?.waitingSince ?? null;
-  }
-
-  /** Writes whether one person holds the need step and the spend step, on the steps whose flag changes. */
-  async flagSamePerson(tx: DbTx, stepIds: readonly string[], same: boolean): Promise<void> {
-    if (stepIds.length === 0) return;
-    await tx.accessRequestStep.updateMany({ where: { id: { in: [...stepIds] } }, data: { samePersonAsSpend: same } });
   }
 
   /** The request follows the step that was given or made to wait; the caller holds its lock. */

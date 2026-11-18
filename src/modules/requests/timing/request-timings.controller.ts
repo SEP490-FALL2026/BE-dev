@@ -29,7 +29,7 @@ export class RequestTimingsController {
   @ApiSuccessResponse(RequestTimingsResponseDto, {
     message: 'ACCESS_REQUEST.TIMINGS_FETCHED',
     description:
-      'When the request was sent, when the last approval was given and when the grant was completed, the seconds to approve it, to grant it and in all, and where it waited for each step (the need, the assessment of the IT Admin, the queue of the head, the review of Finance, the decision of the spend and the grant, each a property that is empty when the request had no such step, and open while the step is not over). The time to approve includes the wait of the head to send it on as spend. Only a request whose grant was completed counts in the indicator of the time to grant. The time Finance spends after the approval is not part of it. The people who may see the request read it.',
+      'When the request was sent, when the last approval was given and when the grant was completed, the seconds to approve it, to grant it and in all, and where it waited for each step (the need, the assessment of the IT Admin, the queue of the head, the decision of the spend and the grant, each a property that is empty when the request had no such step, and open while the step is not over). The time to approve includes the wait of the head to send it on as spend. Only a request whose grant was completed counts in the indicator of the time to grant. The time Finance spends after the approval is not part of it. The people who may see the request read it.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
@@ -59,7 +59,6 @@ function wireOf(timings: Awaited<ReturnType<RequestTimingService['timingsOf']>>)
     NEED: null,
     IT_ASSESSMENT: null,
     QUEUE_WAIT: null,
-    FINANCE_REVIEW: null,
     SPEND_DECISION: null,
     GRANT: null,
   };

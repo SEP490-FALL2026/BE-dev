@@ -53,15 +53,6 @@ export interface ConversionFacts {
 }
 
 /**
- * Whether the database has the two objects of the owner-department expansion (`…_subscription_owner_column`): the
- * `subscriptions.owner_department_id` column and the `subscription_owner_assignments` table. `ABSENT`: neither (the
- * database is before the expansion: it blocks when it holds a subscription). `READY`: both (the compatibility schema and the
- * final one). `PARTIAL`: one without the other, which no migration of this repository produces. `NO_TABLE`: there is no
- * `subscriptions` table at all (an empty database).
- */
-export type SubscriptionOwnerSchema = 'NO_TABLE' | 'ABSENT' | 'READY' | 'PARTIAL';
-
-/**
  * Whether the database has the objects of the Cost Center link (`…_cost_center_department_link`): the
  * `cost_centers.department_id` column and the two tables of the record of a link and of the activation. `ABSENT`: none of
  * them (before the compatibility migration: it blocks when it holds an organization). `READY`: all (the compatibility schema
@@ -75,16 +66,6 @@ export type CostCenterDirectionSchema = 'NO_TABLE' | 'ABSENT' | 'READY' | 'PARTI
  * read in the schema the database has **now**, after a probe — a gate never names an object the schema may not have.
  */
 export interface ContractGateFacts {
-  subscriptionOwner: {
-    schema: SubscriptionOwnerSchema;
-    /**
-     * `ABSENT`: every subscription (the database skipped the expansion: each is a reason to stop). `READY`: the subscriptions
-     * that still have none — no owner department and no valid assignment, or an assignment that conflicts with the owner
-     * department (_dòng gán hợp lệ_); none once the final migration made the column required. Empty for the
-     * other schemas.
-     */
-    subscriptionIds: string[];
-  };
   /** Every Cost Center belongs to exactly one department (`QĐ-87d(1)`). */
   costCenterDirection: {
     schema: CostCenterDirectionSchema;
@@ -132,6 +113,13 @@ export interface RetiredKindFacts {
   pendingTransferIds: string[];
   /** A proposal to move a service account to another department that still waits for the receiving head (`QĐ-89c`). */
   pendingMoveIds: string[];
+  /**
+   * A service account (`kind = 'SERVICE'`) still in force that no record continues (`QĐ-110m`, review of X-SA): the migration
+   * `20261113000900_licensing_service_accounts_converted` writes each one it can as the flagged seat of an IT Admin and keeps the
+   * others as they were, and this release has no operation that ends or converts one. In force: not failed, not cancelled, no end
+   * day or one after today in the calendar of its organization.
+   */
+  serviceAccountIds: string[];
 }
 
 /**
@@ -151,11 +139,9 @@ export interface DirectRoleFacts {
 }
 
 /** A row that needs attention later but does not stop the deploy. Ids only: no name, no amount, no basis. */
-export type PreflightInformation = {
-  code: 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE';
-  proposalId: string;
-  rule: 'R1' | 'R2';
-};
+export type PreflightInformation =
+  | { code: 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE'; proposalId: string; rule: 'R1' | 'R2' }
+  | { code: 'SERVICE_ACCOUNT_STILL_IN_FORCE'; assignmentId: string };
 
 export type PreflightBlocker =
   | { code: 'MIGRATION_FAILED'; migration: string }
@@ -167,9 +153,6 @@ export type PreflightBlocker =
       role: 'SUPER_ADMIN' | 'IT_ADMIN' | 'FINANCE';
     }
   | { code: 'DIRECT_ROLES_SPENDING_APPROVER_WITHOUT_ACCOUNT'; employeeCode: string }
-  | { code: 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED'; subscriptionId: string }
-  | { code: 'SUBSCRIPTION_OWNER_UNASSIGNED'; subscriptionId: string }
-  | { code: 'SUBSCRIPTION_OWNER_SCHEMA_PARTIAL' }
   | { code: 'COST_CENTER_DIRECTION_EXPANSION_REQUIRED'; organizationId: string }
   | { code: 'COST_CENTER_UNLINKED'; costCenterId: string }
   | { code: 'COST_CENTER_LINK_MISMATCH'; costCenterId: string; departmentId: string }

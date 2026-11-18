@@ -1,5 +1,6 @@
 import { ReturnHarness, type ReturnWire } from '../../support/return-harness';
 import type { Unit } from '../../support/spend-harness';
+import { k1Checklist } from '../../support/k1-checklist';
 
 const h = new ReturnHarness();
 const NOTE = 'Export the boards before the seat is taken away';
@@ -51,7 +52,7 @@ describe('the return of a seat over PostgreSQL (US-05-13)', () => {
   };
 
   describe('the holder returns their seat, and the head confirms it is no longer needed (AC-1, AC-2, AC-9)', () => {
-    it('queues the revocation at once, with no step to approve, and does not give the seat back yet (AC-1)', async () => {
+    it('queues the revocation at once, with no step to approve and no handover to confirm, and does not give the seat back yet (AC-1)', async () => {
       const { unit, assignmentId } = await holder(lossy);
       const requestsBefore = await h.requestRows();
       const freeBefore = await h.freeSeats(lossy.subscriptionId);
@@ -68,7 +69,7 @@ describe('the return of a seat over PostgreSQL (US-05-13)', () => {
         requestedOn: h.today(),
         reason: 'The project is over',
         revocationNote: NOTE,
-        handover: { required: true, confirmed: false, flagged: false },
+        handover: { required: false, dueOn: null, confirmed: false, flagged: false },
         completedAt: null,
         failedAt: null,
       });
@@ -92,6 +93,29 @@ describe('the return of a seat over PostgreSQL (US-05-13)', () => {
       });
       expect(JSON.stringify(submitted.after)).not.toContain('The project is over');
       expect(JSON.stringify(submitted.after)).not.toContain('@acme.vn');
+    });
+
+    it('asks nothing of a handover on any return, also one an older release wrote as required and still waiting (QĐ-110g)', async () => {
+      const { unit, assignmentId } = await holder(lossy);
+      const wire = await sent(assignmentId, unit.member.account);
+      // The row an older release wrote for a plan that loses data: a handover required, due three days after the return.
+      await h.ctx.sql.query(`ALTER TABLE return_requests DISABLE TRIGGER return_requests_immutable`);
+      try {
+        await h.ctx.sql.query(
+          `UPDATE return_requests SET handover_required = true, handover_due_on = requested_on + 3 WHERE id = $1`,
+          [wire.id],
+        );
+      } finally {
+        await h.ctx.sql.query(`ALTER TABLE return_requests ENABLE TRIGGER return_requests_immutable`);
+      }
+      expect(await h.returnRow(wire.id)).toMatchObject({ state: 'AWAITING_REVOCATION', handover_required: true });
+
+      const read = h.dataOf<{ returnRequest: ReturnWire }>(await h.returnGet(wire.id, unit.member.account).expect(200));
+      const listed = h.dataOf<{ items: ReturnWire[] }>(await h.returnList(unit.member.account).expect(200)).items;
+
+      for (const row of [read.returnRequest, listed.find((item) => item.id === wire.id)]) {
+        expect(row?.handover).toEqual({ required: false, dueOn: null, confirmed: false, flagged: false });
+      }
     });
 
     it('lets the head of the department of the holder confirm that the seat is no longer needed (AC-2)', async () => {
@@ -253,7 +277,6 @@ describe('the return of a seat over PostgreSQL (US-05-13)', () => {
       expect(done.returnRequest.completedAt).not.toBeNull();
       expect((await h.eventsOf('RETURN_REQUEST.COMPLETED', wire.id))[0].after).toMatchObject({
         holderEmployeeId: unit.member.employeeId,
-        handoverFlagged: false,
       });
       // It saves nothing: no commitment or invoice moves.
       expect(await h.count('budget_commitments')).toEqual(commitmentsBefore);
@@ -287,6 +310,7 @@ describe('the return of a seat over PostgreSQL (US-05-13)', () => {
           evidence: 'Cancelled in the billing page',
           paidThroughOn: h.inDays(20),
           accessState: 'UNTIL_PAID_END',
+          k1Checklist: k1Checklist('STILL_EMPLOYED'),
         })
         .expect(200);
 

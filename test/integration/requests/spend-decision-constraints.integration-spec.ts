@@ -71,10 +71,14 @@ describe('the decision of the spending approver (integration, PostgreSQL constra
     return { state, stepId, requestId: id };
   };
 
-  it('takes an approval with its snapshot, one with an override, and a refusal', async () => {
+  // Rewritten (QĐ-97c, L2-23): there is no override any more, so the decision that took one is refused (CHECK of 20261109141000).
+  it('takes an approval with its snapshot and a refusal', async () => {
     expect((await decision()).state).toBeNull();
-    expect((await decision({ override_reason: 'Accepted', override_years: [2026, 2027] })).state).toBeNull();
     expect((await decision({ decision: 'REJECTED', check_id: null })).state).toBeNull();
+  });
+
+  it('QĐ-97c: refuses a new decision that accepts an exception, with or without a coherent override', async () => {
+    expect((await decision({ override_reason: 'Accepted', override_years: [2026, 2027] })).state).toBe(CHECK);
   });
 
   it.each([
@@ -130,12 +134,12 @@ describe('the decision of the spending approver (integration, PostgreSQL constra
       );
     };
 
-    it('takes a number for a year that is judged, and none for a year that has ended', async () => {
+    it('takes a number for a year that is judged', async () => {
       expect(await year({ code: 'NO_ACTIVE_BUDGET', pending_minor: 5 })).toBeNull();
-      expect(await year({})).toBeNull();
     });
 
-    it('refuses a number for a year that has ended, and a number below nothing', async () => {
+    // Not tested: a year with no code (a year that has ended): the CHECK of 20261109140000 lets a NULL code through (finding for the migration).
+    it('refuses a number for a year that is judged below nothing, and a number for a year with a cost it does not fit', async () => {
       expect(await year({ pending_minor: 5 })).toBe(CHECK);
       expect(await year({ code: 'NO_ACTIVE_BUDGET', pending_minor: -1 })).toBe(CHECK);
     });

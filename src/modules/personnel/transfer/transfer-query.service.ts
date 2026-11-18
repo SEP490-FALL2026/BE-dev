@@ -1,14 +1,24 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { ItHandoverViewService } from '../it-handover/it-handover-view.service';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
+import { TransferOldRightsService } from '../transfer-grace/transfer-old-rights.service';
 import { TransferRefusedError } from './transfer.errors';
 import type { TransferChangeWire, TransferDetailWire, TransferRecordedWire, TransferSummaryWire } from './transfer.dto';
-import { toChange, toDetail, toRecorded, toSummary, type TransferNames } from './transfer.mapper';
-import { TransferRepo } from './transfer.repo';
-import type { TransferListFilter, TransferRecord, TransferWarning } from './transfer.types';
+import {
+  toChange,
+  toDetail,
+  toRecorded,
+  toSummary,
+  type TransferDetailExtras,
+  type TransferNames,
+} from './transfer.mapper';
+import { TransferRepo, type TransferFactRow } from './transfer.repo';
+import type { TransferListFilter, TransferRecord } from './transfer.types';
 
 export interface Paged<T> {
   items: T[];
@@ -37,12 +47,25 @@ export class TransferQueryService {
     private readonly transfers: TransferRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
+    private readonly oldRights: TransferOldRightsService,
+    private readonly itHandovers: ItHandoverViewService,
   ) {}
+
+  /** The transfers of these people that have taken effect on `onDate` and are not closed (`getTransfersInOverlap`). */
+  overlapOf(employeeIds: readonly string[], onDate: BusinessDate): Promise<TransferFactRow[]> {
+    return this.transfers.inOverlap(employeeIds, onDate);
+  }
+
+  /** The transfers with these ids, whatever their state (`getTransfersByIds`). */
+  factsOf(transferIds: readonly string[]): Promise<TransferFactRow[]> {
+    return this.transfers.factsOf(transferIds);
+  }
 
   /** One page of summaries; the names of the page are read in one statement each, whatever the page size. */
   async list(actor: AuthenticatedPrincipal, filter: TransferListFilter): Promise<Paged<TransferSummaryWire>> {
     const { departmentIds } = await this.scopeOf(actor);
     const { items, total } = await this.transfers.list({ ...filter, ...(departmentIds ? { departmentIds } : {}) });
+    const today = await this.organizationReads.businessToday();
     const names = await this.namesOf(
       items.map((item) => ({
         employeeIds: [item.employeeId],
@@ -51,7 +74,7 @@ export class TransferQueryService {
     );
 
     return paged(
-      items.map((item) => toSummary(item, names)),
+      items.map((item) => toSummary(item, names, today)),
       total,
       filter,
     );
@@ -72,11 +95,31 @@ export class TransferQueryService {
   }
 
   async detailOf(record: TransferRecord, access: ReadAccess = 'FULL'): Promise<TransferDetailWire> {
-    return toDetail(record, await this.namesOfRecord(record), access);
+    return toDetail(record, await this.namesOfRecord(record), access, await this.extrasOf(record));
   }
 
-  async recordedOf(record: TransferRecord, warnings: TransferWarning[]): Promise<TransferRecordedWire> {
-    return toRecorded(record, await this.namesOfRecord(record), warnings);
+  async recordedOf(record: TransferRecord): Promise<TransferRecordedWire> {
+    return toRecorded(record, await this.namesOfRecord(record), await this.extrasOf(record));
+  }
+
+  /** The day and the old rights of a transfer that took effect (none before it did, and none for one that was cancelled). */
+  private async extrasOf(record: TransferRecord): Promise<TransferDetailExtras> {
+    const today = await this.organizationReads.businessToday();
+
+    return {
+      today,
+      itHandover: await this.itHandovers.wireOf({ kind: 'DEPARTMENT_TRANSFER', id: record.id }, record.employeeId),
+      oldRights:
+        record.status === 'EFFECTIVE'
+          ? await this.oldRights.of({
+              employeeId: record.employeeId,
+              effectiveOn: record.effectiveOn,
+              closed: record.closedAt !== null,
+              snapshot: record.snapshotBefore,
+              today,
+            })
+          : [],
+    };
   }
 
   async listChanges(

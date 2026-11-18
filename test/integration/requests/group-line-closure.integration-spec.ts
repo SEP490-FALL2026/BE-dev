@@ -2,8 +2,12 @@ import { RequestsApi } from '../../../src/modules/requests/public/requests.api';
 import { GroupHarness } from '../../support/group-harness';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 const h = new GroupHarness();
+const M = 1_000_000;
+/** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 const CHECK = '23514';
 const FINAL = '55000';
 
@@ -33,6 +37,8 @@ async function sqlState(text: string, values: unknown[] = []): Promise<string | 
  * (`US-03-04` AC-25, `US-05-17`), over HTTP, on real PostgreSQL: the line is cancelled with the cause, only that person's task and share
  * go, the request closes only with its last live line, and each person is told only of their own line.
  */
+afterEach(() => jest.restoreAllMocks());
+
 describe('removing a person who left from a request for a group (integration, real PostgreSQL)', () => {
   let subscriptionId: string;
   let paid: string;
@@ -113,7 +119,7 @@ describe('removing a person who left from a request for a group (integration, re
       expect(rows[0].cancel_cause).toBeNull();
       const wire = h.dataOf<{ request: { state: string; pricing: { amount: { amount: string } } } }>(closed).request;
       expect(wire.state).toBe('AWAITING_SPEND_DECISION');
-      expect(wire.pricing.amount.amount).toBe('24000000');
+      expect(wire.pricing.amount.amount).toBe(String(2 * M * monthsLeft));
       expect(await h.commitments(id)).toEqual([]);
       const all = [e1, e2, e3].map((p) => ({ employeeId: p.employeeId, decision: 'APPROVE' }));
       expect(h.codeOf(await h.decideSpendLines(id, { lines: all }, h.boss.account).expect(422))).toBe(
@@ -183,7 +189,8 @@ describe('removing a person who left from a request for a group (integration, re
       const { people, id } = await approved(3);
       const [e1, e2] = people;
       await granted(id, e1.employeeId);
-      await granted(id, e2.employeeId);
+      // Nobody has worked the task of the person who left: the grant takes the work for whoever presses it, so it is one put back in the queue.
+      await h.unclaimed((await granted(id, e2.employeeId)).id);
       await h.depart(e2);
 
       await h.closeLineForDeparture(id, e2.employeeId, note, h.it1).expect(200);
@@ -194,16 +201,16 @@ describe('removing a person who left from a request for a group (integration, re
       const theirs = rows.find((row) => row.employee_id === e1.employeeId);
       expect(mine).toMatchObject({ status: 'CANCELLED', close_reason: 'BENEFICIARY_LEFT' });
       expect(mine?.cancelled_at).not.toBeNull();
-      expect(theirs).toMatchObject({ status: 'QUEUED', cancelled_at: null });
+      expect(theirs).toMatchObject({ status: 'IN_PROGRESS', cancelled_at: null });
       expect(await h.state(id)).toBe('EXECUTING');
     });
 
     it('cancels a task that is being worked only with the evidence that the work was undone', async () => {
       const { people, id } = await approved(2);
       const [e1, e2] = people;
-      const running = await granted(id, e1.employeeId);
+      // Both tasks are in the hands of the IT Admin who granted them: the grant takes the work for whoever presses it.
+      await granted(id, e1.employeeId);
       await granted(id, e2.employeeId);
-      await h.claim(running.id).expect(200);
       await h.depart(e1);
 
       const refused = await h.closeLineForDeparture(id, e1.employeeId, note, h.it1).expect(422);
@@ -211,14 +218,14 @@ describe('removing a person who left from a request for a group (integration, re
       expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.EVIDENCE_REQUIRED');
       expect(await h.lineStates(id)).toEqual(['EXECUTING', 'EXECUTING']);
       expect(await releases(id)).toEqual([]);
-      expect((await tasks(id)).map((row) => row.status).sort()).toEqual(['IN_PROGRESS', 'QUEUED']);
+      expect((await tasks(id)).map((row) => row.status).sort()).toEqual(['IN_PROGRESS', 'IN_PROGRESS']);
 
       await h
         .closeLineForDeparture(id, e1.employeeId, { ...note, evidence: 'Took the invitation back' }, h.it1)
         .expect(200);
 
       expect(await h.lineStates(id)).toEqual(['CANCELLED', 'EXECUTING']);
-      expect((await tasks(id)).map((row) => row.status).sort()).toEqual(['CANCELLED', 'QUEUED']);
+      expect((await tasks(id)).map((row) => row.status).sort()).toEqual(['CANCELLED', 'IN_PROGRESS']);
       expect((await releases(id)).length).toBeGreaterThan(0);
     });
 
@@ -234,7 +241,8 @@ describe('removing a person who left from a request for a group (integration, re
 
       expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.ALREADY_ENDED');
       expect(await h.lineStates(id)).toEqual(['COMPLETED', 'APPROVED']);
-      expect(await releases(id)).toEqual([]);
+      // The refused closure gives nothing back; only the days before the K2 grant of the seat went back when it was completed (M-10).
+      expect((await releases(id)).filter((row) => row.reason !== 'LATE_GRANT')).toEqual([]);
     });
   });
 
@@ -279,6 +287,8 @@ describe('removing a person who left from a request for a group (integration, re
     });
 
     it('ends as cancelled when the others had been withdrawn before', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(2);
       const [e1, e2] = people;
       await h.withdrawLine(id, e1.employeeId, {}, u.head.account).expect(200);
@@ -325,6 +335,8 @@ describe('removing a person who left from a request for a group (integration, re
     });
 
     it('cancels the request when the one live line is the leaver’s', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(2);
       const [e1, e2] = people;
       await h.withdrawLine(id, e2.employeeId, {}, u.head.account).expect(200);
@@ -340,6 +352,8 @@ describe('removing a person who left from a request for a group (integration, re
     });
 
     it('refuses the sole live person while they still work, whichever way it is asked', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(2);
       const [e1, e2] = people;
       await h.withdrawLine(id, e2.employeeId, {}, u.head.account).expect(200);
@@ -355,6 +369,8 @@ describe('removing a person who left from a request for a group (integration, re
 
   describe('what is refused', () => {
     it('refuses a person who still works, a line that ended, a withdrawal that waits for the IT Admin, and nobody’s line', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(3);
       const [e1, e2, e3] = people;
       const stranger = await h.colleague(await unit());
@@ -446,6 +462,8 @@ describe('removing a person who left from a request for a group (integration, re
 
   describe('what the database keeps', () => {
     it('keeps the cause and the end of a cancelled line, and moves only the lines that may be cancelled', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { u, people, id } = await approved(3);
       const [e1, e2] = people;
       const other = await unit();

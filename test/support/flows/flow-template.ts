@@ -3,20 +3,23 @@ import type { AddressInfo, Server } from 'node:net';
 import { Client } from 'pg';
 import { randomBytes } from 'node:crypto';
 import { runSeed } from '../../../src/cli/seed/seed-run';
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
-import { SHARED_DEMO_V3 } from '../../../src/cli/seed/fixture/shared-demo-v3';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v4/installation';
+import { SHARED_DEMO_V4 } from '../../../src/cli/seed/fixture/shared-demo-v4';
 import { BudgetAttachmentExpirySweeper } from '../../../src/modules/budgets/attachment/budget-attachment-expiry.job';
 import { BudgetYearEndSweeper } from '../../../src/modules/budgets/year-end/year-end.job';
+import { NextYearReminderSweeper } from '../../../src/modules/budgets/year-end/next-year-reminder.job';
 import { DocumentExpirySweeper } from '../../../src/modules/catalog/contract/document-expiry.job';
+import { YearStartCommitmentsSweeper } from '../../../src/modules/requests/year-start-commitments/year-start-commitments.job';
 import { ExpiryReminderSweeper } from '../../../src/modules/licensing/expiry/expiry-reminder.job';
-import { HandoverDutySweeper } from '../../../src/modules/licensing/handover/handover-duty.job';
+import { ExpiryRevocationSweeper } from '../../../src/modules/licensing/expiry/expiry-revocation.job';
+import { StopRequestSweeper } from '../../../src/modules/devices/stop-request/stop-request.job';
 import { SaasIssueSweeper } from '../../../src/modules/licensing/saas-issue/saas-issue.job';
-import { ServiceAccountDutySweeper } from '../../../src/modules/licensing/assignment/service-account-duty/service-account-duty.job';
 import { SubscriptionRenewalSweeper } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal.job';
+import { DecisionFollowUpSweeper } from '../../../src/modules/optimization/decision/decision-follow-up.job';
+import { InternalRulesSweeper } from '../../../src/modules/optimization/internal-rules/internal-rules.job';
 import { OrganizationChangeSweeper } from '../../../src/modules/organization/change-announcement/organization-change.job';
 import { LeaveReturnSweeper } from '../../../src/modules/personnel/leave/leave-return.job';
 import { NoticeOverdueSweeper } from '../../../src/modules/personnel/notice/notice-overdue.job';
-import { TransferReviewSweeper } from '../../../src/modules/personnel/transfer-review/transfer-review.job';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import {
@@ -27,6 +30,7 @@ import {
 } from '../disposable-database';
 import type { DisposableDatabase } from '../disposable-database';
 import { createHttpTestApp, SEED_PASSWORD } from '../http-test-app';
+import { SeedStorage } from './seed-storage';
 
 /*
  * The seeded template of the flows runner (spec e2e-main-flows-suite, section 2). Prepared once by test/config/flows-global-setup.ts:
@@ -50,16 +54,19 @@ export const FLOW_SUPER_ADMIN_EMAIL = INSTALLATION.loginEmail;
 export const SWEEPER_OVERRIDES: { token: unknown; useValue: unknown }[] = [
   BudgetAttachmentExpirySweeper,
   BudgetYearEndSweeper,
+  NextYearReminderSweeper,
+  YearStartCommitmentsSweeper,
   DocumentExpirySweeper,
   ExpiryReminderSweeper,
-  HandoverDutySweeper,
+  ExpiryRevocationSweeper,
   SaasIssueSweeper,
-  ServiceAccountDutySweeper,
+  StopRequestSweeper,
   SubscriptionRenewalSweeper,
   OrganizationChangeSweeper,
   LeaveReturnSweeper,
   NoticeOverdueSweeper,
-  TransferReviewSweeper,
+  InternalRulesSweeper,
+  DecisionFollowUpSweeper,
 ].map((token) => ({ token, useValue: {} }));
 
 interface TemplateHandle {
@@ -76,7 +83,10 @@ function seededTemplate(): TemplateHandle {
 
 /** Installs the demo organization and applies the default fixture through the HTTP API of an application on `database`. */
 async function seedInto(database: DisposableDatabase): Promise<void> {
-  const ctx = await createHttpTestApp({ database, providerOverrides: SWEEPER_OVERRIDES });
+  // The files the seed uploads (BM-10, files of a version, invoices) land in a fake storage the seeding application reads.
+  const seedStorage = new SeedStorage();
+  await seedStorage.start();
+  const ctx = await createHttpTestApp({ database, providerOverrides: [...SWEEPER_OVERRIDES, seedStorage.override] });
   const install = await NestFactory.createApplicationContext(
     (await import('../../../src/modules/installation/installation.module')).InstallationModule,
     { logger: false },
@@ -92,7 +102,7 @@ async function seedInto(database: DisposableDatabase): Promise<void> {
     const outcome = await runSeed({
       args: {
         mode: 'apply',
-        fixture: SHARED_DEMO_V3.id,
+        fixture: SHARED_DEMO_V4.id,
         apiUrl,
         operator: 'TEST-FLOWS-1',
         environment: 'LOCAL_TEST',
@@ -114,6 +124,7 @@ async function seedInto(database: DisposableDatabase): Promise<void> {
     await demo?.close();
     await install.close();
     await ctx.close();
+    await seedStorage.stop();
   }
 }
 

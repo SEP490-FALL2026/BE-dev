@@ -74,6 +74,43 @@ export const PROGRESS_RULES: Readonly<Record<string, StatusRule>> = {
       ];
     },
   },
+  // The proposal of new software of a head, who has no need step to go through, asks for its assessment when it is sent. The
+  // assessment asked for by the approval of the need already tells the IT Admin (row 2), so only the one-step route is told here.
+  'ACCESS_REQUEST.ASSESSMENT_REQUESTED': {
+    subject: 'ACCESS_REQUEST',
+    needs: ['REQUEST'],
+    build: (event, facts): NotificationIntent[] => {
+      const request = requestOf(facts);
+
+      return [
+        {
+          recipients: text(event.after, 'routingMode') === 'ONE_STEP' ? [text(event.after, 'itAdminEmployeeId')] : [],
+          code: 'STEP_ASSIGNED',
+          params: { requestId: request.id, stepKind: 'IT_ASSESSMENT', cause: 'SUBMITTED' },
+        },
+      ];
+    },
+  },
+  // The request was sent again after it was sent back: the step opened again is given to the person who holds it. A one-step
+  // request is routed again by the check of the budget, which tells its holder.
+  'ACCESS_REQUEST.RESUBMITTED': {
+    subject: 'ACCESS_REQUEST',
+    needs: ['REQUEST', 'ASSESSMENT_HOLDER'],
+    build: (event, facts): NotificationIntent[] => {
+      const request = requestOf(facts);
+      const assessment = text(event.after, 'reopenedStepKind') === 'IT_ASSESSMENT';
+
+      return [
+        {
+          recipients: assessment
+            ? [facts.assessmentHolderEmployeeId]
+            : (text(event.after, 'assigneeEmployeeIds') ?? '').split(',').filter(Boolean),
+          code: 'STEP_ASSIGNED',
+          params: { requestId: request.id, stepKind: assessment ? 'IT_ASSESSMENT' : 'NEED', cause: 'RESUBMITTED' },
+        },
+      ];
+    },
+  },
   // 13: a step waits for somebody who can hold it.
   'ACCESS_REQUEST.STEP_WAITING': {
     subject: 'ACCESS_REQUEST',

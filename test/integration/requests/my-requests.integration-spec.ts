@@ -24,7 +24,8 @@ interface RowWire {
   softwareName: string | null;
   beneficiary: EmployeeRef | null;
   lineCount: number;
-  termMonths: number;
+  termMonths: number | null;
+  expectedEndDate: string | null;
   submittedAt: string;
   updatedAt: string;
   needStep: { state: string; assignee: EmployeeRef | null; waitingReason: string | null };
@@ -189,36 +190,13 @@ describe('my requests: whose they are and what a row says (integration, real Pos
       }
     });
 
-    it('lists the request for a service account to the one who sent it', async () => {
-      const person = await employee();
-      // A request for a service account is sent once the seat baseline of the installation is closed.
-      await h.closeBaseline().expect(200);
-      const response = await request(h.server())
-        .post('/api/v1/access-requests/service-accounts')
-        .set(h.as(person.account))
-        .send({
-          planId: internal,
-          purpose: 'Build bot of the CI pipeline',
-          expectedIdentifier: 'ci-bot-2',
-          businessReason: 'Run the builds of the product',
-          termMonths: 1,
-        })
-        .expect(201);
-      const sent = h.dataOf<{ request: { id: string } }>(response).request;
-
-      const rows = (await page(person.account)).items;
-
-      expect(rows.map((item) => [item.id, item.type])).toEqual([[sent.id, 'SERVICE_ACCOUNT']]);
-      expect(await idsOf(e1.account)).not.toContain(sent.id);
-    });
-
     it('does not list a draft, which is read with the drafts of the caller, and lists the request once it is sent', async () => {
       const person = await employee();
       const draft = h.dataOf<{ draft: { id: string } }>(
         await request(h.server())
           .post('/api/v1/access-requests/drafts')
           .set(h.as(person.account))
-          .send({ kind: 'INDIVIDUAL', planId: paid, businessReason: 'Design the new brand', termMonths: 6 })
+          .send({ kind: 'INDIVIDUAL', planId: paid, businessReason: 'Design the new brand' })
           .expect(201),
       ).draft;
 
@@ -242,22 +220,22 @@ describe('my requests: whose they are and what a row says (integration, real Pos
     it('says who a request waits for and lets the sender withdraw it, and says who it waits for after the head is changed', async () => {
       const unit = await h.departmentWithHead('P-MR-W');
       const person = await h.staff(unit.department, 'MR-W1', 'EMPLOYEE');
-      const sent = await h.sent(person, internal);
+      // A paid request: free internal software does not wait for the next head, it goes to the IT Admin when the head leaves (QĐ-111bc).
+      const sent = await h.sent(person, paid, { termMonths: 1 });
 
       const before = await rowOf(person.account, sent.id);
       expect(before).toMatchObject({
         state: 'PENDING',
-        branch: 'INTERNAL_FREE',
+        branch: 'PAID_IN_CATALOG',
         needStep: { state: 'PENDING', assignee: ref(unit.head), waitingReason: null },
         spend: null,
         outcome: null,
         withdrawal: null,
         canWithdraw: true,
-        plan: { planId: internal },
+        plan: { planId: paid },
         softwareName: null,
         beneficiary: ref(person),
         lineCount: 1,
-        termMonths: 6,
       });
 
       // The head changes hands, and the step follows: the next read names the new head and not the old.
@@ -273,7 +251,7 @@ describe('my requests: whose they are and what a row says (integration, real Pos
     it('says a request waits under control with nobody to hold it, and the reason', async () => {
       const unit = await h.departmentWithHead('P-MR-V');
       const person = await h.staff(unit.department, 'MR-V1', 'EMPLOYEE');
-      const sent = await h.sent(person, internal);
+      const sent = await h.sent(person, paid, { termMonths: 1 });
       await h.vacateHead(unit.department.id).expect(200);
 
       const row = await rowOf(person.account, sent.id);
@@ -340,7 +318,8 @@ describe('my requests: whose they are and what a row says (integration, real Pos
         state: 'AWAITING_SPEND_DECISION',
         spend: { stage: 'WAITING_SPEND_DECISION' },
         needStep: { state: 'APPROVED', assignee: null },
-        canWithdraw: true,
+        // QĐ-113d: the head decided the need, so the sender no longer withdraws.
+        canWithdraw: false,
       });
       expect(rows.get(refused)).toMatchObject({
         state: 'REJECTED',

@@ -1,12 +1,15 @@
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v4/installation';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { AddressInfo, Server } from 'node:net';
 import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
 import { runSeed, type DemoRunOutcome } from '../../../src/cli/seed/seed-run';
+import { SHARED_DEMO_V4 } from '../../../src/cli/seed/fixture/shared-demo-v4';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
+import { SeedStorage } from '../../support/flows/seed-storage';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
+import { SHARED_DEMO_V4_REQUEST_STATES } from '../../support/seed-demo-v4-states';
 
 /**
  * `pnpm ops:seed` at the edges of the year, on a controlled clock: only `Date` is faked (the API and the command
@@ -14,6 +17,8 @@ import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/htt
  * work as usual. The database keeps its own clock, which no rule of the scenarios reads.
  */
 describe('ops:seed at the edges of the year (integration, real API and PostgreSQL, controlled date)', () => {
+  // The bytes the seed puts at upload links land in the storage the application reads (BM-10, files of a version).
+  const seedStorage = new SeedStorage();
   let ctx: HttpTestApp;
   let demo: INestApplicationContext;
   let baseUrl: string;
@@ -24,7 +29,7 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
     runSeed({
       args: {
         mode,
-        fixture: 'shared-demo-v3',
+        fixture: 'shared-demo-v4',
         apiUrl: baseUrl,
         operator: 'TEST-CALENDAR',
         environment: 'LOCAL_TEST',
@@ -79,7 +84,8 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
       ],
       now: new Date('2026-12-01T03:00:00Z'),
     });
-    ctx = await createHttpTestApp();
+    await seedStorage.start();
+    ctx = await createHttpTestApp({ providerOverrides: [seedStorage.override] });
     const install = await NestFactory.createApplicationContext(
       (await import('../../../src/modules/installation/installation.module')).InstallationModule,
       { logger: false },
@@ -99,6 +105,7 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
   afterAll(async () => {
     await demo?.close();
     await ctx?.close();
+    await seedStorage.stop();
     jest.useRealTimers();
   });
 
@@ -117,23 +124,47 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
     const budgets = await ctx.sql.query<{ year: number; n: number }>(
       'SELECT year, count(*)::int AS n FROM budget_versions GROUP BY year ORDER BY year',
     );
+    // Shared demo v4: every department with a Cost Center and a head holds an approved version of 2026 (Legal has no head, D-Z2-2); of
+    // 2027 Engineering's is approved, Marketing's waits for the spending approver and Sales' was returned (IT stays at its BM-10).
     expect(budgets.rows).toEqual([
-      { year: 2026, n: 3 },
-      { year: 2027, n: 3 },
+      { year: 2026, n: SHARED_DEMO_V4.budgets.length },
+      { year: 2027, n: SHARED_DEMO_V4.nextYear.filter((n) => n.stage !== 'PROPOSAL_SUBMITTED').length },
+    ]);
+    // The seed opened the cycle of the year (deadline the day of the seed) and of the next one; the one after stays a draft.
+    const cycles = await ctx.sql.query<{ year: number; opened: boolean; deadline: string }>(
+      `SELECT year, opened_at IS NOT NULL AS opened, to_char(submission_deadline, 'YYYY-MM-DD') AS deadline
+         FROM budget_cycles ORDER BY year`,
+    );
+    expect(cycles.rows).toEqual([
+      { year: 2026, opened: true, deadline: '2026-12-01' },
+      { year: 2027, opened: true, deadline: '2026-12-31' },
+      { year: 2028, opened: false, deadline: '2027-12-01' },
     ]);
 
-    expect(await requestStates()).toEqual({
-      R1: 'COMPLETED',
-      R2: 'AWAITING_SPEND_DECISION',
-      R3: 'PENDING',
-      R4: 'REJECTED',
-      R5: 'WITHDRAWN',
-      R6: 'AWAITING_EXECUTION',
-      R7: 'AWAITING_SPEND_SUBMISSION',
-      R8: 'AWAITING_IT_ASSESSMENT',
-      R9: 'AWAITING_FINANCE_REVIEW',
-      R10: 'COMPLETED',
-      R11: 'COMPLETED',
+    // R57 is cancelled by the sweep of the block moment, which may run while the suite does (its first pass is five minutes after start).
+    const states = await requestStates();
+    expect(['PENDING', 'CANCELLED']).toContain(states.R57);
+    expect({ ...states, R57: 'PENDING' }).toEqual({
+      ...SHARED_DEMO_V4_REQUEST_STATES,
+      R40: 'AWAITING_SPEND_DECISION',
+      R41: 'REJECTED',
+      R42: 'AWAITING_REQUESTER_REVISION',
+      R43: 'IT_REJECTED',
+      R44: 'AWAITING_REQUESTER_REVISION',
+      R45: 'AWAITING_REQUESTER_REVISION',
+      R46: 'EXECUTING',
+      R47: 'FAILED',
+      R48: 'FAILED',
+      R49: 'AWAITING_EXECUTION',
+      R50: 'COMPLETED',
+      R51: 'PENDING',
+      R52: 'PENDING',
+      R53: 'PENDING',
+      R54: 'AWAITING_SPEND_DECISION',
+      R55: 'AWAITING_SPEND_DECISION',
+      R56: 'COMPLETED',
+      R57: 'PENDING',
+      R58: 'AWAITING_SPEND_DECISION',
     });
   }, 600000);
 

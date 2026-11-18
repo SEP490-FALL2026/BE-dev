@@ -12,6 +12,7 @@ import { SimulatedAiServiceClient } from './ai-service/ai-service-simulated-clie
 import { AiServiceClient } from './ai-service/ai-service.types';
 import { InvocationContentQueryService } from './invocation-content/invocation-content-query.service';
 import { AiInvocationContentRepo } from './invocation/invocation-content.repo';
+import { AiInvocationHistoryStore } from './invocation/invocation-history-store.types';
 import { AiInvocationRepo } from './invocation/invocation.repo';
 import { QueueSummaryRunService } from './queue-summary/queue-summary-run.service';
 import { QueueSummaryService } from './queue-summary/queue-summary.service';
@@ -29,6 +30,7 @@ import { QueueSummaryService } from './queue-summary/queue-summary.service';
   providers: [
     AiInvocationRepo,
     AiInvocationContentRepo,
+    { provide: AiInvocationHistoryStore, useExisting: AiInvocationContentRepo },
     InvocationContentQueryService,
     QueueSummaryRunService,
     QueueSummaryService,

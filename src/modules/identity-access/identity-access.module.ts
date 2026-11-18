@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { ObjectStorageModule } from '../../infrastructure/object-storage/object-storage.module';
 import { EnvironmentVariables } from '../../infrastructure/config/env-schema';
 import { ACCESS_TOKEN_VERIFIER } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditModule } from '../audit/audit.module';
@@ -16,6 +17,8 @@ import { ACCOUNT_SESSIONS } from './accounts/account-sessions.types';
 import { APPROVAL_ROLE_HOLDINGS } from './accounts/account.types';
 import { ActionLinkRevocation } from './accounts/action-link-revocation.service';
 import { AppUsersController } from './accounts/app-users/app-users.controller';
+import { ItAdminDirectoryController } from './it-admin-directory/it-admin-directory.controller';
+import { ItAdminQueryService } from './it-admin-directory/it-admin-query.service';
 import { InvitationMailService } from './accounts/app-users/invitation-mail.service';
 import { InvitationRedemptionService } from './accounts/invitation-redemption.service';
 import { JwtAccessTokenVerifier } from './access/jwt-access-token-verifier.service';
@@ -37,6 +40,12 @@ import { SessionRepo } from './auth/session.repo';
 import { SessionService } from './auth/session.service';
 import { TokenService } from './auth/token.service';
 import { IdentityAccessFacadeModule } from './identity-access-facade.module';
+import { ProfileController } from './profile/profile.controller';
+import { ProfileAvatarService } from './profile/profile-avatar.service';
+import { ProfilePhoneService } from './profile/profile-phone.service';
+import { ProfilePurgeSweeper } from './profile/profile-purge.job';
+import { ProfilePurgeService } from './profile/profile-purge.service';
+import { ProfileQueryService } from './profile/profile-query.service';
 import { RecoveryTicketService } from './recovery/recovery-ticket.service';
 import { RecoveryRepo } from './recovery/recovery.repo';
 
@@ -46,6 +55,7 @@ import { RecoveryRepo } from './recovery/recovery.repo';
     OrganizationModule,
     AuditModule,
     IdentityAccessFacadeModule,
+    ObjectStorageModule,
     NotificationsModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -66,8 +76,9 @@ import { RecoveryRepo } from './recovery/recovery.repo';
       }),
     }),
   ],
-  controllers: [AuthController, MeController, AppUsersController],
+  controllers: [AuthController, MeController, ProfileController, AppUsersController, ItAdminDirectoryController],
   providers: [
+    ItAdminQueryService,
     ApprovalRoleFactsService,
     AccountQueryService,
     ActionLinkRevocation,
@@ -94,6 +105,11 @@ import { RecoveryRepo } from './recovery/recovery.repo';
     { provide: APPROVAL_ROLE_HOLDINGS, useExisting: ApprovalRoleFactsService },
     SessionRepo,
     MeService,
+    ProfileQueryService,
+    ProfileAvatarService,
+    ProfilePhoneService,
+    ProfilePurgeService,
+    ProfilePurgeSweeper,
     TokenService,
     JwtAccessTokenVerifier,
     { provide: ACCESS_TOKEN_VERIFIER, useExisting: JwtAccessTokenVerifier },

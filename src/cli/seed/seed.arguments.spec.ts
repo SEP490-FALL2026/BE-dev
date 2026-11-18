@@ -1,10 +1,10 @@
-import { INSTALLATION, installationWith } from './fixture/shared-demo-v3/installation';
+import { INSTALLATION, installationWith } from './fixture/shared-demo-v4/installation';
 import { SeedArgumentError, parseSeedArguments } from './seed.arguments';
 
 const valid = [
   'plan',
   '--fixture',
-  'shared-demo-v3',
+  'shared-demo-v4',
   '--api-url',
   'http://slm-api:3000',
   '--operator-reference',
@@ -20,7 +20,7 @@ describe('ops:seed arguments', () => {
       help: false,
       command: {
         mode: 'plan',
-        fixture: 'shared-demo-v3',
+        fixture: 'shared-demo-v4',
         apiUrl: 'http://slm-api:3000',
         operator: 'CHG-42',
         environment: 'SHARED',
@@ -33,7 +33,7 @@ describe('ops:seed arguments', () => {
 
   it('checks without API credentials and keeps explicit bootstrap authorization', () => {
     expect(parseSeedArguments(['check', '--environment', 'LOCAL_TEST'])).toMatchObject({
-      command: { mode: 'check', fixture: 'shared-demo-v3', secretsStdin: false },
+      command: { mode: 'check', fixture: 'shared-demo-v4', secretsStdin: false },
     });
     expect(parseSeedArguments([...valid, '--allow-bootstrap'])).toMatchObject({ command: { allowBootstrap: true } });
     expect(() => parseSeedArguments([...valid, '--organization', 'Other'])).toThrow('Unknown option');

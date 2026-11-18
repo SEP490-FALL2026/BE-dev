@@ -10,9 +10,11 @@ import {
   AccountRecord,
   AccountSnapshot,
   ActivationState,
+  AppRole,
   AppUserStatus,
   CreateAppUserInput,
   EmployeeAccountInspection,
+  RoleHolderRecord,
   SuperAdminHolder,
 } from '../public/identity-access.types';
 import { AccessBlockService } from '../access-block/access-block.service';
@@ -127,7 +129,25 @@ export class AccountRecordService {
     return this.accounts.findUsableItAdminEmployeeIds(employeeIds, tx);
   }
 
+  /** Every employee who holds an effective grant of any of these roles on an account that can act, by employee code: who a notice to a role goes to. */
+  findUsableEmployeeIdsHoldingRoles(roles: readonly AppRole[], tx?: DbTx): Promise<string[]> {
+    return this.accounts.findUsableEmployeeIdsHoldingRoles(roles, tx);
+  }
+
+  /** A page of the accounts that can act and hold any of these roles, by employee code (an unlocked read, for a report). */
+  pageUsableRoleHolders(
+    roles: readonly AppRole[],
+    skip: number,
+    take: number,
+  ): Promise<{ rows: RoleHolderRecord[]; total: number }> {
+    return this.accounts.pageUsableRoleHolders(roles, skip, take);
+  }
+
   /** The usable IT Admin with the smallest employee code, or null: who a report is given to when nobody is in charge. */
+  findAllUsableItAdminEmployeeIds(tx?: DbTx): Promise<string[]> {
+    return this.accounts.findAllUsableItAdminEmployeeIds(tx);
+  }
+
   findFirstUsableItAdminEmployeeId(tx?: DbTx): Promise<string | null> {
     return this.accounts.findFirstUsableItAdminEmployeeId(tx);
   }

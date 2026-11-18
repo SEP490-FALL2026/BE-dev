@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpStatus, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -25,7 +25,9 @@ export class MeController {
     private readonly passwordChanges: PasswordChangeService,
   ) {}
 
+  // The answer carries the signed link to the picture: no cache keeps it (`security-jobs`: a response that carries a link is no-store).
   @Get()
+  @Header('Cache-Control', 'no-store')
   @AuthenticatedOnly()
   @ApiOperation({ operationId: 'meGet', summary: 'Get the signed-in account' })
   @ApiSuccessResponse(MeResponseDto, {

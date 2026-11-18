@@ -4,10 +4,12 @@ import {
   flagMap,
   flagsOf,
   isHighPriority,
+  knownFlags,
   sameFlags,
   type HolderFacts,
   type RoleFacts,
 } from './role-duties.policy';
+import { ROLE_FLAGS } from '../public/personnel.types';
 
 const none: RoleFacts = {
   superAdmin: false,
@@ -44,7 +46,7 @@ describe('the roles a person who leaves holds (US-03-04 AC-11, AC-27, AC-28)', (
     expect(flagsOf({ ...none, ...facts })).toEqual(expected);
   });
 
-  it('never makes a flag of the substitute or the fallback approver, which are gone (QĐ-93c)', () => {
+  it('has no flag of the substitute or the fallback approver, which are gone (QĐ-93c, QĐ-110)', () => {
     const every: RoleFacts = {
       superAdmin: true,
       finance: true,
@@ -54,9 +56,19 @@ describe('the roles a person who leaves holds (US-03-04 AC-11, AC-27, AC-28)', (
       workspaces: 1,
     };
 
-    expect(flagsOf(every)).not.toContain('SUBSTITUTE_APPROVER');
-    expect(flagsOf(every)).not.toContain('FALLBACK_APPROVER');
-    expect(flagMap(flagsOf(every))).toMatchObject({ SUBSTITUTE_APPROVER: false, FALLBACK_APPROVER: false });
+    expect(ROLE_FLAGS).not.toContain('SUBSTITUTE_APPROVER');
+    expect(ROLE_FLAGS).not.toContain('FALLBACK_APPROVER');
+    expect(flagsOf(every)).toEqual(ROLE_FLAGS);
+    expect(Object.keys(flagMap(flagsOf(every)))).toEqual([...ROLE_FLAGS]);
+  });
+
+  it('reads the snapshot of a case recorded before without the two names that were retired (the database keeps them)', () => {
+    expect(knownFlags(['FINANCE', 'SUBSTITUTE_APPROVER', 'FALLBACK_APPROVER', 'DEPARTMENT_HEAD'])).toEqual([
+      'FINANCE',
+      'DEPARTMENT_HEAD',
+    ]);
+    expect(knownFlags(['FALLBACK_APPROVER'])).toEqual([]);
+    expect(knownFlags([])).toEqual([]);
   });
 
   it('lists several roles in the order of the wire', () => {
@@ -77,7 +89,7 @@ describe('the roles a person who leaves holds (US-03-04 AC-11, AC-27, AC-28)', (
   it('gives every flag on the wire, true or false', () => {
     const wire = flagMap(['FINANCE']);
 
-    expect(Object.keys(wire)).toHaveLength(8);
+    expect(Object.keys(wire)).toHaveLength(6);
     expect(wire).toMatchObject({ FINANCE: true, SUPER_ADMIN_HOLDER: false, WORKSPACE_OWNER: false });
   });
 

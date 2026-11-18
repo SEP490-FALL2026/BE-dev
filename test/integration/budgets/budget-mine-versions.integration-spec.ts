@@ -83,7 +83,17 @@ describe('budget mine versions (integration)', () => {
     expect(items.map((item) => item.id)).toEqual([mine.version.id]);
     expect(items.map((item) => item.id)).not.toContain(other.version.id);
     expect(await itemsOf(unsent.head.account)).toEqual([]);
-    expect(Object.keys(items[0]).sort()).toEqual(['id', 'number', 'sentAt', 'state', 'year']);
+    // AF-12 (BR-MF4-07, QĐ-100p): the head reads the base, the reserve and the total Finance set on each version.
+    expect(Object.keys(items[0]).sort()).toEqual([
+      'base',
+      'id',
+      'number',
+      'reserve',
+      'sentAt',
+      'state',
+      'total',
+      'year',
+    ]);
 
     const theirs = await itemsOf(other.head.account);
     expect(theirs.map((item) => item.id)).toEqual([other.version.id]);

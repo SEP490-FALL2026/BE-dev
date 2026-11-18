@@ -1,89 +1,215 @@
-import { JsonColumnShapeError } from '../../../infrastructure/database/json-column.errors';
-import { paymentScheduleJson } from './access-request.json';
-import { priceRequest, type PaymentPeriod, type PricingInput } from './pricing.policy';
+import { termRunOf } from '../../../core/term-limit';
+import { pricingRecordFor, requestAmountOf, seatMonthlyOf, type PricingInput } from './pricing.policy';
 
-const FIGMA = { amountMinor: 1500n, currency: 'USD' }; // 15.00 per seat per month
+const SEAT = { amountMinor: 2000n, currency: 'USD' }; // 20.00 per seat per month
 
 const input = (patch: Partial<PricingInput> = {}): PricingInput => ({
-  unitPrice: FIGMA,
+  kind: 'RECURRING',
+  unitPrice: SEAT,
   billingCycle: 'MONTHLY',
-  termMonths: 6,
   beneficiaries: 1,
-  expectedSpendOn: '2026-10-23',
-  fiscalYearStartMonth: 1,
+  checkDate: '2026-11-10',
+  endDate: null,
   ...patch,
 });
 
-describe('the amount of a request for paid software (US-05-02 AC-1, FR-3.2)', () => {
-  it('is the unit price for every billing period of the term and every person it is for', () => {
-    const priced = priceRequest(input());
+describe('BR-MF1-06 shared intake and worker pricing record', () => {
+  const request = { planId: 'plan', free: false, beneficiaries: 2, checkDate: '2026-11-10', endDate: null };
 
-    expect(priced).toMatchObject({
+  it('keeps the same current-year amount and metadata for both callers', () => {
+    expect(pricingRecordFor(request, { kind: 'RECURRING', unitPrice: SEAT, billingCycle: 'MONTHLY' })).toMatchObject({
       status: 'PRICED',
-      amount: { amountMinor: 9000n, currency: 'USD' },
+      amount: { amountMinor: 8000n, currency: 'USD' },
+      amountMonths: 2,
       budgetYear: 2026,
+      expectedEndDate: null,
+      // A right with no end holds twelve months of the next year (R-46).
+      nextYearAmount: { amountMinor: 48000n },
     });
   });
 
-  it('multiplies by the people: three people for twelve months', () => {
-    expect(priceRequest(input({ termMonths: 12, beneficiaries: 3, expectedSpendOn: '2026-01-15' }))).toMatchObject({
+  it('says where the price comes from, in the record of a priced request only (QĐ-113a)', () => {
+    const base = { kind: 'RECURRING', unitPrice: SEAT, billingCycle: 'MONTHLY' } as const;
+
+    expect(pricingRecordFor(request, { ...base, source: 'SUBSCRIPTION' }).priceSource).toBe('SUBSCRIPTION');
+    expect(pricingRecordFor(request, { ...base, source: 'PLAN_REFERENCE' }).priceSource).toBe('PLAN_REFERENCE');
+    expect(pricingRecordFor(request, null).priceSource).toBeUndefined();
+  });
+
+  it('preserves missing-price and internal-free records without guessing an amount', () => {
+    expect(pricingRecordFor(request, null)).toMatchObject({
+      status: 'MISSING',
+      missingReason: 'NO_PRICED_SUBSCRIPTION',
+      amount: null,
+    });
+    expect(pricingRecordFor({ ...request, free: true }, null)).toMatchObject({
+      status: 'NOT_APPLICABLE',
+      budgetYear: null,
+      amount: null,
+    });
+  });
+
+  it('keeps a full next-year renewal at zero this year and shows next year to the approver', () => {
+    expect(
+      pricingRecordFor(
+        { ...request, from: '2027-01-01', endDate: '2027-12-31' },
+        {
+          kind: 'RECURRING',
+          unitPrice: SEAT,
+          billingCycle: 'MONTHLY',
+        },
+      ),
+    ).toMatchObject({
       status: 'PRICED',
-      amount: { amountMinor: 1500n * 12n * 3n },
+      amount: { amountMinor: 0n },
+      budgetYear: 2026,
+      nextYearAmount: { amountMinor: 48000n },
     });
-  });
-
-  it('is paid by the billing period, so a quarterly price counts in quarters and a part of a period is paid whole', () => {
-    expect(
-      priceRequest(
-        input({
-          billingCycle: 'QUARTERLY',
-          unitPrice: { amountMinor: 4000n, currency: 'USD' },
-          termMonths: 6,
-          expectedSpendOn: '2026-01-23',
-        }),
-      ),
-    ).toMatchObject({
-      amount: { amountMinor: 8000n },
-      periods: [{ dueOn: '2026-01-23' }, { dueOn: '2026-04-23' }],
-    });
-    expect(
-      priceRequest(
-        input({ billingCycle: 'ANNUAL', unitPrice: { amountMinor: 12000n, currency: 'USD' }, termMonths: 6 }),
-      ),
-    ).toMatchObject({
-      amount: { amountMinor: 12000n },
-      periods: [{ dueOn: '2026-10-23' }],
-    });
-  });
-
-  it('lays the payments out from the day the money is expected to go out, one for each period', () => {
-    const priced = priceRequest(input({ termMonths: 3, expectedSpendOn: '2026-01-31' }));
-
-    expect(priced.status === 'PRICED' && priced.periods).toEqual([
-      { dueOn: '2026-01-31', amountMinor: 1500n, budgetYear: 2026, binding: true },
-      { dueOn: '2026-02-28', amountMinor: 1500n, budgetYear: 2026, binding: true },
-      { dueOn: '2026-03-31', amountMinor: 1500n, budgetYear: 2026, binding: true },
-    ]);
   });
 });
 
-describe('the budget year of a request (US-05-02 AC-11, QĐ-82e)', () => {
-  it('is the year of the day the money is expected to go out, not the day the request is sent', () => {
-    const priced = priceRequest(input({ termMonths: 1, expectedSpendOn: '2027-01-05' }));
-
-    expect(priced).toMatchObject({ status: 'PRICED', budgetYear: 2027 });
+describe('BR-MF1-06: the amount of a request is the price of the months left of the year', () => {
+  it('BR-MF1-06a: with no end date it runs to the end of the year, the month it starts counted whole (sent 10/11 ⟹ 2 months)', () => {
+    expect(requestAmountOf(input())).toMatchObject({
+      status: 'PRICED',
+      kind: 'RECURRING',
+      months: 2,
+      amount: { amountMinor: 4000n, currency: 'USD' },
+      budgetYear: 2026,
+      nextYearAmount: { amountMinor: 24000n, currency: 'USD' },
+    });
   });
 
-  it('follows the month the fiscal year begins in', () => {
+  it('BR-MF1-06b: the ten people of the example of FR-3.20 for seven months (June to December) cost 14 000', () => {
     expect(
-      priceRequest(input({ termMonths: 1, expectedSpendOn: '2027-03-31', fiscalYearStartMonth: 4 })),
-    ).toMatchObject({ budgetYear: 2026 });
+      requestAmountOf(
+        input({ unitPrice: { amountMinor: 200n, currency: 'USD' }, beneficiaries: 10, checkDate: '2026-06-15' }),
+      ),
+    ).toMatchObject({ months: 7, amount: { amountMinor: 14_000n } });
+  });
+
+  it('BR-MF1-06c: an end date inside the year stops the count in its month (sent 10/07, ends 19/10 ⟹ 4 months)', () => {
+    expect(requestAmountOf(input({ checkDate: '2026-07-10', endDate: '2026-10-19' }))).toMatchObject({
+      months: 4,
+      amount: { amountMinor: 8000n },
+    });
+  });
+
+  it('BR-MF1-06c: an end date after the year does not count past 31/12 (starts 01/10, ends 31/03 next year ⟹ 3 months)', () => {
+    expect(requestAmountOf(input({ checkDate: '2026-10-01', endDate: '2027-03-31' }))).toMatchObject({ months: 3 });
+  });
+
+  it('BR-MF1-06c: an end date before the day it starts still costs the month it starts', () => {
+    expect(requestAmountOf(input({ checkDate: '2026-10-15', endDate: '2026-10-01' }))).toMatchObject({ months: 1 });
+  });
+
+  it('BR-MF1-06d: an annual price is a twelfth of the year a month, rounded up once', () => {
+    expect(
+      requestAmountOf(
+        input({
+          billingCycle: 'ANNUAL',
+          unitPrice: { amountMinor: 240_000n, currency: 'USD' },
+          beneficiaries: 10,
+          checkDate: '2026-06-15',
+        }),
+      ),
+    ).toMatchObject({ months: 7, amount: { amountMinor: 1_400_000n } });
+    expect(
+      requestAmountOf(
+        input({ billingCycle: 'ANNUAL', unitPrice: { amountMinor: 1000n, currency: 'USD' }, checkDate: '2026-12-01' }),
+      ),
+    ).toMatchObject({ months: 1, amount: { amountMinor: 84n } });
+  });
+
+  it('BR-MF1-06d: a quarterly price is a third of the price a month', () => {
+    expect(
+      requestAmountOf(
+        input({
+          billingCycle: 'QUARTERLY',
+          unitPrice: { amountMinor: 300n, currency: 'USD' },
+          checkDate: '2026-10-01',
+        }),
+      ),
+    ).toMatchObject({ months: 3, amount: { amountMinor: 300n } });
+  });
+
+  it('is counted in the year of the check date: the day of 31/12 and the day of 01/01 fall in two years (R-I01)', () => {
+    expect(requestAmountOf(input({ checkDate: '2026-12-31' }))).toMatchObject({ budgetYear: 2026, months: 1 });
+    expect(requestAmountOf(input({ checkDate: '2027-01-01' }))).toMatchObject({ budgetYear: 2027, months: 12 });
+  });
+});
+
+describe('QĐ-109b: a request to go on using, whose new period begins in the year after the check date', () => {
+  it('costs nothing this year and shows what the next year would cost', () => {
+    const priced = requestAmountOf(input({ checkDate: '2026-12-10', from: '2027-01-01', endDate: '2027-03-31' }));
+
+    expect(priced).toMatchObject({
+      status: 'PRICED',
+      months: 0,
+      amount: { amountMinor: 0n },
+      budgetYear: 2026,
+      nextYearAmount: { amountMinor: 6000n },
+    });
+  });
+
+  it('is priced for the months of the new year when it is checked there (approved 05/01 ⟹ 3 months of 2027)', () => {
+    expect(
+      requestAmountOf(input({ checkDate: '2027-01-05', from: '2027-01-01', endDate: '2027-03-31' })),
+    ).toMatchObject({
+      months: 3,
+      amount: { amountMinor: 6000n },
+      budgetYear: 2027,
+      nextYearAmount: null,
+    });
+  });
+
+  it('US-05-23 AC-6: a period 01/07 to 30/09 sent on 05/06 is three months', () => {
+    expect(
+      requestAmountOf(
+        input({
+          unitPrice: { amountMinor: 200n, currency: 'USD' },
+          checkDate: '2026-06-05',
+          from: '2026-07-01',
+          endDate: '2026-09-30',
+        }),
+      ),
+    ).toMatchObject({ months: 3, amount: { amountMinor: 600n } });
+  });
+});
+
+describe('BR-MF1-07: a one-time price (a key, a perpetual license) is the price of the purchase (QĐ-106d)', () => {
+  it('is the unit price times the people, whatever the term', () => {
+    const priced = requestAmountOf(
+      input({
+        kind: 'ONE_TIME',
+        beneficiaries: 2,
+        unitPrice: { amountMinor: 500n, currency: 'USD' },
+        endDate: '2026-12-01',
+      }),
+    );
+
+    expect(priced).toMatchObject({
+      status: 'PRICED',
+      kind: 'ONE_TIME',
+      months: null,
+      amount: { amountMinor: 1000n },
+      billingCycle: 'OTHER',
+    });
+  });
+
+  it('does not depend on the day it is bought', () => {
+    expect(requestAmountOf(input({ kind: 'ONE_TIME', checkDate: '2026-01-02' }))).toMatchObject({
+      amount: { amountMinor: 2000n },
+    });
+    expect(requestAmountOf(input({ kind: 'ONE_TIME', checkDate: '2026-12-30' }))).toMatchObject({
+      amount: { amountMinor: 2000n },
+    });
   });
 });
 
 describe('what is not priced (US-05-02 AC-4, QĐ-84e)', () => {
   it('has no price when the plan has no priced subscription, and keeps the year of its date', () => {
-    expect(priceRequest(input({ unitPrice: null, billingCycle: null }))).toEqual({
+    expect(requestAmountOf(input({ unitPrice: null, billingCycle: null }))).toEqual({
       status: 'MISSING',
       reason: 'NO_PRICED_SUBSCRIPTION',
       budgetYear: 2026,
@@ -91,96 +217,142 @@ describe('what is not priced (US-05-02 AC-4, QĐ-84e)', () => {
   });
 
   it('has no price when the plan has a subscription priced at nothing: a paid request never costs 0 (F34, FR-3.2)', () => {
-    expect(priceRequest(input({ unitPrice: { amountMinor: 0n, currency: 'USD' } }))).toEqual({
+    expect(requestAmountOf(input({ unitPrice: { amountMinor: 0n, currency: 'USD' } }))).toEqual({
       status: 'MISSING',
       reason: 'NO_PRICED_SUBSCRIPTION',
       budgetYear: 2026,
     });
   });
 
-  it('has no price when the billing cycle is not one that has periods', () => {
-    expect(priceRequest(input({ billingCycle: 'OTHER' }))).toMatchObject({
+  it('has no price when the billing cycle is not one that can be counted in months', () => {
+    expect(requestAmountOf(input({ billingCycle: 'OTHER' }))).toMatchObject({
       status: 'MISSING',
       reason: 'CYCLE_UNKNOWN',
     });
   });
 
-  it('is priced, with the year of every payment, when the payments cross a fiscal year: which of them bind is for the budget check', () => {
-    const priced = priceRequest(input({ termMonths: 6, expectedSpendOn: '2026-11-15' }));
+  it('is refused when the amount is beyond what a request holds', () => {
+    expect(
+      requestAmountOf(input({ unitPrice: { amountMinor: 10n ** 18n, currency: 'USD' }, beneficiaries: 1000 })),
+    ).toMatchObject({ status: 'MISSING', reason: 'AMOUNT_TOO_LARGE' });
+  });
+});
 
-    expect(priced).toMatchObject({ status: 'PRICED', amount: { amountMinor: 9000n }, budgetYear: 2026 });
-    expect(priced.status === 'PRICED' && priced.periods.map((period) => period.budgetYear)).toEqual([
-      2026, 2026, 2027, 2027, 2027, 2027,
-    ]);
+describe('T-RQ2: the commitment is the price of a month times the months that begin, split by the year each begins in (QĐ-111j, R-39, R-46)', () => {
+  const dong = (amountMinor: bigint) => ({ amountMinor, currency: 'VND' });
+  const k1 = { kind: 'RECURRING' as const, unitPrice: dong(600_000n), billingCycle: 'MONTHLY' as const };
+
+  it('K1 600.000 for 9 months, approved 15/11/2026: 2026 is 1.200.000 and the part of next year is 4.200.000', () => {
+    const run = termRunOf({ start: '2026-11-15', months: 9, contractEndDate: null });
+
+    expect(requestAmountOf({ ...k1, beneficiaries: 1, checkDate: '2026-11-15', endDate: run.end })).toMatchObject({
+      status: 'PRICED',
+      months: 2,
+      amount: { amountMinor: 1_200_000n },
+      budgetYear: 2026,
+      nextYearAmount: { amountMinor: 4_200_000n },
+    });
   });
 
-  it('is priced when a long term pays inside one fiscal year', () => {
+  it('K2 Dùng lâu dài 375.000, approved 20/11/2026: 2026 is 750.000 and the part of next year is 12 months, 4.500.000', () => {
     expect(
-      priceRequest(
-        input({ termMonths: 12, billingCycle: 'ANNUAL', unitPrice: { amountMinor: 12000n, currency: 'USD' } }),
-      ),
+      requestAmountOf({
+        kind: 'RECURRING',
+        unitPrice: dong(375_000n),
+        billingCycle: 'MONTHLY',
+        beneficiaries: 1,
+        checkDate: '2026-11-20',
+        endDate: null,
+      }),
     ).toMatchObject({
+      months: 2,
+      amount: { amountMinor: 750_000n },
+      nextYearAmount: { amountMinor: 4_500_000n },
+    });
+  });
+
+  it('a term that ends inside the year has no part of next year', () => {
+    const run = termRunOf({ start: '2026-03-10', months: 6, contractEndDate: null });
+
+    expect(requestAmountOf({ ...k1, beneficiaries: 1, checkDate: '2026-03-10', endDate: run.end })).toMatchObject({
+      months: 6,
+      amount: { amountMinor: 3_600_000n },
+      nextYearAmount: null,
+    });
+  });
+
+  it('the price of a month of an annual price is a twelfth, rounded up once, and the twelve months of next year keep it', () => {
+    expect(
+      requestAmountOf({
+        kind: 'RECURRING',
+        unitPrice: dong(1_000n),
+        billingCycle: 'ANNUAL',
+        beneficiaries: 1,
+        checkDate: '2026-12-01',
+        endDate: null,
+      }),
+    ).toMatchObject({ months: 1, amount: { amountMinor: 84n }, nextYearAmount: { amountMinor: 1_000n } });
+  });
+});
+
+describe('T-R38: a person with a term is cut at the end of the contract and each month that begins counts (R-38, R-39)', () => {
+  const k1 = { planId: 'plan', free: false, checkDate: '2026-11-10' };
+  const price = {
+    kind: 'RECURRING' as const,
+    unitPrice: { amountMinor: 600_000n, currency: 'VND' },
+    billingCycle: 'MONTHLY' as const,
+  };
+  const endOf = (contractEndDate: string | null) => termRunOf({ start: '2026-11-10', months: 9, contractEndDate }).end;
+
+  it('an intern whose contract ends 31/01/2027, K1 for 9 months sent 10/11/2026: 3 months begin, 1.800.000 in all (2026: 1.200.000, next year 600.000)', () => {
+    expect(pricingRecordFor({ ...k1, beneficiaries: 1, endDate: endOf('2027-01-31') }, price)).toMatchObject({
       status: 'PRICED',
-      amount: { amountMinor: 12000n },
+      amountMonths: 2,
+      amount: { amountMinor: 1_200_000n },
+      nextYearAmount: { amountMinor: 600_000n },
+    });
+  });
+
+  it('a group prices each person for their own end: only the line of the intern is cut', () => {
+    const record = pricingRecordFor(
+      { ...k1, beneficiaries: 3, endDate: null, endsByPerson: [endOf(null), endOf('2027-01-31'), endOf(null)] },
+      price,
+    );
+
+    // staff: 2 months in 2026 (1.200.000) and 7 in 2027 (4.200.000) each; the intern: 1.200.000 and 600.000.
+    expect(record).toMatchObject({
+      status: 'PRICED',
+      amountMonths: 2,
+      amount: { amountMinor: 3_600_000n },
+      nextYearAmount: { amountMinor: 9_000_000n },
+    });
+  });
+
+  it('a group of people who all end on the same day is the same as the amount of one person times them', () => {
+    const one = pricingRecordFor({ ...k1, beneficiaries: 1, endDate: endOf(null) }, price);
+    const three = pricingRecordFor(
+      { ...k1, beneficiaries: 3, endDate: null, endsByPerson: [endOf(null), endOf(null), endOf(null)] },
+      price,
+    );
+
+    expect(three).toMatchObject({
+      amount: { amountMinor: (one.amount?.amountMinor ?? 0n) * 3n },
+      nextYearAmount: { amountMinor: (one.nextYearAmount?.amountMinor ?? 0n) * 3n },
     });
   });
 });
 
-describe('paymentScheduleJson (the codec of access_requests.payment_schedule)', () => {
-  const stored = [
-    { dueOn: '2026-11-30', amountMinor: '1200000', budgetYear: 2026, binding: true },
-    { dueOn: '2027-11-30', amountMinor: '1200000', budgetYear: 2027, binding: false },
-  ];
-
-  it('reads each payment with its amount as a big integer', () => {
-    const schedule: PaymentPeriod[] | null = paymentScheduleJson.decode(stored);
-
-    expect(schedule).toEqual([
-      { dueOn: '2026-11-30', amountMinor: 1_200_000n, budgetYear: 2026, binding: true },
-      { dueOn: '2027-11-30', amountMinor: 1_200_000n, budgetYear: 2027, binding: false },
-    ]);
+describe('seatMonthlyOf (RV-07, M-10: what one seat of a commitment costs a month)', () => {
+  it('is the cost held over its months and seats, rounded up', () => {
+    expect(seatMonthlyOf({ costMinor: 2_000_000n, kind: 'RECURRING', months: 10, seats: 1 })).toBe(200_000n);
+    expect(seatMonthlyOf({ costMinor: 2_100n, kind: 'RECURRING', months: 7, seats: 3 })).toBe(100n);
+    expect(seatMonthlyOf({ costMinor: 1_001n, kind: 'RECURRING', months: 10, seats: 1 })).toBe(101n);
   });
 
-  it('lets a payment of a schedule written before quotes existed bind: the default is `true`, here and nowhere else', () => {
-    const [legacy] = paymentScheduleJson.decode([{ dueOn: '2025-03-31', amountMinor: '500', budgetYear: 2025 }]) ?? [];
-
-    expect(legacy.binding).toBe(true);
-  });
-
-  it('reads NULL as no schedule and an empty schedule as an empty one', () => {
-    expect(paymentScheduleJson.decode(null)).toBeNull();
-    expect(paymentScheduleJson.decode([])).toEqual([]);
-  });
-
-  it.each([
-    ['a missing field', [{ amountMinor: '1', budgetYear: 2026, binding: true }]],
-    ['an amount that is a number', [{ dueOn: '2026-11-30', amountMinor: 1200000, budgetYear: 2026 }]],
-    [
-      'an amount that is not a whole number of minor units',
-      [{ dueOn: '2026-11-30', amountMinor: '12.5', budgetYear: 2026 }],
-    ],
-    ['a date that is not a date', [{ dueOn: '2026-13-45', amountMinor: '1', budgetYear: 2026 }]],
-    ['a year that is text', [{ dueOn: '2026-11-30', amountMinor: '1', budgetYear: '2026' }]],
-    ['a schedule that is an object', { dueOn: '2026-11-30' }],
-  ])('refuses %s with the table and the column, and never the value', (_label, value) => {
-    expect(() => paymentScheduleJson.decode(value)).toThrow(JsonColumnShapeError);
-    expect(() => paymentScheduleJson.decode(value)).toThrow('access_requests.payment_schedule');
-    expect(() => paymentScheduleJson.decode(value)).not.toThrow(/12\.5|2026-13-45/);
-  });
-
-  // JSON has no big integers: the amounts go out as text, key for key as they were written before the codec.
-  it('writes the amounts as text and the same keys as the schedule has always been written with', () => {
-    const schedule: PaymentPeriod[] = [
-      { dueOn: '2026-11-30', amountMinor: 1_200_000n, budgetYear: 2026, binding: true },
-      { dueOn: '2027-11-30', amountMinor: 9_007_199_254_740_993n, budgetYear: 2027, binding: false },
-    ];
-
-    expect(paymentScheduleJson.encode(schedule)).toEqual([
-      { dueOn: '2026-11-30', amountMinor: '1200000', budgetYear: 2026, binding: true },
-      { dueOn: '2027-11-30', amountMinor: '9007199254740993', budgetYear: 2027, binding: false },
-    ]);
-    expect(paymentScheduleJson.decode(JSON.parse(JSON.stringify(paymentScheduleJson.encode(schedule))))).toEqual(
-      schedule,
-    );
+  it('is null for a one-time price, no months, no seats or a cost of nothing', () => {
+    expect(seatMonthlyOf({ costMinor: 5_000n, kind: 'ONE_TIME', months: null, seats: 1 })).toBeNull();
+    expect(seatMonthlyOf({ costMinor: 5_000n, kind: 'RECURRING', months: 0, seats: 1 })).toBeNull();
+    expect(seatMonthlyOf({ costMinor: 5_000n, kind: 'RECURRING', months: 3, seats: 0 })).toBeNull();
+    expect(seatMonthlyOf({ costMinor: 0n, kind: 'RECURRING', months: 3, seats: 1 })).toBeNull();
   });
 });

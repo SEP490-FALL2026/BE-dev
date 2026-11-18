@@ -21,11 +21,6 @@ export const ROUTE_ERROR_CODES_OPERATING_PARAMETERS: Readonly<
   },
   operatingParameterSet: {
     '404': ['PARAMETER.NOT_FOUND'],
-    '409': ['PARAMETER.LOCKED'],
     '422': ['PARAMETER.VALUE_INVALID'],
-  },
-  reportingCurrencySet: {
-    '409': ['REPORTING_CURRENCY.LOCKED'],
-    '422': ['CURRENCY_NOT_SUPPORTED'],
   },
 };

@@ -17,17 +17,6 @@ export class GroupRequestTooManyLinesError extends Error {
   }
 }
 
-/** The term asked for is longer than the plan takes (`US-05-01` AC-4, `QĐ-98`). */
-export class GroupRequestTermBeyondLimitError extends Error {
-  constructor(
-    readonly maxMonths: number,
-    readonly endsBy: string | null,
-  ) {
-    super('The term is longer than a request for a group may ask for.');
-    this.name = 'GroupRequestTermBeyondLimitError';
-  }
-}
-
 /** Fewer different people were named than a request for a group needs, whoever sends it (`QĐ-100aa`, `S-01`). */
 export class GroupRequestTooFewLinesError extends Error {
   constructor(readonly min: number) {

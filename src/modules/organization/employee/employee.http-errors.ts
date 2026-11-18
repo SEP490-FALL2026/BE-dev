@@ -3,9 +3,14 @@ import { FORBIDDEN_ERROR } from '../../../infrastructure/http/errors/access-erro
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { EmployeeNotFoundError } from '../public/organization.errors';
-import { DepartmentInactiveError, DepartmentNotFoundError } from '../department/department.errors';
+import {
+  DepartmentInactiveError,
+  DepartmentNotFoundError,
+  DepartmentNotYetEffectiveError,
+} from '../department/department.errors';
 import { refuse, toOrganizationApiException } from '../organization.http-errors';
 import {
+  FirstPlacementCorrectionError,
   FirstPlacementError,
   EmployeeForbiddenError,
   EmployeeRowInvalidError,
@@ -15,6 +20,14 @@ import {
 
 /** Maps the errors of the employee routes to their HTTP answers; every other error goes to the mapper of the module. */
 export function toEmployeeApiException(error: unknown): unknown {
+  if (error instanceof FirstPlacementCorrectionError) {
+    const code =
+      error.problem === 'ALREADY_EFFECTIVE' || error.problem === 'IN_USE'
+        ? `EMPLOYEE.FIRST_PLACEMENT_${error.problem}`
+        : `EMPLOYEE.${error.problem}`;
+
+    return refuse(HttpStatus.CONFLICT, code, error.message, error.use ? { usedBy: error.use } : undefined);
+  }
   if (error instanceof FirstPlacementError)
     return refuse(
       error.problem === 'DATE_INVALID' ? HttpStatus.UNPROCESSABLE_ENTITY : HttpStatus.CONFLICT,
@@ -41,6 +54,11 @@ export function toEmployeeApiException(error: unknown): unknown {
     return refuse(HttpStatus.NOT_FOUND, 'DEPARTMENT.NOT_FOUND', error.message);
   if (error instanceof DepartmentInactiveError)
     return refuse(HttpStatus.CONFLICT, 'DEPARTMENT.INACTIVE', error.message);
+  if (error instanceof DepartmentNotYetEffectiveError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT.NOT_YET_EFFECTIVE', error.message, {
+      effectiveFrom: error.effectiveFrom,
+    });
+  }
   return toOrganizationApiException(error);
 }
 
@@ -51,9 +69,13 @@ export const EMPLOYEE_ERROR_EXAMPLES = {
   EMPLOYEE_NOT_FOUND: example(new EmployeeNotFoundError('<employee-id>')),
   DEPARTMENT_NOT_FOUND: example(new DepartmentNotFoundError()),
   DEPARTMENT_INACTIVE: example(new DepartmentInactiveError()),
+  DEPARTMENT_NOT_YET_EFFECTIVE: example(new DepartmentNotYetEffectiveError('2027-01-01')),
   EMPLOYEE_ALREADY_PLACED: example(new FirstPlacementError('ALREADY_PLACED')),
   EMPLOYEE_INACTIVE: example(new FirstPlacementError('EMPLOYEE_INACTIVE')),
   EMPLOYEE_LEAVING: example(new FirstPlacementError('EMPLOYEE_LEAVING')),
+  EMPLOYEE_NOT_PLACED: example(new FirstPlacementCorrectionError('NOT_PLACED')),
+  EMPLOYEE_FIRST_PLACEMENT_ALREADY_EFFECTIVE: example(new FirstPlacementCorrectionError('ALREADY_EFFECTIVE')),
+  EMPLOYEE_FIRST_PLACEMENT_IN_USE: example(new FirstPlacementCorrectionError('IN_USE', 'REQUEST')),
   EMPLOYEE_DATE_INVALID: example(new FirstPlacementError('DATE_INVALID')),
   EMPLOYEE_ROW_INVALID: example(new EmployeeRowInvalidError([{ field: 'employeeCode', code: 'EMPLOYEE_CODE_TAKEN' }])),
   /** The same code when an official field is corrected: the reasons name the fields that route changes. */

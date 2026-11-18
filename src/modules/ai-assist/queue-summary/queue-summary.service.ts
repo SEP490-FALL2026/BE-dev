@@ -7,8 +7,8 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RequestsAiSourceApi } from '../../requests/public/requests-ai-source.api';
-import { AiServiceClients } from '../ai-service/ai-service-clients.service';
 import { type AiProviderMode, QUEUE_MAX_REQUESTS } from '../ai-service/ai-service.types';
+import { AiInvocationHistoryStore } from '../invocation/invocation-history-store.types';
 import { AiInvocationRepo } from '../invocation/invocation.repo';
 import type { InvocationKey, InvocationRecord, LiveInvocation } from '../invocation/invocation.types';
 import { summaryFailedEvent, summaryRequestedEvent } from './queue-summary-audit-event.mapper';
@@ -57,11 +57,11 @@ export class QueueSummaryService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly repo: AiInvocationRepo,
+    private readonly history: AiInvocationHistoryStore,
     private readonly source: RequestsAiSourceApi,
     private readonly parameters: OperatingParametersApi,
     private readonly organizations: OrganizationReadApi,
     private readonly audit: AuditApi,
-    private readonly clients: AiServiceClients,
     private readonly runs: QueueSummaryRunService,
   ) {}
 
@@ -78,7 +78,7 @@ export class QueueSummaryService {
   ): Promise<{ invocationId: string; status: QueueSummaryStatus }> {
     await this.requireSwitchedOn();
     const providerMode = await this.providerMode();
-    if (!this.clients.forMode(providerMode).configured()) throw new AiProviderUnavailableError();
+    if (!this.runs.canAnswerIn(providerMode)) throw new AiProviderUnavailableError();
     const organizationId = await this.organizationId();
     const key: InvocationKey = {
       organizationId,
@@ -197,9 +197,14 @@ export class QueueSummaryService {
       ...key,
       actorEmployeeId: actor.employeeId,
       sourceRevision: queueRevision,
-      context: composed.context,
       status: 'PENDING',
       errorCode: null,
+      at: now,
+    });
+    await this.history.recordAdmitted(tx, {
+      invocationId: id,
+      organizationId: key.organizationId,
+      context: composed.context,
       at: now,
     });
     await this.audit.record(
@@ -296,9 +301,14 @@ export class QueueSummaryService {
         ...key,
         actorEmployeeId: actor.employeeId,
         sourceRevision: queueRevision,
-        context: { generatedAt: now.toISOString(), requests: [] },
         status: 'FAILED',
         errorCode: SUMMARY_ERROR_CODES.SOURCE_UNREADABLE,
+        at: now,
+      });
+      await this.history.recordAdmitted(tx, {
+        invocationId,
+        organizationId: key.organizationId,
+        context: { generatedAt: now.toISOString(), requests: [] },
         at: now,
       });
       await this.audit.record(

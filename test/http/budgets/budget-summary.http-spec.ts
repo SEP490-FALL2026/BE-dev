@@ -7,20 +7,35 @@ import { bearer, createHttpContractApp, principal } from '../../support/http-con
 
 const SUMMARY = {
   year: 2027,
+  annualCeiling: null,
+  sharedPoolReserve: null,
   totals: {
     VND: {
       currency: 'VND',
       base: { amount: '900', currency: 'VND' },
       reserve: { amount: '100', currency: 'VND' },
       total: { amount: '1000', currency: 'VND' },
+      effectiveBudget: {
+        base: { amount: '900', currency: 'VND' },
+        reserve: { amount: '100', currency: 'VND' },
+        total: { amount: '1000', currency: 'VND' },
+        adjustment: { amount: '0', currency: 'VND' },
+      },
       committed: { amount: '300', currency: 'VND' },
       spent: { amount: '200', currency: 'VND' },
       remaining: { amount: '500', currency: 'VND' },
+      pendingSpend: { amount: '0', currency: 'VND' },
+      remainingBase: { amount: '400', currency: 'VND' },
+      remainingWithReserve: { amount: '500', currency: 'VND' },
       costCenterCount: 2,
       overBudgetCount: 0,
     },
   },
   lastInvoiceRecordedAt: null,
+  companySpent: null,
+  sharedPoolUnallocated: null,
+  sharedPoolOverReserve: null,
+  seatMonthsWithoutCostCenter: null,
 };
 
 describe('GET /budgets/summary (HTTP contract, no database)', () => {
@@ -44,8 +59,8 @@ describe('GET /budgets/summary (HTTP contract, no database)', () => {
     expect(bodyOf(response).error.code).toBe('AUTHENTICATION_REQUIRED');
   });
 
-  it('refuses every role but Finance with 403 and reads nothing', async () => {
-    for (const roles of [['MANAGER'], ['EMPLOYEE'], ['IT_ADMIN'], ['SUPER_ADMIN'], ['SPENDING_APPROVER'], []]) {
+  it('BR-MF4-05 refuses roles outside Finance and Spending Approver with 403', async () => {
+    for (const roles of [['MANAGER'], ['EMPLOYEE'], ['IT_ADMIN'], ['SUPER_ADMIN'], []]) {
       const response = await request(app.getHttpServer())
         .get('/api/v1/budgets/summary?year=2027')
         .set('Authorization', bearer(principal(roles)))
@@ -69,10 +84,10 @@ describe('GET /budgets/summary (HTTP contract, no database)', () => {
     expect(summary).not.toHaveBeenCalled();
   });
 
-  it('gives Finance the totals of the year, one entry for each currency, in the envelope', async () => {
+  it.each(['FINANCE', 'SPENDING_APPROVER'])('BR-MF4-05 gives %s the totals in the envelope', async (role) => {
     const response = await request(app.getHttpServer())
       .get('/api/v1/budgets/summary?year=2027')
-      .set('Authorization', bearer(principal(['FINANCE'])))
+      .set('Authorization', bearer(principal([role])))
       .expect(200);
 
     const body = response.body as { success: boolean; message: string; data: typeof SUMMARY };

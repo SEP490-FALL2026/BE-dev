@@ -29,21 +29,6 @@ const DECISION: Record<PreflightBlocker['code'], string> = {
   SERVICE_ACCOUNT_WITHOUT_DEPARTMENT_ON_RECORDED_DAY:
     'The responsible person is in no department on the day the service account was recorded, so QĐ-86c gives it no ' +
     'owning department: Owner/data decision.',
-  SUBSCRIPTION_OWNER_EXPANSION_REQUIRED:
-    'This database is before the owner-department expansion (it has neither the column nor the assignment table) and it ' +
-    'holds this subscription, which this release cannot give an owner department: it requires every subscription to have ' +
-    'one, recorded from the purchase or contract basis. Deploy the compatibility release first (it adds the column and the ' +
-    'table), record the owner of each subscription on it with `pnpm ops:assign-subscription-owner`, run this command again, ' +
-    'then deploy this release. Nothing is inferred.',
-  SUBSCRIPTION_OWNER_UNASSIGNED:
-    'This release requires every subscription to have an owner department, and this one has none and no ' +
-    'valid assignment (or an assignment that conflicts with its department). Record it from the purchase or contract ' +
-    'basis, once per subscription, on the compatibility release that is running: `pnpm ops:assign-subscription-owner ' +
-    '--subscription <id> --department <code> --basis <reference> --operator <reference> --environment LOCAL_TEST|SHARED`. ' +
-    'Nothing is inferred, and there is no bulk form.',
-  SUBSCRIPTION_OWNER_SCHEMA_PARTIAL:
-    'The database has the owner-department column or the assignment table but not both, which no migration of this ' +
-    'repository produces. Do not deploy: Owner/operator decision on how this database got there.',
   COST_CENTER_DIRECTION_EXPANSION_REQUIRED:
     'This database is before the Cost Center link of the compatibility release (none of its column and two tables exist) ' +
     'and it holds this organization: this release needs every Cost Center to belong to one department, activated and ' +
@@ -99,12 +84,20 @@ const DECISION: Record<PreflightBlocker['code'], string> = {
 };
 
 /** What each row to attend to later is, and how the operator resolves it. */
-const INFORMATION: Record<PreflightInformation['code'], { heading: string; how: string }> = {
+const INFORMATION: Record<PreflightInformation['code'], { heading: (count: number) => string; how: string }> = {
   BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE: {
-    heading: 'These budget proposals were given back because their first version was refused.',
+    heading: () => 'These budget proposals were given back because their first version was refused.',
     how:
       'The migration of this release gives each back to `REVIEWED` (R1), or links it to the proposal that sent it ' +
       'again (R2), with an audit record each; nothing is for the operator to do:',
+  },
+  SERVICE_ACCOUNT_STILL_IN_FORCE: {
+    heading: (count) => `${count} service account(s) are still in force.`,
+    how:
+      'There is no service account any more (QĐ-110m) and no operation that ends or converts one. The migration ' +
+      '`20261113000900_licensing_service_accounts_converted` converts each into the flagged seat of an IT Admin and keeps the ' +
+      'ones it cannot yet (its notice names the reason); once the reason has passed, run that file again as ' +
+      '`docs/guides/service-account-conversion.md` says. The cleanup release that drops the kind needs none left:',
   },
 };
 
@@ -122,8 +115,9 @@ export function formatPreflight(report: PreflightReport): string {
     lines.push('`prisma migrate deploy` may run. Back up the database first (the deploy workflow does).');
   }
   for (const code of [...new Set(report.information.map((item) => item.code))]) {
-    lines.push(`${INFORMATION[code].heading} ${INFORMATION[code].how}`, `  ${code}`);
-    for (const item of report.information.filter((entry) => entry.code === code)) lines.push(`    - ${infoText(item)}`);
+    const items = report.information.filter((entry) => entry.code === code);
+    lines.push(`${INFORMATION[code].heading(items.length)} ${INFORMATION[code].how}`, `  ${code}`);
+    for (const item of items) lines.push(`    - ${infoText(item)}`);
   }
   if (report.corrections.length > 0) {
     lines.push('The forward migration moves these service accounts to their recorded-day department (audited):');
@@ -144,7 +138,12 @@ export function formatPreflight(report: PreflightReport): string {
 }
 
 function infoText(item: PreflightInformation): string {
-  return `budget proposal ${item.proposalId} (${item.rule})`;
+  switch (item.code) {
+    case 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE':
+      return `budget proposal ${item.proposalId} (${item.rule})`;
+    case 'SERVICE_ACCOUNT_STILL_IN_FORCE':
+      return `assignment ${item.assignmentId}`;
+  }
 }
 
 function rowText(blocker: PreflightBlocker): string {
@@ -159,11 +158,6 @@ function rowText(blocker: PreflightBlocker): string {
       return `assignment ${blocker.assignmentId} of ${blocker.employeeCode}, started ${blocker.validFrom}`;
     case 'SERVICE_ACCOUNT_WITHOUT_DEPARTMENT_ON_RECORDED_DAY':
       return `assignment ${blocker.assignmentId} of ${blocker.employeeCode}, recorded ${blocker.recordedOn}`;
-    case 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED':
-    case 'SUBSCRIPTION_OWNER_UNASSIGNED':
-      return `subscription ${blocker.subscriptionId}`;
-    case 'SUBSCRIPTION_OWNER_SCHEMA_PARTIAL':
-      return 'the subscriptions table has only one of the owner-department column and the assignment table';
     case 'COST_CENTER_DIRECTION_EXPANSION_REQUIRED':
     case 'COST_CENTER_DIRECTION_NOT_ACTIVATED':
       return `organization ${blocker.organizationId}`;

@@ -1,19 +1,12 @@
 import type { BusinessDate } from './business-date';
 
 /**
- * The fiscal year a day belongs to, named after the calendar year it begins in: with a year that begins in April, the
- * 31st of March 2027 is in fiscal year 2026 and the 1st of April 2027 in 2027. With a year that begins in January it is
- * the calendar year. The month the year begins in is an operating parameter (`FISCAL_YEAR_START_MONTH`, `QĐ-82e`), and
- * the budget period of every Cost Center is this year.
+ * The fiscal year a day belongs to: the calendar year, 1 January to 31 December (`QĐ-104e`(1), `FR-5.1`). The year the
+ * budget of every Cost Center is made for, the year of a request and the year a commitment falls in are this year; no
+ * operating parameter moves where it begins.
  */
-export function fiscalYearOf(date: BusinessDate, startMonth: number): number {
-  if (!Number.isInteger(startMonth) || startMonth < 1 || startMonth > 12) {
-    throw new Error(`The fiscal year begins in a month from 1 to 12, not ${startMonth}.`);
-  }
-  const year = Number(date.slice(0, 4));
-  const month = Number(date.slice(5, 7));
-
-  return month >= startMonth ? year : year - 1;
+export function fiscalYearOf(date: BusinessDate): number {
+  return Number(date.slice(0, 4));
 }
 
 const DAYS_IN_MONTH = (year: number, month: number): number => new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -30,4 +23,18 @@ export function addMonths(date: BusinessDate, months: number): BusinessDate {
   const pad = (value: number, width: number) => String(value).padStart(width, '0');
 
   return `${pad(targetYear, 4)}-${pad(targetMonth, 2)}-${pad(targetDay, 2)}`;
+}
+
+/**
+ * The place, as a whole number of steps, of the first day of the grid `addMonths(anchor, k * stepMonths)` (`k` any whole number, so before the anchor as
+ * well as after it) that is not before `from`: the day of a payment that repeats by a cycle, counted from a stored day both ways. The day of the grid is
+ * always counted from the anchor, never from the day before it, so a shorter month ends on its last day without moving the day of the next. Pure.
+ */
+export function firstGridOffsetFrom(anchor: BusinessDate, stepMonths: number, from: BusinessDate): number {
+  const monthIndex = (day: BusinessDate): number => Number(day.slice(0, 4)) * 12 + Number(day.slice(5, 7)) - 1;
+  let at = Math.floor((monthIndex(from) - monthIndex(anchor)) / stepMonths);
+  while (addMonths(anchor, (at - 1) * stepMonths) >= from) at -= 1;
+  while (addMonths(anchor, at * stepMonths) < from) at += 1;
+
+  return at;
 }

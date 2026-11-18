@@ -1,5 +1,6 @@
 import { ProvisioningTaskAlreadyManualError, ProvisioningTaskStateError } from '../public/licensing.errors';
 import {
+  assertCancellable,
   assertDecidable,
   assertHandOffAllowed,
   availableDecisions,
@@ -100,5 +101,15 @@ describe('the work of a person on a task in the new states (US-07-04, US-07-02)'
     expect(() => nextStatus(status, 'CLAIM', 'MANUAL')).toThrow(new ProvisioningTaskStateError('NOT_CLAIMABLE'));
     expect(() => nextStatus(status, 'COMPLETE', 'MANUAL')).toThrow(new ProvisioningTaskStateError('NOT_IN_PROGRESS'));
     expect(() => nextStatus(status, 'FAIL', 'MANUAL')).toThrow(new ProvisioningTaskStateError('NOT_IN_PROGRESS'));
+  });
+});
+
+describe('US-07-05 AC-22: what may be cancelled', () => {
+  it('a revocation is cancelled while in progress or failed; a grant only from the failure queue, as before', () => {
+    expect(() => assertCancellable('IN_PROGRESS', 'REVOKE')).not.toThrow();
+    expect(() => assertCancellable('FAILED', 'REVOKE')).not.toThrow();
+    expect(() => assertCancellable('QUEUED', 'REVOKE')).toThrow(new ProvisioningTaskStateError('NOT_FAILED'));
+    expect(() => assertCancellable('FAILED', 'GRANT')).not.toThrow();
+    expect(() => assertCancellable('IN_PROGRESS', 'GRANT')).toThrow(new ProvisioningTaskStateError('NOT_FAILED'));
   });
 });

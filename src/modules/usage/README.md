@@ -1,42 +1,119 @@
 # usage
 
-Mục đích: những gì collector trên máy công ty gửi lên và cách đọc lại — danh sách công cụ được phép báo, usage AI theo ngày, ảnh chụp
-đăng nhập và hạn mức của công cụ, lý do một lần gửi bị từ chối. Story chính: US-09-02 (AC-7), US-09-05, US-09-07 và vế cổng nhận của
-US-09-01, US-09-03, US-09-04, US-09-09 — xem [spec](../../../docs/workspace/items/g7-ai-usage-intake/spec.md).
-Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, organization, audit. Được dùng bởi: gốc `src/app/app.module.ts` và lệnh
-`ops:record-super-admin-event` (để graph có đủ người đăng ký của `CollectorAllowlistHook`).
+Mục đích: usage của phần mềm — (1) những gì collector trên máy công ty gửi lên (danh sách công cụ được phép báo, usage AI theo ngày, ảnh
+chụp đăng nhập và hạn mức, lý do một lần gửi bị từ chối) và (2) usage nhà cung cấp (`SBF-04a`): nguồn do IT Admin khai, nhập báo cáo
+(xem trước → xác nhận), khớp danh tính, hàng đợi chưa khớp, phát hiện sai lệch, và **một cửa bằng chứng** cho rule `G3`/`G4`. Story
+chính: US-09-02 (AC-7), US-09-05, US-09-07 và vế cổng nhận của US-09-01/03/04/09 ([spec](../../../docs/workspace/items/g7-ai-usage-intake/spec.md));
+`US-08-01`→`US-08-07`, `US-10-02`…`US-10-04` ([spec](../../../docs/workspace/items/qd103-vendor-usage-import/spec.md)).
+Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, licensing, organization, identity-access, notifications, audit. Được dùng bởi: gốc
+`src/app/app.module.ts`, `dashboards` (số phát hiện sai lệch) và lệnh `ops:record-super-admin-event` (để graph có đủ người đăng ký của
+`CollectorAllowlistHook`).
 
 ## Public API
 
-- Không có (`public/` trống): module chỉ trả lời HTTP và đăng ký vào extension point của `devices`.
+- `UsageEvidenceApi` ([public/usage-evidence.api.ts](public/usage-evidence.api.ts), kiểu ở `usage-evidence.types.ts`) — bằng chứng usage của một
+  ứng dụng cho các rule lãng phí ghế, đọc qua **một** cửa:
+  - `evidenceFor({ applicationId, employeeIds, asOf })` — nguồn nhà cung cấp (mọi nguồn có lần nhập `COMPLETED`: cửa sổ bao phủ hợp
+    nhất, `ageDays = asOf − coverage_to`, `stale` khi quá 7 ngày, độ chặt, định nghĩa hoạt động, `canConcludeAbsence` — chỉ khi nguồn kể cả
+    phủ định **và** có ngày — và nhóm phát hiện được) và collector (`ai_usage_days` gắn người giữ máy qua `DevicesApi.registrationHolders`;
+    `responses > 0` là hoạt động; `COVERED|PARTIAL` là bao phủ; `stale` khi quá 14 ngày; **luôn** `canConcludeAbsence = false`). Theo nhân
+    viên: ngày hoạt động không bị lần nhập sau thay thế, `appeared` (kể cả chỉ đăng nhập — `AUTH_ONLY`), `lastAuthOnlyDate`, phương pháp
+    khớp yếu nhất, `mappingChangedOn`; kèm định danh `OPEN|DISMISSED` của ứng dụng và `candidateEmployeeIds`. Hoạt động của nguồn quá hạn
+    vẫn trả (bằng chứng dương không hết hạn). **Chỉ ngày và siêu dữ liệu nguồn**: không khối lượng, token, sự kiện thô (`QĐ-101i`).
+  - `openFindingCount` — số phát hiện sai lệch đang mở (dashboard IT Admin).
+- `public/usage.extension-points.ts` — `UsageImportListeners` (moment `CONFIRMED { importId, sourceId, applicationId, coverageTo }`), phát
+  trong transaction xác nhận; `qd103-ghost-seat-g3-g4` sẽ bind để đóng khuyến nghị bị phủ định. Chưa có người bind trong repo này.
 
 ## Bảng sở hữu
 
-- `collector_allowlist_versions`, `collector_allowlist_entries` (chỉ ghi thêm: trigger từ chối UPDATE/DELETE/TRUNCATE, quyền runtime
-  `INSERT, SELECT`), `ai_usage_days`, `tool_status_snapshots`, `tool_status_windows`, `intake_rejections`
-  (`prisma/models/usage.prisma`). `device_id`, `registration_id`, `credential_id`, `application_id` là giá trị, không FK: usage có
-  vòng đời và thời hạn lưu riêng.
+- Collector: `collector_allowlist_versions`, `collector_allowlist_entries` (chỉ ghi thêm: trigger từ chối UPDATE/DELETE/TRUNCATE, quyền runtime
+  `INSERT, SELECT`), `ai_usage_days`, `tool_status_snapshots`, `tool_status_windows`, `intake_rejections`.
+- Nhà cung cấp: `usage_sources` (nguồn: loại định danh, múi giờ, dạng báo cáo, mẫu cột, **định nghĩa hoạt động bắt buộc** — `INV-11`, ma trận
+  năng lực), `usage_imports` (cửa sổ bao phủ bắt buộc ≤ 366 ngày — `INV-10`; xem trước → xác nhận; `notice_at`), `usage_import_rows` (dòng xem
+  trước), `usage_activity_days` (ngày hoạt động theo **định danh**, không có `employee_id`; trigger chỉ cho đặt `superseded_by_import_id` một
+  lần), `usage_identity_mappings` (một định danh ↔ một nhân viên còn hiệu lực — partial UNIQUE), `usage_unmatched_identities` (hàng đợi),
+  `usage_no_assignment_findings` (`FR-4.8`) — `prisma/models/usage.prisma`. Rà soát tài khoản (`SBF-08`, RC-2): `vendor_account_discrepancies`
+  (một khác biệt giữa số nội bộ và số nhà cung cấp, giữ **cả hai giá trị**, ngày bằng chứng, quyết định một lần của IT Admin; xóa sau 24 tháng) và
+  `out_of_process_cases` (`SBF-07a`: ca ngoài quy trình, đóng một lần). `device_id`, `registration_id`, `credential_id`, `application_id`, người
+  là giá trị, không FK: usage có vòng đời và thời hạn lưu riêng.
+- Cột JSON có codec riêng: `usage_sources.template`, `usage_imports.summary|result`, `usage_import_rows.cells|errors`.
 
-## Capability (không vòng: `allowlist`, `intake-gate` ← `ai-usage` ← `tool-status`)
+## Capability (không vòng; `usage-evidence` là L0)
 
-- `allowlist/` — phiên bản danh sách công cụ (IT Admin phát hành, số phiên bản dưới advisory lock); `allowedToolsOn` là luật "hiệu lực tại
-  ngày" (một phiên bản có hiệu lực từ lúc phát hành tới phiên bản kế; ngày được tính theo múi giờ tổ chức).
-- `intake-gate/` — ba lỗi 403 của cổng (`DEVICE.NOT_ACKNOWLEDGED`, `DEVICE.COLLECTION_STOPPED`, `DEVICE.TOOL_STATUS_NOT_ACKNOWLEDGED`),
-  `judgeIntakeState`, bảng từ chối và route đọc lý do.
-- `ai-usage/` — lô tuần: `evaluateDays` xét từng ngày theo thứ tự cố định; ghi bằng một câu `INSERT … ON CONFLICT … WHERE` ("bản dựng sau
-  cùng thắng"); đọc cho IT (có `registrationId`) và cho nhân viên (chỉ đăng ký mình từng giữ, không `registrationId`).
-- `tool-status/` — ảnh chụp đăng nhập/hạn mức; mỗi (đăng ký, công cụ, thời điểm) giữ một lần; đọc bản mới nhất mỗi công cụ.
+- `allowlist/`, `intake-gate/`, `ai-usage/`, `tool-status/` — phía collector (xem bên dưới).
+- `vendor-source/` — khai nguồn (`usageSource*`): kiểm mẫu ↔ dạng báo cáo ↔ năng lực (`TEMPLATE_CAPABILITY_MISMATCH`), chặn ứng dụng nội bộ và
+  ứng dụng liên lạc (`US-08-02` AC-3), trả nhóm phát hiện được (`FR-4.4`) và câu giới hạn (`US-08-01` AC-2). Sửa nguồn chỉ áp cho lần nhập sau.
+  `vendor-source-contract.controller.ts` (`usageSourceListOfContract`, `GET /contracts/{id}/usage-sources`, IT Admin và Finance, `US-04-13` AC-15): nguồn của
+  các ứng dụng của hợp đồng đó (đọc ứng dụng qua `CatalogContractApi`, tên ứng dụng qua `CatalogApi`), mỗi nguồn chỉ `id`, `name`, `application`, `status`
+  (`ACTIVE`, hoặc `RETIRED` khi nguồn đã ngừng); Finance không đọc route nguồn nào khác (`QĐ-101i`).
+- `identity/` — hàng đợi chưa khớp (lọc `importId`: định danh mà dòng của lần import đó không khớp hoặc khớp hai người, kể cả lần đầu/lần cuối gặp; gán hoặc bỏ qua vẫn qua route theo id của mục), ánh xạ (`Resolve` = ánh xạ `MANUAL` kèm chuỗi gốc; `Dismiss` ở lại hàng đợi; `MappingEnd` sửa ánh xạ sai) và
+  phát hiện sai lệch.
+- `vendor-import/` — lịch sử `GET /usage-imports` (lọc nguồn, ứng dụng, trạng thái; `duplicateOfImportId`) và cảnh báo `DUPLICATE_FILE` khi xem trước đúng tệp (`content_hash`) mà một lần import đã xác nhận của cùng nguồn đang giữ (cảnh báo, không chặn); `parse/` (CSV theo mẫu / JSON `saas-sentry.vendor-usage-report/0.1-proposal`, cửa sổ bao phủ, phân loại sự kiện),
+  `match/` (khớp danh tính lúc đọc: ánh xạ → email/tài khoản chính xác → quy tắc bí danh; mơ hồ không đoán), `preview/` (xem trước, không ghi
+  ngày), `confirmation/` (khóa nguồn → khóa import, tính lại preview, **báo người giữ trước khi ghi**, ghi theo chunk ≤ 5 000, chồng lấn,
+  ánh xạ, hàng đợi, sai lệch, phát `UsageImportListeners`).
+- `usage-overview/` — màn usage tổng hợp của IT Admin (`GET /usage-overview`, `QĐ-111aw`, `QĐ-111ax`): chuỗi theo kỳ (ngày, tuần ISO, tháng) × phòng,
+  ứng dụng hoặc nguồn; đơn vị duy nhất là **ngày** — `activeDays` (ngày có người hoạt động) và `coveredDays` (ngày có nguồn nào nói được), mỗi ngày đếm một
+  lần dù mấy nguồn kể, hợp ngày chứ không cộng — kèm `status` (`HAS_DATA`, `PARTIAL`, `NO_DATA`) và `updatedAt`. Chỉ đọc người thuộc phòng trong
+  phạm vi `getItAdminScope` (`UsageOverviewScopeService`): lọc ngoài phạm vi ⟹ trang rỗng, không bao giờ tin `departmentId` của FE. Không họ tên, ảnh, token
+  hay xếp hạng; một câu SQL cho cả trang (`usage-overview.repo.ts`), luật chia kỳ và trạng thái ở `usage-overview.policy.ts`.
+  Theo một nhân viên (`GET /employees/{id}/usage-software`, `…/{applicationId}`): phần mềm có quyền hoặc có usage trong kỳ (`hasSeat`, nối qua
+  `LicensingUsageApi.listAssignmentIntervals`) và chi tiết hai nguồn tách riêng (từng nguồn nhà cung cấp, collector); nhân viên chỉ hiện bằng `employeeCode`;
+  **token và số câu trả lời chỉ ở chi tiết** (`collector.days`); nhân viên ngoài phạm vi hoặc không có ⟹ 404 như nhau.
+- `vendor-account-review/` — L0, không controller (RC-2, `QĐ-111y`, R-18, R-45, C-4): `vendor-account-review.repo.ts` là writer duy nhất của hai
+  bảng trên; `vendor-account-intake.service.ts` tạo khác biệt từ cái đã thấy (tài khoản có hoạt động không có ghế và định danh chưa khớp khi
+  xác nhận báo cáo — `vendor-account-review-import.listener.ts` bind `UsageImportListeners`; hồ sơ hóa đơn nghi ngờ của `requests` qua
+  `InvoiceDiscrepancyReferralListeners`; công cụ mà collector gửi và allowlist **hiện hành** không có — `ai-usage-batch.service.ts` so với bản mới nhất lúc nhận, không theo allowlist của ngày; mỗi ngày chỉ bỏ riêng công cụ ngoài allowlist của ngày đó, ngày bị bỏ hết mới `REJECTED NOT_IN_ALLOWLIST`), mỗi
+  thứ một dòng (`source`, `source_ref`), thấy lại chỉ dời ngày bằng chứng của thứ có trong báo cáo vừa xác nhận (`last_import_id`); đã quyết mà thấy lại với bằng chứng mới hơn ⟹ mở lại thành dòng mới (`reopened_from_id`, `QĐ-106j`); không bao giờ giữ tên người (`OQ-03`).
+  `vendor-account-decision.service.ts` (quyết định một lần: `FALSE_ALARM|OUT_OF_PROCESS` kèm `companyAsset` — không còn `LEGALIZE_VIA_REQUEST`/`REVOKE`, `QĐ-103m`; hóa đơn lệch `INVOICE_DIFFERENCE` không đi `OUT_OF_PROCESS`; `OUT_OF_PROCESS` mở ca cùng
+  transaction hoặc gắn vào ca đang mở của cùng tài khoản, `QĐ-98h`), `out-of-process-case-closure.service.ts` (`FALSE_ALARM|RECORD_SPENT|REPORT_ONLY|REVOKED`; `RECORD_SPENT` chỉ FINANCE, `REVOKED` chỉ IT_ADMIN, chỉ ca trên tài sản công ty, kèm `renewalCancelled` + chứng từ hủy gia hạn; ghi tiền chỉ khi có chứng từ + số VND + Cost Center đang hiệu lực hoặc
+  chưa phân bổ: đính tệp qua `CatalogApi.attachOutOfProcessCaseDocuments`, rồi `BudgetsApi.recordOutOfProcessSpend` ghi MỘT khoản thực chi không cam kết),
+  `vendor-account-review-notifier.service.ts` (thông báo trong transaction của thay đổi): `VENDOR_ACCOUNT_DISCREPANCY_OPENED` khi một lần
+  (báo cáo xác nhận, hồ sơ hóa đơn, ngày của collector — mỗi ngày một thông báo) mở **thêm** sai lệch mới (`newCount > 0`, không có thì không báo ai) cho IT Admin
+  phụ trách ứng dụng nếu còn dùng được, không thì mọi IT Admin dùng được; không có `subject`, chỉ id, nguồn và số lượng (không có định danh tài khoản). Khi
+  ca ngoài quy trình đóng bằng `REPORT_ONLY`, `OUT_OF_PROCESS_CASE_REPORTED` báo người dùng và trưởng phòng hôm nay của phòng họ làm việc gần nhất (người đã nghỉ vẫn được báo; ca không gắn người nào thì không báo ai).
+  `vendor-account-evidence-retention.service.ts` + `.job.ts` (`VendorAccountEvidenceSweeper` xóa bằng chứng quá 24 tháng, `US-14-04` AC-2). Policy thuần:
+  `out-of-process-revocation.service.ts` + `.policy.ts` (việc thu hồi một ca trên tài sản công ty đòi ở IT Admin, tính LÚC ĐỌC: `RequestsApi.openGrantRequestsOf` một lần cho cả trang, lịch ngày nghỉ một lần; `required`/`waitingRequestId`/`waitUntil` = ngày làm việc thứ 10 kể từ ngày kết luận/`due`, `US-13-05` AC-20, AC-23, AC-24; không lưu gì, không tác vụ `SBF-18`).
+  Policy thuần: `vendor-account-discrepancy.policy.ts` (hai giá trị, mốc 24 tháng), `out-of-process-case.policy.ts` (đóng ca), `out-of-process-revocation.policy.ts` (thu hồi).
+- `vendor-account-review-queue/` — L3: `GET /vendor-account-discrepancies` + `POST …/{id}/decision` (IT Admin), `GET /out-of-process-cases` +
+  `POST …/{id}/closure` (Finance, IT Admin), mỗi ca kèm `revocation { required, waitingRequestId, waitUntil, due }`; tên ứng dụng của một trang đọc một lần (`CatalogApi.getCollectorApplications`).
+- `usage-evidence/` — L0: repo đọc (nối ánh xạ còn hiệu lực **lúc đọc**), policy (độ mới 7/14 ngày theo loại nguồn, năng lực), service.
 
 ## Luồng và khóa
 
-Một lô = một transaction: `DevicesApi.getIntakeContext` khóa đăng ký `FOR SHARE` → cổng → allowlist theo ngày → upsert → từ chối → `recordAccepted`.
-Từ chối ở cổng được ghi và commit trước khi ném 403. Token không vào log hay audit; lô không ghi audit từng lần.
+Collector: một lô = một transaction: `DevicesApi.getIntakeContext` khóa đăng ký `FOR SHARE` → cổng → allowlist theo ngày → upsert → từ chối →
+`recordAccepted`; từ chối ở cổng được ghi và commit trước khi ném 403; token không vào log hay audit.
+
+Nhà cung cấp: tải lên chỉ ghi `PREVIEW` (24 giờ) và dòng tạm. Xác nhận (`Idempotency-Key`): khóa **nguồn** `FOR UPDATE` rồi import `FOR
+UPDATE` (hai lần nhập của một nguồn xếp hàng), tính lại phán đoán từng dòng — lệch ⟹ 409 `PREVIEW_STALE`; cùng key ⟹ kết quả cũ, khác key ⟹ 409
+`ALREADY_CONFIRMED`; loại sự kiện chưa phân loại ⟹ 422 `EVENT_TYPE_UNMAPPED`.
+
+## Thông báo theo dõi (`US-08-05`)
+
+Lần xác nhận **đầu tiên** của một ứng dụng cần `notice` (`CONFIRMED_DELIVERED` — IT xác nhận đã báo, hoặc `SYSTEM_SENT`), thiếu ⟹ 422
+`TRACKING_NOTICE_REQUIRED`. **Mọi** lần xác nhận gửi `USAGE_TRACKING_NOTICE` (`applicationId`, `activityDefinition`, `dataKinds`, `purpose`,
+`retentionMonths`, `viewPath`) cho người đang giữ quyền, `eventKey = USAGE_TRACKING_NOTICE:<applicationId>`: người đã nhận không nhận lại,
+người được cấp sau nhận ở lần xác nhận kế — luôn **trước** khi ghi ngày (`notice_at` do đồng hồ DB ghi trước `usage_activity_days.created_at`).
+
+## Quyền riêng tư và gắn lúc đọc
+
+Mọi route nhà cung cấp chỉ `IT_ADMIN` (trưởng phòng không thấy dữ liệu thô — `QĐ-101i`). Phạm vi IT (`QĐ-111ax`, cùng
+`UsageOverviewScopeService` của `usage-overview/`): ngoài `usage-overview` và `employees/{id}/usage-software`, `usageIdentityMappingList` và
+`usageNoAssignmentFindingList` chỉ trả ánh xạ và phát hiện của người thuộc phòng IT đó phụ trách (phòng không có IT Admin dùng được thì mọi IT Admin thấy);
+`deviceUsageList` và `deviceToolStatusList` chỉ đọc theo các đăng ký do người trong phạm vi giữ (`DevicesApi.registrationsOfDevice`): máy có mà không
+đăng ký nào trong phạm vi ⟹ trang rỗng 200, máy không có ⟹ 404. `usageUnmatchedIdentityList` giữ nguyên (không lọc theo phòng). Ngày hoạt động không mang `employee_id`: ai là ai được nối
+qua ánh xạ còn hiệu lực lúc đọc, nên sửa ánh xạ sai là đủ (`DA6-11`); định danh chưa khớp không dùng để kết luận (`INV-12`). Dòng thô
+`usage_import_rows.cells` chưa có hạn giữ (ghi sổ lệch).
 
 ## Extension point
 
 - Đăng ký vào `devices.collector-allowlist` (`CollectorAllowlistHook`) — `allowlist/allowlist-session.listener.ts`: `GET /device-session` có
   `allowlist: { version, entries }`.
+- Mở `UsageImportListeners` (xem Public API).
+- Đăng ký vào (thêm): `vendor-import/vendor-import-template.listener.ts` góp định nghĩa cột của báo cáo usage vào `ImportTemplateContributions` của `policies` (file mẫu `usage-csv`).
 
-## Chưa làm (mức B)
+## Chưa làm
 
-Lưu lý do `SCHEMA_VIOLATION`, tự phát hành allowlist khi catalog đổi, xóa theo thời hạn lưu, lô trình duyệt (`WEB_DOMAIN`).
+Collector: lưu lý do `SCHEMA_VIOLATION`, tự phát hành allowlist khi catalog đổi, xóa theo thời hạn lưu, lô trình duyệt (`WEB_DOMAIN`). Nhà cung
+cấp: bật thu thập ứng dụng liên lạc (`US-01-08`), thông báo ngay lúc cấp quyền (cần hook ở `provisioning`), thời hạn giữ
+dòng thô, kết nối API nhà cung cấp.

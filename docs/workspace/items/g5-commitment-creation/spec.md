@@ -24,11 +24,14 @@ Khi Người duyệt chi duyệt một Request, hệ thống tự giữ một kh
 
 ## Primary Story/AC
 
-| Story    | AC                          | Coverage | Phần còn lại thuộc                                                                                                                                                               |
-| -------- | --------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-06-04 | AC-1→AC-3, AC-5, AC-7→AC-13 | full     | —                                                                                                                                                                                |
-| US-06-07 | AC-1, AC-2, AC-5, AC-7      | partial  | AC-3, AC-4, AC-6: `g5-budget-version-decision` (đã làm)                                                                                                                          |
-| US-06-09 | AC-2, AC-4, AC-9            | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-10, AC-21: `g5-budget-version-decision`; AC-12: `g3-downstream-finance-integration` |
+| Story    | AC                          | Coverage | Phần còn lại thuộc                                                                                                                                                                    |
+| -------- | --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-04 | AC-1→AC-3, AC-5, AC-7→AC-13 | partial  | re-pin 11/11/2026 — AC-1, AC-3, AC-7, AC-10: `qd103-commitment-current-year`; AC-14: `qd103-subscription-adjustment-point` (`deferred`); AC-17→AC-19: `qd103-commitment-current-year` |
+| US-06-09 | AC-2, AC-4, AC-9            | partial  | AC-1, AC-3, AC-5→AC-8, AC-11, AC-13→AC-20, AC-22, AC-23: `g5-budget-proposal-and-review`; AC-10, AC-21: `g5-budget-version-decision`; AC-12: `g3-downstream-finance-integration`      |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-06-07` AC-1, AC-2, AC-5, AC-7 (partial) — Story `RETIRED` ở Docs `5bb2e6a` (`US-06-07` `QĐ-103f`); code đã merge là lịch sử, khóa ở scope map là `not affected`.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ `US-06-04` đổi `full` → `partial` vì Docs `5bb2e6a` thêm AC hoặc hạng mục khác cùng hiện thực khóa của Story này (scope map); phần đã code không đổi.
 
 ## Supporting references
 

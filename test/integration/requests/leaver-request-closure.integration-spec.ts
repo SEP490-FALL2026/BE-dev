@@ -1,9 +1,12 @@
+import { Client } from 'pg';
+import { waitForLockWaiters } from '../../support/lock-wait';
 import { RequestCommitmentReleaseGuard } from '../../../src/modules/requests/spend/commitment-release.listener';
 import { OffboardingHarness, type CaseWire } from '../../support/offboarding-harness';
 import { PgRelay } from '../../support/pg-relay';
 import { dataStatements, QueryCounter } from '../../support/query-count';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 const h = new OffboardingHarness();
 const M = 1_000_000;
@@ -57,6 +60,8 @@ async function sqlState(text: string, values: unknown[] = []): Promise<string | 
  * US-03-04 AC-24, AC-25: what is still open for a person who leaves is listed for the IT Admin, and the IT Admin closes each request
  * as cancelled once the person has left, over HTTP, on real PostgreSQL.
  */
+afterEach(() => jest.restoreAllMocks());
+
 describe('the requests and grants of a person who left (integration, real PostgreSQL)', () => {
   let relay: PgRelay;
   let counter: QueryCounter;
@@ -115,6 +120,13 @@ describe('the requests and grants of a person who left (integration, real Postgr
   const granted = async (requestId: string, which = 0): Promise<string> =>
     h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId: plans[which].subscriptionId }).expect(201))
       .task.id;
+  /** A task nobody has worked: the grant takes the work for whoever presses it, so it is one put back in the queue after a failure. */
+  const grantedInQueue = async (requestId: string, which = 0): Promise<string> => {
+    const id = await granted(requestId, which);
+    await h.unclaimed(id);
+
+    return id;
+  };
   /** The person has left: the departure is recorded and the day arrives. */
   const left = async (person: Person): Promise<CaseWire> => {
     const wire = await h.recordedCase(person);
@@ -167,6 +179,32 @@ describe('the requests and grants of a person who left (integration, real Postgr
     );
 
   describe('what is open is listed and nothing changes by itself (AC-24)', () => {
+    it('BR-MF1-02/07: lists a request awaiting requester revision and allows its closure after the beneficiary leaves', async () => {
+      const u = await example();
+      const id = (await h.sent(u.leaver, plan, { termMonths: 1 })).id;
+      await h.ctx.sql.query(
+        `UPDATE access_request_steps SET state = 'NOT_REQUIRED', assignee_employee_id = NULL, assigned_at = NULL,
+           waiting_reason = NULL, waiting_since = NULL WHERE request_id = $1 AND kind = 'NEED'`,
+        [id],
+      );
+      await h.ctx.sql.query(
+        `UPDATE access_requests SET state = 'AWAITING_REQUESTER_REVISION', routing_mode = 'ONE_STEP', one_step_reason = 'HEAD_LEFT' WHERE id = $1`,
+        [id],
+      );
+      const departure = await h.recordedCase(u.leaver);
+
+      expect((await openRequests(departure.id)).items).toContainEqual(
+        expect.objectContaining({ requestId: id, state: 'AWAITING_REQUESTER_REVISION', cancellable: false }),
+      );
+      await h.leaveOnLastDay(departure.id).expect(200);
+      expect((await openRequests(departure.id)).items).toContainEqual(
+        expect.objectContaining({ requestId: id, state: 'AWAITING_REQUESTER_REVISION', cancellable: true }),
+      );
+      expect(wire(await h.cancelForDeparture(id).expect(200)).state).toBe('CANCELLED');
+      expect((await openRequests(departure.id)).items.map((item) => item.requestId)).not.toContain(id);
+      expect(await commitmentOf(id)).toBeUndefined();
+    });
+
     it('lists the request that waits for the need step and the grant being worked beside the record of the departure', async () => {
       const u = await example();
       const waiting = (await h.sent(u.leaver, plan, { termMonths: 1 })).id;
@@ -257,9 +295,9 @@ describe('the requests and grants of a person who left (integration, real Postgr
     it('ends a request that holds money and a task nobody worked as cancelled: the seat is free, the money back, nothing failed', async () => {
       const u = await example();
       const id = await approvedFor(u, u.leaver, 15 * M);
-      const task = await granted(id);
+      const task = await grantedInQueue(id);
       // The seat is on the subscription the department of the request owns (QĐ-89a), not on the one of the seeded department.
-      const ownSubscription = h.owned.subscriptionFor(plans[0].subscriptionId, u.department.id);
+      const ownSubscription = plans[0].subscriptionId;
       const free = await h.freeSeats(ownSubscription);
       expect(await commitmentOf(id)).toMatchObject({ state: 'HELD', released_minor: '0' });
       const wired = await left(u.leaver);
@@ -389,7 +427,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
       });
     });
 
-    it('takes the request out of the batch it was sent in and closes its question to Finance, and no other request changes', async () => {
+    it('takes the request out of the batch it was sent in, and no other request changes', async () => {
       const u = await example();
       const mate = await h.worker(u.department, `LR-M${(n += 1)}`);
       const second = await h.sent(u.leaver, plan, { termMonths: 1 });
@@ -399,7 +437,6 @@ describe('the requests and grants of a person who left (integration, real Postgr
       await h.decide(third.id, { decision: 'APPROVE' }, u.head.account).expect(200);
       await h.setPayments(third.id, { amount: 5 * M });
       await h.sendOn([second.id, third.id], u.head.account).expect(201);
-      await h.askFinance(second.id, { question: 'Is there room in the budget?' }, h.boss.account).expect(201);
       await left(u.leaver);
 
       await h.cancelForDeparture(second.id).expect(200);
@@ -412,11 +449,6 @@ describe('the requests and grants of a person who left (integration, real Postgr
         { request_id: second.id, left_reason: 'REQUEST_CANCELLED' },
         { request_id: third.id, left_reason: null },
       ]);
-      const question = await h.ctx.sql.query<{ state: string; close_reason: string }>(
-        `SELECT state::text, close_reason::text FROM budget_information_requests WHERE request_id = $1`,
-        [second.id],
-      );
-      expect(question.rows).toEqual([{ state: 'CLOSED', close_reason: 'REQUEST_CANCELLED' }]);
       expect(await h.state(third.id)).toBe('AWAITING_SPEND_DECISION');
       expect((await stepStates(third.id)).find((step) => step.kind === 'SPEND_APPROVAL')?.state).toBe('PENDING');
     });
@@ -424,6 +456,8 @@ describe('the requests and grants of a person who left (integration, real Postgr
 
   describe('what refuses the closing', () => {
     it('refuses a person who still works, a request that ended, a withdrawal that waits and a stranger, and changes nothing', async () => {
+      // QĐ-113d: this test withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const u = await example();
       const working = await h.worker(u.department, `LR-W${(n += 1)}`);
       const open = (await h.sent(working, plan, { termMonths: 1 })).id;
@@ -470,7 +504,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
       const other = await h.worker(u.department, `LR-L${(n += 1)}`);
       const request = await approvedFor(u, other, 5 * M);
       const queued = await approvedFor(u, other, 5 * M, 1);
-      const task = await granted(queued, 1);
+      const task = await grantedInQueue(queued, 1);
       await left(other);
 
       const refusedGrant = await h.grant({ requestId: request, subscriptionId: plans[0].subscriptionId }).expect(409);
@@ -479,6 +513,89 @@ describe('the requests and grants of a person who left (integration, real Postgr
       expect(h.codeOf(refusedGrant)).toBe('PROVISIONING.BENEFICIARY_DEPARTED');
       expect(h.codeOf(refusedClaim)).toBe('PROVISIONING.BENEFICIARY_DEPARTED');
       expect((await taskOf(queued)).status).toBe('QUEUED');
+    });
+  });
+
+  describe('a grant is not started from the day a departure blocks the person (QĐ-110d)', () => {
+    it('refuses to grant and to claim a queued task once the block is in force, before the person is marked left, and leaves the task being worked as it is', async () => {
+      const u = await example();
+      const working = await approvedFor(u, u.leaver, 5 * M);
+      const workingTask = await granted(working);
+      await h.claim(workingTask).expect(200);
+      const queued = await approvedFor(u, u.leaver, 5 * M, 1);
+      const queuedTask = await grantedInQueue(queued, 1);
+      const fresh = await approvedFor(u, u.leaver, 5 * M, 2);
+      const departure = await h.recordedCase(u.leaver);
+      // Before the day of the block the grant goes on as it did: the person is still at work.
+      expect(departure.state).toBe('HANDING_OVER');
+      expect(departure.accessBlocked).toBe(false);
+      await h.ctx.sql.query(`UPDATE employee_access_blocks SET blocked_from = $2::date WHERE employee_id = $1`, [
+        u.leaver.employeeId,
+        h.today(),
+      ]);
+
+      const refusedGrant = await h.grant({ requestId: fresh, subscriptionId: plans[2].subscriptionId }).expect(409);
+      const refusedClaim = await h.claim(queuedTask).expect(409);
+
+      expect(h.codeOf(refusedGrant)).toBe('PROVISIONING.BENEFICIARY_DEPARTED');
+      expect(h.detailsOf(refusedGrant)).toMatchObject({ requestId: fresh, cause: 'ACCESS_BLOCKED' });
+      expect(h.codeOf(refusedClaim)).toBe('PROVISIONING.BENEFICIARY_DEPARTED');
+      expect(h.detailsOf(refusedClaim)).toMatchObject({ cause: 'ACCESS_BLOCKED' });
+      expect((await taskOf(queued)).status).toBe('QUEUED');
+      expect(await taskOf(fresh)).toBeUndefined();
+      // The task already being worked is not touched: it is the IT Admin's to check with the vendor and close (QĐ-110d).
+      expect((await taskOf(working)).status).toBe('IN_PROGRESS');
+    });
+
+    it('holds the beneficiary FOR SHARE before it reads the block, as the grant does: a departure that blocks them meanwhile is seen', async () => {
+      const u = await example();
+      const queued = await approvedFor(u, u.leaver, 5 * M);
+      const task = await grantedInQueue(queued);
+      await h.recordedCase(u.leaver);
+      const holder = new Client({ connectionString: h.ctx.database.url });
+      await holder.connect();
+      try {
+        await holder.query('BEGIN');
+        await holder.query('SELECT id FROM employees WHERE id = $1 FOR UPDATE', [u.leaver.employeeId]);
+        await holder.query(`UPDATE employee_access_blocks SET blocked_from = $2::date WHERE employee_id = $1`, [
+          u.leaver.employeeId,
+          h.today(),
+        ]);
+
+        const claiming = h.claim(task).then((response) => response);
+        await waitForLockWaiters(h.ctx.sql, 1);
+        await holder.query('COMMIT');
+        const refused = await claiming;
+
+        expect([refused.status, h.codeOf(refused), h.detailsOf(refused)]).toEqual([
+          409,
+          'PROVISIONING.BENEFICIARY_DEPARTED',
+          { requestId: queued, cause: 'ACCESS_BLOCKED', nextStep: 'CANCEL_REQUEST' },
+        ]);
+        expect((await taskOf(queued)).status).toBe('QUEUED');
+      } finally {
+        await holder.query('ROLLBACK').catch(() => undefined);
+        await holder.end();
+      }
+    });
+
+    it('lets another IT Admin take over a task already being worked once the block is in force: the check with the vendor can change hands', async () => {
+      const u = await example();
+      const working = await approvedFor(u, u.leaver, 5 * M);
+      const workingTask = await granted(working);
+      await h.claim(workingTask).expect(200);
+      await h.recordedCase(u.leaver);
+      await h.ctx.sql.query(`UPDATE employee_access_blocks SET blocked_from = $2::date WHERE employee_id = $1`, [
+        u.leaver.employeeId,
+        h.today(),
+      ]);
+
+      const other = await h.worker(u.department, `LR-I${n}`, ['IT_ADMIN']);
+
+      const taken = await h.claim(workingTask, other.account).expect(200);
+
+      expect(h.dataOf<{ task: TaskWire }>(taken).task).toMatchObject({ id: workingTask, status: 'IN_PROGRESS' });
+      expect((await taskOf(working)).status).toBe('IN_PROGRESS');
     });
   });
 

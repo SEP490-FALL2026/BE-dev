@@ -4,7 +4,7 @@ Mục đích: các việc chạy ngoài HTTP, từ dòng lệnh — cài đặt 
 Super Admin), dữ liệu demo cho database local, tài khoản của dataset demo dùng chung, báo cáo trạng thái cài đặt và kiểm tra trước migration (cả hai chỉ
 đọc). Không controller, không bảng riêng. Nguồn yêu cầu: FR-9.8, `QĐ-87f`(1), `QĐ-87d`(1) (cài đặt); H6.1, H6.2,
 P28-01 (lệnh vận hành).
-Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: organization, identity-access, finance, audit. Được dùng bởi: không
+Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: organization, identity-access, finance, audit, catalog (`CatalogBootstrapApi`: bảy nhóm chức năng chuẩn). Được dùng bởi: không
 module nào; chỉ lệnh trong `src/cli/` (bootstrap, seed, inspect, preflight).
 
 ## Lệnh CLI → public API
@@ -21,7 +21,7 @@ Lệnh nằm ở `src/cli/<lệnh>/` (bảng lệnh: `src/cli/commands.ts`) và 
 ## Public API (`public/`)
 
 - `InstallationApi` ([public/installation.api.ts](public/installation.api.ts)) — `install`: tạo dữ liệu thật tối thiểu
-  trong một transaction; chạy lần hai thấy organization đã có thì không đổi gì.
+  trong một transaction, gồm bảy nhóm chức năng chuẩn của danh mục (`CatalogBootstrapApi.seedStandardFunctionalGroups`, `QĐ-111bf`; số nhóm ghi vào `after.standardFunctionalGroups` của audit `INSTALLATION.ORGANIZATION_CREATED`); chạy lần hai thấy organization đã có thì không đổi gì.
 - `DemoAccountsApi` ([public/demo-accounts.api.ts](public/demo-accounts.api.ts)) — sự thật của cài đặt cho lệnh dataset
   demo (tổ chức, ngày nghiệp vụ, người giữ `SUPER_ADMIN`), tra nhân viên theo mã, và `create`: tài khoản đã kích hoạt
   cho nhân viên của dataset qua `LocalDemoAccountApi` (một vai trực tiếp), mật khẩu hash bằng
@@ -62,7 +62,7 @@ Lệnh nằm ở `src/cli/<lệnh>/` (bảng lệnh: `src/cli/commands.ts`) và 
 ## Bất biến quan trọng
 
 - Cài đặt tạo đúng: organization, MỘT phòng ban đầu tiên không Cost Center/trưởng phòng/IT Admin, nhân viên của
-  Super Admin và tài khoản Super Admin đã kích hoạt; không tạo Cost Center, chức danh hay nhân viên IT
+  Super Admin và tài khoản Super Admin đã kích hoạt, và bảy nhóm chức năng chuẩn (mọi ứng dụng đứng trong một nhóm, nhóm không nêu là _Khác_); không tạo Cost Center, chức danh hay nhân viên IT
   (`installation.api.ts`).
 - Mọi audit event của cài đặt mang `installationException: true`; không bao giờ sửa tài khoản đã có (khôi phục là
   thủ tục riêng, FR-8.10(d)).

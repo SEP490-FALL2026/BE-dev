@@ -1,18 +1,17 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { createApplicationBodySchema } from '../../../src/modules/catalog/application-intake/application-intake.dto';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
-const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
 const VALID_APPLICATION = {
   name: 'Figma',
-  kind: 'SAAS',
   vendorName: 'Figma Inc',
+  homepageUrl: 'https://www.figma.com',
   dataSensitivity: 'MEDIUM',
-  businessOwnerEmployeeId: ID,
-  communication: NO,
+  plan: { name: 'Organization', provisioningType: 'K2', controlLevel: 'FULL' },
 };
 
 type Call = (server: App) => request.Test;
@@ -85,24 +84,42 @@ describe('application catalog routes (e2e, no database)', () => {
     const asIt = () => ({ Authorization: bearer(principal(['IT_ADMIN'])) });
     const without = (key: keyof typeof VALID_APPLICATION) =>
       Object.fromEntries(Object.entries(VALID_APPLICATION).filter(([name]) => name !== key));
-    const withoutOwner = without('businessOwnerEmployeeId');
-    const withoutCommunication = without('communication');
-    const withoutSensitivity = without('dataSensitivity');
+
+    it('QĐ-111g: takes a POST that names nobody (the IT Admin who declares it is the one responsible) and refuses one that still names a Business Owner', () => {
+      expect(createApplicationBodySchema.safeParse(VALID_APPLICATION).success).toBe(true);
+      expect(createApplicationBodySchema.safeParse({ ...VALID_APPLICATION, businessOwnerEmployeeId: ID }).success).toBe(
+        false,
+      );
+    });
+    const withoutPlan = without('plan');
+
+    it('QĐ-111f: takes a POST that names no kind, no communication answer and no sensitivity, only the application and its plan', () => {
+      expect(createApplicationBodySchema.safeParse(without('dataSensitivity')).success).toBe(true);
+      expect(createApplicationBodySchema.safeParse({ ...VALID_APPLICATION, dataSensitivity: null }).success).toBe(true);
+    });
 
     it.each([
       ['no name', { ...VALID_APPLICATION, name: undefined }],
-      ['a kind that is not one', { ...VALID_APPLICATION, kind: 'FREEWARE' }],
-      ['no kind', { ...VALID_APPLICATION, kind: undefined }],
-      ['no Business Owner', withoutOwner],
-      ['a Business Owner that is not a uuid', { ...VALID_APPLICATION, businessOwnerEmployeeId: 'B1' }],
-      ['no sensitivity', withoutSensitivity],
-      ['a sensitivity that is not one', { ...VALID_APPLICATION, dataSensitivity: 'EXTREME' }],
-      ['no communication answers', withoutCommunication],
+      ['no plan', withoutPlan],
+      ['a plan with no kind of provisioning', { ...VALID_APPLICATION, plan: { name: 'Team' } }],
+      ['a kind of provisioning that is not one', { ...VALID_APPLICATION, plan: { name: 'T', provisioningType: 'K9' } }],
       [
-        'a communication answer that is not a boolean',
-        { ...VALID_APPLICATION, communication: { ...NO, mailbox: 'no' } },
+        'a pricing model, which the system works out (B-5)',
+        {
+          ...VALID_APPLICATION,
+          plan: { ...VALID_APPLICATION.plan, pricingModel: 'PER_SEAT' },
+        },
       ],
-      ['a communication answer missing', { ...VALID_APPLICATION, communication: { personToPersonMessaging: false } }],
+      ['a kind of application, which follows the plan (QĐ-111d)', { ...VALID_APPLICATION, kind: 'SAAS' }],
+      ['a Business Owner, which is no field any more', { ...VALID_APPLICATION, businessOwnerEmployeeId: ID }],
+      ['a sensitivity that is not one', { ...VALID_APPLICATION, dataSensitivity: 'EXTREME' }],
+      [
+        'communication answers, which the group Liên lạc replaces (QĐ-111e)',
+        {
+          ...VALID_APPLICATION,
+          communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
+        },
+      ],
       ['domains that are not a list', { ...VALID_APPLICATION, domains: 'figma.com' }],
       [
         'a dictionary line that is not a uuid',
@@ -125,7 +142,8 @@ describe('application catalog routes (e2e, no database)', () => {
       ['a status', { status: 'RETIRED' }],
       ['a name that is not text', { name: 7 }],
       ['a functional group that is not a uuid', { functionalGroupId: 'G' }],
-      ['a communication answer that is not a boolean', { communication: { mailbox: 'yes' } }],
+      ['communication answers, which are no field any more (QĐ-111e)', { communication: { mailbox: true } }],
+      ['a functional group that is null: an application always has one (QĐ-111d)', { functionalGroupId: null }],
     ])('turns away a PATCH naming %s, 422 VALIDATION_ERROR', async (_name, body) => {
       const response = await request(app.getHttpServer())
         .patch(`/api/v1/applications/${ID}`)

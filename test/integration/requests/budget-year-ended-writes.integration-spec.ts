@@ -61,17 +61,13 @@ describe('writes on a year that has ended, before the closure has run (integrati
     await refusedAsEnded(await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account), before);
   });
 
-  it('does not change, adjust, add to, load into or send a draft', async () => {
+  it('does not change or send a draft', async () => {
     const w = await waiting();
     const version = await h.built(w.proposal.id);
     await h.moveYear(w.department.unitId, h.next, ended);
     const before = await fingerprint();
-    const csv = ['cost_center_code,description,amount', `${w.department.unitId},x,1`].join('\n');
 
     await refusedAsEnded(await h.updateVersion(version.id, { base: h.money(1) }), before);
-    await refusedAsEnded(await h.updateLine(version.id, 1, { financeComment: 'late' }), before);
-    await refusedAsEnded(await h.addLines(version.id, [h.line()]), before);
-    await refusedAsEnded(await h.importLines(version.id, csv), before);
     await refusedAsEnded(await h.sendVersion(version.id), before);
   });
 
@@ -85,7 +81,7 @@ describe('writes on a year that has ended, before the closure has run (integrati
 
     await refusedAsEnded(await h.withdraw(waits.proposal.id, waits.head.account), before);
     await refusedAsEnded(await h.giveBack(waits.proposal.id, { reason: 'Too late' }, h.finance), before);
-    await refusedAsEnded(await h.resubmit(toReturn.proposal.id, { lines: [h.line()] }, toReturn.head.account), before);
+    await refusedAsEnded(await h.resubmit(toReturn.proposal.id, h.bm10(50_000_000), toReturn.head.account), before);
     await refusedAsEnded(
       await h.createVersion({
         proposalId: toBuild.proposal.id,

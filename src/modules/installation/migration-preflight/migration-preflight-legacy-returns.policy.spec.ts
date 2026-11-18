@@ -8,7 +8,6 @@ import type { ContractGateFacts, PreflightReport } from '../public/migration-pre
  * is guessed. The same expressions as the first block of that migration; the facts are read only until it has run.
  */
 const nothingElse: Omit<ContractGateFacts, 'legacyReturns'> = {
-  subscriptionOwner: { schema: 'NO_TABLE', subscriptionIds: [] },
   costCenterDirection: {
     schema: 'NO_TABLE',
     organizationIds: [],
@@ -16,7 +15,7 @@ const nothingElse: Omit<ContractGateFacts, 'legacyReturns'> = {
     mismatches: [],
     notActivated: [],
   },
-  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [] },
+  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], serviceAccountIds: [] },
 };
 const returns = (legacyReturns: ContractGateFacts['legacyReturns']): ContractGateFacts => ({
   ...nothingElse,

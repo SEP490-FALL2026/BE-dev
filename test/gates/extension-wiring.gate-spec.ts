@@ -50,7 +50,6 @@ const NO_HTTP_GRAPHS = [
   'InstallationModule',
   'RecoveryCliModule',
   'InspectionCliModule',
-  'AssignSubscriptionOwnerCliModule',
   'AiPurgeCliModule',
   'SeedCliModule',
 ] as const;
@@ -70,13 +69,22 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
     graphs: NO_HTTP_GRAPHS,
     point: 'DepartmentUseContributions',
     binders: [
-      'SubscriptionDepartmentUseReader',
       'DepartmentOpenWorkReader @ modules/licensing/provisioning/department-use/department-open-work.listener.ts',
       'DepartmentOpenWorkReader @ modules/personnel/event-notice/department-open-work.listener.ts',
       'DepartmentOpenRequestsReader',
     ],
     users: ['DepartmentUseService'],
     reason: `The readers are asked by DepartmentUseService.readDepartment, which ${DEACTIVATION_ONLY}. (An unanswered group fails loudly: UseReaderMissingError.)`,
+  },
+  {
+    graphs: NO_HTTP_GRAPHS,
+    point: 'FirstPlacementUseContributions',
+    binders: ['FirstPlacementRequestsReader', 'FirstPlacementPersonnelReader'],
+    users: ['FirstPlacementUseService'],
+    reason:
+      'The readers are asked by FirstPlacementUseService.read, which is called from nowhere but ' +
+      '`EmployeeFirstPlacementCorrectionService.correct`, run by `EmployeesController.correctFirstPlacement` (PATCH /employees/{id}/first-placement), ' +
+      'an HTTP route of the API; none of these graphs serves HTTP or has a command that corrects a first placement.',
   },
   {
     graphs: NO_HTTP_GRAPHS,
@@ -92,7 +100,6 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'BudgetHeadChangeListener',
       'HeldNoticeHandoverListener',
       'TransferEffectiveListener',
-      'TransferReviewListener',
       'SpendingApproverWaitListener',
     ],
     users: ['OrganizationChangeService'],
@@ -101,20 +108,12 @@ const GRAPH_WIRING_EXCEPTIONS: readonly WiringException[] = [
       'in the API graph) and the command `record-super-admin-event`; the worker declares none of them and its loops reach no write of the organization.',
   },
   {
-    graphs: [
-      'InstallationModule',
-      'RecoveryCliModule',
-      'InspectionCliModule',
-      'AssignSubscriptionOwnerCliModule',
-      'AiPurgeCliModule',
-      'SeedCliModule',
-    ],
+    graphs: ['InstallationModule', 'RecoveryCliModule', 'InspectionCliModule', 'AiPurgeCliModule', 'SeedCliModule'],
     point: 'OrganizationChangeListeners',
     binders: [
       'BudgetHeadChangeListener',
       'HeldNoticeHandoverListener',
       'TransferEffectiveListener',
-      'TransferReviewListener',
       'RequestsOrganizationChangeListener',
       'SpendingApproverWaitListener',
     ],

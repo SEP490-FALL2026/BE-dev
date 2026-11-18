@@ -4,6 +4,7 @@ import { OrganizationApi } from '../../../src/modules/organization/public/organi
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
+import { ensureVendorAdmins } from '../../support/builders/catalog.builder';
 import {
   HttpTestApp,
   SeededInstallation,
@@ -11,6 +12,8 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../../support/http-test-app';
+import { intakeBodyOf } from '../../support/application-body';
+import { pricingOfBody, writeLegacyPricing } from '../../support/legacy-pricing';
 
 const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
 
@@ -22,7 +25,6 @@ describe('what licensing reads of catalog and organization (integration, real Po
   let organization: OrganizationApi;
   let organizationReads: OrganizationReadApi;
   let runner: TransactionRunner;
-  let businessOwner: string;
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
@@ -34,7 +36,7 @@ describe('what licensing reads of catalog and organization (integration, real Po
     seed = await seedInstallation(ctx.app);
     const admin = await adminToken(ctx, seed);
     it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
-    businessOwner = (await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' })).employeeId;
+    await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' });
     catalog = ctx.app.get(CatalogApi, { strict: false });
     organization = ctx.app.get(OrganizationApi, { strict: false });
     organizationReads = ctx.app.get(OrganizationReadApi, { strict: false });
@@ -50,18 +52,19 @@ describe('what licensing reads of catalog and organization (integration, real Po
       await request(server())
         .post('/api/v1/applications')
         .set(as(it1))
-        .send({
-          name: unique('App'),
-          kind,
-          ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
-          dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: businessOwner,
-          communication: NO,
-        })
+        .send(
+          intakeBodyOf({
+            name: unique('App'),
+            kind,
+            ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
+            dataSensitivity: 'LOW',
+            communication: NO,
+          }),
+        )
         .expect(201),
     );
-  const plan = async (applicationId: string, type: string, pricing?: string) =>
-    dataOf<{ id: string; name: string }>(
+  const plan = async (applicationId: string, type: string, pricing?: string) => {
+    const created = dataOf<{ id: string; name: string }>(
       await request(server())
         .post('/api/v1/plans')
         .set(as(it1))
@@ -69,16 +72,29 @@ describe('what licensing reads of catalog and organization (integration, real Po
           applicationId,
           name: unique('Plan'),
           provisioningType: type,
-          ...(type === 'K5' ? {} : { pricingModel: pricing ?? 'PER_SEAT', controlLevel: 'FULL' }),
+          ...(type === 'K5' ? {} : { ...pricingOfBody(type, pricing ?? 'PER_SEAT'), controlLevel: 'FULL' }),
         })
         .expect(201),
     );
+    await writeLegacyPricing(ctx.sql, created.id, type, pricing ?? 'PER_SEAT');
+    // A plan that needs admins at the vendor gets the two-person profile an active subscription asks for (X-IT.5).
+    await ensureVendorAdmins(ctx, created.id, it1.employeeId);
+
+    return created;
+  };
   const subscription = async (planId: string, extra: object = {}) =>
     dataOf<{ id: string }>(
       await request(server())
         .post('/api/v1/subscriptions')
         .set(as(it1))
-        .send({ ownerDepartmentId: seed.departmentId, planId, kind: 'TERM', ...extra })
+        .send({
+          planId,
+          kind: 'TERM',
+          // A subscription that becomes active names the months it commits to and the IT Admin who answers for it.
+          commitmentTermMonths: 1,
+          responsibleItAdminEmployeeId: it1.employeeId,
+          ...extra,
+        })
         .expect(201),
     ).id;
 
@@ -102,7 +118,6 @@ describe('what licensing reads of catalog and organization (integration, real Po
         status: 'DRAFT',
         missing: ['START_DATE', 'BILLING_CYCLE', 'UNIT_PRICE'],
         purchasedQuantity: 100,
-        ownerDepartmentId: seed.departmentId,
       });
     });
 
@@ -160,7 +175,6 @@ describe('what licensing reads of catalog and organization (integration, real Po
         status: null,
         missing: [],
         purchasedQuantity: null,
-        ownerDepartmentId: null,
       });
     });
 

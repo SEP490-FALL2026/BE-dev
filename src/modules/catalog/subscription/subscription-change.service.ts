@@ -7,6 +7,7 @@ import { PlanFactsService } from '../plan/plan-facts.service';
 import {
   SubscriptionNotFoundError,
   SubscriptionPlanNotFoundError,
+  SubscriptionStaleError,
   SubscriptionStillDraftError,
   SubscriptionUpdateEmptyError,
 } from './subscription.errors';
@@ -14,22 +15,29 @@ import { sameState, snapshotOf, stateOf } from './subscription.mapper';
 import {
   assertSubscriptionShape,
   deriveNotice,
+  isStaleEdit,
+  missingDataOf,
   nextStateOf,
   noticeInputOf,
   sameUnitPrice,
   subscriptionStatusOf,
 } from './subscription.policy';
+import { assertDeclarableCycle } from './pool/subscription-pool.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import { SubscriptionChangeGuard } from './subscription-change-guard.service';
-import { SubscriptionObligationService } from './subscription-obligation.service';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import { SubscriptionViewService } from './subscription-view.service';
-import type { SubscriptionRecord, SubscriptionState, SubscriptionView } from './subscription.types';
+import type {
+  OriginalPriceRecord,
+  SubscriptionRecord,
+  SubscriptionState,
+  SubscriptionView,
+} from './subscription.types';
 import type { UpdateSubscriptionInput } from './subscription.service';
 
 /**
- * A change of a subscription (`US-04-03`): a new unit price is converted again at the rate of today and recorded with today as its day; the
- * other fields are stored as they are; the owner department is not a field of a change. A write is one transaction under the locks of
+ * A change of a subscription (`US-04-03`): a new unit price is entered in dong and recorded with today as its day and the snapshot of the
+ * same currency (`QĐ-111an`); the original price a vendor quoted is only kept; the other fields are stored as they are; the owner department is not a field of a change. A write is one transaction under the locks of
  * the subscription and its plan.
  */
 @Injectable()
@@ -38,7 +46,6 @@ export class SubscriptionChangeService {
     private readonly subscriptions: SubscriptionRepo,
     private readonly plans: PlanFactsService,
     private readonly pricing: SubscriptionPricingService,
-    private readonly obligation: SubscriptionObligationService,
     private readonly views: SubscriptionViewService,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -46,18 +53,29 @@ export class SubscriptionChangeService {
   ) {}
 
   /**
-   * Changes a subscription: a new unit price is converted again at the rate of today and recorded with today as its day;
-   * the other fields are stored as they are; the owner department is not a field of a change. Throws SubscriptionNotFoundError,
-   * SubscriptionUpdateEmptyError, the shape errors, the money errors and FinanceSetupIncompleteError (a change that creates, raises
-   * or extends what is owed while the owner department has no Cost Center in use). A price edit that would leave an active subscription with no rate for its day is refused
-   * by the finance facade's missing rate, never silently turned back into a draft.
+   * Changes a subscription: a new unit price is entered in dong and recorded with today as its day; the original price a vendor
+   * quoted is kept as given (`null` takes it away); the other fields are stored as they are; the owner department is not a field
+   * of a change. Throws SubscriptionNotFoundError, SubscriptionUpdateEmptyError, SubscriptionStaleError (`expectedUpdatedAt` is not the row's), the shape errors, SubscriptionPriceNotVndError
+   * (a unit price that is not in dong), and the money errors. A subscription has no owning department, so a change asks no Cost Center (`QĐ-113g`).
    */
-  async update(actor: AuthenticatedPrincipal, id: string, input: UpdateSubscriptionInput): Promise<SubscriptionView> {
+  async update(
+    actor: AuthenticatedPrincipal,
+    id: string,
+    input: UpdateSubscriptionInput,
+    expectedUpdatedAt?: Date,
+  ): Promise<SubscriptionView> {
     if (Object.values(input).every((value) => value === undefined)) throw new SubscriptionUpdateEmptyError();
+    assertDeclarableCycle(input.billingCycle);
     const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
+    const originalPrice = input.originalPrice
+      ? await this.pricing.readOriginal(input.originalPrice)
+      : input.originalPrice;
     const organizationId = await this.guard.requireOrganizationId();
+    await this.guard.requireResponsible(input.responsibleItAdminEmployeeId);
 
-    const record = await this.runner.run((tx) => this.changeIn(tx, actor, id, { input, money, organizationId }));
+    const record = await this.runner.run((tx) =>
+      this.changeIn(tx, actor, id, { input, money, originalPrice, organizationId, expectedUpdatedAt }),
+    );
 
     return (await this.views.viewAll([record]))[0];
   }
@@ -69,13 +87,18 @@ export class SubscriptionChangeService {
     change: {
       input: UpdateSubscriptionInput;
       money: { amountMinor: bigint; currency: string } | null;
+      /** What the change gives: the price read, `null` to take it away, `undefined` when it says nothing. */
+      originalPrice: OriginalPriceRecord | null | undefined;
       organizationId: string;
+      expectedUpdatedAt?: Date;
     },
   ): Promise<SubscriptionRecord> {
-    const { input, money, organizationId } = change;
-    const current = await this.subscriptions.lock(tx, id);
-    if (!current) throw new SubscriptionNotFoundError();
-    const plan = await this.plans.lockShared(tx, current.planId);
+    const { input, money, originalPrice, organizationId, expectedUpdatedAt } = change;
+    const current = await this.lockFresh(tx, id, expectedUpdatedAt);
+    // The plan is locked for writing when this subscription is to price it: the subscriptions of one plan take turns (Q-04).
+    const plan = input.isPrimaryForPlan
+      ? await this.plans.lockExclusive(tx, current.planId)
+      : await this.plans.lockShared(tx, current.planId);
     if (!plan) throw new SubscriptionPlanNotFoundError();
     await this.guard.assertNotBelowOccupied(tx, id, current.purchasedQuantity, input.purchasedQuantity);
 
@@ -91,22 +114,58 @@ export class SubscriptionChangeService {
     const priced = samePrice
       ? { unitPrice: current.unitPrice, priceSnapshot: current.priceSnapshot }
       : await this.pricing.priceToday(tx, money);
-    if (!samePrice && current.status === 'ACTIVE' && priced.priceSnapshot === null) {
-      throw new SubscriptionStillDraftError(['EXCHANGE_RATE']);
-    }
     const state: SubscriptionState = {
       ...next,
       ...priced,
-      status: subscriptionStatusOf(plan, current.kind, { ...next, ...priced }),
+      originalPrice: originalPrice === undefined ? current.originalPrice : originalPrice,
+      status: this.statusAfter(plan, current, { ...next, ...priced }),
     };
+    await this.guard.judgePool(tx, { plan, current, state, input, actor, organizationId });
     if (sameState(state, stateOf(current))) return current;
-    // What is owed cannot be created, raised or extended for a department with no Cost Center in use.
-    await this.obligation.assertChargeable(tx, current.ownerDepartmentId, stateOf(current), state);
 
     const updated = await this.subscriptions.update(tx, id, state);
     await this.auditChange(tx, actor, { current, updated, organizationId });
+    // A rise of the seats of a K2 or K4 pool is told to the IT Admin who answers for it, whoever changed the number (`QĐ-110v`, SPEC P24).
+    await this.guard.tellSeatIncrease(tx, {
+      organizationId,
+      subscriptionId: id,
+      planProvisioningType: current.planProvisioningType,
+      status: current.status,
+      responsibleItAdminEmployeeId: updated.responsibleItAdminEmployeeId,
+      from: current.purchasedQuantity,
+      to: updated.purchasedQuantity,
+      requestId: null,
+      actor,
+    });
 
     return updated;
+  }
+
+  /** The subscription, locked, when it is still the one the client read (`expectedUpdatedAt`); else SubscriptionNotFoundError or SubscriptionStaleError. */
+  private async lockFresh(tx: DbTx, id: string, expectedUpdatedAt?: Date): Promise<SubscriptionRecord> {
+    const current = await this.subscriptions.lock(tx, id);
+    if (!current) throw new SubscriptionNotFoundError();
+    if (isStaleEdit(expectedUpdatedAt, current.updatedAt)) throw new SubscriptionStaleError(current.updatedAt);
+
+    return current;
+  }
+
+  /**
+   * The status a change leaves: a change never lowers an active subscription to a draft on its own account. One an earlier release left priced
+   * in another currency (no rate was there to turn it into dong) has no price of the new flow, and the change says so (SubscriptionStillDraftError,
+   * 422, naming what is missing) instead of taking the subscription out of the pool in silence; entering the price in dong keeps it active.
+   */
+  private statusAfter(
+    plan: Parameters<typeof subscriptionStatusOf>[0],
+    current: SubscriptionRecord,
+    state: Parameters<typeof subscriptionStatusOf>[2],
+  ): 'ACTIVE' | 'DRAFT' {
+    const status = subscriptionStatusOf(plan, current.kind, state);
+    if (current.status === 'ACTIVE' && status === 'DRAFT') {
+      throw new SubscriptionStillDraftError(missingDataOf(plan, current.kind, state));
+    }
+
+    return status;
   }
 
   private async auditChange(

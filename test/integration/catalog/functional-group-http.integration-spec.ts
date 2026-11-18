@@ -6,6 +6,7 @@ interface GroupWire {
   id: string;
   name: string;
   status: 'ACTIVE' | 'INACTIVE';
+  systemKey: 'COMMUNICATION' | 'OTHER' | null;
 }
 
 describe('functional groups over HTTP (integration, real PostgreSQL)', () => {
@@ -57,6 +58,49 @@ describe('functional groups over HTTP (integration, real PostgreSQL)', () => {
     ).rows;
   const count = async (): Promise<number> =>
     (await ctx.sql.query<{ n: number }>('SELECT count(*)::int AS n FROM functional_groups')).rows[0].n;
+
+  it('lists the seven standard groups with the system key of the two fixed ones (QĐ-111bf)', async () => {
+    const page = dataOf<{ items: GroupWire[] }>(
+      await request(server()).get('/api/v1/functional-groups?pageSize=100').set(as(it1)).expect(200),
+    );
+    const standard = page.items.filter((group) => group.systemKey !== null);
+
+    expect(standard.map((group) => [group.name, group.systemKey]).sort()).toEqual([
+      ['Khác', 'OTHER'],
+      ['Liên lạc (email, chat, họp)', 'COMMUNICATION'],
+    ]);
+    expect(page.items.map((group) => group.name)).toEqual(
+      expect.arrayContaining([
+        'Trợ lý AI',
+        'Thiết kế & sáng tạo',
+        'Lập trình & kỹ thuật',
+        'Văn phòng & cộng tác',
+        'Chuyên ngành',
+      ]),
+    );
+  });
+
+  it('never renames or switches off a fixed group: 409 FUNCTIONAL_GROUP.FIXED, nothing changed or audited (QĐ-111bf)', async () => {
+    const page = dataOf<{ items: GroupWire[] }>(
+      await request(server()).get('/api/v1/functional-groups?pageSize=100').set(as(it1)).expect(200),
+    );
+    for (const group of page.items.filter((candidate) => candidate.systemKey !== null)) {
+      const renamed = await patch(group.id, { name: unique('Another name') }).expect(409);
+      expect(codeOf(renamed)).toBe('FUNCTIONAL_GROUP.FIXED');
+      expect(codeOf(await patch(group.id, { status: 'INACTIVE' }).expect(409))).toBe('FUNCTIONAL_GROUP.FIXED');
+      // The same name and the status it has change nothing: answered as any no-op, not audited.
+      const same = dataOf<GroupWire>(await patch(group.id, { name: group.name, status: 'ACTIVE' }).expect(200));
+      expect(same).toMatchObject({ name: group.name, status: 'ACTIVE', systemKey: group.systemKey });
+      expect(await auditOf(group.id)).toEqual([]);
+    }
+  });
+
+  it('answers the system key null for a group the IT Admin made, which stays free to rename', async () => {
+    const created = dataOf<GroupWire>(await create({ name: unique('Free group') }).expect(201));
+
+    expect(created.systemKey).toBeNull();
+    await patch(created.id, { name: unique('Renamed free group') }).expect(200);
+  });
 
   it('creates a group, active, and records who did it', async () => {
     const created = dataOf<GroupWire>(await create({ name: '  Thiết kế   giao diện ' }).expect(201));

@@ -100,10 +100,36 @@ describe('requests over HTTP: what the head sees of a request (integration, real
       expect(h.codeOf(await seats(sent.id, head.account, '?pageSize=101').expect(422))).toBe('VALIDATION_ERROR');
     });
 
-    it('shows nothing for a tool whose application is in no group', async () => {
+    it('shows nothing for a tool in the group Khác, though the person holds other tools there: the group that takes every application with no group is not one function (FX2-R2)', async () => {
       const lone = await h.sent(designer, await h.plan('K2'));
 
       expect((await wire(lone.id, head.account)).items).toEqual([]);
+    });
+
+    it('does not show the tools of the group Khác to a tool of a real group, and still shows the fixed group of the chat and mail tools', async () => {
+      const chat = await h.plan('K2');
+      const mail = await h.plan('K5');
+      const communication = (
+        await h.ctx.sql.query<{ id: string }>(`SELECT id FROM functional_groups WHERE system_key = 'COMMUNICATION'`)
+      ).rows[0].id;
+      for (const planId of [chat, mail]) {
+        const { rows } = await h.ctx.sql.query<{ application_id: string }>(
+          `SELECT application_id FROM plans WHERE id = $1`,
+          [planId],
+        );
+        await request(h.server())
+          .patch(`/api/v1/applications/${rows[0].application_id}`)
+          .set(h.as(h.it1))
+          .send({ functionalGroupId: communication })
+          .expect(200);
+      }
+      await h.hold('DES-E1', mail);
+      const sent = await h.sent(designer, chat);
+
+      const page = await wire(sent.id, head.account);
+
+      expect(page.items.map((seat) => seat.plan.planId)).toEqual([mail]);
+      expect(page.items.map((seat) => seat.plan.planId)).not.toContain(jira);
     });
 
     it('is for the person who holds the step: the sender and an IT Admin are refused, a stranger sees nothing', async () => {

@@ -56,57 +56,51 @@ describe('the chain shown before a request is sent (US-05-01)', () => {
     expect(last).toMatchObject({ role: 'IT_ADMIN', assigneeEmployeeId: null });
   });
 
-  describe('the need step follows the routing table (AC-5)', () => {
-    it.each([
-      ['a person of a department with a head', {}, HEAD, 'DEPARTMENT_HEAD'],
-      [
-        'the head asking for themselves: the spending approver',
-        { requesterEmployeeId: HEAD },
-        APPROVER,
-        'HEAD_ASKS_FOR_SELF',
-      ],
-    ])('%s', (_name, over, assignee, explanation) => {
-      const [need] = chainOf(paid, over);
-
-      expect(need).toMatchObject({ kind: 'NEED', assigneeEmployeeId: assignee, explanation, waitingReason: null });
-    });
-
-    it('waits for the head, naming nobody and saying why, when the department has none (row 4)', () => {
-      const [need] = chainOf(paid, { departmentHeadEmployeeId: null });
-
-      expect(need).toMatchObject({
+  describe('BR-MF1-02 the preview follows one-step routing', () => {
+    it('keeps the department head need step for a member of a headed department', () => {
+      expect(chainOf()[0]).toMatchObject({
         kind: 'NEED',
-        role: 'MANAGER',
-        assigneeEmployeeId: null,
-        explanation: 'WAITS_FOR_DEPARTMENT_HEAD',
-        waitingReason: 'NO_DEPARTMENT_HEAD',
+        assigneeEmployeeId: HEAD,
+        explanation: 'DEPARTMENT_HEAD',
+        waitingReason: null,
       });
     });
+    it('omits need and submission for the own request of the head', () => {
+      expect(shape(chainOf(paid, { requesterEmployeeId: HEAD }))).toEqual([
+        ['SPEND_APPROVAL', APPROVER],
+        ['IT_EXECUTION', null],
+      ]);
+    });
+    it('QĐ-110i: keeps the need step, waiting for a head, for paid software of a headless department', () => {
+      const steps = chainOf(paid, { departmentHeadEmployeeId: null });
 
-    it('names nobody and says why when the head asks for themselves and no spending approver can decide it', () => {
-      const [need] = chainOf(paid, { requesterEmployeeId: HEAD, spendingApproverEmployeeId: null });
-
-      expect(need).toMatchObject({
+      expect(shape(steps)).toEqual([
+        ['NEED', null],
+        ['SPEND_SUBMISSION', null],
+        ['SPEND_APPROVAL', APPROVER],
+        ['IT_EXECUTION', null],
+      ]);
+      expect(steps[0]).toMatchObject({ explanation: 'WAITS_FOR_DEPARTMENT_HEAD', waitingReason: 'NO_DEPARTMENT_HEAD' });
+    });
+    it('waits only for the spending approver when none holds that role', () => {
+      const steps = chainOf(paid, { requesterEmployeeId: HEAD, spendingApproverEmployeeId: null });
+      expect(steps).toHaveLength(2);
+      expect(steps[0]).toMatchObject({
+        kind: 'SPEND_APPROVAL',
         assigneeEmployeeId: null,
-        explanation: 'WAITING_FOR_AN_APPROVER',
         waitingReason: 'NO_SPENDING_APPROVER',
       });
     });
+    it('headless internal software needs only IT execution', () => {
+      expect(shape(chainOf(internal, { departmentHeadEmployeeId: null }))).toEqual([['IT_EXECUTION', null]]);
+    });
   });
 
-  it('shows the spend steps unfilled, with the reason, when there is nobody to hold them', () => {
+  it('QĐ-110i headless paid software without an approver waits for the head and for the approver, both named', () => {
     const steps = chainOf(paid, { departmentHeadEmployeeId: null, spendingApproverEmployeeId: null });
-
-    expect(steps[1]).toMatchObject({
-      kind: 'SPEND_SUBMISSION',
-      assigneeEmployeeId: null,
-      explanation: 'WAITS_FOR_DEPARTMENT_HEAD',
-    });
-    expect(steps[2]).toMatchObject({
-      kind: 'SPEND_APPROVAL',
-      assigneeEmployeeId: null,
-      waitingReason: 'NO_SPENDING_APPROVER',
-    });
+    expect(steps.map((step) => step.kind)).toEqual(['NEED', 'SPEND_SUBMISSION', 'SPEND_APPROVAL', 'IT_EXECUTION']);
+    expect(steps[0]).toMatchObject({ assigneeEmployeeId: null, waitingReason: 'NO_DEPARTMENT_HEAD' });
+    expect(steps[2]).toMatchObject({ assigneeEmployeeId: null, waitingReason: 'NO_SPENDING_APPROVER' });
   });
 });
 

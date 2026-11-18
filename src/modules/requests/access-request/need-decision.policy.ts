@@ -12,11 +12,12 @@ export interface DecisionFacts {
   beneficiaryEmployeeIds: readonly string[];
   /** Who holds the need step; null while it waits for somebody. */
   assigneeEmployeeId: string | null;
-  stepState: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
+  stepState: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED' | 'NOT_REQUIRED';
 }
 
 export interface DecisionInput {
-  decision: 'APPROVE' | 'REJECT';
+  /** `RETURN` sends the request back to the person who sent it, to add what is missing and send it again (`QĐ-111ap`, R-24). */
+  decision: 'APPROVE' | 'REJECT' | 'RETURN';
   reason?: string;
 }
 
@@ -74,8 +75,10 @@ export function deciderRoleOf(routingRow: number): DeciderRole {
 
 export interface NeedDecisionOutcome {
   approved: boolean;
-  /** Where the request goes: the next state of its branch for an approval, `REJECTED` for a refusal. */
-  requestState: ApprovedRequestState | 'REJECTED';
+  /** The request was sent back to the person who sent it: nobody refused it and nothing ends. */
+  returned: boolean;
+  /** Where the request goes: the next state of its branch for an approval, `REJECTED` for a refusal, back to its sender for a return. */
+  requestState: ApprovedRequestState | 'REJECTED' | 'AWAITING_REQUESTER_REVISION';
   deciderRole: DeciderRole;
 }
 
@@ -89,6 +92,7 @@ export function needDecisionOutcome(
   input: DecisionInput,
 ): NeedDecisionOutcome {
   const approved = input.decision === 'APPROVE';
+  const returned = input.decision === 'RETURN';
   const deciderRole = deciderRoleOf(asked.routingRow);
   if (deciderRole === null) {
     throw new Error(
@@ -98,7 +102,8 @@ export function needDecisionOutcome(
 
   return {
     approved,
-    requestState: approved ? nextRequestState(asked.branch) : 'REJECTED',
+    returned,
+    requestState: approved ? nextRequestState(asked.branch) : returned ? 'AWAITING_REQUESTER_REVISION' : 'REJECTED',
     deciderRole,
   };
 }

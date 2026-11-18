@@ -37,7 +37,8 @@ Quá SLA thì người được giao nhận nhắc và người quản lý nhậ
 | US-05-09 | AC-1→AC-6, AC-8, AC-10, AC-11 | partial  | AC-7: `g3-downstream-finance-integration`                                                                                      |
 | US-05-06 | AC-10                         | partial  | AC-1→AC-4, AC-7, AC-8, AC-11→AC-15: `g5-it-assessment-of-new-software`; AC-5 (vế thông báo): `g5-request-status-notifications` |
 | US-05-10 | AC-1→AC-5                     | full     | —                                                                                                                              |
-| US-06-02 | AC-3                          | partial  | AC-1, AC-2, AC-4, AC-5, AC-7: `g5-finance-information-request`                                                                 |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-06-02` AC-3 (partial) — Story `RETIRED` ở Docs `5bb2e6a` (`US-06-02` `QĐ-29b`, `QĐ-97c`); code đã merge là lịch sử, khóa ở scope map là `not affected`.
 
 ## Supporting references
 

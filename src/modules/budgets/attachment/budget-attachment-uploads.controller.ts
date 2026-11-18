@@ -8,7 +8,11 @@ import {
   VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
-import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
+import {
+  AuthenticatedOnly,
+  RequireRoles,
+  RequireRolesOrGrants,
+} from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdParamDto } from '../budget/budget.dto';
@@ -100,7 +104,7 @@ export class BudgetAttachmentUploadsController {
   }
 
   @Post('budget-proposals/attachments')
-  @RequireRoles('MANAGER')
+  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
   @HttpCode(HttpStatus.CREATED)
   @Header('Cache-Control', 'no-store')
   @ApiOperation({
@@ -152,7 +156,7 @@ export class BudgetAttachmentUploadsController {
   }
 
   @Post('budget-attachments/:id/complete')
-  @RequireRoles('MANAGER', 'FINANCE')
+  @RequireRolesOrGrants(['MANAGER', 'FINANCE'], ['MANAGER'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     operationId: 'budgetAttachmentComplete',
@@ -167,8 +171,9 @@ export class BudgetAttachmentUploadsController {
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'You do not hold the required role for this attachment.',
-      examples: [FORBIDDEN_EXAMPLE],
+      description:
+        'You do not hold the required role for this attachment, or you no longer answer for a unit that may propose (BUDGET.NOT_YOUR_COST_CENTER).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_YOUR_COST_CENTER],
     },
     {
       status: HttpStatus.NOT_FOUND,
@@ -177,9 +182,11 @@ export class BudgetAttachmentUploadsController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description: 'The upload is still pending, expired, not awaiting upload, or the version is not editable.',
+      description:
+        'The upload is still pending, expired, not awaiting upload, the version is not editable, or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
       examples: [
         EXAMPLES.VERSION_NOT_EDITABLE,
+        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
         ATTACHMENT_EXAMPLES.LIMIT_REACHED,
         ATTACHMENT_EXAMPLES.NOT_AWAITING_UPLOAD,
         ATTACHMENT_EXAMPLES.UPLOAD_PENDING,

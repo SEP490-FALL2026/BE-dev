@@ -16,12 +16,60 @@ import { SUMMARY_SELECT, WITH_ASSIGNMENT, toRecord, type ProvisioningTaskRecord 
 export interface TaskPageFilter {
   channel?: ProvisioningChannel;
   status?: ProvisioningTaskStatus;
+  /** `true`: only the revocations that may be taken today (no day not before, or it has come), and every grant; `false`: only those still in their grace. */
+  claimableOn?: { today: BusinessDate; claimable: boolean };
+  /** `true`: only the tasks past their due day that are not over (completed, cancelled or closed as failed); `false`: all the others. */
+  overdueOn?: { today: BusinessDate; overdue: boolean };
   /** Only the tasks this employee is in charge of by default. */
   responsibleEmployeeId?: string;
   /** Only the tasks nobody is in charge of, or whose person in charge is one of these (who no longer work). */
   generalQueueOf?: readonly string[];
   skip: number;
   take: number;
+}
+
+/** The tasks that need no more work: a task of these statuses is never late. */
+const OVER = ['COMPLETED', 'CANCELLED', 'CLOSED_FAILED'] as const;
+
+/**
+ * Late (`QĐ-110c`): a due day before today on a task that is not over. The others are written out, not negated, so a task with no due day
+ * (every grant, a revocation nobody gave one) is among them: a negation would drop the row whose due day is NULL.
+ */
+function overdueWhere(overdue: { today: BusinessDate; overdue: boolean }): Prisma.ProvisioningTaskWhereInput {
+  const today = toDateColumn(overdue.today);
+
+  return overdue.overdue
+    ? { dueOn: { lt: today }, status: { notIn: [...OVER] } }
+    : { OR: [{ dueOn: null }, { dueOn: { gte: today } }, { status: { in: [...OVER] } }] };
+}
+
+/** The conditions of one page of the queue: the plain ones side by side, the ones made of alternatives each in its own `AND`. */
+function pageWhere(filter: TaskPageFilter): Prisma.ProvisioningTaskWhereInput {
+  const and: Prisma.ProvisioningTaskWhereInput[] = [];
+  if (filter.claimableOn) {
+    const today = toDateColumn(filter.claimableOn.today);
+    and.push(
+      filter.claimableOn.claimable
+        ? { OR: [{ notBefore: null }, { notBefore: { lte: today } }] }
+        : { notBefore: { gt: today } },
+    );
+  }
+  if (filter.overdueOn) and.push(overdueWhere(filter.overdueOn));
+  if (filter.generalQueueOf) {
+    and.push({
+      OR: [
+        { defaultResponsibleEmployeeId: null },
+        { defaultResponsibleEmployeeId: { in: [...filter.generalQueueOf] } },
+      ],
+    });
+  }
+
+  return {
+    ...(filter.channel ? { channel: filter.channel } : {}),
+    ...(filter.status ? { status: filter.status } : {}),
+    ...(filter.responsibleEmployeeId ? { defaultResponsibleEmployeeId: filter.responsibleEmployeeId } : {}),
+    ...(and.length > 0 ? { AND: and } : {}),
+  };
 }
 
 /**
@@ -59,14 +107,47 @@ export class ProvisioningTaskRepo {
       createdByAppUserId: string;
       /** The tries the task gets, from the retries the configuration allows now. */
       maxAttempts: number;
+      /** What was bought with the grant (a K1 seat, or a pool that had nothing free); absent when the seat comes from the pool. */
+      purchase?: { kind: 'POOL_TOP_UP' | 'KEY_PURCHASE' | 'K1_SUBSCRIPTION'; reason: string | null; purchasedAt: Date };
+      /** A grant unless said: the extension of a right whose renewal was approved answers for its request the same way. */
+      kind?: 'GRANT' | 'EXTEND';
     },
   ): Promise<ProvisioningTaskRecord> {
+    const { purchase, kind, ...task } = input;
     const row = await tx.provisioningTask.create({
-      data: { ...input, kind: 'GRANT' },
+      data: {
+        ...task,
+        kind: kind ?? 'GRANT',
+        ...(purchase && {
+          purchaseKind: purchase.kind,
+          purchaseReason: purchase.reason,
+          purchasedAt: purchase.purchasedAt,
+        }),
+      },
       include: WITH_ASSIGNMENT,
     });
 
     return toRecord(row);
+  }
+
+  /**
+   * The grant task a request already has for a person that was neither cancelled nor closed as failed (a task that is over without a seat
+   * is no answer to a second press), the newest first; `employeeId` names the person of a request for a group, whose line each task answers
+   * for. Null when there is none.
+   */
+  async findGrantOf(requestId: string, employeeId?: string, tx?: DbTx): Promise<ProvisioningTaskRecord | null> {
+    const row = await (tx ?? this.prisma).provisioningTask.findFirst({
+      where: {
+        kind: 'GRANT',
+        requestId,
+        status: { notIn: ['CANCELLED', 'CLOSED_FAILED'] },
+        ...(employeeId === undefined ? {} : { assignment: { employeeId } }),
+      },
+      include: WITH_ASSIGNMENT,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+
+    return row ? toRecord(row) : null;
   }
 
   async find(id: string, tx?: DbTx): Promise<ProvisioningTaskRecord | null> {
@@ -105,7 +186,12 @@ export class ProvisioningTaskRepo {
   async markCompleted(tx: DbTx, id: string, appUserId: string, evidence: string, now: Date): Promise<void> {
     await tx.provisioningTask.update({
       where: { id },
-      data: { status: 'COMPLETED', completedByAppUserId: appUserId, completedAt: now, evidence },
+      data: {
+        status: 'COMPLETED',
+        completedByAppUserId: appUserId,
+        completedAt: now,
+        evidence,
+      },
     });
   }
 
@@ -198,17 +284,18 @@ export class ProvisioningTaskRepo {
   /**
    * The grant task of a request, locked `FOR UPDATE` until the transaction ends, or null when the request has none. A request
    * for one person has at most one: its grant makes one assignment and one task. A request for a group has one for each person,
-   * so the task is the one of the seat of that person (`employeeId`).
+   * so the task is the one of the seat of that person (`employeeId`). The task that extends the right of a renewal (`EXTEND`,
+   * `BR-MF1-08d`) answers for its request the same way, so it is the one found for a renewal.
    */
   async lockGrantOfRequest(tx: DbTx, requestId: string, employeeId?: string): Promise<ProvisioningTaskRecord | null> {
     const locked =
       employeeId === undefined
         ? await tx.$queryRaw<
             { id: string }[]
-          >`SELECT id FROM provisioning_tasks WHERE request_id = ${requestId}::uuid AND kind = 'GRANT' ORDER BY created_at DESC LIMIT 1 FOR UPDATE`
+          >`SELECT id FROM provisioning_tasks WHERE request_id = ${requestId}::uuid AND kind IN ('GRANT', 'EXTEND') ORDER BY created_at DESC LIMIT 1 FOR UPDATE`
         : await tx.$queryRaw<{ id: string }[]>`SELECT t.id FROM provisioning_tasks t
             JOIN license_assignments a ON a.id = t.assignment_id
-           WHERE t.request_id = ${requestId}::uuid AND t.kind = 'GRANT' AND a.employee_id = ${employeeId}::uuid
+           WHERE t.request_id = ${requestId}::uuid AND t.kind IN ('GRANT', 'EXTEND') AND a.employee_id = ${employeeId}::uuid
            ORDER BY t.created_at DESC LIMIT 1 FOR UPDATE OF t`;
     if (locked.length === 0) return null;
 
@@ -240,7 +327,8 @@ export class ProvisioningTaskRepo {
       assignmentId: string;
       source: RevocationSource;
       defaultResponsibleEmployeeId: string | null;
-      createdByAppUserId: string;
+      /** An account, or the system (T-10): exactly one, as the CHECK of the table says. */
+      creator: { appUserId: string } | { system: true };
       maxAttempts: number;
     },
   ): Promise<ProvisioningTaskRecord> {
@@ -252,7 +340,9 @@ export class ProvisioningTaskRepo {
         channel: 'MANUAL',
         revocationSource: input.source,
         defaultResponsibleEmployeeId: input.defaultResponsibleEmployeeId,
-        createdByAppUserId: input.createdByAppUserId,
+        ...('system' in input.creator
+          ? { createdBySystem: true, createdByAppUserId: null }
+          : { createdByAppUserId: input.creator.appUserId }),
         maxAttempts: input.maxAttempts,
       },
       include: WITH_ASSIGNMENT,
@@ -273,6 +363,30 @@ export class ProvisioningTaskRepo {
     if (locked.length === 0) return null;
 
     return this.find(locked[0].id, tx);
+  }
+
+  /** Whether a task of revocation is working the assignment (not closed as failed, not cancelled), read without a lock. */
+  async hasLiveRevocation(tx: DbTx, assignmentId: string): Promise<boolean> {
+    const live = await tx.provisioningTask.count({
+      where: { assignmentId, kind: 'REVOKE', status: { notIn: ['CLOSED_FAILED', 'CANCELLED'] } },
+    });
+
+    return live > 0;
+  }
+
+  /** What the reasons that stand ask of a revocation now: the day not before and the due day, as the policy reads them from the reasons. */
+  async markTiming(
+    tx: DbTx,
+    id: string,
+    timing: { dueOn: BusinessDate | null; notBefore: BusinessDate | null },
+  ): Promise<void> {
+    await tx.provisioningTask.update({
+      where: { id },
+      data: {
+        dueOn: timing.dueOn ? toDateColumn(timing.dueOn) : null,
+        notBefore: timing.notBefore ? toDateColumn(timing.notBefore) : null,
+      },
+    });
   }
 
   /** The completion of a revocation: who did it, the evidence, how it was done and what is known of the access. */
@@ -340,19 +454,7 @@ export class ProvisioningTaskRepo {
    * are not selected (`LD-08`); the record carries them as null.
    */
   async page(filter: TaskPageFilter): Promise<{ items: ProvisioningTaskRecord[]; total: number }> {
-    const where: Prisma.ProvisioningTaskWhereInput = {
-      ...(filter.channel ? { channel: filter.channel } : {}),
-      ...(filter.status ? { status: filter.status } : {}),
-      ...(filter.responsibleEmployeeId ? { defaultResponsibleEmployeeId: filter.responsibleEmployeeId } : {}),
-      ...(filter.generalQueueOf
-        ? {
-            OR: [
-              { defaultResponsibleEmployeeId: null },
-              { defaultResponsibleEmployeeId: { in: [...filter.generalQueueOf] } },
-            ],
-          }
-        : {}),
-    };
+    const where = pageWhere(filter);
 
     return this.prisma.$transaction(
       async (tx) => {
@@ -375,6 +477,8 @@ export class ProvisioningTaskRepo {
               closeReason: null,
               accessEvidence: null,
               completionNote: null,
+              // Not part of the record: the checklist of a K1 revocation is read by its own group, for the card of a detail only.
+              k1Checklist: null,
             }),
           ),
           total: await tx.provisioningTask.count({ where }),

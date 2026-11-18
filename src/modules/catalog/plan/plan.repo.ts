@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, toDateColumn } from '../../../core/business-date';
-import type { PlanRevocationInfo, PlanSummary, WorkspaceDuty } from '../public/catalog.types';
+import type { PlanRevocationInfo, PlanSummary, PlanSummaryWithLogo, WorkspaceDuty } from '../public/catalog.types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { escapeLikePattern } from '../../../core/search-key';
 import { searchKey } from '../vendor-dictionary/vendor-matcher.policy';
 import type {
   NewPlan,
@@ -13,17 +14,35 @@ import type {
   PlanRecord,
   PlanSummaryRecord,
   ProvisioningType,
+  ReferencePrice,
   WorkspaceProfileRecord,
 } from './plan.types';
+import { applicationPlanName } from './plan.policy';
 
-const WITH_APPLICATION = { application: { select: { name: true, kind: true } } } as const;
+const WITH_APPLICATION = { application: { select: { name: true, kind: true, logoUrl: true } } } as const;
 type PlanRow = Prisma.PlanGetPayload<{ include: typeof WITH_APPLICATION }>;
 type ProfileRow = Prisma.PlanWorkspaceProfileGetPayload<{ include: { members: true } }>;
+
+/** The reference price of a plan row (`QĐ-113a`): both columns or none (a CHECK of the table). */
+const referencePriceOf = (row: {
+  referencePriceMinor: bigint | null;
+  referencePriceCurrency: string | null;
+}): ReferencePrice | null =>
+  row.referencePriceMinor === null || row.referencePriceCurrency === null
+    ? null
+    : { amountMinor: row.referencePriceMinor, currency: row.referencePriceCurrency };
+
+/** The columns of a reference price to write: none when the change leaves it, both null when it clears it. */
+const referencePriceColumns = (price: ReferencePrice | null | undefined) =>
+  price === undefined
+    ? {}
+    : { referencePriceMinor: price?.amountMinor ?? null, referencePriceCurrency: price?.currency ?? null };
 
 const toPlan = (row: PlanRow): PlanRecord => ({
   id: row.id,
   applicationId: row.applicationId,
   applicationName: row.application.name,
+  applicationLogoUrl: row.application.logoUrl,
   applicationKind: row.application.kind,
   name: row.name,
   provisioningType: row.provisioningType,
@@ -32,6 +51,8 @@ const toPlan = (row: PlanRow): PlanRecord => ({
   revocationNote: row.revocationNote,
   dataLossOnRemoval: row.dataLossOnRemoval,
   sharingPolicy: row.sharingPolicy,
+  hasAdminConsole: row.hasAdminConsole,
+  referencePrice: referencePriceOf(row),
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -52,6 +73,8 @@ const toProfile = (row: ProfileRow): WorkspaceProfileRecord => ({
           holderEmployeeId: row.emergencyHolderEmployeeId as string,
           lastReviewedOn: fromDateColumn(row.emergencyLastReviewedOn as Date),
         },
+  ownerAccountEmail: row.ownerAccountEmail,
+  adminNote: row.adminNote,
   updatedAt: row.updatedAt,
 });
 
@@ -73,6 +96,9 @@ export class PlanRepo {
         revocationNote: input.revocationNote,
         dataLossOnRemoval: input.dataLossOnRemoval,
         sharingPolicy: input.sharingPolicy,
+        hasAdminConsole: input.hasAdminConsole,
+        referencePriceMinor: input.referencePrice?.amountMinor ?? null,
+        referencePriceCurrency: input.referencePrice?.currency ?? null,
       },
       include: WITH_APPLICATION,
     });
@@ -107,6 +133,17 @@ export class PlanRepo {
     return rows;
   }
 
+  /** The plan of the application with this name (compared as the unique index does), or null: what a 409 on a name shows. */
+  async findByName(
+    applicationId: string,
+    name: string,
+  ): Promise<{ id: string; name: string; provisioningType: ProvisioningType } | null> {
+    return this.prisma.plan.findFirst({
+      where: { applicationId, normalizedName: searchKey(name) },
+      select: { id: true, name: true, provisioningType: true },
+    });
+  }
+
   async count(): Promise<number> {
     return this.prisma.plan.count();
   }
@@ -128,6 +165,8 @@ export class PlanRepo {
         ...(changes.revocationNote !== undefined ? { revocationNote: changes.revocationNote } : {}),
         ...(changes.dataLossOnRemoval !== undefined ? { dataLossOnRemoval: changes.dataLossOnRemoval } : {}),
         ...(changes.sharingPolicy !== undefined ? { sharingPolicy: changes.sharingPolicy } : {}),
+        ...(changes.hasAdminConsole !== undefined ? { hasAdminConsole: changes.hasAdminConsole } : {}),
+        ...referencePriceColumns(changes.referencePrice),
       },
       include: WITH_APPLICATION,
     });
@@ -140,7 +179,7 @@ export class PlanRepo {
     const row = await (tx ?? this.prisma).plan.findUnique({
       where: { id },
       include: {
-        application: { select: { name: true, kind: true, catalogStatus: true, businessOwnerEmployeeId: true } },
+        application: { select: { name: true, kind: true, catalogStatus: true } },
       },
     });
 
@@ -151,11 +190,11 @@ export class PlanRepo {
           provisioningType: row.provisioningType,
           pricingModel: row.pricingModel,
           sharingPolicy: row.sharingPolicy,
+          hasAdminConsole: row.hasAdminConsole,
           applicationId: row.applicationId,
           applicationName: row.application.name,
           applicationKind: row.application.kind,
           applicationStatus: row.application.catalogStatus,
-          businessOwnerEmployeeId: row.application.businessOwnerEmployeeId,
         }
       : null;
   }
@@ -166,7 +205,7 @@ export class PlanRepo {
     const rows = await (tx ?? this.prisma).plan.findMany({
       where: { id: { in: [...ids] } },
       include: {
-        application: { select: { name: true, kind: true, catalogStatus: true, businessOwnerEmployeeId: true } },
+        application: { select: { name: true, kind: true, catalogStatus: true } },
       },
     });
 
@@ -176,11 +215,11 @@ export class PlanRepo {
       provisioningType: row.provisioningType,
       pricingModel: row.pricingModel,
       sharingPolicy: row.sharingPolicy,
+      hasAdminConsole: row.hasAdminConsole,
       applicationId: row.applicationId,
       applicationName: row.application.name,
       applicationKind: row.application.kind,
       applicationStatus: row.application.catalogStatus,
-      businessOwnerEmployeeId: row.application.businessOwnerEmployeeId,
     }));
   }
 
@@ -196,7 +235,7 @@ export class PlanRepo {
         provisioningType: true,
         revocationNote: true,
         dataLossOnRemoval: true,
-        application: { select: { name: true } },
+        application: { select: { name: true, logoUrl: true } },
       },
     });
 
@@ -205,18 +244,30 @@ export class PlanRepo {
       planName: row.name,
       applicationId: row.applicationId,
       applicationName: row.application.name,
+      applicationLogoUrl: row.application.logoUrl,
       provisioningType: row.provisioningType,
       revocationNote: row.revocationNote,
       dataLossOnRemoval: row.dataLossOnRemoval,
     }));
   }
 
-  /** The plans with these ids, as far as they exist, with the name of their application. */
-  async findSummaries(ids: readonly string[]): Promise<PlanSummary[]> {
+  /** The plans with these ids, as far as they exist, with the name and the logo of their application; `tx` reads in the caller's transaction, which sees the plans it made. */
+  async findSummaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
+    // Only the fields of a summary: a view that answers the object whole must not carry the logo it did not ask for.
+    return (await this.findSummariesWithLogo(ids, tx)).map((row) => ({
+      planId: row.planId,
+      planName: row.planName,
+      applicationId: row.applicationId,
+      applicationName: row.applicationName,
+    }));
+  }
+
+  /** The same with the logo of the application, for a view that shows it beside the name (`CT-1`). */
+  async findSummariesWithLogo(ids: readonly string[], tx?: DbTx): Promise<PlanSummaryWithLogo[]> {
     if (ids.length === 0) return [];
-    const rows = await this.prisma.plan.findMany({
+    const rows = await (tx ?? this.prisma).plan.findMany({
       where: { id: { in: [...ids] } },
-      select: { id: true, name: true, applicationId: true, application: { select: { name: true } } },
+      select: { id: true, name: true, applicationId: true, application: { select: { name: true, logoUrl: true } } },
     });
 
     return rows.map((row) => ({
@@ -224,22 +275,26 @@ export class PlanRepo {
       planName: row.name,
       applicationId: row.applicationId,
       applicationName: row.application.name,
+      applicationLogoUrl: row.application.logoUrl,
     }));
   }
 
   /**
    * The plans of the other applications in the functional group of this plan's application: what a person may already
-   * have that does the same work (`US-05-04` AC-3). Empty when the application is in no group. The first `limit` by id.
+   * have that does the same work (`US-05-04` AC-3). Empty when the application is in no group, and when its group is the fixed
+   * one that takes every application declared with none (`Khác`, by its system key, not its name): two tools there have no
+   * function in common. The first `limit` by id.
    */
   async findSimilarIds(planId: string, limit: number, tx?: DbTx): Promise<string[]> {
     const rows = await (tx ?? this.prisma).$queryRaw<{ id: string }[]>`
       SELECT other.id
         FROM plans own
         JOIN applications own_app ON own_app.id = own.application_id
+        JOIN functional_groups own_group ON own_group.id = own_app.functional_group_id
         JOIN applications other_app
           ON other_app.functional_group_id = own_app.functional_group_id AND other_app.id <> own_app.id
         JOIN plans other ON other.application_id = other_app.id
-       WHERE own.id = ${planId}::uuid AND own_app.functional_group_id IS NOT NULL
+       WHERE own.id = ${planId}::uuid AND own_group.system_key IS DISTINCT FROM 'OTHER'
        ORDER BY other.id
        LIMIT ${limit}`;
 
@@ -267,14 +322,14 @@ export class PlanRepo {
     return new Map(rows.map((row) => [row.id, row.application.vendorId]));
   }
 
-  /** The Business Owner the application of the plan has now; null when the plan does not exist. */
-  async findBusinessOwnerId(planId: string, tx?: DbTx): Promise<string | null> {
+  /** The IT Admin responsible for the application of the plan now (`QĐ-111g`); null when there is none or the plan does not exist. */
+  async findResponsibleItAdminId(planId: string, tx?: DbTx): Promise<string | null> {
     const row = await (tx ?? this.prisma).plan.findUnique({
       where: { id: planId },
-      select: { application: { select: { businessOwnerEmployeeId: true } } },
+      select: { application: { select: { responsibleItAdminEmployeeId: true } } },
     });
 
-    return row?.application.businessOwnerEmployeeId ?? null;
+    return row?.application.responsibleItAdminEmployeeId ?? null;
   }
 
   /** The same, locked `FOR SHARE` for the rest of the transaction so its kind cannot change under the caller. */
@@ -286,17 +341,36 @@ export class PlanRepo {
   }
 
   /**
+   * The same, locked `FOR UPDATE` for the rest of the transaction: two writers that decide something across the subscriptions of a
+   * plan (which one prices it) take turns, and a reader that holds the plan `FOR SHARE` waits for them.
+   */
+  async lockExclusiveLookup(tx: DbTx, id: string): Promise<PlanLookup | null> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM plans WHERE id = ${id}::uuid FOR UPDATE`;
+    if (locked.length === 0) return null;
+
+    return this.findLookup(id, tx);
+  }
+
+  /**
    * One page by application name then plan name, and the total for the same filter, from one snapshot. The revocation note
    * (up to 2000 characters a plan) is not selected: the list does not show it (`LD-05`).
    */
   async list(filter: PlanListFilter): Promise<{ items: PlanSummaryRecord[]; total: number }> {
+    const key = filter.search ? searchKey(filter.search) : '';
+    const application: Prisma.ApplicationWhereInput = {
+      ...(filter.functionalGroupId ? { functionalGroupId: filter.functionalGroupId } : {}),
+      ...(filter.status ? { catalogStatus: filter.status } : {}),
+    };
     const where: Prisma.PlanWhereInput = {
       ...(filter.applicationId ? { applicationId: filter.applicationId } : {}),
       ...(filter.provisioningType ? { provisioningType: filter.provisioningType } : {}),
+      ...(Object.keys(application).length > 0 ? { application: { is: application } } : {}),
     };
 
     return this.prisma.$transaction(
       async (tx) => {
+        // A search is text, not a pattern: a `%` or `_` in it matches itself, so the match is made in SQL with the pattern escaped.
+        if (key) where.id = { in: await this.idsMatching(tx, key) };
         const rows = await tx.plan.findMany({
           where,
           select: {
@@ -308,9 +382,12 @@ export class PlanRepo {
             controlLevel: true,
             dataLossOnRemoval: true,
             sharingPolicy: true,
+            hasAdminConsole: true,
+            referencePriceMinor: true,
+            referencePriceCurrency: true,
             createdAt: true,
             updatedAt: true,
-            application: { select: { name: true, kind: true } },
+            application: { select: { name: true, kind: true, logoUrl: true } },
           },
           orderBy: [{ application: { normalizedName: 'asc' } }, { normalizedName: 'asc' }, { id: 'asc' }],
           skip: filter.skip,
@@ -318,9 +395,11 @@ export class PlanRepo {
         });
 
         return {
-          items: rows.map(({ application, ...row }) => ({
+          items: rows.map(({ application, referencePriceMinor, referencePriceCurrency, ...row }) => ({
             ...row,
+            referencePrice: referencePriceOf({ referencePriceMinor, referencePriceCurrency }),
             applicationName: application.name,
+            applicationLogoUrl: application.logoUrl,
             applicationKind: application.kind,
           })),
           total: await tx.plan.count({ where }),
@@ -330,6 +409,16 @@ export class PlanRepo {
     );
   }
 
+  /** The plans whose own name, or the name of their application, contains the text (a search key), the text taken literally. */
+  private async idsMatching(tx: DbTx, key: string): Promise<string[]> {
+    const pattern = `%${escapeLikePattern(key)}%`;
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      SELECT p.id FROM plans p JOIN applications a ON a.id = p.application_id
+       WHERE p.normalized_name LIKE ${pattern} ESCAPE '\\' OR a.normalized_name LIKE ${pattern} ESCAPE '\\'`;
+
+    return rows.map((row) => row.id);
+  }
+
   async findProfile(planId: string, tx?: DbTx): Promise<WorkspaceProfileRecord | null> {
     const row = await (tx ?? this.prisma).planWorkspaceProfile.findUnique({
       where: { planId },
@@ -337,6 +426,34 @@ export class PlanRepo {
     });
 
     return row ? toProfile(row) : null;
+  }
+
+  /**
+   * The plans that need at least two admins at the vendor (a `K2` plan, or a `K4` plan with an admin console, `QĐ-110k`, `R-53`) and have a subscription
+   * in use: the ones whose flag a reader of the subscriptions sees. One read.
+   */
+  async findIdsNeedingVendorAdminsInUse(tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).plan.findMany({
+      where: {
+        OR: [{ provisioningType: 'K2' }, { provisioningType: 'K4', hasAdminConsole: true }],
+        subscriptions: { some: { status: 'ACTIVE' } },
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => row.id);
+  }
+
+  /** The profiles of these plans in one read, by plan; a plan with none is absent. */
+  async findProfilesOf(planIds: readonly string[], tx?: DbTx): Promise<Map<string, WorkspaceProfileRecord>> {
+    if (planIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).planWorkspaceProfile.findMany({
+      where: { planId: { in: [...planIds] } },
+      include: { members: true },
+    });
+
+    return new Map(rows.map((row) => [row.planId, toProfile(row)]));
   }
 
   /** The workspaces these people own or administer, one row for each person and plan, the primary owner first (one read, `US-03-04` AC-28). */
@@ -383,6 +500,8 @@ export class PlanRepo {
       emergencyOccupiesSeat: profile.emergencyAccount?.occupiesSeat ?? null,
       emergencyHolderEmployeeId: profile.emergencyAccount?.holderEmployeeId ?? null,
       emergencyLastReviewedOn: profile.emergencyAccount ? toDateColumn(profile.emergencyAccount.lastReviewedOn) : null,
+      ownerAccountEmail: profile.ownerAccountEmail,
+      adminNote: profile.adminNote,
     };
     await tx.planWorkspaceProfile.upsert({
       where: { planId: profile.planId },
@@ -400,5 +519,16 @@ export class PlanRepo {
     const stored = await this.findProfile(profile.planId, tx);
 
     return stored as WorkspaceProfileRecord;
+  }
+
+  /** The name of each of these plans as a sentence names it ("application – plan"), by id, in one read; an id that does not exist is absent. */
+  async namesOf(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).plan.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, name: true, application: { select: { name: true } } },
+    });
+
+    return new Map(rows.map((row) => [row.id, applicationPlanName(row.application.name, row.name)]));
   }
 }

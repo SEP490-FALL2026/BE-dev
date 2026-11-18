@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import { fromDateColumn } from '../../../core/business-date';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { requestPolicyJson } from '../access-request/access-request.json';
-import { hasSpendStep } from '../access-request/access-request.policy';
+import { hasAssessmentStep, hasSpendStep } from '../access-request/access-request.policy';
 import type { NeedStepState, ReadableNeedWaitingReason } from '../access-request/access-request.types';
+import { needStepOfGroup } from '../group-request/group-withdrawal.policy';
 import { needStepOf } from './my-requests.policy';
-import type { MyRequestFilter, MyRequestRow, SentState } from './my-requests.types';
+import type { MyRequestFilter, MyRequestRow, RequestedSoftware, RequestScope, SentState } from './my-requests.types';
 
 /** What a row of the list is read as: the columns of the summary, the first person it is for, how many there are, the need steps. */
 const SELECT_ROW = {
@@ -13,8 +15,13 @@ const SELECT_ROW = {
   type: true,
   branch: true,
   state: true,
+  requesterEmployeeId: true,
+  departmentId: true,
+  routingMode: true,
+  oneStepReason: true,
   planId: true,
   termMonths: true,
+  expectedEndDate: true,
   submittedAt: true,
   updatedAt: true,
   withdrawalRequestedAt: true,
@@ -23,6 +30,8 @@ const SELECT_ROW = {
   policy: true,
   beneficiaries: { select: { employeeId: true }, orderBy: { position: 'asc' }, take: 1 },
   _count: { select: { beneficiaries: true } },
+  // Only a request for a group reads them: the same rule as its withdrawal judges its people by.
+  lines: { select: { state: true, needStepId: true } },
   steps: {
     where: { kind: 'NEED' },
     select: { id: true, state: true, assigneeEmployeeId: true, waitingReason: true },
@@ -37,18 +46,39 @@ function toRow(row: Row): MyRequestRow {
     throw new Error(`The request ${row.id} has not been sent: it is a draft, not a row of the list.`);
   const step = needStepOf(row.steps);
   const isGroup = row.type === 'GROUP_GRANT';
+  const policy = requestPolicyJson.decode(row.policy);
 
   return {
     id: row.id,
     type: row.type,
+    routing: {
+      mode: row.routingMode,
+      oneStepReason: row.oneStepReason as import('../access-request/routing.policy').OneStepReason | null,
+    },
     branch: row.branch,
     // The filter of the page has no draft among its states.
     state: row.state as SentState,
+    requesterEmployeeId: row.requesterEmployeeId,
+    departmentId: row.departmentId,
     planId: row.planId,
     termMonths: row.termMonths,
+    expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
     submittedAt: row.submittedAt,
     updatedAt: row.updatedAt,
-    hasSpendStep: hasSpendStep(requestPolicyJson.decode(row.policy)),
+    hasSpendStep: hasSpendStep(policy),
+    hasAssessmentStep: hasAssessmentStep(policy),
+    withdrawalNeedStep: isGroup
+      ? needStepOfGroup(
+          row.steps.map((s) => ({
+            id: s.id,
+            state: s.state as NeedStepState,
+            assigneeEmployeeId: s.assigneeEmployeeId,
+          })),
+          { state: step.state as NeedStepState },
+          row.lines,
+          row.requesterEmployeeId,
+        )
+      : (step.state as NeedStepState),
     beneficiaryEmployeeId: isGroup ? null : (row.beneficiaries[0]?.employeeId ?? null),
     lineCount: row._count.beneficiaries,
     needStepId: step.id,
@@ -61,13 +91,13 @@ function toRow(row: Row): MyRequestRow {
   };
 }
 
-/** The requests the caller sent, as a list reads them. Reads only: it takes no lock and writes nothing. */
+/** The requests of a scope (the caller's own, a department's, what a role oversees), as a list reads them. Reads only, no lock. */
 @Injectable()
 export class MyRequestsRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * One page of the requests the person sent, the newest first and then by id, and how many there are for the same filter. The page
+   * One page of the requests of the scope, the newest first and then by id, and how many there are for the same filter. The page
    * and the count share one snapshot (RepeatableRead), so a request sent meanwhile cannot make the total disagree with the page.
    * Only requests that were sent are read: the state is always one of `states`, which has no draft.
    */
@@ -90,9 +120,25 @@ export class MyRequestsRepo {
     return { rows: rows.map(toRow), total };
   }
 
-  /** The count of the requests the person sent for the same filter. */
+  /** The count of the requests of the scope for the same filter. */
   async countOf(filter: Omit<MyRequestFilter, 'skip' | 'take'>): Promise<number> {
     return this.prisma.accessRequest.count({ where: whereOf(filter) });
+  }
+
+  /**
+   * What each of these Requests asks for, by id, in one read: the plan, and the name of the software proposed when it is not in the catalog (or the plan is
+   * not linked yet). A Request that does not exist is absent; the notification text names a Request by it.
+   */
+  async softwareOf(requestIds: readonly string[]): Promise<Map<string, RequestedSoftware>> {
+    if (requestIds.length === 0) return new Map();
+    const rows = await this.prisma.accessRequest.findMany({
+      where: { id: { in: [...requestIds] } },
+      select: { id: true, planId: true, proposal: { select: { softwareName: true } } },
+    });
+
+    return new Map(
+      rows.map((row) => [row.id, { planId: row.planId, proposedName: row.proposal?.softwareName ?? null }]),
+    );
   }
 
   /** What the person who proposed software that is not in the catalog called it, by request. */
@@ -112,12 +158,52 @@ function whereOf(filter: Omit<MyRequestFilter, 'skip' | 'take'>): Prisma.AccessR
     ...(filter.from === undefined ? {} : { gte: filter.from }),
     ...(filter.to === undefined ? {} : { lt: filter.to }),
   };
+  const and: Prisma.AccessRequestWhereInput[] = [scopeOf(filter.scope)];
+  if (filter.employeeId !== undefined) and.push(sentByOrFor(filter.employeeId));
+  if (filter.departmentId !== undefined) and.push({ departmentId: filter.departmentId });
+  if (filter.oneStep === true) and.push({ routingMode: 'ONE_STEP' });
+  if (filter.reserveUsed === true) and.push({ reserveConfirmations: { some: {} } });
 
   return {
-    // The one condition of whose they are: the person sent them. Nothing else of the caller widens or narrows it.
-    requesterEmployeeId: filter.requesterEmployeeId,
+    AND: and,
     state: { in: [...filter.states] },
     ...(filter.type === undefined ? {} : { type: filter.type }),
     ...(Object.keys(sentAt).length === 0 ? {} : { submittedAt: sentAt }),
   };
+}
+
+const sentByOrFor = (employeeId: string): Prisma.AccessRequestWhereInput => ({
+  OR: [{ requesterEmployeeId: employeeId }, { beneficiaries: { some: { employeeId } } }],
+});
+
+/** The one condition of whose the requests are; the narrowing of the filter only ever makes it smaller. */
+function scopeOf(scope: RequestScope): Prisma.AccessRequestWhereInput {
+  switch (scope.kind) {
+    case 'SENT_BY':
+      return { requesterEmployeeId: scope.employeeId };
+    case 'FOR':
+      return { beneficiaries: { some: { employeeId: scope.employeeId } } };
+    case 'SENT_BY_OR_FOR':
+      return sentByOrFor(scope.employeeId);
+    case 'DEPARTMENT':
+      return { departmentId: scope.departmentId };
+    case 'OVERSIGHT':
+      return oversightOf(scope);
+  }
+}
+
+/** Every request; else those a spend step was opened on, and those whose spend was approved, for the roles the caller holds. */
+function oversightOf(scope: Extract<RequestScope, { kind: 'OVERSIGHT' }>): Prisma.AccessRequestWhereInput {
+  if (scope.all) return {};
+  const any: Prisma.AccessRequestWhereInput[] = [];
+  if (scope.spendStepOpened) any.push({ steps: { some: { kind: 'SPEND_APPROVAL' } } });
+  if (scope.spendApproved) {
+    any.push(
+      { spendDecisions: { some: { decision: 'APPROVED' } } },
+      { lines: { some: { decisions: { some: { stage: 'SPEND', decision: 'APPROVED' } } } } },
+    );
+  }
+
+  // A scope that opens nothing reads nothing: the guard of the route never lets such a caller in.
+  return any.length === 0 ? { id: { in: [] } } : { OR: any };
 }

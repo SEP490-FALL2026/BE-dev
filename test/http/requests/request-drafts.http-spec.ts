@@ -10,13 +10,12 @@ const PLAN = '8a4d7c1e-2b3f-4c5d-9e6f-0a1b2c3d4e5f';
 const EMPLOYEE = '5c6d7e8f-9a0b-4c1d-8e2f-3a4b5c6d7e8f';
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 const DRAFTS = '/api/v1/access-requests/drafts';
-const INDIVIDUAL = { kind: 'INDIVIDUAL', planId: PLAN, businessReason: 'Design the new brand', termMonths: 6 };
+const INDIVIDUAL = { kind: 'INDIVIDUAL', planId: PLAN, businessReason: 'Design the new brand' };
 const GROUP = {
   kind: 'GROUP',
   planId: PLAN,
   lines: [{ employeeId: EMPLOYEE }],
   businessReason: 'The new brand needs the shared workspace',
-  termMonths: 6,
 };
 const SERVICE_ACCOUNT = {
   kind: 'SERVICE_ACCOUNT',
@@ -24,7 +23,6 @@ const SERVICE_ACCOUNT = {
   purpose: 'Build bot of the CI pipeline',
   expectedIdentifier: 'ci-bot-2',
   businessReason: 'Run the builds of the product',
-  termMonths: 1,
 };
 
 /**
@@ -57,19 +55,22 @@ describe('the drafts of a request, and the Super Admin (e2e, no database)', () =
   });
 
   it.each([
-    ['no kind', { planId: PLAN, businessReason: 'x', termMonths: 6 }],
-    ['a kind that is none of the three', { ...INDIVIDUAL, kind: 'RENEWAL' }],
-    ['a draft of an individual with no reason', { kind: 'INDIVIDUAL', planId: PLAN, termMonths: 6 }],
+    ['no kind', { planId: PLAN, businessReason: 'x' }],
+    ['a kind that is none of the two', { ...INDIVIDUAL, kind: 'RENEWAL' }],
+    ['a draft of an individual with no reason', { kind: 'INDIVIDUAL', planId: PLAN }],
     ['a draft of an individual with a plan that is not an id', { ...INDIVIDUAL, planId: 'not-an-id' }],
-    ['a draft of an individual with a term of no months', { ...INDIVIDUAL, termMonths: 0 }],
+    [
+      'a draft of an individual with an end date, which is not asked any more',
+      { ...INDIVIDUAL, expectedEndDate: '2027-03-31' },
+    ],
+    ['a draft of an individual with months that are not a whole number', { ...INDIVIDUAL, termMonths: 2.5 }],
     [
       'a draft of an individual with an amount, which is nobody’s to give',
       { ...INDIVIDUAL, amount: { amount: '1', currency: 'VND' } },
     ],
     ['a draft of a group with no people', { ...GROUP, lines: [] }],
     ['a draft of a group with a person that is not an id', { ...GROUP, lines: [{ employeeId: 'x' }] }],
-    ['a draft of a service account with no purpose', { ...SERVICE_ACCOUNT, purpose: undefined }],
-    ['a draft of a service account with no identifier', { ...SERVICE_ACCOUNT, expectedIdentifier: undefined }],
+    ['a draft of a service account, a kind that is gone (QĐ-110m)', SERVICE_ACCOUNT],
     ['a field the route does not know', { ...INDIVIDUAL, costCenterId: ID }],
   ])('refuses saving %s with 422', async (_name, payload) => {
     const response = await request(app.getHttpServer())
@@ -124,10 +125,7 @@ describe('the drafts of a request, and the Super Admin (e2e, no database)', () =
   const sending: Array<[string, (agent: Agent) => request.Test]> = [
     [
       'accessRequestSubmit',
-      (agent) =>
-        agent
-          .post('/api/v1/access-requests')
-          .send({ planId: PLAN, businessReason: 'Design the new brand', termMonths: 6 }),
+      (agent) => agent.post('/api/v1/access-requests').send({ planId: PLAN, businessReason: 'Design the new brand' }),
     ],
     [
       'accessRequestPropose',
@@ -138,14 +136,9 @@ describe('the drafts of a request, and the Super Admin (e2e, no database)', () =
           purpose: 'Whiteboards for design reviews',
           dataDescription: 'Product design boards',
           expectedUsers: 5,
-          termMonths: 6,
         }),
     ],
     ['groupRequestSubmit', (agent) => agent.post('/api/v1/group-requests').send({ ...GROUP, kind: undefined })],
-    [
-      'accessRequestServiceAccountSubmit',
-      (agent) => agent.post('/api/v1/access-requests/service-accounts').send({ ...SERVICE_ACCOUNT, kind: undefined }),
-    ],
     [
       'accessRequestRenewalSubmit',
       (agent) =>

@@ -24,15 +24,11 @@ describe('the draft of a paid request (spec L.1, F27)', () => {
   });
 
   describe('what it becomes', () => {
-    it('is a request of one person, a request for a group or a request for a service account', () => {
-      expect(REQUEST_TYPE_OF_KIND).toEqual({
-        INDIVIDUAL: 'GRANT',
-        GROUP: 'GROUP_GRANT',
-        SERVICE_ACCOUNT: 'SERVICE_ACCOUNT',
-      });
+    it('is a request of one person or a request for a group; a service account is no kind of draft any more (QĐ-110m)', () => {
+      expect(REQUEST_TYPE_OF_KIND).toEqual({ INDIVIDUAL: 'GRANT', GROUP: 'GROUP_GRANT' });
       expect(kindOfType('GRANT')).toBe('INDIVIDUAL');
       expect(kindOfType('GROUP_GRANT')).toBe('GROUP');
-      expect(kindOfType('SERVICE_ACCOUNT')).toBe('SERVICE_ACCOUNT');
+      expect(kindOfType('SERVICE_ACCOUNT')).toBeNull();
     });
 
     it('is never a renewal', () => {
@@ -41,9 +37,8 @@ describe('the draft of a paid request (spec L.1, F27)', () => {
   });
 
   describe('how many people it is for', () => {
-    it('is one for a request of one person and for a service account', () => {
+    it('is one for a request of one person', () => {
       expect(beneficiaryCountOf({ kind: 'INDIVIDUAL' })).toBe(1);
-      expect(beneficiaryCountOf({ kind: 'SERVICE_ACCOUNT' })).toBe(1);
     });
 
     it('is the people named of a group, each once', () => {

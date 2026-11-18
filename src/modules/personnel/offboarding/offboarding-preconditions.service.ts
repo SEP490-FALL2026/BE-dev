@@ -211,10 +211,10 @@ export class OffboardingPreconditions {
       lastWorkingDay: input.lastWorkingDay,
       accessBlockMode: input.accessBlockMode,
       employee: { status: held.employee.status, workState: held.employee.workState },
-      grounds: input.grounds,
-      pendingTransfer: held.pending && { effectiveOn: held.pending.effectiveOn },
+      groundsNote: input.groundsNote,
+      pendingTransfer: held.pending && { id: held.pending.id, effectiveOn: held.pending.effectiveOn },
       cancelPendingTransfer: input.cancelPendingTransfer === true,
-      namedAsSuccessor: await this.repo.isNamedSuccessorOfPendingTransfer(tx, input.employeeId),
+      namedAsSuccessor: await this.repo.pendingTransferNaming(tx, input.employeeId),
       // Only a person with a placement in force heads a department (an unplaced one never does), so there is a department to judge.
       successor:
         seen.leavesAsHead && seen.before

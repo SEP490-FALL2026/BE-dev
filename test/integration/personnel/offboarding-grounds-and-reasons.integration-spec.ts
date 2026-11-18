@@ -1,3 +1,4 @@
+import { groundsNoteOfBasis } from '../../../src/modules/personnel/personnel-grounds.policy';
 import { recordAsSuperAdmin, SUPER_ADMIN_EVENT_BASIS } from '../../support/super-admin-event-runner';
 import { OffboardingHarness, type CaseWire } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
@@ -37,33 +38,41 @@ describe('the basis and the reasons of a departure (integration, real PostgreSQL
 
   it('keeps the basis of a move of the last working day in the change and in the Audit Trail (AC-14)', async () => {
     const wire = await h.recordedCase(await leaver());
-    const basis = { type: 'WRITTEN_DIRECTIVE', reference: 'CT-77/2026', issuer: 'Board', issuedOn: '2026-10-21' };
+    const basis = 'Chỉ thị số CT-77/2026 của Ban giám đốc';
 
     await h
-      .changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: 'Bàn giao kéo dài', grounds: basis })
+      .changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: 'Bàn giao kéo dài', groundsNote: basis })
       .expect(200);
 
-    expect(await detailOf(wire.id, 'LAST_DAY_CHANGED')).toMatchObject({ grounds: basis });
+    expect(await detailOf(wire.id, 'LAST_DAY_CHANGED')).toMatchObject({ grounds: { reference: basis } });
     const [event] = await h.auditEventsOf('OFFBOARDING_CASE.LAST_DAY_CHANGED', wire.id);
-    expect(event.after).toMatchObject({ lastWorkingDay: h.day(20), reason: 'Bàn giao kéo dài', grounds: basis });
+    expect(event.after).toMatchObject({
+      lastWorkingDay: h.day(20),
+      reason: 'Bàn giao kéo dài',
+      grounds: { reference: basis },
+    });
   });
 
   it('keeps the basis of a cancellation in the change and in the Audit Trail (AC-15)', async () => {
     const wire = await h.recordedCase(await leaver());
 
-    await h.cancelCase(wire.id, { reason: 'Ở lại', grounds: h.grounds }).expect(200);
+    await h.cancelCase(wire.id, { reason: 'Ở lại', groundsNote: h.groundsNote }).expect(200);
 
-    expect(await detailOf(wire.id, 'CANCELLED')).toMatchObject({ grounds: h.grounds });
+    expect(await detailOf(wire.id, 'CANCELLED')).toMatchObject({ grounds: { reference: h.groundsNote } });
     const [event] = await h.auditEventsOf('OFFBOARDING_CASE.CANCELLED', wire.id);
-    expect(event.after).toMatchObject({ state: 'CANCELLED', reason: 'Ở lại', grounds: h.grounds });
+    expect(event.after).toMatchObject({
+      state: 'CANCELLED',
+      reason: 'Ở lại',
+      grounds: { reference: h.groundsNote },
+    });
   });
 
   it('refuses the code of a notice as the basis of a move and of a cancellation, and changes nothing', async () => {
     const wire = await h.recordedCase(await leaver());
-    const notice = { ...h.grounds, reference: 'BM09-2026-000123' };
+    const notice = 'BM09-2026-000123';
 
-    const moved = await h.changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: 'x', grounds: notice });
-    const cancelled = await h.cancelCase(wire.id, { reason: 'x', grounds: notice });
+    const moved = await h.changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: 'x', groundsNote: notice });
+    const cancelled = await h.cancelCase(wire.id, { reason: 'x', groundsNote: notice });
 
     expect([moved, cancelled].map((response) => [response.status, h.codeOf(response)])).toEqual([
       [422, 'OFFBOARDING_CASE.GROUNDS_IS_NOTICE'],
@@ -77,9 +86,9 @@ describe('the basis and the reasons of a departure (integration, real PostgreSQL
     const wire = await h.recordedCase(await leaver());
 
     const responses = [
-      await h.changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: 'x', grounds: undefined }),
+      await h.changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: 'x', groundsNote: undefined }),
       await h.changeLastDay(wire.id, { lastWorkingDay: h.day(20), reason: undefined }),
-      await h.cancelCase(wire.id, { reason: 'x', grounds: undefined }),
+      await h.cancelCase(wire.id, { reason: 'x', groundsNote: undefined }),
       await h.cancelCase(wire.id, { reason: '  ' }),
     ];
 
@@ -165,8 +174,12 @@ describe('the basis and the reasons of a departure (integration, real PostgreSQL
         reason: 'The Super Admin stays',
       });
 
-      expect(await detailOf(recorded.recordId, 'LAST_DAY_CHANGED')).toMatchObject({ grounds: SUPER_ADMIN_EVENT_BASIS });
-      expect(await detailOf(recorded.recordId, 'CANCELLED')).toMatchObject({ grounds: SUPER_ADMIN_EVENT_BASIS });
+      expect(await detailOf(recorded.recordId, 'LAST_DAY_CHANGED')).toMatchObject({
+        grounds: { reference: groundsNoteOfBasis(SUPER_ADMIN_EVENT_BASIS) },
+      });
+      expect(await detailOf(recorded.recordId, 'CANCELLED')).toMatchObject({
+        grounds: { reference: groundsNoteOfBasis(SUPER_ADMIN_EVENT_BASIS) },
+      });
       const read = h.dataOf<CaseWire>(await h.readCase(recorded.recordId).expect(200));
       expect(read.state).toBe('CANCELLED');
     });

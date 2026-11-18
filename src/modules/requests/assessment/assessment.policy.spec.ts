@@ -1,22 +1,22 @@
 import type { AssessmentFields, Quote } from '../access-request/assessment-record.types';
 import {
   actsForAssignee,
+  assessmentScopeOf,
   canLinkCatalogPlan,
   checkAssessor,
   internalRegistrationBasis,
   judgeCompletion,
   missingFields,
+  monthlyPriceOfQuote,
   registeredShapeOf,
 } from './assessment.policy';
 
 const quote: Quote = {
   unitPrice: { amountMinor: 800n, currency: 'USD' },
+  originalPrice: null,
   billingCycle: 'MONTHLY',
   validFrom: '2026-10-01',
   validUntil: null,
-  commitmentMonths: null,
-  paymentFrequency: null,
-  firstPaymentOn: null,
 };
 const complete = (over: Partial<AssessmentFields> = {}): AssessmentFields => ({
   classification: 'PAID_LICENSED',
@@ -93,7 +93,7 @@ describe('completing the assessment of paid or licensed software (US-05-06)', ()
   });
 
   describe('highly sensitive data (AC-7)', () => {
-    it('needs the opinion of the Business Owner, or the word that there is none with its reason', () => {
+    it('needs the opinion that was obtained, or the word that there is none with its reason', () => {
       expect(missingFields(complete({ dataSensitivity: 'HIGH' }))).toEqual(['opinion.status']);
       expect(missingFields(complete({ dataSensitivity: 'HIGH', opinionStatus: 'NOT_AVAILABLE' }))).toEqual([
         'opinion.note',
@@ -233,12 +233,125 @@ describe('registering internal software for a proposal (US-05-20 AC-3 -> AC-5, A
     expect(registeredShapeOf(false, { ...sent, chain: [...sent.chain] })).toEqual({
       branch: 'INTERNAL_FREE',
       policy: {
-        version: 1,
+        version: 2,
         branch: 'INTERNAL_FREE',
         chain: ['NEED', 'IT_ASSESSMENT', 'IT_EXECUTION'],
         slaWorkingDays: 2,
       },
       state: 'AWAITING_EXECUTION',
     });
+  });
+});
+
+describe('completing the assessment of a plan the catalog lacks of software it has (case B, short: QĐ-111a)', () => {
+  const planOnly = (over: Partial<AssessmentFields> = {}) => complete({ classification: null, ...over });
+  const bare = (over: Partial<AssessmentFields> = {}): AssessmentFields => ({ ...empty, ...over });
+
+  it('is complete with the plan alone: the name, the kind, the terms and the quote, nothing about the application', () => {
+    const fields = bare({
+      plannedPlanName: 'Business',
+      provisioningType: 'K2',
+      termsSummary: 'Annual terms',
+      quote,
+    });
+
+    expect(judgeCompletion(fields, 'PLAN_ONLY')).toEqual({ kind: 'OK' });
+    // The same fields lack the whole application when it is asked in full.
+    expect(judgeCompletion({ ...fields, classification: 'PAID_LICENSED' }, 'FULL')).toMatchObject({
+      kind: 'INCOMPLETE',
+    });
+  });
+
+  it('names what the plan still lacks, in the order a screen shows it', () => {
+    expect(judgeCompletion(bare(), 'PLAN_ONLY')).toEqual({
+      kind: 'INCOMPLETE',
+      missing: ['plannedPlanName', 'provisioningType', 'termsSummary', 'quote'],
+    });
+  });
+
+  it('asks nothing of the application: no vendor, flags, methods, sensitivity, opinion, control level or classification', () => {
+    expect(missingFields(planOnly({ vendorName: null, memberExport: null, sso: null }), 'PLAN_ONLY')).toEqual([]);
+    expect(
+      missingFields(planOnly({ dataSensitivity: 'HIGH', opinionStatus: null, controlLevel: null }), 'PLAN_ONLY'),
+    ).toEqual([]);
+    expect(judgeCompletion(planOnly({ classification: null }), 'PLAN_ONLY')).toEqual({ kind: 'OK' });
+  });
+
+  it('asks whether the plan has an admin console of the vendor for a K4 plan only (R-53)', () => {
+    expect(missingFields(planOnly({ provisioningType: 'K4', adminConsole: null }), 'PLAN_ONLY')).toEqual([
+      'adminConsole',
+    ]);
+    expect(missingFields(planOnly({ provisioningType: 'K4', adminConsole: false }), 'PLAN_ONLY')).toEqual([]);
+    expect(missingFields(planOnly({ provisioningType: 'K2', adminConsole: null }), 'PLAN_ONLY')).toEqual([]);
+  });
+
+  it('is never completed as internal software, whatever the classification says: the application is already in the catalog', () => {
+    expect(judgeCompletion(planOnly({ classification: 'INTERNAL' }), 'PLAN_ONLY')).toEqual({ kind: 'OK' });
+  });
+
+  it('still refuses at the gate a plan the IT Admin concluded cannot be controlled', () => {
+    expect(judgeCompletion(planOnly({ controlLevel: 'UNCONTROLLABLE' }), 'PLAN_ONLY')).toEqual({
+      kind: 'UNCONTROLLABLE',
+    });
+  });
+
+  it('is not completed for a plan of internal software, whatever the IT Admin filled: its plans are free, so it would end paid and go to the spending approver (QĐ-111d, QĐ-103p, B2A-R3)', () => {
+    expect(judgeCompletion(planOnly(), 'PLAN_ONLY', true)).toEqual({ kind: 'FREE_PLAN' });
+    // Judged before what is missing and before the control level: nothing the IT Admin fills makes it completable.
+    expect(judgeCompletion(bare(), 'PLAN_ONLY', true)).toEqual({ kind: 'FREE_PLAN' });
+    expect(judgeCompletion(planOnly({ controlLevel: 'UNCONTROLLABLE' }), 'PLAN_ONLY', true)).toEqual({
+      kind: 'FREE_PLAN',
+    });
+    expect(judgeCompletion(planOnly(), 'PLAN_ONLY', false)).toEqual({ kind: 'OK' });
+  });
+
+  it('leaves the whole assessment as it was: internal software there is the classification, completed by registering it', () => {
+    expect(judgeCompletion(complete({ classification: 'INTERNAL' }), 'FULL', true)).toEqual({
+      kind: 'INTERNAL_BY_REGISTRATION',
+    });
+    expect(judgeCompletion(complete(), 'FULL', true)).toEqual({ kind: 'OK' });
+  });
+
+  it('takes the short shape as the default of nothing: FULL stays what it was', () => {
+    expect(judgeCompletion(complete())).toEqual(judgeCompletion(complete(), 'FULL'));
+    expect(missingFields(empty)).toEqual(missingFields(empty, 'FULL'));
+  });
+
+  it('never registers internal software for a short proposal: its application is not new', () => {
+    expect(
+      internalRegistrationBasis({ classification: 'INTERNAL', dataSensitivity: 'LOW' }, 'LOW', 'PLAN_ONLY'),
+    ).toEqual({
+      kind: 'NOT_INTERNAL',
+    });
+  });
+});
+
+describe('the scope of the assessment of a proposal', () => {
+  it('is the plan alone when the proposal names an application of the catalog, the whole otherwise', () => {
+    expect(assessmentScopeOf({ existingApplicationId: 'app-1' })).toBe('PLAN_ONLY');
+    expect(assessmentScopeOf({ existingApplicationId: null })).toBe('FULL');
+  });
+});
+
+describe('QĐ-113a: the monthly price a quote gives the reference price of the plan', () => {
+  const quoteOf = (amountMinor: bigint, billingCycle: Quote['billingCycle']): Quote => ({
+    ...quote,
+    unitPrice: { amountMinor, currency: 'VND' },
+    billingCycle,
+  });
+
+  it('keeps a monthly quote as it is', () => {
+    expect(monthlyPriceOfQuote(quoteOf(500_000n, 'MONTHLY'))).toEqual({ amountMinor: 500_000n, currency: 'VND' });
+  });
+
+  it('divides a quarterly quote by 3 and an annual one by 12', () => {
+    expect(monthlyPriceOfQuote(quoteOf(1_500_000n, 'QUARTERLY')).amountMinor).toBe(500_000n);
+    expect(monthlyPriceOfQuote(quoteOf(6_000_000n, 'ANNUAL')).amountMinor).toBe(500_000n);
+  });
+
+  it('rounds up to the dong', () => {
+    expect(monthlyPriceOfQuote(quoteOf(1_000_000n, 'QUARTERLY')).amountMinor).toBe(333_334n);
+    expect(monthlyPriceOfQuote(quoteOf(1_000_001n, 'ANNUAL')).amountMinor).toBe(83_334n);
+    expect(monthlyPriceOfQuote(quoteOf(0n, 'ANNUAL')).amountMinor).toBe(0n);
   });
 });

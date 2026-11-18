@@ -7,14 +7,26 @@ import {
   CurrencyNotSupportedError,
   MoneyOutOfRangeError,
   MoneyScaleExceededError,
-  ReportingCurrencyNotSupportedError,
 } from '../../../core/money/money.errors';
-import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import {
   SubscriptionApplicationRetiredError,
+  SubscriptionPriceNotVndError,
+  SubscriptionBillingCycleUnsupportedError,
+  SubscriptionBillingLongerThanCommitmentError,
+  SubscriptionCommitmentTermNotAllowedError,
+  SubscriptionCommitmentTermRequiredError,
+  SubscriptionK1MonthlyOnlyError,
+  SubscriptionK4PerpetualOnlyError,
+  SubscriptionPrimaryConflictError,
+  SubscriptionStaleError,
+  SubscriptionPrimaryNotEligibleError,
+  SubscriptionResponsibleNotItAdminError,
+  SubscriptionResponsibleRequiredError,
+  SubscriptionVendorAdminsRequiredError,
   SubscriptionDatesInvalidError,
+  SubscriptionDuplicatePlanError,
   SubscriptionNotFoundError,
-  SubscriptionOwnerDepartmentInactiveError,
   SubscriptionPerpetualHasNoTermError,
   SubscriptionPerpetualNeedsLicensedApplicationError,
   SubscriptionPlanHasNoSubscriptionError,
@@ -39,15 +51,8 @@ export function toSubscriptionApiException(error: unknown): unknown {
   if (error instanceof SubscriptionPlanNotFoundError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PLAN_NOT_FOUND', error.message);
   }
-  if (error instanceof SubscriptionOwnerDepartmentInactiveError) {
-    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE', error.message);
-  }
   if (error instanceof SubscriptionApplicationRetiredError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.APPLICATION_RETIRED', error.message);
-  }
-  // The owner department has no Cost Center in use yet and the change would create, raise or extend what is owed (`QĐ-88a`(2)).
-  if (error instanceof FinanceSetupIncompleteError) {
-    return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
   }
   if (error instanceof SubscriptionPlanHasNoSubscriptionError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PLAN_HAS_NO_SUBSCRIPTION', error.message);
@@ -73,6 +78,63 @@ export function toSubscriptionApiException(error: unknown): unknown {
   if (error instanceof SubscriptionStillDraftError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.STILL_DRAFT', error.message, { missing: error.missing });
   }
+  if (error instanceof SubscriptionPriceNotVndError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PRICE_NOT_VND', error.message, { currency: error.currency });
+  }
+
+  // The pool of a K2 or K4 plan is one: a second live subscription is refused once the seat baseline is closed (`QĐ-104k`(3)).
+  if (error instanceof SubscriptionDuplicatePlanError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.DUPLICATE_PLAN', error.message, {
+      subscriptionIds: [...error.subscriptionIds],
+    });
+  }
+  if (error instanceof SubscriptionCommitmentTermRequiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.COMMITMENT_TERM_REQUIRED', error.message);
+  }
+  if (error instanceof SubscriptionCommitmentTermNotAllowedError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.COMMITMENT_TERM_NOT_ALLOWED', error.message);
+  }
+  if (error instanceof SubscriptionK1MonthlyOnlyError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.K1_MONTHLY_ONLY', error.message);
+  }
+  if (error instanceof SubscriptionK4PerpetualOnlyError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.K4_PERPETUAL_ONLY', error.message);
+  }
+  if (error instanceof SubscriptionBillingLongerThanCommitmentError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.BILLING_LONGER_THAN_COMMITMENT', error.message);
+  }
+  if (error instanceof SubscriptionBillingCycleUnsupportedError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.BILLING_CYCLE_UNSUPPORTED', error.message, {
+      billingCycle: error.billingCycle,
+    });
+  }
+  if (error instanceof SubscriptionVendorAdminsRequiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED', error.message, {
+      planId: error.planId,
+      given: error.given,
+      required: error.required,
+    });
+  }
+  if (error instanceof SubscriptionResponsibleRequiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.RESPONSIBLE_REQUIRED', error.message);
+  }
+  if (error instanceof SubscriptionResponsibleNotItAdminError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN', error.message);
+  }
+  if (error instanceof SubscriptionPrimaryNotEligibleError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.PRIMARY_NOT_ELIGIBLE', error.message, { reason: error.reason });
+  }
+  if (error instanceof SubscriptionStaleError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.STALE', error.message, {
+      currentUpdatedAt: error.currentUpdatedAt.toISOString(),
+    });
+  }
+  if (
+    error instanceof SubscriptionPrimaryConflictError ||
+    isUniqueViolation(error, 'subscriptions_one_primary_per_plan')
+  ) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.PRIMARY_CONFLICT', new SubscriptionPrimaryConflictError().message);
+  }
 
   const money = toMoneyApiException(error);
   if (money !== error) return money;
@@ -86,18 +148,29 @@ const example = (error: Error) => errorExampleOf(toSubscriptionApiException(erro
 export const SUBSCRIPTION_ERROR_EXAMPLES = {
   NOT_FOUND: example(new SubscriptionNotFoundError()),
   PLAN_NOT_FOUND: example(new SubscriptionPlanNotFoundError()),
-  OWNER_DEPARTMENT_INACTIVE: example(new SubscriptionOwnerDepartmentInactiveError()),
   APPLICATION_RETIRED: example(new SubscriptionApplicationRetiredError()),
-  FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   PLAN_HAS_NO_SUBSCRIPTION: example(new SubscriptionPlanHasNoSubscriptionError()),
   PERPETUAL_NEEDS_LICENSED_APPLICATION: example(new SubscriptionPerpetualNeedsLicensedApplicationError()),
   PERPETUAL_HAS_NO_TERM: example(new SubscriptionPerpetualHasNoTermError(['endDate'])),
   DATES_INVALID: example(new SubscriptionDatesInvalidError('START_AFTER_END')),
   UPDATE_EMPTY: example(new SubscriptionUpdateEmptyError()),
   QUANTITY_BELOW_OCCUPIED: example(new SubscriptionQuantityBelowOccupiedError(3, 2)),
-  STILL_DRAFT: example(new SubscriptionStillDraftError(['EXCHANGE_RATE'])),
-  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
-  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
-  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),
-  REPORTING_CURRENCY_NOT_SUPPORTED: example(new ReportingCurrencyNotSupportedError('XYZ')),
+  STILL_DRAFT: example(new SubscriptionStillDraftError(['UNIT_PRICE'])),
+  PRICE_NOT_VND: example(new SubscriptionPriceNotVndError('USD')),
+  COMMITMENT_TERM_REQUIRED: example(new SubscriptionCommitmentTermRequiredError()),
+  COMMITMENT_TERM_NOT_ALLOWED: example(new SubscriptionCommitmentTermNotAllowedError()),
+  K1_MONTHLY_ONLY: example(new SubscriptionK1MonthlyOnlyError()),
+  K4_PERPETUAL_ONLY: example(new SubscriptionK4PerpetualOnlyError()),
+  BILLING_LONGER_THAN_COMMITMENT: example(new SubscriptionBillingLongerThanCommitmentError()),
+  BILLING_CYCLE_UNSUPPORTED: example(new SubscriptionBillingCycleUnsupportedError('OTHER')),
+  RESPONSIBLE_REQUIRED: example(new SubscriptionResponsibleRequiredError()),
+  VENDOR_ADMINS_REQUIRED: example(new SubscriptionVendorAdminsRequiredError('<plan-id>', 1, 2)),
+  RESPONSIBLE_NOT_IT_ADMIN: example(new SubscriptionResponsibleNotItAdminError()),
+  PRIMARY_NOT_ELIGIBLE: example(new SubscriptionPrimaryNotEligibleError('NOT_ACTIVE')),
+  PRIMARY_CONFLICT: example(new SubscriptionPrimaryConflictError()),
+  STALE: example(new SubscriptionStaleError(new Date('2026-01-01T00:00:00.000Z'))),
+  DUPLICATE_PLAN: example(new SubscriptionDuplicatePlanError(['<subscription-id>'])),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'unitPrice')),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('unitPrice')),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ', 'originalPrice')),
 } as const;

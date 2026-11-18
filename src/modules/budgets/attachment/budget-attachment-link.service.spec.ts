@@ -17,7 +17,7 @@ interface MockAttachments {
 interface MockFacts {
   today: jest.Mock<Promise<Date>, [Date, DbTx]>;
   isSpendingApprover: jest.Mock<Promise<boolean>, [string, DbTx]>;
-  headedCostCenter: jest.Mock<Promise<string | null>, [string, Date, DbTx]>;
+  headedCostCenters: jest.Mock<Promise<string[]>, [string, Date, DbTx]>;
 }
 
 interface MockProposals {
@@ -85,7 +85,7 @@ describe('BudgetAttachmentLinkService', () => {
     facts = {
       today: jest.fn<Promise<Date>, [Date, DbTx]>().mockResolvedValue(new Date('2026-11-03')),
       isSpendingApprover: jest.fn<Promise<boolean>, [string, DbTx]>().mockResolvedValue(false),
-      headedCostCenter: jest.fn<Promise<string | null>, [string, Date, DbTx]>().mockResolvedValue('cc-1'),
+      headedCostCenters: jest.fn<Promise<string[]>, [string, Date, DbTx]>().mockResolvedValue(['cc-1']),
     };
     proposals = {
       findById: jest.fn<Promise<{ id: string; costCenterId: string } | null>, [string, DbTx]>(),

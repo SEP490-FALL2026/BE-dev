@@ -2,7 +2,6 @@ import {
   ApplicationDomainInvalidError,
   ApplicationInternalHasNoVendorError,
   ApplicationNameInvalidError,
-  ApplicationNoteInvalidError,
   ApplicationTooManyDomainsError,
   ApplicationVendorNameInvalidError,
   ApplicationVendorRequiredError,
@@ -11,29 +10,15 @@ import {
 import {
   cleanApplicationDomains,
   cleanApplicationName,
-  cleanNote,
-  isCommunicationService,
-  replacementRequired,
+  needsResponsible,
   usageCollectionDefault,
   vendorSourceOf,
 } from './application.policy';
 
 const LINE = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 
-describe('isCommunicationService (ADR-10: any "yes" of the three questions)', () => {
-  it.each([
-    [false, false, false, false],
-    [true, false, false, true],
-    [false, true, false, true],
-    [false, false, true, true],
-    [true, true, true, true],
-  ])('%s, %s, %s => %s', (messaging, calls, mailbox, flag) => {
-    expect(isCommunicationService({ personToPersonMessaging: messaging, callsOrMeetings: calls, mailbox })).toBe(flag);
-  });
-});
-
 describe('usageCollectionDefault (BR-06.2)', () => {
-  it('is NOT_COLLECTED for a communication service and unset otherwise', () => {
+  it('is NOT_COLLECTED for a communication service (the group Liên lạc, QĐ-111e) and unset otherwise', () => {
     expect(usageCollectionDefault(true)).toBe('NOT_COLLECTED');
     expect(usageCollectionDefault(false)).toBeNull();
   });
@@ -62,17 +47,6 @@ describe('cleanApplicationDomains', () => {
     expect(() => cleanApplicationDomains(Array.from({ length: 21 }, (_, index) => `d${index}.example.com`))).toThrow(
       ApplicationTooManyDomainsError,
     );
-  });
-});
-
-describe('cleanNote', () => {
-  it('is null for nothing or blanks, trimmed text otherwise, and refuses more than 1000 characters', () => {
-    expect(cleanNote(undefined)).toBeNull();
-    expect(cleanNote(null)).toBeNull();
-    expect(cleanNote('   ')).toBeNull();
-    expect(cleanNote('  có bình luận   trên ticket ')).toBe('có bình luận trên ticket');
-    expect(cleanNote('n'.repeat(1000))).toHaveLength(1000);
-    expect(() => cleanNote('n'.repeat(1001))).toThrow(ApplicationNoteInvalidError);
   });
 });
 
@@ -108,12 +82,19 @@ describe('vendorSourceOf', () => {
   });
 });
 
-describe('replacementRequired (US-04-06: the flag is read from the status, never stored)', () => {
-  it('AC-1, AC-2: a Business Owner who has left needs replacing', () => {
-    expect(replacementRequired('TERMINATED')).toBe(true);
+describe('needsResponsible (QĐ-111g, US-04-06: the flag is read from the account, never stored)', () => {
+  const usable = new Set(['it-1', 'it-2']);
+
+  it('is true when nobody is responsible', () => {
+    expect(needsResponsible(null, usable)).toBe(true);
   });
 
-  it('AC-6: one who is still working does not, whatever department they moved to', () => {
-    expect(replacementRequired('ACTIVE')).toBe(false);
+  it('is true when the responsible person is no longer a usable IT Admin (left, locked, lost the role)', () => {
+    expect(needsResponsible('gone', usable)).toBe(true);
+    expect(needsResponsible('it-1', new Set())).toBe(true);
+  });
+
+  it('is false while the responsible person is a usable IT Admin', () => {
+    expect(needsResponsible('it-2', usable)).toBe(false);
   });
 });

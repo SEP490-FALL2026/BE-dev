@@ -283,7 +283,7 @@ describe('budget version attachments (integration, real PostgreSQL)', () => {
     await h.uploaded(SAMPLE_PDF, h.finance, { versionId: version.id });
   });
 
-  it('keeps import and documents apart: a spreadsheet attached to a version creates no line (US-06-09 AC-24)', async () => {
+  it('keeps documents apart from figures: a spreadsheet attached to a version creates no line (US-06-09 AC-24)', async () => {
     const { version } = await waiting();
     const lines = async () =>
       Number(
@@ -297,10 +297,6 @@ describe('budget version attachments (integration, real PostgreSQL)', () => {
 
     await h.uploaded(SAMPLE_XLSX, h.finance, { versionId: version.id });
     expect(await lines()).toBe(before);
-
-    const csv = ['cost_center_code,description,amount', `${version.costCenter.code},Imported one,1000`].join('\n');
-    await h.importLines(version.id, csv).expect(201);
-    expect(await lines()).toBe(before + 1);
   });
 
   /** A second connection discards the file in a transaction that is still open when the complete reaches its row. */

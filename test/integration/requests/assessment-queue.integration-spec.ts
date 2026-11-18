@@ -4,6 +4,7 @@ import type { ApiAccount } from '../../support/api-accounts';
 import { PgRelay } from '../../support/pg-relay';
 import { dataStatements, QueryCounter, tablesOf } from '../../support/query-count';
 import { AccessRequestWire, Department, Person, RequestHarness } from '../../support/request-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 const h = new RequestHarness();
 
@@ -17,6 +18,8 @@ interface QueueWire {
  * IT Admin finds the proposals of the departments they work, with who holds them and how far the assessment has come, and goes on
  * with the routes of the request, which keep their rules. Nobody else reads it.
  */
+afterEach(() => jest.restoreAllMocks());
+
 describe('the proposals waiting for IT assessment (integration, real PostgreSQL)', () => {
   let relay: PgRelay;
   let counter: QueryCounter;
@@ -186,6 +189,8 @@ describe('the proposals waiting for IT assessment (integration, real PostgreSQL)
     });
 
     it('drops a proposal that is completed, refused at the gate or withdrawn', async () => {
+      // QĐ-113d: this test withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const done = await inDesign();
       const refused = await inDesign();
       const withdrawn = await inDesign();

@@ -67,7 +67,16 @@ export function checkLineCount(facts: LineCountFacts): LineCountRefusals {
 
 /** The first reason a person cannot be a line, in the order a caller should learn it; the spending approver is never a party of a Request, so they come first (`D-S21`). */
 export type LineReason =
-  'SPENDING_APPROVER' | 'OUTSIDE_DEPARTMENT' | BeneficiaryRefusal | 'HAS_ACCESS' | 'HAS_OPEN_REQUEST';
+  | 'SPENDING_APPROVER'
+  | 'HEAD_IN_GROUP'
+  | 'OUTSIDE_DEPARTMENT'
+  | BeneficiaryRefusal
+  | 'TERM_REQUIRED'
+  | 'TERM_LONG_TERM_NOT_ALLOWED'
+  | 'TERM_CONTRACT_ENDED'
+  | 'HAS_ACCESS'
+  | 'HAS_OPEN_REQUEST'
+  | 'OPEN_LIMIT_REACHED';
 
 /** What is known of one person who was named, read on the day. */
 export interface LineFacts {
@@ -82,8 +91,16 @@ export interface LineFacts {
   holdsAccess: boolean;
   /** A request for the plan is open for the person: another of their own, or a line of another group. */
   hasOpenRequest: boolean;
+  /** GH-2 (`BR-MF1-01f`, `QĐ-111h`): the person was already named in as many requests for new access this calendar week as they may. */
+  openLimitReached?: boolean;
   /** The sender heads the department and this is their own line: it asks for no email and no end day. */
-  isHeadOwnLine: boolean;
+  isDepartmentHead?: boolean;
+  /**
+   * A person with a term (a contractor, a freelancer, an intern) gets access for a term (`FR-2.8`, `INV-07`): the group gives no months
+   * (`TERM_REQUIRED`), none for a right with no end (`TERM_LONG_TERM_NOT_ALLOWED`), or their contract ended before the term begins
+   * (`TERM_CONTRACT_ENDED`, `INV-07`). Null for anybody else.
+   */
+  termRefusal: 'TERM_REQUIRED' | 'TERM_LONG_TERM_NOT_ALLOWED' | 'TERM_CONTRACT_ENDED' | null;
   /** The person holds the spending approver role: they are no party of a Request, and the reason comes before any other. */
   spendingApprover: boolean;
 }
@@ -109,6 +126,7 @@ export function checkLines(departmentId: string, people: readonly LineFacts[]): 
 
 function reasonFor(departmentId: string, person: LineFacts): LineReason | null {
   if (person.spendingApprover) return 'SPENDING_APPROVER';
+  if (person.isDepartmentHead) return 'HEAD_IN_GROUP';
   if (person.departmentId !== departmentId) return 'OUTSIDE_DEPARTMENT';
   const refusal = checkBeneficiary(
     {
@@ -116,10 +134,12 @@ function reasonFor(departmentId: string, person: LineFacts): LineReason | null {
       workEmail: person.workEmail,
       employmentType: person.employmentType,
     },
-    { skipContact: person.isHeadOwnLine },
+    { skipContact: false },
   );
   if (refusal !== null) return refusal;
+  if (person.termRefusal !== null) return person.termRefusal;
   if (person.holdsAccess) return 'HAS_ACCESS';
+  if (person.hasOpenRequest) return 'HAS_OPEN_REQUEST';
 
-  return person.hasOpenRequest ? 'HAS_OPEN_REQUEST' : null;
+  return person.openLimitReached ? 'OPEN_LIMIT_REACHED' : null;
 }

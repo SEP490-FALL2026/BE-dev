@@ -40,11 +40,11 @@ export class WithdrawalController {
 
   @Post(':id/withdraw')
   @AuthenticatedOnly()
-  @ApiOperation({ operationId: 'accessRequestWithdraw', summary: 'Withdraw a request that is still waiting' })
+  @ApiOperation({ operationId: 'accessRequestWithdraw', summary: 'Withdraw a request nobody has decided yet' })
   @ApiSuccessResponse(AccessRequestResponseDto, {
     message: 'ACCESS_REQUEST.WITHDRAWN',
     description:
-      'The requester withdraws the request while it waits or while the grant has not been carried out; the head of the department does too, with a reason, once Finance gave it back, it waits for a budget or the data stopped it. The open steps and the questions to Finance close, the request leaves the batch it was sent in, what was held for it goes back to the budget and a task nobody has worked is cancelled with its assignment (never failed). When the grant had failed the request waits (AWAITING_IT_CLOSE) until the IT Admin cancels the task, and it then ends as withdrawn.',
+      'The requester withdraws the request only before any decision was taken on it: while it waits for the head at the need step or stands waiting for a head, while it is sent back to add what is missing, or, when no head decides the need, until the first who decides (the spending approver, the IT Admin) has decided; a direct grant until its task is begun. After that the way back is a return once granted. The head of the department does too, with a reason, only while the budget or the data stopped the request or it waits for the head to confirm the reserve. The open steps close, the request leaves the batch it was sent in, what was held for it goes back to the budget and a task nobody has worked is cancelled with its assignment (never failed). When the grant had failed the request waits (AWAITING_IT_CLOSE) until the IT Admin cancels the task, and it then ends as withdrawn.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -58,8 +58,9 @@ export class WithdrawalController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'Nothing is left to withdraw (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin (ACCESS_REQUEST.WITHDRAWAL_PENDING), the task of the grant is being worked: ask again when it has a result (ACCESS_REQUEST.GRANT_RUNNING), or the seat is real and the way back is a return (ACCESS_REQUEST.GRANT_COMPLETED). Nothing changes.',
+        'A decision was already taken (ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION, details.scope and details.state), nothing is left to withdraw (ACCESS_REQUEST.ALREADY_ENDED), the withdrawal waits for the IT Admin (ACCESS_REQUEST.WITHDRAWAL_PENDING), the task of the grant is being worked: ask again when it has a result (ACCESS_REQUEST.GRANT_RUNNING), or the seat is real and the way back is a return (ACCESS_REQUEST.GRANT_COMPLETED). Nothing changes.',
       examples: [
+        EXAMPLES.WITHDRAWAL_AFTER_DECISION,
         EXAMPLES.WITHDRAWAL_ALREADY_ENDED,
         EXAMPLES.WITHDRAWAL_PENDING,
         EXAMPLES.GRANT_RUNNING,

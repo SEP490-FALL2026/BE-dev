@@ -1,3 +1,4 @@
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -19,7 +20,6 @@ export interface GroupWritten {
   body: {
     planId: string;
     businessReason: string;
-    termMonths: number;
   };
   draftId: string | null;
 }
@@ -32,6 +32,7 @@ export interface GroupWritten {
 @Injectable()
 export class GroupRequestWriter {
   constructor(
+    private readonly spendRouting: SpendRoutingService,
     private readonly requests: AccessRequestRepo,
     private readonly lines: RequestLineRepo,
     private readonly decisions: LineDecisionRepo,
@@ -49,14 +50,15 @@ export class GroupRequestWriter {
       type: 'GROUP_GRANT',
       organizationId,
       branch: policy.branch,
-      state: 'PENDING',
+      // The request begins waiting under control when every step open waits for a head (`QĐ-110i`); a step confirmed by sending moves it on below.
+      state: state === 'WAITING_CONTROLLED' ? 'WAITING_CONTROLLED' : 'PENDING',
       planId: body.planId,
       requesterEmployeeId: actor.employeeId,
       beneficiaryEmployeeIds: judged.lines.map((line) => line.employeeId),
       departmentId: unit.departmentId,
       costCenterId: unit.costCenter?.id ?? null,
       businessReason: body.businessReason,
-      termMonths: body.termMonths,
+      termMonths: judged.termMonths,
       pricing: judged.pricing,
       policy,
       createdByAppUserId: actor.appUserId,
@@ -87,7 +89,7 @@ export class GroupRequestWriter {
       organizationId,
       requestId: created.id,
       planId: body.planId,
-      termMonths: body.termMonths,
+      termMonths: judged.termMonths,
       state,
       judged,
       planned,
@@ -96,6 +98,7 @@ export class GroupRequestWriter {
       await this.audit.record(tx, event);
     }
 
+    await this.spendRouting.start(tx, actor, created.id, now);
     const request = await this.requests.findById(created.id, tx);
     if (!request) throw new Error(`The request ${created.id} was not found after it was written.`);
 

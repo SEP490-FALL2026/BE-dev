@@ -3,6 +3,7 @@ import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/b
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { endingAmongOf } from '../shared-pool/shared-pool-capacity.repo';
 import { renewalDecisionSnapshotJson } from './subscription-renewal-decision-snapshot.json';
 import type {
   DeadlineEventRecord,
@@ -20,9 +21,11 @@ import type {
 type Row = Prisma.SubscriptionRenewalGetPayload<object>;
 type EventRow = Prisma.SubscriptionDeadlineEventGetPayload<object>;
 
-/** The role stored with a decision; the two of before `QĐ-94d`(2) are kept for the cases already decided. */
+/** The role stored with a decision; the ones of before the one-write renewal are kept for the cases already decided. */
 function deciderRoleOf(stored: string | null): DeciderRole {
-  if (stored === 'OWNER_DEPARTMENT_HEAD' || stored === 'CONFLICT_SUBSTITUTE') return stored;
+  if (stored === 'OWNER_DEPARTMENT_HEAD' || stored === 'CONFLICT_SUBSTITUTE' || stored === 'IT_ADMIN_IN_CHARGE') {
+    return stored;
+  }
 
   return 'SPENDING_APPROVER';
 }
@@ -81,7 +84,7 @@ function toRecord(row: Row): RenewalRecord {
     proposedChoice: row.proposedChoice,
     proposedQuantity: row.proposedQuantity,
     proposalNote: row.proposalNote,
-    businessOwnerOpinion: row.businessOwnerOpinion,
+    seatsNeeded: row.seatsNeeded,
     proposedByEmployeeId: row.proposedByEmployeeId,
     proposedAt: row.proposedAt,
     decision: decisionOf(row),
@@ -115,13 +118,13 @@ export class SubscriptionRenewalRepo {
   async insert(tx: DbTx, input: NewRenewal): Promise<RenewalRecord | null> {
     const inserted = await tx.$queryRaw<{ id: string }[]>`
       INSERT INTO subscription_renewals (id, organization_id, subscription_id, notice_basis, notice_base_date, proposed_choice,
-             proposed_quantity, proposal_note, business_owner_opinion, proposed_by_employee_id, proposed_by_app_user_id,
+             proposed_quantity, proposal_note, seats_needed, proposed_by_employee_id, proposed_by_app_user_id,
              updated_at)
       VALUES (gen_random_uuid(), ${input.organizationId}::uuid, ${input.subscriptionId}::uuid,
               ${input.noticeBasis}::"RenewalNoticeBasis", ${input.noticeBaseDate}::date,
               ${input.proposedChoice}::"RenewalChoice", ${input.proposedQuantity}::int, ${input.proposalNote},
-              ${input.businessOwnerOpinion}, ${input.proposedByEmployeeId}::uuid, ${input.proposedByAppUserId}::uuid, now())
-      ON CONFLICT (subscription_id) WHERE state <> 'STALE' DO NOTHING
+              ${input.seatsNeeded}::int, ${input.proposedByEmployeeId}::uuid, ${input.proposedByAppUserId}::uuid, now())
+      ON CONFLICT (subscription_id, notice_base_date) WHERE state <> 'STALE' DO NOTHING
       RETURNING id`;
     if (inserted.length === 0) return null;
 
@@ -142,14 +145,32 @@ export class SubscriptionRenewalRepo {
     return locked.length === 0 ? null : this.find(id, tx);
   }
 
-  /** The live case of each of these periods, by subscription id; a period without one (or with only STALE ones) is absent. */
-  async ofSubscriptions(subscriptionIds: readonly string[], tx?: DbTx): Promise<Map<string, RenewalRecord>> {
-    if (subscriptionIds.length === 0) return new Map();
+  /**
+   * Every live case of each of these ids, keyed by subscription id, the earliest period first: one per period (a monthly pack
+   * keeps one row for many months), so one id may map to several. An id with none (or only STALE ones) is absent.
+   */
+  async ofSubscriptions(subscriptionIds: readonly string[], tx?: DbTx): Promise<Map<string, RenewalRecord[]>> {
+    const bySubscription = new Map<string, RenewalRecord[]>();
+    if (subscriptionIds.length === 0) return bySubscription;
     const rows = await (tx ?? this.prisma).subscriptionRenewal.findMany({
       where: { subscriptionId: { in: [...subscriptionIds] }, state: { not: 'STALE' } },
+      orderBy: [{ noticeBaseDate: 'asc' }, { id: 'asc' }],
     });
+    for (const row of rows) {
+      const cases = bySubscription.get(row.subscriptionId) ?? [];
+      cases.push(toRecord(row));
+      bySubscription.set(row.subscriptionId, cases);
+    }
 
-    return new Map(rows.map((row) => [row.subscriptionId, toRecord(row)]));
+    return bySubscription;
+  }
+
+  /**
+   * Which of these periods the company has decided to end and whose decision still stands (`Q-162`): a case decided `CANCEL` that waits for
+   * its outcome, or whose outcome is the one decided. The reading is the one the pool grants by (`endingAmongOf`). One statement, only the ids.
+   */
+  endingAmong(subscriptionIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return endingAmongOf(tx ?? this.prisma, subscriptionIds);
   }
 
   /** Closes a proposal that waits as out of date: the period is free for a new one. False when it no longer waits. */
@@ -209,16 +230,6 @@ export class SubscriptionRenewalRepo {
       rankGroup: row.rankGroup as SeatRankGroup,
       position: row.position,
     }));
-  }
-
-  /** Sets the late flag of a decided case once; false when it was set already or the case is no longer waiting for its outcome. */
-  async flagLate(tx: DbTx, id: string, at: Date): Promise<boolean> {
-    const { count } = await tx.subscriptionRenewal.updateMany({
-      where: { id, state: 'DECIDED', lateFlaggedAt: null },
-      data: { lateFlaggedAt: at },
-    });
-
-    return count === 1;
   }
 
   async recordOutcome(tx: DbTx, id: string, outcome: OutcomeWrite): Promise<RenewalRecord> {

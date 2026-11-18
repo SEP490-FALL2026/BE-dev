@@ -56,18 +56,6 @@ export class OperatingParametersApi {
   }
 
   /**
-   * The value in force now, read in `tx` and kept from changing until `tx` ends: for what is created under the value and must
-   * never be left behind by a change of it (the first budget version, `US-01-04` AC-8). It takes the shared side of the lock that
-   * `set` holds exclusively, so it waits for a change under way and a change waits for it. Throws ParameterNotFoundError for an unknown key.
-   */
-  async holdValue(tx: DbTx, key: string): Promise<ParameterValue> {
-    if (!definitionOf(key)) throw new ParameterNotFoundError(key);
-    await this.repo.holdKey(tx, key);
-
-    return effectiveValues(await this.repo.currentRows(tx))[key];
-  }
-
-  /**
    * The value that was in force at `instant`: the row whose validity covers it, or the default of the parameter when none does.
    * What a story calls "the value when it was created" is read with this, so a later change never moves it (`US-01-04` AC-15).
    * Throws ParameterNotFoundError for an unknown key.

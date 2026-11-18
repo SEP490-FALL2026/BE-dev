@@ -26,7 +26,7 @@ export class ItAdminDashboardController {
   @ApiSuccessResponse(ItAdminDashboardResponseDto, {
     message: 'DASHBOARD.IT_ADMIN_RETRIEVED',
     description:
-      'The sections of the overview of the IT Admin on the business day (asOf), in their scope: the departments that name them in charge (every active one while nobody usable is named), and the tasks and SaaS reports they are in charge of by default. The open grant and revocation tasks, the open SaaS reports, the departures still handing over and the keys in the vault are counted; the subscriptions near their cancellation deadline and the plan terms to review name the operation that lists them; the discrepancies between sources and the machines without a confirmation say they are not available yet and are never shown as zero.',
+      'The sections of the overview of the IT Admin on the business day (asOf), in their scope: the departments that name them in charge (every active one while nobody usable is named), and the tasks and SaaS reports they are in charge of by default. The open grant and revocation tasks, the open SaaS reports, the departures still handing over and the keys in the vault are counted; the subscriptions near their cancellation deadline and the plan terms to review name the operation that lists them; the discrepancies count the open findings of people active in a vendor with no seat to cover the day, and the machines without a confirmation say they are not available yet and are never shown as zero.',
   })
   @ApiErrorResponses(UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE, {
     status: HttpStatus.FORBIDDEN,

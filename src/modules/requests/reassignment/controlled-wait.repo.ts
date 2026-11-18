@@ -92,7 +92,8 @@ export class ControlledWaitRepo {
     return {
       total,
       rows: steps.flatMap((step) =>
-        step.waitingSince === null || step.waitingReason === null
+        // The review of Finance is retired: a step of that kind is an old closed one and is never read as waiting.
+        step.waitingSince === null || step.waitingReason === null || step.kind === 'FINANCE_REVIEW'
           ? []
           : [
               {

@@ -4,7 +4,6 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { HandoverService } from '../handover/handover.service';
 import { RenewalHoldHook } from '../public/licensing.extension-points';
 import type { PendingRenewal } from '../public/licensing-renewal.types';
 import { RevocationService } from '../provisioning/revocation.service';
@@ -24,9 +23,9 @@ interface QueueQuery {
 /**
  * The queue of the IT Admin for the rights that ended on a day (`US-03-05` AC-2, AC-6 to AC-9, AC-11). It is read, never stored: an
  * open personal right whose end day has passed is in it, in force until the IT Admin acts (nothing is revoked or renewed by
- * itself), kept waiting while a renewal sent in time is undecided, and shown with the revocation that is under way and its
- * handover confirmation. Starting the revocation goes through the one gate every source calls, with the source
- * `TIME_LIMITED_EXPIRY`: its handover step falls to the IT Admin, and a revocation that fails leaves the right in force.
+ * itself), kept waiting while a renewal sent in time is undecided, and shown with the revocation that is under way.
+ * Starting the revocation goes through the one gate every source calls, with the source `TIME_LIMITED_EXPIRY`, and a revocation
+ * that fails leaves the right in force. No handover is confirmed (`QĐ-110g`).
  */
 @Injectable()
 export class ExpiryQueueService {
@@ -34,7 +33,6 @@ export class ExpiryQueueService {
     private readonly repo: ExpiryQueueRepo,
     private readonly renewals: RenewalHoldHook,
     private readonly revocations: RevocationService,
-    private readonly handovers: HandoverService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly runner: TransactionRunner,
@@ -42,7 +40,7 @@ export class ExpiryQueueService {
 
   /**
    * One page of the rights that ended, the earliest end first. The statements are the same however many rights there are: the
-   * rights, the renewals waiting, the departments, and then the names and the handover of the page.
+   * rights, the renewals waiting, the departments, and then the names and the plans of the page.
    */
   async list(query: QueueQuery): Promise<Page<ExpiredRightWire>> {
     const today = await this.organizationReads.businessToday();
@@ -119,7 +117,7 @@ export class ExpiryQueueService {
     };
   }
 
-  /** The names, the plan and the handover of the rows of one page, each read once for the whole page. */
+  /** The names and the plan of the rows of one page, each read once for the whole page. */
   private async named(
     shown: readonly {
       right: ExpiredRight;
@@ -130,25 +128,22 @@ export class ExpiryQueueService {
     today: string,
   ): Promise<ExpiredRightWire[]> {
     if (shown.length === 0) return [];
-    const [people, departments, plans, duties] = await Promise.all([
+    const [people, departments, plans] = await Promise.all([
       this.organizationReads.getEmployees([...new Set(shown.map((row) => row.right.employeeId))]),
       this.organizationReads.getDepartmentBriefs([
         ...new Set(shown.flatMap((row) => (row.departmentId ? [row.departmentId] : []))),
       ]),
       this.catalog.getPlanRevocationInfo([...new Set(shown.map((row) => row.right.planId))]),
-      this.handovers.briefsOf(shown.filter((row) => row.right.revocation).map((row) => row.right.assignmentId)),
     ]);
     const personById = new Map(people.map((person) => [person.id, person]));
     const departmentById = new Map(departments.map((department) => [department.id, department]));
     const planById = new Map(plans.map((plan) => [plan.planId, plan]));
-    const dutyOf = new Map(duties.map((duty) => [duty.assignmentId, duty]));
 
     return shown.flatMap((row): ExpiredRightWire[] => {
       const person = personById.get(row.right.employeeId);
       const plan = planById.get(row.right.planId);
       if (!person || !plan) return [];
       const department = row.departmentId ? departmentById.get(row.departmentId) : undefined;
-      const duty = dutyOf.get(row.right.assignmentId);
 
       return [
         {
@@ -171,16 +166,8 @@ export class ExpiryQueueService {
           revocation: row.right.revocation
             ? { taskId: row.right.revocation.taskId, status: row.right.revocation.status }
             : null,
-          handover: duty
-            ? {
-                dutyId: duty.dutyId,
-                status: duty.status,
-                role: duty.role,
-                dueOn: duty.dueOn,
-                overdue: duty.overdue,
-                flaggedUnconfirmed: duty.flaggedUnconfirmed,
-              }
-            : null,
+          // No confirmation of a handover is asked (`QĐ-110g`): the key stays, always null, until the clients stop reading it.
+          handover: null,
         },
       ];
     });

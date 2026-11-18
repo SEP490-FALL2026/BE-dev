@@ -131,23 +131,22 @@ describe('who holds the spend step over PostgreSQL (US-06-01, US-06-14 AC-7, US-
     }
   });
 
-  it('is made at once, with both steps flagged, when the spending approver approved the need of a head (US-06-14 AC-8, US-05-03 AC-9)', async () => {
+  it('BR-MF1-02 is checked when a head sends their own request, and goes to the spending approver for the spend step alone', async () => {
     const unit = await h.departmentWithHead('P-RT9');
     await h.budgetFor(unit, { total: 100 * M });
-    // A head's own request goes to the spending approver (row 2): nobody sends it on, so the check ran when the need was approved.
+    // A head's own request is one-step (row 2): there is no need step, so the check ran when it was sent.
     const sent = await h.sent(unit.head, plan, { termMonths: 1 });
-    await h.decide(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
-    await h.setPayments(sent.id, { amount: 10 * M });
     const id = sent.id;
 
+    expect(sent.needStep).toMatchObject({ routingRow: 2, state: 'NOT_REQUIRED', assignee: null });
     expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([
-      expect.objectContaining({ assignee_employee_id: h.boss.employeeId, same_person_as_spend: true }),
+      expect.objectContaining({ assignee_employee_id: h.boss.employeeId }),
     ]);
-    const need = await h.ctx.sql.query<{ same_person_as_spend: boolean; assignee_employee_id: string }>(
-      `SELECT same_person_as_spend, assignee_employee_id FROM access_request_steps WHERE request_id = $1 AND kind = 'NEED'`,
+    const need = await h.ctx.sql.query<{ state: string; assignee_employee_id: string | null }>(
+      `SELECT state::text, assignee_employee_id FROM access_request_steps WHERE request_id = $1 AND kind = 'NEED'`,
       [id],
     );
-    expect(need.rows).toEqual([{ same_person_as_spend: true, assignee_employee_id: h.boss.employeeId }]);
+    expect(need.rows).toEqual([{ state: 'NOT_REQUIRED', assignee_employee_id: null }]);
   });
 
   it('writes the check into the Audit Trail with the codes and where the request went', async () => {

@@ -3,7 +3,7 @@ import { fromDateColumn, toDateColumn } from '../../../core/business-date';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { LineCancelCause, LineRecord, LineState } from '../access-request/group-request.types';
+import type { LineCancelCause, LineRecord, LineState, SystemCancelCause } from '../access-request/group-request.types';
 
 export interface NewLine {
   requestId: string;
@@ -19,7 +19,7 @@ export interface LineMove {
   endedAt?: Date;
   endedByEmployeeId?: string | null;
   endReason?: string | null;
-  cancelCause?: LineCancelCause;
+  cancelCause?: LineCancelCause | SystemCancelCause;
   withdrawalRequestedAt?: Date;
 }
 
@@ -131,6 +131,17 @@ export class RequestLineRepo {
   }
 
   /** Moves a line; the caller holds the lock and has judged that the move is allowed (the database judges it too). */
+  /**
+   * The people who still wait for their need now wait on a new need step, because the request was sent back and sent on again (R-24); the
+   * database lets a line change its step only for that.
+   */
+  async repointNeed(tx: DbTx, requestId: string, employeeIds: readonly string[], needStepId: string): Promise<void> {
+    await tx.accessRequestLine.updateMany({
+      where: { requestId, employeeId: { in: [...employeeIds] }, state: 'AWAITING_NEED' },
+      data: { needStepId },
+    });
+  }
+
   async move(tx: DbTx, requestId: string, employeeId: string, move: LineMove): Promise<void> {
     await tx.accessRequestLine.update({
       where: { requestId_employeeId: { requestId, employeeId } },

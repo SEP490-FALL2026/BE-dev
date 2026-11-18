@@ -47,6 +47,24 @@ export const SAAS_ISSUE_SECRET_WARNING = {
 
 export const DESCRIPTION_MAX_LENGTH = 2000;
 
+/** The longest title of a report on a list. */
+export const TITLE_MAX_LENGTH = 120;
+
+/**
+ * The title of a report on a list (`IA-1`): the first line of what the reporter wrote that says something, its spaces collapsed, cut to
+ * `TITLE_MAX_LENGTH` characters with an ellipsis as the last one when it was longer. A report has no title of its own; the form refuses a
+ * description of nothing, so the fixed word is only a floor. Pure.
+ */
+export function issueTitleOf(description: string): string {
+  const line = description
+    .split(/\r?\n/)
+    .map((candidate) => candidate.replace(/\s+/g, ' ').trim())
+    .find((candidate) => candidate !== '');
+  if (line === undefined) return '(no description)';
+
+  return line.length <= TITLE_MAX_LENGTH ? line : `${line.slice(0, TITLE_MAX_LENGTH - 1)}…`;
+}
+
 /** The pointers to the work the result of a report may lead to; each is only kept, none opens anything. */
 export interface LinkedWork {
   grantTaskId?: string;

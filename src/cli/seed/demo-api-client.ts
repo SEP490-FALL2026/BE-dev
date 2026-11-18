@@ -151,18 +151,84 @@ export class DemoApiClient {
     return this.sessions.has(email);
   }
 
+  /** Calls a public route without opening an account session. */
+  callPublic<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
+    return this.send<T>(method, path, body, undefined, headers);
+  }
+
+  /** Uses a short-lived device credential only for this call; it is never an account session. */
+  callAsDevice<T>(token: string, method: string, path: string, body?: unknown): Promise<T> {
+    return this.send<T>(method, path, body, token);
+  }
+
   /** The `data` of a 2xx answer, as the account of `email` (signed in before). Throws DemoApiError otherwise. */
-  async call<T>(email: string, method: string, path: string, body?: unknown): Promise<T> {
+  async call<T>(
+    email: string,
+    method: string,
+    path: string,
+    body?: unknown,
+    headers: Record<string, string> = {},
+  ): Promise<T> {
     const session = this.sessions.get(email);
     if (!session) throw new Error(`No session for the account of this step (${method} ${path})`);
     try {
-      return await this.send<T>(method, path, body, session.accessToken);
+      return await this.send<T>(method, path, body, session.accessToken, headers);
     } catch (error) {
       // An access token lives minutes; a long run outlives it. Sign in again once, then let any error through.
       if (!(error instanceof DemoApiError) || error.status !== 401) throw error;
       await this.login(session.email, session.password);
-      return this.send<T>(method, path, body, this.sessions.get(email)?.accessToken ?? '');
+      return this.send<T>(method, path, body, this.sessions.get(email)?.accessToken ?? '', headers);
     }
+  }
+
+  /** Uploads one file with the text fields beside it (`multipart/form-data`), as the account of `email`. */
+  async upload<T>(
+    email: string,
+    path: string,
+    file: { name: string; content: string; type: string },
+    fields: Record<string, string> = {},
+  ): Promise<T> {
+    const form = (): FormData => {
+      const data = new FormData();
+      for (const [name, value] of Object.entries(fields)) data.append(name, value);
+      data.append('file', new Blob([file.content], { type: file.type }), file.name);
+
+      return data;
+    };
+    const session = this.sessions.get(email);
+    if (!session) throw new Error(`No session for the account of this step (POST ${path})`);
+    try {
+      return await this.send<T>('POST', path, form(), session.accessToken);
+    } catch (error) {
+      if (!(error instanceof DemoApiError) || error.status !== 401) throw error;
+      await this.login(session.email, session.password);
+      return this.send<T>('POST', path, form(), this.sessions.get(email)?.accessToken ?? '');
+    }
+  }
+
+  /**
+   * The bytes of a file the API answers as itself, not in an envelope (a template: `GET /import-templates/{kind}`), as the account of `email`.
+   * A refusal is a DemoApiError (method, path, status and code, no body).
+   */
+  async download(email: string, path: string): Promise<Uint8Array> {
+    const session = this.sessions.get(email);
+    if (!session) throw new Error(`No session for the account of this step (GET ${path})`);
+    try {
+      return await this.fetchBytes(path, session.accessToken);
+    } catch (error) {
+      if (!(error instanceof DemoApiError) || error.status !== 401) throw error;
+      await this.login(session.email, session.password);
+      return this.fetchBytes(path, this.sessions.get(email)?.accessToken ?? '');
+    }
+  }
+
+  /**
+   * Puts the bytes of a file at the upload link the API gave (object storage, outside the API): the headers are the ones the API
+   * named. A refusal is a DemoApiError of the storage (method PUT, the link without its signature).
+   */
+  async putFile(url: string, headers: Record<string, string>, content: Uint8Array): Promise<void> {
+    const response = await this.fetchImpl(url, { method: 'PUT', headers, body: content as BodyInit });
+    if (!response.ok) throw new DemoApiError('PUT', url.split('?')[0], response.status, 'OBJECT_STORAGE_REFUSED');
   }
 
   /** Ends every session this run opened (best effort: a logout that fails leaves a session that expires by itself). */
@@ -181,9 +247,15 @@ export class DemoApiClient {
     this.sessions.set(email, { email, password, accessToken: data.accessToken, refreshToken: data.refreshToken });
   }
 
-  private async send<T>(method: string, path: string, body?: unknown, token?: string): Promise<T> {
+  private async send<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    token?: string,
+    headers: Record<string, string> = {},
+  ): Promise<T> {
     for (let attempt = 0; ; attempt++) {
-      const response = await this.fetchOnce(method, path, body, token);
+      const response = await this.fetchOnce(method, path, body, token, headers);
       if (retryable(method, response.status) && attempt < this.retries) {
         await this.sleep(waitOf(response, attempt));
         continue;
@@ -192,16 +264,36 @@ export class DemoApiClient {
     }
   }
 
-  private async fetchOnce(method: string, path: string, body: unknown, token?: string): Promise<Response> {
-    const headers: Record<string, string> = { accept: 'application/json' };
-    if (body !== undefined) headers['content-type'] = 'application/json';
+  private async fetchBytes(path: string, token: string): Promise<Uint8Array> {
+    for (let attempt = 0; ; attempt++) {
+      const response = await this.fetchOnce('GET', path, undefined, token, { accept: '*/*' });
+      if (retryable('GET', response.status) && attempt < this.retries) {
+        await this.sleep(waitOf(response, attempt));
+        continue;
+      }
+      if (!response.ok) return this.read<Uint8Array>('GET', path, response);
+
+      return new Uint8Array(await response.arrayBuffer());
+    }
+  }
+
+  private async fetchOnce(
+    method: string,
+    path: string,
+    body: unknown,
+    token?: string,
+    extra: Record<string, string> = {},
+  ): Promise<Response> {
+    const headers: Record<string, string> = { accept: 'application/json', ...extra };
+    const isForm = body instanceof FormData;
+    if (body !== undefined && !isForm) headers['content-type'] = 'application/json';
     if (token) headers.authorization = `Bearer ${token}`;
     const startedAt = this.now();
     try {
       return await this.fetchImpl(`${this.baseUrl}${path}`, {
         method,
         headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch (error) {

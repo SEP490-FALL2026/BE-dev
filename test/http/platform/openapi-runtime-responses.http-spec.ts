@@ -48,9 +48,16 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
         .map((candidate) => candidate.operationId)
         .sort();
 
-    it('declares the 400 and 413 of the multipart limits on the three upload routes, which are the only multipart routes', () => {
-      // budgetVersionImport (G5) takes one file under the same limits (Prompt 02: it declared neither answer).
-      const uploads = ['budgetVersionImport', 'employeeImportUpload', 'seatBaselineImportUpload'];
+    it('declares the 400 and 413 of the multipart limits on the five upload routes, which are the only multipart routes', () => {
+      // usageImportUpload (MF-5) takes the report of a vendor under the same limits.
+      // meAvatarUpload (PF-1) takes the picture of a person: one file of up to 1 MB, a little over which the policy answers and beyond which the parser does.
+      const uploads = [
+        'departmentAvatarPut',
+        'employeeImportUpload',
+        'meAvatarPut',
+        'seatBaselineImportUpload',
+        'usageImportUpload',
+      ];
       expect(idsWhere((candidate) => Boolean(candidate.requestBody?.content?.['multipart/form-data']))).toEqual(
         uploads,
       );
@@ -63,7 +70,14 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
         });
         expect(responses['400']?.description).toContain('HTTP_BAD_REQUEST');
         expect(responses['413']?.description).toContain('HTTP_PAYLOAD_TOO_LARGE');
-        expect(responses['413']?.description).toContain('2 MiB');
+        // A vendor usage report may be larger: its own limit is 10 MiB (MF-5); a picture is 1 MiB (PF-1); the other uploads keep 2 MiB.
+        const limit =
+          id === 'usageImportUpload'
+            ? '10 MiB'
+            : id === 'meAvatarPut' || id === 'departmentAvatarPut'
+              ? '1 MiB'
+              : '2 MiB';
+        expect(responses['413']?.description).toContain(limit);
       }
     });
 
@@ -81,9 +95,11 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
       }
       // A 413 anywhere else is a multipart upload's own file limit, or a mistake.
       expect(idsWhere((candidate) => candidate.responses['413'] !== undefined && !takesJson(candidate))).toEqual([
-        'budgetVersionImport',
+        'departmentAvatarPut',
         'employeeImportUpload',
+        'meAvatarPut',
         'seatBaselineImportUpload',
+        'usageImportUpload',
       ]);
     });
 
@@ -110,7 +126,11 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
           code415: true,
         });
       }
-      expect(idsWhere((candidate) => candidate.responses['415'] !== undefined && !takesJson(candidate))).toEqual([]);
+      // The one 415 outside a JSON body is the type of a picture, told by the policy from its first bytes (PROFILE.AVATAR_TYPE_UNSUPPORTED).
+      expect(idsWhere((candidate) => candidate.responses['415'] !== undefined && !takesJson(candidate))).toEqual([
+        'departmentAvatarPut',
+        'meAvatarPut',
+      ]);
       expect(
         idsWhere((candidate) => Boolean(candidate.requestBody?.content?.['application/x-www-form-urlencoded'])),
       ).toEqual([]);
@@ -132,16 +152,16 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
       expect(description.slice(own.length + 1)).toContain('it is not valid JSON');
     });
 
-    it('declares REPORTING_CURRENCY_NOT_SUPPORTED as a 409 exactly where a price is converted', () => {
+    it('declares REPORTING_CURRENCY_NOT_SUPPORTED nowhere: no price is converted (QĐ-111an) and the price in another currency is told as PRICE_NOT_VND', () => {
       expect(
         idsWhere((candidate) =>
           Object.values(candidate.responses).some((response) =>
             response.description?.includes('REPORTING_CURRENCY_NOT_SUPPORTED'),
           ),
         ),
-      ).toEqual(['subscriptionComplete', 'subscriptionCreate', 'subscriptionUpdate']);
-      for (const id of ['subscriptionComplete', 'subscriptionCreate', 'subscriptionUpdate']) {
-        expect(operation(id).responses['409']?.description).toContain('REPORTING_CURRENCY_NOT_SUPPORTED');
+      ).toEqual([]);
+      for (const id of ['subscriptionCreate', 'subscriptionUpdate']) {
+        expect(operation(id).responses['422']?.description).toContain('PRICE_NOT_VND');
       }
     });
 

@@ -38,18 +38,6 @@ describe('the Super Admin sends no request (integration, real PostgreSQL)', () =
           planId: plan,
           lines: [{ employeeId: randomUUID() }],
           businessReason: 'The new brand needs the shared workspace',
-          termMonths: 6,
-        }),
-    ],
-    [
-      'accessRequestServiceAccountSubmit',
-      () =>
-        post('/access-requests/service-accounts', {
-          planId: plan,
-          purpose: 'Build bot of the CI pipeline',
-          expectedIdentifier: 'ci-bot-admin',
-          businessReason: 'Run the builds of the product',
-          termMonths: 1,
         }),
     ],
     [
@@ -76,19 +64,6 @@ describe('the Super Admin sends no request (integration, real PostgreSQL)', () =
           planId: plan,
           lines: [{ employeeId: randomUUID() }],
           businessReason: 'The new brand needs the shared workspace',
-          termMonths: 6,
-        }),
-    ],
-    [
-      'accessRequestDraftSave (service account)',
-      () =>
-        post('/access-requests/drafts', {
-          kind: 'SERVICE_ACCOUNT',
-          planId: plan,
-          purpose: 'Build bot of the CI pipeline',
-          expectedIdentifier: 'ci-bot-admin',
-          businessReason: 'Run the builds of the product',
-          termMonths: 1,
         }),
     ],
     ['accessRequestDraftList', () => request(h.server()).get('/api/v1/access-requests/drafts').set(admin())],

@@ -1,21 +1,24 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { AddressInfo, Server } from 'node:net';
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v4/installation';
 import { runSeed } from '../../../src/cli/seed/seed-run';
 import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
+import { SeedStorage } from '../../support/flows/seed-storage';
 import { createHttpTestApp, type HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
 
 describe('seed bootstrap from an empty database (integration, real API and PostgreSQL)', () => {
+  // The bytes the seed puts at upload links land in the storage the application reads (BM-10, files of a version).
+  const seedStorage = new SeedStorage();
   let ctx: HttpTestApp;
   let demo: INestApplicationContext;
   let baseUrl: string;
   const secrets = { superAdminPassword: SEED_PASSWORD, demoAccountPassword: 'a long demo test password' };
   const args = (allowBootstrap: boolean): SeedCommandArguments => ({
     mode: 'apply',
-    fixture: 'shared-demo-v3',
+    fixture: 'shared-demo-v4',
     apiUrl: baseUrl,
     operator: 'TEST-SEED-BOOTSTRAP',
     environment: 'LOCAL_TEST',
@@ -32,7 +35,7 @@ describe('seed bootstrap from an empty database (integration, real API and Postg
       await install
         .get(InstallationApi)
         .install(
-          { ...INSTALLATION, environment: 'LOCAL_TEST', operatorReference: 'SEED:shared-demo-v3:TEST' },
+          { ...INSTALLATION, environment: 'LOCAL_TEST', operatorReference: 'SEED:shared-demo-v4:TEST' },
           secrets.superAdminPassword,
         );
     } finally {
@@ -48,7 +51,8 @@ describe('seed bootstrap from an empty database (integration, real API and Postg
     });
 
   beforeAll(async () => {
-    ctx = await createHttpTestApp();
+    await seedStorage.start();
+    ctx = await createHttpTestApp({ providerOverrides: [seedStorage.override] });
     baseUrl = `http://127.0.0.1:${((ctx.app.getHttpServer() as unknown as Server).address() as AddressInfo).port}`;
     demo = await NestFactory.createApplicationContext(
       (await import('../../../src/modules/installation/seed/seed-cli.module')).SeedCliModule,
@@ -58,6 +62,7 @@ describe('seed bootstrap from an empty database (integration, real API and Postg
   afterAll(async () => {
     await demo?.close();
     await ctx?.close();
+    await seedStorage.stop();
   });
 
   it('refuses weak passwords and missing bootstrap authorization without creating anything', async () => {

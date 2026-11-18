@@ -8,8 +8,6 @@ export interface SpendDecisionRecord {
   requestId: string;
   checkId: string | null;
   decision: 'APPROVED' | 'REJECTED';
-  overrideReason: string | null;
-  overrideYears: number[];
   decidedByEmployeeId: string;
   decidedAt: Date;
 }
@@ -24,8 +22,18 @@ export interface NewSpendDecision {
   deciderRole: 'SPENDING_APPROVER';
   reason: string | null;
   checkId: string | null;
-  overrideReason: string | null;
-  overrideYears: readonly number[];
+  decidedByEmployeeId: string;
+  decidedAt: Date;
+  requestState: AccessRequestState;
+}
+
+/** A spend step the spending approver sent back (`QĐ-111ap`): the step closes, the request goes back, and the record of approval says why. */
+export interface NewSpendReturn {
+  organizationId: string;
+  requestId: string;
+  stepId: string;
+  departmentId: string;
+  reason: string;
   decidedByEmployeeId: string;
   decidedAt: Date;
   requestState: AccessRequestState;
@@ -33,7 +41,7 @@ export interface NewSpendDecision {
 
 /**
  * The one writer of what the spending approver decided: the step, the request, the electronic approval record and the
- * snapshot with its override, written together. The record and the snapshot are never changed (`INV-05`).
+ * snapshot, written together. The record and the snapshot are never changed (`INV-05`).
  */
 @Injectable()
 export class SpendDecisionRepo {
@@ -64,32 +72,51 @@ export class SpendDecisionRepo {
         requestId: input.requestId,
         checkId: input.checkId,
         decision: input.decision,
-        overrideReason: input.overrideReason,
-        overrideYears: [...input.overrideYears],
         decidedByEmployeeId: input.decidedByEmployeeId,
         decidedAt: input.decidedAt,
       },
     });
   }
 
+  /** The return of the step: no snapshot and no decision of spend, only the step, the request and the record of approval (never changed). */
+  async recordReturn(tx: DbTx, input: NewSpendReturn): Promise<void> {
+    await tx.accessRequestStep.update({
+      where: { id: input.stepId },
+      data: { state: 'CLOSED', decidedAt: input.decidedAt },
+    });
+    await tx.accessRequest.update({ where: { id: input.requestId }, data: { state: input.requestState } });
+    await tx.approvalRecord.create({
+      data: {
+        organizationId: input.organizationId,
+        requestId: input.requestId,
+        stepId: input.stepId,
+        decision: 'RETURNED',
+        decidedByEmployeeId: input.decidedByEmployeeId,
+        deciderRole: 'SPENDING_APPROVER',
+        departmentId: input.departmentId,
+        reason: input.reason,
+        decidedAt: input.decidedAt,
+      },
+    });
+  }
+
   /** What the approver decided, the newest if the request was decided more than once. */
-  async latest(
-    requestId: string,
-    tx?: DbTx,
-  ): Promise<(SpendDecisionRecord & { reason: string | null; bySubstitute: boolean }) | null> {
+  async latest(requestId: string, tx?: DbTx): Promise<(SpendDecisionRecord & { reason: string | null }) | null> {
     const db = tx ?? this.prisma;
     const row = await db.spendDecision.findFirst({
       where: { requestId },
       orderBy: { decidedAt: 'desc' },
-      include: { step: { select: { approvalRecord: { select: { reason: true, deciderRole: true } } } } },
+      include: { step: { select: { approvalRecord: { select: { reason: true } } } } },
     });
     if (!row) return null;
     const { step, ...decision } = row;
 
+    if (decision.decision === 'RETURNED') throw new Error('The spend decision of a step is never returned.');
+
     return {
       ...decision,
+      decision: decision.decision,
       reason: step.approvalRecord?.reason ?? null,
-      bySubstitute: step.approvalRecord?.deciderRole === 'CONFLICT_SUBSTITUTE',
     };
   }
 }

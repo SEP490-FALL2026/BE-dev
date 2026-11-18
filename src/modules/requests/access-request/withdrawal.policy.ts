@@ -1,4 +1,4 @@
-import type { AccessRequestState, SpendStage } from './access-request.types';
+import type { AccessRequestState, NeedStepState, SpendStage } from './access-request.types';
 
 /**
  * Why a request is not withdrawn (`US-05-08`, `US-06-14` AC-14). `NOT_REQUESTER` is also the answer to the person it is for
@@ -15,10 +15,12 @@ export type WithdrawalRefusal =
   /** The task of the grant is being worked: ask again when it has a result (`AC-3`). */
   | 'GRANT_RUNNING'
   /** The seat is real: the way back is a return (`AC-3`, `US-05-13`). */
-  | 'GRANT_COMPLETED';
+  | 'GRANT_COMPLETED'
+  /** A decision was already taken on the request: the requester no longer withdraws it (`QĐ-113d`); once granted, it is a return. */
+  | 'WITHDRAWAL_AFTER_DECISION';
 
 /** The stages of a request that costs money in which its head may withdraw it (`FR-3.20`, `FR-3.21`, `QĐ-82n` B). */
-const HEAD_MAY_WITHDRAW_AT: readonly SpendStage[] = ['BLOCKED', 'RETURNED_BY_FINANCE', 'WAITING_BUDGET'];
+const HEAD_MAY_WITHDRAW_AT: readonly SpendStage[] = ['BLOCKED', 'RESERVE_CONFIRMATION'];
 
 export interface WithdrawalFacts {
   actorEmployeeId: string;
@@ -26,6 +28,12 @@ export interface WithdrawalFacts {
   /** The actor heads the department of the request today. */
   actorHeadsDepartment: boolean;
   state: AccessRequestState;
+  /** The need step the request waits at (the first one still open, else the first): `NOT_REQUIRED` when no head decides the need. */
+  needStep: NeedStepState;
+  /** The chain of the request has a spend step: a request that costs money. */
+  hasSpendStep: boolean;
+  /** The chain has an IT assessment (new software): once the IT Admin has decided it, a decision was taken. */
+  hasAssessmentStep: boolean;
   /** Where the request stands on its way to the spending approver; null for a request that costs nothing. */
   spendStage: SpendStage | null;
   reason: string | null;
@@ -36,22 +44,65 @@ export function headMayWithdraw(spendStage: SpendStage | null): boolean {
   return spendStage !== null && HEAD_MAY_WITHDRAW_AT.includes(spendStage);
 }
 
+/**
+ * Whether the request has no decision yet, so its requester may withdraw it (`QĐ-113d`): it waits for the head at the need step (or
+ * stands waiting for a head), or it was sent back to add what is missing; a request with no need step is withdrawn until the first
+ * one who decides (the spending approver, the IT Admin) has decided, a direct grant until its task is begun.
+ */
+export function undecidedForRequester(
+  facts: Pick<WithdrawalFacts, 'state' | 'needStep' | 'hasSpendStep' | 'hasAssessmentStep'>,
+): boolean {
+  if (facts.state === 'AWAITING_REQUESTER_REVISION') return true;
+  if (facts.needStep === 'PENDING' || facts.needStep === 'WAITING') {
+    return facts.state === 'PENDING' || facts.state === 'WAITING_CONTROLLED';
+  }
+  return facts.needStep === 'NOT_REQUIRED' && undecidedWithoutNeedStep(facts);
+}
+
+/** The requester of a request with no need step withdraws until the first decider (the IT Admin, the spending approver) has decided. */
+function undecidedWithoutNeedStep(
+  facts: Pick<WithdrawalFacts, 'state' | 'hasSpendStep' | 'hasAssessmentStep'>,
+): boolean {
+  switch (facts.state) {
+    case 'PENDING':
+    case 'WAITING_CONTROLLED':
+    case 'AWAITING_IT_ASSESSMENT':
+      return true;
+    // Past the assessment the IT Admin has decided it: the first decider is no longer the spending approver.
+    case 'AWAITING_SPEND_SUBMISSION':
+    case 'AWAITING_SPEND_DECISION':
+      return !facts.hasAssessmentStep;
+    case 'AWAITING_EXECUTION':
+      return !facts.hasSpendStep && !facts.hasAssessmentStep;
+    default:
+      return false;
+  }
+}
+
 const ENDED: readonly AccessRequestState[] = ['REJECTED', 'IT_REJECTED', 'FAILED', 'WITHDRAWN', 'CANCELLED'];
 
+/** The refusal of a request that no longer has anything to withdraw, or null. */
+function endedRefusal(state: AccessRequestState): WithdrawalRefusal | null {
+  if (state === 'COMPLETED') return 'GRANT_COMPLETED';
+  if (state === 'AWAITING_IT_CLOSE') return 'WITHDRAWAL_PENDING';
+
+  return ENDED.includes(state) ? 'ALREADY_ENDED' : null;
+}
+
 /**
- * Whether the request may be withdrawn by this person: the requester, always while the request waits or its grant is not
- * carried out; the head of the department, with a reason, only in the stages the head has to act on (`AC-4`). The tasks of the
- * grant are judged by licensing, in the transaction.
+ * Whether the request may be withdrawn by this person: the requester, only while no decision was taken on it (`QĐ-113d`);
+ * the head of the department, with a reason, only in the stages the head has to act on (`AC-4`). The tasks of the grant
+ * are judged by licensing, in the transaction.
  */
 export function checkWithdrawal(facts: WithdrawalFacts): WithdrawalRefusal | null {
   const byRequester = facts.actorEmployeeId === facts.requesterEmployeeId;
   const byHead = !byRequester && facts.actorHeadsDepartment && headMayWithdraw(facts.spendStage);
   if (!byRequester && !byHead) return 'NOT_REQUESTER';
 
-  if (facts.state === 'COMPLETED') return 'GRANT_COMPLETED';
-  if (facts.state === 'AWAITING_IT_CLOSE') return 'WITHDRAWAL_PENDING';
-  if (ENDED.includes(facts.state)) return 'ALREADY_ENDED';
+  const over = endedRefusal(facts.state);
+  if (over) return over;
   if (byHead && (facts.reason === null || facts.reason.trim() === '')) return 'REASON_REQUIRED';
+  if (byRequester && !undecidedForRequester(facts)) return 'WITHDRAWAL_AFTER_DECISION';
 
   return null;
 }

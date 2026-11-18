@@ -23,8 +23,11 @@ export const PDF = { fileName: 'hop-dong-k1.pdf', contentType: 'application/pdf'
 export class DocumentHarness extends ProvisioningHarness {
   readonly storage = new FakeObjectStorage();
 
-  override start(): Promise<void> {
-    return super.start({ providerOverrides: [{ token: OBJECT_STORAGE, useValue: this.storage }] });
+  override start(options: Parameters<ProvisioningHarness['start']>[0] = {}): Promise<void> {
+    return super.start({
+      ...options,
+      providerOverrides: [{ token: OBJECT_STORAGE, useValue: this.storage }, ...(options.providerOverrides ?? [])],
+    });
   }
 
   createContract = (body: object, account: ApiAccount = this.it1) =>
@@ -42,9 +45,25 @@ export class DocumentHarness extends ProvisioningHarness {
   getDocument = (id: string, account: ApiAccount = this.it1) =>
     request(this.server()).get(`/api/v1/documents/${id}`).set(this.as(account));
 
-  /** A contract, as the IT Admin made it. */
+  /** A vendor of the catalog by name, made when it is not there yet (the road a declared application takes, without the application). */
+  async vendorNamed(name: string): Promise<string> {
+    const key = name.trim().toLowerCase();
+    const { rows } = await this.ctx.sql.query<{ id: string }>(
+      `INSERT INTO vendors (id, organization_id, name, normalized_name) VALUES (gen_random_uuid(), $1, $2, $3)
+       ON CONFLICT (organization_id, normalized_name) DO UPDATE SET name = vendors.name RETURNING id`,
+      [this.seed.organizationId, name, key],
+    );
+
+    return rows[0].id;
+  }
+
+  /** A contract, as the IT Admin made it: with a vendor and the day it begins, which a contract that is made now needs. */
   async contract(name = 'Hợp đồng K1'): Promise<string> {
-    return this.dataOf<{ contract: { id: string } }>(await this.createContract({ name }).expect(201)).contract.id;
+    const vendorId = await this.vendorNamed('Contract Vendor');
+
+    return this.dataOf<{ contract: { id: string } }>(
+      await this.createContract({ name, vendorId, effectiveFrom: this.today() }).expect(201),
+    ).contract.id;
   }
 
   /** A file declared, put in the storage as declared, and completed: it waits for its owner. */

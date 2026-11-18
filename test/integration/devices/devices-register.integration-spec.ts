@@ -220,6 +220,15 @@ describe('the register of company machines (integration, real PostgreSQL)', () =
     expect(firstPage.pagination).toMatchObject({ totalItems: 12, totalPages: 3 });
     expect(lastPage.items).toHaveLength(2);
     expect(waiting.items).toHaveLength(12);
+    // US-09-01 AC-2: the count the IT Admin dashboard shows is the total the list answers for the same state.
+    const everyWaiting = h.dataOf<{ pagination: { totalItems: number } }>(
+      await h.listDevices(`?state=AWAITING_ACKNOWLEDGEMENT&pageSize=1`).expect(200),
+    ).pagination.totalItems;
+    const organization = await h.ctx.sql.query<{ id: string }>('SELECT id FROM organizations LIMIT 1');
+    await expect(
+      h.ctx.app.get(DevicesApi).countByCollectionState(organization.rows[0].id, 'AWAITING_ACKNOWLEDGEMENT'),
+    ).resolves.toBe(everyWaiting);
+    expect(everyWaiting).toBeGreaterThanOrEqual(12);
     expect(
       h.dataOf<{ items: DeviceWire[] }>(await h.listDevices(`?state=ACTIVE&holderEmployeeId=${e}`).expect(200)).items,
     ).toEqual([]);

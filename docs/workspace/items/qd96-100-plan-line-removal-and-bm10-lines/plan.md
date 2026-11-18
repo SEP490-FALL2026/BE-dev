@@ -6,7 +6,7 @@
 - Triển khai: `not-started`. PR: chưa có.
 
 **Đợt (Owner 05/11/2026):** cả hạng mục thuộc **Đợt 1** (bước 12b của
-[SPEC-PLAN-DOT-1](../../../reviews/qd96-100-alignment-2026-11-05/fe-batch/SPEC-PLAN-DOT-1.md)). Một migration (nới `NOT NULL`).
+SPEC-PLAN-DOT-1 (nhật ký review đã xóa 11/11/2026 — xem git history)). Một migration (nới `NOT NULL`).
 
 ## Before coding
 

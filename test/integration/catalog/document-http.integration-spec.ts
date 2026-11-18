@@ -169,12 +169,30 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     expect(h.codeOf(await declare({ purpose: 'IMPORT_SOURCE' }, h.finance).expect(403))).toBe(
       'DOCUMENT.PURPOSE_FORBIDDEN',
     );
-    expect(h.codeOf(await declare({ purpose: 'COST_STATEMENT' }).expect(403))).toBe('DOCUMENT.PURPOSE_FORBIDDEN');
+    // A bank statement is no purpose a new file may have (`US-04-04` AC-11): the request is invalid whoever sends it, before any role is judged.
+    expect(h.codeOf(await declare({ purpose: 'COST_STATEMENT' }).expect(422))).toBe('VALIDATION_ERROR');
+    expect(h.codeOf(await declare({ purpose: 'COST_STATEMENT' }, h.finance).expect(422))).toBe('VALIDATION_ERROR');
     expect(h.codeOf(await declare({ purpose: 'TAX_PAYMENT_PROOF' }).expect(403))).toBe('DOCUMENT.PURPOSE_FORBIDDEN');
     const notYet = await declare({ purpose: 'IMPORT_SOURCE' }).expect(409);
     expect(h.codeOf(notYet)).toBe('DOCUMENT.PURPOSE_NOT_AVAILABLE');
     expect(await h.documentCount()).toBe(before);
     expect(wire(await declare({}, h.finance).expect(201)).uploadedBy).toBe(h.finance.appUserId);
+  });
+
+  it('US-04-04 AC-11: a bank statement kept before is still read as one by the person who uploaded it, though no new one is taken', async () => {
+    const id = randomUUID();
+    await h.ctx.sql.query(
+      `INSERT INTO document_attachments (id, organization_id, purpose, file_name, content_type, size_bytes, object_key, uploaded_by_app_user_id)
+       VALUES ($1, $2, 'COST_STATEMENT'::"DocumentPurpose", 'sao-ke.pdf', 'application/pdf', 1000, $3, $4)`,
+      [id, h.seed.organizationId, `documents/2026/10/old-${id}`, h.finance.appUserId],
+    );
+    // Uploaded and looked at, waiting for its owner: the state in which its uploader opens it.
+    await h.ctx.sql.query(
+      `UPDATE document_attachments SET status = 'PENDING_ATTACH', final_object_key = $2 WHERE id = $1`,
+      [id, `documents/2026/10/kept-${id}`],
+    );
+
+    expect(wire(await h.getDocument(id, h.finance).expect(200))).toMatchObject({ id, purpose: 'COST_STATEMENT' });
   });
 
   it('US-04-04 AC-6: a file attached to one contract belongs to it for good: another contract, or the same again, is refused', async () => {
@@ -378,7 +396,7 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     expect(JSON.stringify(events)).not.toContain(await h.keyOf(document.id));
   });
 
-  it('keeps contracts as a name: the IT Admin makes one, the IT Admin and Finance read it, the head does not, nothing changes it', async () => {
+  it('keeps contracts to the IT Admin and Finance: the IT Admin makes one, both read it, the head does not, and no route deletes one', async () => {
     const id = await h.contract('  Hợp đồng Figma  ');
 
     expect(h.codeOf(await h.createContract({ name: '   ' }).expect(422))).toBe('CONTRACT.NAME_REQUIRED');
@@ -391,7 +409,6 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     expect(h.codeOf(await h.getContract(id, head).expect(403))).toBe('AUTHORIZATION.FORBIDDEN');
     expect(h.codeOf(await h.getContract(randomUUID()).expect(404))).toBe('CONTRACT.NOT_FOUND');
     await request(h.server()).delete(`/api/v1/contracts/${id}`).set(h.as(h.it1)).expect(404);
-    await request(h.server()).patch(`/api/v1/contracts/${id}`).set(h.as(h.it1)).send({ name: 'x' }).expect(404);
   });
   describe('the integrity of a file that was looked at (SEC-01, SEC-07, DB-13)', () => {
     it('keeps the bytes that were looked at under a key of their own, and the old upload link is of no use to replace them', async () => {

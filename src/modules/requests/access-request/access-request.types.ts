@@ -1,7 +1,8 @@
 import type { Money } from '../../../core/money/money';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
-import type { BillingCycleCode, MissingPriceReason, PaymentPeriod } from './pricing.policy';
+export type BillingCycleCode = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+export type MissingPriceReason = 'NO_PRICED_SUBSCRIPTION' | 'CYCLE_UNKNOWN' | 'AMOUNT_TOO_LARGE' | 'AWAITING_QUOTE';
 import type { WaitingReason } from './routing.policy';
 
 export type ReadableNeedWaitingReason = WaitingReason;
@@ -21,9 +22,8 @@ export type AccessRequestState =
   | 'AWAITING_EXECUTION'
   | 'AWAITING_IT_ASSESSMENT'
   | 'AWAITING_SPEND_SUBMISSION'
-  | 'AWAITING_FINANCE_REVIEW'
-  | 'AWAITING_BUDGET'
   | 'AWAITING_SPEND_DECISION'
+  | 'AWAITING_REQUESTER_REVISION'
   | 'REJECTED'
   | 'IT_REJECTED'
   | 'EXECUTING'
@@ -33,19 +33,30 @@ export type AccessRequestState =
   | 'WITHDRAWN'
   | 'CANCELLED';
 /** A need step is held or waiting, then decided, or closed because the request ended without a decision (`US-05-08`). */
-export type NeedStepState = 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
-export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER' | 'FALLBACK_APPROVER' | 'CONFLICT_SUBSTITUTE';
+export type NeedStepState = 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED' | 'NOT_REQUIRED';
+export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER';
 
-/** What the request costs: nothing for internal software, a priced amount and its payments, or a missing price. */
+/** What the request costs: nothing for internal software, one amount for the year it is counted in (`QĐ-109`), or a missing price. */
 export interface PricingRecord {
   status: 'NOT_APPLICABLE' | 'PRICED' | 'MISSING';
   missingReason: MissingPriceReason | null;
-  expectedSpendOn: BusinessDate | null;
+  kind: 'RECURRING' | 'ONE_TIME' | null; // Pricing model: BR-MF1-07
   budgetYear: number | null;
+  expectedEndDate: BusinessDate | null; // Date the right ends; BR-MF1-06a
+  amountMonths: number | null; // Months of term for calculation; BR-MF1-06
   amount: Money | null;
   unitPrice: Money | null;
   billingCycle: BillingCycleCode | null;
-  schedule: PaymentPeriod[] | null;
+  /**
+   * What the first year of a request to go on using would cost when it begins in the year after the day it is judged (`QĐ-109b`):
+   * shown to the approver, never held against a budget. Worked out when the amount is, not stored; null for any other request.
+   */
+  nextYearAmount: Money | null;
+  /**
+   * Where the price of a priced request comes from (`QĐ-113a`): `SUBSCRIPTION` the subscription that prices the plan, `PLAN_REFERENCE` the reference price of
+   * the plan itself. Not a column: it is shown in the preview and kept in the audit of the request; a record read back from the row does not carry it.
+   */
+  priceSource?: 'SUBSCRIPTION' | 'PLAN_REFERENCE' | null;
 }
 
 /** What the request of a service account adds to a request (`US-05-21`); neither a password nor a key is kept. */
@@ -67,7 +78,8 @@ export interface ServiceAccountRecord {
 export interface RenewalRecord {
   assignmentId: string;
   previousExpectedEndDate: BusinessDate;
-  newExpectedEndDate: BusinessDate;
+  /** Null for a renewal that goes on with no end (_Dùng lâu dài_). */
+  newExpectedEndDate: BusinessDate | null;
   /** The months the right would run on without a break once renewed; over twelve needs the confirmation of the head. */
   consecutiveMonths: number;
   /** The record that follows the old one, written when the request was approved; null until then. */
@@ -92,13 +104,18 @@ export interface NewAccessRequest {
   /** Null only for a free internal request of a department that has no Cost Center in use (`QĐ-87g(2)`). */
   costCenterId: string | null;
   businessReason: string;
-  termMonths: number;
+  /** Written only by a request made before `QĐ-104a` (a term in months); a new request has an end date instead, or none. */
+  termMonths: number | null;
   pricing: PricingRecord;
   policy: RequestPolicy;
   expectedEndDate?: BusinessDate | null;
   createdByAppUserId: string;
   now: Date;
   needStep: NewNeedStep;
+  /** Why the request was left out of GH-1/GH-2 when it was sent; absent or null when it was not (`QĐ-110q`). */
+  limitExemption?: LimitExemption | null;
+  /** The old right of the person, held from before a transfer, that this request replaces (R-49): only beside the exemption of the grace. */
+  replacesAssignmentId?: string | null;
   /**
    * The draft this request is made from: the row of the draft becomes the request, so it is the same request from the
    * day it was saved. Absent for a request written new. The caller holds the lock of the draft (`RequestDraftRepo.lock`).
@@ -112,7 +129,6 @@ export interface NewNeedStep {
   assigneeEmployeeId: string | null;
   routingRow: number;
   waitingReason: WaitingReason | null;
-  samePersonAsSpend: boolean;
   slaWorkingDays: number;
 }
 
@@ -136,7 +152,8 @@ export interface NeedStepWithDecision extends NeedStepRecord {
 
 /** The electronic approval record of a decision (never changed once written). */
 export interface ApprovalRecordRecord {
-  decision: 'APPROVED' | 'REJECTED';
+  /** `RETURNED`: sent back to the person who sent the request, to add what is missing (`QĐ-111ap`, R-24). */
+  decision: 'APPROVED' | 'REJECTED' | 'RETURNED';
   decidedByEmployeeId: string;
   deciderRole: DeciderRole;
   reason: string | null;
@@ -171,7 +188,17 @@ export interface CancellationRecord {
   note: string | null;
 }
 
+/** Why a request is left out of GH-1/GH-2: a request again in the grace of a transfer (`QĐ-110q`, R-49), or after a role ended (`QĐ-108c`). */
+export const LIMIT_EXEMPTIONS = ['TRANSFER_GRACE', 'ROLE_ENDED'] as const;
+export type LimitExemption = (typeof LIMIT_EXEMPTIONS)[number];
+
 export interface AccessRequestRecord {
+  routing?: import('./routing.policy').RequestRouting;
+  /** Why the request was left out of GH-1/GH-2 when it was sent (`QĐ-110q`: `TRANSFER_GRACE`); null (or absent) when it was not. */
+  limitExemption?: LimitExemption | null;
+  /** The old right of the person this request replaces (R-49); internal, never on the wire. */
+  replacesAssignmentId?: string | null;
+  oneStepBlockedReason?: 'PRICE_MISSING' | null;
   id: string;
   organizationId: string;
   type: AccessRequestKind;
@@ -183,7 +210,8 @@ export interface AccessRequestRecord {
   /** Null only for a free internal request of a department that has no Cost Center in use (`QĐ-87g(2)`): nothing is charged. */
   costCenterId: string | null;
   businessReason: string;
-  termMonths: number;
+  /** Null for a request made after `QĐ-104a`: it has an end date or none, never months. */
+  termMonths: number | null;
   pricing: PricingRecord;
   /** The line of the plan of the budget it is attached to; null when it is attached to none. */
   planLine: { versionId: string; position: number; confirmed: boolean } | null;
@@ -257,15 +285,15 @@ export const NOT_OPEN_FOR_LEAVER: readonly AccessRequestState[] = [...ENDED_STAT
 
 /**
  * Where a request that costs money stands on its way to the spending approver, as the people with a part in it read it
- * (`US-06-14` AC-9, AC-13). It says what is waiting and, for a request that stopped, why: and it is never a figure of a
- * budget, a code of the check that is not a problem with the head's own data, or what is left (`QĐ-82m` `INF-06`).
+ * (`US-06-14` AC-9, AC-13). It says what is waiting and, for a request that stopped, why: and it is never what is left of a
+ * budget (`QĐ-82m` `INF-06`).
  */
 export type SpendStage =
   | 'NOT_SUBMITTED'
+  | 'RETURNED_TO_REQUESTER'
+  /** Its check says it uses the reserve and the head has not confirmed it with a line of reason (`BR-MF1-06h`). */
+  | 'RESERVE_CONFIRMATION'
   | 'BLOCKED'
-  | 'RETURNED_BY_FINANCE'
-  | 'WAITING_FINANCE_REVIEW'
-  | 'WAITING_BUDGET'
   | 'WAITING_SPEND_DECISION'
   /** The spending approver refused it, with the reason (`US-06-01` AC-4). */
   | 'REFUSED';

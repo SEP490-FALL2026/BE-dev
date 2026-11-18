@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import { fromDateColumn, type BusinessDate } from '../../../../core/business-date';
 import type { AccessRequestKind, AccessRequestState } from '../access-request.types';
-import { NOT_OPEN_FOR_LEAVER } from '../access-request.types';
-
-/** The states of the person of a request for a group whose request is still open for them. */
-const OPEN_LINE_STATES = ['AWAITING_NEED', 'NEED_CONFIRMED', 'APPROVED', 'EXECUTING'] as const;
+import { ENDED_STATES, NOT_OPEN_FOR_LEAVER } from '../access-request.types';
+import { currentStateOf } from '../access-request.policy';
+import { OPEN_LINE_STATES, type LineState } from '../group-request.types';
 
 export interface OpenRequestRow {
   id: string;
@@ -17,6 +17,28 @@ export interface OpenRequestRow {
   submittedAt: Date;
 }
 
+export interface GrantRequestRow {
+  id: string;
+  state: AccessRequestState;
+  planId: string | null;
+  beneficiaryEmployeeIds: string[];
+  spendQueuedAt: Date | null;
+  submittedAt: Date;
+  /** The day the right was granted, for a Request that is done. */
+  grantedOn: BusinessDate | null;
+}
+
+/** The states in which a Request to grant is no help to the person: it ended with no right (or never was one), or waits for the IT Admin to close its withdrawal. */
+const NO_RIGHT_STATES = [
+  'DRAFT',
+  'REJECTED',
+  'IT_REJECTED',
+  'FAILED',
+  'WITHDRAWN',
+  'CANCELLED',
+  'AWAITING_IT_CLOSE',
+] as const;
+
 /**
  * The requests a person is the beneficiary of that are still open (`US-03-04` AC-24): one of their own that has not ended, or a line of
  * a request for a group that has not ended. A read that no write goes through (the writer is `AccessRequestRepo`). A page and its total
@@ -26,6 +48,44 @@ export interface OpenRequestRow {
 export class OpenRequestRepo {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * What makes a request open for the person (see the class): shared by the page and by the ids. `withWithdrawalWaiting` also takes in
+   * the request, or the line, withdrawn while its grant had failed, whose task waits for the IT Admin to close it (`AWAITING_IT_CLOSE`):
+   * the page for the IT Admin leaves it out, the system that closes the requests of a person who is gone does not.
+   */
+  private openOf(employeeId: string, filter: { departmentId?: string } = {}, withWithdrawalWaiting = false) {
+    const endedStates = withWithdrawalWaiting ? ENDED_STATES : NOT_OPEN_FOR_LEAVER;
+    const lineStates: readonly LineState[] = withWithdrawalWaiting
+      ? [...OPEN_LINE_STATES, 'AWAITING_IT_CLOSE']
+      : OPEN_LINE_STATES;
+
+    return {
+      beneficiaries: { some: { employeeId } },
+      ...(filter.departmentId === undefined ? {} : { departmentId: filter.departmentId }),
+      // A request being drafted is written by the release after this one and is not read here.
+      state: { not: 'DRAFT' as const },
+      OR: [
+        { type: { not: 'GROUP_GRANT' as const }, state: { notIn: [...endedStates] } },
+        { type: 'GROUP_GRANT' as const, lines: { some: { employeeId, state: { in: [...lineStates] } } } },
+      ],
+    };
+  }
+
+  /**
+   * The ids of every request the person is a beneficiary of that is open, oldest first, in the caller's transaction, those with a
+   * withdrawal waiting for the IT Admin among them: what the system deals with when the person is gone (`BeneficiaryGoneCancellation`). A person has few open requests (the limits of `MF-1` bound them),
+   * so there is no page; the order is fixed so two passes lock them in the same order.
+   */
+  async idsOf(tx: DbTx, employeeId: string): Promise<string[]> {
+    const rows = await tx.accessRequest.findMany({
+      where: this.openOf(employeeId, {}, true),
+      select: { id: true },
+      orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => row.id);
+  }
+
   /** `filter.departmentId` keeps only the requests sent from that department (a department head reads the open work of a member). */
   async pageOf(
     employeeId: string,
@@ -33,16 +93,7 @@ export class OpenRequestRepo {
     tx?: DbTx,
     filter: { departmentId?: string } = {},
   ): Promise<{ items: OpenRequestRow[]; total: number }> {
-    const where = {
-      beneficiaries: { some: { employeeId } },
-      ...(filter.departmentId === undefined ? {} : { departmentId: filter.departmentId }),
-      // A request being drafted is written by the release after this one and is not read here.
-      state: { not: 'DRAFT' as const },
-      OR: [
-        { type: { not: 'GROUP_GRANT' as const }, state: { notIn: [...NOT_OPEN_FOR_LEAVER] } },
-        { type: 'GROUP_GRANT' as const, lines: { some: { employeeId, state: { in: [...OPEN_LINE_STATES] } } } },
-      ],
-    };
+    const where = this.openOf(employeeId, filter);
     const read = async (client: DbTx) => {
       const rows = await client.accessRequest.findMany({
         where,
@@ -59,7 +110,7 @@ export class OpenRequestRepo {
           if (row.submittedAt === null)
             throw new Error(`The request ${row.id} is listed as open but has not been sent.`);
 
-          return { ...row, submittedAt: row.submittedAt };
+          return { ...row, state: currentStateOf(row.state), submittedAt: row.submittedAt };
         }),
         total,
       };
@@ -69,5 +120,48 @@ export class OpenRequestRepo {
     return tx
       ? read(tx)
       : this.prisma.$transaction(read, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+  }
+
+  /**
+   * The Requests to grant (`GRANT`, the person's own, not a group's) of any of the people that are on their way or approved, or done and granted on
+   * or after `since`: what a case outside the process waits for (`US-13-05` AC-23). One statement however many people; the plan of each is read by the
+   * caller. A Request that ended with no right, a draft, and one that waits for the IT Admin to close its withdrawal are left out.
+   */
+  async grantsOf(employeeIds: readonly string[], since: BusinessDate, tx?: DbTx): Promise<GrantRequestRow[]> {
+    if (employeeIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).accessRequest.findMany({
+      where: {
+        type: 'GRANT',
+        beneficiaries: { some: { employeeId: { in: [...employeeIds] } } },
+        state: { notIn: [...NO_RIGHT_STATES] },
+        OR: [{ state: { not: 'COMPLETED' } }, { grantedOn: { gte: new Date(`${since}T00:00:00.000Z`) } }],
+      },
+      select: {
+        id: true,
+        state: true,
+        planId: true,
+        spendQueuedAt: true,
+        submittedAt: true,
+        grantedOn: true,
+        beneficiaries: { select: { employeeId: true } },
+      },
+      orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.flatMap((row) =>
+      row.submittedAt === null
+        ? []
+        : [
+            {
+              id: row.id,
+              state: currentStateOf(row.state),
+              planId: row.planId,
+              beneficiaryEmployeeIds: row.beneficiaries.map((beneficiary) => beneficiary.employeeId),
+              spendQueuedAt: row.spendQueuedAt,
+              submittedAt: row.submittedAt,
+              grantedOn: row.grantedOn === null ? null : fromDateColumn(row.grantedOn),
+            },
+          ],
+    );
   }
 }

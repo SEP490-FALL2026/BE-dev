@@ -60,23 +60,28 @@ export class AssessmentStepRepo {
     });
   }
 
+  /** The last step of the assessment: the one that is open, or the one that ended it (a step sent back is followed by the one that opens when its proposal is sent again). */
   async find(requestId: string, tx?: DbTx): Promise<AssessmentStepRecord | null> {
     const row = await (tx ?? this.prisma).accessRequestStep.findFirst({
       where: { requestId, kind: 'IT_ASSESSMENT' },
+      orderBy: { sequence: 'desc' },
       select: SELECT_STEP,
     });
 
-    // An assessment step is only ever held, waiting, approved or refused.
+    // An assessment step is only ever held, waiting, approved, refused or sent back (closed).
     return row && { ...row, state: row.state as NeedStepState };
   }
 
-  /** Ends the step: approved by completing the assessment, or refused at the gate (`US-05-18`). A step nobody held is taken by the person who ends it. */
+  /**
+   * Ends the step: approved by completing the assessment, refused at the gate (`US-05-18`), or closed because the proposal was sent back to the person who
+   * asked (`QĐ-111ap`). A step nobody held is taken by the person who ends it.
+   */
   async finish(
     tx: DbTx,
     stepId: string,
     employeeId: string,
     now: Date,
-    outcome: 'APPROVED' | 'REJECTED' = 'APPROVED',
+    outcome: 'APPROVED' | 'REJECTED' | 'CLOSED' = 'APPROVED',
   ): Promise<void> {
     const step = await tx.accessRequestStep.findUniqueOrThrow({
       where: { id: stepId },

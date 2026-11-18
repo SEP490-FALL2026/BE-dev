@@ -9,10 +9,11 @@ import {
   ProvisioningTaskStateError,
   ProvisioningTypeNotSupportedError,
 } from '../public/licensing.errors';
-import { ProvisioningItAdminRequiredError } from './provisioning.errors';
+import { ProvisioningItAdminRequiredError, ProvisioningKeyError } from './provisioning.errors';
 import {
   assertGrantableType,
   assertItAdmin,
+  assertKeyFits,
   assertSubscriptionChoice,
   chooseAccount,
   chooseServiceIdentifier,
@@ -72,19 +73,33 @@ describe('steps of a task by the kind of provisioning (US-07-02 AC-4, US-07-01 A
   });
 });
 
-describe('the kinds that can be granted now (US-07-01 AC-10 deferred, RB-4)', () => {
-  it.each(['K1', 'K2', 'K5'] as const)('accepts %s', (type) => {
+describe('the kinds that can be granted now (RB-4, BR-MF1-09)', () => {
+  // Rewritten for BR-MF1-09 / QĐ-103d: K4 is granted from the key pool of its plan; only K3 stays refused.
+  it.each(['K1', 'K2', 'K4', 'K5'] as const)('accepts %s', (type) => {
     expect(() => assertGrantableType(type)).not.toThrow();
   });
 
-  it.each(['K3', 'K4'] as const)('refuses %s until what it needs exists', (type) => {
-    expect(() => assertGrantableType(type)).toThrow(ProvisioningTypeNotSupportedError);
+  it('refuses K3, which is only specified', () => {
+    expect(() => assertGrantableType('K3')).toThrow(ProvisioningTypeNotSupportedError);
+  });
+});
+
+describe('BR-MF1-09: the key a completion names (QĐ-103d)', () => {
+  it('a K4 grant is completed with the free key of the store it gives the seat', () => {
+    expect(() => assertKeyFits('K4', 'key-1')).not.toThrow();
+    expect(() => assertKeyFits('K4', undefined)).toThrow(new ProvisioningKeyError('KEY_REQUIRED'));
+  });
+
+  it.each(['K1', 'K2', 'K5'] as const)('a %s grant names no key', (type) => {
+    expect(() => assertKeyFits(type, undefined)).not.toThrow();
+    expect(() => assertKeyFits(type, 'key-1')).toThrow(new ProvisioningKeyError('KEY_NOT_APPLICABLE'));
   });
 });
 
 describe('the subscription of a grant (US-07-01 AC-1, AC-11)', () => {
-  it.each(['K1', 'K2'] as const)('is required for %s', (type) => {
-    expect(() => assertSubscriptionChoice(type, undefined)).toThrow(new ProvisioningSubscriptionError('REQUIRED'));
+  // Rewritten for BR-MF1-09 / P0-05: the subscription is optional, the pool of the plan gives one when the IT Admin names none.
+  it.each(['K1', 'K2'] as const)('is optional for %s: the pool of the plan gives one when none is named', (type) => {
+    expect(() => assertSubscriptionChoice(type, undefined)).not.toThrow();
     expect(() => assertSubscriptionChoice(type, 'sub-1')).not.toThrow();
   });
 

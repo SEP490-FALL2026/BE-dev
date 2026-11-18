@@ -1,41 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { currentStateOf } from '../access-request/access-request.policy';
 import type { AccessRequestState } from '../access-request/access-request.types';
 
-/**
- * The requests that wait on something in a budget, found for the listener that hears of the change (`US-06-13` AC-11,
- * `US-06-09` AC-17). It only finds them: the service that moves one locks it first and judges it on what it reads then.
- */
+/** The reads of the requests the spend capability needs: the queue of a head, what a commitment shows of its request, and states. */
 @Injectable()
 export class SpendRequestRepo {
   constructor(private readonly prisma: PrismaService) {}
-
-  /** The requests whose open review is about the plan line that moved: attached to it, under a review that is open or waiting. */
-  async awaitingReviewOnLine(tx: DbTx, versionIds: readonly string[], position: number): Promise<string[]> {
-    const rows = await tx.accessRequest.findMany({
-      where: {
-        planLineVersionId: { in: [...versionIds] },
-        planLinePosition: position,
-        state: { in: ['AWAITING_FINANCE_REVIEW', 'WAITING_CONTROLLED'] },
-      },
-      select: { id: true },
-      orderBy: { submittedAt: 'asc' },
-    });
-
-    return rows.map((row) => row.id);
-  }
-
-  /** The requests of the Cost Center that wait, under control, for a version of the budget to be approved. */
-  async awaitingBudget(tx: DbTx, costCenterId: string): Promise<string[]> {
-    const rows = await tx.accessRequest.findMany({
-      where: { costCenterId, state: 'AWAITING_BUDGET' },
-      select: { id: true },
-      orderBy: { submittedAt: 'asc' },
-    });
-
-    return rows.map((row) => row.id);
-  }
 
   /**
    * The requests that wait in the queue of a department's head, in the order their need was settled: those that cost money and
@@ -46,6 +18,7 @@ export class SpendRequestRepo {
     const where = {
       departmentId,
       state: 'AWAITING_SPEND_SUBMISSION' as const,
+      routingMode: 'VIA_HEAD' as const,
       policy: { path: ['chain'], array_contains: 'SPEND_APPROVAL' },
     };
     const rows = await db.accessRequest.findMany({
@@ -122,7 +95,7 @@ export class SpendRequestRepo {
       select: { id: true, state: true },
     });
 
-    return new Map(rows.map((row) => [row.id, row.state]));
+    return new Map(rows.map((row) => [row.id, currentStateOf(row.state)]));
   }
 }
 

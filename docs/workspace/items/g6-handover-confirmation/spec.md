@@ -26,9 +26,11 @@ Với mỗi công cụ bị thu hồi, đúng một người theo bảng ca (tr�
 
 | Story    | AC                      | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                 |
 | -------- | ----------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-03-09 | AC-1→AC-10              | full     | —                                                                                                                                                                                                                                  |
+| US-03-09 | AC-1→AC-10              | partial  | re-pin 11/11/2026 — AC-11: `g6-handover-confirmation` (`deferred`)                                                                                                                                                                 |
 | US-07-09 | AC-1→AC-13, AC-15→AC-23 | partial  | AC-24: `g3-downstream-finance-integration`                                                                                                                                                                                         |
 | US-07-05 | AC-13, AC-16            | partial  | AC-1→AC-5, AC-8, AC-11, AC-12, AC-15, AC-17→AC-19: `g6-revocation-by-grant-kind`; AC-6, AC-7: `g4-device-dependent-features`; AC-9: `g6-transfer-tool-review`; AC-10 và vế khuyến nghị `G2` của AC-13: `g6-downstream-integration` |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ `US-03-09` đổi `full` → `partial` vì Docs `5bb2e6a` thêm AC hoặc hạng mục khác cùng hiện thực khóa của Story này (scope map); phần đã code không đổi.
 
 ## Supporting references
 

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { nullableJsonColumn } from '../../infrastructure/database/json-column';
 
 /**
- * What an event of an offboarding case carries beyond its kind and dates (`abrupt`, `assignmentIds`, `count` …): an object of JSON
+ * What an event of an offboarding case carries beyond its kind and dates (`accessBlockMode`, `assignmentIds`, `count` …): an object of JSON
  * values whose keys depend on the kind. Free-form on purpose, but always an object of JSON, so a list or a bare value is a fault.
  */
 const schema = z.record(z.string(), z.json());

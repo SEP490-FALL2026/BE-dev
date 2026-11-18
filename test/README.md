@@ -13,7 +13,7 @@ chế database dùng riêng: [test/support/README.md](support/README.md).
 | HTTP contract | `test/http/<module>/*.http-spec.ts`               | guard, khai quyền, validate, mã lỗi, envelope, OpenAPI                                   | không DB (repo/port giả khi cần)      | `pnpm test:http`        |
 | Integration   | `test/integration/<module>/*.integration-spec.ts` | ràng buộc DB, SQL của repo, transaction, khóa, đồng thời, role H7, CLI                   | không đi qua HTTP chỉ để dựng dữ liệu | `pnpm test:integration` |
 | E2E smoke     | `test/e2e/*.e2e-spec.ts`                          | vài hành trình nghiệp vụ qua HTTP + PostgreSQL thật                                      | không kiểm từng nhánh lỗi             | `pnpm test:e2e`         |
-| Main flows    | `test/flows/*.flow-spec.ts`                       | 5 main flow qua API thật, đăng nhập thật theo vai, dataset seed, đồng hồ điều khiển được | không mock bước nghiệp vụ, không CI   | `pnpm test:flows`       |
+| Main flows    | `test/flows/*.flow-spec.ts`                       | 5 main flow qua API thật, đăng nhập thật theo vai, dataset seed, đồng hồ điều khiển được | không mock bước, không chạy mỗi PR    | `pnpm test:flows`       |
 
 Script trong `scripts/**/*.test.mjs` chạy bằng `pnpm rules:test` và `pnpm test:scripts`. Chưa có browser suite.
 
@@ -23,7 +23,7 @@ nối nhiều module chạy được từ đầu tới cuối → một bước 
 
 ## Main flows (`pnpm test:flows`)
 
-Runner riêng cho suite E2E của 5 main flow ([spec](../docs/workspace/items/e2e-main-flows-suite/spec.md)): cần `TEST_DATABASE_ADMIN_URL` như integration; global setup migrate một mẫu, **seed đầy đủ bằng `runSeed` qua HTTP** thành mẫu thứ hai, mỗi file flow clone mẫu seed và dựng app với mọi `*Sweeper` tắt. Đăng nhập thật theo mã người trong dataset (`NV-DEV3`, `NV-ENGH`, `NV-CEO`…, `NV-SA`), `Date` giả riêng trong tiến trình (`FlowClock`, chỉ tiến), job chạy tay (`clock.sweep(tên)`). Thay thế duy nhất ngoài BE: `FakeObjectStorage` cho bytes tệp. Không thuộc `pnpm check` hay CI. Harness: [support/flows](support/flows).
+Runner riêng cho suite E2E của 5 main flow ([spec](../docs/workspace/items/e2e-main-flows-suite/spec.md)): cần `TEST_DATABASE_ADMIN_URL` như integration; global setup migrate một mẫu, **seed đầy đủ bằng `runSeed` qua HTTP** thành mẫu thứ hai, mỗi file flow clone mẫu seed và dựng app với mọi `*Sweeper` tắt. Đăng nhập thật theo mã người trong dataset (`NV-DEV3`, `NV-ENGH`, `NV-CEO`…, `NV-SA`), `Date` giả riêng trong tiến trình (`FlowClock`, chỉ tiến), job chạy tay (`clock.sweep(tên)`). Thay thế duy nhất ngoài BE: `FakeObjectStorage` cho bytes tệp. Không thuộc `pnpm check` và không chạy ở mỗi PR; chạy ở job `flows` của nightly (Chủ nhật 02:00 VN, hoặc `workflow_dispatch`), đo local khoảng 1 phút 40 giây cả lượt. Dataset là `shared-demo-v4`: mỗi flow chọn người, phòng và thuê bao của nó theo [bảng của fixture](../src/cli/seed/fixture/shared-demo-v4/README.md), không đếm toàn bảng (dataset đã có sẵn Request, tác vụ thu hồi, hồ sơ nghỉ việc của riêng nó) và một file chỉ dựng một app. Harness: [support/flows](support/flows).
 
 ## Chạy
 
@@ -141,7 +141,7 @@ it('refuses an employee with 403', async () => {
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | push/PR `dev`             | `quality` (`pnpm check`), `http-contract`, 3 shard `integration` của module đổi + module phụ thuộc; timing/serial ở `integration-inband` |
 | push `main`               | như trên nhưng integration **đầy đủ**, thêm `e2e-smoke`; `deploy` chỉ khi mọi job xanh                                                   |
-| Chủ nhật 02:00 VN (`dev`) | integration đầy đủ + timing + serial + E2E + `pnpm test:mutation`, lưu báo cáo thời gian                                                 |
+| Chủ nhật 02:00 VN (`dev`) | integration đầy đủ + timing + serial + E2E + `pnpm test:flows` (job `flows`) + `pnpm test:mutation`, lưu báo cáo thời gian               |
 
 PR chỉ chạy khi đích là `dev`; push `main` vẫn chạy đầy đủ. Push `dev` ở repo deploy `WDP301-FA26-GR8/BE` chỉ chạy
 `select` rồi bỏ qua các job test; repo phát triển vẫn chạy bình thường. Chỉ run PR cũ bị hủy khi có run PR mới; mỗi run

@@ -11,14 +11,13 @@ describe('who writes the departure of a person, and the one about an IT Admin (i
   let des: Department;
   let a1: Person;
   let subscription: string;
-  let seat: string;
 
   beforeAll(async () => {
     await h.start();
     des = await h.departmentWithUnit('P-IT');
     a1 = await h.worker(des, 'A1-OS', ['IT_ADMIN']);
     subscription = await h.subscription(40, 'K2');
-    seat = await h.seatOf(a1, { subscriptionId: subscription }, 'A1-OS');
+    await h.seatOf(a1, { subscriptionId: subscription }, 'A1-OS');
   }, 300000);
 
   afterAll(async () => {
@@ -73,9 +72,7 @@ describe('who writes the departure of a person, and the one about an IT Admin (i
     const byItAdmin = h.dataOf<CaseWire>(await h.revokeRights(wire.id, { accountLock: { note: 'khóa' } }).expect(200));
 
     expect(byItAdmin.revocations?.created).toBe(1);
-    // One duty for each departure recorded on the seat in this suite: the two cancelled by the tests above, and the one of this case.
-    const duties = await h.dutyRows(seat);
-    expect(duties).toHaveLength(3);
-    expect(duties.filter((duty) => duty.cancelled_at === null)).toHaveLength(1);
+    // No duty of a handover is made for any departure recorded on the seat in this suite (QĐ-110g).
+    expect(await h.count('handover_duties')).toBe(0);
   });
 });

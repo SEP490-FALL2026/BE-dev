@@ -13,6 +13,7 @@ import {
   EmployeeRecord,
   EmployeeWorkState,
   OfficialFieldsPatch,
+  EmployeePlacementSpan,
   PlacementInForce,
   ProfileNotice,
   ProfileNoticeRequest,
@@ -77,6 +78,18 @@ export class EmployeeRecordService {
     return this.repo.insertFirstPlacement(tx, input);
   }
 
+  placementsOf(tx: DbTx, employeeId: string): Promise<{ id: string; departmentId: string; validFrom: BusinessDate }[]> {
+    return this.repo.placementsOf(tx, employeeId);
+  }
+
+  correctFirstPlacement(
+    tx: DbTx,
+    placementId: string,
+    changes: { departmentId?: string; effectiveFrom?: BusinessDate },
+  ): Promise<void> {
+    return this.repo.correctFirstPlacement(tx, placementId, changes);
+  }
+
   scheduledFirstPlacement(
     employeeId: string,
     onDate: BusinessDate,
@@ -122,8 +135,16 @@ export class EmployeeRecordService {
     return this.repo.placementIdsOn(employeeId, onDate, tx);
   }
 
+  lastPlacementBy(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<{ departmentId: string } | null> {
+    return this.repo.lastPlacementIdsBy(employeeId, onDate, tx);
+  }
+
   findManyByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {
     return this.repo.findEmployeesByCodes(employeeCodes, tx);
+  }
+
+  findManyByNormalizedEmails(normalizedEmails: readonly string[], tx?: DbTx) {
+    return this.repo.findEmployeesByNormalizedEmails(normalizedEmails, tx);
   }
 
   workEmailDomains(tx?: DbTx): Promise<string[]> {
@@ -143,8 +164,21 @@ export class EmployeeRecordService {
     return this.repo.searchActiveEmployees(search, onDate, limit, excludeEmployeeIds);
   }
 
+  pageAmong(employeeIds: readonly string[], search: string | undefined, skip: number, take: number) {
+    return this.repo.pageAmong(employeeIds, search, skip, take);
+  }
+
   profile(employeeId: string, onDate: Date): Promise<EmployeeProfile | null> {
     return this.repo.findProfile(employeeId, onDate);
+  }
+
+  placementsBetween(
+    employeeIds: readonly string[],
+    from: BusinessDate,
+    to: BusinessDate,
+    tx?: DbTx,
+  ): Promise<EmployeePlacementSpan[]> {
+    return this.repo.placementsBetween(employeeIds, from, to, tx);
   }
 
   /** The database clock at the start of the caller's transaction: the instant the new employee's `created_at` gets. */

@@ -4,8 +4,10 @@ import request from 'supertest';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { VendorRecordService } from '../../../src/modules/catalog/vendor/vendor-record.service';
 import { bodyOf } from '../../support/api-body';
+import { declareApplication, declarePlan, declareSubscription } from '../../support/builders/catalog.builder';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 import { waitForLockWaiters } from '../../support/lock-wait';
+import { intakeBodyOf } from '../../support/application-body';
 
 const h = new SeatHarness();
 const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
@@ -18,6 +20,23 @@ async function sqlState(client: Client, text: string, values: unknown[] = []): P
     return null;
   } catch (error) {
     return (error as { code?: string }).code ?? 'unknown';
+  }
+}
+
+/** The SQLSTATE and the constraint a rejected statement names: which rule of the database said no, not only that one did. */
+async function refusalOf(
+  client: Client,
+  text: string,
+  values: unknown[] = [],
+): Promise<{ code: string; constraint: string | null } | null> {
+  try {
+    await client.query(text, values);
+
+    return null;
+  } catch (error) {
+    const { code, constraint } = error as { code?: string; constraint?: string };
+
+    return { code: code ?? 'unknown', constraint: constraint ?? null };
   }
 }
 
@@ -77,13 +96,14 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
     request(h.server())
       .post('/api/v1/applications')
       .set(as())
-      .send({
-        kind: 'SAAS',
-        dataSensitivity: 'LOW',
-        businessOwnerEmployeeId: h.businessOwner,
-        communication: NO,
-        ...body,
-      });
+      .send(
+        intakeBodyOf({
+          kind: 'SAAS',
+          dataSensitivity: 'LOW',
+          communication: NO,
+          ...body,
+        }),
+      );
   const dictionary = async (groupName: string, lineName: string) => {
     const created = h.dataOf<{ id: string }>(
       await request(h.server())
@@ -365,6 +385,135 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
       expect(h.codeOf(response)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
       expect(h.detailsOf(response)).toEqual({ reason: 'LICENSE_KEYS' });
       expect(await sqlState(sql(), `UPDATE plans SET provisioning_type = 'K1' WHERE id = $1`, [plan])).toBe('23514');
+    }, 60_000);
+
+    it('B-5: a K4 plan is bought once, so a term cannot be declared for it (422 SUBSCRIPTION.K4_PERPETUAL_ONLY) and a perpetual purchase can', async () => {
+      const k4 = await h.plan('K4');
+      const declare = (body: object) =>
+        request(h.server())
+          .post('/api/v1/subscriptions')
+          .set(as())
+          .send({ planId: k4, ...body });
+      const before = (await sql().query<{ n: number }>(`SELECT count(*)::int AS n FROM subscriptions`)).rows[0].n;
+
+      const term = await declare({
+        kind: 'TERM',
+        billingCycle: 'MONTHLY',
+        startDate: '2026-03-15',
+        purchasedQuantity: 5,
+      });
+
+      expect(term.status).toBe(422);
+      expect(h.codeOf(term)).toBe('SUBSCRIPTION.K4_PERPETUAL_ONLY');
+      expect((await sql().query<{ n: number }>(`SELECT count(*)::int AS n FROM subscriptions`)).rows[0].n).toBe(before);
+      expect((await declare({ kind: 'PERPETUAL', startDate: '2026-03-15', purchasedQuantity: 5 })).status).toBe(201);
+    }, 60_000);
+
+    it('CT-1: refuses to leave K4 while a perpetual purchase of an application that is not licensed hangs on it, and lets a licensed one go', async () => {
+      const perpetual = (planId: string) =>
+        declareSubscription(h.ctx, h.it1.accessToken, {
+          planId,
+          kind: 'PERPETUAL',
+          startDate: '2026-03-15',
+          purchasedQuantity: 5,
+        });
+      // A K4 plan of an application that is not LICENSED, which is what the one command of the catalog makes (B-5).
+      const saas = await declareApplication(h.ctx, h.it1.accessToken, {
+        name: h.unique('Bought once app'),
+        kind: 'SAAS',
+        vendorName: h.unique('Vendor'),
+        dataSensitivity: 'LOW',
+      });
+      const bought = await declarePlan(h.ctx, h.it1.accessToken, {
+        applicationId: saas,
+        name: h.unique('Bought once'),
+        provisioningType: 'K4',
+        controlLevel: 'FULL',
+      });
+      await perpetual(bought);
+
+      const response = await patchPlan(bought, { provisioningType: 'K2' });
+
+      expect(response.status).toBe(409);
+      expect(h.codeOf(response)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
+      expect(h.detailsOf(response)).toEqual({ reason: 'PERPETUAL_SUBSCRIPTIONS' });
+      expect(
+        (await sql().query<{ type: string }>(`SELECT provisioning_type AS type FROM plans WHERE id = $1`, [bought]))
+          .rows[0].type,
+      ).toBe('K4');
+      expect(await sqlState(sql(), `UPDATE plans SET provisioning_type = 'K2' WHERE id = $1`, [bought])).toBe('23514');
+      // A licensed application was always allowed the purchase on any plan: its plan may leave K4.
+      const licensed = await h.plan('K4');
+      await sql().query(
+        `UPDATE applications SET kind = 'LICENSED' WHERE id = (SELECT application_id FROM plans WHERE id = $1)`,
+        [licensed],
+      );
+      await perpetual(licensed);
+      expect((await patchPlan(licensed, { provisioningType: 'K1' })).status).toBe(200);
+    }, 60_000);
+  });
+
+  describe('DB-07 (C-R1): a plan bought once keeps no subscription over a term', () => {
+    const kindOf = async (planId: string) =>
+      (
+        await sql().query<{ provisioning_type: string; pricing_model: string | null }>(
+          `SELECT provisioning_type, pricing_model FROM plans WHERE id = $1`,
+          [planId],
+        )
+      ).rows[0];
+
+    it('refuses to enter K4 while a term subscription hangs on the plan: 409 PLAN.IN_USE_BLOCKS_CHANGE reason TERM_SUBSCRIPTIONS, the plan stays as it was, and the database refuses too', async () => {
+      const subscription = await h.subscription(10, 'K1');
+      const plan = await planOfSubscription(subscription);
+      const before = await kindOf(plan);
+
+      const response = await patchPlan(plan, { provisioningType: 'K4' });
+
+      expect(response.status).toBe(409);
+      expect(h.codeOf(response)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
+      expect(h.detailsOf(response)).toEqual({ reason: 'TERM_SUBSCRIPTIONS' });
+      expect(await kindOf(plan)).toEqual(before);
+      expect(await refusalOf(sql(), `UPDATE plans SET provisioning_type = 'K4' WHERE id = $1`, [plan])).toEqual({
+        code: '23514',
+        constraint: 'plans_change_keeps_terms',
+      });
+    }, 60_000);
+
+    it('refuses the same for a plan of seats (K2) with the profile of its workspace admins, and leaves the profile as it was', async () => {
+      const subscription = await h.subscription(10, 'K2');
+      const plan = await planOfSubscription(subscription);
+      const before = await kindOf(plan);
+      const profileOf = async () =>
+        (
+          await sql().query<{ profiles: string; admins: string }>(
+            `SELECT (SELECT count(*) FROM plan_workspace_profiles WHERE plan_id = $1)::text AS profiles,
+                    (SELECT count(*) FROM plan_workspace_admins WHERE plan_id = $1)::text AS admins`,
+            [plan],
+          )
+        ).rows[0];
+      expect(await profileOf()).toEqual({ profiles: '1', admins: '2' });
+
+      const response = await patchPlan(plan, { provisioningType: 'K4' });
+
+      expect(response.status).toBe(409);
+      expect(h.codeOf(response)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
+      expect(h.detailsOf(response)).toEqual({ reason: 'TERM_SUBSCRIPTIONS' });
+      expect(await kindOf(plan)).toEqual(before);
+      expect(await profileOf()).toEqual({ profiles: '1', admins: '2' });
+      expect(await refusalOf(sql(), `UPDATE plans SET provisioning_type = 'K4' WHERE id = $1`, [plan])).toEqual({
+        code: '23514',
+        constraint: 'plans_change_keeps_terms',
+      });
+    }, 60_000);
+
+    it('lets a plan with no subscription enter K4, and a plan that is K4 already stays K4 (the trigger looks at the change of kind only)', async () => {
+      const empty = await h.plan('K1');
+      expect((await patchPlan(empty, { provisioningType: 'K4' })).status).toBe(200);
+      expect((await kindOf(empty)).provisioning_type).toBe('K4');
+
+      const bought = await h.subscription(5, 'K4');
+      const plan = await planOfSubscription(bought);
+      expect((await patchPlan(plan, { name: h.unique('Renamed bought once') })).status).toBe(200);
     }, 60_000);
   });
 

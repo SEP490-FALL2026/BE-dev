@@ -1,23 +1,42 @@
 import { demoSteps } from './seed-steps';
-import { SHARED_DEMO_V3 } from './fixture/shared-demo-v3';
+import { SHARED_DEMO_V4 } from './fixture/shared-demo-v4';
 
 describe('the steps of the shared dataset', () => {
-  const steps = demoSteps(SHARED_DEMO_V3);
+  const steps = demoSteps(SHARED_DEMO_V4);
+  const keys = steps.map((step) => step.key);
 
   it('has each key once, and every step after the steps it needs', () => {
-    expect(new Set(steps.map((step) => step.key)).size).toBe(steps.length);
+    expect(new Set(keys).size).toBe(steps.length);
     steps.forEach((step, index) => {
       const before = steps.slice(0, index).map((candidate) => candidate.key);
       for (const needed of step.needs) expect(before).toContain(needed);
     });
   });
 
-  it('records the invoices after the requests whose commitments they are recorded against, and the next-year proposal before the requests', () => {
-    const keys = steps.map((step) => step.key);
-    const invoices = steps.find((step) => step.key === 'finance.invoices');
+  it('has no step for the exchange rates: the price of a plan is written in dong and the route of the rates is gone (FX-2)', () => {
+    expect(keys).not.toContain('finance.exchange-rates');
+    for (const step of steps) expect(step.needs).not.toContain('finance.exchange-rates');
+  });
 
-    expect(invoices?.needs).toEqual(expect.arrayContaining(['requests.R1', 'requests.R10', 'requests.R11']));
-    expect(keys.indexOf('finance.invoices')).toBeGreaterThan(keys.indexOf('requests.R11'));
+  it('has a step for every scenario request, after the baseline and the approved budgets they stand on', () => {
+    for (const request of SHARED_DEMO_V4.requests) {
+      expect(keys).toContain(`requests.${request.key}`);
+      expect(keys.indexOf(`requests.${request.key}`)).toBeGreaterThan(keys.indexOf('budget.year'));
+      expect(keys.indexOf(`requests.${request.key}`)).toBeGreaterThan(keys.indexOf('catalog.baseline-close'));
+    }
+  });
+
+  it('records SBF-20 and closes the months only once every request stands where the fixture puts it', () => {
+    for (const key of ['renewals.adjustments', 'demo.budget-reviews']) {
+      const step = steps.find((candidate) => candidate.key === key)!;
+      for (const request of SHARED_DEMO_V4.requests) expect(step.needs).toContain(`requests.${request.key}`);
+    }
+  });
+
+  it('runs the rules of MF-5 after the usage is imported and the people moved, and the head decides after the rules', () => {
+    expect(keys.indexOf('rules.first-run')).toBeGreaterThan(keys.indexOf('usage.imports'));
+    expect(keys.indexOf('rules.first-run')).toBeGreaterThan(keys.indexOf('personnel.events'));
+    expect(keys.indexOf('ghost.decisions')).toBeGreaterThan(keys.indexOf('rules.first-run'));
     expect(keys.indexOf('budget.next-year')).toBeGreaterThan(keys.indexOf('budget.year'));
   });
 });

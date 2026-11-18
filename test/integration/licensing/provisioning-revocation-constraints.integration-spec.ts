@@ -92,6 +92,19 @@ describe('the tasks of a revocation (integration, PostgreSQL constraints)', () =
 
     return { id, code };
   };
+  /** An extension task (a renewal the IT Admin extends), with an id the test knows: it answers for a request, as a grant does. */
+  const extensionWithId = async (assignmentId: string): Promise<{ id: string; code: string | null }> => {
+    const id = randomUUID();
+    const code = await sqlState(
+      sql,
+      `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, request_id, max_attempts,
+         created_by_app_user_id)
+       VALUES ($1, $2, $3, 'EXTEND', 'MANUAL', $4, 4, $5)`,
+      [id, organizationId, assignmentId, randomUUID(), person()],
+    );
+
+    return { id, code };
+  };
   const claimed = async (assignmentId?: string) => {
     const made = await revocation({ ...(assignmentId ? { assignmentId } : {}) });
     await sql.query(
@@ -398,6 +411,61 @@ describe('the tasks of a revocation (integration, PostgreSQL constraints)', () =
       const { id } = await revocation();
 
       expect(await sqlState(sql, `DELETE FROM provisioning_tasks WHERE id = $1`, [id])).toBe('55000');
+    });
+  });
+
+  describe('the checklist of a K1 task (QĐ-111az)', () => {
+    const renewal = { completion: 'RENEWAL_CANCELLED', paid_through_on: '2026-11-30', access_state: 'UNTIL_PAID_END' };
+    const checklist = JSON.stringify({
+      variant: 'STILL_EMPLOYED',
+      items: [{ code: 'RENEWAL_DISABLED', order: 1, doneAt: '2026-11-13T08:00:00.000Z' }],
+    });
+
+    it('is kept with the completion as a JSON object, and nothing else is kept', async () => {
+      const id = await claimed();
+
+      expect(await complete(id, { ...renewal, k1_checklist: '[1]' })).toBe('23514');
+      expect(await complete(id, { ...renewal, k1_checklist: '"RENEWAL_DISABLED"' })).toBe('23514');
+      expect(await complete(id, { ...renewal, k1_checklist: checklist })).toBeNull();
+      const { rows } = await sql.query<{ variant: string }>(
+        `SELECT k1_checklist->>'variant' AS variant FROM provisioning_tasks WHERE id = $1`,
+        [id],
+      );
+      expect(rows[0].variant).toBe('STILL_EMPLOYED');
+    });
+
+    it('is written while the task is in progress, and never changed once the task is completed', async () => {
+      const id = await claimed();
+      const set = (target: string) =>
+        sqlState(sql, `UPDATE provisioning_tasks SET k1_checklist = $2::jsonb WHERE id = $1`, [target, checklist]);
+
+      expect(await set(id)).toBeNull();
+      expect(await complete(id, renewal)).toBeNull();
+      expect(await set(id)).toBe('55000');
+    });
+
+    it('belongs to a revocation or to a grant (K1-GR): an extension has none, and a revocation made before it has NULL', async () => {
+      const assignmentId = await newAssignment();
+      const { id: granted, code } = await grantWithId(assignmentId);
+      const { id: extended, code: extensionCode } = await extensionWithId(assignmentId);
+      const { id: revoked } = await revocation();
+      const set = (target: string, value: string) =>
+        sqlState(sql, `UPDATE provisioning_tasks SET k1_checklist = $2::jsonb WHERE id = $1`, [target, value]);
+      const forGrant = JSON.stringify({
+        variant: 'GRANT',
+        items: [{ code: 'COMPANY_EMAIL_REGISTERED', order: 1, doneAt: '2026-11-15T08:00:00.000Z' }],
+      });
+
+      expect(code).toBeNull();
+      expect(extensionCode).toBeNull();
+      expect(await set(granted, forGrant)).toBeNull();
+      expect(await set(granted, '[1]')).toBe('23514');
+      expect(await set(extended, forGrant)).toBe('23514');
+      const { rows } = await sql.query<{ k1_checklist: unknown }>(
+        `SELECT k1_checklist FROM provisioning_tasks WHERE id = $1`,
+        [revoked],
+      );
+      expect(rows[0].k1_checklist).toBeNull();
     });
   });
 

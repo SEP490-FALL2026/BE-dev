@@ -66,7 +66,7 @@ describe('the time a request took (US-05-15 AC-1, AC-6, AC-11)', () => {
     });
   });
 
-  it('has no time of Finance after the approval, and at most one segment of each of the six kinds', () => {
+  it('has no time of Finance (its review is retired) and at most one segment of each of the five kinds, a step of before ignored', () => {
     const { segments } = timingsOf(
       paid({
         steps: [
@@ -83,12 +83,9 @@ describe('the time a request took (US-05-15 AC-1, AC-6, AC-11)', () => {
       'NEED',
       'IT_ASSESSMENT',
       'QUEUE_WAIT',
-      'FINANCE_REVIEW',
       'SPEND_DECISION',
       'GRANT',
     ]);
-    expect(segments.filter((segment) => segment.kind === 'FINANCE_REVIEW')).toHaveLength(1);
-    expect(segments.find((segment) => segment.kind === 'FINANCE_REVIEW')?.startedAt).toEqual(at(5, 13));
   });
 
   it('takes the assessment of the IT Admin into the approval of new software', () => {
@@ -165,12 +162,12 @@ describe('the time a request took (US-05-15 AC-1, AC-6, AC-11)', () => {
     });
   });
 
-  it('shows only the latest wait when Finance gave the request back and the head sent it on again', () => {
+  it('shows only the latest wait when the check at the decision sent the request back and the head sent it on again', () => {
     const { segments } = timingsOf(
       paid({
         steps: [
           step('NEED', 'APPROVED', at(1), at(2)),
-          step('FINANCE_REVIEW', 'COMPLETED', at(5), at(7)),
+          step('SPEND_APPROVAL', 'CLOSED', at(5), at(7)),
           step('SPEND_APPROVAL', 'APPROVED', at(9), at(10)),
         ],
         queueSentAt: at(8),

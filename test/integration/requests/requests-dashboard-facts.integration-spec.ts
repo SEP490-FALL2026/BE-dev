@@ -138,7 +138,7 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
       await request(h.server())
         .post('/api/v1/access-requests/drafts')
         .set(h.as(person.account))
-        .send({ kind: 'INDIVIDUAL', planId: paid, businessReason: 'Design the new brand', termMonths: 6 })
+        .send({ kind: 'INDIVIDUAL', planId: paid, businessReason: 'Design the new brand' })
         .expect(201);
       // Somebody else's request is not theirs, and nor is one the head sent for them and a colleague: it is the head's.
       await h.sent(colleague, await freshInternal());
@@ -183,11 +183,11 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
       const third = await h.sent(member, await freshInternal());
       expect(await needCounts(u.head)).toEqual({ facade: 3, list: 3 });
 
-      // The request of the head is decided by the spending approver, not by the head: it is the approver's step.
+      // MF1-D (BR-MF1-02): the request of the head goes one step: it is a need step of nobody, the head and the approver alike.
       const approverBefore = await needCounts(h.boss);
       await h.sent(u.head, await freshInternal());
       expect(await needCounts(u.head)).toEqual({ facade: 3, list: 3 });
-      expect(await needCounts(h.boss)).toEqual({ facade: approverBefore.list + 1, list: approverBefore.list + 1 });
+      expect(await needCounts(h.boss)).toEqual({ facade: approverBefore.list, list: approverBefore.list });
 
       // A step the head decided is no longer waiting for them.
       await h.decide(third.id, { decision: 'APPROVE' }, u.head.account).expect(200);
@@ -205,9 +205,9 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
 
     it('moves a step from the head who held it to the one who holds it now', async () => {
       const u = await unit();
-      const member = await employeeOf(u);
-      await h.sent(member, await freshInternal());
-      await h.sent(member, await freshInternal());
+      // Paid requests: free internal software goes to the IT Admin when the department has no head (QĐ-111bc), so it does not wait for one.
+      await h.sent(await employeeOf(u), paid, { termMonths: 1 });
+      await h.sent(await employeeOf(u), paid, { termMonths: 1 });
       expect(await needCounts(u.head)).toEqual({ facade: 2, list: 2 });
       const successor = await h.staff(u.department, `${u.department.code}-S${number}`);
 

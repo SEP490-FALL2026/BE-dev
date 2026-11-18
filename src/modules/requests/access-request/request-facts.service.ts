@@ -1,8 +1,8 @@
-import { checkTerm, termLimitOf, type TermLimit } from '../../../core/term-limit';
 import type { HeldAccess } from './access-request.types';
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
+import { checkTermMonths, termRunOf, type TermKind, type TermRefusal, type TermRun } from '../../../core/term-limit';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
@@ -15,19 +15,17 @@ import {
 } from './access-request.errors';
 import { hasSpendStep, policyFor, proposalPolicy, type RequestPolicy } from './access-request.policy';
 import type { PricingRecord } from './access-request.types';
-import { priceRequest } from './pricing.policy';
+import { pricingRecordFor, type RequestPriceInput } from './pricing.policy';
 import { RoutingFactsService, type GatheredRouting } from './routing-facts.service';
-import { routeNeedStep, type RoutingDecision } from './routing.policy';
+import { routeNeedStep, requestRoutingOf, type RoutingDecision } from './routing.policy';
+import { TransferGraceHoldContributions, type TransferGraceHolding } from '../public/requests.extension-points';
 
 /** The parameter that says how long an approval step may wait; read when a request is sent and fixed in its policy. */
 const APPROVAL_SLA_PARAMETER = 'APPROVAL_SLA_WORKING_DAYS';
-/** The month the fiscal year begins in: it gives the budget year of the day the money is expected to go out. */
-const FISCAL_YEAR_PARAMETER = 'FISCAL_YEAR_START_MONTH';
 
 /** The operating parameters a request is judged by, read once before the transaction opens. */
 export interface RequestSettings {
   slaWorkingDays: number;
-  fiscalYearStartMonth: number;
 }
 
 /**
@@ -50,9 +48,16 @@ export interface Assessment {
   pricing: PricingRecord;
   routing: GatheredRouting & { decision: RoutingDecision };
   heldAccess: HeldAccess | null;
-  /** What term the plan takes on the day (`US-05-01` AC-4) and whether the term asked for breaks it. */
-  termLimit: TermLimit;
-  termBeyondLimit: boolean;
+  /**
+   * The seat held is a right from before a transfer whose grace still lasts (`QĐ-110q`, R-49): asking for it again is let through the check of the seat
+   * held and the count of the limits (GH-2; a duplicate of the plan stays refused), and the request replaces that right. Null when nothing is held, or the seat is not one of those.
+   */
+  graceHold: TransferGraceHolding | null;
+  /** What is wrong with the time of use asked for, or null (`QĐ-111i`, `FR-2.8`); and the run it has for the person from today (R-38, R-39). */
+  termRefusal: TermRefusal | null;
+  term: TermRun;
+  /** The last day of the contract of the person with a term; null for anybody else or a contract not known (`TERM_CONTRACT_ENDED` says it). */
+  contractEndDate: BusinessDate | null;
 }
 
 /** What a proposal of software that is not in the catalog is judged by: there is no plan, so no price or seat. */
@@ -64,6 +69,10 @@ export interface ProposalAssessment {
   /** Missing until the IT Admin records a quote (`US-05-06` AC-11): the request is not yet priced. */
   pricing: PricingRecord;
   routing: GatheredRouting & { decision: RoutingDecision };
+  /** What is wrong with the time of use asked for, or null; and the run it has for the person from today (`QĐ-111i`). */
+  termRefusal: TermRefusal | null;
+  term: TermRun;
+  contractEndDate: BusinessDate | null;
 }
 
 export interface AssessmentInput {
@@ -72,8 +81,17 @@ export interface AssessmentInput {
   /** Who sends it, when it is not the person it is for (`US-03-02`); the need step is routed from them. */
   requesterEmployeeId?: string;
   planId: string;
-  termMonths: number;
-  expectedSpendOn?: BusinessDate;
+  /**
+   * The time of use in months (`QĐ-111i`); null for _Dùng lâu dài_, a right with no end; absent when the form says nothing, which a plan
+   * asked by the month refuses.
+   */
+  termMonths?: number | null;
+  /**
+   * The day the time of use begins when it is not today: a request to go on using begins the day after the right ends (`QĐ-98`, `QĐ-109b`). Given,
+   * the request is for the renewal of a right: the months are judged and run from that day as for any request (`QĐ-111l`), a plan bought once is
+   * refused (it has no end to move), and the end is kept as the end of the new period; a start in a year after today costs nothing in this one.
+   */
+  termStart?: BusinessDate;
   now: Date;
   settings: RequestSettings;
   /** Sending locks the department of the sender against change until commit; showing a preview locks nothing. */
@@ -99,13 +117,13 @@ export class RequestFactsService {
     private readonly routing: RoutingFactsService,
     private readonly parameters: OperatingParametersApi,
     private readonly licensing: LicensingApi,
+    private readonly graceHolds: TransferGraceHoldContributions,
   ) {}
 
   /** Read before the transaction opens, so a slow parameter read never holds a lock. */
   async settings(): Promise<RequestSettings> {
     return {
       slaWorkingDays: Number(await this.parameters.getValue(APPROVAL_SLA_PARAMETER)),
-      fiscalYearStartMonth: Number(await this.parameters.getValue(FISCAL_YEAR_PARAMETER)),
     };
   }
 
@@ -131,15 +149,23 @@ export class RequestFactsService {
         : this.organizationReads.requireUnitCostCenter(found);
     if (input.lockDepartment) await this.organizationReads.lockDepartmentShared(tx, unit.departmentId);
 
+    const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
+    const renewing = input.termStart !== undefined;
+    const judged = this.termOf({
+      today: input.termStart ?? today,
+      kind: target.provisioningType,
+      termMonths: input.termMonths,
+      employee,
+      renewing,
+    });
     const pricing = await this.priceFor(tx, {
       planId: input.planId,
-      departmentId: unit.departmentId,
       free: policy.branch === 'INTERNAL_FREE',
-      termMonths: input.termMonths,
       beneficiaries: 1,
-      expectedSpendOn: input.expectedSpendOn,
-      today,
-      fiscalYearStartMonth: input.settings.fiscalYearStartMonth,
+      checkDate: today,
+      endDate: judged.term.end,
+      endIsDerived: !renewing,
+      from: input.termStart,
     });
     const gathered = await this.routing.gather(tx, {
       requesterEmployeeId: input.requesterEmployeeId ?? input.employeeId,
@@ -148,22 +174,22 @@ export class RequestFactsService {
       chainHasSpendStep: hasSpendStep(policy),
     });
 
+    const heldAccess = await this.heldAccess(input.employeeId, input.planId);
+
     return {
       today,
       unit,
       target,
-      policy,
+      policy: policyFor(
+        target.applicationKind,
+        input.settings.slaWorkingDays,
+        requestRoutingOf(routeNeedStep(gathered.facts)),
+      ),
       pricing,
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
-      heldAccess: await this.heldAccess(input.employeeId, input.planId),
-      ...(await this.termCheck(tx, {
-        planId: input.planId,
-        departmentId: unit.departmentId,
-        free: policy.branch === 'INTERNAL_FREE',
-        termMonths: input.termMonths,
-        today,
-        fiscalYearStartMonth: input.settings.fiscalYearStartMonth,
-      })),
+      heldAccess,
+      graceHold: heldAccess ? await this.graceHoldOf(tx, input.employeeId, heldAccess, today) : null,
+      ...judged,
     };
   }
 
@@ -174,7 +200,7 @@ export class RequestFactsService {
    */
   async assessProposal(
     tx: DbTx,
-    input: Pick<AssessmentInput, 'employeeId' | 'expectedSpendOn' | 'now' | 'settings' | 'lockDepartment'>,
+    input: Pick<AssessmentInput, 'employeeId' | 'termMonths' | 'now' | 'settings' | 'lockDepartment'>,
   ): Promise<ProposalAssessment> {
     const today = await this.organizationReads.businessToday(input.now, tx);
     const found = (await this.organizationReads.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
@@ -183,7 +209,7 @@ export class RequestFactsService {
     if (input.lockDepartment) await this.organizationReads.lockDepartmentShared(tx, unit.departmentId);
 
     const policy = proposalPolicy(input.settings.slaWorkingDays);
-    const expectedSpendOn = input.expectedSpendOn ?? today;
+    const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
     const gathered = await this.routing.gather(tx, {
       requesterEmployeeId: input.employeeId,
       departmentId: unit.departmentId,
@@ -194,44 +220,78 @@ export class RequestFactsService {
     return {
       today,
       unit,
-      policy,
+      policy: proposalPolicy(input.settings.slaWorkingDays, requestRoutingOf(routeNeedStep(gathered.facts))),
       pricing: {
         status: 'MISSING',
         missingReason: 'AWAITING_QUOTE',
-        expectedSpendOn,
-        budgetYear: fiscalYearOf(expectedSpendOn, input.settings.fiscalYearStartMonth),
+        kind: null,
+        expectedEndDate: null,
+        amountMonths: null,
+        budgetYear: fiscalYearOf(today),
         amount: null,
         unitPrice: null,
         billingCycle: null,
-        schedule: null,
+        nextYearAmount: null,
       },
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
+      // The kind of plan of a proposal is not known until the IT Admin registers it: the rule that takes the most (1 to 12 months, or none) judges it.
+      ...this.termOf({ today, kind: 'K2', termMonths: input.termMonths, employee }),
     };
   }
 
-  /** The term limit of the plan from today, and whether the term asked for breaks it; a flexible plan is the one the department can cut mid-term. */
-  async termCheck(
-    tx: DbTx,
-    input: {
-      planId: string;
-      departmentId: string;
-      free: boolean;
-      termMonths: number;
-      today: BusinessDate;
-      fiscalYearStartMonth: number;
-    },
-  ): Promise<{ termLimit: TermLimit; termBeyondLimit: boolean }> {
-    const flexible = input.free
-      ? false
-      : ((await this.catalog.getPlanPrice(input.planId, input.departmentId, tx))?.allowsMidTermReduction ?? false);
-    const facts = {
-      start: input.today,
-      months: input.termMonths,
-      flexible,
-      fiscalYearStartMonth: input.fiscalYearStartMonth,
-    };
+  /**
+   * The time of use judged for the person (`QĐ-111i`, `FR-2.8`): what is wrong with it, if anything, and the run it has from `today`: its end,
+   * cut at the end of the contract of a person with a term, and the months that begin by it (R-38, R-39). A term that is refused has no
+   * months, so nothing is counted on it.
+   */
+  termOf(facts: {
+    today: BusinessDate;
+    kind: TermKind;
+    termMonths: number | null | undefined;
+    employee: { employmentType: string; contractEndDate?: BusinessDate | null } | null;
+    /** The time of use is the one of a request to go on using a right: a plan bought once has no end to move, so it is never renewed (`QĐ-111l`). */
+    renewing?: boolean;
+  }): Pick<Assessment, 'termRefusal' | 'term' | 'contractEndDate'> {
+    const fixedTermPerson = (facts.employee?.employmentType ?? 'STAFF') !== 'STAFF';
+    const contractEndDate = facts.employee?.contractEndDate ?? null;
+    const termRefusal = checkTermMonths({
+      kind: facts.kind,
+      termMonths: facts.termMonths,
+      fixedTermPerson,
+      contractEndKnown: contractEndDate !== null,
+      renewing: facts.renewing === true,
+      contractEndDate,
+      termStart: facts.today,
+    });
+    const months = termRefusal === null && typeof facts.termMonths === 'number' ? facts.termMonths : null;
 
-    return { termLimit: termLimitOf(facts), termBeyondLimit: checkTerm(facts) !== null };
+    return {
+      termRefusal,
+      term: termRunOf({ start: facts.today, months, contractEndDate }),
+      contractEndDate,
+    };
+  }
+
+  /**
+   * Whether the seat held is a right from before a transfer whose grace still lasts (`QĐ-110q`, R-49): asked of the personnel context through the
+   * contributions this module opens (ADR-0019), the first that knows the right answering. With none added there is no grace, and the seat held refuses
+   * the request as it always did.
+   */
+  private async graceHoldOf(
+    tx: DbTx,
+    employeeId: string,
+    held: HeldAccess,
+    today: BusinessDate,
+  ): Promise<TransferGraceHolding | null> {
+    for (const contribution of this.graceHolds.all()) {
+      const found = await contribution.holdingOf(
+        { employeeId, assignmentId: held.assignmentId, effectiveFrom: held.effectiveFrom, today },
+        tx,
+      );
+      if (found !== null) return found;
+    }
+
+    return null;
   }
 
   /**
@@ -246,68 +306,12 @@ export class RequestFactsService {
   }
 
   /**
-   * What the request costs (`FR-3.2`): nothing for internal software, which also has no day the money goes out; for paid
-   * software the amount made from the price of its plan, the term and the people it is for, or a missing price that
-   * says why. The day the money is expected to go out is the sender's to give and today when they do not (`OQ-C-14`).
+   * What the request costs (`FR-3.2`, `BR-MF1-06`): nothing for internal software; for paid software the price of the months left
+   * of the calendar year of `checkDate` (the month it starts counted whole, or to the month of the end date), for the people it is for, or a
+   * missing price that says why. The price is the one of the main subscription of the plan, never a department's. `checkDate` is
+   * the day the amount is worked out on (`QĐ-109e`): the day of sending for a provisional amount, later the day of each check.
    */
-  async priceFor(
-    tx: DbTx,
-    input: {
-      planId: string;
-      /** The department of the request: only an active subscription it owns gives a price; never another department's. */
-      departmentId: string;
-      free: boolean;
-      termMonths: number;
-      beneficiaries: number;
-      expectedSpendOn: BusinessDate | undefined;
-      today: BusinessDate;
-      fiscalYearStartMonth: number;
-    },
-  ): Promise<PricingRecord> {
-    if (input.free) {
-      return {
-        status: 'NOT_APPLICABLE',
-        missingReason: null,
-        expectedSpendOn: null,
-        budgetYear: null,
-        amount: null,
-        unitPrice: null,
-        billingCycle: null,
-        schedule: null,
-      };
-    }
-    const expectedSpendOn = input.expectedSpendOn ?? input.today;
-    const price = await this.catalog.getPlanPrice(input.planId, input.departmentId, tx);
-    const priced = priceRequest({
-      unitPrice: price?.unitPrice ?? null,
-      billingCycle: price?.billingCycle ?? null,
-      termMonths: input.termMonths,
-      beneficiaries: input.beneficiaries,
-      expectedSpendOn,
-      fiscalYearStartMonth: input.fiscalYearStartMonth,
-    });
-    if (priced.status === 'MISSING') {
-      return {
-        status: 'MISSING',
-        missingReason: priced.reason,
-        expectedSpendOn,
-        budgetYear: priced.budgetYear,
-        amount: null,
-        unitPrice: null,
-        billingCycle: null,
-        schedule: null,
-      };
-    }
-
-    return {
-      status: 'PRICED',
-      missingReason: null,
-      expectedSpendOn,
-      budgetYear: priced.budgetYear,
-      amount: priced.amount,
-      unitPrice: priced.unitPrice,
-      billingCycle: priced.billingCycle,
-      schedule: priced.periods,
-    };
+  async priceFor(tx: DbTx, input: RequestPriceInput): Promise<PricingRecord> {
+    return pricingRecordFor(input, input.free ? null : await this.catalog.getPlanPrice(input.planId, tx));
   }
 }

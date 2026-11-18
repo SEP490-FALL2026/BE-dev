@@ -8,6 +8,7 @@ export function toDepartmentWire(view: DepartmentView) {
     name: view.name,
     function: view.functionDescription,
     status: view.status,
+    effectiveFrom: view.effectiveFrom,
     costCenter: view.costCenter,
     itAdmin: view.itAdmin
       ? {
@@ -17,6 +18,7 @@ export function toDepartmentWire(view: DepartmentView) {
           usable: view.itAdminUsable,
         }
       : null,
+    avatarUrl: view.avatarUrl,
     head: view.head,
     memberCount: view.memberCount,
     warnings: view.warnings,

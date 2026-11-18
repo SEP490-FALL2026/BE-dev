@@ -100,6 +100,7 @@ model Vendor {
   taxProfile      VendorTaxProfile?
   assessments     AccessRequestAssessment[]
   invoices        Invoice[]
+  contracts       Contract[]
 
   @@unique([organizationId, normalizedName])
   @@unique([organizationId, dictionaryGroupId])
@@ -113,6 +114,8 @@ model FunctionalGroup {
   name           String
   normalizedName String                @map("normalized_name")
   status         FunctionalGroupStatus @default(ACTIVE)
+  // QĐ-111bf: the two groups the system relies on (COMMUNICATION, OTHER) carry a key and are never renamed or switched off; null for the rest.
+  systemKey      String?               @map("system_key")
   createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -120,6 +123,7 @@ model FunctionalGroup {
   applications Application[]
 
   @@unique([organizationId, normalizedName])
+  @@unique([organizationId, systemKey])
   @@map("functional_groups")
 }
 
@@ -132,13 +136,22 @@ model Application {
   name                        String
   normalizedName              String          @map("normalized_name")
   dictionaryLineId            String?         @map("dictionary_line_id") @db.Uuid
-  functionalGroupId           String?         @map("functional_group_id") @db.Uuid
-  businessOwnerEmployeeId     String          @map("business_owner_employee_id") @db.Uuid
-  dataSensitivity             DataSensitivity @map("data_sensitivity")
-  commPersonToPersonMessaging Boolean         @map("comm_person_to_person_messaging")
-  commCallsOrMeetings         Boolean         @map("comm_calls_or_meetings")
-  commMailbox                 Boolean         @map("comm_mailbox")
-  isCommunicationService      Boolean         @map("is_communication_service")
+  // QĐ-111d: always one; an application declared with none stands in the fixed group Khác.
+  functionalGroupId           String          @map("functional_group_id") @db.Uuid
+  // QĐ-104 removed the Business Owner: null for an application declared since; older rows keep the person they named.
+  businessOwnerEmployeeId     String?         @map("business_owner_employee_id") @db.Uuid
+  // QĐ-111g: the IT Admin who answers for the application: the one who declared it, changed by a transfer of responsibility.
+  // Null for an application whose creator is no longer a usable IT Admin; `needsResponsible` is read from this column and the account.
+  responsibleItAdminEmployeeId String?        @map("responsible_it_admin_employee_id") @db.Uuid
+  // QĐ-111f: may be left empty.
+  dataSensitivity             DataSensitivity? @map("data_sensitivity")
+  // CT-1.L1: an https link to the logo image, pasted by the IT Admin (nothing is uploaded, the server never fetches it); at most 500 characters (a CHECK).
+  logoUrl                     String?         @map("logo_url")
+  // QĐ-111e: no longer asked or written; the group COMMUNICATION says an application is a communication service. Kept (default false) for the rows written before.
+  commPersonToPersonMessaging Boolean         @default(false) @map("comm_person_to_person_messaging")
+  commCallsOrMeetings         Boolean         @default(false) @map("comm_calls_or_meetings")
+  commMailbox                 Boolean         @default(false) @map("comm_mailbox")
+  isCommunicationService      Boolean         @default(false) @map("is_communication_service")
   communicationNote           String?         @map("communication_note")
   domains                     String[]        @default([])
   catalogStatus               CatalogStatus   @default(APPROVED) @map("catalog_status")
@@ -152,16 +165,21 @@ model Application {
   organization              Organization                        @relation(fields: [organizationId], references: [id])
   vendor                    Vendor?                             @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   dictionaryLine            VendorServiceLine?                  @relation(fields: [dictionaryLineId], references: [id], onDelete: Restrict)
-  functionalGroup           FunctionalGroup?                    @relation(fields: [functionalGroupId], references: [id], onDelete: Restrict)
-  businessOwner             Employee                            @relation(fields: [businessOwnerEmployeeId], references: [id])
+  functionalGroup           FunctionalGroup                     @relation(fields: [functionalGroupId], references: [id], onDelete: Restrict)
+  businessOwner             Employee?                           @relation("ApplicationLegacyBusinessOwner", fields: [businessOwnerEmployeeId], references: [id], onDelete: Restrict)
+  responsibleItAdmin        Employee?                           @relation("ApplicationResponsibleItAdmin", fields: [responsibleItAdminEmployeeId], references: [id], onDelete: Restrict)
   proposals                 VendorDictionaryProposal[]
   plans                     Plan[]
   applicationBusinessOwners ApplicationBusinessOwner[]
   retirementConfirmation    ApplicationRetirementConfirmation?  @relation("ApplicationRetiredOn", fields: [retirementConfirmationId], references: [id], onDelete: Restrict)
   retirementConfirmations   ApplicationRetirementConfirmation[] @relation("ApplicationConfirmed")
+  departmentSoftwareEntries   DepartmentSoftwareEntry[]
+  departmentSoftwareProposals DepartmentSoftwareProposal[]
+  shortProposals              AccessRequestProposal[]     @relation("ProposalExistingApplication")
 
   @@unique([organizationId, dictionaryLineId])
   @@index([functionalGroupId])
+  @@index([responsibleItAdminEmployeeId])
   @@map("applications")
 }
 
@@ -211,6 +229,11 @@ model Plan {
   revocationNote    String?          @map("revocation_note")
   dataLossOnRemoval Boolean          @default(false) @map("data_loss_on_removal")
   sharingPolicy     SharingPolicy?   @map("sharing_policy")
+  // R-53: a K4 plan the company administers through a console of the vendor needs two admins there (QĐ-110k). Only K4 may be true (a CHECK).
+  hasAdminConsole   Boolean          @default(false) @map("has_admin_console")
+  // QĐ-113a: the reference price in dong, before tax (K1/K2: one seat for one month; K4: one purchase). Both columns or none, VND, K1/K2/K4 only (CHECKs in the migration).
+  referencePriceMinor    BigInt?          @map("reference_price_minor")
+  referencePriceCurrency String?          @map("reference_price_currency") @db.Char(3)
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -218,20 +241,43 @@ model Plan {
   application            Application               @relation(fields: [applicationId], references: [id])
   workspaceProfile       PlanWorkspaceProfile?
   subscriptions          Subscription[]
+  usageRate              PlanUsageRate?
   terms                  PlanTerms?
   termOpinions           PlanTermOpinion[]
   seatBaselineImports    SeatBaselineImport[]
   licenseAssignments     LicenseAssignment[]
+  poolGrantAvoidedCosts  PoolGrantAvoidedCost[]
   accessRequests         AccessRequest[]
   returnRequests         ReturnRequest[]
   assessmentsEquivalent  AccessRequestAssessment[] @relation("AssessmentEquivalentPlan")
   assessmentsAlternative AccessRequestAssessment[] @relation("AssessmentAlternativePlan")
   budgetProposalLines    BudgetProposalLine[]      @relation("BudgetProposalLinePlan")
   budgetVersionLines     BudgetVersionLine[]       @relation("BudgetVersionLinePlan")
+  departmentSoftwareEntries   DepartmentSoftwareEntry[]
+  departmentSoftwareProposals DepartmentSoftwareProposal[]
 
   @@unique([organizationId, applicationId, normalizedName])
   @@index([applicationId])
   @@map("plans")
+}
+
+// KPI-3 of a plan priced per seat (QĐ-109d): how many of its seats showed activity in the 30 days before the last weekly pass of the usage
+// rules (MF-5), over how many that pass could judge. The pass (optimization) replaces the rows of the organization through the catalog
+// facade; the budget reads them over the seats bought. A plan with no row has no figure. The CHECKs and the foreign key to the
+// organization are in the migration 20261110040100_catalog_plan_usage_rates.
+model PlanUsageRate {
+  planId         String   @id @map("plan_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  activeSeats    Int      @map("active_seats")
+  assessedSeats  Int      @map("assessed_seats")
+  assessedOn     DateTime @map("assessed_on") @db.Date
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
+
+  plan         Plan         @relation(fields: [planId], references: [id], onDelete: Restrict)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@map("plan_usage_rates")
 }
 
 // The workspace of a K2 plan (QĐ-77d): who owns and administers it, and the emergency account. No secret is stored.
@@ -245,6 +291,9 @@ model PlanWorkspaceProfile {
   emergencyOccupiesSeat     Boolean?  @map("emergency_occupies_seat")
   emergencyHolderEmployeeId String?   @map("emergency_holder_employee_id") @db.Uuid
   emergencyLastReviewedOn   DateTime? @map("emergency_last_reviewed_on") @db.Date
+  // QĐ-110u: the email of the company account that stands as owner of the plan at the vendor (never a password), and a free note.
+  ownerAccountEmail         String?   @map("owner_account_email")
+  adminNote                 String?   @map("admin_note")
   createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -308,7 +357,12 @@ model Subscription {
   priceReportingMinor    BigInt?            @map("price_reporting_minor")
   priceReportingCurrency String?            @map("price_reporting_currency") @db.Char(3)
   priceExchangeRateId    String?            @map("price_exchange_rate_id") @db.Uuid
+  // The price a vendor quoted in another currency, kept beside the price in dong (QĐ-111an, R-44): the amount in the minor units of its own currency.
+  originalUnitPriceMinor BigInt?            @map("original_unit_price_minor")
+  originalCurrency       String?            @map("original_currency") @db.Char(3)
   billingCycle           BillingCycle?      @map("billing_cycle")
+  // The months the purchase commits to, 1 or 12 (QĐ-103e); a perpetual purchase has none (a CHECK). A new active term needs it (checked by the application).
+  commitmentTermMonths   Int?               @map("commitment_term_months") @db.SmallInt
   startDate              DateTime?          @map("start_date") @db.Date
   endDate                DateTime?          @map("end_date") @db.Date
   renewalDate            DateTime?          @map("renewal_date") @db.Date
@@ -316,8 +370,13 @@ model Subscription {
   noticePeriodDays       Int?               @map("notice_period_days")
   autoRenew              Boolean            @default(false) @map("auto_renew")
   allowsMidTermReduction Boolean            @default(false) @map("allows_mid_term_reduction")
-  // The department that owns the purchase (QĐ-89a): required, and never changed once set (a trigger).
-  ownerDepartmentId      String             @map("owner_department_id") @db.Uuid
+  // The IT Admin who answers for the subscription (QĐ-103v(4)): set when it is declared; null only for data older than the rule or a draft.
+  responsibleItAdminEmployeeId String?      @map("responsible_it_admin_employee_id") @db.Uuid
+  // The least number of seats the vendor sells (QĐ-103e), when it says one.
+  vendorMinimumSeats     Int?               @map("vendor_minimum_seats")
+  // The subscription that prices the plan when there are several of it (Q-04): at most one per plan (a unique partial index).
+  isPrimaryForPlan       Boolean            @default(false) @map("is_primary_for_plan")
+  // The department that owns the purchase (QĐ-89a): nullable since gói 9 (phần cấp từ kho không được ghi phòng sở hữu).
   // The period this one continues (QĐ-16): set once, when the outcome of a renewal is recorded; a period has at most one
   // successor (the unique index) and the link never changes (a trigger).
   renewedFromId          String?            @unique @map("renewed_from_id") @db.Uuid
@@ -326,43 +385,23 @@ model Subscription {
 
   organization        Organization                 @relation(fields: [organizationId], references: [id])
   plan                Plan                         @relation(fields: [planId], references: [id])
-  ownerDepartment     Department                   @relation("SubscriptionOwnerDepartment", fields: [ownerDepartmentId], references: [id], onDelete: Restrict)
+  responsibleItAdmin  Employee?                    @relation("SubscriptionResponsibleItAdmin", fields: [responsibleItAdminEmployeeId], references: [id], onDelete: Restrict)
   renewedFrom         Subscription?                @relation("SubscriptionRenewalChain", fields: [renewedFromId], references: [id], onDelete: Restrict)
   renewedBy           Subscription?                @relation("SubscriptionRenewalChain")
   renewalCases        SubscriptionRenewal[]        @relation("RenewalOfPeriod")
   renewalNextOf       SubscriptionRenewal?         @relation("RenewalNextPeriod")
   deadlineEvent       SubscriptionDeadlineEvent?
-  ownerAssignment     SubscriptionOwnerAssignment?
   priceCurrency       Currency?                    @relation("SubscriptionPriceCurrency", fields: [unitPriceCurrency], references: [code], onDelete: Restrict)
+  originalCurrencyRecord Currency?                 @relation("SubscriptionOriginalCurrency", fields: [originalCurrency], references: [code], onDelete: Restrict)
   exchangeRate        ExchangeRate?                @relation(fields: [priceExchangeRateId], references: [id], onDelete: Restrict)
   seatBaselineImports SeatBaselineImport[]
   licenseAssignments  LicenseAssignment[]
   licenseKeys         LicenseKey[]
+  contractLink        ContractSubscription?
 
   @@index([planId])
-  @@index([ownerDepartmentId])
+  @@index([responsibleItAdminEmployeeId])
   @@map("subscriptions")
-}
-
-// The durable record of the basis on which an operator gave an existing subscription its owner department (QĐ-89e,
-// `pnpm ops:assign-subscription-owner`). Added to, never changed: the final release copies the department from here
-// into `subscriptions.owner_department_id` and keeps the row as the evidence.
-model SubscriptionOwnerAssignment {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  subscriptionId String   @unique @map("subscription_id") @db.Uuid
-  departmentId   String   @map("department_id") @db.Uuid
-  basisReference String   @map("basis_reference")
-  operatorRef    String   @map("operator_ref")
-  environment    String
-  assignedAt     DateTime @default(now()) @map("assigned_at") @db.Timestamptz(3)
-
-  organization Organization @relation(fields: [organizationId], references: [id])
-  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
-  department   Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-
-  @@index([departmentId])
-  @@map("subscription_owner_assignments")
 }
 
 // What IT read in the terms of a plan (US-04-11): a link, the date of the last review and the points of the checklist, as
@@ -458,19 +497,52 @@ enum DocumentStatus {
   EXPIRED
 }
 
-// A contract, for now only a name (the Story of the contract itself is not written, OQ-B-17). Never changed or deleted.
+// A contract with a vendor (US-04-13, QĐ-111t). The fields beyond the name are optional in the table because the rows made when a contract was
+// only a name have none: such a contract reads as incomplete until the IT Admin fills them in. A contract that is made now has a vendor and an
+// effective-from day (the application checks it); an empty effective-to day means it never ends. There is no kind of contract and no renewal
+// date or terms here (they belong to the subscription and the plan). `numberKey` is the number as `searchKey` reads it, unique in the organization.
+// Never deleted; what a change touches is the fields below, and who made it, where and when stay (a trigger).
 model Contract {
-  id                 String   @id @default(uuid()) @db.Uuid
-  organizationId     String   @map("organization_id") @db.Uuid
+  id                 String    @id @default(uuid()) @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
   name               String
+  vendorId           String?   @map("vendor_id") @db.Uuid
+  number             String?
+  numberKey          String?   @map("number_key")
+  effectiveFrom      DateTime? @map("effective_from") @db.Date
+  effectiveTo        DateTime? @map("effective_to") @db.Date
+  note               String?
   // A value, not a foreign key: the record outlives the account (as the audit trail does).
-  createdByAppUserId String   @map("created_by_app_user_id") @db.Uuid
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdByAppUserId String    @map("created_by_app_user_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization         @relation(fields: [organizationId], references: [id])
-  documents    DocumentAttachment[]
+  organization  Organization           @relation(fields: [organizationId], references: [id])
+  vendor        Vendor?                @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  documents     DocumentAttachment[]
+  subscriptions ContractSubscription[]
 
+  @@unique([organizationId, numberKey])
+  @@index([vendorId])
   @@map("contracts")
+}
+
+// The link of a subscription of a shared stock (K2 or K4) to the contract it rests on (QĐ-111t): a subscription has at most one contract (the
+// unique index), the contract and the subscription have the same vendor, and the plan is K2 or K4 (a trigger says no to the rest). A link is
+// made and unmade by the IT Admin, each with its audit event; the contract itself is never deleted.
+model ContractSubscription {
+  id                String   @id @default(uuid()) @db.Uuid
+  contractId        String   @map("contract_id") @db.Uuid
+  subscriptionId    String   @unique @map("subscription_id") @db.Uuid
+  // A value, not a foreign key, as on the contract.
+  linkedByAppUserId String   @map("linked_by_app_user_id") @db.Uuid
+  linkedAt          DateTime @default(now()) @map("linked_at") @db.Timestamptz(3)
+
+  contract     Contract     @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+
+  @@index([contractId, linkedAt])
+  @@map("contract_subscriptions")
 }
 
 // A private file kept for a contract. The bytes are in the object storage; this row says where and what they are. It
@@ -491,6 +563,10 @@ model DocumentAttachment {
   contractId          String?         @map("contract_id") @db.Uuid
   // A `SIGNATURE_RECORD` belongs to the person who signed it, not to a contract (BM-06).
   signerEmployeeId    String?         @map("signer_employee_id") @db.Uuid
+  // A `PURCHASE_DOCUMENT` that came with a purchase invoice of the requests context belongs to it (PI-1): a value, not a foreign key.
+  purchaseInvoiceId   String?         @map("purchase_invoice_id") @db.Uuid
+  // The proof of payment a case outside the process (`SBF-07a`) was closed with belongs to it (RC-2): a value, not a foreign key.
+  outOfProcessCaseId  String?         @map("out_of_process_case_id") @db.Uuid
   attachedAt          DateTime?       @map("attached_at") @db.Timestamptz(3)
   createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
 
@@ -498,6 +574,8 @@ model DocumentAttachment {
   contract     Contract?    @relation(fields: [contractId], references: [id], onDelete: Restrict)
 
   @@index([contractId])
+  @@index([purchaseInvoiceId])
+  @@index([outOfProcessCaseId])
   @@index([uploadedByAppUserId, status])
   @@map("document_attachments")
 }

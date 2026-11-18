@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import type { OperatorAuditActor } from '../../licensing/public/licensing-handover.types';
+import type { OperatorAuditActor } from '../../licensing/public/licensing.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ControlledWaitAlertService } from './controlled-wait-alert.service';
 import {
@@ -10,6 +10,7 @@ import {
   touchesHeldStep,
   type OpenStep,
   type ReassignableStepKind,
+  type ReassignmentDecision,
   type ReassignmentTrigger,
 } from '../step-routing/reassignment.policy';
 import { reassignmentAuditEvent } from './reassignment-audit.mapper';
@@ -18,6 +19,7 @@ import {
   type ReassignableRequest,
   type ReassignableStep,
 } from '../step-routing/step-reassignment.repo';
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { StepTargetService, type TodayFacts } from '../step-routing/step-target.service';
 
 /** The events a pass of the worker looks again at a request for. */
@@ -34,6 +36,8 @@ export interface ReconcileResult {
   assignedFromWait: number;
   /** Steps that went on waiting, for another reason (`QĐ-93k(2)`). */
   rewaited: number;
+  /** Need steps that ended as not required: free internal software of a department with no head goes to the IT Admin (`QĐ-111bc`). */
+  endedNotRequired: number;
   /** Alerts raised for a stretch of waiting that had none. */
   alerted: number;
 }
@@ -60,6 +64,7 @@ export class StepReassignmentService {
     private readonly alerts: ControlledWaitAlertService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
+    private readonly spending: SpendRoutingService,
   ) {}
 
   // --- what the worker looks at: the requests no event carried, each in a transaction of its own -------------------
@@ -113,6 +118,7 @@ export class StepReassignmentService {
       madeToWait: 0,
       assignedFromWait: 0,
       rewaited: 0,
+      endedNotRequired: 0,
       alerted: 0,
     };
     const requests = await this.repo.lockWithOpenSteps(tx, requestIds);
@@ -160,7 +166,6 @@ export class StepReassignmentService {
     const { gone, operator } = context;
     const steps = request.steps.map((step) => ({ ...step }));
     let state = request.state;
-    let holdersChanged = false;
 
     for (const step of steps) {
       if (!OPEN.has(step.state)) continue;
@@ -210,6 +215,17 @@ export class StepReassignmentService {
 
       const previous = step.assigneeEmployeeId;
       const previousReason = step.waitingReason;
+      if (decision.action === 'END_NOT_REQUIRED') {
+        await this.endNeedStep(tx, request, step, decision, { trigger, correlationId, now, operator });
+        step.state = 'NOT_REQUIRED';
+        step.assigneeEmployeeId = null;
+        step.waitingReason = null;
+        step.waitingSince = null;
+        // The one-step route of free software sets this state (`SpendRoutingService.start`).
+        state = 'AWAITING_EXECUTION';
+        result.endedNotRequired += 1;
+        continue;
+      }
       if (decision.action === 'ASSIGN') {
         await this.repo.assign(tx, step.id, decision.assigneeEmployeeId, decision.routingRow, now);
         const wasWaiting = open.state === 'WAITING';
@@ -274,10 +290,44 @@ export class StepReassignmentService {
         result.madeToWait += 1;
         result.alerted += await this.alert(tx, request, step, correlationId);
       }
-      if (step.kind === 'NEED' || step.kind === 'SPEND_APPROVAL') holdersChanged = true;
     }
+  }
 
-    if (holdersChanged) await this.flagSamePerson(tx, request, steps, facts);
+  /**
+   * Free internal software of a department that has no head: nobody needs to decide the need step, so it ends and the request goes to the
+   * IT Admin the way one sent now does (`QĐ-111bc`, `D-78`): the one-step route writes the state and the audit flag `NO_NEED_APPROVER`,
+   * which is what the Super Admin reads. The step is no longer open, so no later pass finds it again.
+   */
+  private async endNeedStep(
+    tx: DbTx,
+    request: ReassignableRequest,
+    step: ReassignableStep,
+    decision: Extract<ReassignmentDecision, { action: 'END_NOT_REQUIRED' }>,
+    context: { trigger: ReassignmentTrigger; correlationId: string; now: Date; operator?: OperatorAuditActor },
+  ): Promise<void> {
+    const { trigger, correlationId, now, operator } = context;
+    await this.repo.endNeedStepNotRequired(tx, request.id, step.id, decision.routingRow, decision.oneStepReason);
+    await this.audit.record(
+      tx,
+      reassignmentAuditEvent(
+        request.organizationId,
+        'ACCESS_REQUEST.STEP_NOT_REQUIRED',
+        'ACCESS_REQUEST_STEP',
+        step.id,
+        {
+          requestId: request.id,
+          stepKind: step.kind,
+          trigger: trigger.kind,
+          source: correlationId,
+          oneStepReason: decision.oneStepReason,
+          stepCreatedAt: step.createdAt.toISOString(),
+        },
+        correlationId,
+        { assigneeEmployeeId: step.assigneeEmployeeId, waitingReason: step.waitingReason },
+        operator,
+      ),
+    );
+    await this.spending.start(tx, null, request.id, now);
   }
 
   /** The request follows the step: waiting under control while a step waits, the state of the step once it is held. */
@@ -321,34 +371,5 @@ export class StepReassignmentService {
     );
 
     return raised ? 1 : 0;
-  }
-
-  /**
-   * One person holding the need step and the spend step is flagged on both (`US-05-03` AC-9). Once a spend step is open the
-   * flag follows whether the two holders are the same; before it, the need step is flagged when its holder is the spending
-   * approver of a chain that has a spend step.
-   */
-  private async flagSamePerson(
-    tx: DbTx,
-    request: ReassignableRequest,
-    steps: readonly ReassignableStep[],
-    facts: TodayFacts,
-  ): Promise<void> {
-    const need = steps.find((step) => step.kind === 'NEED');
-    const spend = steps.find((step) => step.kind === 'SPEND_APPROVAL' && OPEN.has(step.state));
-    if (!need) return;
-
-    const same = spend
-      ? need.assigneeEmployeeId !== null && need.assigneeEmployeeId === spend.assigneeEmployeeId
-      : request.chainHasSpendStep &&
-        need.assigneeEmployeeId !== null &&
-        need.assigneeEmployeeId === facts.spendingApproverEmployeeId;
-    const changing = [need, ...(spend ? [spend] : [])].filter((step) => step.samePersonAsSpend !== same);
-    await this.repo.flagSamePerson(
-      tx,
-      changing.map((step) => step.id),
-      same,
-    );
-    for (const step of changing) step.samePersonAsSpend = same;
   }
 }

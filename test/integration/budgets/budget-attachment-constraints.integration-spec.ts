@@ -78,7 +78,6 @@ describe('budget record attachments and history (integration, PostgreSQL constra
       reserve_minor: 20,
       total_minor: 80,
       currency: 'VND',
-      high_value_percent: 50,
       created_by_employee_id: employeeId,
       ...over,
     };

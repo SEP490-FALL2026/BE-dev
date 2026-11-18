@@ -123,10 +123,12 @@ describe('plans and workspace profiles (integration, PostgreSQL constraints)', (
   });
 
   describe('plans', () => {
-    it('ties the pricing model to the kind: K1, K2, K4 have one, K3 and K5 have none', async () => {
+    it('ties the pricing model to the kind: K1 and K2 have one, K3 and K5 have none, K4 either (it is bought once, B-5)', async () => {
       expect(await insertPlan({ type: 'K1', pricing: 'FLAT_RATE' })).toBeNull();
       expect(await insertPlan({ type: 'K2', pricing: 'PER_SEAT' })).toBeNull();
       expect(await insertPlan({ type: 'K4', pricing: 'PER_HOST' })).toBeNull();
+      expect(await insertPlan({ type: 'K4', pricing: null, name: 'K4 bought once' })).toBeNull();
+      expect(await insertPlan({ type: 'K2', pricing: null })).toBe('23514');
       expect(await insertPlan({ type: 'K1', pricing: null })).toBe('23514');
       expect(await insertPlan({ type: 'K5', applicationId: internalId, pricing: 'PER_SEAT' })).toBe('23514');
       expect(await insertPlan({ type: 'K3', pricing: 'PER_SEAT' })).toBe('23514');
@@ -173,14 +175,14 @@ describe('plans and workspace profiles (integration, PostgreSQL constraints)', (
   });
 
   describe('workspace profiles', () => {
-    it('exists only for a K2 or K3 plan (trigger)', async () => {
+    it('exists only for a K2, K3 or K4 plan (trigger; X-IT.4b lets a K4 plan with an admin console have one)', async () => {
       const k2 = await planWithType('K2');
       const k1 = await planWithType('K1');
       const k4 = await planWithType('K4');
 
       expect(await insertProfile(k2, [null, null, null, null])).toBeNull();
       expect(await insertProfile(k1, [null, null, null, null])).toBe('23514');
-      expect(await insertProfile(k4, [null, null, null, null])).toBe('23514');
+      expect(await insertProfile(k4, [null, null, null, null])).toBeNull();
     });
 
     it('holds the four emergency account fields together or none of them', async () => {

@@ -4,8 +4,9 @@ import { BusinessDate, fromDateColumn, toDateColumn } from '../../../core/busine
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { Grounds } from '../personnel-grounds.policy';
+import { recordedGroundsOf, type RecordedGrounds } from '../personnel-grounds.policy';
 import { transferHeadHandoverJson } from '../personnel-head-handover.json';
+import { snapshotAfterJson, snapshotBeforeJson } from '../transfer-grace/transfer-snapshot.json';
 import type {
   HeadHandoverFacts,
   TransferChangeRecord,
@@ -23,7 +24,13 @@ const SUMMARY = {
   toDepartmentId: true,
   effectiveOn: true,
   status: true,
+  closedAt: true,
+  supersededByCaseId: true,
+  graceEndsOn: true,
+  graceReminderOn: true,
 } as const;
+
+const dayOrNull = (value: Date | null): BusinessDate | null => (value === null ? null : fromDateColumn(value));
 
 function toRecord(row: TransferRow): TransferRecord {
   return {
@@ -37,12 +44,7 @@ function toRecord(row: TransferRow): TransferRecord {
     closesPlacementId: row.closesPlacementId,
     opensPlacementId: row.opensPlacementId,
     headHandover: transferHeadHandoverJson.decode(row.headHandover),
-    grounds: {
-      type: row.groundsType,
-      reference: row.groundsReference,
-      issuer: row.groundsIssuer,
-      issuedOn: fromDateColumn(row.groundsIssuedOn),
-    },
+    grounds: recordedGroundsOf(row),
     recordedByAppUserId: row.recordedByAppUserId,
     recordedByTicketId: row.recordedByTicketId,
     recordedAt: row.recordedAt,
@@ -53,14 +55,60 @@ function toRecord(row: TransferRow): TransferRecord {
     cancelledReason: row.cancelledReason,
     closedAt: row.closedAt,
     closedByAppUserId: row.closedByAppUserId,
+    closedBySystem: row.closedBySystem,
+    supersededByCaseId: row.supersededByCaseId,
+    graceEndsOn: dayOrNull(row.graceEndsOn),
+    graceReminderOn: dayOrNull(row.graceReminderOn),
+    remindedAt: row.remindedAt,
+    snapshotBefore: snapshotBeforeJson.decode(row.snapshotBefore),
+    snapshotAfter: snapshotAfterJson.decode(row.snapshotAfter),
   };
 }
 
-const groundsColumns = (grounds: Grounds) => ({
+/** A transfer as another module reads it (the rules of wasted seats): where the person goes and whether it is over. */
+export interface TransferFactRow {
+  employeeId: string;
+  transferId: string;
+  fromDepartmentId: string;
+  toDepartmentId: string;
+  effectiveOn: BusinessDate;
+  status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
+  closedAt: Date | null;
+}
+
+const toFact = (row: {
+  id: string;
+  employeeId: string;
+  fromDepartmentId: string;
+  toDepartmentId: string;
+  effectiveOn: Date;
+  status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
+  closedAt: Date | null;
+}): TransferFactRow => ({
+  employeeId: row.employeeId,
+  transferId: row.id,
+  fromDepartmentId: row.fromDepartmentId,
+  toDepartmentId: row.toDepartmentId,
+  effectiveOn: fromDateColumn(row.effectiveOn),
+  status: row.status,
+  closedAt: row.closedAt,
+});
+
+const FACT_COLUMNS = {
+  id: true,
+  employeeId: true,
+  fromDepartmentId: true,
+  toDepartmentId: true,
+  effectiveOn: true,
+  status: true,
+  closedAt: true,
+} as const;
+
+const groundsColumns = (grounds: RecordedGrounds) => ({
   groundsType: grounds.type,
   groundsReference: grounds.reference,
   groundsIssuer: grounds.issuer,
-  groundsIssuedOn: toDateColumn(grounds.issuedOn),
+  groundsIssuedOn: grounds.issuedOn ? toDateColumn(grounds.issuedOn) : null,
 });
 
 /**
@@ -85,6 +133,13 @@ export class TransferRepo {
       | 'cancelledReason'
       | 'closedAt'
       | 'closedByAppUserId'
+      | 'closedBySystem'
+      | 'supersededByCaseId'
+      | 'graceEndsOn'
+      | 'graceReminderOn'
+      | 'remindedAt'
+      | 'snapshotBefore'
+      | 'snapshotAfter'
     > & { noticeId?: string | null },
   ): Promise<TransferRecord> {
     const created = await tx.departmentTransfer.create({
@@ -131,18 +186,26 @@ export class TransferRepo {
     return row && toRecord(row);
   }
 
-  /** How many reviews of the tools the transfer opened still wait for the head (a part of the record that is not closed). */
-  countOpenReviews(tx: DbTx, transferId: string): Promise<number> {
-    return tx.transferReview.count({ where: { transferId, status: 'OPEN' } });
+  /**
+   * The transfer of the employee that took effect and is not closed yet (`QĐ-110r`: the system closes it once every right of the old
+   * department is taken back); the latest if there are more. A day that has come but was not settled yet is settled by the caller first.
+   */
+  async findUnclosedOf(tx: DbTx, employeeId: string): Promise<TransferRecord | null> {
+    const row = await tx.departmentTransfer.findFirst({
+      where: { employeeId, status: 'EFFECTIVE', closedAt: null },
+      orderBy: [{ effectiveOn: 'desc' }, { id: 'desc' }],
+    });
+
+    return row && toRecord(row);
   }
 
   /** Whether a transfer that waits names this person to follow the head of the department it leaves. */
-  async isNamedSuccessorOfPending(tx: DbTx, employeeId: string): Promise<boolean> {
+  async pendingTransferNaming(tx: DbTx, employeeId: string): Promise<string | null> {
     const rows = await tx.$queryRaw<{ id: string }[]>`
       SELECT id FROM department_transfers
        WHERE status = 'PENDING' AND head_handover ->> 'successorEmployeeId' = ${employeeId} LIMIT 1`;
 
-    return rows.length > 0;
+    return rows[0]?.id ?? null;
   }
 
   /**
@@ -230,16 +293,6 @@ export class TransferRepo {
     return toRecord(row);
   }
 
-  /** Closes an effective transfer that is not closed yet: only the two columns of the closing change. */
-  async close(tx: DbTx, id: string, appUserId: string): Promise<TransferRecord> {
-    const row = await tx.departmentTransfer.update({
-      where: { id },
-      data: { closedAt: new Date(), closedByAppUserId: appUserId },
-    });
-
-    return toRecord(row);
-  }
-
   async insertChange(
     tx: DbTx,
     input: {
@@ -248,7 +301,7 @@ export class TransferRepo {
       oldEffectiveOn: BusinessDate;
       newEffectiveOn: BusinessDate | null;
       reason: string;
-      grounds: Grounds;
+      grounds: RecordedGrounds;
       changedByAppUserId: string | null;
       changedByTicketId: string | null;
     },
@@ -284,6 +337,14 @@ export class TransferRepo {
         : {}),
       ...(filter.employeeId ? { employeeId: filter.employeeId } : {}),
       ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.graceEndsBefore || filter.graceEndsFrom
+        ? {
+            graceEndsOn: {
+              ...(filter.graceEndsBefore ? { lt: toDateColumn(filter.graceEndsBefore) } : {}),
+              ...(filter.graceEndsFrom ? { gte: toDateColumn(filter.graceEndsFrom) } : {}),
+            },
+          }
+        : {}),
       ...(filter.effectiveFrom || filter.effectiveTo
         ? {
             effectiveOn: {
@@ -305,7 +366,13 @@ export class TransferRepo {
         });
 
         return {
-          items: rows.map((row) => ({ ...row, effectiveOn: fromDateColumn(row.effectiveOn) })),
+          items: rows.map(({ closedAt, ...row }) => ({
+            ...row,
+            effectiveOn: fromDateColumn(row.effectiveOn),
+            closed: closedAt !== null,
+            graceEndsOn: dayOrNull(row.graceEndsOn),
+            graceReminderOn: dayOrNull(row.graceReminderOn),
+          })),
           total: await tx.departmentTransfer.count({ where }),
         };
       },
@@ -334,12 +401,7 @@ export class TransferRepo {
             oldEffectiveOn: fromDateColumn(row.oldEffectiveOn),
             newEffectiveOn: row.newEffectiveOn ? fromDateColumn(row.newEffectiveOn) : null,
             reason: row.reason,
-            grounds: {
-              type: row.groundsType,
-              reference: row.groundsReference,
-              issuer: row.groundsIssuer,
-              issuedOn: fromDateColumn(row.groundsIssuedOn),
-            },
+            grounds: recordedGroundsOf(row),
             changedByAppUserId: row.changedByAppUserId,
             changedByTicketId: row.changedByTicketId,
             changedAt: row.changedAt,
@@ -349,5 +411,32 @@ export class TransferRepo {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
+  }
+  /** The transfers of these people that have taken effect on `onDate` and are not closed yet (not cancelled, the service accounts not settled). */
+  async inOverlap(employeeIds: readonly string[], onDate: BusinessDate): Promise<TransferFactRow[]> {
+    if (employeeIds.length === 0) return [];
+    const rows = await this.prisma.departmentTransfer.findMany({
+      where: {
+        employeeId: { in: [...employeeIds] },
+        status: { in: ['PENDING', 'EFFECTIVE'] },
+        effectiveOn: { lte: toDateColumn(onDate) },
+        closedAt: null,
+      },
+      select: FACT_COLUMNS,
+      orderBy: [{ effectiveOn: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map(toFact);
+  }
+
+  /** The transfers with these ids, whatever their state. */
+  async factsOf(transferIds: readonly string[]): Promise<TransferFactRow[]> {
+    if (transferIds.length === 0) return [];
+    const rows = await this.prisma.departmentTransfer.findMany({
+      where: { id: { in: [...transferIds] } },
+      select: FACT_COLUMNS,
+    });
+
+    return rows.map(toFact);
   }
 }

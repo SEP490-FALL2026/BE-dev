@@ -6,10 +6,18 @@ export type WorkspaceRole = 'OWNER' | 'ADMIN';
 export type SeatTracking = 'APPLICABLE' | 'NOT_APPLICABLE';
 export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
 
+/** The reference price of a plan, in minor units of dong (`QĐ-113a`). */
+export interface ReferencePrice {
+  amountMinor: bigint;
+  currency: string;
+}
+
 export interface PlanRecord {
   id: string;
   applicationId: string;
   applicationName: string;
+  /** The https link to the logo image the IT Admin pasted, or null. */
+  applicationLogoUrl: string | null;
   applicationKind: ApplicationKind;
   name: string;
   provisioningType: ProvisioningType;
@@ -18,6 +26,10 @@ export interface PlanRecord {
   revocationNote: string | null;
   dataLossOnRemoval: boolean;
   sharingPolicy: SharingPolicy | null;
+  /** A `K4` plan the company administers through a console of the vendor (`R-53`); false for every other kind. */
+  hasAdminConsole: boolean;
+  /** The price a request is counted by when no subscription of the plan has one (`QĐ-113a`); null when none is entered. */
+  referencePrice: ReferencePrice | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +55,9 @@ export interface WorkspaceProfileRecord {
     holderEmployeeId: string;
     lastReviewedOn: string;
   } | null;
+  /** The email of the company account that stands as owner of the plan at the vendor; no password (`QĐ-110u`). */
+  ownerAccountEmail: string | null;
+  adminNote: string | null;
   updatedAt: Date;
 }
 
@@ -65,12 +80,19 @@ export interface WorkspaceProfileView {
     holder: PersonView;
     lastReviewedOn: string;
   } | null;
+  ownerAccountEmail: string | null;
+  adminNote: string | null;
   updatedAt: Date;
 }
 
 export interface PlanListFilter {
   applicationId?: string;
   provisioningType?: ProvisioningType;
+  functionalGroupId?: string;
+  /** The catalog status of the application of the plan. */
+  status?: 'APPROVED' | 'RETIRED';
+  /** Text in the name of the plan or of its application. */
+  search?: string;
   skip: number;
   take: number;
 }
@@ -85,6 +107,8 @@ export interface NewPlan {
   revocationNote: string | null;
   dataLossOnRemoval: boolean;
   sharingPolicy: SharingPolicy | null;
+  hasAdminConsole: boolean;
+  referencePrice: ReferencePrice | null;
 }
 
 export interface PlanChanges {
@@ -95,6 +119,8 @@ export interface PlanChanges {
   revocationNote?: string | null;
   dataLossOnRemoval?: boolean;
   sharingPolicy?: SharingPolicy | null;
+  hasAdminConsole?: boolean;
+  referencePrice?: ReferencePrice | null;
 }
 
 /** The plan and the facts about it the capabilities that hang off it read: a subscription, the terms. */
@@ -104,11 +130,10 @@ export interface PlanLookup {
   provisioningType: ProvisioningType;
   pricingModel: PricingModel | null;
   sharingPolicy: SharingPolicy | null;
+  hasAdminConsole: boolean;
   applicationId: string;
   applicationName: string;
   applicationKind: ApplicationKind;
   /** Whether the application is still in the catalog or has been retired. */
   applicationStatus: 'APPROVED' | 'RETIRED';
-  /** The Business Owner of the application now. */
-  businessOwnerEmployeeId: string;
 }

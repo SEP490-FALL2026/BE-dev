@@ -1,19 +1,22 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { RenewalFinancialSnapshot } from '../public/licensing-subscription-renewal.types';
 
-export type RenewalChoice = 'RENEW' | 'REDUCE' | 'CANCEL';
-/** `STALE`: a proposal closed because it was out of date when the head confirmed it; the IT Admin proposes again. */
+export type RenewalChoice = 'RENEW' | 'REDUCE' | 'CANCEL' | 'INCREASE';
+/** `STALE`: a case closed without an outcome: one waiting for the head when the one-write renewal came, or one out of date. */
 export type RenewalState = 'PROPOSED' | 'DECIDED' | 'OUTCOME_RECORDED' | 'STALE';
 export type ExecutionPoint = 'AS_PLANNED' | 'MID_TERM' | 'NEXT_RENEWAL';
 export type RenewalOutcomeKind = 'AS_DECIDED' | 'VENDOR_REFUSED' | 'DIFFERENT' | 'UNCONFIRMED';
-export type NoticeBasis = 'DECLARED' | 'INFERRED_UNCONFIRMED' | 'BY_END_DATE';
-/** `SPENDING_APPROVER` and `CONFLICT_SUBSTITUTE` are historical: a decision of before `QĐ-94d`(2); none is written now. */
-export type DeciderRole = 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'OWNER_DEPARTMENT_HEAD';
+export type NoticeBasis = 'DECLARED' | 'INFERRED_UNCONFIRMED' | 'BY_END_DATE' | 'BY_RENEWAL_DATE' | 'BY_PAYMENT_DATE';
+/**
+ * `SPENDING_APPROVER`, `CONFLICT_SUBSTITUTE` and `OWNER_DEPARTMENT_HEAD` are historical: a decision of before the one-write renewal
+ * (`QĐ-103e`). `IT_ADMIN_IN_CHARGE` is the one written now: the IT Admin who records the result decides alone.
+ */
+export type DeciderRole = 'SPENDING_APPROVER' | 'CONFLICT_SUBSTITUTE' | 'OWNER_DEPARTMENT_HEAD' | 'IT_ADMIN_IN_CHARGE';
 export type DeadlineOutcome = 'AUTO_RENEWAL_INCIDENT' | 'EXPIRY_MARKED';
 /** The order a seat is offered in when a reduction goes below the seats in use (`QĐ-66x`). */
 export type SeatRankGroup = 'REVOCATION_DECIDED' | 'HOLDER_LEFT' | 'USAGE_FLAGGED' | 'OTHER';
 
-export const RENEWAL_CHOICES = ['RENEW', 'REDUCE', 'CANCEL'] as const;
+export const RENEWAL_CHOICES = ['RENEW', 'REDUCE', 'CANCEL', 'INCREASE'] as const;
 export const RENEWAL_OUTCOMES = ['AS_DECIDED', 'VENDOR_REFUSED', 'DIFFERENT', 'UNCONFIRMED'] as const;
 
 /** The snapshot frozen with a decision: the money the decider saw, or that none was connected. */
@@ -55,7 +58,8 @@ export interface RenewalRecord {
   proposedChoice: RenewalChoice;
   proposedQuantity: number | null;
   proposalNote: string | null;
-  businessOwnerOpinion: string | null;
+  /** The seats the system counted for the next period when the result was recorded; null on a case written before. */
+  seatsNeeded: number | null;
   proposedByEmployeeId: string;
   proposedAt: Date;
   decision: RenewalDecisionRecord | null;
@@ -71,7 +75,7 @@ export interface NewRenewal {
   proposedChoice: RenewalChoice;
   proposedQuantity: number | null;
   proposalNote: string | null;
-  businessOwnerOpinion: string | null;
+  seatsNeeded: number | null;
   proposedByEmployeeId: string;
   proposedByAppUserId: string;
 }
@@ -90,6 +94,16 @@ export interface ReleasedSeat {
   assignmentId: string;
   rankGroup: SeatRankGroup;
   position: number;
+}
+
+/** What the database says of the seats of a subscription for the count of the seats its next period needs (`SBF-20` §4.3). */
+export interface SeatsNeededFacts {
+  /** Seats not being taken back whose last day is after the renewal day (no end counts). */
+  heldPastRenewal: number;
+  /** The seats not being taken back that are in effect today and end by the renewal day: a request to go on using may wait for each. */
+  endingAssignmentIds: string[];
+  /** The seats not ended today (a seat that starts later and one being taken back included), as the renewal outcome counts them. */
+  activeSeatsToday: number;
 }
 
 /** A seat held on a subscription on a day, with what the ranking of a reduction reads of it. */

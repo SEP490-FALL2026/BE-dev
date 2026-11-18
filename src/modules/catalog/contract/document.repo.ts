@@ -21,6 +21,16 @@ export interface DocumentRecord {
   createdAt: Date;
 }
 
+/** A file attached to a contract as the contract shows it: what it is, never where its bytes are. */
+export interface AttachedDocumentRow {
+  id: string;
+  purpose: DocumentPurpose;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  attachedAt: Date;
+}
+
 /**
  * The one writer of `document_attachments`: where a file is and what it is, never its bytes and never a link. A file
  * moves one way (the database refuses anything else) and is never deleted.
@@ -76,6 +86,27 @@ export class DocumentRepo {
     });
   }
 
+  /** The files attached to a contract, the last attached first, at most `limit`. */
+  async attachedTo(contractId: string, limit: number): Promise<AttachedDocumentRow[]> {
+    const rows = await this.prisma.documentAttachment.findMany({
+      where: { contractId, status: 'READY' },
+      select: {
+        id: true,
+        purpose: true,
+        fileName: true,
+        contentType: true,
+        sizeBytes: true,
+        attachedAt: true,
+        createdAt: true,
+      },
+      orderBy: [{ attachedAt: 'desc' }, { id: 'asc' }],
+      take: limit,
+    });
+
+    // A file is READY exactly when it has its owner and the time it got it (a CHECK), so the second is never missing.
+    return rows.map(({ createdAt, attachedAt, ...document }) => ({ ...document, attachedAt: attachedAt ?? createdAt }));
+  }
+
   async markQuarantined(tx: DbTx, id: string): Promise<void> {
     await tx.documentAttachment.update({ where: { id }, data: { status: 'QUARANTINED' } });
   }
@@ -84,6 +115,22 @@ export class DocumentRepo {
     await tx.documentAttachment.update({
       where: { id },
       data: { status: 'READY', contractId, attachedAt: now },
+    });
+  }
+
+  /** A purchase document belongs to the purchase invoice it came with, in the transaction of the caller. */
+  async markAttachedToPurchaseInvoice(tx: DbTx, id: string, purchaseInvoiceId: string, now: Date): Promise<void> {
+    await tx.documentAttachment.update({
+      where: { id },
+      data: { status: 'READY', purchaseInvoiceId, attachedAt: now },
+    });
+  }
+
+  /** A proof of payment belongs to the case outside the process it was closed with, in the transaction of the caller. */
+  async markAttachedToOutOfProcessCase(tx: DbTx, id: string, outOfProcessCaseId: string, now: Date): Promise<void> {
+    await tx.documentAttachment.update({
+      where: { id },
+      data: { status: 'READY', outOfProcessCaseId, attachedAt: now },
     });
   }
 

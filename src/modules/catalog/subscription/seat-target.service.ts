@@ -3,6 +3,7 @@ import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { SeatTarget, SeatTargetRef } from '../public/catalog.types';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import type { LockedPlan as PlanLookup } from '../plan/plan-facts.service';
+import { isPricedInDong } from './price/subscription-price.policy';
 import { missingData } from './subscription.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import type { SubscriptionRecord } from './subscription.types';
@@ -20,7 +21,6 @@ const ofPlan = (plan: PlanLookup): SeatTarget => ({
   status: null,
   missing: [],
   purchasedQuantity: null,
-  ownerDepartmentId: null,
   allowsMidTermReduction: false,
 });
 
@@ -35,11 +35,9 @@ const ofSubscription = (subscription: SubscriptionRecord, plan: PlanLookup): Sea
     quantity: subscription.purchasedQuantity,
     startDate: subscription.startDate,
     billingCycle: subscription.billingCycle,
-    hasPrice: subscription.unitPrice !== null,
-    hasSnapshot: subscription.priceSnapshot !== null,
+    hasPrice: isPricedInDong(subscription),
   }),
   purchasedQuantity: subscription.purchasedQuantity,
-  ownerDepartmentId: subscription.ownerDepartmentId,
   allowsMidTermReduction: subscription.allowsMidTermReduction,
 });
 

@@ -1,6 +1,7 @@
 import { CURRENT_POLICY_VERSION, type RequestPolicy } from '../access-request/access-request.policy';
 import type { AccessRequestState } from '../access-request/access-request.types';
-import type { AssessmentFields } from '../access-request/assessment-record.types';
+import type { Money } from '../../../core/money/money';
+import type { AssessmentFields, Quote } from '../access-request/assessment-record.types';
 
 /**
  * The rules of the assessment the IT Admin completes for software that is not in the catalog (`US-05-06`, `BM-02`), as
@@ -12,20 +13,50 @@ import type { AssessmentFields } from '../access-request/assessment-record.types
 export type CompletionVerdict =
   | { kind: 'OK' }
   | { kind: 'INCOMPLETE'; missing: string[] }
-  /** Internal software is completed by registering it in the catalog with its Business Owner (`US-05-20`), not here. */
+  /** Internal software is completed by registering it in the catalog (`US-05-20`), not here. */
   | { kind: 'INTERNAL_BY_REGISTRATION' }
   /** A tool that cannot be controlled is refused at the gate with a reason (`US-05-18` AC-1), not sent on. */
-  | { kind: 'UNCONTROLLABLE' };
+  | { kind: 'UNCONTROLLABLE' }
+  /** A plan of internal software costs nothing: it has no quote and no spending approver (`QĐ-111d`, `QĐ-103p`), so a short proposal for it is rejected, not completed. */
+  | { kind: 'FREE_PLAN' };
 
 const REQUIRED_FLAGS = ['adminConsole', 'memberExport', 'sso'] as const;
 
 /**
+ * What the IT Admin assesses: the software with its plan, or the plan alone when the proposal names an application the catalog already has
+ * (case B, short: `QĐ-111a`, the IT Admin does not assess the application again).
+ */
+export type AssessmentScope = 'FULL' | 'PLAN_ONLY';
+
+export const assessmentScopeOf = (proposal: { existingApplicationId: string | null }): AssessmentScope =>
+  proposal.existingApplicationId === null ? 'FULL' : 'PLAN_ONLY';
+
+/**
+ * What the assessment of a plan alone still lacks (`QĐ-111a`: terms, price, kind of provisioning; R-53: whether a K4 plan has an admin console of
+ * the vendor): nothing of the application, which the catalog already holds.
+ */
+function missingPlanFields(fields: AssessmentFields): string[] {
+  const missing: string[] = [];
+  if (fields.plannedPlanName === null) missing.push('plannedPlanName');
+  if (fields.provisioningType === null) missing.push('provisioningType');
+  if (fields.provisioningType === 'K4' && fields.adminConsole === null) missing.push('adminConsole');
+  if (fields.termsSummary === null) missing.push('termsSummary');
+  if (fields.quote === null) missing.push('quote');
+
+  return missing;
+}
+
+/**
  * What the assessment of paid or licensed software still lacks, in the order a screen shows it (`US-05-06` AC-3): the
  * minimum of `QĐ-22`, the control level, the quote that gives the request its amount and, for data that is highly
- * sensitive, the opinion of the Business Owner or the reason there is none (`OI-05a`: an opinion that is missing does not
+ * sensitive, the opinion that was obtained or the reason there is none (`OI-05a`: an opinion that is missing does not
  * stop the request, but the IT Admin says so).
  */
-export function missingFields(fields: AssessmentFields): string[] {
+export function missingFields(fields: AssessmentFields, scope: AssessmentScope = 'FULL'): string[] {
+  return scope === 'PLAN_ONLY' ? missingPlanFields(fields) : missingFullFields(fields);
+}
+
+function missingFullFields(fields: AssessmentFields): string[] {
   const missing: string[] = [];
   const text = (
     name: 'vendorName' | 'plannedPlanName' | 'termsSummary' | 'memberUsageMethod' | 'grantRevokeMethod',
@@ -50,7 +81,23 @@ export function missingFields(fields: AssessmentFields): string[] {
   return missing;
 }
 
-export function judgeCompletion(fields: AssessmentFields): CompletionVerdict {
+/**
+ * What completing the assessment would do. `internalApplication` is whether the application a short proposal names is internal software: all its
+ * plans are `K5` and free (the catalog keeps one for the other), and a short proposal always ends paid (`D-38`), so nothing the IT Admin fills
+ * lets it be completed and it is told so first (`QĐ-111d`, `QĐ-103p`, `QĐ-50a`). It says nothing of a whole assessment, where internal software is `classification`.
+ */
+export function judgeCompletion(
+  fields: AssessmentFields,
+  scope: AssessmentScope = 'FULL',
+  internalApplication = false,
+): CompletionVerdict {
+  if (scope === 'PLAN_ONLY') {
+    if (internalApplication) return { kind: 'FREE_PLAN' };
+    if (fields.controlLevel === 'UNCONTROLLABLE') return { kind: 'UNCONTROLLABLE' };
+    const missing = missingPlanFields(fields);
+
+    return missing.length > 0 ? { kind: 'INCOMPLETE', missing } : { kind: 'OK' };
+  }
   if (fields.classification === null) return { kind: 'INCOMPLETE', missing: ['classification'] };
   if (fields.classification === 'INTERNAL') return { kind: 'INTERNAL_BY_REGISTRATION' };
   if (fields.controlLevel === 'UNCONTROLLABLE') return { kind: 'UNCONTROLLABLE' };
@@ -106,11 +153,13 @@ export function actsForAssignee(step: { assigneeEmployeeId: string | null } | nu
 export function internalRegistrationBasis(
   assessment: Pick<AssessmentFields, 'classification' | 'dataSensitivity'>,
   given: AssessmentFields['dataSensitivity'] | undefined,
+  scope: AssessmentScope = 'FULL',
 ):
   | { kind: 'NOT_INTERNAL' }
   | { kind: 'DATA_SENSITIVITY_MISSING' }
   | { kind: 'OK'; dataSensitivity: NonNullable<AssessmentFields['dataSensitivity']> } {
-  if (assessment.classification !== 'INTERNAL') return { kind: 'NOT_INTERNAL' };
+  // A short proposal is for a plan of an application already in the catalog: registering a new application for it would be a duplicate.
+  if (scope === 'PLAN_ONLY' || assessment.classification !== 'INTERNAL') return { kind: 'NOT_INTERNAL' };
   const dataSensitivity = given ?? assessment.dataSensitivity;
 
   return dataSensitivity === null ? { kind: 'DATA_SENSITIVITY_MISSING' } : { kind: 'OK', dataSensitivity };
@@ -135,9 +184,26 @@ export function registeredShapeOf(
     policy: {
       version: CURRENT_POLICY_VERSION,
       branch: 'INTERNAL_FREE',
-      chain: ['NEED', 'IT_ASSESSMENT', 'IT_EXECUTION'],
+      chain: sent.chain.includes('NEED')
+        ? ['NEED', 'IT_ASSESSMENT', 'IT_EXECUTION']
+        : ['IT_ASSESSMENT', 'IT_EXECUTION'],
       slaWorkingDays: sent.slaWorkingDays,
     },
     state: 'AWAITING_EXECUTION',
+  };
+}
+
+const QUOTE_CYCLE_MONTHS: Readonly<Record<Quote['billingCycle'], bigint>> = { MONTHLY: 1n, QUARTERLY: 3n, ANNUAL: 12n };
+
+/**
+ * The price of one person for one month a quote gives (`QĐ-113a`): a monthly quote as it is, a quarterly one over 3, an annual one over 12, rounded up
+ * to the dong. It is the reference price a plan takes from the approved quote of a case B request.
+ */
+export function monthlyPriceOfQuote(quote: Pick<Quote, 'unitPrice' | 'billingCycle'>): Money {
+  const months = QUOTE_CYCLE_MONTHS[quote.billingCycle];
+
+  return {
+    amountMinor: (quote.unitPrice.amountMinor + months - 1n) / months,
+    currency: quote.unitPrice.currency,
   };
 }

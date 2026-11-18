@@ -33,8 +33,29 @@ export const deviceListQuerySchema = z.strictObject({
   state: z.enum(COLLECTION_STATES).optional(),
 });
 
+export const deviceRegistrationListQuerySchema = z.strictObject({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+
 const holderSchema = z.strictObject({ id: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 const instant = z.iso.datetime();
+const END_CAUSES = ['HOLDER_CHANGED', 'DEVICE_RETIRED', 'DEPARTURE', 'EMPLOYEE_LEFT', 'DEPARTURE_BLOCKED'] as const;
+const pagination = z.strictObject({
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+});
+
+/** What the list says of whether the machine is being collected from: the state, and the last time an intake from it was accepted. */
+const collectionSchema = z.strictObject({
+  state: z.enum(COLLECTION_STATES),
+  lastAcceptedAt: instant.nullable().meta({
+    description:
+      'The latest instant any credential of the open registration was accepted (usage or tool status); null while nothing was and for a machine nobody holds. State ACTIVE alone only says the holder acknowledged the notice.',
+  }),
+});
 
 export const deviceSummarySchema = z.strictObject({
   id: z.uuid(),
@@ -45,6 +66,7 @@ export const deviceSummarySchema = z.strictObject({
   registrationId: z.uuid().nullable(),
   registeredFrom: responseBusinessDate.nullable(),
   state: z.enum(COLLECTION_STATES),
+  collection: collectionSchema,
   signatureRecorded: z.boolean(),
   retiredAt: instant.nullable(),
 });
@@ -60,10 +82,28 @@ export const deviceDetailSchema = deviceSummarySchema.extend({
       holder: holderSchema,
       validUntil: responseBusinessDate,
       endedAt: instant,
-      endCause: z.enum(['HOLDER_CHANGED', 'DEVICE_RETIRED', 'DEPARTURE', 'EMPLOYEE_LEFT']),
+      endCause: z.enum(END_CAUSES),
     })
     .nullable(),
   retirementReason: z.string().nullable(),
+});
+
+/** One registration of a machine in its history: the holder, the days, how it ended, and where acknowledgement and collection stand. */
+export const deviceRegistrationSchema = z.strictObject({
+  id: z.uuid(),
+  holder: holderSchema.nullable().meta({ description: 'Null only when the person record can no longer be read.' }),
+  validFrom: responseBusinessDate,
+  validUntil: responseBusinessDate
+    .nullable()
+    .meta({ description: 'The last day of the registration; null while it is open.' }),
+  endedAt: instant.nullable(),
+  endCause: z.enum(END_CAUSES).nullable(),
+  acknowledgedFrom: instant.nullable(),
+  collectionStoppedAt: instant.nullable(),
+  signatureRecorded: z.boolean(),
+  lastAcceptedAt: instant
+    .nullable()
+    .meta({ description: 'The latest instant any credential of this registration was accepted.' }),
 });
 
 export const signatureRecordSchema = z.strictObject({
@@ -80,18 +120,17 @@ export class RetirementBodyDto extends createZodDto(retirementBodySchema) {}
 export class SignatureRecordBodyDto extends createZodDto(signatureRecordBodySchema) {}
 export class DeviceIdParamDto extends createZodDto(deviceIdParamSchema) {}
 export class DeviceListQueryDto extends createZodDto(deviceListQuerySchema) {}
+export class DeviceRegistrationListQueryDto extends createZodDto(deviceRegistrationListQuerySchema) {}
 export class DeviceDetailResponseDto extends createZodDto(successEnvelopeSchema(deviceDetailSchema)) {}
 export class SignatureRecordResponseDto extends createZodDto(successEnvelopeSchema(signatureRecordSchema)) {}
 export class DevicePageResponseDto extends createZodDto(
   successEnvelopeSchema(
     z.strictObject({
       items: z.array(deviceSummarySchema),
-      pagination: z.strictObject({
-        page: z.number().int().positive(),
-        pageSize: z.number().int().positive(),
-        totalItems: z.number().int().nonnegative(),
-        totalPages: z.number().int().nonnegative(),
-      }),
+      pagination,
     }),
   ),
+) {}
+export class DeviceRegistrationPageResponseDto extends createZodDto(
+  successEnvelopeSchema(z.strictObject({ items: z.array(deviceRegistrationSchema), pagination })),
 ) {}

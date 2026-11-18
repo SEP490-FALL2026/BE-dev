@@ -33,7 +33,7 @@ export class NeedDecisionQueueController {
   @ApiSuccessResponse(NeedQueueResponseDto, {
     message: 'NEED_DECISION.LISTED',
     description:
-      'The need steps given to the caller that are pending, the oldest first: what each request is, who asked and who it is for, when the step is due, whether approving needs a confirmed term or a line of the plan of the budget, and what the request costs as the request itself says. A step that waits for somebody to hold it, a request the caller asked for or is given, and a request that was decided, withdrawn or ended are not here; neither is any figure of a budget. A request for a group is decided line by line.',
+      'The need steps given to the caller that are pending, the oldest first: what each request is, who asked and who it is for, when the step is due, and what the request costs as the request itself says. A step that waits for somebody to hold it, a request the caller asked for or is given, and a request that was decided, withdrawn or ended are not here; neither is any figure of a budget. A request for a group is decided line by line.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

@@ -1,5 +1,10 @@
 import type { BusinessDate } from '../../../core/business-date';
 import {
+  adjustmentDeltasOf,
+  belowCarriedOver,
+  carriedOverShortfall,
+  versionAttachmentMissing,
+  versionFiguresOf,
   defaultReserveOf,
   reserveReasonMissing,
   checkVersionDecision,
@@ -11,12 +16,8 @@ import {
   closesAtYearEnd,
   deciderOf,
   isEditable,
-  copiedLineOf,
-  quartersMismatchAfter,
-  patchChangesLine,
   versionDecidedDetail,
   proposalIsSucceedable,
-  quartersMatch,
   totalOf,
   versionSourceOf,
   versionWaitingReason,
@@ -31,15 +32,13 @@ const day = (value: string): BusinessDate => value;
 
 describe('which fiscal years take a proposal (US-06-10 AC-9)', () => {
   it.each([
-    ['a year to come', 2027, '2026-06-15', 1, true],
-    ['the year that is running', 2026, '2026-06-15', 1, true],
-    ['a year that has ended', 2025, '2026-06-15', 1, false],
-    ['the last day of a year', 2026, '2026-12-31', 1, true],
-    ['the first day after it', 2026, '2027-01-01', 1, false],
-    ['a year that begins in April: March still belongs to the year before', 2026, '2027-03-31', 4, true],
-    ['a year that begins in April: April is the next year', 2026, '2027-04-01', 4, false],
-  ])('%s', (_name, year, today, startMonth, open) => {
-    expect(yearIsOpen(year, day(today), startMonth)).toBe(open);
+    ['a year to come', 2027, '2026-06-15', true],
+    ['the year that is running', 2026, '2026-06-15', true],
+    ['a year that has ended', 2025, '2026-06-15', false],
+    ['the last day of a year', 2026, '2026-12-31', true],
+    ['the first day after it', 2026, '2027-01-01', false],
+  ])('%s', (_name, year, today, open) => {
+    expect(yearIsOpen(year, day(today))).toBe(open);
   });
 });
 
@@ -47,12 +46,6 @@ describe('adding up a version', () => {
   it('is the sum of the lines', () => {
     expect(totalOf([{ amountMinor: 50_000_000n }, { amountMinor: 20_000_000n }])).toBe(70_000_000n);
     expect(totalOf([])).toBe(0n);
-  });
-
-  it('has a forecast by quarter only when the four quarters add up to the total (US-06-09 AC-6)', () => {
-    expect(quartersMatch(80n, [20n, 20n, 20n, 20n])).toBe(true);
-    expect(quartersMatch(80n, [20n, 20n, 20n, 15n])).toBe(false);
-    expect(quartersMatch(80n, [100n, -20n, 0n, 0n])).toBe(false);
   });
 });
 
@@ -82,13 +75,10 @@ describe('what can be done to a proposal that was sent (US-06-10 AC-4, AC-5, AC-
 });
 
 describe('the year that has ended (F62, QĐ-91c)', () => {
-  it('has ended once the fiscal year after it has begun, whatever the month the fiscal year begins in', () => {
-    expect(yearHasEnded(2026, day('2027-01-01'), 1)).toBe(true);
-    expect(yearHasEnded(2026, day('2026-12-31'), 1)).toBe(false);
-    // With a year that begins in April, the fiscal year 2026 runs to the 31st of March 2027.
-    expect(yearHasEnded(2026, day('2027-03-31'), 4)).toBe(false);
-    expect(yearHasEnded(2026, day('2027-04-01'), 4)).toBe(true);
-    expect(yearHasEnded(2027, day('2027-04-01'), 4)).toBe(false);
+  it('has ended once the calendar year after it has begun', () => {
+    expect(yearHasEnded(2026, day('2027-01-01'))).toBe(true);
+    expect(yearHasEnded(2026, day('2026-12-31'))).toBe(false);
+    expect(yearHasEnded(2027, day('2027-04-01'))).toBe(false);
   });
 
   it('keeps the current version as the reference budget and closes the ones that never became current', () => {
@@ -215,10 +205,9 @@ describe('who may decide a version, and when (US-06-11 AC-7, AC-8, SoD-8)', () =
 });
 
 describe('what the decision of the spending approver on a version of a budget records (US-06-11, F63)', () => {
-  it('maps each decision to what the record says and the state the version goes to', () => {
+  it('maps each decision to what the record says and the state the version goes to: approve, or return it to Finance (QĐ-111ad)', () => {
     expect(decisionOutcomeOf('APPROVE')).toEqual({ decision: 'APPROVED', state: 'APPROVED' });
-    expect(decisionOutcomeOf('REJECT')).toEqual({ decision: 'REJECTED', state: 'REJECTED' });
-    expect(decisionOutcomeOf('REQUEST_CHANGES')).toEqual({ decision: 'CHANGES_REQUESTED', state: 'CHANGES_REQUESTED' });
+    expect(decisionOutcomeOf('RETURN')).toEqual({ decision: 'CHANGES_REQUESTED', state: 'CHANGES_REQUESTED' });
   });
 
   const version = { costCenterId: 'cc-1', year: 2027, totalMinor: 5_000n };
@@ -253,76 +242,6 @@ describe('what the decision of the spending approver on a version of a budget re
   });
 });
 
-describe('whether an adjustment changes what the line of the proposal said (US-06-09 AC-14)', () => {
-  const line = {
-    description: 'Giấy phép',
-    planId: 'plan-1' as string | null,
-    seats: 10 as number | null,
-    amountMinor: 1_000n,
-  };
-
-  it('changes nothing when the patch gives nothing, or gives what the line already says', () => {
-    expect(patchChangesLine(line, {})).toBe(false);
-    expect(patchChangesLine(line, { description: 'Giấy phép', seats: 10, amountMinor: 1_000n })).toBe(false);
-    expect(patchChangesLine(line, { planId: undefined })).toBe(false);
-  });
-
-  it.each([
-    ['its words', { description: 'Giấy phép mới' }],
-    ['its plan', { planId: 'plan-2' }],
-    ['its plan, cleared', { planId: null }],
-    ['its seats', { seats: 12 }],
-    ['its money', { amountMinor: 1_100n }],
-  ])('changes the line when the patch changes %s', (_label, patch) => {
-    expect(patchChangesLine(line, patch)).toBe(true);
-  });
-});
-
-describe('what a version copies from the line before it, and whether an edit keeps the quarters honest (US-06-09, QĐ-82e)', () => {
-  const line = {
-    description: 'Giấy phép',
-    planId: 'plan-1',
-    seats: 10,
-    amountMinor: 1_000n,
-    financeComment: 'đã có',
-    adjustmentReason: 'đổi giá',
-  };
-
-  it('copies the line with where it came from, and starts it without a comment of Finance or a reason to adjust it', () => {
-    expect(copiedLineOf(line, { proposalId: 'prop-1', proposalPosition: 3 })).toEqual({
-      proposalId: 'prop-1',
-      proposalPosition: 3,
-      description: 'Giấy phép',
-      planId: 'plan-1',
-      seats: 10,
-      amountMinor: 1_000n,
-      financeComment: null,
-      adjustmentReason: null,
-    });
-  });
-
-  const version = {
-    baseMinor: 800n,
-    reserveMinor: 200n,
-    quarters: [250n, 250n, 250n, 250n] as [bigint, bigint, bigint, bigint] | null,
-  };
-
-  it('is honest while the quarters add up to the base and the reserve, as they are after the edit', () => {
-    expect(quartersMismatchAfter(version, {})).toBe(false);
-    expect(quartersMismatchAfter(version, { baseMinor: 900n, quarters: [300n, 300n, 300n, 200n] })).toBe(false);
-  });
-
-  it('refuses an edit that moves the total and leaves the quarters, or sets quarters that do not add up', () => {
-    expect(quartersMismatchAfter(version, { baseMinor: 900n })).toBe(true);
-    expect(quartersMismatchAfter(version, { quarters: [1n, 1n, 1n, 1n] })).toBe(true);
-  });
-
-  it('has nothing to keep honest when there are no quarters, or when the edit takes them away', () => {
-    expect(quartersMismatchAfter({ ...version, quarters: null }, { baseMinor: 5n })).toBe(false);
-    expect(quartersMismatchAfter(version, { baseMinor: 5n, quarters: null })).toBe(false);
-  });
-});
-
 describe('the default reserve of a version (US-06-09 AC-30, QĐ-98)', () => {
   it('is the share of the base rounded to the nearest minor unit', () => {
     expect(defaultReserveOf(1_000_000n, 10)).toBe(100_000n);
@@ -331,12 +250,137 @@ describe('the default reserve of a version (US-06-09 AC-30, QĐ-98)', () => {
     expect(defaultReserveOf(500n, 0)).toBe(0n);
   });
 
-  it('asks a reason only of a version that kept its share and differs from it', () => {
+  it('asks a reason of a version whose reserve is not the default share of the organization, and of nothing else', () => {
     const version = { baseMinor: 1000n, reserveMinor: 100n, reservePercent: 10, reserveReason: null };
 
-    expect(reserveReasonMissing(version)).toBe(false);
-    expect(reserveReasonMissing({ ...version, reserveMinor: 150n })).toBe(true);
-    expect(reserveReasonMissing({ ...version, reserveMinor: 150n, reserveReason: 'Kế hoạch mua thêm' })).toBe(false);
-    expect(reserveReasonMissing({ ...version, reserveMinor: 150n, reservePercent: null })).toBe(false);
+    expect(reserveReasonMissing(version, 10)).toBe(false);
+    expect(reserveReasonMissing({ ...version, reserveMinor: 150n }, 10)).toBe(true);
+    expect(reserveReasonMissing({ ...version, reserveMinor: 150n, reserveReason: 'Kế hoạch mua thêm' }, 10)).toBe(
+      false,
+    );
+    expect(reserveReasonMissing({ ...version, reserveMinor: 150n, reservePercent: null }, 10)).toBe(false);
+  });
+
+  it('compares with the default share of the organization, never with the share the version itself holds: a chosen 15 % against a default of 10 % asks a reason (FIX-LB3 LBG-02)', () => {
+    const chosen = { baseMinor: 1000n, reserveMinor: 150n, reservePercent: 15, reserveReason: null };
+
+    expect(reserveReasonMissing(chosen, 10)).toBe(true);
+    expect(reserveReasonMissing({ ...chosen, reserveReason: 'Mua thêm vào mùa thu' }, 10)).toBe(false);
+    // The reserve that is the default share asks nothing, whatever share the version holds.
+    expect(reserveReasonMissing({ ...chosen, reserveMinor: 100n }, 10)).toBe(false);
+    // The default of the organization is the one that counts when it is read: a version made at 10 % is not the default once it is 12 %.
+    expect(reserveReasonMissing({ ...chosen, reserveMinor: 100n, reservePercent: 10 }, 12)).toBe(true);
+    expect(reserveReasonMissing({ ...chosen, reserveMinor: 120n, reservePercent: 12 }, 12)).toBe(false);
+  });
+});
+
+describe('the figures of a version as Finance gives them (QĐ-111ac, BG-2.5)', () => {
+  it('fills the base in with what the Cost Center carries into the year when Finance gives none', () => {
+    expect(versionFiguresOf({ carriedOverMinor: 123_000_000n, defaultPercent: 10 })).toEqual({
+      baseMinor: 123_000_000n,
+      reserveMinor: 12_300_000n,
+      reservePercent: 10,
+    });
+    expect(versionFiguresOf({ baseMinor: 0n, carriedOverMinor: 123_000_000n, defaultPercent: 10 }).baseMinor).toBe(0n);
+  });
+
+  it('takes the reserve as a share Finance chooses, or as an amount kept against the default share', () => {
+    expect(
+      versionFiguresOf({ baseMinor: 1_000n, reservePercent: 15, carriedOverMinor: 0n, defaultPercent: 10 }),
+    ).toEqual({
+      baseMinor: 1_000n,
+      reserveMinor: 150n,
+      reservePercent: 15,
+    });
+    expect(versionFiguresOf({ baseMinor: 1_000n, reserveMinor: 7n, carriedOverMinor: 0n, defaultPercent: 10 })).toEqual(
+      {
+        baseMinor: 1_000n,
+        reserveMinor: 7n,
+        reservePercent: 10,
+      },
+    );
+  });
+
+  describe('the red flag: the budget of the department, its base and its reserve, is below what is carried into the year (QĐ-111ac, C-09, QT §4.6)', () => {
+    const M = 1_000_000n;
+
+    it('is down when the base alone is below what is carried over but the base and the reserve cover it: 850 + 85 against 900 (FIX-LB3 LBG-01)', () => {
+      const version = { baseMinor: 850n * M, reserveMinor: 85n * M };
+
+      expect(belowCarriedOver(version, 900n * M)).toBe(false);
+      expect(carriedOverShortfall(version, 900n * M)).toBe(0n);
+    });
+
+    it('is up, with the amount that is missing, when the base and the reserve do not cover it: the example of the process, 800 + 80 against 900 is 20 short', () => {
+      const version = { baseMinor: 800n * M, reserveMinor: 80n * M };
+
+      expect(belowCarriedOver(version, 900n * M)).toBe(true);
+      expect(carriedOverShortfall(version, 900n * M)).toBe(20n * M);
+    });
+
+    it('does not count a budget that equals what is carried over, nor one when nothing is carried over', () => {
+      expect(belowCarriedOver({ baseMinor: 900n * M, reserveMinor: 0n }, 900n * M)).toBe(false);
+      expect(belowCarriedOver({ baseMinor: 899n * M, reserveMinor: 1n * M }, 900n * M)).toBe(false);
+      expect(belowCarriedOver({ baseMinor: 0n, reserveMinor: 0n }, 0n)).toBe(false);
+      expect(carriedOverShortfall({ baseMinor: 0n, reserveMinor: 0n }, 0n)).toBe(0n);
+      expect(belowCarriedOver({ baseMinor: 899n * M, reserveMinor: 0n }, 900n * M)).toBe(true);
+      expect(carriedOverShortfall({ baseMinor: 899n * M, reserveMinor: 0n }, 900n * M)).toBe(1n * M);
+    });
+  });
+
+  it('sends a version only with one file at least that explains it', () => {
+    expect(versionAttachmentMissing(0)).toBe(true);
+    expect(versionAttachmentMissing(1)).toBe(false);
+  });
+});
+
+describe('what the approved adjustments add to the base of a Cost Center (AD-1, QĐ-111bh)', () => {
+  const A = 'a';
+  const B = 'b';
+  const C = 'c';
+
+  it('adds to the one that receives, takes from the one that gives, and leaves a Cost Center with no budget out', () => {
+    const rows = [
+      { fromCostCenterId: A, toCostCenterId: B, amountMinor: 20n, createdVersionId: null },
+      { fromCostCenterId: null, toCostCenterId: B, amountMinor: 5n, createdVersionId: null },
+      { fromCostCenterId: A, toCostCenterId: null, amountMinor: 3n, createdVersionId: null },
+      { fromCostCenterId: null, toCostCenterId: C, amountMinor: 9n, createdVersionId: null },
+    ];
+
+    const deltas = adjustmentDeltasOf(
+      rows,
+      new Map([
+        [A, 'va'],
+        [B, 'vb'],
+      ]),
+    );
+
+    expect(deltas.get(A)).toBe(-23n);
+    expect(deltas.get(B)).toBe(25n);
+    expect(deltas.has(C)).toBe(false);
+  });
+
+  it('counts once the adjustment that made the version of the Cost Center: its amount is already the base of that version (R-48)', () => {
+    const rows = [
+      { fromCostCenterId: A, toCostCenterId: B, amountMinor: 20n, createdVersionId: 'vb' },
+      { fromCostCenterId: null, toCostCenterId: B, amountMinor: 5n, createdVersionId: null },
+    ];
+
+    const deltas = adjustmentDeltasOf(
+      rows,
+      new Map([
+        [A, 'va'],
+        [B, 'vb'],
+      ]),
+    );
+
+    expect(deltas.get(B)).toBe(5n);
+    expect(deltas.get(A)).toBe(-20n);
+  });
+
+  it('counts the adjustment that made the version of another Cost Center against the one that gives', () => {
+    const rows = [{ fromCostCenterId: A, toCostCenterId: B, amountMinor: 20n, createdVersionId: 'vb' }];
+
+    expect(adjustmentDeltasOf(rows, new Map([[A, 'va']])).get(A)).toBe(-20n);
   });
 });

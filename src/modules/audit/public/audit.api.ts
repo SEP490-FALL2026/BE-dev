@@ -2,7 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { UnsafeAuditPayloadError } from '../audit.errors';
 import { AuditRepo } from '../audit.repo';
-import { AuditCursor, AuditEventInput, AuditEventSlice, AuditValue } from './audit.types';
+import {
+  AuditCursor,
+  AuditEventInput,
+  AuditEventSlice,
+  AuditResourceRef,
+  AuditValue,
+  ResourceEventQuery,
+  ResourceEventSlice,
+} from './audit.types';
 
 /** Keys that must never be written to the Audit Trail (US-01-10 AC-9, FR-8.11(b)). */
 const FORBIDDEN_KEY = /pass(word)?|hash|token|secret|cookie|credential|authorization|pepper/i;
@@ -50,6 +58,19 @@ export class AuditApi {
     options: { upTo: Date; actions: readonly string[]; limit: number },
   ): Promise<AuditEventSlice[]> {
     return this.repo.readSince(tx, cursor, options);
+  }
+
+  /**
+   * One page of the events of these resources, oldest first by `(occurred_at, id)`, and how many there are for the same query, in the
+   * caller's transaction: for the module that owns the resources to show their history to the people its own policy lets read them.
+   * Only the actions it names are read, and never the `before` snapshot. Two statements, whatever the number of events.
+   */
+  pageOfResources(
+    tx: DbTx,
+    resources: readonly AuditResourceRef[],
+    query: ResourceEventQuery,
+  ): Promise<{ rows: ResourceEventSlice[]; total: number }> {
+    return this.repo.pageOfResources(tx, resources, query);
   }
 
   /**

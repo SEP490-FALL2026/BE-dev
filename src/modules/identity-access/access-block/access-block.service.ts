@@ -19,8 +19,8 @@ export class AccessBlockService {
     return this.blocks.find(employeeId, tx);
   }
 
-  async findMany(employeeIds: readonly string[]): Promise<Map<string, AccessBlockRecord>> {
-    return this.blocks.findMany(employeeIds);
+  async findMany(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, AccessBlockRecord>> {
+    return this.blocks.findMany(employeeIds, tx);
   }
 
   /** Whether a block refuses the employee on `today` (whether the employee has left is the status's to say). */

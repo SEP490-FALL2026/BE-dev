@@ -1,7 +1,7 @@
 # Spec: qd96-100-request-year-without-spend-date — không còn ngày dự kiến chi; năm tạm tính lúc trình, tính lại lúc duyệt
 
 - Phụ trách: AI theo giao việc Owner (05/11/2026); người nhận implement tiếp quản spec/plan và evidence.
-- Thiết kế ban đầu bởi: AI (agent C-SPEC-B) theo [tracker qd96-100](../../../reviews/qd96-100-alignment-2026-11-05/README.md),
+- Thiết kế ban đầu bởi: AI (agent C-SPEC-B) theo tracker qd96-100 (nhật ký review đã xóa 11/11/2026 — xem git history),
   `LEDGER.md` L-105, L-106, L-217, L-219 (vế response); tự giải S-14.
 - Thiết kế: `draft`. Owner review: chưa review. Peer review: chưa có.
 - Nguồn: Docs `3d73a7f` (BRD 4.0 `FR-3.2`, `FR-3.21`; US 05/11/2026 — `US-06-12` AC-11, `US-06-01` AC-25; `US-06-14` AC-15 bỏ;

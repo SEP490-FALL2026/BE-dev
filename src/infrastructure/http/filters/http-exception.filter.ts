@@ -2,9 +2,11 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logge
 import type { Request, Response } from 'express';
 import { ZodSerializationException } from 'nestjs-zod';
 import { RequestContextService } from '../../observability/request-context.service';
+import { describeForOperator } from '../../observability/operator-error';
 import { resolveRequestId } from '../../observability/request-id';
 import { ERROR_CODE_PATTERN, type ErrorEnvelope } from '../dto/error-envelope.dto';
 import { fallbackErrorFor } from './fallback-error';
+import { toUnavailableApiException } from '../errors/service-unavailable';
 import { fromRequestParserError } from './request-parser-errors';
 
 @Catch()
@@ -22,13 +24,25 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const requestId =
       this.requestContext.getRequestId() ?? resolveRequestId(request.header('x-request-id'), { trustInbound: false });
     // A refusal of a request parser (body too large, a multipart form that breaks its limits) is the client's error.
-    const handled = fromRequestParserError(exception) ?? exception;
+    // A database or object-storage outage that no mapper of the route caught is a 503, not a 500.
+    const handled = fromRequestParserError(exception) ?? this.unavailableOrSelf(exception, requestId);
     const status = handled instanceof HttpException ? handled.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const body = this.createEnvelope(handled, status, requestId);
 
     // A client that left (request.aborted) has no socket to answer on: classify, but never write to it.
     if (this.clientIsGone(response)) return;
     response.setHeader('x-request-id', requestId).status(status).json(body);
+  }
+
+  /** The 503 of a dependency outage, or the exception itself. The cause is logged here: an ApiException is not logged again. */
+  private unavailableOrSelf(exception: unknown, requestId: string): unknown {
+    const unavailable = toUnavailableApiException(exception);
+    if (unavailable === undefined) return exception;
+
+    this.logger.warn(
+      `[requestId=${requestId}] Dependency unavailable; answering 503: ${describeForOperator(exception)}`,
+    );
+    return unavailable;
   }
 
   private clientIsGone(response: Response): boolean {

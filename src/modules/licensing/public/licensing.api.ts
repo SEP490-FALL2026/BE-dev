@@ -3,6 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AssignmentService } from '../assignment/assignment.service';
+import { SubscriptionRenewalRepo } from '../subscription-renewal/subscription-renewal.repo';
 import { ProvisioningFailureService, type FailureRecorded } from '../provisioning/provisioning-failure.service';
 import {
   ProvisioningCancellationService,
@@ -10,6 +11,7 @@ import {
 } from '../provisioning/grant-cancellation/provisioning-cancellation.service';
 import { ProvisioningTaskFrame } from '../provisioning/provisioning-task-frame.service';
 import { RevocationViewService } from '../provisioning/revocation-view.service';
+import { RevocationWithdrawalService } from '../provisioning/revocation-withdrawal/revocation-withdrawal.service';
 import { RevocationService } from '../provisioning/revocation.service';
 import type {
   AssignmentRecord,
@@ -19,9 +21,16 @@ import type {
   OpenRevocationInput,
   PersonalSeat,
   ProvisioningFailureKind,
+  ProvisioningKind,
+  RightChain,
+  SeatHolding,
   RevocationSource,
   SelfExecutionMode,
+  SystemActor,
   TerminatingAccess,
+  WaitingRegrant,
+  WithdrawnRevocation,
+  WithdrawRevocationInput,
 } from './licensing.types';
 
 /**
@@ -36,7 +45,9 @@ export class LicensingApi {
     private readonly cancellations: ProvisioningCancellationService,
     private readonly frame: ProvisioningTaskFrame,
     private readonly revocations: RevocationService,
+    private readonly withdrawals: RevocationWithdrawalService,
     private readonly revocationView: RevocationViewService,
+    private readonly renewals: SubscriptionRenewalRepo,
   ) {}
 
   /**
@@ -45,10 +56,29 @@ export class LicensingApi {
    * reason is added to it. Done in the transaction of the source, which decides who is revoked and why; the seat is given back
    * only when the task is completed. Asking again for the same source and reference changes nothing. Throws
    * RevocationRefusedError, AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError and
-   * ProvisioningAnotherItAdminNeededError.
+   * ProvisioningAnotherItAdminNeededError. A sweeper that acts on a rule passes the system as `actor`: the task is then marked as made by
+   * the system and no self-execution rule applies.
    */
-  openRevocation(tx: DbTx, actor: AuthenticatedPrincipal, input: OpenRevocationInput): Promise<OpenedRevocation> {
+  openRevocation(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal | SystemActor,
+    input: OpenRevocationInput,
+  ): Promise<OpenedRevocation> {
     return this.revocations.open(tx, actor, input);
+  }
+
+  /**
+   * Takes back the reason a source gave for the revocation of a seat (the source decided otherwise, or its cause ended), in the
+   * transaction of that source: the task goes on while another reason stands, and is cancelled as no longer applying when none does
+   * (a task in progress only when `cancelInProgressClaimedBy` is the IT Admin who took it). Asking twice changes nothing. The
+   * listeners hear `REASON_WITHDRAWN`.
+   */
+  withdrawRevocationReason(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: WithdrawRevocationInput,
+  ): Promise<WithdrawnRevocation> {
+    return this.withdrawals.withdraw(tx, actor, input);
   }
 
   /**
@@ -58,6 +88,31 @@ export class LicensingApi {
    */
   listPersonalSeatsOf(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<PersonalSeat[]> {
     return this.revocationView.personalSeatsOf(employeeId, onDate, tx);
+  }
+
+  /**
+   * The request that made each of these rights and the assignments each continues (a renewal or a handover carries a right on), in the order
+   * given: what the module of requests finds the money held for a right by when it gives it back without a revocation completed, the day a
+   * transfer takes effect (`QĐ-111bg`). Read in the caller's transaction.
+   */
+  listRightChainsOf(tx: DbTx, assignmentIds: readonly string[]): Promise<RightChain[]> {
+    return this.revocationView.rightChainsOf(tx, assignmentIds);
+  }
+
+  /**
+   * Which of these rights a later right replaced (R-49): the ones the grant of a request ended the day it gave the person the same software again on
+   * the same subscription, and so the grace of a transfer does not take back. One statement.
+   */
+  listRegrantedAssignments(assignmentIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.assignments.regrantedAmong(assignmentIds, tx);
+  }
+
+  /**
+   * The grants of a right asked for again (R-49) of this person that still wait (not done, not failed, not cancelled), with the day the right each
+   * ended began: a transfer is not closed while one waits, because a grant that fails gives its old right back. One statement.
+   */
+  listWaitingRegrants(employeeId: string, tx?: DbTx): Promise<WaitingRegrant[]> {
+    return this.assignments.waitingRegrantsOf(employeeId, tx);
   }
 
   /**
@@ -74,9 +129,74 @@ export class LicensingApi {
     return this.revocationView.heldSoftwareOf(employeeId, onDate, page, tx);
   }
 
+  /** Which of these subscriptions the company has decided to end (the live renewal case was decided `CANCEL`), in one statement. */
+  getSubscriptionIdsToEnd(subscriptionIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.renewals.endingAmong(subscriptionIds, tx);
+  }
+
+  /** How many seats each of these subscriptions holds as of `onDate`, the way the warehouse counts them (a service account and a future start included), in one statement. */
+  countSeatsOfSubscriptions(
+    subscriptionIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, number>> {
+    return this.assignments.countHoldingOfSubscriptions(subscriptionIds, onDate, tx);
+  }
+
+  /**
+   * The seats of these subscriptions held as of `onDate`, counted the way the warehouse counts them (a service account and a future start
+   * included), by the person who holds each or answers for it, in one statement: the baseline charges a seat to that person's department
+   * (`QĐ-103k`).
+   */
+  countSeatsByHolderOfSubscriptions(
+    subscriptionIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<SeatHolding[]> {
+    return this.assignments.countHoldingByHolder(subscriptionIds, onDate, tx);
+  }
+
   /** How many personal seats each of these people holds on `onDate` or will, in one statement (the people with none are absent). */
   countPersonalSeatsOf(employeeIds: readonly string[], onDate: BusinessDate, tx?: DbTx): Promise<Map<string, number>> {
     return this.revocationView.countPersonalSeats(employeeIds, onDate, tx);
+  }
+
+  /**
+   * How many personal seats each of these people holds on `onDate` or will **without a completed task of revocation**, in one statement
+   * (the people with none are absent): the late rights of a departure (`QĐ-110c`), whether or not a task was ever opened for the seat.
+   */
+  countPersonalSeatsWithoutCompletedTaskOf(
+    employeeIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, number>> {
+    return this.revocationView.countPersonalSeatsWithoutCompletedTask(employeeIds, onDate, tx);
+  }
+
+  /**
+   * How many personal seats of one kind of provisioning (K1: the mailbox) a person holds on `onDate` or will **without a completed task of
+   * revocation**: what a departure asks before it locks the mailbox for good (`B-1`, `QĐ-110e`), the same seats
+   * {@link LicensingApi.countPersonalSeatsWithoutCompletedTaskOf} counts, narrowed to the kind. One statement.
+   */
+  countPersonalSeatsOfKindWithoutCompletedTask(
+    employeeId: string,
+    kind: ProvisioningKind,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<number> {
+    return this.revocationView.countPersonalSeatsOfKindWithoutCompletedTask(employeeId, kind, onDate, tx);
+  }
+
+  /**
+   * Which of these people have a completed K1 revocation that ticked the lock of the mailbox of a departure (the step only the last K1
+   * revocation of a person carries): what the personnel module settles the lock of the mailbox from when it could not write it as the
+   * revocation completed (`P28`). One statement for any number of people; the people with none are absent.
+   */
+  listPeopleWithMailboxLockTicked(
+    people: readonly { employeeId: string; since: Date }[],
+    tx?: DbTx,
+  ): Promise<Set<string>> {
+    return this.revocationView.mailboxLockTickedAmong(people, tx);
   }
 
   /**

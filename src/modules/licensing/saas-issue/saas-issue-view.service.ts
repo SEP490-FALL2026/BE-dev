@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type {
   SaasIssueEligibleWire,
@@ -27,6 +28,7 @@ export interface ListIssuesQuery {
   state?: SaasIssueState;
   overdue?: boolean;
   reporterEmployeeId?: string;
+  departmentId?: string;
   page: number;
   pageSize: number;
 }
@@ -43,6 +45,7 @@ export class SaasIssueViewService {
     private readonly facts: SaasIssueFactsRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** The form: the warning, the categories and impacts, and the page of the rights the caller may report on. */
@@ -56,7 +59,7 @@ export class SaasIssueViewService {
       take: query.pageSize,
     });
     const plans = new Map(
-      (await this.catalog.getPlanSummaries([...new Set(items.map((item) => item.planId))])).map((plan) => [
+      (await this.catalog.getPlanSummariesWithLogo([...new Set(items.map((item) => item.planId))])).map((plan) => [
         plan.planId,
         plan,
       ]),
@@ -67,6 +70,7 @@ export class SaasIssueViewService {
         planId: item.planId,
         planName: plans.get(item.planId)?.planName ?? '',
         applicationName: plans.get(item.planId)?.applicationName ?? '',
+        logoUrl: plans.get(item.planId)?.applicationLogoUrl ?? null,
       },
       grantTaskId: item.grantTaskId,
     }));
@@ -90,8 +94,11 @@ export class SaasIssueViewService {
     }
     const today = await this.organizationReads.businessToday();
     const reporterEmployeeId = scope === 'mine' ? actor.employeeId : query.reporterEmployeeId;
+    const inDepartment = await this.reportersOf(actor, query.departmentId, today);
+    if (inDepartment !== undefined && inDepartment.length === 0) return pageOf([], 0, query.page, query.pageSize);
     const { items, total } = await this.issues.page({
       ...(reporterEmployeeId ? { reporterEmployeeId } : {}),
+      ...(inDepartment ? { reporterEmployeeIds: inDepartment } : {}),
       ...(scope === 'assigned' ? { assignedItAdminEmployeeId: actor.employeeId } : {}),
       ...(query.overdue ? { overdueBefore: today } : query.state ? { state: query.state } : {}),
       skip: (query.page - 1) * query.pageSize,
@@ -105,6 +112,27 @@ export class SaasIssueViewService {
       query.page,
       query.pageSize,
     );
+  }
+
+  /**
+   * The people placed in the department asked for, when one is asked for: only an IT Admin asks, and a department outside the ones they work
+   * (R-20) has none for them, as it is for any filter outside the scope (D8). Undefined when no department is asked for.
+   * Throws SaasIssueError (`SCOPE_FORBIDDEN`).
+   */
+  private async reportersOf(
+    actor: AuthenticatedPrincipal,
+    departmentId: string | undefined,
+    today: string,
+  ): Promise<string[] | undefined> {
+    if (departmentId === undefined) return undefined;
+    if (!actor.roles.includes('IT_ADMIN')) throw new SaasIssueError('SCOPE_FORBIDDEN');
+    const scope = await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
+      this.identity.findUsableItAdminEmployeeIds(ids),
+    );
+
+    return scope.includes(departmentId)
+      ? await this.organizationReads.getMemberIdsOfDepartments([departmentId], today)
+      : [];
   }
 
   /** The report the caller may see, or SaasIssueError `NOT_FOUND`. */
@@ -158,13 +186,19 @@ export class SaasIssueViewService {
   private async namesOf(records: readonly SaasIssueRecord[], today: string): Promise<IssueNames> {
     const planIdOf = await this.facts.planIdsOf([...new Set(records.map((record) => record.assignmentId))]);
     const originalIds = [...new Set(records.map((record) => record.duplicateOfId).filter(isPresent))];
-    const [people, plans, originals] = await Promise.all([
+    const reporterIds = [...new Set(records.map((record) => record.reporterEmployeeId))];
+    const [people, plans, originals, units] = await Promise.all([
       this.organizationReads.getEmployees([
         ...new Set(records.flatMap((record) => [record.reporterEmployeeId, record.assignedItAdminEmployeeId])),
       ]),
-      this.catalog.getPlanSummaries([...new Set(planIdOf.values())]),
+      this.catalog.getPlanSummariesWithLogo([...new Set(planIdOf.values())]),
       this.issues.findMany(originalIds),
+      this.organizationReads.getOwningUnits(reporterIds, today),
     ]);
+    const briefs = await this.organizationReads.getDepartmentBriefs([
+      ...new Set([...units.values()].map((unit) => unit.departmentId)),
+    ]);
+    const departmentById = new Map(briefs.map((brief) => [brief.id, brief]));
     const personById = new Map(people.map((person) => [person.id, person]));
     const planById = new Map(plans.map((plan) => [plan.planId, plan]));
     const codeById = new Map(originals.map((original) => [original.id, original.code]));
@@ -172,11 +206,21 @@ export class SaasIssueViewService {
     return {
       today,
       employee: (id) => briefOf(personById.get(id), id),
+      department: (employeeId) => {
+        const brief = departmentById.get(units.get(employeeId)?.departmentId ?? '');
+
+        return brief ? { id: brief.id, name: brief.name } : null;
+      },
       plan: (assignmentId) => {
         const planId = planIdOf.get(assignmentId) ?? '';
         const plan = planById.get(planId);
 
-        return { planId, planName: plan?.planName ?? '', applicationName: plan?.applicationName ?? '' };
+        return {
+          planId,
+          planName: plan?.planName ?? '',
+          applicationName: plan?.applicationName ?? '',
+          logoUrl: plan?.applicationLogoUrl ?? null,
+        };
       },
       originalCode: (id) => codeById.get(id) ?? '',
     };

@@ -25,6 +25,7 @@ const APPLICATION_ROW = {
   id: true,
   name: true,
   kind: true,
+  logoUrl: true,
   vendor: { select: { name: true } },
   functionalGroup: { select: { id: true, name: true } },
   _count: { select: { plans: true } },
@@ -35,7 +36,7 @@ const PLAN_ROW = {
   id: true,
   name: true,
   provisioningType: true,
-  application: { select: { id: true, name: true, kind: true } },
+  application: { select: { id: true, name: true, kind: true, logoUrl: true } },
 } as const;
 type PlanRow = Prisma.PlanGetPayload<{ select: typeof PLAN_ROW }>;
 
@@ -43,6 +44,7 @@ const toApplication = (row: ApplicationRow): RequestableApplicationRecord => ({
   id: row.id,
   name: row.name,
   kind: row.kind,
+  logoUrl: row.logoUrl,
   vendorName: row.vendor?.name ?? null,
   functionalGroup: row.functionalGroup,
   planCount: row._count.plans,
@@ -56,7 +58,7 @@ const toPlan = (row: PlanRow): RequestablePlanRecord => ({
 });
 
 /**
- * The catalog as a person who asks for software reads it. It selects only what may be shown to them: no Business Owner, price,
+ * The catalog as a person who asks for software reads it. It selects only what may be shown to them: no responsible IT Admin, price,
  * subscription, contract, seat, key or workspace; the list reads the columns of a row and nothing a detail adds.
  */
 @Injectable()
@@ -151,7 +153,9 @@ export class RequestableSoftwareRepo {
         ...PLAN_ROW,
         sharingPolicy: true,
         dataLossOnRemoval: true,
-        application: { select: { id: true, name: true, kind: true, vendor: { select: { name: true } } } },
+        application: {
+          select: { id: true, name: true, kind: true, logoUrl: true, vendor: { select: { name: true } } },
+        },
       },
     });
     if (!row) return null;

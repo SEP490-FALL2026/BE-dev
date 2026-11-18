@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Patch, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -16,16 +16,13 @@ import {
   ApplicationIdParamDto,
   ApplicationPageResponseDto,
   ApplicationResponseDto,
-  CreatedApplicationResponseDto,
-  DeclareApplicationBodyDto,
   ListApplicationsQueryDto,
   UpdateApplicationBodyDto,
 } from './application.dto';
 import { APPLICATION_ERROR_EXAMPLES as EXAMPLES, toApplicationApiException } from './application.http-errors';
-import { usageCollectionDefault } from './application.policy';
+import { toSummaryWire, toWire } from './application.mapper';
 import { ApplicationListService } from './application-list.service';
 import { ApplicationService } from './application.service';
-import type { ApplicationSummaryView, ApplicationView } from './application.types';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const IT_ONLY = {
@@ -39,34 +36,20 @@ const READERS = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const INVALID_DESCRIPTION =
-  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.';
+  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH, UPDATE_EMPTY or INTERNAL_HAS_NO_VENDOR (a dictionary line is sent for internal software, which has no vendor).';
 /** The rule refusals both a declaration and a change can meet. */
 const SHARED_RULE_EXAMPLES = [
   EXAMPLES.NAME_INVALID,
   EXAMPLES.DOMAIN_INVALID,
   EXAMPLES.TOO_MANY_DOMAINS,
-  EXAMPLES.NOTE_INVALID,
-  EXAMPLES.INTERNAL_HAS_NO_VENDOR,
-  EXAMPLES.BUSINESS_OWNER_INVALID,
   EXAMPLES.FUNCTIONAL_GROUP_INVALID,
   EXAMPLES.DICTIONARY_LINE_NOT_FOUND,
   EXAMPLES.DICTIONARY_LINE_MISMATCH,
 ] as const;
-const DECLARE_INVALID = {
-  status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: INVALID_DESCRIPTION,
-  examples: [
-    VALIDATION_EXAMPLE,
-    ...SHARED_RULE_EXAMPLES,
-    EXAMPLES.VENDOR_NAME_INVALID,
-    EXAMPLES.VENDOR_REQUIRED,
-    EXAMPLES.VENDOR_SOURCE_AMBIGUOUS,
-  ],
-} as const;
 const UPDATE_INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: INVALID_DESCRIPTION,
-  examples: [VALIDATION_EXAMPLE, ...SHARED_RULE_EXAMPLES, EXAMPLES.UPDATE_EMPTY],
+  examples: [VALIDATION_EXAMPLE, ...SHARED_RULE_EXAMPLES, EXAMPLES.UPDATE_EMPTY, EXAMPLES.INTERNAL_HAS_NO_VENDOR],
 } as const;
 const CONFLICT = {
   status: HttpStatus.CONFLICT,
@@ -80,38 +63,10 @@ const NOT_FOUND = {
   examples: [EXAMPLES.NOT_FOUND],
 } as const;
 
-function toSummaryWire(application: ApplicationSummaryView) {
-  return {
-    id: application.id,
-    name: application.name,
-    kind: application.kind,
-    vendor: application.vendor ? { id: application.vendor.id, name: application.vendor.name } : null,
-    dataSensitivity: application.dataSensitivity,
-    isCommunicationService: application.isCommunicationService,
-    businessOwner: application.businessOwner,
-    businessOwnerReplacementRequired: application.businessOwnerReplacementRequired,
-    usageCollectionDefault: usageCollectionDefault(application.isCommunicationService),
-    functionalGroup: application.functionalGroup,
-    status: application.status,
-    updatedAt: application.updatedAt.toISOString(),
-  };
-}
-
-/** The detail: the summary fields (the same function) and the rest of the application. */
-function toWire(application: ApplicationView) {
-  return {
-    ...toSummaryWire({ ...application, isCommunicationService: application.communication.isCommunicationService }),
-    dictionaryServiceLineId: application.dictionaryServiceLineId,
-    domains: application.domains,
-    communication: application.communication,
-    createdAt: application.createdAt.toISOString(),
-  };
-}
-
 /**
- * The application catalog (`US-04-01`). The IT Admin declares and changes applications; Finance reads them. Finance,
- * the department head, employees and the Super Admin do not declare or change one (AC-6, `SoD-1`); the Business Owner is
- * an attribute, not an account. Retiring an application is `g3-catalog-retire`; there is no route that deletes one.
+ * The application catalog (`US-04-01`). The IT Admin changes applications (declaring one, with its first plan, is `application-intake`'s one command); Finance reads them. Finance,
+ * the department head, employees and the Super Admin do not declare or change one (AC-6, `SoD-1`); the responsible IT Admin is
+ * the one who declared it. Retiring an application is `g3-catalog-retire`; there is no route that deletes one.
  */
 @ApiTags('applications')
 @Controller({ path: 'applications', version: '1' })
@@ -140,26 +95,6 @@ export class ApplicationsController {
       const emptyState = page.items.length === 0 ? await this.applications.emptyState() : null;
 
       return { items: page.items.map(toSummaryWire), pagination: page.pagination, emptyState };
-    } catch (error) {
-      throw toApplicationApiException(error);
-    }
-  }
-
-  @Post()
-  @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'applicationCreate', summary: 'Declare an application' })
-  @ApiSuccessResponse(CreatedApplicationResponseDto, {
-    status: HttpStatus.CREATED,
-    message: 'APPLICATION.CREATED',
-    description:
-      'The application is in the catalog; proposedToDictionary says it was outside the dictionary and proposed to it.',
-  })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, DECLARE_INVALID, CONFLICT)
-  async declare(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DeclareApplicationBodyDto) {
-    try {
-      const { application, proposed } = await this.applications.declare(actor, body);
-
-      return { ...toWire(application), proposedToDictionary: proposed };
     } catch (error) {
       throw toApplicationApiException(error);
     }

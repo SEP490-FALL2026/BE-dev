@@ -8,7 +8,7 @@ import {
   SeatTargetNotFoundError,
 } from '../public/licensing.errors';
 import { toLicensingApiException } from '../licensing.http-errors';
-import { LicenseKeyApplicationRetiredError } from './license-key.errors';
+import { LicenseKeyApplicationRetiredError, LicenseKeyStateError } from './license-key.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });
@@ -31,6 +31,9 @@ export function toLicenseKeyApiException(error: unknown): unknown {
   if (error instanceof LicenseKeyApplicationRetiredError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_KEY.APPLICATION_RETIRED', error.message);
   }
+  if (error instanceof LicenseKeyStateError) {
+    return refuse(HttpStatus.CONFLICT, `LICENSE_KEY.${error.problem}`, error.message);
+  }
   if (error instanceof LicenseKeyPlanNotK4Error) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'LICENSE_KEY.PLAN_NOT_K4', error.message, {
       provisioningType: error.provisioningType,
@@ -49,4 +52,9 @@ export const LICENSE_KEY_ERROR_EXAMPLES = {
   APPLICATION_RETIRED: example(new LicenseKeyApplicationRetiredError()),
   REVEAL_LIMIT: example(new LicenseKeyRevealLimitError('MINUTE')),
   SUBSCRIPTION_NOT_FOUND: example(new SeatTargetNotFoundError('SUBSCRIPTION')),
+  WITHDRAWN: example(new LicenseKeyStateError('WITHDRAWN')),
+  ASSIGNED: example(new LicenseKeyStateError('ASSIGNED')),
+  ALREADY_WITHDRAWN: example(new LicenseKeyStateError('ALREADY_WITHDRAWN')),
+  NOT_IN_STORE: example(new LicenseKeyStateError('NOT_IN_STORE')),
+  SUBSCRIPTION_MISMATCH: example(new LicenseKeyStateError('SUBSCRIPTION_MISMATCH')),
 } as const;

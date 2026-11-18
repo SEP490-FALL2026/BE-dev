@@ -4,9 +4,9 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RoutingFactsService } from '../access-request/routing-facts.service';
-import { routeNeedStep } from '../access-request/routing.policy';
-import { routeFinanceReview, routeSpendStep } from './spend-routing.policy';
-import type { StepTarget } from './reassignment.policy';
+import { routeNeedStep, type RoutingDecision } from '../access-request/routing.policy';
+import { routeSpendStep } from './spend-routing.policy';
+import { needStepTarget, type StepTarget } from './reassignment.policy';
 import type { ReassignableRequest, ReassignableStep } from './step-reassignment.repo';
 
 /** What the tables read on one day, once for a pass over many requests: the spending approver who can act today. */
@@ -14,16 +14,14 @@ export interface TodayFacts {
   today: BusinessDate;
   /** The spending approver when they still work: a role whose holder has left is held by nobody. */
   spendingApproverEmployeeId: string | null;
-  /** Finance on an account that can act now, or null. */
-  financeEmployeeId: string | null;
 }
 
 /**
  * Who each kind of step would be given on today's data, by running the routing tables that gave it in the first place on the
  * facts of today (`FR-3.16`, `US-05-12`). No table of its own: the need step is `routeNeedStep` on the department the
- * requester is in now, the spend step `routeSpendStep`, the review of Finance `routeFinanceReview`, and the assessment goes to
- * the IT Admin in charge of the department of the requester. A person who has left holds nothing, whether or not they are
- * still named, which is also what the spend step and the review are given from (`FR-3.16` last sentence).
+ * requester is in now, the spend step `routeSpendStep`, and the assessment goes to the IT Admin in charge of the department of the
+ * requester. A person who has left holds nothing, whether or not they are still named, which is also what the spend step is given
+ * from (`FR-3.16` last sentence).
  */
 @Injectable()
 export class StepTargetService {
@@ -32,6 +30,11 @@ export class StepTargetService {
     private readonly identity: IdentityAccessApi,
     private readonly routing: RoutingFactsService,
   ) {}
+
+  async assessmentTarget(tx: DbTx, requesterEmployeeId: string, now: Date): Promise<string | null> {
+    const today = await this.organizationReads.businessToday(now, tx);
+    return (await this.organizationReads.getItAdminInCharge(requesterEmployeeId, today, tx))?.itAdminEmployeeId ?? null;
+  }
 
   /**
    * The spending approver now, leaving out one who has left the company. With `forShare` the row of the grant is locked until the
@@ -49,7 +52,6 @@ export class StepTargetService {
     return {
       today: await this.organizationReads.businessToday(now, tx),
       spendingApproverEmployeeId: await this.usableSpendingApproverEmployeeId(tx),
-      financeEmployeeId: await this.identity.findUsableFinanceEmployeeId(tx),
     };
   }
 
@@ -66,10 +68,11 @@ export class StepTargetService {
     };
     switch (step.kind) {
       case 'NEED': {
+        const departmentId = await this.needDepartment(tx, request, facts.today);
         const gathered = (
           await this.routing.gather(tx, {
             requesterEmployeeId: request.requesterEmployeeId,
-            departmentId: await this.needDepartment(tx, request, facts.today),
+            departmentId,
             today: facts.today,
             chainHasSpendStep: request.chainHasSpendStep,
           })
@@ -78,11 +81,13 @@ export class StepTargetService {
         const head = gathered.departmentHeadEmployeeId;
         const holdsHead =
           head !== null && request.lines.some((line) => line.needStepId === step.id && line.employeeId === head);
+
         const decision = routeNeedStep(holdsHead ? { ...gathered, requesterEmployeeId: head } : gathered);
 
-        return decision.outcome === 'ASSIGNED'
-          ? { assigneeEmployeeId: decision.assigneeEmployeeId, routingRow: decision.row }
-          : { assigneeEmployeeId: null, reason: decision.reason };
+        return needStepTarget(decision, {
+          chainHasSpendStep: request.chainHasSpendStep,
+          successorRecorded: await this.successorRecorded(tx, decision, departmentId, facts.today),
+        });
       }
       case 'SPEND_APPROVAL': {
         const assignment = routeSpendStep(people, facts.spendingApproverEmployeeId);
@@ -90,14 +95,6 @@ export class StepTargetService {
         return assignment.outcome === 'ASSIGNED'
           ? { assigneeEmployeeId: assignment.assigneeEmployeeId, routingRow: null }
           : { assigneeEmployeeId: null, reason: assignment.reason };
-      }
-      case 'FINANCE_REVIEW': {
-        const review = routeFinanceReview(people, facts.financeEmployeeId);
-
-        // Finance being a party to a review that is already open leaves nobody independent to hold it: it waits.
-        return review.outcome === 'ASSIGNED'
-          ? { assigneeEmployeeId: review.assigneeEmployeeId, routingRow: null }
-          : { assigneeEmployeeId: null, reason: 'NO_FINANCE_REVIEWER' };
       }
       case 'IT_ASSESSMENT': {
         const inCharge = await this.organizationReads.getItAdminInCharge(request.requesterEmployeeId, facts.today, tx);
@@ -107,6 +104,21 @@ export class StepTargetService {
           : { assigneeEmployeeId: null, reason: 'NO_IT_ADMIN_IN_CHARGE' };
       }
     }
+  }
+
+  /**
+   * Whether a head is recorded to follow, asked only when the table says free software of a department with no head needs nobody (`QĐ-110h`:
+   * the work that waits goes to the head who starts, so a department with a successor is not left without one). Nothing else reads it.
+   */
+  private async successorRecorded(
+    tx: DbTx,
+    decision: RoutingDecision,
+    departmentId: string,
+    today: BusinessDate,
+  ): Promise<boolean> {
+    if (decision.outcome !== 'NOT_REQUIRED' || decision.oneStepReason !== 'NO_DEPARTMENT_HEAD') return false;
+
+    return (await this.organizationReads.nextHeadPeriodOf(departmentId, today, tx)) !== null;
   }
 
   /**
