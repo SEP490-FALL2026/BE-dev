@@ -173,7 +173,28 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     const resumed = reportOf(await run('apply'));
     expect(resumed.steps.filter((step) => step.status !== 'done' && step.status !== 'present')).toEqual([]);
     expect(resumed.exitCode).toBe(0);
-    expect(await requestStates()).toEqual(SHARED_DEMO_V4_REQUEST_STATES);
+    expect(await requestStates()).toEqual({
+      ...SHARED_DEMO_V4_REQUEST_STATES,
+      R40: 'AWAITING_SPEND_DECISION',
+      R41: 'REJECTED',
+      R42: 'AWAITING_REQUESTER_REVISION',
+      R43: 'IT_REJECTED',
+      R44: 'AWAITING_REQUESTER_REVISION',
+      R45: 'AWAITING_REQUESTER_REVISION',
+      R46: 'EXECUTING',
+      R47: 'FAILED',
+      R48: 'AWAITING_IT_CLOSE',
+      R49: 'AWAITING_EXECUTION',
+      R50: 'COMPLETED',
+      R51: 'PENDING',
+      R52: 'PENDING',
+      R53: 'PENDING',
+      R54: 'AWAITING_SPEND_DECISION',
+      R55: 'AWAITING_SPEND_DECISION',
+      R56: 'COMPLETED',
+      R57: 'PENDING',
+      R58: 'AWAITING_SPEND_DECISION',
+    });
     // Every department with a Cost Center and a head holds the approved budget of this year (BM-10 → version → decision); of next year
     // each department of the fixture stands at its stage (DEMO-15) and Information Technology's BM-10 waits for Finance.
     const year = new Date().getFullYear();
@@ -243,6 +264,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
         code: person.code,
         role: person.code === SHARED_DEMO_V4.approvalRoles.SPENDING_APPROVER ? 'SPENDING_APPROVER' : person.account,
       }))
+      .concat(SHARED_DEMO_V4.accountStates.invited.map((code) => ({ code, role: 'EMPLOYEE' as const })))
       .concat([{ code: 'NV-SA', role: 'SUPER_ADMIN' as const }])
       .sort((a, b) => a.code.localeCompare(b.code));
     expect(rows.rows).toEqual(wanted);

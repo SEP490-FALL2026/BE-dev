@@ -141,7 +141,28 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
       { year: 2028, opened: false, deadline: '2027-12-01' },
     ]);
 
-    expect(await requestStates()).toEqual(SHARED_DEMO_V4_REQUEST_STATES);
+    expect(await requestStates()).toEqual({
+      ...SHARED_DEMO_V4_REQUEST_STATES,
+      R40: 'AWAITING_SPEND_DECISION',
+      R41: 'REJECTED',
+      R42: 'AWAITING_REQUESTER_REVISION',
+      R43: 'IT_REJECTED',
+      R44: 'AWAITING_REQUESTER_REVISION',
+      R45: 'AWAITING_REQUESTER_REVISION',
+      R46: 'EXECUTING',
+      R47: 'FAILED',
+      R48: 'AWAITING_IT_CLOSE',
+      R49: 'AWAITING_EXECUTION',
+      R50: 'COMPLETED',
+      R51: 'PENDING',
+      R52: 'PENDING',
+      R53: 'PENDING',
+      R54: 'AWAITING_SPEND_DECISION',
+      R55: 'AWAITING_SPEND_DECISION',
+      R56: 'COMPLETED',
+      R57: 'PENDING',
+      R58: 'AWAITING_SPEND_DECISION',
+    });
   }, 600000);
 
   it('refuses plan and apply once the year has turned, writing nothing', async () => {

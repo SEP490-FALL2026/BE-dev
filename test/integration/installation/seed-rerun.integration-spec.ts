@@ -145,7 +145,10 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
     expect(first.exitCode).toBe(0);
     expect(statements.length).toBeGreaterThan(demoAccounts * 4);
     expect(largestTransaction(statements)).toBeLessThanOrEqual(MAX_STATEMENTS_PER_TRANSACTION);
-    expect(await demoAccountRows()).toEqual({ accounts: demoAccounts, created: demoAccounts });
+    expect(await demoAccountRows()).toEqual({
+      accounts: demoAccounts + SHARED_DEMO_V4.accountStates.invited.length,
+      created: demoAccounts,
+    });
     expect(await heldAdvisoryLocks()).toBe(0);
   }, 600000);
 
@@ -160,7 +163,10 @@ describe('ops:seed reruns over a slow database connection (A-04, real API and Po
         notPresent: again.steps.filter((s) => s.status !== 'present'),
       }).toEqual({ attempt, exitCode: 2, notPresent: [] });
       expect(largestTransaction(statements)).toBeLessThanOrEqual(MAX_STATEMENTS_PER_TRANSACTION);
-      expect(await demoAccountRows()).toEqual({ accounts: demoAccounts, created: demoAccounts });
+      expect(await demoAccountRows()).toEqual({
+        accounts: demoAccounts + SHARED_DEMO_V4.accountStates.invited.length,
+        created: demoAccounts,
+      });
       expect(await heldAdvisoryLocks()).toBe(0);
     }
   }, 600000);
