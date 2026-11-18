@@ -151,6 +151,16 @@ export class DemoApiClient {
     return this.sessions.has(email);
   }
 
+  /** Calls a public route without opening an account session. */
+  callPublic<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
+    return this.send<T>(method, path, body, undefined, headers);
+  }
+
+  /** Uses a short-lived device credential only for this call; it is never an account session. */
+  callAsDevice<T>(token: string, method: string, path: string, body?: unknown): Promise<T> {
+    return this.send<T>(method, path, body, token);
+  }
+
   /** The `data` of a 2xx answer, as the account of `email` (signed in before). Throws DemoApiError otherwise. */
   async call<T>(
     email: string,

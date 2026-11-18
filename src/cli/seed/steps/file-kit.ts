@@ -40,7 +40,7 @@ interface DeclaredDocument {
 export async function uploadDocument(
   ctx: DemoRunContext,
   email: string,
-  purpose: 'CONTRACT_ATTACHMENT' | 'PURCHASE_DOCUMENT',
+  purpose: 'CONTRACT_ATTACHMENT' | 'PURCHASE_DOCUMENT' | 'SIGNATURE_RECORD',
   file: BuiltFile,
 ): Promise<string> {
   const declared = await ctx.api.call<DeclaredDocument>(email, 'POST', '/documents', {
