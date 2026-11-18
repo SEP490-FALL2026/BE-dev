@@ -74,11 +74,17 @@ describe('an employee the dataset leaves without a department (QĐ-93g)', () => 
     expect(call).toHaveBeenCalledWith('sa@example.test', 'GET', '/employees/e-1');
   });
 
-  it('reports a conflict when somebody has already placed the unplaced one, or renamed them', async () => {
+  it('keeps a rerun going after the demo placed the unplaced one (QĐ-93g), and still checks the name', async () => {
     await expect(runWith({ fullName: 'Âu Thị Xuyến', department: { code: 'ENG' } }).run).resolves.toMatchObject({
+      status: 'present',
+    });
+  });
+
+  it('reports a conflict when somebody renamed the unplaced one', async () => {
+    await expect(runWith({ fullName: 'Người khác', department: null }).run).resolves.toMatchObject({
       status: 'conflict',
     });
-    await expect(runWith({ fullName: 'Người khác', department: null }).run).resolves.toMatchObject({
+    await expect(runWith({ fullName: 'Người khác', department: { code: 'ENG' } }).run).resolves.toMatchObject({
       status: 'conflict',
     });
   });

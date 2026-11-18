@@ -35,6 +35,20 @@ const pick = (key: string): DemoStep => {
   return found;
 };
 
+/**
+ * Steps that freeze what they read once written (the target of SBF-20, the snapshots of the monthly closes): they also need every request of the
+ * fixture, so a request left in conflict blocks them instead of being frozen into a figure a later `--continue` can no longer correct.
+ */
+const AFTER_EVERY_REQUEST: ReadonlySet<string> = new Set(['renewals.adjustments', 'demo.budget-reviews']);
+
+function afterRequests(steps: readonly DemoStep[], fixture: DemoFixture): DemoStep[] {
+  return steps.map((step) =>
+    AFTER_EVERY_REQUEST.has(step.key)
+      ? { ...step, needs: [...step.needs, ...fixture.requests.map(({ key }) => `requests.${key}`)] }
+      : step,
+  );
+}
+
 /** The steps of a fixture in an order where every step comes after the steps it needs. */
 export function demoSteps(fixture: DemoFixture): DemoStep[] {
   return [
@@ -57,7 +71,7 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     ...NOTICE_STEPS,
     ...ABRUPT_DEPARTURE_STEPS,
     ...USAGE_STEPS,
-    ...RENEWAL_STEPS,
+    ...afterRequests(RENEWAL_STEPS, fixture),
     ...DEVICE_STEPS,
     ...COLLECTOR_STEPS,
     ...STOP_REQUEST_STEPS,
@@ -65,6 +79,6 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     // Last: the invoices, the closes of the months and the adjustments read what the requests and seats above hold; the policy published
     // again changes the version every checklist answers, so it comes after every decision of the dataset.
     ...DEMO_DOCUMENT_STEPS,
-    ...DEMO_STEPS,
+    ...afterRequests(DEMO_STEPS, fixture),
   ];
 }

@@ -173,7 +173,10 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     const resumed = reportOf(await run('apply'));
     expect(resumed.steps.filter((step) => step.status !== 'done' && step.status !== 'present')).toEqual([]);
     expect(resumed.exitCode).toBe(0);
-    expect(await requestStates()).toEqual({
+    // R57 is cancelled by the sweep of the block moment, which may run while the suite does (its first pass is five minutes after start).
+    const states = await requestStates();
+    expect(['PENDING', 'CANCELLED']).toContain(states.R57);
+    expect({ ...states, R57: 'PENDING' }).toEqual({
       ...SHARED_DEMO_V4_REQUEST_STATES,
       R40: 'AWAITING_SPEND_DECISION',
       R41: 'REJECTED',

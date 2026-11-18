@@ -448,6 +448,8 @@ export interface DemoFixture {
   retiredApplications: string[];
   ghostDecisions: DemoGhostDecision[];
   personnel: DemoPersonnelEvent[];
+  /** The departure recorded right after the person sends a request (`BLOCK_NOW`): a step of its own, after that request. */
+  abruptDeparture: DemoPersonnelEvent;
   departmentSoftware: DemoDepartmentSoftware[];
   softwareProposals: DemoSoftwareProposal[];
   /** A draft that is saved and never sent (its department has no Cost Center, so it cannot be sent). */

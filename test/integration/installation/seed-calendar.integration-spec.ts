@@ -141,7 +141,10 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
       { year: 2028, opened: false, deadline: '2027-12-01' },
     ]);
 
-    expect(await requestStates()).toEqual({
+    // R57 is cancelled by the sweep of the block moment, which may run while the suite does (its first pass is five minutes after start).
+    const states = await requestStates();
+    expect(['PENDING', 'CANCELLED']).toContain(states.R57);
+    expect({ ...states, R57: 'PENDING' }).toEqual({
       ...SHARED_DEMO_V4_REQUEST_STATES,
       R40: 'AWAITING_SPEND_DECISION',
       R41: 'REJECTED',

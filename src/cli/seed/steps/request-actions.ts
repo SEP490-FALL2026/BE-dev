@@ -69,6 +69,16 @@ export function assessmentRejectBody(
   };
 }
 
+/** The plan IT points at instead: a scenario that names one must find it, never be refused silently without it (R43). */
+function alternativePlanIdOf(ctx: DemoRunContext, scenario: DemoRequestScenario): string | undefined {
+  if (!scenario.alternativePlan) return undefined;
+  const id = ctx.ids.plans.get(scenario.alternativePlan);
+  if (!id)
+    throw new Error(`The plan ${scenario.alternativePlan} that IT suggests for ${scenario.key} is not in the catalog`);
+
+  return id;
+}
+
 /** IT sends a proposal back to the person who made it: no kind of refusal goes with a return. */
 export function assessmentReturnBody(ctx: DemoRunContext, scenario: DemoRequestScenario, checklist: ChecklistBody) {
   return { decision: 'RETURN' as const, reason: reasonOf(ctx, scenario, 'ASSESSMENT_RETURN'), checklist };
@@ -190,7 +200,7 @@ async function assess(
   const body =
     decision === 'RETURN'
       ? assessmentReturnBody(ctx, scenario, checklist)
-      : assessmentRejectBody(ctx, scenario, checklist, ctx.ids.plans.get(scenario.alternativePlan ?? ''));
+      : assessmentRejectBody(ctx, scenario, checklist, alternativePlanIdOf(ctx, scenario));
   await post(ctx, admin, `/access-requests/${request.id}/assessment/rejection`, body);
 }
 
@@ -254,6 +264,7 @@ interface TaskRow {
   kind: string;
   status: string;
   requestId: string | null;
+  createdAt?: string;
 }
 
 async function tasksOf(ctx: DemoRunContext, email: string, requestId: string, kind = 'GRANT'): Promise<TaskRow[]> {
@@ -271,8 +282,10 @@ export async function grantTaskStatus(
   const admin = grantAdminOf(ctx, scenario, request);
   if (!admin) return null;
   const tasks = await tasksOf(ctx, await as(ctx, admin), request.id);
+  // The latest task by creation, whatever order the list comes in.
+  const latest = [...tasks].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '')).at(-1);
 
-  return tasks.length === 0 ? null : tasks[tasks.length - 1].status;
+  return latest?.status ?? null;
 }
 
 /** The free key of the K4 subscription the scenario's plan has, for the IT Admin to hand over. */
@@ -338,7 +351,11 @@ async function failTaskOpen(ctx: DemoRunContext, scenario: DemoRequestScenario, 
   const admin = grantAdminOf(ctx, scenario, request);
   if (!admin) throw new Error(`No IT Admin of the dataset carries out ${scenario.key}`);
   const email = await as(ctx, admin);
-  for (const task of (await tasksOf(ctx, email, request.id)).filter((row) => row.status !== 'FAILED')) {
+  // Only a task still running can fail: a completed, cancelled or closed task of an earlier attempt is history and the API refuses it.
+  const running = (await tasksOf(ctx, email, request.id)).filter((row) =>
+    ['QUEUED', 'IN_PROGRESS'].includes(row.status),
+  );
+  for (const task of running) {
     if (task.status === 'QUEUED') await ctx.api.call(email, 'POST', `/provisioning-tasks/${task.id}/claim`);
     await ctx.api.call(email, 'POST', `/provisioning-tasks/${task.id}/report-failure`, {
       reason: reasonOf(ctx, scenario, 'TASK_FAILED'),

@@ -47,6 +47,23 @@ describe('simulated AI summaries', () => {
     await expect(AI_STEPS[0].run(ctx)).resolves.toMatchObject({ status: 'conflict' });
     expect(call).toHaveBeenCalledTimes(1);
   });
+  it('is present when both switches are on, even after the operator moved the provider mode to MODEL', async () => {
+    const call = jest.fn().mockResolvedValue({
+      items: [
+        { key: 'AI_PROVIDER_MODE', value: 'MODEL' },
+        { key: 'AI_ENABLED', value: 'ON' },
+        { key: 'AI_ACCESS_REQUEST_SUMMARY_ENABLED', value: 'ON' },
+      ],
+    });
+    const ctx = {
+      fixture,
+      mode: 'apply',
+      superAdminEmail: 'sa@example.test',
+      api: { call },
+    } as unknown as DemoRunContext;
+    await expect(AI_STEPS[0].run(ctx)).resolves.toMatchObject({ status: 'present' });
+    expect(call).toHaveBeenCalledTimes(1);
+  });
   it('returns done after an accepted POST even if the optional detail is still pending', async () => {
     const ids = emptyIds();
     ids.appUsers.set('NV-ENGH', 'user-1');

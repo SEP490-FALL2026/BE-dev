@@ -74,7 +74,9 @@ describe('the simulated collector payloads', () => {
       return Promise.resolve({ code: 'test-enrollment' });
     });
     const callAsDevice = jest.fn((_token: string, method: string) =>
-      Promise.resolve(method === 'GET' ? { state: 'ACTIVE' } : { results: [{ outcome: 'REJECTED' }] }),
+      Promise.resolve(
+        method === 'GET' ? { state: 'ACTIVE', timezone: 'Asia/Ho_Chi_Minh' } : { results: [{ outcome: 'REJECTED' }] },
+      ),
     );
     const current = {
       ...ctx,
@@ -84,5 +86,43 @@ describe('the simulated collector payloads', () => {
     } as unknown as DemoRunContext;
     await expect(COLLECTOR_STEPS[0].run(current)).resolves.toMatchObject({ status: 'conflict' });
     expect(callAsDevice).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends the business day of the machine when the first run has passed midnight', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] }).setSystemTime(new Date('2026-11-18T17:30:00Z'));
+    try {
+      const call = jest.fn((_email: string, _method: string, path: string) => {
+        if (path.startsWith('/devices?'))
+          return Promise.resolve({
+            items: [{ id: 'machine-1', assetCode: 'SV-LT-001', state: 'ACTIVE', registrationId: 'reg-1' }],
+          });
+        if (path.endsWith('/usage?page=1&pageSize=100')) return Promise.resolve({ items: [] });
+        return Promise.resolve({ code: 'test-enrollment' });
+      });
+      const sent: { days?: { date: string }[] }[] = [];
+      const callAsDevice = jest.fn(
+        (_token: string, method: string, _path: string, body?: { days?: { date: string }[] }) => {
+          if (method === 'GET') return Promise.resolve({ state: 'ACTIVE', timezone: 'Asia/Ho_Chi_Minh' });
+          if (body) sent.push(body);
+          return Promise.resolve({ results: [{ outcome: 'ACCEPTED' }] });
+        },
+      );
+      const current = {
+        ...ctx,
+        mode: 'apply',
+        today: '2026-11-18',
+        fixture: { ...fixture, devices: [fixture.devices[0]] },
+        api: {
+          call,
+          callAsDevice,
+          callPublic: jest.fn().mockResolvedValue({ token: 'fake-token' }),
+          signIn: jest.fn(),
+        },
+      } as unknown as DemoRunContext;
+      await expect(COLLECTOR_STEPS[0].run(current)).resolves.toMatchObject({ status: 'done' });
+      expect(sent[0].days?.map(({ date }) => date)).toEqual(['2026-11-19']);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

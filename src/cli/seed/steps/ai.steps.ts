@@ -10,10 +10,12 @@ async function switches(ctx: DemoRunContext): Promise<StepOutcome> {
     'GET',
     '/operating-parameters',
   );
-  if (items.find(({ key }) => key === 'AI_PROVIDER_MODE')?.value !== 'SIMULATED')
-    return { status: 'conflict', detail: 'S19 requires SIMULATED; the provider mode is left to the operator' };
+  // Both switches on is the end state whatever the provider mode: the operator may have moved it to MODEL since (Q4), and a rerun the next day
+  // must not stop there. Only switching AI on is refused outside SIMULATED, so the seed never starts a call to a real model.
   const missing = SWITCHES.filter((key) => items.find((row) => row.key === key)?.value !== 'ON');
   if (!missing.length) return { status: 'present' };
+  if (items.find(({ key }) => key === 'AI_PROVIDER_MODE')?.value !== 'SIMULATED')
+    return { status: 'conflict', detail: 'S19 requires SIMULATED; the provider mode is left to the operator' };
   if (ctx.mode === 'plan') return { status: 'planned' };
   for (const key of missing)
     await ctx.api.call(ctx.superAdminEmail, 'PUT', `/operating-parameters/${key}`, { value: 'ON' });

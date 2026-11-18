@@ -133,8 +133,7 @@ async function placedAsWanted(
 }
 
 function personnelEvent(ctx: DemoRunContext, code: string): DemoPersonnelEvent | undefined {
-  if (code === 'NV-DEV7') return { kind: 'OFFBOARDING', employee: code };
-  return ctx.fixture.personnel.find((event) => event.employee === code);
+  return [...ctx.fixture.personnel, ctx.fixture.abruptDeparture].find((event) => event.employee === code);
 }
 
 interface EmployeeProfile {
@@ -184,7 +183,10 @@ async function afterPersonnelEvent(
     : { status: 'conflict', label: `${person.code}: phòng hiện tại không khớp sự kiện của fixture` };
 }
 
-/** The unplaced employee is the demo one while the profile has no department and the fixture's name (a placement is somebody's change). */
+/**
+ * The unplaced employee is the demo one under the fixture's name. Placing them is the very thing the demo shows (`QĐ-93g`), so a profile that has a
+ * department since is present too, reported with it; only another name is somebody else's change.
+ */
 async function stillUnplaced(ctx: DemoRunContext, person: DemoPerson): Promise<Result> {
   const id = ctx.ids.employees.get(person.code);
   const profile = await ctx.api.call<{ fullName: string; department: { code: string } | null }>(
@@ -192,13 +194,12 @@ async function stillUnplaced(ctx: DemoRunContext, person: DemoPerson): Promise<R
     'GET',
     `/employees/${id}`,
   );
-  if (profile.department !== null) {
-    return { status: 'conflict', label: `${person.code} đã được xếp vào phòng ${profile.department.code}` };
-  }
+  if (!same(profile.fullName, person.fullName))
+    return { status: 'conflict', label: `${person.code} đã có với họ tên khác` };
 
-  return same(profile.fullName, person.fullName)
+  return profile.department === null
     ? { status: 'present', label: person.code }
-    : { status: 'conflict', label: `${person.code} đã có với họ tên khác` };
+    : { status: 'present', label: `${person.code} (đã được xếp vào ${profile.department.code} khi demo)` };
 }
 
 /**

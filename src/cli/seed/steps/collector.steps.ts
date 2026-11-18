@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { businessDateAt } from '../../../core/business-date';
 import { listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoDevice } from '../fixture/demo-fixture.types';
@@ -17,8 +18,12 @@ function valueFor(assetCode: string, day: string): number {
   return (hash % 70) + 10;
 }
 
-export function usageBatchBody(ctx: DemoRunContext, machine: DemoDevice, now: Date) {
-  const value = valueFor(machine.assetCode, ctx.today);
+/**
+ * The usage of one day as the collector sends it. `day` is the business day of `now` on the machine (the session's time zone), not the day the
+ * seed started: a first run that passes midnight acknowledges on the new day, and the server takes no day before the acknowledgement.
+ */
+export function usageBatchBody(ctx: DemoRunContext, machine: DemoDevice, now: Date, day: string = ctx.today) {
+  const value = valueFor(machine.assetCode, day);
   const tools = (machine.tools ?? []).map((tool, index) => {
     const unobservable = machine.assetCode === 'SV-LT-003' && tool === 'CODEX';
     return {
@@ -28,7 +33,7 @@ export function usageBatchBody(ctx: DemoRunContext, machine: DemoDevice, now: Da
       totalTokens: unobservable ? 0 : (value + index * 7) * 1200,
     };
   });
-  return { generatedAt: now.toISOString(), days: [{ date: ctx.today, tools }] };
+  return { generatedAt: now.toISOString(), days: [{ date: day, tools }] };
 }
 
 export function statusSnapshotsBody(ctx: DemoRunContext, machine: DemoDevice, now: Date) {
@@ -55,14 +60,14 @@ function accepted(results: { outcome: string }[]): boolean {
 }
 
 async function sendBatch(ctx: DemoRunContext, spec: DemoDevice, token: string): Promise<StepOutcome> {
-  const session = await ctx.api.callAsDevice<{ state: string }>(token, 'GET', '/device-session');
+  const session = await ctx.api.callAsDevice<{ state: string; timezone: string }>(token, 'GET', '/device-session');
   if (session.state !== 'ACTIVE') return { status: 'conflict', detail: 'Device session is not ACTIVE' };
   const now = new Date();
   const usage = await ctx.api.callAsDevice<{ results: { outcome: string }[] }>(
     token,
     'POST',
     '/ai-usage-batches',
-    usageBatchBody(ctx, spec, now),
+    usageBatchBody(ctx, spec, now, businessDateAt(now, session.timezone)),
   );
   if (!accepted(usage.results)) return { status: 'conflict', detail: 'Usage batch was not fully accepted' };
   const status = await ctx.api.callAsDevice<{ results: { outcome: string }[] }>(

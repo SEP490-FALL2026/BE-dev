@@ -113,7 +113,7 @@ export const ABRUPT_DEPARTURE_STEPS: readonly DemoStep[] = [
     title: 'Nghỉ đột ngột: DEV7 bị chặn ngay sau khi gửi R57',
     needs: ['personnel.events', 'requests.R57'],
     run: async (ctx) => {
-      const result = await record(ctx, { kind: 'OFFBOARDING', employee: 'NV-DEV7' });
+      const result = await record(ctx, ctx.fixture.abruptDeparture);
       return { status: result.status, detail: result.label };
     },
   },
