@@ -1,7 +1,6 @@
 import { as, listAll, summarize, tag, yearOf } from '../demo-step-kit';
-import { dayOffset } from '../demo-dates';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
-import { contractPdf, invoicePdf, receiptPdf } from './pdf-builders';
+import { receiptPdf } from './pdf-builders';
 import { uploadDocument } from './file-kit';
 import { financePerson, money } from './finance-kit';
 
@@ -24,138 +23,8 @@ const subscriptionOf = (ctx: DemoRunContext, key: string) => {
 const vendorNameOf = (ctx: DemoRunContext, applicationKey: string): string =>
   ctx.fixture.applications.find((application) => application.key === applicationKey)?.vendorName ?? applicationKey;
 
-const vendorOfPlan = (ctx: DemoRunContext, planKey: string): string =>
-  ctx.fixture.applications.find((application) => application.plans.some((plan) => plan.key === planKey))?.vendorName ??
-  planKey;
-
 const headOfCostCenter = (ctx: DemoRunContext, costCenterCode: string): string | null =>
   ctx.fixture.departments.find((department) => department.costCenter?.code === costCenterCode)?.head ?? null;
-
-/** DEMO-9: one contract per vendor, each holding its subscription (K2 Jira, K4 JetBrains All), with its signed file. */
-const CONTRACTS = [
-  { number: 'SV-HD-ATL-01', name: 'Hợp đồng Atlassian (Jira Software)', application: 'jira', subscriptions: ['jira'] },
-  {
-    number: 'SV-HD-JB-01',
-    name: 'Hợp đồng JetBrains (All Products)',
-    application: 'jetbrains',
-    subscriptions: ['jetbrains'],
-  },
-];
-
-async function contracts(ctx: DemoRunContext): Promise<StepOutcome> {
-  const results: Result[] = [];
-  for (const spec of CONTRACTS) {
-    const admin = await as(ctx, subscriptionOf(ctx, spec.subscriptions[0]).responsible);
-    const existing = await listAll<{ id: string; number: string | null }>(ctx, admin, '/contracts');
-    if (existing.some((row) => row.number === spec.number)) {
-      results.push({ status: 'present', label: spec.number });
-      continue;
-    }
-    if (ctx.mode === 'plan') {
-      results.push({ status: 'planned', label: spec.number });
-      continue;
-    }
-    const effective = { from: dayOffset(ctx.today, -200), to: dayOffset(ctx.today, 165) };
-    const created = await ctx.api.call<{ contract: { id: string } }>(admin, 'POST', '/contracts', {
-      name: spec.name,
-      number: spec.number,
-      vendorId: ctx.ids.vendors.get(spec.application),
-      effectiveFrom: effective.from,
-      effectiveTo: effective.to,
-      note: `${tag(ctx, 'CONTRACT')} Hợp đồng khung một năm, gia hạn theo thuê bao.`,
-    });
-    const contractId = created.contract.id;
-    for (const key of spec.subscriptions) {
-      await ctx.api.call(admin, 'POST', `/contracts/${contractId}/subscriptions`, {
-        subscriptionId: ctx.ids.subscriptions.get(key),
-      });
-    }
-    const pdf = await contractPdf({
-      number: spec.number,
-      name: spec.name,
-      vendor: vendorNameOf(ctx, spec.application),
-      effectiveFrom: effective.from,
-      effectiveTo: effective.to,
-    });
-    const file = await uploadDocument(ctx, admin, 'CONTRACT_ATTACHMENT', pdf);
-    await ctx.api.call(admin, 'POST', `/documents/${file}/attach`, { contractId });
-    results.push({ status: 'done', label: spec.number });
-  }
-
-  return summarize(results);
-}
-
-/**
- * DEMO-10/11: purchase invoices of the shared pool for the month of the seed, sent by the IT Admin in charge of the subscription and left in
- * each state: one waits for Finance's signature, one is signed, one returned, and one signed with more seats than were bought (12 against
- * 7), which opens a discrepancy case (`SBF-11a`).
- */
-const INVOICES = [
-  { number: 'SV-INV-001', subscription: 'jira', quantity: 10, target: 'SUBMITTED' },
-  { number: 'SV-INV-002', subscription: 'slack', quantity: 9, target: 'CONFIRMED' },
-  { number: 'SV-INV-003', subscription: 'github', quantity: 9, target: 'RETURNED' },
-  { number: 'SV-INV-004', subscription: 'postman', quantity: 12, target: 'CONFIRMED' },
-] as const;
-
-interface InvoiceRow {
-  id: string;
-  state: string;
-  vendorInvoiceNumber: string;
-}
-
-async function invoices(ctx: DemoRunContext): Promise<StepOutcome> {
-  const finance = await as(ctx, financePerson(ctx));
-  const existing = await listAll<InvoiceRow>(ctx, finance, '/purchase-invoices');
-  const results: Result[] = [];
-  for (const spec of INVOICES) {
-    const label = `${spec.number} → ${spec.target}`;
-    let row = existing.find((candidate) => candidate.vendorInvoiceNumber === spec.number);
-    if (row && (row.state === spec.target || row.state !== 'SUBMITTED')) {
-      results.push({ status: row.state === spec.target ? 'present' : 'conflict', label });
-      continue;
-    }
-    if (ctx.mode === 'plan') {
-      results.push({ status: 'planned', label });
-      continue;
-    }
-    if (!row) {
-      const subscription = subscriptionOf(ctx, spec.subscription);
-      const admin = await as(ctx, subscription.responsible);
-      const price = BigInt(subscription.unitPrice.amount);
-      const netAmount = (price * BigInt(spec.quantity)).toString();
-      const pdf = await invoicePdf({
-        vendorInvoiceNumber: spec.number,
-        vendorName: vendorOfPlan(ctx, subscription.plan),
-        issuedOn: ctx.today,
-        servicePeriodMonth: ctx.today.slice(0, 7),
-        quantity: spec.quantity,
-        unitPrice: price.toString(),
-        netAmount,
-      });
-      const document = await uploadDocument(ctx, admin, 'PURCHASE_DOCUMENT', pdf);
-      row = await ctx.api.call<InvoiceRow>(admin, 'POST', '/purchase-invoices', {
-        link: { subscriptionId: ctx.ids.subscriptions.get(spec.subscription) },
-        vendorInvoiceNumber: spec.number,
-        issuedOn: ctx.today,
-        servicePeriodMonth: ctx.today.slice(0, 7),
-        quantity: spec.quantity,
-        unitPriceOriginal: { amount: price.toString(), currency: 'VND' },
-        netAmount: money(netAmount),
-        paymentSource: 'COMPANY_CARD',
-        documentIds: [document],
-      });
-    }
-    if (spec.target === 'CONFIRMED') await ctx.api.call(finance, 'POST', `/purchase-invoices/${row.id}/confirmation`);
-    if (spec.target === 'RETURNED') {
-      await ctx.api.call(finance, 'POST', `/purchase-invoices/${row.id}/return`, {
-        reason: `${tag(ctx, spec.number)} Hóa đơn thiếu mã số thuế của nhà cung cấp; nộp lại bản đúng.`,
-      });
-    }
-    results.push({ status: 'done', label });
-  }
-
-  return summarize(results);
-}
 
 interface PeriodRow {
   id: string;
@@ -417,18 +286,6 @@ async function policyAgain(ctx: DemoRunContext): Promise<StepOutcome> {
 }
 
 export const DEMO_STEPS: readonly DemoStep[] = [
-  {
-    key: 'demo.contracts',
-    title: 'Hợp đồng gắn thuê bao K2 và K4, có tệp (IT Admin, DEMO-9)',
-    needs: ['catalog.subscriptions'],
-    run: contracts,
-  },
-  {
-    key: 'demo.purchase-invoices',
-    title: 'Hóa đơn mua: chờ ký, đã ký, bị trả, một hóa đơn lệch số lượng (IT Admin → Finance, DEMO-10/11)',
-    needs: ['catalog.subscriptions', 'org.accounts'],
-    run: invoices,
-  },
   {
     key: 'demo.budget-reviews',
     title: 'Chốt số các tháng đã qua của năm, quý chờ giải trình (Finance, trưởng phòng; DEMO-12/13)',

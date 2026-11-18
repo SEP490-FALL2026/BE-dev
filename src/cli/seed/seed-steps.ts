@@ -7,6 +7,7 @@ import { budgetSteps } from './steps/budget.steps';
 import { CATALOG_EXTRA_STEPS } from './steps/catalog-extra.steps';
 import { CATALOG_STEPS } from './steps/catalog.steps';
 import { DEMO_STEPS } from './steps/demo.steps';
+import { DEMO_DOCUMENT_STEPS } from './steps/demo-documents.steps';
 import { DEVICE_STEPS } from './steps/devices.steps';
 import { COLLECTOR_STEPS } from './steps/collector.steps';
 import { STOP_REQUEST_STEPS } from './steps/device-stops.steps';
@@ -63,6 +64,7 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     ...aiSteps(fixture),
     // Last: the invoices, the closes of the months and the adjustments read what the requests and seats above hold; the policy published
     // again changes the version every checklist answers, so it comes after every decision of the dataset.
+    ...DEMO_DOCUMENT_STEPS,
     ...DEMO_STEPS,
   ];
 }
