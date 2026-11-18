@@ -1,5 +1,6 @@
 import type { DemoFixture } from '../demo-fixture.types';
 import { CATALOG } from './catalog';
+import { RETIRED_APPLICATIONS } from './catalog-extra';
 import { FINANCE } from './finance';
 import { DEVICES, MONITORING_NOTICE } from './devices';
 import { ORGANIZATION } from './organization';
@@ -25,6 +26,7 @@ export const SHARED_DEMO_V4: DemoFixture = {
   devices: DEVICES,
   monitoringNotice: MONITORING_NOTICE,
   aiSummaries: AI_SUMMARIES,
+  retiredApplications: RETIRED_APPLICATIONS,
   ...USAGE,
   usageSources: [...USAGE.usageSources, ...EXTRA_USAGE_SOURCES],
   ...SOFTWARE_LIST,

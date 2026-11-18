@@ -445,6 +445,7 @@ export interface DemoFixture {
   devices: DemoDevice[];
   monitoringNotice: DemoMonitoringNotice;
   aiSummaries: string[];
+  retiredApplications: string[];
   ghostDecisions: DemoGhostDecision[];
   personnel: DemoPersonnelEvent[];
   departmentSoftware: DemoDepartmentSoftware[];

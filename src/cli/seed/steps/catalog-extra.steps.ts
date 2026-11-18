@@ -45,7 +45,35 @@ async function planTerms(ctx: DemoRunContext): Promise<StepOutcome> {
   return summarize(results);
 }
 
+async function retireOne(ctx: DemoRunContext, admin: string, key: string): Promise<Result> {
+  const id = ctx.ids.applications.get(key);
+  if (!id) return { status: 'conflict', label: `${key}: no application id` };
+  const { retirement } = await ctx.api.call<{ retirement: { status: string; canRetire: boolean } }>(
+    admin,
+    'GET',
+    `/applications/${id}/retirement`,
+  );
+  if (retirement.status === 'RETIRED') return { status: 'present', label: key };
+  if (!retirement.canRetire) return { status: 'conflict', label: `${key}: retirement is blocked` };
+  if (ctx.mode === 'plan') return { status: 'planned', label: key };
+  await ctx.api.call(admin, 'POST', `/applications/${id}/retire`);
+  return { status: 'done', label: key };
+}
+
+async function retirement(ctx: DemoRunContext): Promise<StepOutcome> {
+  const admin = await as(ctx, 'NV-ITA1');
+  const results: Result[] = [];
+  for (const key of ctx.fixture.retiredApplications) results.push(await retireOne(ctx, admin, key));
+  return summarize(results);
+}
+
 export const CATALOG_EXTRA_STEPS: readonly DemoStep[] = [
+  {
+    key: 'catalog.retirement',
+    title: 'Ngừng Skype for Business không còn thuê bao hoặc ghế',
+    needs: ['catalog.plans'],
+    run: retirement,
+  },
   {
     key: 'catalog.plan-terms',
     title: 'Điều khoản của bốn gói, hai gói để chờ rà soát (IT Admin)',

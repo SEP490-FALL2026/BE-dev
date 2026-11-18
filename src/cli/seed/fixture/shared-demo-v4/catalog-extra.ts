@@ -1,6 +1,8 @@
 import type { DemoApplication, DemoPlan, DemoPlanTerms, DemoSeat, DemoSubscription } from '../demo-fixture.types';
 import { app, groupOf, k2, k4, monthly } from './catalog-kit';
 
+export const RETIRED_APPLICATIONS = ['skype'];
+
 /** A per-seat plan bought one by one (K1): the control the company has over the seat is the one the vendor allows. */
 const k1 = (key: string, name: string, controlLevel: NonNullable<DemoPlan['controlLevel']>): DemoPlan => ({
   key,
