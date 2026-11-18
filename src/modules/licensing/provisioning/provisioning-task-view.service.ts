@@ -64,7 +64,7 @@ export interface TaskSummaryView {
   /** The request a grant answers for; null for a revocation. */
   requestId: string | null;
   assignmentId: string;
-  beneficiary: { employeeId: string; employeeCode: string; fullName: string } | null;
+  beneficiary: { employeeId: string; employeeCode: string; fullName: string; workEmail: string | null } | null;
   plan: {
     planId: string;
     planName: string;
@@ -130,7 +130,14 @@ export type TaskView = Omit<TaskSummaryView, 'revocation'> & TaskDetailFields;
 interface ViewContext {
   employees: Map<
     string,
-    { id: string; employeeCode: string; fullName: string; status: string; contractEndDate?: string | null }
+    {
+      id: string;
+      employeeCode: string;
+      fullName: string;
+      workEmail: string | null;
+      status: string;
+      contractEndDate?: string | null;
+    }
   >;
   plans: Map<string, SeatTarget>;
   /** The note of each plan of a revocation about what to do before the seat is taken away (`QĐ-110g`: read only, nobody confirms it). */
@@ -140,6 +147,18 @@ interface ViewContext {
   reasonCounts: Map<string, number>;
   today: BusinessDate;
   now: number;
+}
+
+/** The person a task is for, with the work email the grant goes to (`QĐ-87b`, `FR-2.9`); null when the person is not found. */
+function beneficiaryOf(employee: ReturnType<ViewContext['employees']['get']>) {
+  return employee
+    ? {
+        employeeId: employee.id,
+        employeeCode: employee.employeeCode,
+        fullName: employee.fullName,
+        workEmail: employee.workEmail,
+      }
+    : null;
 }
 
 /** The plan on a card: its names and kind of provisioning, and, on a revocation, what the plan says to do before the seat goes. */
@@ -321,9 +340,7 @@ export class ProvisioningTaskViewService {
       status: task.status,
       requestId: task.requestId,
       assignmentId: task.assignmentId,
-      beneficiary: beneficiary
-        ? { employeeId: beneficiary.id, employeeCode: beneficiary.employeeCode, fullName: beneficiary.fullName }
-        : null,
+      beneficiary: beneficiaryOf(beneficiary),
       plan: planCardOf(plan, task.kind === 'REVOKE' ? notes.get(task.assignment.planId) : undefined),
       subscriptionId: task.assignment.subscriptionId,
       accountIdentifier: task.assignment.accountIdentifier,
