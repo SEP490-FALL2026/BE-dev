@@ -386,6 +386,7 @@ export interface DemoDevice {
   acknowledge: boolean;
   changeTo?: string;
   retire?: boolean;
+  tools?: ('CLAUDE_CODE' | 'CODEX')[];
 }
 
 export interface DemoMonitoringNotice {
