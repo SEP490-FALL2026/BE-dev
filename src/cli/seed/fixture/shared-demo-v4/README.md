@@ -158,7 +158,7 @@ phòng MKT, DES, SAL không có Request nào khác giữ hoặc chờ ngân sác
 
 ## MF-1: Request ở mọi trạng thái
 
-Gửi theo thứ tự bảng (Request đã cấp trước, để ghế trong kho và số Request đang mở của từng người đúng). Mỗi Request mang thẻ `[SV-Rnn]` ở đầu lý do; mỗi người có tối đa 3 Request đang mở (GH-2).
+Gửi theo thứ tự bảng (Request đã cấp trước, để ghế trong kho và số Request đang mở của từng người đúng). Mỗi Request mang thẻ `[SV-Rnn]` ở đầu lý do; mỗi người có tối đa 3 Request đang mở (GH-2). Chữ trong cột «Kịch bản» của các bảng R.. là ghi chú cho dev, **không** gửi API; lý do thật (việc dùng phần mềm để làm) là trường `reason` của kịch bản (`requests.ts`, `requests-extra.ts`), đi sau thẻ `[SV-Rnn]`. R31 và R54 (đang chờ Người duyệt chi) cố ý có lý do lẫn câu thúc giục và đường dẫn để demo AI tóm tắt lọc nhiễu.
 
 _Thời gian dùng_ (`QĐ-111i`): Request gửi `termMonths`, không gửi ngày kết thúc. Gói K1 xin 3 tháng, R10, R21, R11 một tháng, R17 hai tháng, R16 ba tháng (bị cắt tại ngày hết hợp đồng của nhà thầu); gói K2, K5 của nhân viên chính thức không hạn, gói K4 không hỏi tháng.
 
