@@ -28,6 +28,7 @@ describe('the body of a subscription the dataset declares', () => {
       responsibleItAdminEmployeeId: 'id-NV-ITA1',
       startDate: '2026-01-01',
       endDate: '2026-12-31',
+      renewalDate: '2026-11-30',
     });
     expect(body).not.toHaveProperty('ownerDepartmentId');
   });
@@ -78,9 +79,15 @@ describe('the workspace profile the dataset records for the plans that need admi
   it('names the IT Admin who answers for the subscription as the owner and another IT Admin as the admin, for every plan that needs them', () => {
     const needing = SHARED_DEMO_V4.applications
       .flatMap((app) => app.plans)
-      .filter((p) => p.provisioningType === 'K2' || p.hasAdminConsole === true);
+      .filter((p) => p.provisioningType === 'K2' || p.hasAdminConsole === true)
+      // A plan with no subscription (Skype, retired in S21) has no IT Admin who answers for it and so no profile.
+      .filter((p) => SHARED_DEMO_V4.subscriptions.some((s) => s.plan === p.key) || p.key === 'skype-online');
     expect(needing.map((p) => p.key)).toContain('jetbrains-all');
     for (const needed of needing) {
+      if (needed.key === 'skype-online') {
+        expect(workspaceProfileBody(ctx, needed)).toBeNull();
+        continue;
+      }
       const body = workspaceProfileBody(ctx, needed)!;
       const responsible = SHARED_DEMO_V4.subscriptions.find((s) => s.plan === needed.key)!.responsible;
 
@@ -111,5 +118,133 @@ describe('the workspace profile the dataset records for the plans that need admi
 
     expect(steps.get('catalog.workspace-profiles')?.needs).toEqual(['catalog.plans']);
     expect(steps.get('catalog.subscriptions')?.needs).toContain('catalog.workspace-profiles');
+  });
+});
+
+/** Q5, SPEC 4.5: the days of a subscription are counted from the day the seed runs, so the demo has plans inside and outside the adjustment window on any day. */
+describe('the days of a subscription counted from the day of the seed (T5)', () => {
+  const employees = new Map(SHARED_DEMO_V4.people.map((person) => [person.code, `id-${person.code}`]));
+  const ctxOn = (today: string) =>
+    ({ fixture: SHARED_DEMO_V4, today, ids: { employees, departments: new Map() } }) as unknown as DemoRunContext;
+  const declared = (key: string) => SHARED_DEMO_V4.subscriptions.find((candidate) => candidate.key === key)!;
+  const monthly = (renewalInDays: number) => ({ ...declared('jira'), renewalInDays });
+  const annual = (extra: Record<string, unknown>) => ({ ...declared('figma'), ...extra });
+
+  it('anchors the payment day of a monthly plan on today', () => {
+    expect(subscriptionBody(ctxOn('2026-11-17'), monthly(20), 'p')).toMatchObject({
+      renewalDate: '2026-12-07',
+      startDate: '2026-01-01',
+      endDate: '2026-12-31',
+    });
+  });
+
+  it('moves the end of a monthly plan past the year when its payment day is next year', () => {
+    expect(subscriptionBody(ctxOn('2026-12-20'), monthly(20), 'p')).toMatchObject({
+      renewalDate: '2027-01-09',
+      endDate: '2027-01-08',
+    });
+  });
+
+  it('declares the deadline to cancel of an annual plan when the fixture names one', () => {
+    const body = subscriptionBody(ctxOn('2026-11-17'), annual({ renewalInDays: 70, noticeDeadlineInDays: 25 }), 'p');
+
+    expect(body).toMatchObject({ renewalDate: '2027-01-26', noticeDeadline: '2026-12-12', autoRenew: true });
+    expect(subscriptionBody(ctxOn('2026-11-17'), annual({}), 'p')).not.toHaveProperty('noticeDeadline');
+  });
+
+  it('writes no date to alert from for a plan the fixture leaves without dates', () => {
+    const body = subscriptionBody(ctxOn('2026-11-17'), annual({ renewalInDays: undefined, withoutDates: true }), 'p');
+
+    expect(body).toMatchObject({
+      billingCycle: 'ANNUAL',
+      commitmentTermMonths: 12,
+      startDate: '2026-05-01',
+      autoRenew: false,
+    });
+    for (const field of ['endDate', 'renewalDate', 'noticePeriodDays', 'noticeDeadline']) {
+      expect(body).not.toHaveProperty(field);
+    }
+  });
+
+  it('lets a plan opt out of the automatic renewal', () => {
+    expect(subscriptionBody(ctxOn('2026-11-17'), annual({ autoRenew: false }), 'p')).toMatchObject({
+      autoRenew: false,
+    });
+  });
+
+  it('leaves a monthly plan with no payment day on the calendar year', () => {
+    const body = subscriptionBody(ctxOn('2026-11-17'), { ...declared('jira'), renewalInDays: undefined }, 'p');
+
+    expect(body).toMatchObject({ startDate: '2026-01-01', endDate: '2026-12-31' });
+    expect(body).not.toHaveProperty('renewalDate');
+  });
+
+  it.each(['2026-12-31', '2028-02-29', '2027-01-31'])(
+    'keeps renewalDate at most one day after endDate on %s',
+    (today) => {
+      for (const days of [1, 3, 20]) {
+        const body = subscriptionBody(ctxOn(today), monthly(days), 'p') as {
+          startDate: string;
+          endDate: string;
+          renewalDate: string;
+        };
+        const dayAfterEnd = new Date(`${body.endDate}T00:00:00Z`).getTime() + 86_400_000;
+
+        expect(new Date(`${body.renewalDate}T00:00:00Z`).getTime()).toBeLessThanOrEqual(dayAfterEnd);
+        expect(body.startDate <= body.endDate).toBe(true);
+      }
+    },
+  );
+
+  it('gives the seven monthly K2 plans of the first dataset a payment day 20 days away, and Figma stays at 50', () => {
+    for (const key of ['jira', 'slack', 'github', 'onepassword', 'postman', 'mailchimp', 'canva']) {
+      expect(declared(key).renewalInDays).toBe(20);
+    }
+    expect(declared('figma').renewalInDays).toBe(50);
+    for (const key of ['chatgpt', 'cursor', 'grammarly']) expect(declared(key).renewalInDays).toBeUndefined();
+  });
+});
+
+/** SPEC S05: thirteen more workspace profiles (the twelve K2 plans with a subscription and Visio); Notion Business names no company account. */
+describe('the workspace profiles of the plans of T4 and T6', () => {
+  const employees = new Map(SHARED_DEMO_V4.people.map((person) => [person.code, `id-${person.code}`]));
+  const ctx = { fixture: SHARED_DEMO_V4, today: '2026-11-17', ids: { employees } } as unknown as DemoRunContext;
+  const plans = SHARED_DEMO_V4.applications.flatMap((app) => app.plans);
+
+  it('records a profile for each K2 plan with a subscription and for Visio, and none for Skype or the K1, K5 plans', () => {
+    const withProfile = plans.filter((plan) => workspaceProfileBody(ctx, plan) !== null).map((plan) => plan.key);
+    const added = withProfile.filter(
+      (key) =>
+        ![
+          'jira-standard',
+          'figma-professional',
+          'slack-pro',
+          'github-team',
+          'onepassword-business',
+          'postman-professional',
+          'mailchimp-standard',
+          'canva-teams',
+          'jetbrains-all',
+        ].includes(key),
+    );
+
+    expect(added).toHaveLength(13);
+    expect(added).toContain('visio-pro');
+    expect(withProfile).not.toContain('skype-online');
+    expect(withProfile).not.toContain('claude-pro');
+    expect(withProfile).not.toContain('sublime-license');
+  });
+
+  it('names the third IT Admin as the vendor admin of Microsoft 365 and Visio, and leaves Notion Business without a company account', () => {
+    const body = (key: string) =>
+      workspaceProfileBody(
+        ctx,
+        plans.find((plan) => plan.key === key)!,
+      )!;
+
+    expect(body('m365-basic').members).toContainEqual({ employeeId: 'id-NV-ITA3', role: 'ADMIN' });
+    expect(body('visio-pro').members).toContainEqual({ employeeId: 'id-NV-ITA3', role: 'ADMIN' });
+    expect(body('notion-business')).not.toHaveProperty('ownerAccountEmail');
+    expect(body('notion-plus').ownerAccountEmail).toBe('it-notion-plus@saoviet.example');
   });
 });

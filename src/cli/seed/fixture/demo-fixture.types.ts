@@ -24,7 +24,8 @@ export interface DemoPerson {
   fullName: string;
   /** The local part of the work email; the domain is the fixture's. */
   email: string;
-  department: string;
+  /** The department code the person is placed in; null: the dataset leaves them unplaced (`QĐ-93g`), the Super Admin places them later. */
+  department: string | null;
   employmentType: 'STAFF' | 'CONTRACTOR' | 'FREELANCER' | 'INTERN';
   /** The one direct role of the person's sign-in account; null: no account (the Super Admin can create one to test). */
   account: DemoRole | null;
@@ -33,16 +34,41 @@ export interface DemoPerson {
    * request, which names months, is cut there (`QĐ-111i`, R-38); a staff member has none (the API refuses one).
    */
   contractEndInDays?: number;
+  /** The dataset locks this person's account (`org.account-states`): the later runs do not check that account against its spec (C-1). */
+  lockedInDemo?: true;
+}
+
+/** A line of a people file the Super Admin imports (`SBF-01a`): the department is a code that may be wrong on purpose. */
+export interface DemoImportRow {
+  code: string;
+  fullName: string;
+  /** The local part of the work email, or the person of the fixture whose email the line repeats (a refusal on purpose). */
+  email: string | { sameAsPerson: string };
+  employmentType: DemoPerson['employmentType'];
+  department: string;
+  jobTitle?: string;
+}
+
+/** One people file: confirmed (the people exist after it) or only previewed (kept as the screen with lines to fix). */
+export interface DemoEmployeeImport {
+  key: string;
+  fileName: string;
+  confirm: boolean;
+  /** For a confirmed import, the key of its confirmation (the API answers a second one with the first). */
+  idempotencyKey: string;
+  rows: DemoImportRow[];
+  /** The codes the preview must give the lines it refuses, in the order of the lines. */
+  expectedErrors: string[];
 }
 
 export interface DemoPlan {
   key: string;
   name: string;
   provisioningType: 'K1' | 'K2' | 'K4' | 'K5';
-  controlLevel?: 'FULL' | 'PARTIAL';
+  controlLevel?: 'FULL' | 'PARTIAL' | 'UNCONTROLLABLE';
   dataLossOnRemoval: boolean;
   revocationNote?: string;
-  sharingPolicy?: 'NOT_ALLOWED';
+  sharingPolicy?: 'NOT_ALLOWED' | 'ALLOWED';
   /** K4 only: the plan has an admin console at the vendor, so like a K2 plan it needs a workspace profile of two IT Admins (`QĐ-110k`, R-53). */
   hasAdminConsole?: boolean;
   /** The IT Admin who administers the plan at the vendor beside the one responsible for its subscription (default: the first other IT Admin). */
@@ -75,8 +101,17 @@ export interface DemoSubscription {
   billingCycle: 'MONTHLY' | 'ANNUAL';
   /** The commitment of the period: 1 month for a monthly plan, 12 for an annual one. */
   termMonths: 1 | 12;
-  /** An annual subscription renews this many days from today; none: the term of the current year. */
+  /**
+   * The payment day of a monthly subscription, or the renewal day of an annual one, this many days from today (negative: already past); none: a
+   * monthly one runs the calendar year with no payment day, and an annual one has the year of its start.
+   */
   renewalInDays?: number;
+  /** An annual subscription declares the deadline to cancel this many days from today (otherwise it follows from the renewal and the notice period). */
+  noticeDeadlineInDays?: number;
+  /** The subscription carries no end, renewal or notice date at all (`NO_ALERT_ANCHOR`, `CONTRACT_DATA_INCOMPLETE`): only a start and the cycle. */
+  withoutDates?: true;
+  /** Whether the subscription renews by itself (default true). */
+  autoRenew?: boolean;
   noticePeriodDays?: number;
   /** The IT Admin who answers for it (a person code). */
   responsible: string;
@@ -86,6 +121,23 @@ export interface DemoSubscription {
   ownerDepartment?: string;
   /** Seats bought when no baseline file gives the number (K1, K4, K5). */
   quantity?: number;
+}
+
+/**
+ * What IT read in the terms of a plan (`US-04-11`), the points of the checklist as free text; the day of the last review counts back from today.
+ * A plan the fixture gives none, or an old review, is what `GET /plan-warnings` shows for the subscription whose window of review has opened.
+ */
+export interface DemoPlanTerms {
+  plan: string;
+  termsUrl?: string;
+  /** Days before today the terms were last reviewed; none: the review is not dated. */
+  lastReviewedDaysAgo?: number;
+  aiTraining?: string;
+  dataLocation?: string;
+  /** For a K4 plan the number of machines a key may be installed on. */
+  installLimit?: { maxDevicesPerKey: number; note?: string };
+  commercialUse?: string;
+  cancellationRefund?: string;
 }
 
 /** A seat the baseline file puts in the pool before the dataset starts, granted in the past. */
@@ -115,9 +167,27 @@ export interface DemoCycle {
 /** The approved budget of the current year of a department: `BM-10` of its head (one amount, one file), then Finance's version. */
 export interface DemoBudget {
   department: string;
-  /** The amount of `BM-10` and the base of the version; the reserve is the default share of it (10 %) the server works out. */
+  /**
+   * The amount of `BM-10` and the base of the version; the reserve is the default share of it (10 %) the server works out. For a department with
+   * a `light` it is only the value the day does not decide: the base is counted from the day of the seed (`baseFor`, SPEC S24).
+   */
   base: string;
+  /** The light the department shows at the close of the latest month, which the base is counted for; none: the amount above is kept. */
+  light?: 'UNDER' | 'GREEN' | 'YELLOW';
+  /** Finance sets the reserve to this share of the base (default: the server's) and gives the reason, which carries the tag of the dataset. */
+  reserve?: { percent: number; reason: string };
   note?: string;
+}
+
+/** A line of `BM-10`: software a department expects to need in the year, for how many people, at what price and for how many months. */
+export interface DemoBudgetLine {
+  software: string;
+  plan: string;
+  seats: number;
+  /** VND a seat a month, before tax. */
+  monthlyPrice: number;
+  months: number;
+  reason: string;
 }
 
 /** Where the budget of the next year of a department is left for the demo to carry on from. */
@@ -148,7 +218,17 @@ export type DemoRequestTarget =
   | 'AWAITING_IT_ASSESSMENT'
   | 'RESERVE_UNCONFIRMED'
   | 'BLOCKED'
-  | 'COMPLETED';
+  | 'COMPLETED'
+  | 'AWAITING_REQUESTER_REVISION'
+  | 'IT_REJECTED'
+  | 'EXECUTING'
+  | 'FAILED'
+  | 'AWAITING_IT_CLOSE'
+  /** Where a request is that a job may cancel later (the head of its sender is blocked): both are the end of the scenario. */
+  | 'PENDING_OR_CANCELLED';
+
+/** The step that refuses, or sends back, a request the scenario does not bring to the end. */
+export type DemoRequestStep = 'NEED' | 'ASSESSMENT' | 'SPEND';
 
 export interface DemoRequestScenario {
   key: string;
@@ -175,6 +255,16 @@ export interface DemoRequestScenario {
    */
   termMonths: number | null;
   target: DemoRequestTarget;
+  /** For `REJECTED`: the step that refuses (default `NEED`, the head); `SPEND` is the spending approver, and the request then stands at the stage `REFUSED`. */
+  rejectAt?: Extract<DemoRequestStep, 'NEED' | 'SPEND'>;
+  /** For `AWAITING_REQUESTER_REVISION`: the step that sends it back to its requester (`SPEND` only for a request of one step). */
+  returnAt?: DemoRequestStep;
+  /** For a group request: the people the spending approver refuses (the others are approved) and who get no task of grant. */
+  rejectedLines?: string[];
+  /** For `IT_REJECTED`: the plan of the catalog IT points the requester at instead (a key of the fixture). */
+  alternativePlan?: string;
+  /** The person who reads the request instead of its requester, when the requester cannot sign in any more (R57, C-2). */
+  readAs?: string;
   /** The head confirms the use of the reserve with the batch, so the request goes on to the spending approver. */
   confirmReserve?: boolean;
   /** For COMPLETED or AWAITING_EXECUTION, how IT grants the seat: from the pool, buying a seat (or a key), or a free key of the key store. */
@@ -182,6 +272,39 @@ export interface DemoRequestScenario {
   /** The IT Admin does the grant (default: the one in charge of the requester's department). */
   grantedBy?: string;
   summary: string;
+}
+
+/** A holder's SaaS report and the point in its handling where the demo leaves it. */
+export interface DemoSaasIssue {
+  key: string;
+  reporter: string;
+  plan: string;
+  description: string;
+  end: 'NEW' | 'IN_PROGRESS' | 'RESOLVED' | 'REOPENED' | 'WAITING_PROVIDER' | 'DUPLICATE';
+  reporterReply?: string;
+  duplicateOf?: string;
+}
+
+export interface DemoNotice {
+  key: string;
+  sender: string;
+  employee: string;
+  kind: 'LONG_LEAVE' | 'DEPARTURE';
+  proposedInDays: number;
+  note: string;
+  handling?: 'LINK' | 'REJECT' | 'RECORD';
+  returnInDays?: number;
+}
+
+/** A baseline seat returned by its holder, either revoked by IT or waiting for IT. */
+export interface DemoReturn {
+  key: string;
+  holder: string;
+  /** The key of the subscription (the key of its plan) the seat is in. */
+  subscription: string;
+  reason: string;
+  /** IT completes the revocation of the seat (the return is `COMPLETED`); otherwise it stays `AWAITING_REVOCATION`. */
+  complete: boolean;
 }
 
 export interface DemoKeys {
@@ -248,6 +371,35 @@ export interface DemoSoftwareProposal {
   rejectionReason?: string;
 }
 
+export interface DemoRenewal {
+  subscription: string;
+  by: string;
+  outcome: 'AS_DECIDED' | 'VENDOR_REFUSED';
+  outcomeNote: string;
+  nextPeriod: boolean;
+}
+
+export interface DemoDevice {
+  assetCode: string;
+  holder: string;
+  signature: boolean;
+  acknowledge: boolean;
+  changeTo?: string;
+  retire?: boolean;
+  tools?: ('CLAUDE_CODE' | 'CODEX')[];
+  stop?: 'OPEN' | 'COMPLETED';
+}
+
+export interface DemoMonitoringNotice {
+  collected: string;
+  notCollected: string;
+  purpose: string;
+  retention: string;
+  stopRight: string;
+  includesToolStatus: boolean;
+  requiresReacknowledgement: boolean;
+}
+
 export interface DemoFixture {
   id: string;
   /** The prefix of every code and the tag written into free text, so a person can tell demo data from the rest. */
@@ -257,17 +409,23 @@ export interface DemoFixture {
   currency: string;
   departments: DemoDepartment[];
   people: DemoPerson[];
+  /** The people files of the Super Admin: one is confirmed, one is left as a preview with lines to fix (`SBF-01a`). */
+  employeeImports: DemoEmployeeImport[];
+  /** What the Super Admin does to accounts after they exist: locks one with a reason, invites a person who has none (`SPEC S03`). */
+  accountStates: { locked: { employee: string; reason: string }[]; invited: string[] };
   /** The one approval role left, the spending approver (a role grant, `QĐ-93b`). */
   approvalRoles: { SPENDING_APPROVER: string };
   applications: DemoApplication[];
   subscriptions: DemoSubscription[];
   seats: DemoSeat[];
-  /** A Finance-declared tax profile for the vendor of one application. */
-  taxProfile: {
+  /** The terms IT recorded for some plans; the others have none yet (the warning of a review due). */
+  planTerms: DemoPlanTerms[];
+  /** The tax profiles Finance declares, one per vendor (named by one of its applications); simulated, never advice (`QĐ-60b`). */
+  taxProfiles: {
     application: string;
-    group: 'T2';
+    group: 'T2' | 'T3';
     lines: { taxType: string; ratePercent: string; deductible: boolean }[];
-  };
+  }[];
   /** The budget cycle of the year, then of the next one, each opened before any proposal (`QĐ-111z`); the year after stays a draft. */
   cycle: DemoCycle;
   nextCycle: DemoCycle;
@@ -276,17 +434,28 @@ export interface DemoFixture {
   budgets: DemoBudget[];
   /** The budgets of the next year, each left at the stage a demo carries on from. */
   nextYear: DemoNextYear[];
+  /** The lines of the `BM-10` file of each department (by code), this year and next; what they leave short of the amount asked is one balancing line. */
+  budgetLines: Record<string, DemoBudgetLine[]>;
   requests: DemoRequestScenario[];
+  /** The seats returned by their holders (`SBF-03a`). */
+  returns: DemoReturn[];
   keys: DemoKeys[];
   usageSources: DemoUsageSource[];
+  renewals: DemoRenewal[];
+  devices: DemoDevice[];
+  monitoringNotice: DemoMonitoringNotice;
+  aiSummaries: string[];
+  retiredApplications: string[];
   ghostDecisions: DemoGhostDecision[];
   personnel: DemoPersonnelEvent[];
+  /** The departure recorded right after the person sends a request (`BLOCK_NOW`): a step of its own, after that request. */
+  abruptDeparture: DemoPersonnelEvent;
   departmentSoftware: DemoDepartmentSoftware[];
   softwareProposals: DemoSoftwareProposal[];
   /** A draft that is saved and never sent (its department has no Cost Center, so it cannot be sent). */
   draft: { requester: string; plan: string; termMonths: number | null };
   /** A report of an error in the seat the request of this key granted. */
-  saasIssue: { request: string; description: string };
+  saasIssues: DemoSaasIssue[];
   /** A notice (BM-09) a head sends; it changes nothing until the Super Admin handles it. */
-  notice: { sender: string; employee: string; kind: 'LONG_LEAVE'; proposedInDays: number; note: string };
+  notices: DemoNotice[];
 }

@@ -1,4 +1,5 @@
-import { grantChecklistBody, termBody } from './request.steps';
+import { grantChecklistBody } from './request-actions';
+import { termBody } from './request.steps';
 
 /** QĐ-111i (RQ-2): a request names the time of use in months; there is no end date to send (a body with `expectedEndDate` is a 422). */
 describe('the time of use a scenario request sends', () => {

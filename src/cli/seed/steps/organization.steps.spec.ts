@@ -1,6 +1,7 @@
 import type { DemoRunContext } from '../demo-run.types';
 import { SHARED_DEMO_V4 } from '../fixture/shared-demo-v4';
-import { employeeBodyOf } from './organization.steps';
+import { ORGANIZATION_STEPS, accountSpecsToCheck, employeeBodyOf } from './organization.steps';
+import type { DemoPerson } from '../fixture/demo-fixture.types';
 
 /** RQ-2, D-21: the end of a person's contract is a field of the employee the Super Admin writes; a request names months and is cut there. */
 describe('the body of an employee the dataset declares', () => {
@@ -31,5 +32,84 @@ describe('the body of an employee the dataset declares', () => {
 
       expect(body.contractEndDate > body.hireDate).toBe(true);
     }
+  });
+});
+
+describe('an employee the dataset leaves without a department (QĐ-93g)', () => {
+  const unplaced: DemoPerson = {
+    code: 'NV-NEW2',
+    fullName: 'Âu Thị Xuyến',
+    email: 'xuyen.au',
+    department: null,
+    employmentType: 'STAFF',
+    account: 'EMPLOYEE',
+  };
+  const baseCtx = { fixture: { people: [unplaced], emailDomain: 'saoviet.example' }, today: '2026-11-17' };
+  const employeesStep = ORGANIZATION_STEPS.find((step) => step.key === 'org.employees')!;
+  const runWith = (profile: { fullName: string; department: { code: string } | null }) => {
+    const call = jest.fn().mockResolvedValue(profile);
+    const ctx = {
+      ...baseCtx,
+      mode: 'apply',
+      superAdminEmail: 'sa@example.test',
+      ids: { employees: new Map<string, string>(), departments: new Map<string, string>() },
+      accounts: { findEmployees: () => Promise.resolve(new Map([['NV-NEW2', { id: 'e-1', status: 'ACTIVE' }]])) },
+      api: { call },
+    } as unknown as DemoRunContext;
+
+    return { run: employeesStep.run(ctx), call };
+  };
+
+  it('sends no department for a person the fixture leaves unplaced', () => {
+    const body = employeeBodyOf(baseCtx as unknown as DemoRunContext, unplaced);
+
+    expect(body).not.toHaveProperty('departmentCode');
+    expect(body).toMatchObject({ employeeCode: 'NV-NEW2', workEmail: 'xuyen.au@saoviet.example' });
+  });
+
+  it('counts the unplaced one as present when the profile has no department and the fixture name', async () => {
+    const { run, call } = runWith({ fullName: 'Âu Thị Xuyến', department: null });
+
+    await expect(run).resolves.toMatchObject({ status: 'present' });
+    expect(call).toHaveBeenCalledWith('sa@example.test', 'GET', '/employees/e-1');
+  });
+
+  it('keeps a rerun going after the demo placed the unplaced one (QĐ-93g), and still checks the name', async () => {
+    await expect(runWith({ fullName: 'Âu Thị Xuyến', department: { code: 'ENG' } }).run).resolves.toMatchObject({
+      status: 'present',
+    });
+  });
+
+  it('reports a conflict when somebody renamed the unplaced one', async () => {
+    await expect(runWith({ fullName: 'Người khác', department: null }).run).resolves.toMatchObject({
+      status: 'conflict',
+    });
+    await expect(runWith({ fullName: 'Người khác', department: { code: 'ENG' } }).run).resolves.toMatchObject({
+      status: 'conflict',
+    });
+  });
+});
+
+describe('the accounts the run checks (C-1)', () => {
+  const people = SHARED_DEMO_V4.people;
+
+  it('leaves a locked account of the dataset out of the check, so the rerun does not report ACCOUNT_DIFFERS', () => {
+    const ctx = { fixture: SHARED_DEMO_V4 } as unknown as DemoRunContext;
+    const kept = accountSpecsToCheck(ctx, new Set(['NV-BOD3'])).map((spec) => spec.employeeCode);
+
+    expect(kept).not.toContain('NV-BOD3');
+    expect(kept).toHaveLength(people.filter((person) => person.account !== null).length - 1);
+  });
+
+  it('keeps it while it is not locked yet (the first run creates it, the next step locks it)', () => {
+    const ctx = { fixture: SHARED_DEMO_V4 } as unknown as DemoRunContext;
+
+    expect(accountSpecsToCheck(ctx, new Set()).map((spec) => spec.employeeCode)).toContain('NV-BOD3');
+  });
+
+  it('never drops a person the fixture does not mark as locked, even when the account is locked', () => {
+    const ctx = { fixture: SHARED_DEMO_V4 } as unknown as DemoRunContext;
+
+    expect(accountSpecsToCheck(ctx, new Set(['NV-DEV1'])).map((spec) => spec.employeeCode)).toContain('NV-DEV1');
   });
 });

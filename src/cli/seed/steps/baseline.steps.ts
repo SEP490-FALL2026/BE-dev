@@ -2,23 +2,41 @@ import { dayOffset } from '../demo-dates';
 import { as, emailOf, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoSeat } from '../fixture/demo-fixture.types';
-import { catalogAdmin } from './catalog.steps';
+import { catalogAdmin, subscriptionStartDate } from './catalog.steps';
+import { SEAT_BASELINE_COLUMNS, csvCell } from './file-builders';
+import { HIRE_DAYS_AGO } from './organization.steps';
 
 type Result = { status: StepOutcome['status']; label: string };
 
 /** Seats are granted this many days ago unless the fixture says otherwise: past the 90-day tier of the optimization rules. */
 const DEFAULT_GRANTED_DAYS_AGO = 130;
 /** The columns of the seat template: a column it does not know (the old `reason`) would come back as `ignoredColumns` on every preview. */
-const HEADER = 'employee_code,account_identifier,kind,granted_on,expected_end_date';
+const HEADER = SEAT_BASELINE_COLUMNS.join(',');
 
-const cell = (value: string): string => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+/**
+ * The day a seat of the baseline was granted: the days of the seat before today, but never before the subscription starts (the annual ones of the
+ * dataset start late in the year) nor before the person was hired.
+ */
+export function grantedOnOf(ctx: Pick<DemoRunContext, 'fixture' | 'today'>, seat: DemoSeat): string {
+  const wanted = dayOffset(ctx.today, -(seat.grantedDaysAgo ?? DEFAULT_GRANTED_DAYS_AGO));
+  const subscription = ctx.fixture.subscriptions.find((candidate) => candidate.key === seat.subscription);
+  const floors = [
+    dayOffset(ctx.today, -HIRE_DAYS_AGO),
+    ...(subscription ? [subscriptionStartDate(ctx, subscription)] : []),
+  ];
+
+  return [wanted, ...floors].reduce((latest, day) => (day > latest ? day : latest));
+}
 
 /** One line of the seat file for a seat of the fixture: the import takes personal seats only (`QĐ-110m`). */
 export function lineOf(ctx: DemoRunContext, seat: DemoSeat): string {
-  const grantedOn = dayOffset(ctx.today, -(seat.grantedDaysAgo ?? DEFAULT_GRANTED_DAYS_AGO));
-  const end = seat.endInDays === undefined ? '' : dayOffset(ctx.today, seat.endInDays);
+  const granted = grantedOnOf(ctx, seat);
+  // A seat that has already ended never ends before it was granted: early in January the grant is clamped to the first day of the
+  // subscription (the 1st of the year), after the few days back the fixture asks for (SL-R1).
+  const wanted = seat.endInDays === undefined ? '' : dayOffset(ctx.today, seat.endInDays);
+  const end = wanted !== '' && wanted < granted ? granted : wanted;
 
-  return [seat.holder, emailOf(ctx, seat.holder), 'personal', grantedOn, end].map(cell).join(',');
+  return [seat.holder, emailOf(ctx, seat.holder), 'personal', granted, end].map(csvCell).join(',');
 }
 
 interface ImportPreview {

@@ -2,7 +2,7 @@ import type { DemoAccountSpec } from '../../../modules/installation/public/demo-
 import { dayOffset } from '../demo-dates';
 import { emailOf, listAll, summarize } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
-import type { DemoDepartment, DemoPerson } from '../fixture/demo-fixture.types';
+import type { DemoDepartment, DemoPerson, DemoPersonnelEvent } from '../fixture/demo-fixture.types';
 
 type Result = { status: StepOutcome['status']; label: string };
 
@@ -19,7 +19,7 @@ interface DepartmentProfile extends DepartmentRow {
 }
 
 /** Everybody started 400 days before today: a seat granted in the past never precedes the person it is for. */
-const HIRE_DAYS_AGO = 400;
+export const HIRE_DAYS_AGO = 400;
 const same = (a: string, b: string) => a.normalize('NFC').trim() === b.normalize('NFC').trim();
 
 async function departments(ctx: DemoRunContext): Promise<StepOutcome> {
@@ -66,7 +66,7 @@ export function employeeBodyOf(ctx: DemoRunContext, person: DemoPerson): Record<
     workEmail: emailOf(ctx, person.code),
     employmentType: person.employmentType,
     hireDate: dayOffset(ctx.today, -HIRE_DAYS_AGO),
-    departmentCode: person.department,
+    ...(person.department === null ? {} : { departmentCode: person.department }),
     ...(person.contractEndInDays === undefined
       ? {}
       : { contractEndDate: dayOffset(ctx.today, person.contractEndInDays) }),
@@ -103,13 +103,17 @@ async function employees(ctx: DemoRunContext): Promise<StepOutcome> {
 
 /**
  * An employee of a demo code is the demo one only while they are a member of the department the fixture places them in,
- * under the fixture's name: anything else is somebody's change, reported and never overwritten.
+ * under the fixture's name: anything else is somebody's change, reported and never overwritten. One the fixture leaves
+ * unplaced is read from the profile instead (no department yet).
  */
 async function placedAsWanted(
   ctx: DemoRunContext,
   person: DemoPerson,
   cache: Map<string, Map<string, { fullName: string }>>,
 ): Promise<Result> {
+  if (person.department === null) return stillUnplaced(ctx, person);
+  const event = personnelEvent(ctx, person.code);
+  if (event) return afterPersonnelEvent(ctx, person, event);
   const departmentId = ctx.ids.departments.get(person.department);
   if (!departmentId) return { status: 'conflict', label: `${person.code}: phòng ${person.department} không có` };
   if (!cache.has(departmentId)) {
@@ -128,9 +132,83 @@ async function placedAsWanted(
     : { status: 'conflict', label: `${person.code} đã có với họ tên khác` };
 }
 
-function accountSpecs(ctx: DemoRunContext): DemoAccountSpec[] {
+function personnelEvent(ctx: DemoRunContext, code: string): DemoPersonnelEvent | undefined {
+  return [...ctx.fixture.personnel, ctx.fixture.abruptDeparture].find((event) => event.employee === code);
+}
+
+interface EmployeeProfile {
+  fullName: string;
+  department: { code: string } | null;
+  status: string;
+  workState: string;
+}
+
+/** Compare with the event's stored date, never a fresh relative date that would move forward on each rerun. */
+async function departmentAfterTransfer(
+  ctx: DemoRunContext,
+  person: DemoPerson,
+  event: Extract<DemoPersonnelEvent, { kind: 'TRANSFER' }>,
+): Promise<string | null> {
+  const rows = await listAll<{ effectiveOn: string; status: string; to: { department: { code: string } } }>(
+    ctx,
+    ctx.superAdminEmail,
+    `/department-transfers?employeeId=${ctx.ids.employees.get(person.code)}`,
+  );
+  const transfer = rows.find((row) => row.status !== 'CANCELLED' && row.to.department.code === event.toDepartment);
+  return transfer && transfer.effectiveOn <= ctx.today ? event.toDepartment : person.department;
+}
+
+/** Only the changes declared by this dataset can explain a different current placement. Names must still match. */
+async function afterPersonnelEvent(
+  ctx: DemoRunContext,
+  person: DemoPerson,
+  event: DemoPersonnelEvent,
+): Promise<Result> {
+  const profile = await ctx.api.call<EmployeeProfile>(
+    ctx.superAdminEmail,
+    'GET',
+    `/employees/${ctx.ids.employees.get(person.code)}`,
+  );
+  if (!same(profile.fullName, person.fullName))
+    return { status: 'conflict', label: `${person.code}: họ tên đã thay đổi` };
+  if (
+    event.kind === 'OFFBOARDING' &&
+    (profile.status === 'TERMINATED' || ['HANDING_OVER', 'LEFT'].includes(profile.workState))
+  ) {
+    return { status: 'present', label: person.code };
+  }
+  const expected = event.kind === 'TRANSFER' ? await departmentAfterTransfer(ctx, person, event) : person.department;
+  return profile.department?.code === expected
+    ? { status: 'present', label: person.code }
+    : { status: 'conflict', label: `${person.code}: phòng hiện tại không khớp sự kiện của fixture` };
+}
+
+/**
+ * The unplaced employee is the demo one under the fixture's name. Placing them is the very thing the demo shows (`QĐ-93g`), so a profile that has a
+ * department since is present too, reported with it; only another name is somebody else's change.
+ */
+async function stillUnplaced(ctx: DemoRunContext, person: DemoPerson): Promise<Result> {
+  const id = ctx.ids.employees.get(person.code);
+  const profile = await ctx.api.call<{ fullName: string; department: { code: string } | null }>(
+    ctx.superAdminEmail,
+    'GET',
+    `/employees/${id}`,
+  );
+  if (!same(profile.fullName, person.fullName))
+    return { status: 'conflict', label: `${person.code} đã có với họ tên khác` };
+
+  return profile.department === null
+    ? { status: 'present', label: person.code }
+    : { status: 'present', label: `${person.code} (đã được xếp vào ${profile.department.code} khi demo)` };
+}
+
+/**
+ * The accounts the run describes against the fixture. A person the dataset locks is left out once the account is locked: the demo account
+ * contract reports a locked account as different from its spec (`ACCOUNT_DIFFERS`), which would stop every later run (C-1).
+ */
+export function accountSpecsToCheck(ctx: DemoRunContext, lockedCodes: ReadonlySet<string>): DemoAccountSpec[] {
   return ctx.fixture.people
-    .filter((person) => person.account !== null)
+    .filter((person) => person.account !== null && !(person.lockedInDemo && lockedCodes.has(person.code)))
     .map((person) => ({
       employeeCode: person.code,
       loginEmail: emailOf(ctx, person.code),
@@ -141,8 +219,25 @@ function accountSpecs(ctx: DemoRunContext): DemoAccountSpec[] {
     }));
 }
 
+/** The locked accounts of the dataset's own people, by employee code (the Super Admin reads the list; there is no filter by employee). */
+async function lockedAccounts(ctx: DemoRunContext): Promise<Map<string, string>> {
+  const rows = await listAll<{ id: string; employee: { employeeCode: string } | null }>(
+    ctx,
+    ctx.superAdminEmail,
+    '/app-users?status=LOCKED',
+  );
+  const wanted = new Set(ctx.fixture.people.filter((person) => person.lockedInDemo).map((person) => person.code));
+
+  return new Map(
+    rows
+      .filter((row) => row.employee !== null && wanted.has(row.employee.employeeCode))
+      .map((row) => [row.employee!.employeeCode, row.id]),
+  );
+}
+
 async function accounts(ctx: DemoRunContext): Promise<StepOutcome> {
-  const specs = accountSpecs(ctx);
+  const locked = await lockedAccounts(ctx);
+  const specs = accountSpecsToCheck(ctx, new Set(locked.keys()));
   const before = await ctx.accounts.describe(specs);
   const after = ctx.mode === 'apply' ? await ctx.accounts.create(specs) : before;
   const results: Result[] = after.map((item) => {
@@ -154,6 +249,10 @@ async function accounts(ctx: DemoRunContext): Promise<StepOutcome> {
 
     return { status: wasAbsent ? 'done' : 'present', label: item.employeeCode };
   });
+  for (const [code, id] of locked) {
+    ctx.ids.appUsers.set(code, id);
+    results.push({ status: 'present', label: `${code} (đã khóa)` });
+  }
 
   return summarize(results);
 }
