@@ -102,6 +102,16 @@ export const MF1_TEXTS = {
       message: 'The spend for your request {requestId:name} was approved. The IT Admin will now grant access.',
     },
   },
+  REQUEST_READY_FOR_GRANT: {
+    vi: {
+      title: 'Yêu cầu chờ cấp quyền',
+      message: 'Yêu cầu {requestId:name} đã được duyệt đủ và đang chờ bạn cấp quyền.',
+    },
+    en: {
+      title: 'Request ready to grant',
+      message: 'Request {requestId:name} is fully approved and waits for you to grant access.',
+    },
+  },
   REQUEST_GRANTED: {
     vi: {
       title: 'Đã cấp quyền',
