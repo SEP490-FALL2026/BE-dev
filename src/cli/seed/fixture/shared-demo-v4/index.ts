@@ -6,6 +6,7 @@ import { REQUESTS } from './requests';
 import { REQUESTS_EXTRA, RETURNS } from './requests-extra';
 import { SOFTWARE_LIST } from './software-list';
 import { USAGE } from './usage';
+import { EXTRA_USAGE_SOURCES } from './usage-extra';
 
 export const SHARED_DEMO_V4: DemoFixture = {
   id: 'shared-demo-v4',
@@ -19,5 +20,6 @@ export const SHARED_DEMO_V4: DemoFixture = {
   requests: [...REQUESTS.requests, ...REQUESTS_EXTRA],
   returns: RETURNS,
   ...USAGE,
+  usageSources: [...USAGE.usageSources, ...EXTRA_USAGE_SOURCES],
   ...SOFTWARE_LIST,
 };
