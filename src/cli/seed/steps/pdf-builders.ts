@@ -32,6 +32,8 @@ interface Sheet {
   heading: string;
   rows: readonly (readonly [label: string, value: string])[];
   footer: string;
+  /** The day of the document (`YYYY-MM-DD`), its creation date in the file's properties. */
+  date: string;
 }
 
 type Font = Awaited<ReturnType<PDFDocument['embedFont']>>;
@@ -56,12 +58,14 @@ async function render(sheet: Sheet): Promise<BuiltPdf> {
   fontBytes ??= readFileSync(FONT_PATH);
   const document = await PDFDocument.create({ updateMetadata: false });
   document.registerFontkit(fontkit);
-  const font = await document.embedFont(fontBytes, { subset: true });
+  // No `ccmp`: composing the vowels with a dot below (ạ ẹ ị ọ ụ ỵ) from a base and a mark leaves the mark without a Unicode value in the file,
+  // so copying or searching the text would give `tri` for "trị". The precomposed glyphs of Noto Sans draw them the same.
+  const font = await document.embedFont(fontBytes, { subset: true, features: { ccmp: false } });
   document.setTitle(sheet.number);
   document.setProducer('SaaS-Sentry demo dataset');
   document.setCreator('SaaS-Sentry seed');
-  document.setCreationDate(new Date(0));
-  document.setModificationDate(new Date(0));
+  document.setCreationDate(new Date(`${sheet.date}T00:00:00Z`));
+  document.setModificationDate(new Date(`${sheet.date}T00:00:00Z`));
   const page = document.addPage([PAGE.width, PAGE.height]);
   const width = PAGE.width - 2 * PAGE.margin;
   const lines: string[] = [sheet.heading];
@@ -100,6 +104,7 @@ export interface ContractSpec {
 /** A contract: its number, name, vendor and the days it is in force. */
 export function contractPdf(spec: ContractSpec): Promise<BuiltPdf> {
   return render({
+    date: spec.effectiveFrom,
     number: spec.number,
     fileName: `${spec.number}.pdf`,
     heading: `Hợp đồng ${spec.number}`,
@@ -128,6 +133,7 @@ export interface InvoiceSpec {
 /** A purchase invoice: the figures of the `POST /purchase-invoices` that attaches it. */
 export function invoicePdf(spec: InvoiceSpec): Promise<BuiltPdf> {
   return render({
+    date: spec.issuedOn,
     number: spec.vendorInvoiceNumber,
     fileName: `${spec.vendorInvoiceNumber}.pdf`,
     heading: `Hóa đơn ${spec.vendorInvoiceNumber}`,
@@ -156,6 +162,7 @@ export interface ReceiptSpec {
 /** The proof of a purchase outside the process, attached when Finance records what was spent. */
 export function receiptPdf(spec: ReceiptSpec): Promise<BuiltPdf> {
   return render({
+    date: spec.issuedOn,
     number: spec.number,
     fileName: `${spec.number}.pdf`,
     heading: `Biên nhận ${spec.number}`,
@@ -180,6 +187,7 @@ export interface SignatureSpec {
 /** `BM-06`, the record a person signs when a device they hold is monitored: the device, the holder and the version of the notice. */
 export function signaturePdf(spec: SignatureSpec): Promise<BuiltPdf> {
   return render({
+    date: spec.signedOn,
     number: spec.assetCode,
     fileName: `BM-06-${spec.assetCode}.pdf`,
     heading: `BM-06 Bản ký xác nhận thông báo giám sát — ${spec.assetCode}`,
