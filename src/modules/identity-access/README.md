@@ -79,7 +79,8 @@ Không vòng (`pnpm arch:capabilities --module identity-access`, gate `capabilit
   Super Admin trong ứng dụng (QĐ-93e). Email đăng nhập luôn là email công việc (`workEmail`) của nhân viên đọc lại dưới khóa
   (`resolveLoginEmail` ở `account-invitation.service.ts`): `loginEmail` trong body của `POST /app-users` là trường cũ, bỏ qua được; có gửi mà khác
   `workEmail` (không phân biệt hoa thường) ⟹ 422 `APP_USER.LOGIN_EMAIL_NOT_WORK_EMAIL`, và không bao giờ được lưu; không có `workEmail` ⟹ 422
-  `APP_USER.LOGIN_EMAIL_REQUIRED`.
+  `APP_USER.LOGIN_EMAIL_REQUIRED`. Khi Super Admin sửa `workEmail` của nhân viên đã có tài khoản (`PATCH /employees/{id}`), email đăng nhập đổi theo trong cùng transaction
+  (`account-login-email-follow.service.ts`, nối qua `EmployeeAccountsHook.followWorkEmail`; Audit `APP_USER.LOGIN_EMAIL_CHANGED`; không đổi nguồn/ngày xác minh email, phiên đang mở, lời mời đang chờ); trùng email đăng nhập của tài khoản khác ⟹ 422 `WORK_EMAIL_TAKEN` theo trường `workEmail`, không ghi gì; xóa email công ty của người đã có tài khoản ⟹ 422 `WORK_EMAIL_REQUIRED_FOR_ACCOUNT` (`followWorkEmail` với `workEmail: null` trả `ACCOUNT_NEEDS_EMAIL`), không ghi gì.
 - `credentials/` — mật khẩu của tài khoản: `credential.service.ts`, `credential.repo.ts`, `password-hasher.service.ts` (Argon2id),
   `password.policy.ts`; không import capability nào, `accounts/`, `auth/` và `recovery/` import nó (tách khỏi `accounts/` để thư
   mục đó dưới trần 25 file sau khi `mappers/`, `dto/`, `policies/` được dời vào).

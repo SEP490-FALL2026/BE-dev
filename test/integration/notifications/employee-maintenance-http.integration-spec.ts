@@ -316,22 +316,54 @@ describe('correcting the official fields of an employee over HTTP (integration, 
       expect(codeOf(await patch(id, { workEmail: 'not an email' }).expect(422))).toBe('VALIDATION_ERROR');
     });
 
-    it('does not change the login email of the account the person has (FR-8.6)', async () => {
-      const before = (
-        await h.ctx.sql.query<{ login_email: string }>(`SELECT login_email FROM app_users WHERE id = $1`, [
-          h.finance.appUserId,
-        ])
-      ).rows[0].login_email;
+    const loginOf = async (appUserId: string) =>
+      (
+        await h.ctx.sql.query<{ login_email: string; normalized_login_email: string }>(
+          `SELECT login_email, normalized_login_email FROM app_users WHERE id = $1`,
+          [appUserId],
+        )
+      ).rows[0];
 
-      await patch(h.finance.employeeId, { workEmail: 'finance.new@acme.vn' }).expect(200);
+    it('refuses clearing the work email of a person who has an account, and changes nothing', async () => {
+      const workBefore = (await rowOf(h.finance.employeeId)).work_email;
+      const before = await loginOf(h.finance.appUserId);
 
-      const after = (
-        await h.ctx.sql.query<{ login_email: string }>(`SELECT login_email FROM app_users WHERE id = $1`, [
-          h.finance.appUserId,
-        ])
-      ).rows[0].login_email;
-      expect(after).toBe(before);
-      expect((await rowOf(h.finance.employeeId)).work_email).toBe('finance.new@acme.vn');
+      const refused = await patch(h.finance.employeeId, { workEmail: null }).expect(422);
+
+      expect(codeOf(refused)).toBe('EMPLOYEE.ROW_INVALID');
+      expect(reasonsOf(refused)).toEqual([{ field: 'workEmail', code: 'WORK_EMAIL_REQUIRED_FOR_ACCOUNT' }]);
+      expect((await rowOf(h.finance.employeeId)).work_email).toBe(workBefore);
+      expect(await loginOf(h.finance.appUserId)).toEqual(before);
+    });
+
+    it('moves the login email of the account the person has with it, in the same change, and audits the move', async () => {
+      await patch(h.finance.employeeId, { workEmail: ' Finance.New+x@Acme.vn ' }).expect(200);
+
+      expect(await loginOf(h.finance.appUserId)).toEqual({
+        login_email: 'Finance.New+x@Acme.vn',
+        normalized_login_email: 'finance.new@acme.vn',
+      });
+      expect((await rowOf(h.finance.employeeId)).work_email).toBe('Finance.New+x@Acme.vn');
+      const events = (
+        await h.ctx.sql.query<{ before: { loginEmail: string }; after: { loginEmail: string } }>(
+          `SELECT before, after FROM audit_events WHERE action = 'APP_USER.LOGIN_EMAIL_CHANGED' AND resource_id = $1`,
+          [h.finance.appUserId],
+        )
+      ).rows;
+      expect(events).toHaveLength(1);
+      expect(events[0].after.loginEmail).toBe('Finance.New+x@Acme.vn');
+    });
+
+    it('refuses the whole correction when another account already logs in with the new address, and changes nothing', async () => {
+      const other = await loginOf(h.it1.appUserId);
+      const before = await loginOf(h.finance.appUserId);
+      const workBefore = (await rowOf(h.finance.employeeId)).work_email;
+
+      const refused = await patch(h.finance.employeeId, { workEmail: other.login_email }).expect(422);
+
+      expect(reasonsOf(refused)).toEqual([{ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' }]);
+      expect(await loginOf(h.finance.appUserId)).toEqual(before);
+      expect((await rowOf(h.finance.employeeId)).work_email).toBe(workBefore);
     });
   });
 

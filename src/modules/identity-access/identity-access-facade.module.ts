@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { AuditModule } from '../audit/audit.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { AccessBlockRepo } from './access-block/access-block.repo';
 import { AccessBlockService } from './access-block/access-block.service';
+import { AccountLoginEmailFollowService } from './accounts/account-login-email-follow.service';
 import { AccountRecordService } from './accounts/account-record.service';
 import { ActionLinkService } from './accounts/action-link.service';
 import { ActionTokenRepo } from './accounts/action-token.repo';
@@ -32,7 +34,7 @@ import {
  * the facade (D5) in every graph that loads it.
  */
 @Module({
-  imports: [DatabaseModule, OrganizationModule],
+  imports: [DatabaseModule, OrganizationModule, AuditModule],
   providers: [
     AppUserRepo,
     AccessBlockRepo,
@@ -46,6 +48,7 @@ import {
     ProfileRepo,
     PasswordHasher,
     AccountRecordService,
+    AccountLoginEmailFollowService,
     AccessBlockService,
     RoleGrantService,
     ActionLinkService,
