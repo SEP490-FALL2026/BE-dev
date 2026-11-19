@@ -27,6 +27,8 @@ export interface CreateDepartmentInput {
   name: string;
   /** The day it takes effect; the installation names today in the calendar of the organization (`QĐ-104e(3)`). */
   effectiveFrom?: string;
+  /** Marks the department the installation creates with the organization; no other creation sets it. */
+  starting?: boolean;
 }
 
 export interface CreateEmployeeWithPlacementInput {

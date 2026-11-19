@@ -193,6 +193,7 @@ export class DepartmentRecordService {
         id: department.id,
         active: true,
         itAdminEmployeeId: department.itAdminEmployeeId,
+        starting: department.starting,
         itAdminUsable:
           department.itAdminEmployeeId !== null &&
           department.itAdminStatus === 'ACTIVE' &&

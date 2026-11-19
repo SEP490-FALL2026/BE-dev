@@ -90,6 +90,7 @@ describe('department.policy (who may do what with departments, F13, QĐ-87a, QĐ
       active: true,
       itAdminEmployeeId: null,
       itAdminUsable: false,
+      starting: false,
       ...over,
     });
 
@@ -103,6 +104,17 @@ describe('department.policy (who may do what with departments, F13, QĐ-87a, QĐ
       ]);
 
       expect([...scope].sort()).toEqual(['mine', 'nobody', 'other-unusable']);
+    });
+
+    it('leaves the starting department out of the common queue, but keeps it for the IT Admin named for it', () => {
+      const scope = itAdminScope('me', [
+        department({ id: 'starting-nobody', starting: true }),
+        department({ id: 'starting-unusable', starting: true, itAdminEmployeeId: 'someone', itAdminUsable: false }),
+        department({ id: 'starting-mine', starting: true, itAdminEmployeeId: 'me', itAdminUsable: true }),
+        department({ id: 'plain-nobody' }),
+      ]);
+
+      expect([...scope].sort()).toEqual(['plain-nobody', 'starting-mine']);
     });
 
     it('keeps a retired department the caller was in charge of, and drops one only others answer for', () => {

@@ -17,6 +17,7 @@ export interface DepartmentWire {
   itAdmin: { employeeId: string; employeeCode: string; fullName: string; usable: boolean } | null;
   head: { employeeId: string; employeeCode: string; fullName: string; since: string } | null;
   memberCount: number;
+  starting?: boolean;
   warnings: string[];
   headHistory: { employeeCode: string; validFrom: string; validTo: string | null }[];
   /** The person named to take over from a day after today; null when nobody is (`QĐ-87` `D-5`). */
