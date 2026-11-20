@@ -4,6 +4,7 @@ import { Contributions } from '../../../core/extension/contributions';
 import { Hook } from '../../../core/extension/hook';
 import { Listeners } from '../../../core/extension/listeners';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type {
   CostCenterUseGroupName,
   DepartmentUseGroupName,
@@ -116,6 +117,13 @@ export interface EmployeeAccountDetail extends EmployeeAccountSummary {
   roles: readonly string[];
 }
 
+/**
+ * What became of the account of an employee whose work email changed: it had none (`NO_ACCOUNT`), its login email now is the new work
+ * email (`FOLLOWED`), or another account already logs in with that address (`TAKEN`, nothing was written). When the work email is
+ * cleared instead, an account cannot go without a login email, so the clearing is refused (`ACCOUNT_NEEDS_EMAIL`, nothing was written).
+ */
+export type LoginEmailFollow = 'NO_ACCOUNT' | 'FOLLOWED' | 'TAKEN' | 'ACCOUNT_NEEDS_EMAIL';
+
 /** The accounts of the employees, as the department use cases need them (D5: the organization never imports identity-access). */
 export interface EmployeeAccounts {
   /**
@@ -131,6 +139,15 @@ export interface EmployeeAccounts {
   summarizeAccounts(employeeIds: readonly string[]): Promise<Map<string, EmployeeAccountSummary>>;
   /** Describes the account and its active direct roles for one employee in one statement, unlocked. */
   describeAccount(employeeId: string): Promise<EmployeeAccountDetail | null>;
+  /**
+   * Moves the login email of the employee's account to their new work email, in `tx` and with an Audit Trail event of its own, so that the
+   * two never differ. A null `workEmail` (the work email is being cleared) writes nothing: it answers `ACCOUNT_NEEDS_EMAIL` for a person
+   * who has an account and `NO_ACCOUNT` for one who has none. The caller holds the employee `FOR UPDATE` first (lock order: the employee, then the account).
+   */
+  followWorkEmail(
+    tx: DbTx,
+    input: { actor: AuthenticatedPrincipal; organizationId: string; employeeId: string; workEmail: string | null },
+  ): Promise<LoginEmailFollow>;
 }
 
 /**

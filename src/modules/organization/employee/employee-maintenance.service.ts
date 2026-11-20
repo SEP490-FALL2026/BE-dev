@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
+import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -12,6 +13,7 @@ import {
 } from '../public/organization.errors';
 import { OrganizationContextService } from '../organization-context.service';
 import { EmployeeRecordService } from '../employee/employee-record.service';
+import { EmployeeAccountsHook } from '../public/organization.extension-points';
 import type { EmployeeRecord } from '../public/organization.types';
 import { EmployeeWorkState, EmploymentType } from '../public/organization.types';
 import { EmployeeRowInvalidError, EmployeeUpdateEmptyError } from './employee.errors';
@@ -48,7 +50,7 @@ export interface MaintainedEmployeeView {
  * of staff, free-text job title and a hire date that has not come yet, with no HR basis to give (`QĐ-93f`), by the Super Admin alone and never on
  * the Super Admin's own record (`QĐ-87c`: that goes through the controlled procedure, so this refuses with 403 and writes
  * nothing). The department and the status are events with a day they take effect (`US-03-01`) and are never changed here; neither
- * are the account, its roles or the login email (`FR-8.6`). The person, and the head of their department, are told in the same
+ * are the account or its roles; the login email is not asked for but follows a new work email (`followWorkEmail`). The person, and the head of their department, are told in the same
  * transaction (`QĐ-87b(3)`). Who may is `employee.policy.ts`, run first.
  */
 @Injectable()
@@ -58,6 +60,7 @@ export class EmployeeMaintenanceService {
     private readonly employees: EmployeeRecordService,
     private readonly audit: AuditApi,
     private readonly notifications: NotificationsApi,
+    private readonly employeeAccounts: EmployeeAccountsHook,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -84,6 +87,10 @@ export class EmployeeMaintenanceService {
     } catch (error) {
       // A concurrent change won the unique email after the check: the same answer the check gives.
       if (error instanceof EmployeeEmailTakenError) {
+        throw new EmployeeRowInvalidError([{ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' }]);
+      }
+      // Another account logs in with the new address and the unique index won the race after the check.
+      if (isUniqueViolation(error, 'normalized_login_email')) {
         throw new EmployeeRowInvalidError([{ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' }]);
       }
       // A contractor, freelancer or intern holds every open seat with an expected end (INV-07): PostgreSQL
@@ -121,7 +128,30 @@ export class EmployeeMaintenanceService {
     current: EmployeeRecord,
     correction: Correction,
   ): Promise<void> {
+    // The account of the person logs in with the work email (`POST /app-users`): a new work email moves it in the same transaction,
+    // and clearing it is refused for a person who has an account (it cannot have no login email), before anything is written.
+    const newWorkEmail = correction.changes.workEmail;
+    if (newWorkEmail === null) {
+      const followed = await this.employeeAccounts.get().followWorkEmail(tx, {
+        actor: who.actor,
+        organizationId: who.organizationId,
+        employeeId: who.employeeId,
+        workEmail: null,
+      });
+      if (followed === 'ACCOUNT_NEEDS_EMAIL') {
+        throw new EmployeeRowInvalidError([{ field: 'workEmail', code: 'WORK_EMAIL_REQUIRED_FOR_ACCOUNT' }]);
+      }
+    }
     await this.employees.updateOfficialFields(tx, who.employeeId, correction.changes);
+    if (newWorkEmail) {
+      const followed = await this.employeeAccounts.get().followWorkEmail(tx, {
+        actor: who.actor,
+        organizationId: who.organizationId,
+        employeeId: who.employeeId,
+        workEmail: newWorkEmail,
+      });
+      if (followed === 'TAKEN') throw new EmployeeRowInvalidError([{ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' }]);
+    }
     await this.audit.record(
       tx,
       organizationAuditEvent(
