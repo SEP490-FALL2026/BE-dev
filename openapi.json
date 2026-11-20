@@ -1684,7 +1684,7 @@
         },
         "responses": {
           "200": {
-            "description": "The name, work email, kind of staff, job title (free text; null clears it) or a hire date still to come were changed; the Audit Trail keeps who, when and the values before and after, and the employee and the head of their department are told. The login email, the department and the status are untouched.",
+            "description": "The name, work email, kind of staff, job title (free text; null clears it) or a hire date still to come were changed; the Audit Trail keeps who, when and the values before and after, and the employee and the head of their department are told. The department and the status are untouched; the login email of the account of the person, if there is one, follows a new work email in the same change.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1845,7 +1845,7 @@
             }
           },
           "422": {
-            "description": "The body is malformed, names a field that is not an official one, among them an HR basis, which no correction takes (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST, JOB_TITLE_TOO_LONG, OPEN_ASSIGNMENT_NEEDS_EXPECTED_END — a contractor, freelancer or intern needs an expected end on every open seat).",
+            "description": "The body is malformed, names a field that is not an official one, among them an HR basis, which no correction takes (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, WORK_EMAIL_REQUIRED_FOR_ACCOUNT — the work email of a person who has an account cannot be cleared,HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST, JOB_TITLE_TOO_LONG, OPEN_ASSIGNMENT_NEEDS_EXPECTED_END — a contractor, freelancer or intern needs an expected end on every open seat).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -102179,6 +102179,7 @@
                       "nullable": true
                     },
                     "avatarUrl": { "type": "string", "nullable": true },
+                    "starting": { "type": "boolean" },
                     "memberCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                     "warnings": {
                       "type": "array",
@@ -102203,6 +102204,7 @@
                     "itAdmin",
                     "head",
                     "avatarUrl",
+                    "starting",
                     "memberCount",
                     "warnings",
                     "effectiveFrom",
@@ -102305,6 +102307,7 @@
                 "nullable": true
               },
               "avatarUrl": { "type": "string", "nullable": true },
+              "starting": { "type": "boolean" },
               "memberCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
               "warnings": {
                 "type": "array",
@@ -102353,6 +102356,7 @@
               "itAdmin",
               "head",
               "avatarUrl",
+              "starting",
               "memberCount",
               "warnings",
               "effectiveFrom",
@@ -110397,7 +110401,11 @@
         "properties": {
           "requestId": { "type": "string", "format": "uuid" },
           "subscriptionId": { "type": "string", "format": "uuid" },
-          "accountIdentifier": { "type": "string", "maxLength": 254 },
+          "accountIdentifier": {
+            "description": "The company address to grant a paid right to. Leave it empty or omit the field to use the work email of the person.",
+            "type": "string",
+            "maxLength": 254
+          },
           "responsibleEmployeeId": { "type": "string", "format": "uuid" },
           "beneficiaryEmployeeId": { "type": "string", "format": "uuid" },
           "purchase": {
@@ -110442,9 +110450,14 @@
                     "properties": {
                       "employeeId": { "type": "string", "format": "uuid" },
                       "employeeCode": { "type": "string" },
-                      "fullName": { "type": "string" }
+                      "fullName": { "type": "string" },
+                      "workEmail": {
+                        "description": "The work email on the profile, as stored (not normalized): the address a grant is made to when the IT Admin names no other one; null when the profile has none.",
+                        "type": "string",
+                        "nullable": true
+                      }
                     },
-                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "required": ["employeeId", "employeeCode", "fullName", "workEmail"],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -110817,9 +110830,14 @@
                       "properties": {
                         "employeeId": { "type": "string", "format": "uuid" },
                         "employeeCode": { "type": "string" },
-                        "fullName": { "type": "string" }
+                        "fullName": { "type": "string" },
+                        "workEmail": {
+                          "description": "The work email on the profile, as stored (not normalized): the address a grant is made to when the IT Admin names no other one; null when the profile has none.",
+                          "type": "string",
+                          "nullable": true
+                        }
                       },
-                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "required": ["employeeId", "employeeCode", "fullName", "workEmail"],
                       "additionalProperties": false,
                       "nullable": true
                     },
@@ -111062,9 +111080,14 @@
                     "properties": {
                       "employeeId": { "type": "string", "format": "uuid" },
                       "employeeCode": { "type": "string" },
-                      "fullName": { "type": "string" }
+                      "fullName": { "type": "string" },
+                      "workEmail": {
+                        "description": "The work email on the profile, as stored (not normalized): the address a grant is made to when the IT Admin names no other one; null when the profile has none.",
+                        "type": "string",
+                        "nullable": true
+                      }
                     },
-                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "required": ["employeeId", "employeeCode", "fullName", "workEmail"],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -119371,9 +119394,14 @@
                       "properties": {
                         "employeeId": { "type": "string", "format": "uuid" },
                         "employeeCode": { "type": "string" },
-                        "fullName": { "type": "string" }
+                        "fullName": { "type": "string" },
+                        "workEmail": {
+                          "description": "The work email on the profile, as stored (not normalized): the address the grant is made to when the IT Admin names no other one; null when the profile has none.",
+                          "type": "string",
+                          "nullable": true
+                        }
                       },
-                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "required": ["employeeId", "employeeCode", "fullName", "workEmail"],
                       "additionalProperties": false
                     },
                     "state": { "type": "string", "enum": ["WAITING", "EXECUTING", "DONE"] },

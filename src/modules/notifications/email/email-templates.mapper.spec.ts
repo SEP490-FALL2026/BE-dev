@@ -61,4 +61,35 @@ describe('email templates', () => {
       expect(reset.text).not.toEqual(changed.text);
     });
   });
+
+  describe('LOGIN_EMAIL_CHANGED_NOTICE', () => {
+    const payload = {
+      previousEmail: 'old@acme.test',
+      currentEmail: 'new@acme.test',
+      at: '2026-11-19T09:00:00.000Z',
+      fullName: 'An',
+    };
+
+    it.each(['vi', 'en'])('names both addresses and the time, with no link or token, in %s', (locale) => {
+      const { text } = renderEmail('LOGIN_EMAIL_CHANGED_NOTICE', locale, { ...payload, audience: 'CURRENT' }, APP_URL);
+
+      expect(text).toContain('old@acme.test');
+      expect(text).toContain('new@acme.test');
+      expect(text).toContain('2026-11-19T09:00:00.000Z');
+      expect(text).not.toContain('#token=');
+      expect(text).not.toMatch(/https?:\/\//);
+      expect(text).not.toContain('undefined');
+    });
+
+    it('adds the warning for the previous address only', () => {
+      const previous = renderEmail('LOGIN_EMAIL_CHANGED_NOTICE', 'vi', { ...payload, audience: 'PREVIOUS' }, APP_URL);
+      const current = renderEmail('LOGIN_EMAIL_CHANGED_NOTICE', 'vi', { ...payload, audience: 'CURRENT' }, APP_URL);
+
+      expect(previous.text).toContain('Nếu bạn không yêu cầu thay đổi này, hãy liên hệ quản trị viên.');
+      expect(current.text).not.toContain('Nếu bạn không yêu cầu');
+      expect(
+        renderEmail('LOGIN_EMAIL_CHANGED_NOTICE', 'en', { ...payload, audience: 'PREVIOUS' }, APP_URL).text,
+      ).toContain('If you did not ask for this change');
+    });
+  });
 });

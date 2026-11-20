@@ -66,6 +66,15 @@ export function goneNotice(event: StatusEvent, facts: StatusFacts): Notification
   };
 }
 
+/** The request waits for the IT Admin to grant it: one notice for the whole request, whatever the number of people it is for. */
+export function readyForGrant(request: RequestFacts, facts: StatusFacts): NotificationIntent {
+  return {
+    recipients: facts.grantItAdminEmployeeIds,
+    code: 'REQUEST_READY_FOR_GRANT',
+    params: { requestId: request.id, beneficiaryCount: request.beneficiaryEmployeeIds.length },
+  };
+}
+
 export function stepKindOf(event: StatusEvent): string | null {
   return text(event.after, 'stepKind');
 }

@@ -43,6 +43,7 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       'itAdmin',
       'memberCount',
       'name',
+      'starting',
       'status',
       'updatedAt',
       'warnings',
@@ -71,6 +72,7 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
         effectiveFrom: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) as unknown,
         costCenter: null,
         avatarUrl: null,
+        starting: false,
         itAdmin: {
           employeeId: h.it2.employeeId,
           employeeCode: 'E-IT2',

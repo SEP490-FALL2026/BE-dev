@@ -19,6 +19,7 @@ export function toDepartmentWire(view: DepartmentView) {
         }
       : null,
     avatarUrl: view.avatarUrl,
+    starting: view.starting,
     head: view.head,
     memberCount: view.memberCount,
     warnings: view.warnings,

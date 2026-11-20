@@ -13,6 +13,7 @@ import {
   EmployeeSelfChangeForbiddenError,
   EmployeeUpdateEmptyError,
 } from './employee.errors';
+import { EmployeeAccountsHook } from '../public/organization.extension-points';
 import { EmployeeMaintenanceService } from './employee-maintenance.service';
 
 /**
@@ -53,6 +54,8 @@ describe('EmployeeMaintenanceService', () => {
     updateEmployeeOfficialFields: jest.fn(),
     getProfileNotices: jest.fn(),
   };
+  const followWorkEmail = jest.fn();
+  let employeeAccounts: EmployeeAccountsHook;
   const audit = { record: jest.fn() };
   const notifications = { notifyInApp: jest.fn() };
   const runner = {
@@ -85,6 +88,7 @@ describe('EmployeeMaintenanceService', () => {
         },
         { provide: AuditApi, useValue: audit },
         { provide: NotificationsApi, useValue: notifications },
+        { provide: EmployeeAccountsHook, useValue: employeeAccounts },
         { provide: TransactionRunner, useValue: runner },
       ],
     }).compile();
@@ -95,6 +99,9 @@ describe('EmployeeMaintenanceService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     calls = [];
+    followWorkEmail.mockResolvedValue('NO_ACCOUNT');
+    employeeAccounts = new EmployeeAccountsHook();
+    employeeAccounts.bind({ followWorkEmail } as never);
     organization.getOrganization.mockResolvedValue({ id: 'org-1' });
     organization.businessToday.mockResolvedValue('2026-10-28');
     organization.lockEmployeeForUpdate.mockImplementation(() => {
@@ -184,6 +191,67 @@ describe('EmployeeMaintenanceService', () => {
       onDate: '2026-10-28',
     });
     expect(view).toMatchObject({ id: 'emp-1', jobTitle: 'Senior Designer', fullName: 'An Nguyen' });
+  });
+
+  it('moves the login email of the account with a new work email, after the write and before the audit, in the same transaction', async () => {
+    followWorkEmail.mockImplementation(() => {
+      calls.push('follow');
+
+      return Promise.resolve('FOLLOWED');
+    });
+
+    await (await service()).update(superAdmin, 'emp-1', { workEmail: ' New.Mail@Corp.test ' });
+
+    expect(calls).toEqual(['begin', 'lock employee', 'write', 'follow', 'audit', 'notice', 'notice', 'commit']);
+    expect(followWorkEmail).toHaveBeenCalledWith(tx, {
+      actor: superAdmin,
+      organizationId: 'org-1',
+      employeeId: 'emp-1',
+      workEmail: 'New.Mail@Corp.test',
+    });
+  });
+
+  it('refuses the whole correction when another account already logs in with the new email, and audits nothing', async () => {
+    followWorkEmail.mockResolvedValue('TAKEN');
+
+    await expect((await service()).update(superAdmin, 'emp-1', { workEmail: 'taken@corp.test' })).rejects.toMatchObject(
+      {
+        reasons: [{ field: 'workEmail', code: 'WORK_EMAIL_TAKEN' }],
+      },
+    );
+
+    expect(audit.record).not.toHaveBeenCalled();
+    expect(calls).not.toContain('commit');
+  });
+
+  it('does not touch the account when the work email is not changed', async () => {
+    organization.getEmployee.mockResolvedValue({ ...person, workEmail: 'old@corp.test' });
+    await (await service()).update(superAdmin, 'emp-1', { jobTitle: 'Lead' });
+
+    expect(followWorkEmail).not.toHaveBeenCalled();
+  });
+
+  it('clears the work email of a person who has no account', async () => {
+    organization.getEmployee.mockResolvedValue({ ...person, workEmail: 'old@corp.test' });
+
+    await (await service()).update(superAdmin, 'emp-1', { workEmail: null });
+
+    expect(followWorkEmail).toHaveBeenCalledWith(tx, expect.objectContaining({ employeeId: 'emp-1', workEmail: null }));
+    expect(organization.updateEmployeeOfficialFields).toHaveBeenCalledWith(tx, 'emp-1', { workEmail: null });
+  });
+
+  it('refuses clearing the work email of a person who has an account, and writes, audits and tells nobody', async () => {
+    organization.getEmployee.mockResolvedValue({ ...person, workEmail: 'old@corp.test' });
+    followWorkEmail.mockResolvedValue('ACCOUNT_NEEDS_EMAIL');
+
+    await expect((await service()).update(superAdmin, 'emp-1', { workEmail: null })).rejects.toMatchObject({
+      reasons: [{ field: 'workEmail', code: 'WORK_EMAIL_REQUIRED_FOR_ACCOUNT' }],
+    });
+
+    expect(organization.updateEmployeeOfficialFields).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+    expect(notifications.notifyInApp).not.toHaveBeenCalled();
+    expect(calls).not.toContain('commit');
   });
 
   it('clears the title when it is sent blank or null', async () => {
