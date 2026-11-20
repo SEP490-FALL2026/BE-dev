@@ -105,7 +105,6 @@ describe('the vendor admins gate and the renewal of a period (integration, real 
       commitmentTermMonths: 1,
       startDate: '2026-04-05',
       purchasedQuantity: 3,
-      ownerDepartmentId: h.seed.departmentId,
       responsibleItAdminEmployeeId: h.it1.employeeId,
     };
 

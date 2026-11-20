@@ -189,16 +189,11 @@ export class SeatHarness {
    * owned by the seed department unless a department is named: a subscription always has an owner department, and a seat sits only
    * on a subscription of its own department (`QĐ-89a`, F20), so a suite whose seats belong to another department names it.
    */
-  async subscription(
-    quantity: number | null = 100,
-    type: 'K1' | 'K2' | 'K4' = 'K2',
-    ownerDepartmentId: string = this.seed.departmentId,
-  ): Promise<string> {
+  async subscription(quantity: number | null = 100, type: 'K1' | 'K2' | 'K4' = 'K2'): Promise<string> {
     const planId = await this.plan(type, quantity === null ? 'FLAT_RATE' : 'PER_SEAT');
 
     // A K4 plan is bought once (B-5): what is written for it is a perpetual purchase, which has no billing cycle.
     return declareSubscription(this.ctx, this.it1.accessToken, {
-      ownerDepartmentId,
       planId,
       kind: type === 'K4' ? 'PERPETUAL' : 'TERM',
       unitPrice: { amount: '1000000', currency: 'VND' },
@@ -213,7 +208,6 @@ export class SeatHarness {
     const planId = await this.plan(type);
 
     return declareSubscription(this.ctx, this.it1.accessToken, {
-      ownerDepartmentId: this.seed.departmentId,
       planId,
       kind: type === 'K4' ? 'PERPETUAL' : 'TERM',
       purchasedQuantity: 10,

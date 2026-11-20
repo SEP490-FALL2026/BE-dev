@@ -1,29 +1,12 @@
 import { as, listAll, tag } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoRequestScenario } from '../fixture/demo-fixture.types';
-import { yesChecklist } from './checklist-kit';
-import { nextScenarioAction, reachedTarget, ScenarioAction } from './scenario-path';
+import { grantTaskStatus, perform, type RequestWire } from './request-actions';
+import { nextScenarioAction, reachedTarget, type ScenarioPosition } from './scenario-path';
 
-export interface RequestWire {
-  id: string;
-  state: string;
-  businessReason?: string | null;
-  proposal?: { purpose: string } | null;
-  plan?: { planId: string } | null;
-  department: { code: string };
-  routing: { mode: 'VIA_HEAD' | 'ONE_STEP' };
-  spend?: { stage: string } | null;
-  needStep: { assignee: { employeeCode: string } | null } | null;
-}
+export type { RequestWire } from './request-actions';
 
 const MAX_TURNS = 10;
-
-function departmentOf(ctx: DemoRunContext, code: string) {
-  const department = ctx.fixture.departments.find((candidate) => candidate.code === code);
-  if (!department) throw new Error(`The request belongs to a department the fixture does not declare: ${code}`);
-
-  return department;
-}
 
 /**
  * The time of use of a request as the body carries it (`QĐ-111i`, RQ-2): the months it asks for, never a date (`expectedEndDate` is a 422).
@@ -33,9 +16,13 @@ function departmentOf(ctx: DemoRunContext, code: string) {
 export const termBody = (termMonths: number | null): { termMonths?: number } =>
   termMonths === null ? {} : { termMonths };
 
+/** Who reads the request: its requester, unless the scenario names another because the requester can no longer sign in (C-2). */
+const readerOf = (scenario: DemoRequestScenario): string => scenario.readAs ?? scenario.requester;
+
 /**
  * The request of a scenario, found from what the API itself recorded: every request its requester sent is an Audit Trail
- * event (written in the transaction that sent it), and the request carries the scenario's tag at the start of its text.
+ * event (written in the transaction that sent it), and the request carries the scenario's tag at the start of its text. It is read by
+ * `readAs` when the scenario names one, so a requester whose access is blocked is never signed in for it (C-2).
  */
 export async function findScenarioRequest(
   ctx: DemoRunContext,
@@ -48,10 +35,11 @@ export async function findScenarioRequest(
     ctx.superAdminEmail,
     `/audit-events?actorAppUserId=${appUserId}&resourceType=ACCESS_REQUEST&action=ACCESS_REQUEST.SUBMITTED`,
   );
-  const requester = await as(ctx, scenario.requester);
+  if (events.length === 0) return null;
+  const reader = await as(ctx, readerOf(scenario));
   const marker = tag(ctx, scenario.key);
   for (const id of new Set(events.map((event) => event.resourceId))) {
-    const data = await ctx.api.call<{ request?: RequestWire }>(requester, 'GET', `/access-requests/${id}`);
+    const data = await ctx.api.call<{ request?: RequestWire }>(reader, 'GET', `/access-requests/${id}`);
     const texts = [data.request?.businessReason, data.request?.proposal?.purpose];
     if (data.request && texts.some((text) => text?.startsWith(marker))) {
       ctx.ids.requests.set(scenario.key, id);
@@ -62,9 +50,13 @@ export async function findScenarioRequest(
   return null;
 }
 
+/** The free text a scenario sends as its reason or purpose: the tag that finds it again, then the business reason (never the developer's `summary`). */
+export const requestTextOf = (ctx: DemoRunContext, scenario: DemoRequestScenario): string =>
+  `${tag(ctx, scenario.key)} ${scenario.reason}`;
+
 async function submit(ctx: DemoRunContext, scenario: DemoRequestScenario): Promise<RequestWire> {
   const requester = await as(ctx, scenario.requester);
-  const text = `${tag(ctx, scenario.key)} ${scenario.summary}`;
+  const text = requestTextOf(ctx, scenario);
   const planId = ctx.ids.plans.get(scenario.plan ?? '');
   let created: { request: RequestWire };
   if (scenario.proposal) {
@@ -94,7 +86,22 @@ async function submit(ctx: DemoRunContext, scenario: DemoRequestScenario): Promi
   return created.request;
 }
 
-const positionOf = (request: RequestWire) => ({ state: request.state, stage: request.spend?.stage ?? null });
+/**
+ * Where the request stands on its path: its state and, besides it, the stage of its spend step, or for a request being granted the status of
+ * its grant task (read only when the scenario goes on from there, which is a call to the task list).
+ */
+async function positionOf(
+  ctx: DemoRunContext,
+  scenario: DemoRequestScenario,
+  request: RequestWire,
+): Promise<ScenarioPosition> {
+  const needsTask = request.state === 'EXECUTING' && scenario.target === 'FAILED';
+
+  return {
+    state: request.state,
+    stage: needsTask ? await grantTaskStatus(ctx, scenario, request) : (request.spend?.stage ?? null),
+  };
+}
 
 /** Why the request cannot go on towards its scenario, or null when it can. */
 function obstacleOf(ctx: DemoRunContext, scenario: DemoRequestScenario, request: RequestWire): string | null {
@@ -107,6 +114,12 @@ function obstacleOf(ctx: DemoRunContext, scenario: DemoRequestScenario, request:
 const describePosition = (request: RequestWire): string =>
   `${request.state}${request.spend ? `/${request.spend.stage}` : ''}`;
 
+async function reload(ctx: DemoRunContext, scenario: DemoRequestScenario, id: string): Promise<RequestWire> {
+  const reader = await as(ctx, readerOf(scenario));
+
+  return (await ctx.api.call<{ request: RequestWire }>(reader, 'GET', `/access-requests/${id}`)).request;
+}
+
 async function scenarioStep(ctx: DemoRunContext, scenario: DemoRequestScenario): Promise<StepOutcome> {
   let request = await findScenarioRequest(ctx, scenario);
   let moved = false;
@@ -118,9 +131,10 @@ async function scenarioStep(ctx: DemoRunContext, scenario: DemoRequestScenario):
   for (let turn = 0; turn < MAX_TURNS; turn++) {
     const obstacle = obstacleOf(ctx, scenario, request);
     if (obstacle) return { status: 'conflict', detail: obstacle };
-    if (reachedTarget(positionOf(request), scenario))
+    const position = await positionOf(ctx, scenario, request);
+    if (reachedTarget(position, scenario))
       return { status: moved ? 'done' : 'present', detail: describePosition(request) };
-    const action = nextScenarioAction(positionOf(request), scenario);
+    const action = nextScenarioAction(position, scenario);
     if (!action)
       return { status: 'conflict', detail: `đang ở ${describePosition(request)}, không tới được ${scenario.target}` };
     if (ctx.mode === 'plan') return { status: 'planned', detail: `${request.state} → ${action}` };
@@ -130,193 +144,6 @@ async function scenarioStep(ctx: DemoRunContext, scenario: DemoRequestScenario):
   }
 
   return { status: 'conflict', detail: `không tới được ${scenario.target} sau ${MAX_TURNS} bước` };
-}
-
-async function reload(ctx: DemoRunContext, scenario: DemoRequestScenario, id: string): Promise<RequestWire> {
-  const requester = await as(ctx, scenario.requester);
-
-  return (await ctx.api.call<{ request: RequestWire }>(requester, 'GET', `/access-requests/${id}`)).request;
-}
-
-/** The checklist of a decision step all Yes, as the person of `code` reads it. */
-async function checklistOf(ctx: DemoRunContext, code: string | null, step: string) {
-  if (!code) throw new Error(`No demo person decides step ${step}: the fixture leaves that role empty`);
-
-  return yesChecklist(ctx, await as(ctx, code), step);
-}
-
-async function post(ctx: DemoRunContext, code: string | null, path: string, body?: unknown): Promise<unknown> {
-  if (!code) throw new Error(`No demo person acts at ${path}: the fixture leaves that role empty`);
-
-  return ctx.api.call(await as(ctx, code), 'POST', path, body);
-}
-
-async function perform(
-  ctx: DemoRunContext,
-  scenario: DemoRequestScenario,
-  request: RequestWire,
-  action: ScenarioAction,
-): Promise<void> {
-  const department = departmentOf(ctx, request.department.code);
-  switch (action) {
-    case 'NEED_APPROVE':
-    case 'NEED_REJECT':
-      return decideNeed(ctx, scenario, request, action === 'NEED_APPROVE');
-    case 'WITHDRAW':
-      await post(ctx, scenario.requester, `/access-requests/${request.id}/withdraw`, {
-        reason: `${tag(ctx, scenario.key)} Không còn cần.`,
-      });
-      return;
-    case 'SUBMIT_BATCH':
-      // A batch that confirms the reserve answers the checklist of step 1.6 once for the batch (FIX-PL2-O4).
-      await post(ctx, department.head, '/spend-batches', {
-        requestIds: [request.id],
-        ...(scenario.confirmReserve
-          ? {
-              reserveConfirmations: [
-                { requestId: request.id, reason: `${tag(ctx, scenario.key)} Cần cho chiến dịch tháng này.` },
-              ],
-              checklist: await checklistOf(ctx, department.head, '1.6'),
-            }
-          : {}),
-      });
-      return;
-    case 'CONFIRM_RESERVE':
-      await post(ctx, department.head, `/access-requests/${request.id}/reserve-confirmation`, {
-        reason: `${tag(ctx, scenario.key)} Cần cho chiến dịch tháng này.`,
-        checklist: await checklistOf(ctx, department.head, '1.6'),
-      });
-      return;
-    case 'APPROVE_SPEND':
-      return approveSpend(ctx, scenario, request);
-    case 'GRANT':
-      return grant(ctx, scenario, request, department.itAdmin);
-    case 'COMPLETE_TASK':
-      return completeGrant(ctx, department.itAdmin, request.id, scenario);
-  }
-}
-
-/** The spending approver approves with the checklist of step 1.7: a group line by line (every person it names), a request as a whole. */
-async function approveSpend(ctx: DemoRunContext, scenario: DemoRequestScenario, request: RequestWire) {
-  const approver = ctx.fixture.approvalRoles.SPENDING_APPROVER;
-  const checklist = await checklistOf(ctx, approver, '1.7');
-  if (scenario.beneficiaries) {
-    await post(ctx, approver, `/access-requests/${request.id}/line-spend-decisions`, {
-      lines: scenario.beneficiaries.map((code) => ({ employeeId: ctx.ids.employees.get(code), decision: 'APPROVE' })),
-      checklist,
-    });
-    return;
-  }
-  await post(ctx, approver, `/access-requests/${request.id}/spend-approval`, { decision: 'APPROVE', checklist });
-}
-
-async function decideNeed(ctx: DemoRunContext, scenario: DemoRequestScenario, request: RequestWire, approve: boolean) {
-  const assignee = request.needStep?.assignee?.employeeCode ?? null;
-  if (!assignee || !ctx.fixture.people.some((person) => person.code === assignee)) {
-    throw new Error(
-      `The need step of ${scenario.key} is held by somebody outside the dataset (${assignee ?? 'nobody'})`,
-    );
-  }
-  const checklist = await checklistOf(ctx, assignee, '1.2');
-  const body = approve
-    ? { decision: 'APPROVE', checklist }
-    : { decision: 'REJECT', reason: `${tag(ctx, scenario.key)} Chưa cần trong quý này.`, checklist };
-  await post(ctx, assignee, `/access-requests/${request.id}/need-decision`, body);
-}
-
-function planTypeOf(ctx: DemoRunContext, scenario: DemoRequestScenario): string | null {
-  for (const application of ctx.fixture.applications) {
-    const plan = application.plans.find((candidate) => candidate.key === scenario.plan);
-    if (plan) return plan.provisioningType;
-  }
-
-  return null;
-}
-
-/** IT Admin opens the grant task: from the pool, with a purchase when the pool is out (K2) or the store has no key (K4). */
-async function grant(ctx: DemoRunContext, scenario: DemoRequestScenario, request: RequestWire, admin: string | null) {
-  const type = planTypeOf(ctx, scenario);
-  const buys = scenario.grant === 'PURCHASE' && (type === 'K2' || type === 'K4');
-  const beneficiaries = scenario.beneficiaries ?? [null];
-  for (const code of beneficiaries) {
-    await post(ctx, admin, '/provisioning-tasks', {
-      requestId: request.id,
-      ...(code ? { beneficiaryEmployeeId: ctx.ids.employees.get(code) } : {}),
-      ...(buys ? { purchase: { reason: `${tag(ctx, scenario.key)} Kho hết, cần mua thêm.` } } : {}),
-    });
-  }
-}
-
-interface TaskRow {
-  id: string;
-  kind: string;
-  status: string;
-  requestId: string | null;
-}
-
-/** The free key of the K4 subscription the scenario's plan has, for the IT Admin to hand over. */
-async function freeKeyId(
-  ctx: DemoRunContext,
-  email: string,
-  scenario: DemoRequestScenario,
-): Promise<string | undefined> {
-  if (scenario.grant !== 'KEY') return undefined;
-  const subscription = ctx.fixture.subscriptions.find((candidate) => candidate.plan === scenario.plan);
-  const subscriptionId = ctx.ids.subscriptions.get(subscription?.key ?? '');
-  const keys = await listAll<{ id: string; status: string }>(
-    ctx,
-    email,
-    `/license-keys?subscriptionId=${subscriptionId}&status=IN_STORE`,
-  );
-
-  return keys[0]?.id;
-}
-
-/**
- * What the grant of a K1 seat is completed with besides the evidence (`QĐ-111az`, K1-GR): the two steps of its checklist, the company email first,
- * ticked a moment ago and in that order. The grant of any other kind takes none. No evidence goes in the checklist: it is sent beside it.
- */
-export function grantChecklistBody(
-  type: string | null,
-  now: number,
-): { k1Checklist?: { items: { code: string; done: boolean; doneAt: string }[] } } {
-  if (type !== 'K1') return {};
-  const steps = ['COMPANY_EMAIL_REGISTERED', 'NO_PERSONAL_DEVICE_MFA'];
-
-  return {
-    k1Checklist: {
-      items: steps.map((code, index) => ({
-        code,
-        done: true,
-        doneAt: new Date(now - 1000 * (steps.length - index)).toISOString(),
-      })),
-    },
-  };
-}
-
-async function completeGrant(
-  ctx: DemoRunContext,
-  admin: string | null,
-  requestId: string,
-  scenario: DemoRequestScenario,
-) {
-  if (!admin) throw new Error(`No IT Admin of the dataset carries out ${scenario.key}`);
-  const email = await as(ctx, admin);
-  const type = planTypeOf(ctx, scenario);
-  const tasks = await listAll<TaskRow>(ctx, email, '/provisioning-tasks?scope=ALL');
-  const open = tasks.filter(
-    (row) => row.requestId === requestId && row.kind === 'GRANT' && ['QUEUED', 'IN_PROGRESS'].includes(row.status),
-  );
-  if (open.length === 0) throw new Error(`The grant task of ${scenario.key} is neither queued nor in progress`);
-  for (const task of open) {
-    if (task.status === 'QUEUED') await ctx.api.call(email, 'POST', `/provisioning-tasks/${task.id}/claim`);
-    const licenseKeyId = await freeKeyId(ctx, email, scenario);
-    await ctx.api.call(email, 'POST', `/provisioning-tasks/${task.id}/complete`, {
-      evidence: `${tag(ctx, scenario.key)} Đã cấp quyền cho người dùng.`,
-      ...(licenseKeyId ? { licenseKeyId } : {}),
-      ...grantChecklistBody(type, Date.now()),
-    });
-  }
 }
 
 const BASE_NEEDS = ['catalog.baseline-close', 'org.heads', 'org.approval-roles', 'org.it-admins', 'assets.keys'];

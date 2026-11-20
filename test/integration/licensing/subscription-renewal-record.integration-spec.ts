@@ -8,7 +8,6 @@ const h = new RenewalHarness();
 interface CaseWire {
   id: string;
   state: string;
-  subscription: { ownerDepartmentId: string | null };
   waitingReason: string | null;
   proposal: { choice: string; quantity: number | null; seatsNeeded: number | null };
   decision: { choice: string; deciderRole: string } | null;
@@ -248,7 +247,6 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
       renewalDate: h.inDays(5),
       endDate: h.inDays(5),
       autoRenew: true,
-      ownerDepartmentId: unit.department.id,
     });
     for (const member of unit.members) await h.seatOf(member, { subscriptionId });
     await takeOwnerOff(h, subscriptionId);
@@ -414,18 +412,16 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     const renewal = h.dataOf<{ renewal: CaseWire }>(response).renewal;
     expect(renewal).toMatchObject({
       state: 'OUTCOME_RECORDED',
-      subscription: { ownerDepartmentId: null },
       waitingReason: null,
       proposal: { choice: 'REDUCE', quantity: 2, seatsNeeded: 2 },
       decision: { choice: 'REDUCE', deciderRole: 'IT_ADMIN_IN_CHARGE' },
       outcomeDetail: { kind: 'AS_DECIDED', lateRenewal: false },
     });
-    // Every reader of the cases finds it: the IT Admin and Finance; the head of a department sees none of a pool subscription.
+    // Every reader of the cases finds it: the IT Admin and Finance; the head of a department reads none.
     const asIt = await h.read(renewal.id);
     expect(asIt.status).toBe(200);
-    expect(h.dataOf<{ renewal: CaseWire }>(asIt).renewal.subscription.ownerDepartmentId).toBeNull();
     expect((await h.read(renewal.id, h.finance)).status).toBe(200);
-    expect((await h.read(renewal.id, unit.head.account)).status).toBe(404);
+    expect(h.codeOf(await h.read(renewal.id, unit.head.account))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
     const listed = await h.renewals(`?subscriptionId=${subscriptionId}`, h.finance);
     expect(listed.status).toBe(200);
     expect(h.dataOf<{ items: Array<{ id: string }> }>(listed).items.map((item) => item.id)).toEqual([renewal.id]);
@@ -445,7 +441,6 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
       renewalDate: h.inDays(5),
       endDate: h.inDays(5),
       autoRenew: true,
-      ownerDepartmentId: unit.department.id,
     });
     const seats: string[] = [];
     for (const member of unit.members) seats.push(await h.seatOf(member, { subscriptionId }));
@@ -472,7 +467,6 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     const renewal = h.dataOf<{ renewal: CaseWire }>(response).renewal;
     expect(renewal).toMatchObject({
       state: 'OUTCOME_RECORDED',
-      subscription: { ownerDepartmentId: null },
       proposal: { choice: 'REDUCE', quantity: 2, seatsNeeded: 2 },
       decision: { deciderRole: 'IT_ADMIN_IN_CHARGE' },
       outcomeDetail: { kind: 'AS_DECIDED', lateRenewal: false },
@@ -494,7 +488,6 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
       renewalDate: h.inDays(5),
       endDate: h.inDays(5),
       autoRenew: true,
-      ownerDepartmentId: unit.department.id,
     });
     for (const member of unit.members) await h.seatOf(member, { subscriptionId });
     await takeOwnerOff(h, subscriptionId);

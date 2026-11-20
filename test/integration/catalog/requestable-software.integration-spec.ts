@@ -80,9 +80,8 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       provisioningType: kind === 'INTERNAL' ? 'K5' : 'K1',
       ...(kind === 'INTERNAL' ? {} : { pricingModel: 'PER_SEAT', controlLevel: 'FULL' }),
     });
-    for (const { departmentId, cycle } of pricedFor) {
+    for (const { cycle } of pricedFor) {
       const subscriptionId = await declareSubscription(h.ctx, h.it1.accessToken, {
-        ownerDepartmentId: departmentId,
         planId,
         kind: 'TERM',
         unitPrice: { amount: '1000000', currency: 'VND' },

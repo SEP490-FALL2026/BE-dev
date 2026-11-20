@@ -8,7 +8,6 @@ import {
   FORWARD_MIGRATION,
   LegacyReturnFacts,
   MigrationRecord,
-  SubscriptionOwnerSchema,
   UNIT_ONLY_MIGRATION,
 } from '../public/migration-preflight.types';
 import { RecoveryTargetFacts } from '../public/recovery-target.policy';
@@ -193,7 +192,6 @@ export class MigrationPreflightRepo {
    */
   async contractGateFacts(tx: DbTx): Promise<ContractGateFacts> {
     return {
-      subscriptionOwner: await this.subscriptionOwnerFacts(tx),
       costCenterDirection: await this.costCenterDirectionFacts(tx),
       retiredKinds: await this.retiredKindFacts(tx),
       legacyReturns: await this.legacyReturnFacts(tx),
@@ -372,46 +370,6 @@ export class MigrationPreflightRepo {
       mismatches,
       notActivated: notActivated.map((row) => row.id),
     };
-  }
-
-  /**
-   * The owner department of a subscription (F02, spec L.3). Before the expansion migration every subscription is listed (the
-   * database skipped the expansion). Valid assignment: exactly one row for the subscription, of the same organization, to a
-   * department of that organization. Open: no owner department and no valid assignment, or an owner department the assignment
-   * contradicts — none once the final migration made the column required. The ids come out sorted and nothing else is read.
-   */
-  private async subscriptionOwnerFacts(tx: DbTx): Promise<ContractGateFacts['subscriptionOwner']> {
-    const [probe] = await tx.$queryRaw<{ hasSubscriptions: boolean; hasColumn: boolean; hasTable: boolean }[]>`
-      SELECT to_regclass('public.subscriptions') IS NOT NULL AS "hasSubscriptions",
-             EXISTS (SELECT 1 FROM information_schema.columns
-                      WHERE table_schema = 'public' AND table_name = 'subscriptions'
-                        AND column_name = 'owner_department_id') AS "hasColumn",
-             to_regclass('public.subscription_owner_assignments') IS NOT NULL AS "hasTable"`;
-    if (!probe.hasSubscriptions) return { schema: 'NO_TABLE', subscriptionIds: [] };
-
-    const schema: SubscriptionOwnerSchema =
-      probe.hasColumn && probe.hasTable ? 'READY' : !probe.hasColumn && !probe.hasTable ? 'ABSENT' : 'PARTIAL';
-    if (schema === 'PARTIAL') return { schema, subscriptionIds: [] };
-    if (schema === 'ABSENT') {
-      const rows = await tx.$queryRaw<{ id: string }[]>`SELECT "id"::text AS "id" FROM "subscriptions" ORDER BY "id"`;
-
-      return { schema, subscriptionIds: rows.map((row) => row.id) };
-    }
-
-    const rows = await tx.$queryRaw<{ id: string }[]>`
-      SELECT s."id"::text AS "id"
-        FROM "subscriptions" s
-        LEFT JOIN "subscription_owner_assignments" a ON a."subscription_id" = s."id"
-        LEFT JOIN "departments" d ON d."id" = a."department_id"
-       WHERE (s."owner_department_id" IS NULL
-              AND (a."id" IS NULL OR d."id" IS NULL
-                   OR a."organization_id" <> s."organization_id" OR d."organization_id" <> s."organization_id"))
-          OR (s."owner_department_id" IS NOT NULL AND a."id" IS NOT NULL
-              AND (a."department_id" <> s."owner_department_id"
-                   OR a."organization_id" <> s."organization_id" OR d."organization_id" <> s."organization_id"))
-       ORDER BY s."id"`;
-
-    return { schema, subscriptionIds: rows.map((row) => row.id) };
   }
 
   /**

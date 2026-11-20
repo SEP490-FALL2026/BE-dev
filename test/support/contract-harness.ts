@@ -87,7 +87,6 @@ export class ContractHarness extends DocumentHarness {
       controlLevel: 'FULL',
     });
     const subscriptionId = await declareSubscription(this.ctx, token, {
-      ownerDepartmentId: this.seed.departmentId,
       planId,
       kind: type === 'K4' ? 'PERPETUAL' : 'TERM',
       unitPrice: { amount: '1000000', currency: 'VND' },

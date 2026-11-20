@@ -65,7 +65,6 @@ model Organization {
   plans                              Plan[]
   vendorTaxProfiles                  VendorTaxProfile[]
   subscriptions                      Subscription[]
-  subscriptionOwnerAssignments       SubscriptionOwnerAssignment[]
   costCenterDepartmentLinks          CostCenterDepartmentLink[]
   costCenterDirectionActivation      CostCenterDirectionActivation?
   seatBaselineImports                SeatBaselineImport[]
@@ -157,6 +156,13 @@ model Department {
   // The day the department takes effect (QĐ-104e(3)): one made in the budgeting period takes effect on 1 January of the next year.
   // The application always names it (the installation too, in the calendar of the organization); the default is only for plain SQL.
   effectiveFrom       DateTime         @default(dbgenerated("CURRENT_DATE")) @map("effective_from") @db.Date
+  // The picture of the department (QĐ-113c): the key in the object storage, its type and when it was set; all three null or none.
+  avatarObjectKey     String?          @map("avatar_object_key")
+  avatarContentType   String?          @map("avatar_content_type")
+  avatarUpdatedAt     DateTime?        @map("avatar_updated_at") @db.Timestamptz(3)
+  // The department the installation created with the organization (at most one per organization, a partial unique index in the migration).
+  // Its work is never taken over by every IT Admin (`QĐ-58b`); only an IT Admin named for it reads it.
+  starting            Boolean          @default(false) @map("is_starting")
 
   organization            Organization                  @relation(fields: [organizationId], references: [id])
   costCenters             CostCenter[]                  @relation("CostCenterDepartment")
@@ -182,8 +188,6 @@ model Department {
   noticesTargeting        PersonnelNotice[]             @relation("NoticeTargetDepartment")
   noticesSent             PersonnelNotice[]             @relation("NoticeSenderDepartment")
   // The subscriptions the department owns (QĐ-89a) and the assignments that gave existing ones their owner.
-  ownedSubscriptions      Subscription[]                @relation("SubscriptionOwnerDepartment")
-  ownerAssignments        SubscriptionOwnerAssignment[]
   heldNotifications       HeldDepartmentNotification[]
 
   @@unique([organizationId, code])

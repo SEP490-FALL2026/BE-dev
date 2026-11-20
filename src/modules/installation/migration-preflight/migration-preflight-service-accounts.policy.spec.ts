@@ -14,7 +14,6 @@ const noDirection: ContractGateFacts['costCenterDirection'] = {
   notActivated: [],
 };
 const facts = (serviceAccountIds: string[]): ContractGateFacts => ({
-  subscriptionOwner: { schema: 'NO_TABLE', subscriptionIds: [] },
   costCenterDirection: noDirection,
   retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], serviceAccountIds },
   legacyReturns: { candidates: [], neighbours: [] },

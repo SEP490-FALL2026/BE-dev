@@ -189,7 +189,6 @@ const CASES: [string, Error, HttpStatus, string, Record<string, unknown> | undef
       members: { items: people, total: 4 },
       serviceAccounts: { items: [], total: 0 },
       openWork: { items: work, total: 2 },
-      subscriptions: { items: [], total: 0 },
     }),
     HttpStatus.CONFLICT,
     'DEPARTMENT.IN_USE',
@@ -200,8 +199,6 @@ const CASES: [string, Error, HttpStatus, string, Record<string, unknown> | undef
       totalServiceAccounts: 0,
       openWork: work,
       totalOpenWork: 2,
-      subscriptions: [],
-      totalSubscriptions: 0,
     },
   ],
   ...(
@@ -248,13 +245,12 @@ describe('toOrganizationApiException (organization HTTP error contract)', () => 
     expect(answer(error)).toEqual({ status: HttpStatus.FORBIDDEN, body: { ...FORBIDDEN_ERROR } });
   });
 
-  it('keeps DEPARTMENT.IN_USE details to the four bounded groups, never shared accounts (QĐ-75, QĐ-86c, F15)', () => {
+  it('keeps DEPARTMENT.IN_USE details to the three bounded groups, never shared accounts (QĐ-75, QĐ-86c, F15)', () => {
     const { body } = answer(
       new DepartmentInUseError({
         members: { items: people, total: 1 },
         serviceAccounts: { items: [{ assignmentId: 'a-1', accountIdentifier: 'ci-bot' }], total: 1 },
         openWork: { items: [], total: 0 },
-        subscriptions: { items: [], total: 0 },
       }),
     );
 
@@ -262,11 +258,9 @@ describe('toOrganizationApiException (organization HTTP error contract)', () => 
       'members',
       'openWork',
       'serviceAccounts',
-      'subscriptions',
       'totalMembers',
       'totalOpenWork',
       'totalServiceAccounts',
-      'totalSubscriptions',
     ]);
   });
 

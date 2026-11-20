@@ -7,6 +7,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx, readSqlState } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
+import { FirstPlacementCorrectionError } from './employee.errors';
 import {
   EmployeeCodeTakenError,
   EmployeeEmailTakenError,
@@ -189,6 +190,27 @@ export class EmployeeRepo {
         validFrom: toDateColumn(input.effectiveFrom),
       },
     });
+  }
+
+  /** Every placement of the person, oldest first. */
+  async placementsOf(tx: DbTx, employeeId: string) {
+    const rows = await tx.employeePlacement.findMany({
+      where: { employeeId },
+      orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((r) => ({ id: r.id, departmentId: r.departmentId, validFrom: fromDateColumn(r.validFrom) }));
+  }
+
+  /** Changes the department and/or the first day in place; the triggers allow it only for the first placement not yet in effect (`QĐ-113e`). */
+  async correctFirstPlacement(tx: DbTx, id: string, to: { departmentId?: string; effectiveFrom?: BusinessDate }) {
+    const validFrom = to.effectiveFrom ? toDateColumn(to.effectiveFrom) : undefined;
+    // The trigger refused (`object_not_in_prerequisite_state`): the placement took effect, got a second one or was told since it was read.
+    await tx.employeePlacement
+      .update({ where: { id }, data: { departmentId: to.departmentId, validFrom } })
+      .catch((error: unknown) => {
+        throw readSqlState(error) === '55000' ? new FirstPlacementCorrectionError('ALREADY_EFFECTIVE') : error;
+      });
   }
 
   async scheduledFirstPlacement(

@@ -160,7 +160,7 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
     it('asks nothing of a K1 plan', async () => {
       const planId = await planOf('K1');
 
-      await declare(complete(planId, { ownerDepartmentId: h.seed.departmentId })).expect(201);
+      await declare(complete(planId, {})).expect(201);
     });
   });
 
@@ -259,9 +259,7 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
 
     it('is quiet for a plan that needs no admins: empty list, no email, no flag', async () => {
       const planId = await planOf('K1');
-      const created = h.dataOf<SubscriptionWire>(
-        await declare(complete(planId, { ownerDepartmentId: h.seed.departmentId })).expect(201),
-      );
+      const created = h.dataOf<SubscriptionWire>(await declare(complete(planId, {})).expect(201));
 
       expect(await read(created.id)).toMatchObject({
         vendorAdmins: [],

@@ -1,4 +1,5 @@
 import { SpendHarness, Unit } from '../../support/spend-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 const h = new SpendHarness();
 const M = 1_000_000;
@@ -62,6 +63,7 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
   afterAll(async () => {
     await h.stop();
   });
+  afterEach(() => jest.restoreAllMocks());
 
   /** A department with a budget of 100 million, 20 held and 40 spent. */
   const example = async (): Promise<Unit> => {
@@ -164,6 +166,7 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
     });
 
     it('closes the spend step with the withdrawal (AC-2; the question to Finance is retired, QĐ-97c)', async () => {
+      liftWithdrawalAfterDecisionRefusal();
       const u = await example();
       const id = await h.waitingForApprover(u, plan, { amount: 15 * M });
 
@@ -194,6 +197,7 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
     });
 
     it('takes the request out of the batch it was sent in and leaves the others as they were (AC-12)', async () => {
+      liftWithdrawalAfterDecisionRefusal();
       const u = await example();
       const other = await h.staff(u.department, `W-O${(counter += 1)}`);
       const a = await h.waitingForApprover(u, plan, { amount: 5 * M });
@@ -220,6 +224,46 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       expect(await h.state(third.id)).toBe('AWAITING_SPEND_DECISION');
       expect((await stepStates(third.id)).find((step) => step.kind === 'SPEND_APPROVAL')?.state).toBe('PENDING');
       expect(await h.state(a)).toBe('AWAITING_SPEND_DECISION');
+    });
+  });
+
+  describe('only before the first decision (QĐ-113d)', () => {
+    it('refuses with WITHDRAWAL_AFTER_DECISION once the head decided, at every step after it, and changes nothing', async () => {
+      const u = await example();
+      const waiting = await h.waitingForApprover(u, plan, { amount: 5 * M });
+      const refused = await h.withdrawRequest(waiting, {}, u.member.account).expect(409);
+      expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION');
+      expect((refused.body as { error: { details: unknown } }).error.details).toEqual({
+        scope: 'REQUEST',
+        state: 'AWAITING_SPEND_DECISION',
+      });
+      expect(await h.state(waiting)).toBe('AWAITING_SPEND_DECISION');
+
+      const carried = await approved(u, 5 * M);
+      expect(await h.state(carried)).toBe('AWAITING_EXECUTION');
+      expect(h.codeOf(await h.withdrawRequest(carried, {}, u.member.account).expect(409))).toBe(
+        'ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION',
+      );
+      await granted(carried);
+      expect(await h.state(carried)).toBe('EXECUTING');
+      expect(h.codeOf(await h.withdrawRequest(carried, {}, u.member.account).expect(409))).toBe(
+        'ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION',
+      );
+      expect(await commitmentOf(carried)).toMatchObject({ state: 'HELD', released_minor: '0' });
+    });
+
+    it('lets the requester withdraw a request sent back to add what is missing', async () => {
+      const u = await example();
+      const sent = await h.sent(u.member, plan, { termMonths: 1 });
+      const no = h.checklists.questionsOf('1.2')[0];
+      await h
+        .decide(sent.id, { decision: 'RETURN', checklist: h.checklists.answer('1.2', [no]) }, u.head.account)
+        .expect(200);
+      expect(await h.state(sent.id)).toBe('AWAITING_REQUESTER_REVISION');
+
+      await h.withdrawRequest(sent.id, {}, u.member.account).expect(200);
+
+      expect(await h.state(sent.id)).toBe('WITHDRAWN');
     });
   });
 
@@ -283,7 +327,9 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
     });
   });
 
-  describe('a request that was approved and waits to be carried out (AC-5)', () => {
+  describe('what a withdrawal after the approval does, which only the system reaches now (AC-5, QĐ-113d)', () => {
+    beforeEach(liftWithdrawalAfterDecisionRefusal);
+
     it('gives the money back at once and ends as withdrawn, while nothing has been granted', async () => {
       const u = await example();
       const id = await approved(u, 15 * M);
@@ -364,7 +410,9 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
     });
   });
 
-  describe('a grant that failed (AC-9)', () => {
+  describe('a grant that failed (AC-9, QĐ-113d: reached only with the rule lifted)', () => {
+    beforeEach(liftWithdrawalAfterDecisionRefusal);
+
     it('waits for the IT Admin to close the task as cancelled, and only then ends and gives the money back', async () => {
       const u = await example();
       const id = await approved(u, 15 * M);

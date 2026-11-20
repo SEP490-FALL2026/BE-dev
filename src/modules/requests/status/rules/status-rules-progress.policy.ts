@@ -1,4 +1,4 @@
-import { requestOf, stepKindOf, text } from './status-rule.policy';
+import { readyForGrant, requestOf, stepKindOf, text } from './status-rule.policy';
 import type { NotificationIntent, StatusRule } from '../request-status.types';
 
 /** Where a request goes when its need step is approved, from the state the decision gave it (`US-05-15` AC-2 is the refusal). */
@@ -50,7 +50,7 @@ export const PROGRESS_RULES: Readonly<Record<string, StatusRule>> = {
   // 2: the need step was approved; the next step of a request for new software is given to the IT Admin who holds it.
   'ACCESS_REQUEST.NEED_APPROVED': {
     subject: 'ACCESS_REQUEST',
-    needs: ['REQUEST', 'ASSESSMENT_HOLDER'],
+    needs: ['REQUEST', 'ASSESSMENT_HOLDER', 'GRANT_IT_ADMINS'],
     build: (event, facts): NotificationIntent[] => {
       const request = requestOf(facts);
       const state = text(event.after, 'requestState') ?? '';
@@ -71,6 +71,8 @@ export const PROGRESS_RULES: Readonly<Record<string, StatusRule>> = {
           code: 'STEP_ASSIGNED',
           params: { requestId: request.id, stepKind: 'IT_ASSESSMENT', cause: 'ASSESSMENT' },
         },
+        // An internal request with no spend step now waits in the queue of grants.
+        ...(next === 'EXECUTION' ? [readyForGrant(request, facts)] : []),
       ];
     },
   },

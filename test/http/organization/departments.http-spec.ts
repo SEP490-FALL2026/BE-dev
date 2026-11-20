@@ -18,6 +18,8 @@ const HR_BASIS_BODY = { type: 'DECISION', reference: 'QD-2026-001', issuer: 'HR 
 /** What the Super Admin alone does (`QĐ-87a`, `QĐ-87b(1)`, no HR basis since `QĐ-93f`): the IT Admin lost every one of these. */
 const SUPER_ADMIN_ONLY: Array<[string, Call]> = [
   ['PATCH /departments/{id}', (server) => request(server).patch(`/api/v1/departments/${ID}`).send({ name: 'x' })],
+  ['PUT /departments/{id}/avatar', (server) => request(server).put(`/api/v1/departments/${ID}/avatar`)],
+  ['DELETE /departments/{id}/avatar', (server) => request(server).delete(`/api/v1/departments/${ID}/avatar`)],
   [
     'POST /departments/{id}/deactivate',
     (server) => request(server).post(`/api/v1/departments/${ID}/deactivate`).send({}),

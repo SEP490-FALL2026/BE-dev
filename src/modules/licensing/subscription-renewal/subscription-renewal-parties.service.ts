@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { renewalNamedItAdminOf } from './renewal-it-admin.policy';
 
 /** The people a renewal concerns, as they hold their roles now (an unlocked read unless a transaction is given). */
 export interface RenewalPeople {
@@ -14,44 +11,32 @@ export interface RenewalPeople {
   superAdmin: string | null;
 }
 
-/** What a reader of the renewals sees: every case (the IT Admin, Finance), or those of the department that owns the subscription. */
-export type RenewalReadScope = { kind: 'ALL'; itAdmin: boolean } | { kind: 'DEPARTMENT'; departmentId: string };
+/** What a reader of the renewals sees: every case (the IT Admin, Finance). */
+export type RenewalReadScope = { kind: 'ALL'; itAdmin: boolean };
 
 /**
- * Who a renewal concerns (`US-11-01`, `US-11-05`, `QĐ-103e`, `QĐ-104l`): the IT Admin who answers for the subscription (else the one in charge
- * of the department that owns it, else any usable IT Admin), Finance, who is told of every result, and the person who decides spending, who
- * hears of an incident only (`QĐ-99h`). Nobody confirms a renewal: the head of the owner department only reads the cases of their department.
+ * Who a renewal concerns (`US-11-01`, `US-11-05`, `QĐ-103e`, `QĐ-104l`): the IT Admin who answers for the subscription (else any usable IT Admin), Finance, who is told of every result, and the person who decides spending, who
+ * hears of an incident only (`QĐ-99h`). Nobody confirms a renewal and no department takes part (`QĐ-113g`).
  */
 @Injectable()
 export class RenewalPartiesService {
-  constructor(
-    private readonly organizationReads: OrganizationReadApi,
-    private readonly identity: IdentityAccessApi,
-  ) {}
+  constructor(private readonly identity: IdentityAccessApi) {}
 
   /**
-   * The IT Admin of the period (`QĐ-111g`, `BB-9`): the one responsible for the subscription while they are a usable IT Admin, else the IT
-   * Admin in charge of the owner department while they are one too, else the first usable IT Admin; null when there is none. The
-   * department is read first and both named are tested in ONE read; the first usable IT Admin is read only when neither is usable.
+   * The IT Admin of the period (`QĐ-113g`, `BB-9`): the one responsible for the subscription while they are a usable IT Admin, else the
+   * first usable IT Admin; null when there is none. No department takes part: a subscription has no owning department. The first usable
+   * IT Admin is read only when the responsible one is not usable.
    */
-  async itAdminOf(
-    period: { ownerDepartmentId: string | null; responsibleItAdminEmployeeId: string | null },
-    tx?: DbTx,
-  ): Promise<string | null> {
-    const inCharge =
-      period.ownerDepartmentId === null
-        ? null
-        : await this.organizationReads.getItAdminInChargeOfDepartment(period.ownerDepartmentId, tx);
-    const named = [...new Set([period.responsibleItAdminEmployeeId, inCharge].filter((id) => id !== null))];
-    const usable = await this.identity.findUsableItAdminEmployeeIds(named, tx);
+  async itAdminOf(period: { responsibleItAdminEmployeeId: string | null }, tx?: DbTx): Promise<string | null> {
+    const responsible = period.responsibleItAdminEmployeeId;
+    if (
+      responsible !== null &&
+      (await this.identity.findUsableItAdminEmployeeIds([responsible], tx)).has(responsible)
+    ) {
+      return responsible;
+    }
 
-    return (
-      renewalNamedItAdminOf({
-        responsibleItAdminEmployeeId: period.responsibleItAdminEmployeeId,
-        departmentItAdminEmployeeId: inCharge,
-        usableItAdminEmployeeIds: usable,
-      }) ?? (await this.identity.findFirstUsableItAdminEmployeeId(tx))
-    );
+    return this.identity.findFirstUsableItAdminEmployeeId(tx);
   }
 
   /**
@@ -84,16 +69,14 @@ export class RenewalPartiesService {
   }
 
   /**
-   * What the caller reads of the cases: every case for the IT Admin and Finance (Finance only reads), those of the department the
-   * caller heads today for a head (whatever role their account holds), and nothing for anyone else (`SoD-2`): null.
+   * What the caller reads of the cases: every case for the IT Admin and Finance (Finance only reads), and nothing for anyone else
+   * (`SoD-2`): null. No department scope: a subscription has no owning department (`QĐ-113g`).
    */
-  async readScopeOf(actor: AuthenticatedPrincipal, today: BusinessDate): Promise<RenewalReadScope | null> {
+  readScopeOf(actor: AuthenticatedPrincipal): RenewalReadScope | null {
     if (actor.roles.includes('IT_ADMIN')) return { kind: 'ALL', itAdmin: true };
     if (actor.roles.includes('FINANCE')) return { kind: 'ALL', itAdmin: false };
-    // The head of today reads the cases of their department whatever role their account holds: the one who confirms must be able to read.
-    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, today);
 
-    return headed ? { kind: 'DEPARTMENT', departmentId: headed.departmentId } : null;
+    return null;
   }
 
   /** The people every period shares (Finance, the spending approver, the Super Admin), read once for a pass. */
@@ -107,7 +90,7 @@ export class RenewalPartiesService {
 
   /** Everyone a milestone of the period may be sent to: the shared people and those of the period itself. */
   async peopleOf(
-    period: { ownerDepartmentId: string | null; responsibleItAdminEmployeeId: string | null },
+    period: { responsibleItAdminEmployeeId: string | null },
     shared: Pick<RenewalPeople, 'finance' | 'approver' | 'superAdmin'>,
   ): Promise<RenewalPeople> {
     return {

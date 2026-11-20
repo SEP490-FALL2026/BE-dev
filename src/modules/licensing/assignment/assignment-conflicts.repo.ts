@@ -17,11 +17,6 @@ export function toAssignmentFailure(error: unknown, index: number): Error | null
 
     return new AssignmentConflictError(haystack.includes('identifier') ? 'IDENTIFIER_IN_USE' : 'OVERLAP', index);
   }
-  // The trigger of the final schema names its constraint at the start of its message: the driver adapter hands over the message and
-  // the code of the refusal, not the CONSTRAINT field. The answer is the one the service gives before it writes.
-  if (isCheckViolation(error, 'license_assignments_owner_department_guard')) {
-    return new AssignmentConflictError('SUBSCRIPTION_DEPARTMENT_MISMATCH', index);
-  }
   if (isCheckViolation(error, 'seats of the subscription')) return new AssignmentConflictError('SEAT_CAPACITY', index);
   if (isCheckViolation(error, 'needs an expected end date')) {
     return new AssignmentConflictError('EXPECTED_END_REQUIRED', index);

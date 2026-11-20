@@ -29,21 +29,6 @@ const DECISION: Record<PreflightBlocker['code'], string> = {
   SERVICE_ACCOUNT_WITHOUT_DEPARTMENT_ON_RECORDED_DAY:
     'The responsible person is in no department on the day the service account was recorded, so QĐ-86c gives it no ' +
     'owning department: Owner/data decision.',
-  SUBSCRIPTION_OWNER_EXPANSION_REQUIRED:
-    'This database is before the owner-department expansion (it has neither the column nor the assignment table) and it ' +
-    'holds this subscription, which this release cannot give an owner department: it requires every subscription to have ' +
-    'one, recorded from the purchase or contract basis. Deploy the compatibility release first (it adds the column and the ' +
-    'table), record the owner of each subscription on it with `pnpm ops:assign-subscription-owner`, run this command again, ' +
-    'then deploy this release. Nothing is inferred.',
-  SUBSCRIPTION_OWNER_UNASSIGNED:
-    'This release requires every subscription to have an owner department, and this one has none and no ' +
-    'valid assignment (or an assignment that conflicts with its department). Record it from the purchase or contract ' +
-    'basis, once per subscription, on the compatibility release that is running: `pnpm ops:assign-subscription-owner ' +
-    '--subscription <id> --department <code> --basis <reference> --operator <reference> --environment LOCAL_TEST|SHARED`. ' +
-    'Nothing is inferred, and there is no bulk form.',
-  SUBSCRIPTION_OWNER_SCHEMA_PARTIAL:
-    'The database has the owner-department column or the assignment table but not both, which no migration of this ' +
-    'repository produces. Do not deploy: Owner/operator decision on how this database got there.',
   COST_CENTER_DIRECTION_EXPANSION_REQUIRED:
     'This database is before the Cost Center link of the compatibility release (none of its column and two tables exist) ' +
     'and it holds this organization: this release needs every Cost Center to belong to one department, activated and ' +
@@ -173,11 +158,6 @@ function rowText(blocker: PreflightBlocker): string {
       return `assignment ${blocker.assignmentId} of ${blocker.employeeCode}, started ${blocker.validFrom}`;
     case 'SERVICE_ACCOUNT_WITHOUT_DEPARTMENT_ON_RECORDED_DAY':
       return `assignment ${blocker.assignmentId} of ${blocker.employeeCode}, recorded ${blocker.recordedOn}`;
-    case 'SUBSCRIPTION_OWNER_EXPANSION_REQUIRED':
-    case 'SUBSCRIPTION_OWNER_UNASSIGNED':
-      return `subscription ${blocker.subscriptionId}`;
-    case 'SUBSCRIPTION_OWNER_SCHEMA_PARTIAL':
-      return 'the subscriptions table has only one of the owner-department column and the assignment table';
     case 'COST_CENTER_DIRECTION_EXPANSION_REQUIRED':
     case 'COST_CENTER_DIRECTION_NOT_ACTIVATED':
       return `organization ${blocker.organizationId}`;

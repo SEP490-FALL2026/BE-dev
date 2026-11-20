@@ -421,7 +421,7 @@ export class AssignmentService {
     // The pool buys exactly the seats the adjustment counted, and the count leaves out a seat that ends on the renewal day of the period that
     // runs (R2-2, A1C-06, V-6): not the first day of the next, which a plan by the year may begin the day after it.
     const renewalOn = period.adjustment?.end ?? startDate;
-    if (next.ownerDepartmentId === null && carriedPast(carried, renewalOn).length === 0) return;
+    if (carriedPast(carried, renewalOn).length === 0) return;
 
     const carrying = {
       assignmentIds: [seat.id],
@@ -435,7 +435,7 @@ export class AssignmentService {
   /**
    * Carries the seat; when the next period holds no free seat for it and is the shared pool (no department owns it), buys one seat on it for the
    * request and carries again: the person who comes in after the adjustment was recorded is a seat the IT Admin buys for the period (`QĐ-103q`),
-   * told like any seat a grant buys (`QĐ-110v`). A next period a department owns buys nothing here. Throws ProvisioningSubscriptionError
+   * told like any seat a grant buys (`QĐ-110v`). Throws ProvisioningSubscriptionError
    * (`NEXT_PERIOD_SEATS`).
    */
   private async carryOrBuy(
@@ -443,15 +443,14 @@ export class AssignmentService {
     actor: AuthenticatedPrincipal,
     input: {
       carrying: Parameters<AssignmentCarryRepo['carry']>[1];
-      next: { subscriptionId: string; ownerDepartmentId: string | null };
+      next: { subscriptionId: string };
       requestId: string;
     },
   ): Promise<void> {
     const refused = await this.carrying.carryBehindSavepoint(tx, input.carrying);
     if (refused === null) return;
     this.requireNoRoom(refused);
-    const { subscriptionId, ownerDepartmentId } = input.next;
-    if (ownerDepartmentId !== null) throw new ProvisioningSubscriptionError('NEXT_PERIOD_SEATS');
+    const { subscriptionId } = input.next;
     await this.catalog.lockSeatTarget(tx, { subscriptionId });
     await this.catalog.addPoolSeat(tx, actor, subscriptionId, input.requestId);
     try {

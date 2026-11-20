@@ -10,7 +10,7 @@ const r = (scenario: DemoRequestScenario): DemoRequestScenario => scenario;
  * software (K2, K5) takes 1 to 12 or none (a right with no end, never for a person with a term), a plan bought once (K4) takes none. The dates
  * of the budget scenarios do not depend on the day the seed runs: R10, R21 and R11 ask for one month, which costs one month of the price.
  */
-export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIssue' | 'notice'> = {
+export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIssues' | 'notices'> = {
   requests: [
     r({
       key: 'R01',
@@ -19,6 +19,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       termMonths: null,
       target: 'COMPLETED',
       grant: 'POOL',
+      reason: 'Kiểm thử và lưu bộ yêu cầu API của dịch vụ thanh toán để cả nhóm dùng chung.',
       summary: 'Cấp từ kho dùng chung: duyệt nhu cầu, trình lô, duyệt chi, IT cấp từ ghế Trống.',
     }),
     r({
@@ -29,6 +30,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       termMonths: null,
       target: 'COMPLETED',
       grant: 'POOL',
+      reason: 'Trao đổi hằng ngày trong nhóm kỹ thuật và nhận thông báo cảnh báo hệ thống.',
       summary: 'Request nhóm của trưởng phòng cho hai nhân viên, cấp từ kho.',
     }),
     r({
@@ -38,6 +40,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       termMonths: 3,
       target: 'COMPLETED',
       grant: 'POOL',
+      reason: 'Theo dõi công việc và lỗi của phần dự án được giao trong thời gian hợp đồng.',
       summary: 'Nhà thầu có thời hạn: quyền còn 20 ngày, đã vào cửa sổ Request tiếp tục (30 ngày).',
     }),
     r({
@@ -47,6 +50,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       termMonths: 2,
       target: 'COMPLETED',
       grant: 'POOL',
+      reason: 'Kiểm thử các API mới trước khi bàn giao cho nhóm ứng dụng di động.',
       summary: 'Quyền có thời hạn 60 ngày: cửa sổ Request tiếp tục chưa mở.',
     }),
     r({
@@ -56,6 +60,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       termMonths: 3,
       target: 'COMPLETED',
       grant: 'PURCHASE',
+      reason: 'Tra cứu tài liệu, soạn thảo và giải thích đoạn mã khó khi phát triển tính năng mới.',
       summary: 'Gói K1: luôn mua thêm một ghế khi cấp.',
     }),
     r({
@@ -65,6 +70,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       termMonths: null,
       target: 'COMPLETED',
       grant: 'KEY',
+      reason: 'Phát triển và gỡ lỗi mã bằng bộ IDE chuyên dụng cho nhiều ngôn ngữ của dự án.',
       summary: 'Gói K4: IT gán một khóa Trống của kho khóa cho người yêu cầu.',
     }),
     r({
@@ -73,7 +79,8 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'cursor-pro',
       termMonths: 3,
       target: 'WITHDRAWN',
-      summary: 'Người yêu cầu tự rút khi còn chờ.',
+      reason: 'Dùng trình soạn mã có AI để viết và rà soát mã nhanh hơn trong dự án cổng thanh toán.',
+      summary: 'Người yêu cầu tự rút khi còn chờ trưởng phòng duyệt nhu cầu, chưa có quyết định nào (QĐ-113d).',
     }),
     r({
       key: 'R04',
@@ -81,6 +88,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'canva-teams',
       termMonths: null,
       target: 'REJECTED',
+      reason: 'Thiết kế ấn phẩm và bài trình bày cho khách hàng của phòng Thiết kế.',
       summary: 'Trưởng phòng Thiết kế từ chối ở bước nhu cầu.',
     }),
     r({
@@ -89,6 +97,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'hr-portal-access',
       termMonths: null,
       target: 'AWAITING_EXECUTION',
+      reason: 'Xem phiếu lương, đăng ký nghỉ phép và cập nhật thông tin cá nhân trên cổng nhân sự.',
       summary: 'Phần mềm nội bộ không phí: đã duyệt nhu cầu, chờ IT Admin cấp, không kiểm tra ngân sách.',
     }),
     r({
@@ -102,6 +111,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       },
       termMonths: null,
       target: 'AWAITING_IT_ASSESSMENT',
+      reason: 'Dựng bảng vẽ cộng tác để phác thảo luồng sản phẩm cùng nhóm trong các buổi workshop.',
       summary: 'Đề xuất phần mềm ngoài danh mục: đã duyệt nhu cầu, chờ IT Admin thẩm định.',
     }),
     r({
@@ -115,6 +125,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       },
       termMonths: null,
       target: 'AWAITING_IT_ASSESSMENT',
+      reason: 'Vẽ nhanh sơ đồ luồng người dùng và wireframe để thống nhất giao diện với nhóm kỹ thuật.',
       summary: 'Đề xuất phần mềm ngoài danh mục thứ hai: IT có thể từ chối vì không kiểm soát được.',
     }),
     r({
@@ -124,6 +135,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'mailchimp-standard',
       termMonths: null,
       target: 'AWAITING_SPEND_SUBMISSION',
+      reason: 'Gửi email thông báo phát hành và cập nhật sản phẩm tới người dùng thử nghiệm.',
       summary:
         'Request nhóm do trưởng phòng gửi: không qua bước nhu cầu, nằm trong hàng trình lô của chính trưởng phòng.',
     }),
@@ -133,6 +145,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'cursor-pro',
       termMonths: 3,
       target: 'PENDING',
+      reason: 'Viết và tái cấu trúc mã nhanh hơn nhờ gợi ý của AI khi làm tính năng mới.',
       summary: 'Đang chờ trưởng phòng duyệt nhu cầu.',
     }),
     r({
@@ -141,6 +154,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'mailchimp-standard',
       termMonths: null,
       target: 'AWAITING_SPEND_SUBMISSION',
+      reason: 'Gửi bản tin kỹ thuật định kỳ tới nhóm người dùng đang thử nghiệm sản phẩm.',
       summary: 'Đã duyệt nhu cầu, nằm trong hàng trình lô của trưởng phòng.',
     }),
     r({
@@ -149,6 +163,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'github-team',
       termMonths: null,
       target: 'AWAITING_SPEND_DECISION',
+      reason: 'Quản lý mã nguồn và code review cho dự án cổng thanh toán.',
       summary: 'Lô đã trình, kiểm tra ngân sách: trong số cơ sở; đang chờ Người duyệt chi.',
     }),
     r({
@@ -158,6 +173,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       termMonths: null,
       target: 'AWAITING_EXECUTION',
       grant: 'PURCHASE',
+      reason: 'Lưu và chia sẻ an toàn mật khẩu, khóa truy cập của các môi trường thử nghiệm trong nhóm.',
       summary: 'Đã duyệt chi, chờ IT cấp: kho 1Password hết ghế nên IT phải mua thêm.',
     }),
     r({
@@ -167,6 +183,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       termMonths: null,
       target: 'AWAITING_EXECUTION',
       grant: 'PURCHASE',
+      reason: 'Truy vấn và tối ưu cơ sở dữ liệu khi phát triển module thanh toán.',
       summary: 'Đã duyệt chi, chờ IT cấp: kho khóa DataGrip hết, IT phải mua và nhập khóa.',
     }),
     r({
@@ -176,6 +193,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       termMonths: null,
       target: 'AWAITING_EXECUTION',
       grant: 'POOL',
+      reason: 'Tạo nhánh, gửi pull request và theo dõi kiểm tra tự động cho dự án ứng dụng di động.',
       summary: 'Đã duyệt chi, chờ IT cấp: kho GitHub còn ghế Trống nên cấp được ngay.',
     }),
     r({
@@ -185,6 +203,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       termMonths: 1,
       target: 'AWAITING_SPEND_DECISION',
       confirmReserve: true,
+      reason: 'Thiết kế banner và bài đăng mạng xã hội cho chiến dịch khuyến mãi Tết.',
       summary: 'Marketing: dùng dự phòng, trưởng phòng đã xác nhận kèm lý do; đang chờ Người duyệt chi.',
     }),
     r({
@@ -193,6 +212,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'postman-professional',
       termMonths: 1,
       target: 'RESERVE_UNCONFIRMED',
+      reason: 'Thử và chia sẻ API mô phỏng để thiết kế giao diện khớp với dữ liệu thật của nhóm kỹ thuật.',
       summary: 'Thiết kế: dùng dự phòng nhưng trưởng phòng chưa xác nhận nên chưa tới Người duyệt chi.',
     }),
     r({
@@ -201,6 +221,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'mailchimp-standard',
       termMonths: 1,
       target: 'BLOCKED',
+      reason: 'Gửi email chăm sóc khách hàng tiềm năng và thông báo ưu đãi cho khách hàng cũ.',
       summary: 'Kinh doanh: vượt cả dự phòng, bị chặn khi trình lô.',
     }),
     r({
@@ -209,6 +230,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'cursor-pro',
       termMonths: 3,
       target: 'AWAITING_SPEND_DECISION',
+      reason: 'Viết nhanh các đoạn mã mẫu và rà soát cách triển khai khi hỗ trợ nhóm kỹ thuật.',
       summary: 'Trưởng phòng tự gửi: một bước, không bước nhu cầu, thẳng tới Người duyệt chi.',
     }),
     r({
@@ -217,6 +239,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'slack-pro',
       termMonths: null,
       target: 'WAITING_CONTROLLED',
+      reason: 'Trao đổi nhanh với các phòng ban khi rà soát điều khoản hợp đồng và hồ sơ pháp lý.',
       summary:
         'Phòng chưa có trưởng phòng: Request trả phí chờ ở bước nhu cầu tới khi Super Admin gán trưởng phòng (QĐ-110i).',
     }),
@@ -226,6 +249,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'hr-portal-access',
       termMonths: null,
       target: 'COMPLETED',
+      reason: 'Tra cứu hồ sơ nhân sự khi soạn hợp đồng lao động cho các phòng ban.',
       summary:
         'Phần mềm nội bộ K5 của phòng chưa có trưởng phòng: không bước nhu cầu, IT cấp thẳng, Super Admin nhận cờ audit (QĐ-111bc).',
     }),
@@ -235,6 +259,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'slack-pro',
       termMonths: null,
       target: 'PENDING',
+      reason: 'Nhận và xử lý yêu cầu hỗ trợ từ nhân viên, phối hợp với nhóm hạ tầng qua các kênh chuyên trách.',
       summary: 'Request cá nhân của IT Admin đi qua trưởng phòng Công nghệ thông tin.',
     }),
     r({
@@ -250,6 +275,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       },
       termMonths: null,
       target: 'AWAITING_IT_ASSESSMENT',
+      reason: 'Thiết kế ấn phẩm marketing với thư viện thương hiệu dùng chung và phân quyền cho cả nhóm.',
       summary:
         'Case B rút gọn: ứng dụng Canva đã có trong danh mục, gói Canva Enterprise chưa có; chờ IT thẩm định (DEMO-1).',
     }),
@@ -264,6 +290,7 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       },
       termMonths: null,
       target: 'WAITING_CONTROLLED',
+      reason: 'Gửi và ký điện tử hợp đồng với đối tác để rút ngắn thời gian chờ chữ ký.',
       summary: 'Case B của phòng chưa có trưởng phòng: chờ ở bước nhu cầu tới khi có trưởng phòng (DEMO-2).',
     }),
     r({
@@ -272,6 +299,8 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'chatgpt-plus',
       termMonths: 9,
       target: 'AWAITING_SPEND_DECISION',
+      reason:
+        'Em cần ChatGPT để tra cứu và soạn tài liệu cho dự án thực tập. Nhờ anh chị duyệt giúp em, em đã báo mentor rồi, chi tiết ở drive.saoviet.vn.',
       summary:
         'Thực tập sinh hết hợp đồng sau 76 ngày xin K1 9 tháng: thời hạn bị cắt ở ngày hết hợp đồng (termCutAt, DEMO-3).',
     }),
@@ -281,20 +310,118 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
       plan: 'grammarly-pro',
       termMonths: 9,
       target: 'COMPLETED',
+      reason: 'Soát lỗi chính tả và văn phong cho tài liệu kỹ thuật và email tiếng Anh gửi đối tác.',
       summary: 'K1 9 tháng qua năm: năm nay giữ phần còn lại của năm, số năm sau đã lưu khi duyệt chi (DEMO-4).',
     }),
+    r({
+      key: 'R59',
+      requester: 'NV-DEV5',
+      plan: 'grammarly-business',
+      termMonths: 3,
+      target: 'AWAITING_SPEND_DECISION',
+      reason: 'Chuẩn hóa văn phong tiếng Anh trong tài liệu API gửi khách hàng.',
+      summary:
+        'Gói K1 chưa có thuê bao, chỉ có giá tham chiếu: số tiền Request tính từ giá của gói (QĐ-113a); trưởng phòng đã trình lô, chờ Người duyệt chi.',
+    }),
+    r({
+      key: 'R60',
+      requester: 'NV-DEV3',
+      plan: 'confluence-standard',
+      termMonths: null,
+      target: 'WITHDRAWN_AFTER_RETURN',
+      reason: 'Viết và lưu trữ tài liệu thiết kế, biên bản họp của dự án ở một nơi chung.',
+      summary:
+        'Trưởng phòng trả về bổ sung (chưa có quyết định nào), người yêu cầu không bổ sung nữa và tự rút (QĐ-113d).',
+    }),
   ],
-  keys: [{ subscription: 'jetbrains', count: 3 }],
+  keys: [
+    { subscription: 'jetbrains', count: 3 },
+    { subscription: 'visio-pro', count: 3 },
+    { subscription: 'sublime-license', count: 2 },
+  ],
   draft: { requester: 'NV-OPS1', plan: 'jira-standard', termMonths: null },
-  saasIssue: {
-    request: 'R01',
-    description: '[SV-ISSUE] Không mở được bộ sưu tập sau khi được thêm vào workspace.',
-  },
-  notice: {
-    sender: 'NV-ENGH',
-    employee: 'NV-DEV3',
-    kind: 'LONG_LEAVE',
-    proposedInDays: 14,
-    note: '[SV-NOTICE] Dự kiến nghỉ dài hạn, chờ căn cứ của phòng Nhân sự.',
-  },
+  saasIssues: [
+    {
+      key: 'ISSUE',
+      reporter: 'NV-DEV1',
+      plan: 'postman-professional',
+      end: 'NEW',
+      description: 'Không mở được bộ sưu tập sau khi được thêm vào workspace.',
+    },
+    {
+      key: 'ISSUE2',
+      reporter: 'NV-DEV5',
+      plan: 'confluence-standard',
+      end: 'IN_PROGRESS',
+      description: 'Không vào được trang tài liệu của nhóm.',
+      reporterReply: 'Đã thử lại bằng tài khoản công ty nhưng vẫn gặp lỗi.',
+    },
+    {
+      key: 'ISSUE3',
+      reporter: 'NV-ITO1',
+      plan: 'm365-basic',
+      end: 'RESOLVED',
+      description: 'Không kích hoạt được tài khoản Microsoft 365.',
+    },
+    {
+      key: 'ISSUE4',
+      reporter: 'NV-BOD1',
+      plan: 'zoom-pro',
+      end: 'REOPENED',
+      description: 'Không mở được cuộc họp bằng tài khoản công ty.',
+    },
+    {
+      key: 'ISSUE5',
+      reporter: 'NV-BOD4',
+      plan: 'adobe-cc-teams',
+      end: 'WAITING_PROVIDER',
+      description: 'Ứng dụng không nhận giấy phép của nhóm.',
+    },
+    {
+      key: 'ISSUE5B',
+      reporter: 'NV-BOD4',
+      plan: 'adobe-cc-teams',
+      end: 'DUPLICATE',
+      duplicateOf: 'ISSUE5',
+      description: 'Gửi lại lỗi giấy phép Adobe của cùng tài khoản.',
+    },
+  ],
+  notices: [
+    {
+      key: 'NOTICE',
+      sender: 'NV-ENGH',
+      employee: 'NV-DEV3',
+      kind: 'LONG_LEAVE',
+      proposedInDays: 14,
+      note: 'Dự kiến nghỉ dài hạn, chờ căn cứ của phòng Nhân sự.',
+    },
+    {
+      key: 'NOTICE2',
+      sender: 'NV-DESH',
+      employee: 'NV-DES7',
+      kind: 'LONG_LEAVE',
+      proposedInDays: 0,
+      handling: 'LINK',
+      note: 'Nghỉ dài hạn đã được phòng Nhân sự ghi nhận.',
+    },
+    {
+      key: 'NOTICE3',
+      sender: 'NV-DEP',
+      employee: 'NV-BOD5',
+      kind: 'DEPARTURE',
+      proposedInDays: 30,
+      handling: 'REJECT',
+      note: 'Dự kiến nghỉ việc, chưa có căn cứ xác nhận.',
+    },
+    {
+      key: 'NOTICE4',
+      sender: 'NV-ITOH',
+      employee: 'NV-ITO2',
+      kind: 'LONG_LEAVE',
+      proposedInDays: 0,
+      handling: 'RECORD',
+      returnInDays: 5,
+      note: 'Nghỉ dài hạn có quyết định và ngày trở lại sau năm ngày.',
+    },
+  ],
 };

@@ -30,7 +30,6 @@ const period = (extra: Partial<RenewalPeriodFacts> = {}): RenewalPeriodFacts => 
   applicationId: 'app',
   applicationName: 'Figma',
   applicationKind: 'SAAS',
-  ownerDepartmentId: null,
   responsibleItAdminEmployeeId: null,
   provisioningType: 'K2',
   commitmentTermMonths: 12,
@@ -88,8 +87,6 @@ describe('the order of the refusals of a recorded renewal (SBF-20 §4.4 steps 2,
 
   it('gives the adjustment of a subscription of the shared pool that is a live term the day the point has come', () => {
     expect(run({})).toEqual({ adjustment: adjustment() });
-    // A department that owns a K2 workspace keeps a point (a K2 of before the pool).
-    expect(run({ ownerDepartmentId: 'dep' })).toEqual({ adjustment: adjustment() });
   });
 
   it('names why a subscription has no renewal, in the order perpetual, internal, not a pool term, not active, continued (step 2)', () => {
@@ -101,7 +98,7 @@ describe('the order of the refusals of a recorded renewal (SBF-20 §4.4 steps 2,
       problem: 'NOT_RENEWABLE',
       details: { reason: 'INTERNAL' },
     });
-    expect(reason({ provisioningType: 'K1', ownerDepartmentId: 'dep' })).toEqual({
+    expect(reason({ provisioningType: 'K1' })).toEqual({
       problem: 'NOT_RENEWABLE',
       details: { reason: 'NOT_POOL_TERM' },
     });
@@ -342,7 +339,7 @@ describe('the point of adjustment read before a result is recorded (SBF-20 §5, 
   });
 
   it('names why a subscription has no point, with the same reasons as the write (K1, K4, K5 and the others)', () => {
-    expect(pointOf(period({ provisioningType: 'K1', ownerDepartmentId: 'dep' }), false)).toEqual({
+    expect(pointOf(period({ provisioningType: 'K1' }), false)).toEqual({
       refusal: { problem: 'NOT_RENEWABLE', details: { reason: 'NOT_POOL_TERM' } },
     });
     expect(pointOf(period({ kind: 'PERPETUAL', provisioningType: 'K4' }), false)).toEqual({

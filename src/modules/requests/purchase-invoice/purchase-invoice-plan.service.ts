@@ -123,7 +123,7 @@ export class PurchaseInvoicePlanService {
 
     return form.link.requestId !== undefined
       ? this.requestFacts(form.link.requestId, form.link.provisioningTaskId ?? null, scope, serviceMonth, tx)
-      : this.subscriptionFacts(form.link.subscriptionId as string, scope, tx);
+      : this.subscriptionFacts(form.link.subscriptionId as string, tx);
   }
 
   private async requestFacts(
@@ -203,13 +203,12 @@ export class PurchaseInvoicePlanService {
   }
 
   /**
-   * A subscription a department owns is named by the IT Admin of that department only (`D8`). One of the shared pool has no department, and its
-   * invoice comes from any IT Admin (`QĐ-111u`: every purchase has one, `QĐ-58b`: another IT Admin works in the place of the one who answers), so
-   * the route's role is its whole scope.
+   * The invoice of a subscription comes from any IT Admin (`QĐ-111u`: every purchase has one, `QĐ-58b`: another IT Admin works in the place of
+   * the one who answers): a subscription has no owning department, so the route's role is its whole scope.
    */
-  private async subscriptionFacts(subscriptionId: string, scope: readonly string[], tx?: DbTx): Promise<LinkFacts> {
+  private async subscriptionFacts(subscriptionId: string, tx?: DbTx): Promise<LinkFacts> {
     const [period] = await this.periods.getPurchaseFacts([subscriptionId], tx);
-    if (!period || (period.ownerDepartmentId !== null && !scope.includes(period.ownerDepartmentId))) {
+    if (!period) {
       throw new PurchaseInvoiceRefusedError('LINK_NOT_FOUND');
     }
     const vendorId = await this.catalog.getPlanVendorId(period.planId, tx);

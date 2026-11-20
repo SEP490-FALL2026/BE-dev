@@ -403,9 +403,9 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
       const draft = dataOf<PoolWire>(await create({ planId, kind: 'TERM' }).expect(201));
       // A period that continues `first`, written the way a renewal writes it: the link is set when the row is made.
       await h.ctx.sql.query(
-        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, owner_department_id, renewed_from_id, start_date, updated_at)
-         VALUES (gen_random_uuid(), $1, $2, 'TERM', $3, $4, '2027-03-15', now())`,
-        [h.seed.organizationId, planId, h.seed.departmentId, first.id],
+        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, renewed_from_id, start_date, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, 'TERM', $3, '2027-03-15', now())`,
+        [h.seed.organizationId, planId, first.id],
       );
 
       const notActive = await patch(draft.id, { isPrimaryForPlan: true }).expect(422);

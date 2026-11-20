@@ -92,7 +92,7 @@ const requestablePlanSummarySchema = z.strictObject({
     })
     .meta({
       description:
-        'Whether the department of the caller can price the plan, never the price itself. A missing price does not stop the request: the preview says it cannot go on to the spend step until the plan is priced.',
+        'Whether the department of the caller can price the plan, never the price itself: a plan with a subscription that has a price, or with a reference price of its own, is priced; NO_PRICED_SUBSCRIPTION means neither exists. A missing price does not stop the request: the preview says it cannot go on to the spend step until the plan is priced.',
     }),
   ...submission,
 });

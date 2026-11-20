@@ -29,6 +29,8 @@ interface RightWire {
  * withdrawing a simple request, all on the routes of the web with a mobile label. Real HTTP and PostgreSQL. The list of the
  * requests the Employee sent is not here: no route lists them yet (B-03), see the item spec.
  */
+afterEach(() => jest.restoreAllMocks());
+
 describe('the Employee on the phone: own software, own requests, send and withdraw a simple request (US-16-01, integration)', () => {
   let design: Department;
   let head: Person;
@@ -273,7 +275,7 @@ describe('the Employee on the phone: own software, own requests, send and withdr
       expect((await read(r1.id, e1.account)).state).toBe('PENDING');
     });
 
-    it('refuses while the grant is being carried out, and sends a granted request to the return on the web', async () => {
+    it('refuses once the grant is being carried out (a decision was taken), and sends a granted request to the return on the web', async () => {
       const person = await employee();
       const running = await approvedAndGranted(person);
       const other = await employee();
@@ -283,7 +285,8 @@ describe('the Employee on the phone: own software, own requests, send and withdr
       const whileRunning = await post(`/access-requests/${running.id}/withdraw`, person.account, {}).expect(409);
       const afterGrant = await post(`/access-requests/${done.id}/withdraw`, other.account, {}).expect(409);
 
-      expect(h.codeOf(whileRunning)).toBe('ACCESS_REQUEST.GRANT_RUNNING');
+      expect(h.codeOf(whileRunning)).toBe('ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION');
+      expect(h.detailsOf(whileRunning)).toEqual({ scope: 'REQUEST', state: 'EXECUTING' });
       expect((await read(running.id, person.account)).state).toBe('EXECUTING');
       expect(h.codeOf(afterGrant)).toBe('ACCESS_REQUEST.GRANT_COMPLETED');
       expect(h.detailsOf(afterGrant)).toEqual({ assignmentId: done.task.assignmentId });

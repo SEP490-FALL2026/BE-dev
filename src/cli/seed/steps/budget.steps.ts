@@ -1,7 +1,9 @@
-import { as, listAll, summarize, yearOf } from '../demo-step-kit';
+import { as, listAll, summarize, tag, yearOf } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
-import type { DemoNextYear } from '../fixture/demo-fixture.types';
+import type { DemoBudget, DemoNextYear } from '../fixture/demo-fixture.types';
 import { yesChecklist } from './checklist-kit';
+import { proposalFile, versionFile } from './budget-files';
+import { baseFor } from './budget-targets';
 import { uploadBudgetFile } from './file-kit';
 import { financePerson, money } from './finance-kit';
 
@@ -54,7 +56,7 @@ async function propose(
     ctx,
     to.headEmail,
     '/budget-proposals/attachments',
-    `BM-10-${plan.department}-${to.year}.pdf`,
+    await proposalFile(ctx, to.headEmail, plan, to.year),
   );
 
   return ctx.api.call(to.headEmail, 'POST', '/budget-proposals', {
@@ -69,7 +71,8 @@ async function propose(
 async function sendVersion(ctx: DemoRunContext, finance: string, versionId: string, label: string): Promise<unknown> {
   const files = await listAll<{ id: string }>(ctx, finance, `/budget-versions/${versionId}/attachments`);
   if (files.length === 0) {
-    await uploadBudgetFile(ctx, finance, `/budget-versions/${versionId}/attachments`, `phien-ban-${label}.pdf`);
+    const file = await versionFile(ctx, finance, versionId, `phien-ban-${label}.xlsx`);
+    await uploadBudgetFile(ctx, finance, `/budget-versions/${versionId}/attachments`, file);
   }
 
   return ctx.api.call(finance, 'POST', `/budget-versions/${versionId}/submission`);
@@ -92,7 +95,14 @@ async function decide(ctx: DemoRunContext, versionId: string, decision: 'APPROVE
  */
 async function turn(
   ctx: DemoRunContext,
-  plan: { department: string; amount: string; base: string; note?: string; reason?: string },
+  plan: {
+    department: string;
+    amount: string;
+    base: string;
+    note?: string;
+    reason?: string;
+    reserve?: { percent: number; reason: string };
+  },
   stage: DemoNextYear['stage'],
   year: number,
 ): Promise<Move> {
@@ -107,8 +117,14 @@ async function turn(
   if (proposal.state !== 'SUBMITTED') return { done: false, action: null };
 
   return act(ctx, 'Finance lập phiên bản', () =>
-    // The server sets the reserve to the default 10 % of the base; a different share would carry `reserveReason`.
-    ctx.api.call(finance, 'POST', '/budget-versions', { proposalId: proposal.id, base: money(plan.base) }),
+    // The server sets the reserve to the default 10 % of the base; a different share carries its `reserveReason` (the tag of the dataset first).
+    ctx.api.call(finance, 'POST', '/budget-versions', {
+      proposalId: proposal.id,
+      base: money(plan.base),
+      ...(plan.reserve
+        ? { reservePercent: plan.reserve.percent, reserveReason: `${tag(ctx, 'RESERVE')} ${plan.reserve.reason}` }
+        : {}),
+    }),
   );
 }
 
@@ -155,17 +171,39 @@ async function walk(
   return { status: 'conflict', detail: 'chuỗi ngân sách không tới được trạng thái cần' };
 }
 
+/**
+ * The base of a department of the year: counted from the day of the seed for the four that carry a light (SPEC S24), the fixture's amount for the
+ * others. A light a day cannot give (before June there is no `UNDER`) is named in the label and never a conflict.
+ */
+export function yearPlanOf(ctx: DemoRunContext, plan: DemoBudget): { base: string; label: string } {
+  const choice = baseFor(ctx.fixture, plan.department, ctx.today);
+  if (!choice) return { base: plan.base, label: '' };
+  const label = choice.reachable
+    ? ` (đèn ${choice.wanted})`
+    : ` (đèn ${choice.wanted} chưa đạt được ở ngày này, ra ${choice.light})`;
+
+  return { base: String(choice.base), label };
+}
+
 /** The approved budget of the year of every department with a Cost Center and a head, each through its whole chain. */
 async function currentYear(ctx: DemoRunContext): Promise<StepOutcome> {
   const year = yearOf(ctx).year;
   const results: Result[] = [];
   for (const plan of ctx.fixture.budgets) {
+    const { base, label } = yearPlanOf(ctx, plan);
+    const choice = baseFor(ctx.fixture, plan.department, ctx.today);
     const outcome = await walk(
       ctx,
-      () => turn(ctx, { ...plan, amount: plan.base }, 'APPROVED', year),
+      () =>
+        turn(
+          ctx,
+          { ...plan, base, amount: base, reserve: plan.reserve && choice ? plan.reserve : undefined },
+          'APPROVED',
+          year,
+        ),
       'ngân sách năm hiện hành đã được duyệt',
     );
-    results.push({ status: outcome.status, label: `${plan.department} ${year}: ${outcome.detail}` });
+    results.push({ status: outcome.status, label: `${plan.department} ${year}: ${outcome.detail}${label}` });
   }
 
   return summarize(results);

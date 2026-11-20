@@ -1,6 +1,6 @@
 import { as, listAll, summarize, tag, yearOf } from '../demo-step-kit';
-import { dayOffset } from '../demo-dates';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
+import { receiptPdf } from './pdf-builders';
 import { uploadDocument } from './file-kit';
 import { financePerson, money } from './finance-kit';
 
@@ -20,116 +20,11 @@ const subscriptionOf = (ctx: DemoRunContext, key: string) => {
   return found;
 };
 
+const vendorNameOf = (ctx: DemoRunContext, applicationKey: string): string =>
+  ctx.fixture.applications.find((application) => application.key === applicationKey)?.vendorName ?? applicationKey;
+
 const headOfCostCenter = (ctx: DemoRunContext, costCenterCode: string): string | null =>
   ctx.fixture.departments.find((department) => department.costCenter?.code === costCenterCode)?.head ?? null;
-
-/** DEMO-9: one contract per vendor, each holding its subscription (K2 Jira, K4 JetBrains All), with its signed file. */
-const CONTRACTS = [
-  { number: 'SV-HD-ATL-01', name: 'Hợp đồng Atlassian (Jira Software)', application: 'jira', subscriptions: ['jira'] },
-  {
-    number: 'SV-HD-JB-01',
-    name: 'Hợp đồng JetBrains (All Products)',
-    application: 'jetbrains',
-    subscriptions: ['jetbrains'],
-  },
-];
-
-async function contracts(ctx: DemoRunContext): Promise<StepOutcome> {
-  const results: Result[] = [];
-  for (const spec of CONTRACTS) {
-    const admin = await as(ctx, subscriptionOf(ctx, spec.subscriptions[0]).responsible);
-    const existing = await listAll<{ id: string; number: string | null }>(ctx, admin, '/contracts');
-    if (existing.some((row) => row.number === spec.number)) {
-      results.push({ status: 'present', label: spec.number });
-      continue;
-    }
-    if (ctx.mode === 'plan') {
-      results.push({ status: 'planned', label: spec.number });
-      continue;
-    }
-    const created = await ctx.api.call<{ contract: { id: string } }>(admin, 'POST', '/contracts', {
-      name: spec.name,
-      number: spec.number,
-      vendorId: ctx.ids.vendors.get(spec.application),
-      effectiveFrom: dayOffset(ctx.today, -200),
-      effectiveTo: dayOffset(ctx.today, 165),
-      note: `${tag(ctx, 'CONTRACT')} Hợp đồng khung một năm, gia hạn theo thuê bao.`,
-    });
-    const contractId = created.contract.id;
-    for (const key of spec.subscriptions) {
-      await ctx.api.call(admin, 'POST', `/contracts/${contractId}/subscriptions`, {
-        subscriptionId: ctx.ids.subscriptions.get(key),
-      });
-    }
-    const file = await uploadDocument(ctx, admin, 'CONTRACT_ATTACHMENT', `${spec.number}.pdf`);
-    await ctx.api.call(admin, 'POST', `/documents/${file}/attach`, { contractId });
-    results.push({ status: 'done', label: spec.number });
-  }
-
-  return summarize(results);
-}
-
-/**
- * DEMO-10/11: purchase invoices of the shared pool for the month of the seed, sent by the IT Admin in charge of the subscription and left in
- * each state: one waits for Finance's signature, one is signed, one returned, and one signed with more seats than were bought (12 against
- * 7), which opens a discrepancy case (`SBF-11a`).
- */
-const INVOICES = [
-  { number: 'SV-INV-001', subscription: 'jira', quantity: 10, target: 'SUBMITTED' },
-  { number: 'SV-INV-002', subscription: 'slack', quantity: 9, target: 'CONFIRMED' },
-  { number: 'SV-INV-003', subscription: 'github', quantity: 9, target: 'RETURNED' },
-  { number: 'SV-INV-004', subscription: 'postman', quantity: 12, target: 'CONFIRMED' },
-] as const;
-
-interface InvoiceRow {
-  id: string;
-  state: string;
-  vendorInvoiceNumber: string;
-}
-
-async function invoices(ctx: DemoRunContext): Promise<StepOutcome> {
-  const finance = await as(ctx, financePerson(ctx));
-  const existing = await listAll<InvoiceRow>(ctx, finance, '/purchase-invoices');
-  const results: Result[] = [];
-  for (const spec of INVOICES) {
-    const label = `${spec.number} → ${spec.target}`;
-    let row = existing.find((candidate) => candidate.vendorInvoiceNumber === spec.number);
-    if (row && (row.state === spec.target || row.state !== 'SUBMITTED')) {
-      results.push({ status: row.state === spec.target ? 'present' : 'conflict', label });
-      continue;
-    }
-    if (ctx.mode === 'plan') {
-      results.push({ status: 'planned', label });
-      continue;
-    }
-    if (!row) {
-      const subscription = subscriptionOf(ctx, spec.subscription);
-      const admin = await as(ctx, subscription.responsible);
-      const document = await uploadDocument(ctx, admin, 'PURCHASE_DOCUMENT', `${spec.number}.pdf`);
-      const price = BigInt(subscription.unitPrice.amount);
-      row = await ctx.api.call<InvoiceRow>(admin, 'POST', '/purchase-invoices', {
-        link: { subscriptionId: ctx.ids.subscriptions.get(spec.subscription) },
-        vendorInvoiceNumber: spec.number,
-        issuedOn: ctx.today,
-        servicePeriodMonth: ctx.today.slice(0, 7),
-        quantity: spec.quantity,
-        unitPriceOriginal: { amount: price.toString(), currency: 'VND' },
-        netAmount: money((price * BigInt(spec.quantity)).toString()),
-        paymentSource: 'COMPANY_CARD',
-        documentIds: [document],
-      });
-    }
-    if (spec.target === 'CONFIRMED') await ctx.api.call(finance, 'POST', `/purchase-invoices/${row.id}/confirmation`);
-    if (spec.target === 'RETURNED') {
-      await ctx.api.call(finance, 'POST', `/purchase-invoices/${row.id}/return`, {
-        reason: `${tag(ctx, spec.number)} Hóa đơn thiếu mã số thuế của nhà cung cấp; nộp lại bản đúng.`,
-      });
-    }
-    results.push({ status: 'done', label });
-  }
-
-  return summarize(results);
-}
 
 interface PeriodRow {
   id: string;
@@ -143,9 +38,28 @@ interface PeriodLine {
   explanationStatus: string;
 }
 
+export function quartersToSign(periods: readonly PeriodRow[]): PeriodRow[] {
+  const quarters = periods.filter((period) => period.kind === 'QUARTER').sort((a, b) => a.month - b.month);
+  return quarters.slice(0, -1).filter((period) => period.state !== 'SIGNED');
+}
+
+export function explanationMove(
+  lines: readonly PeriodLine[],
+): { kind: 'present' } | { kind: 'limited'; pending: number } | { kind: 'explain'; line: PeriodLine } {
+  const explained = lines.filter((line) => line.explanationStatus === 'EXPLAINED').length;
+  if (explained >= 2) return { kind: 'present' };
+  const pending = lines.filter((line) => line.costCenter !== null && line.explanationStatus === 'PENDING');
+  if (pending.length < 3 - explained) return { kind: 'limited', pending: pending.length };
+  const line =
+    pending.find((row) => row.costCenter?.code === 'CC-FIN') ??
+    pending.find((row) => row.costCenter?.code === 'CC-DES') ??
+    pending[0];
+  return { kind: 'explain', line };
+}
+
 /**
  * DEMO-12/13: Finance closes the months of the year that have ended, up to October (a quarter month opens explanations); in the last
- * quarter closed one head explains its line and the others wait; Finance does not sign.
+ * quarter closed two heads explain and at least one waits; Finance signs every older quarter.
  */
 async function reviews(ctx: DemoRunContext): Promise<StepOutcome> {
   const finance = await as(ctx, financePerson(ctx));
@@ -166,6 +80,16 @@ async function reviews(ctx: DemoRunContext): Promise<StepOutcome> {
     closed.push(await ctx.api.call<PeriodRow>(finance, 'POST', '/budget-review-periods', { year, month }));
     results.push({ status: 'done', label: `tháng ${month}` });
   }
+  for (const quarter of quartersToSign(closed)) {
+    if (ctx.mode === 'plan') results.push({ status: 'planned', label: `ký quý tháng ${quarter.month}` });
+    else {
+      await ctx.api.call(finance, 'POST', `/budget-review-periods/${quarter.id}/signature`, {
+        note: `${tag(ctx, 'REVIEW')} Ký kỳ quý đã qua.`,
+      });
+      quarter.state = 'SIGNED';
+      results.push({ status: 'done', label: `ký quý tháng ${quarter.month}` });
+    }
+  }
   const quarter = closed
     .filter((period) => period.kind === 'QUARTER' && period.state === 'AWAITING_EXPLANATIONS')
     .sort((a, b) => b.month - a.month)[0];
@@ -176,27 +100,36 @@ async function reviews(ctx: DemoRunContext): Promise<StepOutcome> {
 
 async function explainOne(ctx: DemoRunContext, finance: string, quarter: PeriodRow): Promise<Result> {
   const label = `giải trình quý (tháng ${quarter.month})`;
-  const detail = await ctx.api.call<{ items: PeriodLine[] }>(
-    finance,
-    'GET',
-    `/budget-review-periods/${quarter.id}?pageSize=100`,
-  );
-  const lines = detail.items.filter((line) => line.costCenter && headOfCostCenter(ctx, line.costCenter.code));
-  if (lines.some((line) => line.explanationStatus === 'EXPLAINED')) return { status: 'present', label };
-  const pending = lines.filter((line) => line.explanationStatus === 'PENDING');
-  // One head explains, at least one other is left waiting (DEMO-13); with a single line asked nothing is explained.
-  if (pending.length < 2) return { status: 'present', label: `${label}: ${pending.length} dòng chờ, không giải trình` };
-  if (ctx.mode === 'plan') return { status: 'planned', label };
-  const line = pending[0];
+  const written: string[] = [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const detail = await ctx.api.call<{ items: PeriodLine[] }>(
+      finance,
+      'GET',
+      `/budget-review-periods/${quarter.id}?pageSize=100`,
+    );
+    const lines = detail.items.filter((line) => line.costCenter && headOfCostCenter(ctx, line.costCenter.code));
+    const move = explanationMove(lines);
+    if (move.kind === 'present') return { status: written.length ? 'done' : 'present', label };
+    if (move.kind === 'limited')
+      return {
+        status: 'present',
+        label: `${label}: ${move.pending} dòng chờ, không đủ hai giải trình và một dòng còn chờ`,
+      };
+    if (ctx.mode === 'plan') return { status: 'planned', label };
+    await explainLine(ctx, quarter.id, move.line);
+    written.push(move.line.costCenter?.code ?? '?');
+  }
+  return { status: 'done', label: `${label}: ${written.join(', ')}` };
+}
+
+async function explainLine(ctx: DemoRunContext, quarterId: string, line: PeriodLine): Promise<void> {
   const head = await as(ctx, headOfCostCenter(ctx, line.costCenter?.code ?? '') ?? '');
-  await ctx.api.call(head, 'PUT', `/budget-review-periods/${quarter.id}/lines/${line.costCenter?.id}/explanation`, {
+  await ctx.api.call(head, 'PUT', `/budget-review-periods/${quarterId}/lines/${line.costCenter?.id}/explanation`, {
     cause: 'Mua thêm ghế cho người mới vào giữa quý, chưa có trong số đề xuất đầu năm.',
     persistence: 'ONE_OFF',
     action: 'Rà soát ghế không dùng trong tháng tới và thu hồi trước kỳ gia hạn.',
     knownNeedsToYearEnd: { amount: money('0'), note: 'Không có nhu cầu mới tới cuối năm.' },
   });
-
-  return { status: 'done', label: `${label}: ${line.costCenter?.code}` };
 }
 
 /**
@@ -256,6 +189,12 @@ interface DiscrepancyRow {
 }
 
 /**
+ * What Finance records as spent for the Jira that a Sales employee bought himself for two months (D-16): over the base and the reserve of
+ * Sales (290.000 + 29.000), so the department shows the red light; R11 of Sales stays blocked whatever this amount is.
+ */
+export const OUT_OF_PROCESS_SPENT = '400000';
+
+/**
  * DEMO-11 (`SBF-07a`): of the accounts the Jira usage file shows with no seat (`SBF-08`), the IT Admin of Jira sends NV-SAL1's out of
  * process (not a company asset), and Finance records what it cost with the receipt, charged to Sales: the case closes. The other account
  * and the unknown identity of the Figma file stay open (`SBF-08` keeps two values).
@@ -295,12 +234,19 @@ async function outOfProcess(ctx: DemoRunContext): Promise<StepOutcome> {
     caseId = decided.outOfProcessCaseId;
   }
   if (!caseId) return { status: 'conflict', detail: 'quyết định không mở ca ngoài quy trình' };
-  const receipt = await uploadDocument(ctx, finance, 'PURCHASE_DOCUMENT', 'bien-nhan-jira-ca-nhan.pdf');
+  const pdf = await receiptPdf({
+    number: 'bien-nhan-jira-ca-nhan',
+    vendor: vendorNameOf(ctx, 'jira'),
+    amount: OUT_OF_PROCESS_SPENT,
+    issuedOn: ctx.today,
+    note: 'Nhân viên Kinh doanh tự mua Jira hai tháng bằng thẻ cá nhân, Finance ghi phần đã chi theo biên nhận.',
+  });
+  const receipt = await uploadDocument(ctx, finance, 'PURCHASE_DOCUMENT', pdf);
   await ctx.api.call(finance, 'POST', `/out-of-process-cases/${caseId}/closure`, {
     outcome: 'RECORD_SPENT',
     note: `${tag(ctx, 'SBF07')} Ghi phần đã chi theo biên nhận, tính cho phòng Kinh doanh.`,
     documentIds: [receipt],
-    amount: money('200000'),
+    amount: money(OUT_OF_PROCESS_SPENT),
     costCenterId: ctx.ids.costCenters.get('SAL'),
   });
 
@@ -385,24 +331,6 @@ async function policyAgain(ctx: DemoRunContext): Promise<StepOutcome> {
 
 export const DEMO_STEPS: readonly DemoStep[] = [
   {
-    key: 'demo.contracts',
-    title: 'Hợp đồng gắn thuê bao K2 và K4, có tệp (IT Admin, DEMO-9)',
-    needs: ['catalog.subscriptions'],
-    run: contracts,
-  },
-  {
-    key: 'demo.purchase-invoices',
-    title: 'Hóa đơn mua: chờ ký, đã ký, bị trả, một hóa đơn lệch số lượng (IT Admin → Finance, DEMO-10/11)',
-    needs: ['catalog.subscriptions', 'org.accounts'],
-    run: invoices,
-  },
-  {
-    key: 'demo.budget-reviews',
-    title: 'Chốt số các tháng đã qua của năm, quý chờ giải trình (Finance, trưởng phòng; DEMO-12/13)',
-    needs: ['budget.year'],
-    run: reviews,
-  },
-  {
     key: 'demo.budget-adjustments',
     title: 'Điều chỉnh ngân sách năm khi kỳ đã khóa: Bổ sung chờ duyệt, Chuyển đã duyệt (DEMO-14)',
     needs: ['budget.year', 'org.approval-roles'],
@@ -431,5 +359,11 @@ export const DEMO_STEPS: readonly DemoStep[] = [
     title: 'Một chính sách xuất bản lại, chờ xác nhận lại (Super Admin)',
     needs: ['org.accounts'],
     run: policyAgain,
+  },
+  {
+    key: 'demo.budget-reviews',
+    title: 'Chốt tháng, ký quý cũ và hai giải trình ở quý mới nhất (Finance, trưởng phòng)',
+    needs: ['budget.year', 'demo.purchase-invoices', 'demo.out-of-process'],
+    run: reviews,
   },
 ];

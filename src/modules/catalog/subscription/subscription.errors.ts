@@ -12,14 +12,6 @@ export class SubscriptionPlanNotFoundError extends Error {
   }
 }
 
-/** The department named as the owner of a purchase does not exist or is no longer active (`QĐ-89a`). */
-export class SubscriptionOwnerDepartmentInactiveError extends Error {
-  constructor() {
-    super('The department that would own the subscription does not exist or is not active.');
-    this.name = 'SubscriptionOwnerDepartmentInactiveError';
-  }
-}
-
 /** The application of the plan is retired: a purchase of it is no longer declared (`US-04-01` AC-8, AC-9). */
 export class SubscriptionApplicationRetiredError extends Error {
   constructor() {
@@ -53,6 +45,14 @@ export class SubscriptionDatesInvalidError extends Error {
   constructor(readonly reason: string) {
     super('The dates are not in order.');
     this.name = 'SubscriptionDatesInvalidError';
+  }
+}
+
+/** The subscription changed after the client read it: its `updated_at` is no longer the one the edit was made on. */
+export class SubscriptionStaleError extends Error {
+  constructor(readonly currentUpdatedAt: Date) {
+    super('The subscription was changed by someone else since it was read: read it again before editing.');
+    this.name = 'SubscriptionStaleError';
   }
 }
 

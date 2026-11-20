@@ -39,6 +39,8 @@ export interface StatusFacts {
   departmentHeadEmployeeId: string | null;
   /** The IT Admin in charge of the department of the requester today, while they still work. */
   itAdminEmployeeId: string | null;
+  /** Who carries out the grant of the request: the IT Admin in charge of its department, or every usable IT Admin when none is usable. */
+  grantItAdminEmployeeIds: readonly string[];
   financeEmployeeId: string | null;
   superAdminEmployeeId: string | null;
   /** Who decided the step the event is about, and the reason they gave. */
@@ -69,6 +71,7 @@ export type FactNeed =
   | 'REQUEST'
   | 'DEPARTMENT_HEAD'
   | 'IT_ADMIN'
+  | 'GRANT_IT_ADMINS'
   | 'FINANCE'
   | 'SUPER_ADMIN'
   | 'DECISION'
@@ -85,6 +88,7 @@ export const NO_FACTS: StatusFacts = {
   request: null,
   departmentHeadEmployeeId: null,
   itAdminEmployeeId: null,
+  grantItAdminEmployeeIds: [],
   financeEmployeeId: null,
   superAdminEmployeeId: null,
   decision: null,

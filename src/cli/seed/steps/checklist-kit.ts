@@ -13,10 +13,10 @@ interface PolicyStep {
 /**
  * The checklist of a decision step (`QĐ-111ap`, PL-2) as the person answers it in the demo: the version of the policy in force at that step
  * (`GET /policies/{code}/steps/{stepCode}`, read at each decision so a version published meanwhile is the one answered) and every question
- * of the person answered Yes. The policy of a step is the one of its main flow: `1.6` → `POL-MF1`, `4.7` → `POL-MF4`, `5.4` → `POL-MF5`.
+ * of the person answered Yes. SaaS assessment (1.3) belongs to POL-SAAS; the remaining steps belong to their main flow.
  */
 export async function yesChecklist(ctx: DemoRunContext, email: string, stepCode: string): Promise<ChecklistBody> {
-  const policy = `POL-MF${stepCode.split('.')[0]}`;
+  const policy = stepCode === '1.3' ? 'POL-SAAS' : `POL-MF${stepCode.split('.')[0]}`;
   const read = await ctx.api.call<PolicyStep>(email, 'GET', `/policies/${policy}/steps/${stepCode}`);
 
   return {

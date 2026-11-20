@@ -116,6 +116,16 @@ export const firstPlacementBodySchema = z.strictObject({
   departmentId: z.uuid(),
   effectiveFrom: businessDateSchema('effectiveFrom must be a real date as YYYY-MM-DD.'),
 });
+/**
+ * The correction of the first placement (`QĐ-113e`): a department and/or a day, and the reason, which is kept in the Audit Trail. A body with
+ * neither the department nor the day is refused by the service (EMPLOYEE.UPDATE_EMPTY).
+ */
+export const correctFirstPlacementBodySchema = z.strictObject({
+  departmentId: z.uuid().optional(),
+  effectiveFrom: businessDateSchema('effectiveFrom must be a real date as YYYY-MM-DD.').optional(),
+  reason: z.string().normalize('NFC').trim().min(1).max(500),
+});
+export class CorrectFirstPlacementBodyDto extends createZodDto(correctFirstPlacementBodySchema) {}
 export class FirstPlacementBodyDto extends createZodDto(firstPlacementBodySchema) {}
 
 export class CreateEmployeeBodyDto extends createZodDto(createEmployeeBodySchema) {}

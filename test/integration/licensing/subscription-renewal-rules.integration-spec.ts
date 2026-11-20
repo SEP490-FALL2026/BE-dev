@@ -63,7 +63,7 @@ describe('who records and reads a renewal and what is refused (integration, real
   };
 
   describe('who reads the cases (QĐ-94d(2), SoD-2)', () => {
-    it('gives the IT Admin and Finance every case, a head only the cases of their department, and the others none', async () => {
+    it('gives the IT Admin and Finance every case, and the others none, a head of a department included', async () => {
       const unit = await h.unit(1);
       const other = await h.unit(1);
       const mine = await renewed(unit);
@@ -75,18 +75,19 @@ describe('who records and reads a renewal and what is refused (integration, real
 
       expect(await idsOf(h.it1)).toEqual(expect.arrayContaining([mine.id, theirs.id]));
       expect(await idsOf(h.finance)).toEqual(expect.arrayContaining([mine.id, theirs.id]));
-      const headSees = await idsOf(unit.head.account);
-      expect(headSees).toContain(mine.id);
-      expect(headSees).not.toContain(theirs.id);
-      await h.read(mine.id, unit.head.account).expect(200);
-      expect(h.codeOf(await h.read(theirs.id, unit.head.account).expect(404))).toBe('SUBSCRIPTION_RENEWAL.NOT_FOUND');
-      for (const account of [h.boss.account, h.employee, unit.members[0].account, h.bystander.account]) {
+      for (const account of [
+        unit.head.account,
+        h.boss.account,
+        h.employee,
+        unit.members[0].account,
+        h.bystander.account,
+      ]) {
         expect(h.codeOf(await h.renewals('', account).expect(403))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
         expect(h.codeOf(await h.read(mine.id, account).expect(403))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
       }
     });
 
-    it('shows the head the holder by code and name and no email, and proposes no seat to take back; Finance does not read the seats', async () => {
+    it('shows the IT Admin the holder by code and name and no email, and proposes no seat to take back; Finance does not read the seats', async () => {
       const seatUnit = await h.unit(3);
       const { subscriptionId } = await h.termWithSeats(seatUnit, 20, { quantity: 5, ...year() });
       const { id } = await h.recordedRenewal({
@@ -106,8 +107,8 @@ describe('who records and reads a renewal and what is refused (integration, real
         pagination: { totalItems: number };
       };
 
-      const all = h.dataOf<Ranking>(await h.ranking(id, seatUnit.head.account).expect(200));
-      const proposed = h.dataOf<Ranking>(await h.ranking(id, seatUnit.head.account, '?proposedOnly=true').expect(200));
+      const all = h.dataOf<Ranking>(await h.ranking(id, h.it1).expect(200));
+      const proposed = h.dataOf<Ranking>(await h.ranking(id, h.it1, '?proposedOnly=true').expect(200));
 
       expect(all.pagination.totalItems).toBe(3);
       // The system counts the seats: no seat is chosen for a reduction any more (the route is deprecated).
@@ -119,8 +120,9 @@ describe('who records and reads a renewal and what is refused (integration, real
       }
       expect(JSON.stringify(all)).not.toMatch(/@acme\.vn/);
       expect(h.codeOf(await h.ranking(id, h.finance).expect(403))).toBe('SUBSCRIPTION_RENEWAL.READ_FORBIDDEN');
-      const otherHead = (await h.unit(1)).head.account;
-      expect(h.codeOf(await h.ranking(id, otherHead).expect(404))).toBe('SUBSCRIPTION_RENEWAL.NOT_FOUND');
+      expect(h.codeOf(await h.ranking(id, seatUnit.head.account).expect(403))).toBe(
+        'SUBSCRIPTION_RENEWAL.READ_FORBIDDEN',
+      );
     });
 
     it('shows Finance the snapshot of the decision and hides it from the IT Admin who decided it (L-617)', async () => {
@@ -151,9 +153,7 @@ describe('who records and reads a renewal and what is refused (integration, real
     });
 
     it('does not wait for a head or a Cost Center: a department with none is recorded at once and nobody is asked (QĐ-93c, QĐ-94m(2))', async () => {
-      const bare = await h.bareDepartment();
       const subscriptionId = await h.term({
-        ownerDepartmentId: bare.id,
         quantity: 10,
         ...year(),
         noticeDeadline: h.inDays(20),
@@ -199,11 +199,10 @@ describe('who records and reads a renewal and what is refused (integration, real
     it('refuses a subscription that has no point of adjustment, with the reason, and a period no date gives a point to', async () => {
       const unit = await h.unit(1);
       const dated = await h.termWithSeats(unit, 20, { quantity: 1, ...year() });
-      const undated = await h.term({ ownerDepartmentId: unit.department.id, autoRenew: true });
+      const undated = await h.term({ autoRenew: true });
       const draft = await h.draftSubscription();
       const perpetual = await h.perpetual();
       const withDepartment = await h.term({
-        ownerDepartmentId: unit.department.id,
         type: 'K1',
         billingCycle: 'MONTHLY',
         ...year(),

@@ -338,11 +338,30 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       expect(retired.every((item) => item.status === 'INACTIVE')).toBe(true);
     });
 
+    it('keeps the starting department out of an IT Admin list unless named for it, and shows the Super Admin every one', async () => {
+      const starting = await newDepartment();
+      await h.ctx.sql.query('UPDATE departments SET is_starting = true WHERE id = $1', [starting.id]);
+      const listOf = async (headers: Record<string, string>) =>
+        (
+          (await api().get(`/api/v1/departments?search=${starting.code.toLowerCase()}`).set(headers).expect(200))
+            .body as { data: { items: DepartmentWire[]; pagination: { totalItems: number } } }
+        ).data;
+
+      const seenByIt = await listOf(asIt());
+      const seenByAdmin = await listOf(asAdmin());
+
+      expect(seenByIt.items).toHaveLength(0);
+      expect(seenByIt.pagination.totalItems).toBe(0);
+      expect(seenByAdmin.items.map((item) => item.id)).toEqual([starting.id]);
+      expect(seenByAdmin.items[0]).toMatchObject({ starting: true });
+      await api().get(`/api/v1/departments/${starting.id}`).set(asIt()).expect(404);
+    });
+
     it('shows the IT Admin and the Super Admin the warnings, and nobody else (SoD-1)', async () => {
       const department = await newDepartment();
 
       for (const headers of [asIt(), asAdmin()]) {
-        const response = await api().get('/api/v1/department-warnings').set(headers).expect(200);
+        const response = await api().get('/api/v1/department-warnings?pageSize=100').set(headers).expect(200);
         const items = (response.body as { data: { items: { departmentId: string; warning: string }[] } }).data.items;
 
         expect(
@@ -362,7 +381,7 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
 
       await assignHead(department.id, member.employeeId).expect(200);
 
-      const response = await api().get('/api/v1/department-warnings').set(asIt()).expect(200);
+      const response = await api().get('/api/v1/department-warnings?pageSize=100').set(asIt()).expect(200);
       const items = (response.body as { data: { items: { departmentId: string }[] } }).data.items;
       expect(items.some((item) => item.departmentId === department.id)).toBe(false);
     });
@@ -378,20 +397,16 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       const error = (response.body as { error: { code: string; message: string; details: Record<string, unknown> } })
         .error;
       expect(error.code).toBe('DEPARTMENT.IN_USE');
-      expect(error.message).toBe(
-        'The department still has members, service accounts, open work or subscriptions that owe a payment.',
-      );
-      // Members, the service accounts the department owns (QĐ-86c), open work and the subscriptions that owe a payment (US-03-06
+      expect(error.message).toBe('The department still has members, service accounts, or open work.');
+      // Members, the service accounts the department owns (QĐ-86c), and open work (US-03-06
       // AC-19, QĐ-90e), each with its total. Shared accounts are out of scope since QĐ-75, so that key is absent.
       expect(Object.keys(error.details).sort()).toEqual([
         'members',
         'openWork',
         'serviceAccounts',
-        'subscriptions',
         'totalMembers',
         'totalOpenWork',
         'totalServiceAccounts',
-        'totalSubscriptions',
       ]);
       expect(Object.hasOwn(error.details, 'sharedAccounts')).toBe(false);
       expect(response.text).not.toContain('sharedAccounts');
@@ -402,16 +417,13 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
         serviceAccounts: [],
         openWork: [],
         totalOpenWork: 0,
-        subscriptions: [],
-        totalSubscriptions: 0,
       });
       expect((await getDepartment(department.id)).status).toBe('ACTIVE');
       expect(await auditOf(department.id)).toHaveLength(1);
     });
 
-    it.each<[string, 'openWork' | 'subscriptions', string]>([
+    it.each<[string, 'openWork', string]>([
       ['a Request that is not over, a personnel event waiting or an open task', 'openWork', 'ACCESS_REQUEST'],
-      ['a subscription or a purchase that still owes a payment', 'subscriptions', 'SUBSCRIPTION'],
     ])('is refused while it has %s, listing it with its total (QĐ-90e, F15)', async (_name, group, kind) => {
       const department = await newDepartment();
       h.useFacts[group] = Array.from({ length: 21 }, (_unused, index) => ({
@@ -425,7 +437,7 @@ describe('department profiles, heads and the MANAGER role over HTTP (integration
       );
 
       const details = error.details as Record<string, unknown>;
-      const total = group === 'openWork' ? 'totalOpenWork' : 'totalSubscriptions';
+      const total = 'totalOpenWork';
       expect(error.code).toBe('DEPARTMENT.IN_USE');
       expect(details[total]).toBe(21);
       expect(details[group]).toHaveLength(20);

@@ -3,6 +3,8 @@ import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
 
+afterEach(() => jest.restoreAllMocks());
+
 describe('what the people of a group are told, each of what became of them alone, over PostgreSQL (US-05-15 AC-9, US-05-17)', () => {
   let subscriptionId: string;
   let paid: string;

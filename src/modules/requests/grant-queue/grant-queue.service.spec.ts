@@ -21,7 +21,7 @@ const waiting: WaitingRequestRow = {
   state: 'WAITING',
   withdrawing: false,
 };
-const person = (id: string) => ({ id, employeeCode: `E-${id}`, fullName: id });
+const person = (id: string) => ({ id, employeeCode: `E-${id}`, fullName: id, workEmail: `${id}@congty.vn` });
 const plan = { planId: 'p1', planName: 'Teams', applicationName: 'Slack', applicationLogoUrl: null };
 const department = { id: 'd1', name: 'Design' };
 

@@ -1,63 +1,9 @@
 import type { DemoApplication, DemoFixture, DemoPlan, DemoSeat, DemoSubscription } from '../demo-fixture.types';
-
-const k2 = (key: string, name: string, extra: Partial<DemoPlan> = {}): DemoPlan => ({
-  key,
-  name,
-  provisioningType: 'K2',
-  controlLevel: 'FULL',
-  dataLossOnRemoval: false,
-  sharingPolicy: 'NOT_ALLOWED',
-  ...extra,
-});
-
-const k4 = (key: string, name: string, extra: Partial<DemoPlan> = {}): DemoPlan => ({
-  key,
-  name,
-  provisioningType: 'K4',
-  controlLevel: 'FULL',
-  dataLossOnRemoval: false,
-  sharingPolicy: 'NOT_ALLOWED',
-  ...extra,
-});
-
-const app = (
-  key: string,
-  name: string,
-  vendorName: string,
-  plans: DemoPlan[],
-  kind: DemoApplication['kind'] = 'SAAS',
-  dataSensitivity: DemoApplication['dataSensitivity'] = 'MEDIUM',
-): DemoApplication => ({ key, name, kind, vendorName, dataSensitivity, functionalGroup: groupOf(key), plans });
-
-/**
- * The seven functional groups the installation writes (`functional-group-standard.policy.ts`), each holding at least one application of the
- * dataset (C-O5): the catalog screen and the dashboards show every group.
- */
-export const FUNCTIONAL_GROUPS: readonly (readonly [application: string, group: string])[] = [
-  ['chatgpt', 'Trợ lý AI'],
-  ['cursor', 'Trợ lý AI'],
-  ['figma', 'Thiết kế & sáng tạo'],
-  ['canva', 'Thiết kế & sáng tạo'],
-  ['jira', 'Lập trình & kỹ thuật'],
-  ['github', 'Lập trình & kỹ thuật'],
-  ['postman', 'Lập trình & kỹ thuật'],
-  ['jetbrains', 'Lập trình & kỹ thuật'],
-  ['onepassword', 'Văn phòng & cộng tác'],
-  ['grammarly', 'Văn phòng & cộng tác'],
-  ['mailchimp', 'Chuyên ngành'],
-  ['hr-portal', 'Khác'],
-  ['slack', 'Liên lạc (email, chat, họp)'],
-];
-
-function groupOf(key: string): string {
-  const group = FUNCTIONAL_GROUPS.find(([application]) => application === key)?.[1];
-  if (!group) throw new Error(`The application ${key} names no functional group`);
-
-  return group;
-}
+import { EXTRA_APPLICATIONS, EXTRA_SEATS, EXTRA_SUBSCRIPTIONS, PLAN_TERMS } from './catalog-extra';
+import { app, groupOf, k2, k4, monthly } from './catalog-kit';
 
 /*
- * Thirteen applications. Each (application, plan) has exactly one subscription, the stock of the shared pool (`QĐ-103d`): K2 plans have
+ * The thirteen applications of the first dataset (twelve more are in `catalog-extra.ts`). Each (application, plan) has exactly one subscription, the stock of the shared pool (`QĐ-103d`): K2 plans have
  * seats Free to grant (Postman, Slack, GitHub, Mailchimp, Canva, Jira, Figma) and one plan is sold out (1Password); K1 plans are bought
  * on each grant; K4 plans draw from a key store (JetBrains has keys, DataGrip has none); K5 is internal software.
  *
@@ -134,6 +80,16 @@ const APPLICATIONS: DemoApplication[] = [
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
       },
+      // A K1 plan with no subscription at all, only a reference price: a request for it is priced from the plan (`QĐ-113a`, R59).
+      {
+        key: 'grammarly-business',
+        name: 'Grammarly Business',
+        provisioningType: 'K1',
+        controlLevel: 'PARTIAL',
+        dataLossOnRemoval: false,
+        sharingPolicy: 'NOT_ALLOWED',
+        referencePrice: '360000',
+      },
     ],
     'SAAS',
     'MEDIUM',
@@ -154,26 +110,8 @@ const APPLICATIONS: DemoApplication[] = [
   },
 ];
 
-const monthly = (
-  key: string,
-  plan: string,
-  amount: string,
-  responsible: string,
-  freeAfterBaseline: number,
-): DemoSubscription => ({
-  key,
-  plan,
-  kind: 'TERM',
-  unitPrice: { amount, currency: 'VND' },
-  billingCycle: 'MONTHLY',
-  termMonths: 1,
-  noticePeriodDays: 30,
-  responsible,
-  freeAfterBaseline,
-});
-
 const SUBSCRIPTIONS: DemoSubscription[] = [
-  monthly('jira', 'jira-standard', '200000', 'NV-ITA1', 4),
+  { ...monthly('jira', 'jira-standard', '200000', 'NV-ITA1', 4), renewalInDays: 20 },
   // The annual one: 12 months of commitment, renewing in 50 days; a seat costs 4.500.000 a year, 375.000 a month.
   {
     key: 'figma',
@@ -187,25 +125,24 @@ const SUBSCRIPTIONS: DemoSubscription[] = [
     responsible: 'NV-ITA2',
     freeAfterBaseline: 4,
   },
-  monthly('slack', 'slack-pro', '180000', 'NV-ITA1', 6),
-  monthly('github', 'github-team', '100000', 'NV-ITA1', 5),
-  monthly('onepassword', 'onepassword-business', '200000', 'NV-ITA1', 0),
-  monthly('postman', 'postman-professional', '300000', 'NV-ITA1', 5),
+  { ...monthly('slack', 'slack-pro', '180000', 'NV-ITA1', 6), renewalInDays: 20 },
+  { ...monthly('github', 'github-team', '100000', 'NV-ITA1', 5), renewalInDays: 20 },
+  { ...monthly('onepassword', 'onepassword-business', '200000', 'NV-ITA1', 0), renewalInDays: 20 },
+  { ...monthly('postman', 'postman-professional', '300000', 'NV-ITA1', 5), renewalInDays: 20 },
   // The IT Admin who leaves answers for it: his departure hands it over (P5).
-  monthly('mailchimp', 'mailchimp-standard', '400000', 'NV-ITA4', 4),
-  monthly('canva', 'canva-teams', '250000', 'NV-ITA2', 4),
+  { ...monthly('mailchimp', 'mailchimp-standard', '400000', 'NV-ITA4', 4), renewalInDays: 20 },
+  { ...monthly('canva', 'canva-teams', '250000', 'NV-ITA2', 4), renewalInDays: 20 },
   // K1: bought one by one when a seat is granted, so ChatGPT and Cursor start with none (the MF-5 reduction flows count their seats).
-  { ...monthly('chatgpt', 'chatgpt-plus', '500000', 'NV-ITA1', 0), quantity: 0, ownerDepartment: 'ENG' },
+  { ...monthly('chatgpt', 'chatgpt-plus', '500000', 'NV-ITA1', 0), quantity: 0 },
   // The vendor quotes 20 USD; a price is written in dong (`QĐ-111an`), so it is 508.000 (at the 25.400 the dataset used to record) and the
   // dollar quote stays beside it as the original price (FX-1, D-45).
   {
     ...monthly('cursor', 'cursor-pro', '508000', 'NV-ITA1', 0),
     quantity: 0,
-    ownerDepartment: 'ENG',
     originalPrice: { amount: '20', currency: 'USD' },
   },
   // The K1 plan of the person who leaves today: its one seat is his, so his revocation shows the K1 checklist (D-62).
-  { ...monthly('grammarly', 'grammarly-pro', '300000', 'NV-ITA1', 0), quantity: 1, ownerDepartment: 'ENG' },
+  { ...monthly('grammarly', 'grammarly-pro', '300000', 'NV-ITA1', 0), quantity: 1 },
   // K4: a key is bought once; the keys sit in the key store. JetBrains has three, DataGrip none.
   {
     key: 'jetbrains',
@@ -270,8 +207,32 @@ const SEATS: DemoSeat[] = [
   ...seat('grammarly', ['NV-OFF1']),
 ];
 
-export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats'> = {
-  applications: APPLICATIONS,
-  subscriptions: SUBSCRIPTIONS,
-  seats: SEATS,
+/**
+ * The reference price of every paid plan (`QĐ-113a`): the price of one seat for a month of the subscription of the plan (a yearly price over 12, rounded
+ * up to the dong), or the price of one key (K4). A plan the fixture gave a price by hand (a plan with no subscription) keeps it; K5 has none.
+ */
+function withReferencePrices(
+  applications: readonly DemoApplication[],
+  subscriptions: readonly DemoSubscription[],
+): DemoApplication[] {
+  const priced = (plan: DemoPlan): DemoPlan => {
+    const subscription = subscriptions.find((candidate) => candidate.plan === plan.key);
+    if (plan.provisioningType === 'K5' || plan.referencePrice !== undefined || !subscription) return plan;
+    const amount = BigInt(subscription.unitPrice.amount);
+    const perMonth = subscription.billingCycle === 'ANNUAL' ? (amount + 11n) / 12n : amount;
+
+    return { ...plan, referencePrice: String(plan.provisioningType === 'K4' ? amount : perMonth) };
+  };
+
+  return applications.map((application) => ({ ...application, plans: application.plans.map(priced) }));
+}
+
+export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats' | 'planTerms'> = {
+  applications: withReferencePrices(
+    [...APPLICATIONS, ...EXTRA_APPLICATIONS],
+    [...SUBSCRIPTIONS, ...EXTRA_SUBSCRIPTIONS],
+  ),
+  subscriptions: [...SUBSCRIPTIONS, ...EXTRA_SUBSCRIPTIONS],
+  seats: [...SEATS, ...EXTRA_SEATS],
+  planTerms: PLAN_TERMS,
 };

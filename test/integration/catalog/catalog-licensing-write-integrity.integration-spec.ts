@@ -393,7 +393,7 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
         request(h.server())
           .post('/api/v1/subscriptions')
           .set(as())
-          .send({ ownerDepartmentId: h.seed.departmentId, planId: k4, ...body });
+          .send({ planId: k4, ...body });
       const before = (await sql().query<{ n: number }>(`SELECT count(*)::int AS n FROM subscriptions`)).rows[0].n;
 
       const term = await declare({
@@ -412,7 +412,6 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
     it('CT-1: refuses to leave K4 while a perpetual purchase of an application that is not licensed hangs on it, and lets a licensed one go', async () => {
       const perpetual = (planId: string) =>
         declareSubscription(h.ctx, h.it1.accessToken, {
-          ownerDepartmentId: h.seed.departmentId,
           planId,
           kind: 'PERPETUAL',
           startDate: '2026-03-15',

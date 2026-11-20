@@ -109,10 +109,10 @@ describe('the cost avoided by a grant from the pool, and the grant that names no
     const declare = async (quantity: number, price: string) =>
       (
         await h.ctx.sql.query<{ id: string }>(
-          `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity,
+          `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity,
              unit_price_minor, unit_price_currency, price_recorded_on, billing_cycle, commitment_term_months, start_date,
              responsible_it_admin_employee_id, updated_at, price_rate, price_rate_date, price_rate_source, price_reporting_minor, price_reporting_currency)
-           SELECT gen_random_uuid(), s.organization_id, $1, s.owner_department_id, 'TERM', 'ACTIVE', $2, $3::bigint, 'VND', '2026-01-05',
+           SELECT gen_random_uuid(), s.organization_id, $1, 'TERM', 'ACTIVE', $2, $3::bigint, 'VND', '2026-01-05',
                   'MONTHLY', 1, '2026-01-05', s.responsible_it_admin_employee_id, now(), s.price_rate, s.price_rate_date,
                   s.price_rate_source, $3::bigint, s.price_reporting_currency
              FROM subscriptions s WHERE s.id = (SELECT id FROM subscriptions WHERE price_rate IS NOT NULL LIMIT 1)

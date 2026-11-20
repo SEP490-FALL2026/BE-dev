@@ -106,9 +106,9 @@ describe('the preview of a departure and of a transfer (integration, real Postgr
     dest = await h.departmentWithHead('P-PV-DEST');
     await h.setItAdminInCharge(des.department, { employeeId: it1.employeeId, account: it1 });
     await h.setItAdminInCharge(dest.department, { employeeId: it1.employeeId, account: it1 });
-    k1 = await h.subscription(40, 'K1', des.department.id);
-    k2 = await h.subscription(40, 'K2', des.department.id);
-    k2b = await h.subscription(40, 'K2', des.department.id);
+    k1 = await h.subscription(40, 'K1');
+    k2 = await h.subscription(40, 'K2');
+    k2b = await h.subscription(40, 'K2');
     internal = await h.plan('K5');
   }, 300000);
 

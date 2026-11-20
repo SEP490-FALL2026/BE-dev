@@ -104,14 +104,14 @@ describe('license keys (integration, PostgreSQL constraints)', () => {
     );
     subscriptionId = randomUUID();
     await sql.query(
-      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity)
-       VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'PERPETUAL', 'DRAFT', 50)`,
+      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity)
+       VALUES ($1, $2, $3, 'PERPETUAL', 'DRAFT', 50)`,
       [subscriptionId, organizationId, planId],
     );
     otherSubscriptionId = randomUUID();
     await sql.query(
-      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity)
-       VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'PERPETUAL', 'DRAFT', 10)`,
+      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity)
+       VALUES ($1, $2, $3, 'PERPETUAL', 'DRAFT', 10)`,
       [otherSubscriptionId, organizationId, planId],
     );
   }, 90000);

@@ -233,10 +233,10 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
         `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
            normalized_account_identifier, valid_from, valid_until, valid_from_basis, owning_department_id, created_by_app_user_id)
          SELECT gen_random_uuid(), s.organization_id, 'PERSONAL', 'REQUEST', s.plan_id, s.id, e.id, e.work_email, e.work_email,
-                '2026-01-05', '2026-12-01', 'RECORDED', s.owner_department_id, gen_random_uuid()
+                '2026-01-05', '2026-12-01', 'RECORDED', $3::uuid, gen_random_uuid()
            FROM subscriptions s JOIN employees e ON e.id = $2 WHERE s.plan_id = $1 LIMIT 1
          RETURNING id`,
-        [plans[0], who.employeeId],
+        [plans[0], who.employeeId, h.seed.departmentId],
       );
       await h.ctx.sql.query('BEGIN');
       try {
@@ -354,9 +354,9 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
           `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
              normalized_account_identifier, valid_from, valid_from_basis, owning_department_id, created_by_app_user_id)
            SELECT gen_random_uuid(), s.organization_id, 'PERSONAL', 'REQUEST', s.plan_id, s.id, e.id, e.work_email, e.work_email,
-                  '2026-01-05', 'RECORDED', s.owner_department_id, gen_random_uuid()
+                  '2026-01-05', 'RECORDED', $3::uuid, gen_random_uuid()
              FROM subscriptions s JOIN employees e ON e.id = $2 WHERE s.plan_id = $1 LIMIT 1`,
-          [planId, e7.employeeId],
+          [planId, e7.employeeId, h.seed.departmentId],
         );
       }
       fresh = await h.planOf(await h.subscription(20));

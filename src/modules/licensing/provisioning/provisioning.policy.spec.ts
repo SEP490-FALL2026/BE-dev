@@ -120,6 +120,20 @@ describe('the account of a grant is the company account (US-07-01 AC-9, FR-2.9)'
   });
 
   it.each([
+    ['empty', ''],
+    ['only spaces', '   '],
+  ])('takes the work email when the address named is %s', (_name, requested) => {
+    expect(chooseAccount({ workEmail: 'e1@congty.vn', requested, companyDomains: DOMAINS })).toBe('e1@congty.vn');
+  });
+
+  it('refuses a blank address when the person has no work email', () => {
+    for (const requested of ['', '   '])
+      expect(() => chooseAccount({ workEmail: null, requested, companyDomains: DOMAINS })).toThrow(
+        ProvisioningPersonalAccountError,
+      );
+  });
+
+  it.each([
     ['a personal address', 'e1.private@gmail.com'],
     ['an address of another company', 'e1@khac.vn'],
     ['a name that is not an email', 'e1'],

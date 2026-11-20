@@ -11,7 +11,6 @@ import { bearer, createHttpContractApp, principal } from '../../support/http-con
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 const VALID_SUBSCRIPTION = {
   planId: ID,
-  ownerDepartmentId: ID,
   kind: 'TERM',
   purchasedQuantity: 100,
   unitPrice: { amount: '1200000', currency: 'VND' },
@@ -90,9 +89,10 @@ describe('subscription routes (e2e, no database)', () => {
   describe('validation', () => {
     const asIt = () => ({ Authorization: bearer(principal(['IT_ADMIN'])) });
 
-    it('AF-05, QĐ-103d: takes a POST with no owner department at validation; whether the plan needs one (K1) is judged by the service', () => {
-      expect(declareSubscriptionBodySchema.safeParse(without(VALID_SUBSCRIPTION, 'ownerDepartmentId')).success).toBe(
-        true,
+    it('QĐ-113g: takes a POST with no owner department, a K1 one too; the body is strict, so the field is refused', () => {
+      expect(declareSubscriptionBodySchema.safeParse(VALID_SUBSCRIPTION).success).toBe(true);
+      expect(declareSubscriptionBodySchema.safeParse({ ...VALID_SUBSCRIPTION, ownerDepartmentId: ID }).success).toBe(
+        false,
       );
     });
 
@@ -109,7 +109,7 @@ describe('subscription routes (e2e, no database)', () => {
     it.each([
       ['no plan', without(VALID_SUBSCRIPTION, 'planId')],
       ['a plan that is not a uuid', { ...VALID_SUBSCRIPTION, planId: 'P' }],
-      ['an owner department that is not a uuid', { ...VALID_SUBSCRIPTION, ownerDepartmentId: 'D' }],
+      ['an owner department, which a subscription has none of', { ...VALID_SUBSCRIPTION, ownerDepartmentId: ID }],
       ['an owner department that is null', { ...VALID_SUBSCRIPTION, ownerDepartmentId: null }],
       ['no kind', without(VALID_SUBSCRIPTION, 'kind')],
       ['a kind that is not one', { ...VALID_SUBSCRIPTION, kind: 'LEASE' }],
@@ -146,7 +146,7 @@ describe('subscription routes (e2e, no database)', () => {
 
     it.each([
       ['a plan', { planId: ID }],
-      ['an owner department, which never changes once the subscription has it', { ownerDepartmentId: ID }],
+      ['an owner department, which a subscription has none of', { ownerDepartmentId: ID }],
       ['a kind', { kind: 'PERPETUAL' }],
       ['a status', { status: 'ACTIVE' }],
       ['a null price', { unitPrice: null }],

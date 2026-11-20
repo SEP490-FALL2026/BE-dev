@@ -10,7 +10,7 @@ const ANSWERS: Readonly<Record<RenewalProblem, { status: HttpStatus; message: st
   NOT_FOUND: { status: HttpStatus.NOT_FOUND, message: 'There is no renewal or subscription with this id.' },
   READ_FORBIDDEN: {
     status: HttpStatus.FORBIDDEN,
-    message: 'Only the IT Admin, Finance and the head of the department that owns the subscription read the renewals.',
+    message: 'Only the IT Admin and Finance read the renewals.',
   },
   NOT_RENEWABLE: {
     status: HttpStatus.CONFLICT,

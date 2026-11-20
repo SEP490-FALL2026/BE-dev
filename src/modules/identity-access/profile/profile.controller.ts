@@ -35,7 +35,7 @@ import {
   WorkPhoneResultResponseDto,
 } from './profile.dto';
 import { PROFILE_ERROR_EXAMPLES as EXAMPLES, toProfileApiException } from './profile.http-errors';
-import { AVATAR_MAX_BYTES } from './profile.policy';
+import { PICTURE_MAX_BYTES as AVATAR_MAX_BYTES } from '../../../infrastructure/object-storage/picture-image';
 import { ProfileAvatarService } from './profile-avatar.service';
 import { ProfilePhoneService } from './profile-phone.service';
 import { ProfileQueryService } from './profile-query.service';

@@ -106,7 +106,6 @@ export class UsageHarness extends SeatHarness {
       controlLevel: 'FULL',
     });
     const subscriptionId = await declareSubscription(this.ctx, this.it1.accessToken, {
-      ownerDepartmentId: this.seed.departmentId,
       planId,
       kind: 'TERM',
       unitPrice: { amount: '1000000', currency: 'VND' },

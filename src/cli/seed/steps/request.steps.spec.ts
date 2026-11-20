@@ -1,4 +1,7 @@
-import { grantChecklistBody, termBody } from './request.steps';
+import { grantChecklistBody } from './request-actions';
+import { SHARED_DEMO_V4 } from '../fixture/shared-demo-v4';
+import type { DemoRunContext } from '../demo-run.types';
+import { requestTextOf, termBody } from './request.steps';
 
 /** QĐ-111i (RQ-2): a request names the time of use in months; there is no end date to send (a body with `expectedEndDate` is a 422). */
 describe('the time of use a scenario request sends', () => {
@@ -38,5 +41,33 @@ describe('the checklist a scenario sends to complete the grant of a K1 seat', ()
 
   it.each([['K2'], ['K3'], ['K4'], ['K5'], [null]])('sends nothing for %s', (type) => {
     expect(grantChecklistBody(type, NOW)).toEqual({});
+  });
+});
+
+/** The reason of a scenario is a business reason a person would write; the note for the developer (`summary`) never reaches the API. */
+describe('the text a scenario request sends as its reason', () => {
+  const ctx = { fixture: SHARED_DEMO_V4 } as unknown as DemoRunContext;
+  const scenarios = SHARED_DEMO_V4.requests;
+
+  it('is the tag and the reason, and carries nothing of the summary', () => {
+    for (const scenario of scenarios) {
+      const text = requestTextOf(ctx, scenario);
+      expect(text).toBe(`[SV-${scenario.key}] ${scenario.reason}`);
+      expect(text).not.toContain(scenario.summary);
+    }
+  });
+
+  it('gives every scenario a reason that fits the limit and speaks of no budget, batch, decision or scenario code', () => {
+    for (const { reason } of scenarios) {
+      expect(reason.trim().length).toBeGreaterThan(20);
+      expect(reason.length).toBeLessThanOrEqual(240);
+      expect(reason).not.toMatch(/dự phòng|ngân sách|trình lô|trưởng phòng|QĐ-|DEMO-|\bR\d{2}\b/i);
+    }
+  });
+
+  it('keeps the two noisy reasons for requests waiting for the spending approver', () => {
+    const noisy = scenarios.filter(({ reason }) => reason.includes('drive.saoviet.vn'));
+    expect(noisy.map(({ key }) => key).sort()).toEqual(['R31', 'R54']);
+    expect(noisy.every(({ target }) => target === 'AWAITING_SPEND_DECISION')).toBe(true);
   });
 });

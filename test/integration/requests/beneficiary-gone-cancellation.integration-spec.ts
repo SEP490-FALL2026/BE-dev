@@ -5,6 +5,7 @@ import type { BeneficiaryGoneInput } from '../../../src/modules/requests/public/
 import { GroupHarness } from '../../support/group-harness';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 const h = new GroupHarness();
 const M = 1_000_000;
@@ -34,6 +35,8 @@ async function sqlState(text: string, values: unknown[] = []): Promise<string | 
  * called as the sweeps of MF-2 (`ALL_OPEN`, the day access is blocked) and MF-3 (`PAID_OLD_DEPARTMENT`, the day a transfer takes effect)
  * call it, in a transaction of their own; nothing here goes through a route to close anything.
  */
+afterEach(() => jest.restoreAllMocks());
+
 describe('the system closes the open requests of a person who is gone (integration, real PostgreSQL)', () => {
   /** Three plans, because a person who holds a seat in a plan cannot ask for it again. */
   const plans: { plan: string; subscriptionId: string }[] = [];
@@ -217,6 +220,8 @@ describe('the system closes the open requests of a person who is gone (integrati
     });
 
     it('does not close a request withdrawn while its grant had failed, whose task waits for the IT Admin to close it, and tells the IT Admin', async () => {
+      // QĐ-113d: this test withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const u = await unit();
       const person = await h.colleague(u);
       const failing = await approvedFor(u, person, 1);
@@ -307,6 +312,7 @@ describe('the system closes the open requests of a person who is gone (integrati
     });
 
     it('does not end the line of a person withdrawn while their grant had failed: the IT Admin closes the task, and is told', async () => {
+      liftWithdrawalAfterDecisionRefusal();
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
       const id = await h.groupApproved(u, plans[0].plan, [e1, e2]);

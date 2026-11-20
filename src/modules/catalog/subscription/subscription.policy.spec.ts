@@ -9,6 +9,7 @@ import {
   assertSubscriptionShape,
   declaredStateOf,
   deriveNotice,
+  isStaleEdit,
   missingData,
   nextStateOf,
   noticeWarnings,
@@ -392,4 +393,8 @@ describe('what a declared subscription starts as (US-04-03)', () => {
       isPrimaryForPlan: false,
     });
   });
+});
+
+it('isStaleEdit: stale only when a read is named and the row moved on, to the millisecond', () => {
+  expect([undefined, new Date(1), new Date(0)].map((r) => isStaleEdit(r, new Date(1)))).toEqual([false, false, true]);
 });

@@ -52,6 +52,11 @@ export interface PricingRecord {
    * shown to the approver, never held against a budget. Worked out when the amount is, not stored; null for any other request.
    */
   nextYearAmount: Money | null;
+  /**
+   * Where the price of a priced request comes from (`QĐ-113a`): `SUBSCRIPTION` the subscription that prices the plan, `PLAN_REFERENCE` the reference price of
+   * the plan itself. Not a column: it is shown in the preview and kept in the audit of the request; a record read back from the row does not carry it.
+   */
+  priceSource?: 'SUBSCRIPTION' | 'PLAN_REFERENCE' | null;
 }
 
 /** What the request of a service account adds to a request (`US-05-21`); neither a password nor a key is kept. */

@@ -43,28 +43,35 @@ async function costCenters(ctx: DemoRunContext): Promise<StepOutcome> {
   return summarize(results);
 }
 
-async function taxProfile(ctx: DemoRunContext): Promise<StepOutcome> {
-  const finance = await as(ctx, financePerson(ctx));
-  const vendorId = ctx.ids.vendors.get(ctx.fixture.taxProfile.application);
-  if (!vendorId) return { status: 'conflict', detail: 'ứng dụng không có nhà cung cấp' };
+type TaxProfileSpec = DemoRunContext['fixture']['taxProfiles'][number];
+
+/** One vendor's profile: one Finance already declared stays as it is, whoever declared it: the dataset's only with the fixture's group. */
+async function oneTaxProfile(ctx: DemoRunContext, finance: string, spec: TaxProfileSpec): Promise<Result> {
+  const label = `hồ sơ thuế ${spec.application}`;
+  const vendorId = ctx.ids.vendors.get(spec.application);
+  if (!vendorId) return { status: 'conflict', label: `${label}: ứng dụng không có nhà cung cấp` };
   const profile = await ctx.api.call<{ status: string; profile: { group: string } | null }>(
     finance,
     'GET',
     `/vendors/${vendorId}/tax-profile`,
   );
-  // A profile Finance already declared stays as it is, whoever declared it: the dataset's only with the fixture's group.
   if (profile.status === 'DECLARED') {
-    return profile.profile?.group === ctx.fixture.taxProfile.group
-      ? { status: 'present', detail: 'nhà cung cấp đã có hồ sơ thuế' }
-      : { status: 'conflict', detail: `hồ sơ thuế đã khai với nhóm ${profile.profile?.group ?? '?'}, khác fixture` };
+    return profile.profile?.group === spec.group
+      ? { status: 'present', label }
+      : { status: 'conflict', label: `${label}: đã khai nhóm ${profile.profile?.group ?? '?'}, khác fixture` };
   }
-  if (ctx.mode === 'plan') return { status: 'planned', detail: 'khai hồ sơ thuế' };
-  await ctx.api.call(finance, 'PUT', `/vendors/${vendorId}/tax-profile`, {
-    group: ctx.fixture.taxProfile.group,
-    lines: ctx.fixture.taxProfile.lines,
-  });
+  if (ctx.mode === 'plan') return { status: 'planned', label };
+  await ctx.api.call(finance, 'PUT', `/vendors/${vendorId}/tax-profile`, { group: spec.group, lines: spec.lines });
 
-  return { status: 'done', detail: 'đã khai hồ sơ thuế' };
+  return { status: 'done', label };
+}
+
+async function taxProfile(ctx: DemoRunContext): Promise<StepOutcome> {
+  const finance = await as(ctx, financePerson(ctx));
+  const results: Result[] = [];
+  for (const spec of ctx.fixture.taxProfiles) results.push(await oneTaxProfile(ctx, finance, spec));
+
+  return summarize(results);
 }
 
 interface CycleRow {
@@ -121,7 +128,7 @@ export const FINANCE_STEPS: readonly DemoStep[] = [
   { key: 'finance.cost-centers', title: 'Cost Center của phòng (Finance)', needs: ['org.accounts'], run: costCenters },
   {
     key: 'finance.tax-profile',
-    title: 'Hồ sơ thuế nhà cung cấp (Finance)',
+    title: 'Hồ sơ thuế của sáu nhà cung cấp (Finance)',
     needs: ['catalog.applications'],
     run: taxProfile,
   },

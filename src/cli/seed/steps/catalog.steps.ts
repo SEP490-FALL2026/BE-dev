@@ -77,7 +77,7 @@ function firstPlanBody(plan: DemoPlan): Record<string, unknown> {
   return body;
 }
 
-function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown> {
+export function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown> {
   return {
     applicationId,
     name: plan.name,
@@ -87,6 +87,8 @@ function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown
     ...(plan.revocationNote ? { revocationNote: plan.revocationNote } : {}),
     ...(plan.sharingPolicy ? { sharingPolicy: plan.sharingPolicy } : {}),
     ...(plan.hasAdminConsole !== undefined ? { hasAdminConsole: plan.hasAdminConsole } : {}),
+    // QĐ-113a: the price before tax in dong of a paid plan, the one a request falls back to when no subscription of the plan has a price.
+    ...(plan.referencePrice ? { referencePrice: { amount: plan.referencePrice, currency: 'VND' } } : {}),
   };
 }
 
@@ -212,6 +214,50 @@ export function purchasedQuantityOf(ctx: DemoRunContext, subscription: DemoSubsc
   return subscription.quantity ?? baselineSeatsOf(ctx, subscription.key) + subscription.freeAfterBaseline;
 }
 
+/** What the dates of a subscription are counted from: the day of the seed. */
+type DatedContext = Pick<DemoRunContext, 'today'>;
+
+/** The date fields of a subscription, by the name the API takes. */
+type Dates = Record<string, string>;
+
+/** The days of a monthly plan: the calendar year, and a payment day `renewalInDays` from today that stretches the year when it falls in the next one. */
+function monthlyDates(ctx: DatedContext, subscription: DemoSubscription): Dates {
+  const { year, lastDay } = yearOf(ctx);
+  const dates = { startDate: `${year}-01-01`, endDate: lastDay };
+  if (subscription.renewalInDays === undefined) return dates;
+  const renewalDate = dayOffset(ctx.today, subscription.renewalInDays);
+
+  return {
+    ...dates,
+    renewalDate,
+    ...(renewalDate > `${year + 1}-01-01` ? { endDate: dayOffset(renewalDate, -1) } : {}),
+  };
+}
+
+/** The days of an annual plan: the 12 months before the renewal day, and the deadline to cancel when the fixture declares one. */
+function annualDates(ctx: DatedContext, subscription: DemoSubscription): Dates {
+  const { year } = yearOf(ctx);
+  if (subscription.renewalInDays === undefined) return { startDate: `${year}-01-01`, endDate: `${year}-12-31` };
+  const renewalDate = dayOffset(ctx.today, subscription.renewalInDays);
+
+  return {
+    startDate: addMonths(renewalDate, -12),
+    endDate: dayOffset(renewalDate, -1),
+    renewalDate,
+    ...(subscription.noticeDeadlineInDays === undefined
+      ? {}
+      : { noticeDeadline: dayOffset(ctx.today, subscription.noticeDeadlineInDays) }),
+  };
+}
+
+/** The day a subscription starts: the first day the seats of the pool exist, so no seat of it is granted before. */
+export function subscriptionStartDate(ctx: DatedContext, subscription: DemoSubscription): string {
+  if (subscription.kind === 'PERPETUAL' || subscription.withoutDates) return dayOffset(ctx.today, -200);
+
+  return (subscription.billingCycle === 'ANNUAL' ? annualDates(ctx, subscription) : monthlyDates(ctx, subscription))
+    .startDate;
+}
+
 /** The terms of a subscription (everything but which plan and for whom), as the API takes them on creation and on update of a draft. */
 export function subscriptionTerms(ctx: DemoRunContext, subscription: DemoSubscription): Record<string, unknown> {
   const base = {
@@ -223,19 +269,26 @@ export function subscriptionTerms(ctx: DemoRunContext, subscription: DemoSubscri
   };
   // A key is bought once, on a day in the past (the purchase date is the start date); it has no term and no end.
   if (subscription.kind === 'PERPETUAL') return { ...base, startDate: dayOffset(ctx.today, -200) };
-  const { year } = yearOf(ctx);
-  // The annual one renews on a day from today and runs the 12 months before it; the monthly ones run the calendar year, a month at a time.
-  const renewal = subscription.renewalInDays === undefined ? null : dayOffset(ctx.today, subscription.renewalInDays);
+  const cycle = { billingCycle: subscription.billingCycle, commitmentTermMonths: subscription.termMonths };
+  // A plan with no date to alert from: no end, no renewal, no notice (the warning `NO_ALERT_ANCHOR`, the refusal `CONTRACT_DATA_INCOMPLETE`).
+  if (subscription.withoutDates) {
+    return {
+      ...base,
+      ...cycle,
+      startDate: dayOffset(ctx.today, -200),
+      autoRenew: false,
+      allowsMidTermReduction: false,
+    };
+  }
+  const dates =
+    subscription.billingCycle === 'ANNUAL' ? annualDates(ctx, subscription) : monthlyDates(ctx, subscription);
 
   return {
     ...base,
-    billingCycle: subscription.billingCycle,
-    commitmentTermMonths: subscription.termMonths,
-    startDate: renewal ? addMonths(renewal, -12) : `${year}-01-01`,
-    endDate: renewal ? dayOffset(renewal, -1) : `${year}-12-31`,
-    ...(renewal ? { renewalDate: renewal } : {}),
+    ...cycle,
+    ...dates,
     noticePeriodDays: subscription.noticePeriodDays ?? 30,
-    autoRenew: true,
+    autoRenew: subscription.autoRenew ?? true,
     allowsMidTermReduction: false,
   };
 }
@@ -248,9 +301,6 @@ export function subscriptionBody(
   return {
     planId,
     kind: subscription.kind,
-    ...(subscription.ownerDepartment
-      ? { ownerDepartmentId: ctx.ids.departments.get(subscription.ownerDepartment) }
-      : {}),
     ...subscriptionTerms(ctx, subscription),
   };
 }

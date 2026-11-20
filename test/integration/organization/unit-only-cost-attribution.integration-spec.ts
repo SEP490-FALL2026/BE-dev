@@ -224,13 +224,14 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
     it('refuses to retire a department while it owns an open service account, naming it, and retires it once the account has ended', async () => {
       today('2026-12-01');
       const ops = await department('P-UO3');
-      const subscriptionId = await h.subscription(10, 'K2', ops.id);
+      const subscriptionId = await h.subscription(10, 'K2');
       const owner = await enter(ops.code, 'UO-OWN3');
       // A service account of the earlier releases, written by SQL (nothing writes one any more).
       const serviceId = await legacyServiceAccount(h.ctx.sql, {
         subscriptionId,
         employeeId: owner,
         identifier: 'uo3-bot',
+        departmentId: ops.id,
       });
       const service = { id: serviceId };
       // The placement began on the day the person was entered; nobody is a member any more: only the service account keeps the department in use.
@@ -245,8 +246,6 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
         serviceAccounts: [{ assignmentId: service.id, accountIdentifier: 'uo3-bot' }],
       });
       await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = '2026-12-10' WHERE id = $1`, [service.id]);
-      // The subscription the department owns keeps it in use until its term is over (QĐ-90e).
-      await h.ctx.sql.query(`UPDATE subscriptions SET end_date = '2026-12-10' WHERE id = $1`, [subscriptionId]);
       today('2026-12-20');
       await deactivate(ops.id).expect(200);
     });

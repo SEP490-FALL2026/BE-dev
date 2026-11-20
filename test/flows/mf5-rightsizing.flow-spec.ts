@@ -233,13 +233,15 @@ describe('F5-02 thu hồi ghế rảnh rồi IT ghi kết quả điều chỉnh 
       const refused = await call().post(code, '/subscription-renewals', body);
       expect([code, refused.status]).toEqual([code, 403]);
     }
-    const asFinance = call().data<{ renewal: { state: string; subscription: { ownerDepartmentId: string | null } } }>(
+    const asFinance = call().data<{ renewal: { state: string } }>(
       await call().get('NV-FIN1', `/subscription-renewals/${renewalId}`),
     ).renewal;
-    expect(asFinance).toMatchObject({ state: 'OUTCOME_RECORDED', subscription: { ownerDepartmentId: null } });
+    expect(asFinance).toMatchObject({ state: 'OUTCOME_RECORDED' });
     expect((await call().get('NV-ITA2', `/subscription-renewals/${renewalId}`)).status).toBe(200);
-    // The head of a department reads the cases of the subscriptions the department owns, and none of the shared pool.
-    expect((await call().get('NV-DESH', `/subscription-renewals/${renewalId}`)).status).toBe(404);
+    // Only the IT Admin and Finance read the cases: the head of a department does not.
+    expect(call().codeOf(await call().get('NV-DESH', `/subscription-renewals/${renewalId}`))).toBe(
+      'SUBSCRIPTION_RENEWAL.READ_FORBIDDEN',
+    );
     expect(call().codeOf(await call().get('NV-CEO', '/subscription-renewals'))).toBe(
       'SUBSCRIPTION_RENEWAL.READ_FORBIDDEN',
     );

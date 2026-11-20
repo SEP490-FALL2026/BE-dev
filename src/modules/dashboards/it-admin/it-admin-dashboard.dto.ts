@@ -39,7 +39,7 @@ const itAdminDashboardSchema = z.strictObject({
       'The SaaS error reports given to the caller that are not resolved, closed or marked duplicate.',
     ),
     missingInvoicePeriods: section(
-      'The periods of a right paid by the month or the year whose invoice has not been submitted five working days after the payment day, in the departments of the caller: the total of the list of them (`purchaseInvoiceMissingPeriodList`).',
+      'The periods of a right paid by the month or the year whose invoice has not been submitted five working days after the payment day, in the requests of the departments of the caller and the subscriptions the caller answers for: the total of the list of them (`purchaseInvoiceMissingPeriodList`).',
     ),
     outOfProcessRevocationsDue: section(
       'The open cases outside the process on a company asset whose revocation is due now: no Request of the person to wait for, or the ten working days of the wait have passed with the Request not yet at the step of the spending approver. The cases are listed by `outOfProcessCaseList`, each with its `revocation`; no list answers this number alone.',

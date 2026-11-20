@@ -91,6 +91,10 @@ const departmentSchema = z.strictObject({
   head: z
     .strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string(), since: z.string() })
     .nullable(),
+  /** A signed link to the picture of the department, good for 15 minutes; null when it has none (`QĐ-113c`). */
+  avatarUrl: z.string().nullable(),
+  /** Whether this is the department created with the organization at installation; an IT Admin reads it only when named in charge of it, and no IT Admin takes over its work. */
+  starting: z.boolean(),
   memberCount: z.number().int().nonnegative(),
   /** What the department still lacks: a head, a usable IT Admin in charge, a Cost Center in use (finance configuration incomplete). */
   warnings: z.array(z.enum(['MISSING_HEAD', 'MISSING_IT_ADMIN', 'MISSING_COST_CENTER'])),

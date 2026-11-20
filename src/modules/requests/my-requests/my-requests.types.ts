@@ -80,6 +80,10 @@ export interface MyRequestRow {
   updatedAt: Date;
   /** Whether the chain of the request has a spend step: only then is there a stage on the way to the spending approver. */
   hasSpendStep: boolean;
+  /** Whether the chain has an IT assessment (new software): once the IT Admin decided it, the sender withdraws no more. */
+  hasAssessmentStep: boolean;
+  /** The need step the withdrawal judges the request by: for a request for a group, read over its people (`needStepOfGroup`). */
+  withdrawalNeedStep: NeedStepState;
   /** The one person it is for; null for a request for a group, whose people are read as lines. */
   beneficiaryEmployeeId: string | null;
   lineCount: number;

@@ -75,7 +75,7 @@ describe('the AI summary of the queue of the spending approver (integration, rea
     r12 = await h.proposed(design.member, { softwareName: 'Loom' });
     await h.decide(r12.id, { decision: 'APPROVE' }, design.head.account).expect(200);
     // S1 of AC-13: a renewal recorded on a subscription, which is no Access Request and which C1 never decides.
-    renewal = await h.recordedRenewal(design.department.id, RENEWAL_OPINION);
+    renewal = await h.recordedRenewal(RENEWAL_OPINION);
     stepsBefore = await h.stepRows(allIds());
 
     // First a model that writes figures of its own on every line: nothing is shown and the call is not kept for the revision.

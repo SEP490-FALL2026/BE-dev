@@ -6,6 +6,12 @@ export type WorkspaceRole = 'OWNER' | 'ADMIN';
 export type SeatTracking = 'APPLICABLE' | 'NOT_APPLICABLE';
 export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
 
+/** The reference price of a plan, in minor units of dong (`QĐ-113a`). */
+export interface ReferencePrice {
+  amountMinor: bigint;
+  currency: string;
+}
+
 export interface PlanRecord {
   id: string;
   applicationId: string;
@@ -22,6 +28,8 @@ export interface PlanRecord {
   sharingPolicy: SharingPolicy | null;
   /** A `K4` plan the company administers through a console of the vendor (`R-53`); false for every other kind. */
   hasAdminConsole: boolean;
+  /** The price a request is counted by when no subscription of the plan has one (`QĐ-113a`); null when none is entered. */
+  referencePrice: ReferencePrice | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -100,6 +108,7 @@ export interface NewPlan {
   dataLossOnRemoval: boolean;
   sharingPolicy: SharingPolicy | null;
   hasAdminConsole: boolean;
+  referencePrice: ReferencePrice | null;
 }
 
 export interface PlanChanges {
@@ -111,6 +120,7 @@ export interface PlanChanges {
   dataLossOnRemoval?: boolean;
   sharingPolicy?: SharingPolicy | null;
   hasAdminConsole?: boolean;
+  referencePrice?: ReferencePrice | null;
 }
 
 /** The plan and the facts about it the capabilities that hang off it read: a subscription, the terms. */

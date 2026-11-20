@@ -54,12 +54,12 @@ flowchart BT
   budgets -->|4| operating_parameters
   budgets -->|23| organization
   budgets -->|8| policies
-  catalog -->|23| audit
-  catalog -->|10| finance
+  catalog -->|22| audit
+  catalog -->|11| finance
   catalog -->|8| identity_access
   catalog -->|3| notifications
   catalog -->|3| operating_parameters
-  catalog -->|33| organization
+  catalog -->|27| organization
   dashboards -->|2| catalog
   dashboards -->|2| devices
   dashboards -->|4| identity_access
@@ -84,9 +84,9 @@ flowchart BT
   devices -->|16| organization
   finance -->|3| audit
   finance -->|3| organization
-  identity_access -->|18| audit
-  identity_access -->|10| notifications
-  identity_access -->|36| organization
+  identity_access -->|20| audit
+  identity_access -->|11| notifications
+  identity_access -->|37| organization
   installation -->|6| audit
   installation -->|2| catalog
   installation -->|2| finance
@@ -94,12 +94,12 @@ flowchart BT
   installation -->|8| organization
   installation -->|2| policies
   licensing -->|30| audit
-  licensing -->|57| catalog
+  licensing -->|56| catalog
   licensing -->|2| finance
   licensing -->|12| identity_access
   licensing -->|10| notifications
   licensing -->|6| operating_parameters
-  licensing -->|55| organization
+  licensing -->|54| organization
   licensing -->|4| policies
   onboarding -->|2| catalog
   onboarding -->|2| data_import
@@ -118,8 +118,8 @@ flowchart BT
   optimization -->|7| personnel
   optimization -->|9| policies
   optimization -->|9| usage
-  organization -->|10| audit
-  organization -->|8| notifications
+  organization -->|12| audit
+  organization -->|9| notifications
   personnel -->|24| audit
   personnel -->|11| catalog
   personnel -->|3| devices
@@ -127,7 +127,7 @@ flowchart BT
   personnel -->|31| licensing
   personnel -->|6| notifications
   personnel -->|8| operating_parameters
-  personnel -->|97| organization
+  personnel -->|98| organization
   personnel -->|8| requests
   policies -->|5| audit
   policies -->|4| identity_access
@@ -141,7 +141,7 @@ flowchart BT
   requests -->|60| licensing
   requests -->|14| notifications
   requests -->|12| operating_parameters
-  requests -->|97| organization
+  requests -->|98| organization
   requests -->|34| policies
   usage -->|10| audit
   usage -->|3| budgets

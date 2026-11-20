@@ -129,10 +129,10 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
          normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from, valid_from_basis, created_by_app_user_id)
        SELECT gen_random_uuid(), s.organization_id, 'SERVICE', 'REQUEST', s.plan_id, s.id, $2, 'bot@acme.vn', 'bot@acme.vn', 'bot',
-              (SELECT id FROM cost_centers WHERE department_id = s.owner_department_id LIMIT 1), s.owner_department_id,
+              (SELECT id FROM cost_centers WHERE department_id = $3::uuid LIMIT 1), $3::uuid,
               '2026-01-05', 'RECORDED', gen_random_uuid()
          FROM subscriptions s WHERE s.id = $1 RETURNING id`,
-      [serviceSubscription, answeringFor],
+      [serviceSubscription, answeringFor, w.worldDepartment],
     );
     const service = {
       assignmentId: rows[0].id,

@@ -48,10 +48,16 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
         .map((candidate) => candidate.operationId)
         .sort();
 
-    it('declares the 400 and 413 of the multipart limits on the four upload routes, which are the only multipart routes', () => {
+    it('declares the 400 and 413 of the multipart limits on the five upload routes, which are the only multipart routes', () => {
       // usageImportUpload (MF-5) takes the report of a vendor under the same limits.
       // meAvatarUpload (PF-1) takes the picture of a person: one file of up to 1 MB, a little over which the policy answers and beyond which the parser does.
-      const uploads = ['employeeImportUpload', 'meAvatarPut', 'seatBaselineImportUpload', 'usageImportUpload'];
+      const uploads = [
+        'departmentAvatarPut',
+        'employeeImportUpload',
+        'meAvatarPut',
+        'seatBaselineImportUpload',
+        'usageImportUpload',
+      ];
       expect(idsWhere((candidate) => Boolean(candidate.requestBody?.content?.['multipart/form-data']))).toEqual(
         uploads,
       );
@@ -65,7 +71,12 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
         expect(responses['400']?.description).toContain('HTTP_BAD_REQUEST');
         expect(responses['413']?.description).toContain('HTTP_PAYLOAD_TOO_LARGE');
         // A vendor usage report may be larger: its own limit is 10 MiB (MF-5); a picture is 1 MiB (PF-1); the other uploads keep 2 MiB.
-        const limit = id === 'usageImportUpload' ? '10 MiB' : id === 'meAvatarPut' ? '1 MiB' : '2 MiB';
+        const limit =
+          id === 'usageImportUpload'
+            ? '10 MiB'
+            : id === 'meAvatarPut' || id === 'departmentAvatarPut'
+              ? '1 MiB'
+              : '2 MiB';
         expect(responses['413']?.description).toContain(limit);
       }
     });
@@ -84,6 +95,7 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
       }
       // A 413 anywhere else is a multipart upload's own file limit, or a mistake.
       expect(idsWhere((candidate) => candidate.responses['413'] !== undefined && !takesJson(candidate))).toEqual([
+        'departmentAvatarPut',
         'employeeImportUpload',
         'meAvatarPut',
         'seatBaselineImportUpload',
@@ -116,6 +128,7 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
       }
       // The one 415 outside a JSON body is the type of a picture, told by the policy from its first bytes (PROFILE.AVATAR_TYPE_UNSUPPORTED).
       expect(idsWhere((candidate) => candidate.responses['415'] !== undefined && !takesJson(candidate))).toEqual([
+        'departmentAvatarPut',
         'meAvatarPut',
       ]);
       expect(

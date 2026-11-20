@@ -16,6 +16,11 @@ const pricingModel = z.enum(['PER_SEAT', 'FLAT_RATE', 'CONCURRENT', 'CONSUMPTION
 const controlLevel = z.enum(['FULL', 'PARTIAL', 'UNCONTROLLABLE']);
 const sharingPolicy = z.enum(['ALLOWED', 'NOT_ALLOWED']);
 const workspaceRole = z.enum(['OWNER', 'ADMIN']);
+/** The reference price of a plan (`QĐ-113a`): money as text (ADR-0007), in dong; another currency is refused (PLAN.REFERENCE_PRICE_NOT_VND). */
+const referencePrice = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) }).meta({
+  description:
+    'The price before tax in dong, a decimal string in major units, currency VND: K1/K2, one seat for one month (a yearly price over 12); K4, one purchase. Used by a request when no subscription of the plan has a price. K5 has none.',
+});
 
 export const declarePlanBodySchema = z.strictObject({
   applicationId: z.uuid(),
@@ -27,6 +32,7 @@ export const declarePlanBodySchema = z.strictObject({
   dataLossOnRemoval: z.boolean().optional(),
   sharingPolicy: sharingPolicy.optional(),
   hasAdminConsole: z.boolean().optional(),
+  referencePrice: referencePrice.optional(),
 });
 
 /** The application cannot change: it is not a field here, so naming it is a validation error. */
@@ -39,6 +45,9 @@ export const updatePlanBodySchema = z.strictObject({
   dataLossOnRemoval: z.boolean().optional(),
   sharingPolicy: sharingPolicy.nullable().optional(),
   hasAdminConsole: z.boolean().optional(),
+  referencePrice: referencePrice.nullable().optional().meta({
+    description: 'The reference price; null clears it. Moving the plan to K5, or between K1/K2 and K4, clears it too.',
+  }),
 });
 
 export const workspaceProfileBodySchema = z.strictObject({
@@ -121,6 +130,10 @@ const planSummarySchema = z.strictObject({
   sharingPolicy: sharingPolicy.nullable(),
   /** A `K4` plan the company administers through a console of the vendor needs two IT Admins there (`R-53`); false for every other kind. */
   hasAdminConsole: z.boolean(),
+  referencePrice: z
+    .strictObject({ amount: z.string(), currency: z.string() })
+    .nullable()
+    .meta({ description: 'The reference price in dong before tax, or null when none is entered.' }),
   seatTracking: z.enum(['APPLICABLE', 'NOT_APPLICABLE']),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),

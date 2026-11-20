@@ -1,6 +1,7 @@
 import { bookPurchaseInvoice } from '../../support/book-purchase-invoice';
 import { GroupHarness } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 const h = new GroupHarness();
 
@@ -9,6 +10,8 @@ const h = new GroupHarness();
  * share of the person can reach into what the invoice made an expense. The withdrawal gives back only what is still held, and
  * does not fail because the share is more than that.
  */
+afterEach(() => jest.restoreAllMocks());
+
 describe('a person of a group leaves after an invoice was recorded over PostgreSQL (US-06-06 AC-9, US-05-17 AC-10)', () => {
   let paid: string;
   let vendorId: string;
@@ -66,6 +69,8 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
     (await h.shares(id)).filter((row) => row.employee_id === employeeId).every((row) => row.released_at !== null);
 
   it('gives back only what is still held when the share is more, and the commitment becomes an expense', async () => {
+    // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+    liftWithdrawalAfterDecisionRefusal();
     const { u, people, id, commitmentId, amount } = await approved();
     const net = (amount * 9n) / 10n;
     expect((await invoice({ u, id, commitmentId }, net)).booking).toBe('COMMITMENT');
@@ -86,6 +91,8 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
   });
 
   it('is not refused when the invoice already took the whole commitment: nothing goes back and the line still ends', async () => {
+    // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+    liftWithdrawalAfterDecisionRefusal();
     const { u, people, id, commitmentId, amount } = await approved();
     expect((await invoice({ u, id, commitmentId }, amount)).booking).toBe('COMMITMENT');
 
@@ -98,6 +105,8 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
   });
 
   it('gives back the share in full when the invoice took less than what is left over', async () => {
+    // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+    liftWithdrawalAfterDecisionRefusal();
     const { u, people, id, commitmentId, amount } = await approved();
     const net = amount / 10n;
     expect((await invoice({ u, id, commitmentId }, net)).booking).toBe('COMMITMENT');
@@ -112,6 +121,8 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
   });
 
   it('gives back what is left of the commitment when the whole request is withdrawn after an invoice', async () => {
+    // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+    liftWithdrawalAfterDecisionRefusal();
     const { u, id, commitmentId, amount } = await approved();
     const net = (amount * 6n) / 10n;
     expect((await invoice({ u, id, commitmentId }, net)).booking).toBe('COMMITMENT');
