@@ -22,6 +22,9 @@ const emptyLookups = {
   person: (id: string): never => {
     throw new Error(`The employee ${id} of a request to carry out does not exist.`);
   },
+  beneficiary: (id: string): never => {
+    throw new Error(`The employee ${id} of a request to carry out does not exist.`);
+  },
 };
 
 /**
@@ -89,7 +92,7 @@ export class GrantQueueService {
             logoUrl: plan.applicationLogoUrl,
           },
           department: { id: department.id, name: department.name },
-          beneficiary: lookups.person(row.beneficiaryEmployeeId),
+          beneficiary: lookups.beneficiary(row.beneficiaryEmployeeId),
           requester: lookups.person(row.requesterEmployeeId),
           expectedEndDate: row.expectedEndDate,
           submittedAt: row.submittedAt.toISOString(),
@@ -120,16 +123,33 @@ export class GrantQueueService {
       tasks.set(execution.requestId, [...(tasks.get(execution.requestId) ?? []), execution]);
     const personById = new Map(people.map((employee) => [employee.id, employee]));
 
+    const personOf = (id: string) => {
+      const found = personById.get(id);
+      if (!found) throw new Error(`The employee ${id} of a request to carry out does not exist.`);
+
+      return found;
+    };
+
     return {
       plans: new Map(plans.map((plan) => [plan.planId, plan])),
       departments: new Map(departments.map((department) => [department.id, department])),
       stocks,
       tasks,
       person: (id: string) => {
-        const found = personById.get(id);
-        if (!found) throw new Error(`The employee ${id} of a request to carry out does not exist.`);
+        const found = personOf(id);
 
         return { employeeId: found.id, employeeCode: found.employeeCode, fullName: found.fullName };
+      },
+      /** The person to grant to, with the work email the grant will go to (`QĐ-87b`): the requester never carries it. */
+      beneficiary: (id: string) => {
+        const found = personOf(id);
+
+        return {
+          employeeId: found.id,
+          employeeCode: found.employeeCode,
+          fullName: found.fullName,
+          workEmail: found.workEmail,
+        };
       },
     };
   }

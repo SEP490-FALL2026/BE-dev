@@ -24,6 +24,14 @@ export const grantQueueQuerySchema = z.strictObject({
 
 const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 
+/** The person to grant to: the IT Admin invites them at the vendor with their work email (`QĐ-87b`, `FR-2.9`), so it is shown here. */
+const beneficiaryRef = employeeRef.extend({
+  workEmail: z.string().nullable().meta({
+    description:
+      'The work email on the profile, as stored (not normalized): the address the grant is made to when the IT Admin names no other one; null when the profile has none.',
+  }),
+});
+
 /** One request that waits for the IT Admin to carry it out. */
 const grantQueueItemSchema = z.strictObject({
   requestId: z.uuid(),
@@ -48,7 +56,7 @@ const grantQueueItemSchema = z.strictObject({
   department: z.strictObject({ id: z.uuid(), name: z.string() }).meta({
     description: 'The department the request was sent for: the IT Admin works the departments they are in charge of.',
   }),
-  beneficiary: employeeRef,
+  beneficiary: beneficiaryRef,
   state: queueState,
   /** The grant task of this person; null while the grant has not begun, and for a request that ended without one. */
   execution: z

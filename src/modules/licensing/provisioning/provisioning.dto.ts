@@ -20,7 +20,10 @@ const purchaseBodySchema = z.strictObject({ reason: z.string().trim().min(1).max
 export const grantBodySchema = z.strictObject({
   requestId: z.uuid(),
   subscriptionId: z.uuid().optional(),
-  accountIdentifier: z.string().max(254).optional(),
+  accountIdentifier: z.string().max(254).optional().meta({
+    description:
+      'The company address to grant a paid right to. Leave it empty or omit the field to use the work email of the person.',
+  }),
   /** Only for the request of a service account: the person of its department who answers for it, in the place of the one it names. */
   responsibleEmployeeId: z.uuid().optional(),
   /** Only for a request for a group, which is granted one person at a time: the person of the request this grant is for. */
@@ -191,7 +194,17 @@ const taskSummarySchema = z.strictObject({
   status: z.enum(TASK_STATUSES),
   requestId: z.uuid().nullable(),
   assignmentId: z.uuid(),
-  beneficiary: z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() }).nullable(),
+  beneficiary: z
+    .strictObject({
+      employeeId: z.uuid(),
+      employeeCode: z.string(),
+      fullName: z.string(),
+      workEmail: z.string().nullable().meta({
+        description:
+          'The work email on the profile, as stored (not normalized): the address a grant is made to when the IT Admin names no other one; null when the profile has none.',
+      }),
+    })
+    .nullable(),
   plan: z
     .strictObject({
       planId: z.uuid(),
