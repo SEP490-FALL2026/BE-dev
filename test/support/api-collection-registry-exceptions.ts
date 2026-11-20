@@ -302,6 +302,7 @@ export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
       'itAdmin',
       'memberCount',
       'name',
+      'starting',
       'status',
       'updatedAt',
       'warnings',

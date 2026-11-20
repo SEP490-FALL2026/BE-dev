@@ -160,6 +160,9 @@ model Department {
   avatarObjectKey     String?          @map("avatar_object_key")
   avatarContentType   String?          @map("avatar_content_type")
   avatarUpdatedAt     DateTime?        @map("avatar_updated_at") @db.Timestamptz(3)
+  // The department the installation created with the organization (at most one per organization, a partial unique index in the migration).
+  // Its work is never taken over by every IT Admin (`QĐ-58b`); only an IT Admin named for it reads it.
+  starting            Boolean          @default(false) @map("is_starting")
 
   organization            Organization                  @relation(fields: [organizationId], references: [id])
   costCenters             CostCenter[]                  @relation("CostCenterDepartment")

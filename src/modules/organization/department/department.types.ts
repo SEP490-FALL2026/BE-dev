@@ -32,6 +32,8 @@ export interface DepartmentRecord {
   /** The picture of the department in the storage (`QĐ-113c`); never put on the wire, only the signed link is. */
   avatarObjectKey: string | null;
   avatarContentType: string | null;
+  /** The department the installation created with the organization: no IT Admin takes over its work, only the one named for it reads it. */
+  starting: boolean;
 }
 
 /** Who heads a department on a day, and since when. */
