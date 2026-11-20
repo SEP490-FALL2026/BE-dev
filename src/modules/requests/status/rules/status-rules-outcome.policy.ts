@@ -1,5 +1,5 @@
 import type { NotificationIntent, StatusRule } from '../request-status.types';
-import { goneNotice, outcomeRecipients, requestOf, text } from './status-rule.policy';
+import { goneNotice, outcomeRecipients, readyForGrant, requestOf, text } from './status-rule.policy';
 
 /**
  * How a request ended, or a decision on it, told to the requester and to the people it is for (rows 3 to 8 and 16 of the table of
@@ -104,7 +104,7 @@ export const OUTCOME_RULES: Readonly<Record<string, StatusRule>> = {
   // 5: the spending approver approved the spend.
   'ACCESS_REQUEST.SPEND_APPROVED': {
     subject: 'ACCESS_REQUEST',
-    needs: ['REQUEST'],
+    needs: ['REQUEST', 'GRANT_IT_ADMINS'],
     build: (_event, facts): NotificationIntent[] => {
       const request = requestOf(facts);
 
@@ -114,6 +114,8 @@ export const OUTCOME_RULES: Readonly<Record<string, StatusRule>> = {
           code: 'REQUEST_SPEND_APPROVED',
           params: { requestId: request.id },
         },
+        // The request now waits in the queue of grants: the IT Admin who carries it out is told once for the whole request.
+        ...(request.type === 'RENEWAL' ? [] : [readyForGrant(request, facts)]),
       ];
     },
   },

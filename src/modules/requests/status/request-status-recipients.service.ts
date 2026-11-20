@@ -6,7 +6,11 @@ import type { FactNeed, RequestFacts, StatusFacts } from './request-status.types
 
 export type RoleHolders = Pick<
   StatusFacts,
-  'departmentHeadEmployeeId' | 'itAdminEmployeeId' | 'financeEmployeeId' | 'superAdminEmployeeId'
+  | 'departmentHeadEmployeeId'
+  | 'itAdminEmployeeId'
+  | 'grantItAdminEmployeeIds'
+  | 'financeEmployeeId'
+  | 'superAdminEmployeeId'
 >;
 
 /**
@@ -27,6 +31,7 @@ export class RequestStatusRecipientsService {
     const holders: RoleHolders = {
       departmentHeadEmployeeId: null,
       itAdminEmployeeId: null,
+      grantItAdminEmployeeIds: [],
       financeEmployeeId: null,
       superAdminEmployeeId: null,
     };
@@ -39,11 +44,27 @@ export class RequestStatusRecipientsService {
         (await this.organizationReads.getItAdminInCharge(request.requesterEmployeeId, today))?.itAdminEmployeeId ??
         null;
     }
+    holders.grantItAdminEmployeeIds = await this.grantItAdminsOf(needs, request);
     if (needs.includes('FINANCE')) holders.financeEmployeeId = await this.identity.findUsableFinanceEmployeeId();
     if (needs.includes('SUPER_ADMIN'))
       holders.superAdminEmployeeId = await this.identity.findUsableSuperAdminEmployeeId();
 
     return holders;
+  }
+
+  /**
+   * Who the grant of a request of this department is told to, as the queue of grants shares it: the IT Admin in charge of the
+   * department when their account can act, otherwise every IT Admin whose account can act.
+   */
+  private async grantItAdminsOf(needs: readonly FactNeed[], request: RequestFacts | null): Promise<string[]> {
+    if (request === null || !needs.includes('GRANT_IT_ADMINS')) return [];
+    const departmentId = request.departmentId;
+    const inCharge = await this.organizationReads.getItAdminInChargeOfDepartment(departmentId);
+    if (inCharge !== null && (await this.identity.findUsableItAdminEmployeeIds([inCharge])).has(inCharge)) {
+      return [inCharge];
+    }
+
+    return this.identity.findAllUsableItAdminEmployeeIds();
   }
 
   /** Among these employees, those who still work: a person who has left is told nothing. */

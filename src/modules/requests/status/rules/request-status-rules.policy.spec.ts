@@ -189,6 +189,46 @@ describe('what the inbox tells the people of a request about how it is going and
       expect(told(approved)).toEqual([`${PEOPLE.requester}:REQUEST_SPEND_APPROVED`]);
     });
 
+    it('tells the IT Admin who grants that the request is ready, once for the whole request, and keeps the notice of the requester', () => {
+      const planned = plan(
+        event('ACCESS_REQUEST.SPEND_APPROVED', {}, { actorEmployeeId: PEOPLE.approver }),
+        facts({ grantItAdminEmployeeIds: [PEOPLE.itAdmin] }),
+      );
+
+      expect(told(planned)).toEqual([
+        `${PEOPLE.requester}:REQUEST_SPEND_APPROVED`,
+        `${PEOPLE.itAdmin}:REQUEST_READY_FOR_GRANT`,
+      ]);
+      expect(planned[1].params).toEqual({
+        requestId: REQUEST_ID,
+        beneficiaryCount: planned[1].params.beneficiaryCount,
+      });
+    });
+
+    it('tells every usable IT Admin when the facts carry several (the department has none in charge)', () => {
+      const planned = plan(
+        event('ACCESS_REQUEST.SPEND_APPROVED', {}, { actorEmployeeId: PEOPLE.approver }),
+        facts({ grantItAdminEmployeeIds: [PEOPLE.itAdmin, PEOPLE.finance] }),
+      );
+
+      expect(told(planned).filter((line) => line.endsWith('REQUEST_READY_FOR_GRANT'))).toEqual([
+        `${PEOPLE.itAdmin}:REQUEST_READY_FOR_GRANT`,
+        `${PEOPLE.finance}:REQUEST_READY_FOR_GRANT`,
+      ]);
+    });
+
+    it('tells the IT Admin when the need step of an internal request with no spend step was approved', () => {
+      const planned = plan(
+        event('ACCESS_REQUEST.NEED_APPROVED', { requestState: 'AWAITING_EXECUTION' }, { actorEmployeeId: PEOPLE.head }),
+        facts({ grantItAdminEmployeeIds: [PEOPLE.itAdmin] }),
+      );
+
+      expect(told(planned)).toEqual([
+        `${PEOPLE.requester}:REQUEST_NEED_APPROVED`,
+        `${PEOPLE.itAdmin}:REQUEST_READY_FOR_GRANT`,
+      ]);
+    });
+
     it('tells the requester a refusal of the spend with the reason and the tool that does the same work (row 6)', () => {
       const planned = plan(
         event('ACCESS_REQUEST.SPEND_REJECTED', {}, { actorEmployeeId: PEOPLE.approver }),
