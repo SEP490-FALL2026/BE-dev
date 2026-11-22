@@ -5,3 +5,4 @@ Các test http / integration / flow cũ khẳng định hành vi trước Wave 1
 | Gói | File test | Ca | Lý do |
 | --- | --------- | -- | ----- |
 | P1 | `test/integration/personnel/offboarding-departure.integration-spec.ts` | `lockAgain` (~lines 187-189, gọi `revokeRights(wire.id, { accountLock: LOCK })` khi đã khóa & đã mở thu hồi) | Trước W1-01 `revocationSelection` lọc bỏ seat `hasTask: true` nên trả `NOTHING_TO_REVOKE` trước khi kiểm tra `lockRecorded && lockGiven`; sau W1-01 seat `hasTask: true` vẫn vào `selected` nên trả `409 OFFBOARDING_CASE.ALREADY_RECORDED`. |
+| P11 | `test/integration/optimization/ghost-seat-g2-reclaim.integration-spec.ts` | `KPI-5 (DA6-39)` (lines 242-290, seed `G4 ACTION SUPERSEDED` và khẳng định 3 of 8 = 37.5 %) | Trước W1-18 `SUPERSEDED` nằm trong tử & mẫu KPI-5; sau W1-18 `SUPERSEDED` và `LEFT_TO_EXPIRE` bị loại khỏi cả tử lẫn mẫu, kết quả thành 2 of 7 (28.6 %). |
