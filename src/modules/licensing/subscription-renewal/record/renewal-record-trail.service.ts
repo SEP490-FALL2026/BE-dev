@@ -63,9 +63,9 @@ export class RenewalRecordTrail {
   }
 
   /**
-   * Finance is told of the result and, when another IT Admin recorded it, the one responsible too (`QĐ-106i`(3)); the spending approver is not
-   * (`QĐ-99h`). A renewal the vendor made that was not chosen is told at once to the spending approver, the IT Admin of the subscription and
-   * Finance (`QĐ-106i`(4)).
+   * Finance is told of the result (with `substitute` recorded in audit/params when another IT Admin recorded for an
+   * absent or locked responsible IT Admin); the spending approver is not. A renewal the vendor made that was not chosen
+   * is told at once to the spending approver, the IT Admin of the subscription and Finance.
    */
   async told(
     tx: DbTx,

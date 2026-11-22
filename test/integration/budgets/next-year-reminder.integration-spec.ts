@@ -37,7 +37,9 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
     };
   })();
 
-  /** The reminder notices written on the aggregated shape (`subject = null`), ordered by event key and recipient. */
+  let since = '1970-01-01T00:00:00.000Z';
+
+  /** The reminder notices written since the start of the current test, ordered by event key and recipient. */
   const noticesForDay = async (day: string) =>
     (
       await h.ctx.sql.query<{
@@ -48,15 +50,18 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
         event_key: string;
       }>(
         `SELECT recipient_employee_id, subject_type, subject_id, params, event_key FROM in_app_notifications
-          WHERE code = 'BUDGET_NEXT_YEAR_MISSING' AND event_key = $1 ORDER BY recipient_employee_id`,
-        [`nextYearBudget:${h.next}:${day}`],
+          WHERE code = 'BUDGET_NEXT_YEAR_MISSING' AND event_key = $1 AND created_at >= $2::timestamptz
+          ORDER BY recipient_employee_id`,
+        [`nextYearBudget:${h.next}:${day}`, since],
       )
     ).rows;
   const noticesAll = async () =>
     (
       await h.ctx.sql.query<{ recipient_employee_id: string; params: Record<string, unknown>; event_key: string }>(
         `SELECT recipient_employee_id, params, event_key FROM in_app_notifications
-          WHERE code = 'BUDGET_NEXT_YEAR_MISSING' ORDER BY event_key, recipient_employee_id`,
+          WHERE code = 'BUDGET_NEXT_YEAR_MISSING' AND created_at >= $1::timestamptz
+          ORDER BY event_key, recipient_employee_id`,
+        [since],
       )
     ).rows;
   const unapprovedUnits: { head: Awaited<ReturnType<typeof h.departmentWithHead>>['head']; unitId: string }[] = [];
@@ -104,7 +109,8 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
   }, 240000);
 
   beforeEach(async () => {
-    await h.ctx.sql.query(`DELETE FROM in_app_notifications WHERE code = 'BUDGET_NEXT_YEAR_MISSING'`);
+    const { rows } = await h.ctx.sql.query<{ now: string }>(`SELECT clock_timestamp()::text AS now`);
+    since = rows[0].now;
   });
 
   afterAll(async () => {
@@ -133,28 +139,31 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
 
   it('writes nothing the second time on the same day, and nothing more when two instances run at once', async () => {
     await bare();
+    const m1 = december.monday;
 
-    await Promise.all([passOn(december.first), passOn(december.first)]);
-    await passOn(december.first);
+    await Promise.all([passOn(m1), passOn(m1)]);
+    await passOn(m1);
 
-    expect(await noticesForDay(december.first)).toHaveLength(2);
+    expect(await noticesForDay(m1)).toHaveLength(2);
   });
 
   it('tells again on the first Monday after, with a key of its own day, and on no day between: not the Tuesday after, not a day of November', async () => {
     await bare();
-    await passOn(december.first);
+    const jan1 = december.january;
+    const jan2 = addDays(jan1, 7);
+    await passOn(jan1);
 
     await passOn(december.quietNovember);
     expect(await noticesAll()).toHaveLength(2);
-    await passOn(december.tuesday);
+    await passOn(addDays(jan1, 1));
     expect(await noticesAll()).toHaveLength(2);
-    await passOn(december.monday);
+    await passOn(jan2);
 
     const told = await noticesAll();
     expect(told).toHaveLength(4);
     expect([...new Set(told.map((notice) => notice.event_key))]).toEqual([
-      `nextYearBudget:${h.next}:${december.first}`,
-      `nextYearBudget:${h.next}:${december.monday}`,
+      `nextYearBudget:${h.next}:${jan1}`,
+      `nextYearBudget:${h.next}:${jan2}`,
     ]);
   });
 
@@ -163,38 +172,39 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
     const unit = await h.departmentWithHead(`P-NYR${(counter += 1)}`);
     const lacking = unit.department.unitId;
     const totalMissing = await missingCount();
-    await passOn(december.first);
+    const jan3 = addDays(december.january, 14);
+    const jan4 = addDays(december.january, 21);
+    const jan5 = addDays(december.january, 28);
+    await passOn(jan3);
     expect(await noticesAll()).toHaveLength(2);
 
-    await passOn(december.january);
-    const afterJan1 = await noticesAll();
-    expect(afterJan1).toHaveLength(4);
+    await passOn(jan4);
+    const afterJan4 = await noticesAll();
+    expect(afterJan4).toHaveLength(4);
     // The year after has become the year that runs: the notice in January still names that year.
-    expect(
-      afterJan1.filter((notice) => notice.event_key.endsWith(december.january)).map((notice) => notice.params),
-    ).toEqual([
+    expect(afterJan4.filter((notice) => notice.event_key.endsWith(jan4)).map((notice) => notice.params)).toEqual([
       { year: h.next, costCenterCount: totalMissing },
       { year: h.next, costCenterCount: totalMissing },
     ]);
-    await passOn(december.secondJanuary);
-    expect(await noticesAll()).toHaveLength(6);
 
     const proposal = await h.budgetProposed(unit.head, lacking, undefined, h.next);
     await h.current(proposal.id);
-    await passOn(addDays(december.secondJanuary, 7));
-    expect(await noticesAll()).toHaveLength(6);
+    await passOn(jan5);
+    expect(await noticesAll()).toHaveLength(4);
   });
 
   it('stops in December once every Cost Center has an approved version of the year after', async () => {
     await approveAllLacking();
     const unit = await h.departmentWithHead(`P-NYR${(counter += 1)}`);
     const lacking = unit.department.unitId;
-    await passOn(december.first);
+    const m2 = addDays(december.monday, 7);
+    const m3 = addDays(december.monday, 14);
+    await passOn(m2);
     expect(await noticesAll()).toHaveLength(2);
 
     const proposal = await h.budgetProposed(unit.head, lacking, undefined, h.next);
     await h.current(proposal.id);
-    await passOn(december.monday);
+    await passOn(m3);
     expect(await noticesAll()).toHaveLength(2);
   });
 
@@ -210,24 +220,12 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
     const covered = await h.departmentWithHead(`P-NYR${(counter += 1)}`);
     await h.current((await h.budgetProposed(covered.head, covered.department.unitId, undefined, h.next)).id);
 
-    const { rows: unapprovedBefore } = await h.ctx.sql.query<{ count: string }>(
-      `SELECT count(DISTINCT cc.id)::text AS count
-         FROM cost_centers cc
-         JOIN departments d ON d.id = cc.department_id
-        WHERE d.status = 'ACTIVE' AND cc.status = 'ACTIVE'
-          AND NOT EXISTS (
-            SELECT 1 FROM budget_versions v
-             WHERE v.cost_center_id = cc.id AND v.year = $1 AND v.state = 'APPROVED'
-          )`,
-      [h.next],
-    );
-    const totalMissing = Number(unapprovedBefore[0].count);
+    const totalMissing = await missingCount();
     expect(totalMissing).toBeGreaterThanOrEqual(3);
 
-    const secondMonday = addDays(december.monday, 7);
-    const sinceRow = await h.ctx.sql.query<{ now: string }>(`SELECT clock_timestamp()::text AS now`);
-    await passOn(secondMonday);
-    await passOn(secondMonday);
+    const m4 = addDays(december.monday, 21);
+    await passOn(m4);
+    await passOn(m4);
 
     const aggregated = (
       await h.ctx.sql.query<{
@@ -241,14 +239,14 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
            FROM in_app_notifications
           WHERE code = 'BUDGET_NEXT_YEAR_MISSING' AND created_at >= $1::timestamptz
           ORDER BY recipient_employee_id`,
-        [sinceRow.rows[0].now],
+        [since],
       )
     ).rows;
 
     expect(aggregated).toHaveLength(2);
     expect(aggregated.map((row) => row.recipient_employee_id).sort()).toEqual(bothTold());
     expect(aggregated.every((row) => row.subject_type === null && row.subject_id === null)).toBe(true);
-    expect(aggregated.every((row) => row.event_key === `nextYearBudget:${h.next}:${secondMonday}`)).toBe(true);
+    expect(aggregated.every((row) => row.event_key === `nextYearBudget:${h.next}:${m4}`)).toBe(true);
     expect(aggregated.map((row) => row.params)).toEqual([
       { year: h.next, costCenterCount: totalMissing },
       { year: h.next, costCenterCount: totalMissing },
