@@ -15,14 +15,14 @@ Bộ kiểm tra nhanh Owner chốt từ 02/11/2026. **Không** chạy `pnpm chec
 4. `pnpm rules:check`
 5. `pnpm test:gates`
 6. `pnpm openapi:export` rồi `git diff --stat openapi.json`: không được có drift ngoài ý muốn. Nếu API đổi có chủ đích, commit `openapi.json` cùng thay đổi.
-7. Test **theo từng file đã sửa**: unit `pnpm jest <path>`, http `pnpm test:http -- <path>`, integration `pnpm test:integration -- <path>`.
+7. Unit test **theo từng file đã sửa**: `pnpm jest <path>`. `test:http`, `test:integration`, e2e **không** chạy trên máy — chạy trên CI GitHub (`gh workflow run ci.yml --ref <nhánh>`), xem [quy trình code AI](../../../docs/guides/quy-trinh-code-ai.md).
 
 Nếu một bước đỏ: sửa tối thiểu rồi chạy lại đúng bước đó, không chạy lại cả bộ.
 
 ## Báo cáo cuối
 
 - Liệt kê lệnh đã chạy và kết quả từng bước, cùng danh sách test theo file cho từng item.
-- Ghi rõ: "pnpm check và test toàn bộ CHƯA chạy — Owner chạy khi audit". Không được tuyên bố full suite xanh.
+- Ghi rõ: "pnpm check và test toàn bộ CHƯA chạy — full test chỉ chạy trên CI GitHub". Không được tuyên bố full suite xanh.
 - Bước nào bỏ qua thì nói rõ lý do.
 
 ## Lưu ý

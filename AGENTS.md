@@ -28,6 +28,7 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
 | Documentation or ADR                         | [Documentation rules](docs/rules/documentation.md)                                             |
 | Split assigned work into items (spec/plan)   | [Work-item sizing](docs/rules/work-item-sizing.md)                                             |
 | Add or change an out-of-HTTP command or seed | [Operational commands](docs/rules/operational-commands.md)                                     |
+| Code a spec/plan wave with AI (team of two)  | [Quy trình code AI](docs/guides/quy-trinh-code-ai.md) — lanes, quick checks, CI on GitHub      |
 
 ## Repository constraints
 
