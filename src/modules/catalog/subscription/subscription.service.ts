@@ -80,7 +80,8 @@ export interface UpdateSubscriptionInput {
  * The subscriptions and perpetual purchases of the plans, declared by the IT Admin (`US-04-03`, `US-04-05`). A write is
  * one transaction: the plan is locked `FOR SHARE`, the price is entered in dong and recorded with the snapshot of the same
  * currency (`QĐ-111an`: no exchange rate is read), the status is computed from what is complete, the audit event commits with the
- * row. The notice deadline, its source, the alert dates and the data-quality warning are derived when a subscription is read.
+ * row (see the standard lock order in `docs/rules/database-business.md`: subscription candidates before plan). The notice
+ * deadline, its source, the alert dates and the data-quality warning are derived when a subscription is read.
  */
 @Injectable()
 export class SubscriptionService {
@@ -241,10 +242,9 @@ export class SubscriptionService {
     const organizationId = await this.requireOrganizationId();
 
     const record = await this.runner.run(async (tx) => {
-      const current = await this.subscriptions.lock(tx, id);
-      if (!current) throw new SubscriptionNotFoundError();
+      const current = await this.lockForComplete(tx, id);
       if (current.status === 'ACTIVE') return current;
-      // The subscription is locked, then its plan `FOR UPDATE`: a draft that becomes live takes its turn against the other writes of the plan.
+      // The subscription candidates are locked first, then the plan `FOR UPDATE`: a draft that becomes live takes its turn against the other writes of the plan.
       const plan = await this.plans.lockExclusive(tx, current.planId);
       if (!plan) throw new SubscriptionPlanNotFoundError();
 
@@ -278,6 +278,26 @@ export class SubscriptionService {
     });
 
     return (await this.views.viewAll([record]))[0];
+  }
+
+  /**
+   * Locks the draft subscription and, when it renews a previous period, all current primary candidates of the plan together with
+   * the previous period in id order before locking the plan.
+   */
+  private async lockForComplete(tx: DbTx, id: string): Promise<SubscriptionRecord> {
+    const probe = await this.subscriptions.find(id, tx);
+    if (!probe) throw new SubscriptionNotFoundError();
+    if (probe.renewedFromId !== null) {
+      await this.subscriptions.lockPrimaryCandidates(tx, probe.planId, [id, probe.renewedFromId]);
+      const current = await this.subscriptions.find(id, tx);
+      if (!current) throw new SubscriptionNotFoundError();
+
+      return current;
+    }
+    const current = await this.subscriptions.lock(tx, id);
+    if (!current) throw new SubscriptionNotFoundError();
+
+    return current;
   }
 
   private assertShape(

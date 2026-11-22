@@ -28,7 +28,8 @@ import type { PoolStock } from '../../shared-pool/shared-pool.policy';
 type Planned = Awaited<ReturnType<ProvisioningGrantPlanner['plan']>>;
 
 /**
- * Writes the grant of the seat of a request in its own transaction (`US-07-01`, `QĐ-89a`): the request is locked and moved to "being
+ * Writes the grant of the seat of a request in its own transaction (`US-07-01`, `QĐ-89a`): for a personal seat the beneficiary employee
+ * is held `FOR SHARE` first (standard lock order in `docs/rules/database-business.md`), then the request is locked and moved to "being
  * carried out" (a second grant of it finds it no longer grantable), the seat target is locked, the holder is made, the assignment is written
  * and so is the manual task in the queue of the IT Admin in charge, with its audit event.
  */
@@ -53,6 +54,9 @@ export class ProvisioningGrantWriter {
   ): Promise<ProvisioningTaskRecord> {
     const { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts } = planned;
     const { holderContractEnd, holderHasTerm } = planned;
+    if (answer.seat === 'PERSONAL') {
+      await this.holders.lockPersonalEmployee(tx, answer.employeeId);
+    }
     // The request is locked and moved to "being carried out" here, in the transaction of the grant: a second grant of
     // the same request finds it no longer grantable, and a request that changed since the read above is refused.
     const claimed = await this.gate.get().claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);

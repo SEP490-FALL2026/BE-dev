@@ -46,6 +46,8 @@ interface Day {
  * AC-2 to AC-5, AC-8, AC-17, AC-18): one choice and one reason for a batch of up to 50, all or nothing (`Q-94`). The recommendations are
  * locked in ascending id order before licensing is called (`DA6-23`). _Keep_ and _exempt_ close the recommendation; _reclaim_ opens the
  * revocation through the gate of licensing with the grace of the decision, unless the right ends within a month, then it is left to end.
+ * Multi-seat reclaims follow the standard lock order (`docs/rules/database-business.md`): processed by `(subscriptionId, assignmentId, id)`
+ * while preserving the input `ids` order in returned outcomes.
  */
 @Injectable()
 export class DecisionService {
@@ -104,9 +106,14 @@ export class DecisionService {
     });
     const graceDays = input.choice === 'RECLAIM' ? await this.reclaims.graceDays() : 0;
     const batchId = ids.length > 1 ? randomUUID() : null;
-    const outcomes: DecisionOutcome[] = [];
-    for (const record of found) {
-      outcomes.push(
+    const ordered =
+      input.choice === 'RECLAIM'
+        ? [...found].sort((a, b) => compareSeatOrder(seats.get(a.id), a.id, seats.get(b.id), b.id))
+        : found;
+    const byId = new Map<string, DecisionOutcome>();
+    for (const record of ordered) {
+      byId.set(
+        record.id,
         await this.applyOne(
           tx,
           actor,
@@ -119,7 +126,7 @@ export class DecisionService {
     }
     await this.keepChecklist(tx, actor, found, { verdict, choice: input.choice, decidedAt: day.now });
 
-    return outcomes;
+    return found.map((record) => byId.get(record.id)!);
   }
 
   /** The answers of the head, kept once for each recommendation decided (one batch answers once). */
@@ -271,4 +278,23 @@ export class DecisionService {
 
     return { ...base, outcome: exempt ? 'EXEMPTED' : 'KEPT', revocationTaskId: null, notBefore: null };
   }
+}
+
+function compareText(left: string, right: string): number {
+  if (left < right) return -1;
+
+  return left > right ? 1 : 0;
+}
+
+function compareSeatOrder(
+  leftSeat: RuleSeat | undefined,
+  leftId: string,
+  rightSeat: RuleSeat | undefined,
+  rightId: string,
+): number {
+  return (
+    compareText(leftSeat?.subscriptionId ?? '', rightSeat?.subscriptionId ?? '') ||
+    compareText(leftSeat?.assignmentId ?? '', rightSeat?.assignmentId ?? '') ||
+    compareText(leftId, rightId)
+  );
 }

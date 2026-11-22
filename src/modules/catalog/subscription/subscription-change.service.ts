@@ -38,7 +38,7 @@ import type { UpdateSubscriptionInput } from './subscription.service';
 /**
  * A change of a subscription (`US-04-03`): a new unit price is entered in dong and recorded with today as its day and the snapshot of the
  * same currency (`QĐ-111an`); the original price a vendor quoted is only kept; the other fields are stored as they are; the owner department is not a field of a change. A write is one transaction under the locks of
- * the subscription and its plan.
+ * the subscription and its plan (see the standard lock order in `docs/rules/database-business.md`: subscription before plan).
  */
 @Injectable()
 export class SubscriptionChangeService {
@@ -94,8 +94,10 @@ export class SubscriptionChangeService {
     },
   ): Promise<SubscriptionRecord> {
     const { input, money, originalPrice, organizationId, expectedUpdatedAt } = change;
-    const current = await this.lockFresh(tx, id, expectedUpdatedAt);
-    // The plan is locked for writing when this subscription is to price it: the subscriptions of one plan take turns (Q-04).
+    const current = input.isPrimaryForPlan
+      ? await this.lockForPrimaryChange(tx, id, expectedUpdatedAt)
+      : await this.lockFresh(tx, id, expectedUpdatedAt);
+    // The plan is locked for writing when this subscription is to price it: the subscriptions of one plan take turns.
     const plan = input.isPrimaryForPlan
       ? await this.plans.lockExclusive(tx, current.planId)
       : await this.plans.lockShared(tx, current.planId);
@@ -144,6 +146,21 @@ export class SubscriptionChangeService {
   /** The subscription, locked, when it is still the one the client read (`expectedUpdatedAt`); else SubscriptionNotFoundError or SubscriptionStaleError. */
   private async lockFresh(tx: DbTx, id: string, expectedUpdatedAt?: Date): Promise<SubscriptionRecord> {
     const current = await this.subscriptions.lock(tx, id);
+    if (!current) throw new SubscriptionNotFoundError();
+    if (isStaleEdit(expectedUpdatedAt, current.updatedAt)) throw new SubscriptionStaleError(current.updatedAt);
+
+    return current;
+  }
+
+  /**
+   * Locks every current primary subscription of the plan together with `id` in id order before locking the plan exclusively,
+   * then re-reads and checks optimistic concurrency.
+   */
+  private async lockForPrimaryChange(tx: DbTx, id: string, expectedUpdatedAt?: Date): Promise<SubscriptionRecord> {
+    const probe = await this.subscriptions.find(id, tx);
+    if (!probe) throw new SubscriptionNotFoundError();
+    await this.subscriptions.lockPrimaryCandidates(tx, probe.planId, [id]);
+    const current = await this.subscriptions.find(id, tx);
     if (!current) throw new SubscriptionNotFoundError();
     if (isStaleEdit(expectedUpdatedAt, current.updatedAt)) throw new SubscriptionStaleError(current.updatedAt);
 

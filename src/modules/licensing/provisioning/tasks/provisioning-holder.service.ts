@@ -39,6 +39,14 @@ export class ProvisioningHolderService {
   ) {}
 
   /**
+   * Holds the beneficiary employee `FOR SHARE` before locking the request,
+   * keeping the standard lock order (`docs/rules/database-business.md`: employee before request).
+   */
+  lockPersonalEmployee(tx: DbTx, employeeId: string): Promise<void> {
+    return this.organizationReads.lockEmployeeForShare(tx, employeeId);
+  }
+
+  /**
    * No task to grant begins for a beneficiary who has left, nor from the day a departure blocks their access although they are not marked
    * left yet (`QĐ-77f`, `QĐ-110d`); a task already being worked is not touched. The grant and the claim of a queued task both ask it, in the
    * transaction of the act. Throws ProvisioningBeneficiaryDepartedError.
