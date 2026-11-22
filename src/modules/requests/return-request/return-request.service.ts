@@ -109,7 +109,7 @@ export class ReturnRequestService {
     const holderUnit = (await this.organizationReads.getOwningUnits([facts.employeeId], today, tx)).get(
       facts.employeeId,
     );
-    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, today);
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, today, tx);
     const sender = checkSender({
       actorEmployeeId: actor.employeeId,
       holderEmployeeId: facts.employeeId,

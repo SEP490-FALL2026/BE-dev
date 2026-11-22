@@ -280,7 +280,8 @@ export class LicensingApi {
     employeeId: string,
     planIds: readonly string[],
     page: { skip: number; take: number },
+    tx?: DbTx,
   ): Promise<{ items: AssignmentRecord[]; total: number }> {
-    return this.assignments.pageHeldOfPlans(employeeId, planIds, page);
+    return this.assignments.pageHeldOfPlans(employeeId, planIds, page, tx);
   }
 }

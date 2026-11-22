@@ -163,7 +163,7 @@ export class BudgetFactsService {
 
   /** The department the person heads today with its Cost Center, or null when they head none. */
   async headedUnit(employeeId: string, today: BusinessDate, tx?: DbTx): Promise<HeadedUnit | null> {
-    const headed = await this.organizationReads.getHeadedDepartment(employeeId, today);
+    const headed = await this.organizationReads.getHeadedDepartment(employeeId, today, tx);
     if (!headed) return null;
     const unit = (await this.organizationReads.getOwningUnits([employeeId], today, tx)).get(employeeId);
     if (!unit || unit.departmentId !== headed.departmentId) return null;

@@ -133,13 +133,15 @@ export class AssignmentService {
     employeeId: string,
     planIds: readonly string[],
     page: { skip: number; take: number },
+    tx?: DbTx,
   ): Promise<{ items: AssignmentRecord[]; total: number }> {
     return this.repo.pageHeldOfPlans(
       employeeId,
       planIds,
-      await this.organizationReads.businessToday(),
+      await this.organizationReads.businessToday(new Date(), tx),
       page.skip,
       page.take,
+      tx,
     );
   }
 

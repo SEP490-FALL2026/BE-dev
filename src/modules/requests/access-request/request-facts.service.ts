@@ -174,7 +174,7 @@ export class RequestFactsService {
       chainHasSpendStep: hasSpendStep(policy),
     });
 
-    const heldAccess = await this.heldAccess(input.employeeId, input.planId);
+    const heldAccess = await this.heldAccess(tx, input.employeeId, input.planId);
 
     return {
       today,
@@ -295,11 +295,11 @@ export class RequestFactsService {
   }
 
   /**
-   * The seat the person holds of the plan today, if any. It is read outside the transaction: it is a courtesy that spares
-   * a pointless request, and the grant itself still refuses an overlapping seat (`LICENSE_ASSIGNMENT.OVERLAP`).
+   * The seat the person holds of the plan today, if any. Read in the caller's transaction so the check and the decision see
+   * the same snapshot; the grant itself still refuses an overlapping seat (`LICENSE_ASSIGNMENT.OVERLAP`).
    */
-  private async heldAccess(employeeId: string, planId: string): Promise<HeldAccess | null> {
-    const { items } = await this.licensing.getSeatsHeldInPlans(employeeId, [planId], { skip: 0, take: 1 });
+  private async heldAccess(tx: DbTx, employeeId: string, planId: string): Promise<HeldAccess | null> {
+    const { items } = await this.licensing.getSeatsHeldInPlans(employeeId, [planId], { skip: 0, take: 1 }, tx);
     const [seat] = items;
 
     return seat ? { assignmentId: seat.id, effectiveFrom: seat.effectiveFrom, validUntil: seat.validUntil } : null;

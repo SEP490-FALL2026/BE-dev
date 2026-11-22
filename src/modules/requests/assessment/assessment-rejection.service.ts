@@ -44,7 +44,7 @@ export class AssessmentRejectionService {
       this.gate.requireAssessor(actor, request);
       if (
         body.alternativePlanId !== undefined &&
-        (await this.catalog.getPlanSummaries([body.alternativePlanId])).length === 0
+        (await this.catalog.getPlanSummaries([body.alternativePlanId], tx)).length === 0
       ) {
         throw new AssessmentReferenceNotFoundError('alternativePlanId');
       }

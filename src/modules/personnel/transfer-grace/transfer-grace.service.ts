@@ -38,8 +38,8 @@ export class TransferGraceService {
     const grace = graceOf({
       effectiveOn: transfer.effectiveOn,
       notedOn: today,
-      workingDays: Number(await this.parameters.getValue('TRANSFER_GRACE_WORKING_DAYS')),
-      reminderWorkingDays: Number(await this.parameters.getValue('TRANSFER_GRACE_REMINDER_WORKING_DAYS')),
+      workingDays: Number(await this.parameters.getValue('TRANSFER_GRACE_WORKING_DAYS', tx)),
+      reminderWorkingDays: Number(await this.parameters.getValue('TRANSFER_GRACE_REMINDER_WORKING_DAYS', tx)),
       nonWorkingDates: await this.parameters.getNonWorkingDates(startsOn, graceWindowEnd(startsOn)),
     });
     if (!(await this.graces.claim(tx, transfer.id, { endsOn: grace.endsOn, reminderOn: grace.reminderOn })))

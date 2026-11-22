@@ -91,7 +91,7 @@ export class DecisionService {
     day: Day,
   ): Promise<DecisionOutcome[]> {
     const records = await this.repo.lockMany(tx, ids);
-    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, day.today);
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, day.today, tx);
     const found = ids.flatMap((id) => records.get(id) ?? []);
     const seats =
       input.choice === 'RECLAIM' ? await this.reclaims.openSeatsOf(tx, day.today, found) : new Map<string, RuleSeat>();
@@ -104,7 +104,7 @@ export class DecisionService {
       decision: input.choice,
       reason: input.reason,
     });
-    const graceDays = input.choice === 'RECLAIM' ? await this.reclaims.graceDays() : 0;
+    const graceDays = input.choice === 'RECLAIM' ? await this.reclaims.graceDays(tx) : 0;
     const batchId = ids.length > 1 ? randomUUID() : null;
     const ordered =
       input.choice === 'RECLAIM'

@@ -52,7 +52,7 @@ export class OpenRequestService {
       [...new Set(items.map((item) => item.requesterEmployeeId))],
       tx,
     );
-    const plans = planIds.length === 0 ? [] : await this.catalog.getPlanSummaries(planIds);
+    const plans = planIds.length === 0 ? [] : await this.catalog.getPlanSummaries(planIds, tx);
     const beneficiary = await this.organizationReads.getEmployees([employeeId], tx);
     const left = beneficiary[0]?.status === 'TERMINATED';
 

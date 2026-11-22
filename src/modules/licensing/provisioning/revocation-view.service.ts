@@ -78,7 +78,7 @@ export class RevocationViewService {
     const { items, total } = await this.reads.heldPage(employeeId, onDate, page, tx);
     const planIds = [...new Set(items.map((row) => row.planId))];
     const plans = new Map(
-      (planIds.length > 0 ? await this.catalog.getPlanSummaries(planIds) : []).map((plan) => [plan.planId, plan]),
+      (planIds.length > 0 ? await this.catalog.getPlanSummaries(planIds, tx) : []).map((plan) => [plan.planId, plan]),
     );
 
     return {

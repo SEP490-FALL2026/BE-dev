@@ -92,4 +92,49 @@ describe('DecisionService batch reclaim processing order', () => {
     expect(openedOrder).toEqual(['rec-3', 'rec-2', 'rec-1']);
     expect(outcomes.map((o) => o.recommendationId)).toEqual(['rec-1', 'rec-2', 'rec-3']);
   });
+
+  it('forwards tx to getHeadedDepartment and reclaims.graceDays', async () => {
+    const getHeadedDepartment = jest.fn(() => Promise.resolve({ departmentId: 'dept-1' }));
+    const graceDays = jest.fn(() => Promise.resolve(7));
+    const organizationReads = {
+      getOrganization: jest.fn(() => Promise.resolve({ id: 'org-1' })),
+      businessToday: jest.fn(() => Promise.resolve('2026-11-23')),
+      getHeadedDepartment,
+    } as unknown as OrganizationReadApi;
+    const reclaims = {
+      openSeatsOf: jest.fn(() => Promise.resolve(new Map([['rec-1', makeSeat('rec-1', 'sub-A', 'asg-1')]]))),
+      graceDays,
+      open: jest.fn(() => Promise.resolve({ taskId: 'task-1', notBefore: '2026-11-30' })),
+    } as unknown as DecisionReclaimService;
+
+    const service = new DecisionService(
+      runner,
+      {
+        lockMany: jest.fn(() => Promise.resolve(new Map([['rec-1', makeRecord('rec-1')]]))),
+      } as unknown as GhostSeatRepo,
+      { insertDecision: jest.fn(() => Promise.resolve({ id: 'dec-1' })) } as unknown as GhostSeatDecisionRepo,
+      { transition: jest.fn() } as unknown as GhostSeatService,
+      organizationReads,
+      { pauseIfTransferred: jest.fn() } as unknown as DecisionTransferService,
+      reclaims,
+      {
+        judge: jest.fn(() => Promise.resolve({ verdict: 'OK' })),
+        record: jest.fn(),
+      } as unknown as PolicyChecklistApi,
+    );
+
+    await service.decide(
+      actor,
+      {
+        recommendationIds: ['rec-1'],
+        choice: 'RECLAIM',
+        reason: 'Unused seat',
+        checklist: { versionId: 'v1', answers: [] } as never,
+      },
+      new Date('2026-11-23T00:00:00Z'),
+    );
+
+    expect(getHeadedDepartment).toHaveBeenCalledWith('head-1', '2026-11-23', tx);
+    expect(graceDays).toHaveBeenCalledWith(tx);
+  });
 });

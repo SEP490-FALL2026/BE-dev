@@ -49,10 +49,10 @@ export class OperatingParametersApi {
   ) {}
 
   /** The value in force now: the stored one, or the default of the parameter. Throws ParameterNotFoundError for an unknown key. */
-  async getValue(key: string): Promise<ParameterValue> {
+  async getValue(key: string, tx?: DbTx): Promise<ParameterValue> {
     if (!definitionOf(key)) throw new ParameterNotFoundError(key);
 
-    return effectiveValues(await this.repo.currentRows())[key];
+    return effectiveValues(await this.repo.currentRows(tx))[key];
   }
 
   /**

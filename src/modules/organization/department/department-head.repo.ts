@@ -262,8 +262,12 @@ export class DepartmentHeadRepo {
   }
 
   /** The department the employee heads on `onDate`, if any (an unlocked read, for the per-request role check). */
-  async headedDepartment(employeeId: string, onDate: BusinessDate): Promise<{ departmentId: string } | null> {
-    const rows = await this.prisma.$queryRaw<{ department_id: string }[]>`
+  async headedDepartment(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ departmentId: string } | null> {
+    const rows = await (tx ?? this.prisma).$queryRaw<{ department_id: string }[]>`
       SELECT h.department_id FROM department_head_periods h
        WHERE h.employee_id = ${employeeId}::uuid
          AND h.valid_from <= ${onDate}::date AND (h.valid_to IS NULL OR h.valid_to > ${onDate}::date)

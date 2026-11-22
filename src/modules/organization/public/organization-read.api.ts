@@ -65,12 +65,16 @@ export class OrganizationReadApi {
 
   /** True when the employee heads a department or has a head period not yet ended: never a Super Admin (FR-8.7, AC-3). */
   async isDepartmentHead(employeeId: string, tx?: DbTx): Promise<boolean> {
-    return this.departments.hasHeadPeriodFrom(tx, employeeId, await this.businessToday());
+    return this.departments.hasHeadPeriodFrom(tx, employeeId, await this.businessToday(new Date(), tx));
   }
 
   /** The department this employee heads on `onDate` (default today), or null; unlocked, for the per-request role check. */
-  async getHeadedDepartment(employeeId: string, onDate?: BusinessDate): Promise<{ departmentId: string } | null> {
-    return this.departments.headedDepartment(employeeId, onDate ?? (await this.businessToday()));
+  async getHeadedDepartment(
+    employeeId: string,
+    onDate?: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ departmentId: string } | null> {
+    return this.departments.headedDepartment(employeeId, onDate ?? (await this.businessToday(new Date(), tx)), tx);
   }
 
   /** Every Unit Cost Center each of these departments ever had, in use or retired, by department id. */

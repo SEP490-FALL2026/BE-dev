@@ -36,7 +36,7 @@ export class DepartmentOpenWorkReader implements DepartmentUseReader, OnModuleIn
   async read(departmentId: string, _day: BusinessDate, limit: number, tx?: DbTx): Promise<UseGroup> {
     const { items, total } = await this.repo.openOfDepartment(departmentId, limit, tx);
     const plans = new Map(
-      (await this.catalog.getPlanSummaries([...new Set(items.map((item) => item.planId))])).map((plan) => [
+      (await this.catalog.getPlanSummaries([...new Set(items.map((item) => item.planId))], tx)).map((plan) => [
         plan.planId,
         `${plan.applicationName} / ${plan.planName}`,
       ]),

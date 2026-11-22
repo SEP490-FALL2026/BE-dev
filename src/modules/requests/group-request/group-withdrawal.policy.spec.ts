@@ -1,3 +1,11 @@
+import type { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import type { LicensingApi } from '../../licensing/public/licensing.api';
+import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import type { AccessRequestRepo } from '../access-request/access-request.repo';
+import type { SpendStatusService } from '../spend/spend-status.service';
+import type { GroupLineWithdrawer } from './group-line-withdrawer.service';
+import type { GroupWithdrawalAftermath } from './group-withdrawal-aftermath.service';
 import {
   checkLineWithdrawal,
   needStepOfGroup,
@@ -7,6 +15,8 @@ import {
   withdrawalAuditOf,
   type LineWithdrawalFacts,
 } from './group-withdrawal.policy';
+import { GroupWithdrawalService } from './group-withdrawal.service';
+import type { RequestLineRepo } from './request-line.repo';
 
 const facts: LineWithdrawalFacts = {
   actorEmployeeId: 'sender',
@@ -194,5 +204,77 @@ describe('the need step a request for a group is withdrawn by (QĐ-113d)', () =>
     ];
     expect(needStepOfGroup(steps, first, lines, 'req')).toBe('APPROVED');
     expect(needStepOfGroup(steps, first, [lines[0], { state: 'WITHDRAWN', needStepId: 's2' }], 'req')).toBe('PENDING');
+  });
+});
+
+describe('GroupWithdrawalService tx forwarding', () => {
+  const tx = { name: 'tx' } as unknown as DbTx;
+  const runner = { run: (work: (t: DbTx) => Promise<unknown>) => work(tx) } as unknown as TransactionRunner;
+  const actor = {
+    employeeId: 'emp-head',
+    appUserId: 'user-head',
+    roles: ['MANAGER'],
+    directRoles: ['MANAGER'],
+  } as unknown as AuthenticatedPrincipal;
+
+  const baseRequest = {
+    id: 'req-1',
+    type: 'GROUP_GRANT',
+    state: 'PENDING',
+    departmentId: 'dept-1',
+    requesterEmployeeId: 'emp-head',
+    beneficiaryEmployeeIds: ['emp-1'],
+    policy: { chain: ['NEED'], slaWorkingDays: 2 },
+    needStep: { state: 'PENDING', assigneeEmployeeId: 'emp-head' },
+    needSteps: [{ id: 'step-1', state: 'PENDING', assigneeEmployeeId: 'emp-head' }],
+    spendStep: null,
+    assessmentStep: null,
+    lines: [{ employeeId: 'emp-1', needStepId: 'step-1', state: 'AWAITING_NEED' }],
+  };
+
+  const makeService = () => {
+    const requests = {
+      lockById: jest.fn().mockResolvedValue(baseRequest),
+      findById: jest.fn().mockResolvedValue(baseRequest),
+    };
+    const lines = {
+      lock: jest.fn().mockResolvedValue([{ employeeId: 'emp-1', needStepId: 'step-1', state: 'AWAITING_NEED' }]),
+    };
+    const licensing = { lockGrantOfRequest: jest.fn().mockResolvedValue(undefined) };
+    const organizationReads = {
+      getHeadedDepartment: jest.fn().mockResolvedValue({ departmentId: 'dept-1' }),
+    };
+    const spendStatus = { of: jest.fn().mockResolvedValue(null) };
+    const withdrawer = { withdrawOne: jest.fn().mockResolvedValue({ kind: 'CANCELLED_BEFORE_GRANT' }) };
+    const aftermath = { after: jest.fn().mockResolvedValue(undefined) };
+
+    const service = new GroupWithdrawalService(
+      runner,
+      requests as unknown as AccessRequestRepo,
+      lines as unknown as RequestLineRepo,
+      licensing as unknown as LicensingApi,
+      organizationReads as unknown as OrganizationReadApi,
+      spendStatus as unknown as SpendStatusService,
+      withdrawer as unknown as GroupLineWithdrawer,
+      aftermath as unknown as GroupWithdrawalAftermath,
+    );
+
+    return { service, organizationReads };
+  };
+
+  it('forwards tx to getHeadedDepartment in withdrawLine', async () => {
+    const { service, organizationReads } = makeService();
+
+    await service.withdrawLine(actor, 'req-1', 'emp-1', { reason: 'No longer needed' });
+
+    expect(organizationReads.getHeadedDepartment).toHaveBeenCalledWith('emp-head', undefined, tx);
+  });
+
+  it('forwards tx to getHeadedDepartment in withdrawAll', async () => {
+    const { service, organizationReads } = makeService();
+
+    await service.withdrawAll(actor, 'req-1', { reason: 'No longer needed' });
+
+    expect(organizationReads.getHeadedDepartment).toHaveBeenCalledWith('emp-head', undefined, tx);
   });
 });

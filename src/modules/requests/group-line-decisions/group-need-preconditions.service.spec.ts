@@ -62,5 +62,6 @@ describe('GroupNeedPreconditions', () => {
 
     expect(result.open.map((line) => line.employeeId)).toEqual(['e1', 'e3']);
     expect(result.approves).toBe(true);
+    expect(licensing.getSeatsHeldInPlans).toHaveBeenCalledWith('e1', ['plan-1'], { skip: 0, take: 1 }, tx);
   });
 });

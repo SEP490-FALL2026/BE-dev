@@ -391,6 +391,7 @@ export class AssignmentRepo {
     day: BusinessDate,
     skip: number,
     take: number,
+    tx?: DbTx,
   ): Promise<{ items: AssignmentRecord[]; total: number }> {
     if (planIds.length === 0) return { items: [], total: 0 };
     const where: Prisma.LicenseAssignmentWhereInput = {
@@ -400,21 +401,21 @@ export class AssignmentRepo {
       validFrom: { lte: toDateColumn(day) },
       ...HOLDING(day),
     };
+    const read = async (client: DbTx) => {
+      const rows = await client.licenseAssignment.findMany({
+        where,
+        orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
+        skip,
+        take,
+      });
+      const total = await client.licenseAssignment.count({ where });
 
-    return this.prisma.$transaction(
-      async (tx) => {
-        const rows = await tx.licenseAssignment.findMany({
-          where,
-          orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
-          skip,
-          take,
-        });
-        const total = await tx.licenseAssignment.count({ where });
+      return { items: rows.map(toRecord), total };
+    };
 
-        return { items: rows.map(toRecord), total };
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
-    );
+    if (tx) return read(tx);
+
+    return this.prisma.$transaction(read, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
   /** How many different people hold an assignment of these plan ids that has not ended and has not failed. */

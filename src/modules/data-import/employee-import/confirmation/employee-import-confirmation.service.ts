@@ -148,7 +148,7 @@ export class EmployeeImportConfirmationService {
     fresh: JudgedRow[],
     on: { actor: AuthenticatedPrincipal; importId: string },
   ): Promise<Map<string, number>> {
-    const today = await this.organizationReads.businessToday();
+    const today = await this.organizationReads.businessToday(new Date(), tx);
     const createdByDepartment = new Map<string, number>();
     for (const row of fresh) {
       if (row.outcome !== 'VALID' || !row.parsed) continue;

@@ -71,23 +71,29 @@ export class GroupNeedPreconditions {
       input.lines.map((verdict) => verdict.employeeId),
     );
     if (mismatch) throw new GroupRequestLinesMismatchError(mismatch);
-    await this.assertNobodyHoldsAccess(request, input.lines);
+    await this.assertNobodyHoldsAccess(tx, request, input.lines);
 
     return { request, step, open, approves };
   }
 
   /** A person who holds a seat of the plan since the request was sent is not approved: the line is checked again (`AC-15`). */
   private async assertNobodyHoldsAccess(
+    tx: DbTx,
     request: AccessRequestRecord,
     verdicts: readonly { employeeId: string; decision: string }[],
   ): Promise<void> {
     if (request.planId === null) return;
     const holding: string[] = [];
     for (const verdict of verdicts.filter((candidate) => candidate.decision === 'APPROVE')) {
-      const { total } = await this.licensing.getSeatsHeldInPlans(verdict.employeeId, [request.planId], {
-        skip: 0,
-        take: 1,
-      });
+      const { total } = await this.licensing.getSeatsHeldInPlans(
+        verdict.employeeId,
+        [request.planId],
+        {
+          skip: 0,
+          take: 1,
+        },
+        tx,
+      );
       if (total > 0) holding.push(verdict.employeeId);
     }
     if (holding.length > 0) throw new GroupRequestLineHoldsAccessError(holding);
