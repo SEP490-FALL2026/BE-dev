@@ -5,7 +5,7 @@ import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/t
 import { BudgetYearEndService } from '../../src/modules/budgets/year-end/year-end.service';
 import { OrganizationHistoryApi } from '../../src/modules/organization/public/organization-history.api';
 import type { ApiAccount } from './api-accounts';
-import { afterPreparing, attachedVersionFile, SendingCycleLock, withProposalFile } from './budget-files';
+import { afterPreparing, attachedVersionFile, sendingCycleLock, withProposalFile } from './budget-files';
 import { Department, Person, RequestHarness } from './request-harness';
 
 export interface ProposalWire {
@@ -191,14 +191,12 @@ export class BudgetHarness extends RequestHarness {
       .put(`/api/v1/budget-versions/${id}`)
       .set(this.as(account))
       .send('base' in body && !('baseReason' in body) ? { baseReason: 'Finance moved the base', ...body } : body);
-  private readonly sendingCycleLock = new SendingCycleLock();
-
   /**
    * Sends a version; one that can take a file and has none gets one first (a version is sent with one at least, `QĐ-111ac`),
    * and an open cycle is temporarily locked for the duration of the send so later tests on the same year stay open.
    */
   sendVersion = (id: string, account: ApiAccount = this.finance) =>
-    this.sendingCycleLock.wrap(
+    sendingCycleLock.wrap(
       this.ctx.sql,
       id,
       this.today(),

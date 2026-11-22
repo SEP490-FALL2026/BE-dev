@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -65,33 +66,51 @@ export class BudgetAdjustmentDecisionService {
         throw new BudgetYearEndedError(adjustment.year);
       }
       const now = new Date();
+      const baseWatch = body.decision === 'APPROVE' ? await this.applier.watchSourceBase(tx, adjustment) : null;
       const createdVersionId =
         body.decision === 'APPROVE' ? await this.applier.apply(tx, actor, cycle, adjustment, today, now) : null;
-      await this.repo.decide(tx, id, {
-        state: body.decision === 'APPROVE' ? 'APPROVED' : 'REJECTED',
-        decidedByEmployeeId: actor.employeeId,
-        decidedAt: now,
-        decisionReason: body.reason ?? null,
-        createdVersionId,
-      });
-      const record = (await this.repo.findById(id, tx)) as AdjustmentRecord;
-      await this.audit.record(
-        tx,
-        budgetAuditEvent(
-          actor,
-          record.organizationId,
-          `BUDGET_ADJUSTMENT.${record.state}`,
-          'BUDGET_ADJUSTMENT',
-          id,
-          { ...auditOf(record), decisionReason: record.decisionReason },
-          { state: 'PENDING' },
-        ),
-      );
-      await this.notifier.decided(tx, record, today);
+      const record = await this.writeDecision(tx, actor, id, body, { createdVersionId, now, today });
+      await this.applier.settleSourceBase(tx, baseWatch, now);
 
       return record;
     });
 
     return (await this.queries.wires([decided]))[0];
+  }
+
+  private async writeDecision(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    id: string,
+    body: DecideAdjustmentBodyDto,
+    context: {
+      createdVersionId: string | null;
+      now: Date;
+      today: Parameters<BudgetAdjustmentNotifierService['decided']>[2];
+    },
+  ): Promise<AdjustmentRecord> {
+    await this.repo.decide(tx, id, {
+      state: body.decision === 'APPROVE' ? 'APPROVED' : 'REJECTED',
+      decidedByEmployeeId: actor.employeeId,
+      decidedAt: context.now,
+      decisionReason: body.reason ?? null,
+      createdVersionId: context.createdVersionId,
+    });
+    const record = (await this.repo.findById(id, tx)) as AdjustmentRecord;
+    await this.audit.record(
+      tx,
+      budgetAuditEvent(
+        actor,
+        record.organizationId,
+        `BUDGET_ADJUSTMENT.${record.state}`,
+        'BUDGET_ADJUSTMENT',
+        id,
+        { ...auditOf(record), decisionReason: record.decisionReason },
+        { state: 'PENDING' },
+      ),
+    );
+    await this.notifier.decided(tx, record, context.today);
+
+    return record;
   }
 }

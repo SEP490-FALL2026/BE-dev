@@ -90,6 +90,15 @@ export class SendingCycleLock {
   private chain: Promise<void> = Promise.resolve();
   private active = new Map<string, { organizationId: string; year: number; originalDeadline: string; count: number }>();
 
+  async run<T>(sql: Client, versionId: string, today: string, work: () => Promise<T>): Promise<T> {
+    const key = await this.acquire(sql, versionId, today);
+    try {
+      return await work();
+    } finally {
+      await this.release(sql, key);
+    }
+  }
+
   wrap<T extends Test>(sql: Client, versionId: string, today: string, test: T): T {
     const innerEnd = test.end.bind(test);
     test.end = (callback?: Parameters<Test['end']>[0]): T => {
@@ -164,3 +173,5 @@ export class SendingCycleLock {
     });
   }
 }
+
+export const sendingCycleLock = new SendingCycleLock();

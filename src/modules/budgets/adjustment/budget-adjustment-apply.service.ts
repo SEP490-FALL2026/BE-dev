@@ -6,7 +6,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { budgetAuditEvent } from '../budget/budget-facts.service';
 import { VersionRepo } from '../budget/version.repo';
 import { CycleRepo, type CycleRecord } from '../cycle/cycle.repo';
-import { ThresholdAlertService } from '../threshold/threshold-alert.service';
+import { ThresholdAlertService, type BaseDropWatch } from '../threshold/threshold-alert.service';
 import { VersionAdjustmentCreationService } from '../version/version-adjustment-creation.service';
 import type { AdjustmentRecord } from './budget-adjustment.repo';
 import { BudgetAdjustmentJudgeService } from './budget-adjustment-judge.service';
@@ -64,6 +64,20 @@ export class BudgetAdjustmentApplyService {
     await this.thresholds.settle(tx, watch, now);
 
     return versionId;
+  }
+
+  /** Reads the source Cost Center's effective base before an approved TRANSFER/RETURN lowers it; null for other kinds. */
+  watchSourceBase(tx: DbTx, adjustment: AdjustmentRecord): Promise<BaseDropWatch | null> {
+    if ((adjustment.kind !== 'TRANSFER' && adjustment.kind !== 'RETURN') || adjustment.fromCostCenterId === null) {
+      return Promise.resolve(null);
+    }
+
+    return this.thresholds.watchBase(tx, [{ costCenterId: adjustment.fromCostCenterId, year: adjustment.year }]);
+  }
+
+  /** Evaluates threshold crossings on the lowered source base after the adjustment decision is recorded. */
+  async settleSourceBase(tx: DbTx, watch: BaseDropWatch | null, now: Date): Promise<void> {
+    if (watch !== null) await this.thresholds.settleBase(tx, watch, now);
   }
 
   /** Lowers the annual ceiling of the cycle and keeps the ceiling before and after in the trail of the cycle, with the adjustment that moved it (US-06-20: Audit Trail). */
