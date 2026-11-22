@@ -91,6 +91,53 @@ export class SpendRoutingService {
     }
   }
 
+  /** Reloads the request after one-step conversion and finishes routing it within the caller's transaction. */
+  async finishConversionById(tx: DbTx, requestId: string, now: Date): Promise<void> {
+    const request = await this.requests.findById(requestId, tx);
+    if (request) await this.finishConversion(tx, request, now);
+  }
+
+  /** Routes a priced proposal after IT assessment: converts individual requests whose requester became head to one-step. */
+  async enterAfterAssessment(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void> {
+    let request = await this.requests.findById(requestId, tx);
+    if (!request) throw new Error(`The request ${requestId} was not found after its assessment was completed.`);
+    if (
+      request.routing?.mode !== 'ONE_STEP' &&
+      request.type !== 'GROUP_GRANT' &&
+      (await this.targets.isRequesterHead(
+        tx,
+        {
+          requesterEmployeeId: request.requesterEmployeeId,
+          departmentId: request.departmentId,
+          chainHasSpendStep: true,
+          branch: request.branch,
+        },
+        now,
+      ))
+    ) {
+      await this.requests.markOneStep(tx, request.id, 'REQUESTER_IS_HEAD');
+      await this.audit.record(
+        tx,
+        accessRequestAuditEvent(
+          actor,
+          request.organizationId,
+          'ACCESS_REQUEST.STEP_NOT_REQUIRED',
+          'ACCESS_REQUEST',
+          request.id,
+          {
+            requestId: request.id,
+            stepKind: 'NEED',
+            trigger: 'ASSESSMENT_COMPLETED',
+            oneStepReason: 'REQUESTER_IS_HEAD',
+            requesterBecameHead: true,
+          },
+        ),
+      );
+      request = (await this.requests.findById(requestId, tx)) ?? request;
+    }
+    if (request.routing?.mode === 'ONE_STEP') await this.route(tx, actor, request, 'SUBMISSION', now);
+  }
+
   private opensSpend(outcome: BudgetOutcome | null, oneStep: boolean): boolean {
     return outcome === 'WITHIN_BASE' || (oneStep && outcome === 'USES_RESERVE');
   }

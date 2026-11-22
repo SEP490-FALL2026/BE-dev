@@ -138,21 +138,18 @@ export function decideReassignment(
 
 /**
  * What the routing table of the need step says, as the target the reassignment reads. Free internal software of a department with no head
- * needs nobody to decide it (`QĐ-111bc`) unless a head is recorded to follow (`successorRecorded`): the work that waits moves to that head on the
- * day the period starts (`QĐ-110h`, `QĐ-110i`: the successor is required, so "no head" with none to follow is the department that never had
- * one), so it waits. Free software whose requester heads the department today needs nobody either: a head asking for themselves goes to the IT
- * Admin (`QĐ-103p`, `US-05-24`), and a request that was with the former head is ended the same way. Every other request that has no head waits
- * for one (`QĐ-110i`), and so does a paid request whose requester heads the department: the spend step it has is not one the Owner has chosen to
- * open here (`B2A-Q2`). A request sent now is routed by the table alone and is not changed by this.
+ * needs nobody to decide it unless a head is recorded to follow (a pending successor takes it when their period starts), so it waits.
+ * When a requester heads the department today, any non-group request — free or individual paid — skips the need step as `REQUESTER_IS_HEAD`,
+ * whereas a group request line stays unchanged. Every other request that has no head waits for one.
  */
 export function needStepTarget(
   decision: RoutingDecision,
-  facts: { chainHasSpendStep: boolean; successorRecorded: boolean },
+  facts: { chainHasSpendStep: boolean; successorRecorded: boolean; isGroupRequest?: boolean },
 ): StepTarget {
   if (decision.outcome === 'ASSIGNED') {
     return { assigneeEmployeeId: decision.assigneeEmployeeId, routingRow: decision.row };
   }
-  if (decision.outcome === 'NOT_REQUIRED' && endsAsFree(decision.oneStepReason, facts)) {
+  if (decision.outcome === 'NOT_REQUIRED' && isNotRequired(decision.oneStepReason, facts)) {
     return { assigneeEmployeeId: null, notRequired: decision.oneStepReason, routingRow: decision.row };
   }
 
@@ -162,15 +159,15 @@ export function needStepTarget(
   };
 }
 
-/** Whether the need step needs nobody, for the reason the table gives: only a chain with no spend step (free software) ends, and not while a head is recorded to follow a department that has none. */
-function endsAsFree(
+/** Whether the need step needs nobody: free software with no pending successor head, or an individual request whose requester is now head. */
+function isNotRequired(
   reason: OneStepReason,
-  facts: { chainHasSpendStep: boolean; successorRecorded: boolean },
+  facts: { chainHasSpendStep: boolean; successorRecorded: boolean; isGroupRequest?: boolean },
 ): reason is NeedNotRequiredReason {
+  if (reason === 'REQUESTER_IS_HEAD') return !facts.isGroupRequest;
   if (facts.chainHasSpendStep) return false;
-  if (reason === 'NO_DEPARTMENT_HEAD') return !facts.successorRecorded;
 
-  return reason === 'REQUESTER_IS_HEAD';
+  return reason === 'NO_DEPARTMENT_HEAD' && !facts.successorRecorded;
 }
 
 function endNotRequired(target: Extract<StepTarget, { notRequired: unknown }>): ReassignmentDecision {
