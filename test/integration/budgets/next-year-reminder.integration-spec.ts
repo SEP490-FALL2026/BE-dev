@@ -154,4 +154,61 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
     await passOn(december.monday);
     expect(await noticesOf(lacking)).toHaveLength(2);
   });
+
+  it('sends one aggregated notice per recipient with subject null and costCenterCount across multiple missing cost centers', async () => {
+    const missingUnits = await Promise.all([
+      h.departmentWithHead(`P-NYR${(counter += 1)}`),
+      h.departmentWithHead(`P-NYR${(counter += 1)}`),
+      h.departmentWithHead(`P-NYR${(counter += 1)}`),
+    ]);
+    for (const unit of missingUnits) {
+      await h.current((await h.budgetProposed(unit.head, unit.department.unitId, undefined, h.year)).id);
+    }
+    const covered = await h.departmentWithHead(`P-NYR${(counter += 1)}`);
+    await h.current((await h.budgetProposed(covered.head, covered.department.unitId, undefined, h.next)).id);
+
+    const { rows: unapprovedBefore } = await h.ctx.sql.query<{ count: string }>(
+      `SELECT count(DISTINCT d.unit_cost_center_id)::text AS count
+         FROM departments d
+         JOIN cost_centers cc ON cc.id = d.unit_cost_center_id
+        WHERE d.status = 'ACTIVE' AND cc.status = 'ACTIVE'
+          AND NOT EXISTS (
+            SELECT 1 FROM budget_versions v
+             WHERE v.cost_center_id = cc.id AND v.year = $1 AND v.state = 'APPROVED'
+          )`,
+      [h.next],
+    );
+    const totalMissing = Number(unapprovedBefore[0].count);
+    expect(totalMissing).toBeGreaterThanOrEqual(3);
+
+    const secondMonday = addDays(december.monday, 7);
+    const sinceRow = await h.ctx.sql.query<{ now: string }>(`SELECT clock_timestamp()::text AS now`);
+    await passOn(secondMonday);
+    await passOn(secondMonday);
+
+    const aggregated = (
+      await h.ctx.sql.query<{
+        recipient_employee_id: string;
+        subject_type: string | null;
+        subject_id: string | null;
+        params: Record<string, unknown>;
+        event_key: string;
+      }>(
+        `SELECT recipient_employee_id, subject_type, subject_id, params, event_key
+           FROM in_app_notifications
+          WHERE code = 'BUDGET_NEXT_YEAR_MISSING' AND created_at >= $1::timestamptz
+          ORDER BY recipient_employee_id`,
+        [sinceRow.rows[0].now],
+      )
+    ).rows;
+
+    expect(aggregated).toHaveLength(2);
+    expect(aggregated.map((row) => row.recipient_employee_id).sort()).toEqual(bothTold());
+    expect(aggregated.every((row) => row.subject_type === null && row.subject_id === null)).toBe(true);
+    expect(aggregated.every((row) => row.event_key === `nextYearBudget:${h.next}:${secondMonday}`)).toBe(true);
+    expect(aggregated.map((row) => row.params)).toEqual([
+      { year: h.next, costCenterCount: totalMissing },
+      { year: h.next, costCenterCount: totalMissing },
+    ]);
+  });
 });

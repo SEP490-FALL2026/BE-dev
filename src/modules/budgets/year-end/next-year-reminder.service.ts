@@ -13,13 +13,11 @@ export interface NextYearReminderResult {
 }
 
 /**
- * The reminder that the budget of the year after is not approved (`QĐ-111am`, B-4): on 01/12 and then every Monday until a version is
- * approved, Finance and the spending approver are told, for each Cost Center in use that has no approved budget of the year asked for, that it
- * has none. In December the year asked for is the next one; from 01/01 it is the year that runs (the year after has become it, and a request
- * waits for a budget as `QĐ-30b` says), so the Mondays of January and after go on for it. A Cost Center whose budget is approved is told no
- * more. The notice says the Cost Center and the year, never a figure. Its event key is the Cost Center and the
- * day, so a pass that runs again, or on another instance, writes nothing new. Each Cost Center is told in a transaction of its own, so one
- * that fails does not stop the others and is tried again at the next pass of the same day. Reminders only: nothing is decided or changed.
+ * Sends the reminder that budgets for the target year are not approved yet: on 01/12 and every Monday thereafter until every
+ * Cost Center in use has an approved budget, Finance and the spending approver each receive one aggregated inbox notification per pass
+ * (`subject` null, reporting the target year and how many Cost Centers still lack an approved budget, never a monetary figure).
+ * In December the target year is the next year; from 01/01 it becomes the running year. The event key contains the year and the day,
+ * so retries or concurrent workers write nothing twice. Each recipient has its own transaction so one failure never blocks the others.
  */
 @Injectable()
 export class NextYearReminderService {
@@ -47,27 +45,22 @@ export class NextYearReminderService {
       await this.facts.usableSpendingApproverEmployeeId(),
     ].filter((id): id is string => id !== null);
     let notices = 0;
-    for (const costCenterId of missing) {
+    for (const recipientEmployeeId of recipients) {
       try {
-        notices += await this.runner.run(async (tx) => {
-          let written = 0;
-          for (const recipientEmployeeId of recipients) {
-            const isNew = await this.notifications.notifyInApp(tx, {
-              organizationId,
-              recipientEmployeeId,
-              code: 'BUDGET_NEXT_YEAR_MISSING',
-              subject: { type: 'COST_CENTER', id: costCenterId },
-              params: { costCenterId, year: due.year },
-              eventKey: `nextYearBudget:${costCenterId}:${day}`,
-            });
-            if (isNew) written += 1;
-          }
-
-          return written;
-        });
+        const isNew = await this.runner.run((tx) =>
+          this.notifications.notifyInApp(tx, {
+            organizationId,
+            recipientEmployeeId,
+            code: 'BUDGET_NEXT_YEAR_MISSING',
+            subject: null,
+            params: { year: due.year, costCenterCount: missing.length },
+            eventKey: `nextYearBudget:${due.year}:${day}`,
+          }),
+        );
+        if (isNew) notices += 1;
       } catch (error) {
         this.logger.error(
-          `Next year budget reminder of Cost Center ${costCenterId} (${due.year}) failed: ${describeForOperator(error)}`,
+          `Next year budget reminder for recipient ${recipientEmployeeId} (${due.year}) failed: ${describeForOperator(error)}`,
           traceForOperator(error),
         );
       }
