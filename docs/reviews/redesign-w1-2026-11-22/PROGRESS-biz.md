@@ -23,8 +23,8 @@ Tracker sống qua compact context. Sonnet đọc lại file này **đầu mỗi
 | P14  | W1-21                  | xong       | 5cb99605 | `tsc` 0; `eslint` 0; `depcruise` 0; `check-rules` 0; `jest.gates` 17/17 (335); `export-openapi` 0 diff; `jest` 42/42 (453) | không         | Đã thêm `crossedByBaseDrop`, `watchBase`/`settleBase`, I-test (b)/(c) + sửa `SendingCycleLock` ở `budget.builder` (chạy trên CI) |
 | P15a | W1-24                  | chưa       |     |                     |               |                          |
 | P15b | W1-25                  | chưa       |     |                     |               |                          |
-| P17a | W1-17 (a)–(c), (f)–(h) | xong       |     | `tsc` 0; `eslint` 0; `depcruise` 0; `check-rules` 0; `jest.gates` 17/17 (335); `export-openapi` 0 diff; `jest` 100/100 (1354) | `department-head-loss.integration-spec.ts` (`B2A-Q2`) | `D-2`; thêm `requester-became-head.integration-spec.ts` ((a)-(c), (f)-(h)), gỡ suppression cũ của `step-reassignment.service.ts` (chạy I-test trên CI) |
-| P17b | W1-17 (d), (e), (i)    | chưa       |     |                     |               |                          |
+| P17a | W1-17 (a)–(c), (f)–(h) | xong       | a85fddb2 | `tsc` 0; `eslint` 0; `depcruise` 0; `check-rules` 0; `jest.gates` 17/17 (335); `export-openapi` 0 diff; `jest` 100/100 (1354) | `department-head-loss.integration-spec.ts` (`B2A-Q2`) | `D-2`; thêm `requester-became-head.integration-spec.ts` ((a)-(c), (f)-(h)), gỡ suppression cũ của `step-reassignment.service.ts` (chạy I-test trên CI) |
+| P17b | W1-17 (d), (e), (i)    | xong       |     | `tsc` 0; `eslint` 0; `depcruise` 0; `check-rules` 0; `jest.gates` 17/17 (335); `export-openapi` 0 diff; `jest` 101/101 (1359) | không         | Thêm unit `spend-routing.service.spec.ts` (ở `reassignment/`) & I-test `requester-became-head-edges.integration-spec.ts` ((d), (e), (i)) (chạy trên CI) |
 | P18  | chốt đợt               | chưa       |     |                     |               |                          |
 
 Trạng thái: `chưa` · `đang làm` · `xong` · `dừng hỏi`.
