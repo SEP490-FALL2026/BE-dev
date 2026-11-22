@@ -106,6 +106,28 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
     const boss = await h.staff(await h.departmentWithUnit('P-NYR-BOSS'), 'NYR-BOSS');
     await h.setRole('SPENDING_APPROVER', boss);
     approver = boss.employeeId;
+
+    await h.lockedCycle(h.next);
+    try {
+      const { rows: initialMissing } = await h.ctx.sql.query<{ id: string }>(
+        `SELECT cc.id FROM cost_centers cc JOIN departments d ON d.id = cc.department_id
+          WHERE d.status = 'ACTIVE' AND cc.status = 'ACTIVE'
+            AND NOT EXISTS (
+              SELECT 1 FROM budget_versions v
+               WHERE v.cost_center_id = cc.id AND v.year = $1 AND v.state = 'APPROVED'
+            )`,
+        [h.next],
+      );
+      for (const { id: costCenterId } of initialMissing) {
+        const res = await h.createVersion({ source: 'BASELINE', costCenterId, year: h.next }).expect(201);
+        const versionId = h.dataOf<{ version: { id: string } }>(res).version.id;
+        await h.sendVersion(versionId).expect(200);
+        await h.makeCurrent(versionId);
+      }
+    } finally {
+      await h.reopenedCycle(h.next);
+    }
+    expect(await missingCount()).toBe(0);
   }, 240000);
 
   beforeEach(async () => {
