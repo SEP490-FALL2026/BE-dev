@@ -24,7 +24,7 @@ Tracker sống qua compact context. Sonnet đọc lại file này **đầu mỗi
 | P15a | W1-24                  | chưa       |     |                     |               |                          |
 | P15b | W1-25                  | chưa       |     |                     |               |                          |
 | P17a | W1-17 (a)–(c), (f)–(h) | xong       | a85fddb2 | `tsc` 0; `eslint` 0; `depcruise` 0; `check-rules` 0; `jest.gates` 17/17 (335); `export-openapi` 0 diff; `jest` 100/100 (1354) | `department-head-loss.integration-spec.ts` (`B2A-Q2`) | `D-2`; thêm `requester-became-head.integration-spec.ts` ((a)-(c), (f)-(h)), gỡ suppression cũ của `step-reassignment.service.ts` (chạy I-test trên CI) |
-| P17b | W1-17 (d), (e), (i)    | xong       |     | `tsc` 0; `eslint` 0; `depcruise` 0; `check-rules` 0; `jest.gates` 17/17 (335); `export-openapi` 0 diff; `jest` 101/101 (1359) | không         | Thêm unit `spend-routing.service.spec.ts` (ở `reassignment/`) & I-test `requester-became-head-edges.integration-spec.ts` ((d), (e), (i)) (chạy trên CI) |
+| P17b | W1-17 (d), (e), (i)    | xong       | 1147140c | `tsc` 0; `eslint` 0; `depcruise` 0; `check-rules` 0; `jest.gates` 17/17 (335); `export-openapi` 0 diff; `jest` 101/101 (1359) | không         | Thêm unit `spend-routing.service.spec.ts` (ở `reassignment/`) & I-test `requester-became-head-edges.integration-spec.ts` ((d), (e), (i)) (chạy trên CI) |
 | P18  | chốt đợt               | chưa       |     |                     |               |                          |
 
 Trạng thái: `chưa` · `đang làm` · `xong` · `dừng hỏi`.
@@ -63,3 +63,4 @@ Trạng thái: `chưa` · `đang làm` · `xong` · `dừng hỏi`.
 
 | Lần | Commit | Run | Kết quả từng job |
 | --- | ------ | --- | ---------------- |
+| 1 | `1147140c` | [#45034271771](https://github.com/SEP490-FALL2026/BE-dev/actions/runs/45034271771) | `select` PASS; `http-contract` PASS; `e2e-smoke` PASS; `quality` FAIL (`module-graph.md` cũ); `integration(1)` 172/177 PASS (5 fail: 2 `FIX-TEST`, 2 `D-1` seed, 1 bug W1-20); `integration(2)` 171/177 PASS (6 fail: 3 `FIX-TEST`, 2 `D-1` seed, 2 bug test mới P7/P13b); `integration(3)` 171/175 PASS (4 fail: 2 `FIX-TEST`/P8-test, 2 bug test mới P17a/P17b); `integration-inband` 12/13 PASS (1 `D-1` seed) |

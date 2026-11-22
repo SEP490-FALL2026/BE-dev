@@ -168,9 +168,9 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
     await h.current((await h.budgetProposed(covered.head, covered.department.unitId, undefined, h.next)).id);
 
     const { rows: unapprovedBefore } = await h.ctx.sql.query<{ count: string }>(
-      `SELECT count(DISTINCT d.unit_cost_center_id)::text AS count
-         FROM departments d
-         JOIN cost_centers cc ON cc.id = d.unit_cost_center_id
+      `SELECT count(DISTINCT cc.id)::text AS count
+         FROM cost_centers cc
+         JOIN departments d ON d.id = cc.department_id
         WHERE d.status = 'ACTIVE' AND cc.status = 'ACTIVE'
           AND NOT EXISTS (
             SELECT 1 FROM budget_versions v

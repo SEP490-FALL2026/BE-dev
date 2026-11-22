@@ -143,12 +143,12 @@ describe('W1-17: when a requester becomes head, individual paid requests convert
       const sent = await h.sent(u.member, paid, { termMonths: 1 });
       const needStep = await h.stepOf(sent.id, 'NEED');
       await h.ctx.sql.query(
-        `UPDATE department_head_periods SET valid_from = valid_from - 2, valid_to = valid_from - 1 WHERE department_id = $1`,
-        [u.department.id],
-      );
-      await h.ctx.sql.query(
         `UPDATE employee_placements SET valid_from = valid_from - 2 WHERE department_id = $1 AND employee_id = $2`,
         [u.department.id, u.head.employeeId],
+      );
+      await h.ctx.sql.query(
+        `UPDATE department_head_periods SET valid_from = valid_from - 2, valid_to = valid_from - 1 WHERE department_id = $1`,
+        [u.department.id],
       );
       await changeRoleTo(h.ctx, h.admin, u.member.employeeId, 'MANAGER');
       const [{ id: periodId }] = (

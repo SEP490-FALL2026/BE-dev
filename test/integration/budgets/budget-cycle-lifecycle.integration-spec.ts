@@ -512,7 +512,14 @@ describe('the budget cycle: draft, open, locked (integration, real PostgreSQL)',
     it('allows draft build and update while OPEN, refuses submission with 409 BUDGET_CYCLE.NOT_LOCKED, and accepts after deadline', async () => {
       const unit = await h.departmentWithHead(`P-VLK${(counter += 1)}`);
       const year = nextYear();
-      await create(body(year, { submissionDeadline: day(5), decisionDeadline: day(20) })).expect(201);
+      await create(
+        body(year, {
+          submissionDeadline: day(5),
+          decisionDeadline: day(20),
+          annualCeiling: money(500_000_000),
+          sharedPoolReserve: money(50_000_000),
+        }),
+      ).expect(201);
       await open(year).expect(201);
 
       const proposal = await h.budgetProposed(unit.head, unit.department.unitId, undefined, year);

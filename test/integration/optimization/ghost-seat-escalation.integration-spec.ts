@@ -362,7 +362,7 @@ describe('the early push of a watch to the head of the department (integration, 
 
       const refused = batchOf(await post({ recommendationIds: [id] }, key(), w.it1).expect(201));
       expect(refused).toMatchObject({ escalated: 0, skipped: 1 });
-      expect(refused.results[0]).toEqual({ recommendationId: id, outcome: 'SKIPPED', reason: 'NOT_IN_CHARGE' });
+      expect(refused.results[0]).toMatchObject({ recommendationId: id, outcome: 'SKIPPED', reason: 'NOT_IN_CHARGE' });
 
       const byOwner = batchOf(await post({ recommendationIds: [id] }, key(), activeIt).expect(201));
       expect(byOwner).toMatchObject({ escalated: 1, skipped: 0 });

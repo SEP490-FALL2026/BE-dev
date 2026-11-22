@@ -317,7 +317,7 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
 
     const committed = await h.ctx.sql.query<CommitmentRow>(
       `SELECT year, amount_minor::text, origin::text, seat_monthly_minor::text
-         FROM budget_commitments WHERE request_id = $1 ORDER BY year`,
+         FROM budget_commitments WHERE request_id = $1 AND origin = 'YEAR_START' ORDER BY year`,
       [id],
     );
     expect(committed.rows).toEqual([

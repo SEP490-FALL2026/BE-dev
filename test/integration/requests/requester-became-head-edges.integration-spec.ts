@@ -131,7 +131,7 @@ describe('W1-17 edge cases: (d) blocked re-check, (e) Case B IT assessment, (i) 
 
       await h.makeHead(u.department, e2);
 
-      expect(await h.state(groupId)).toBe('PENDING');
+      expect(await h.state(groupId)).toBe('WAITING_CONTROLLED');
       const allApprove = [e1, e2, e3].map((person) => ({ employeeId: person.employeeId, decision: 'APPROVE' }));
       const ownBlocked = await h.decideLines(groupId, { lines: allApprove }, e2.account).expect(403);
       expect(h.codeOf(ownBlocked)).toBe('ACCESS_REQUEST.OWN_REQUEST');
@@ -139,6 +139,8 @@ describe('W1-17 edge cases: (d) blocked re-check, (e) Case B IT assessment, (i) 
       await h.withdrawLine(groupId, e2.employeeId, { reason: 'Cannot withdraw as head' }, e2.account).expect(403);
 
       await h.withdrawLine(groupId, e2.employeeId, { reason: 'Became department head' }, e1.account).expect(200);
+      await h.sweep();
+      expect(await h.state(groupId)).toBe('PENDING');
       await h
         .decideLines(
           groupId,

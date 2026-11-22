@@ -53,7 +53,7 @@ const SELECT_REQUEST = {
   departmentId: true,
   policy: true,
   beneficiaries: { select: { employeeId: true }, orderBy: { position: 'asc' } },
-  lines: { select: { employeeId: true, needStepId: true } },
+  lines: { where: { state: 'AWAITING_NEED' }, select: { employeeId: true, needStepId: true } },
   steps: {
     select: {
       id: true,
