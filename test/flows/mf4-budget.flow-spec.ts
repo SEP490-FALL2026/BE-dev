@@ -31,11 +31,31 @@ describe('MF-4 ngân sách năm: nháp → mở → BM-10 → chốt → phiên 
     return (wire(response).proposal as { id: string }).id;
   };
 
-  /** Finance sends a version with a file of its own (a version is sent with at least one). */
-  const sendVersion = async (id: string) => {
+  /** Temporarily shifts the submission deadline of `forYear` to yesterday while sending a budget version, then restores it. */
+  const withLockedCycle = async <T>(forYear: number, fn: () => Promise<T>): Promise<T> => {
+    const { submission_deadline: previous } = await world.facts.one<{ submission_deadline: Date }>(
+      `SELECT submission_deadline FROM budget_cycles WHERE year = $1`,
+      [forYear],
+    );
+    await world.ctx.sql.query(
+      `UPDATE budget_cycles SET submission_deadline = (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date - 1 WHERE year = $1`,
+      [forYear],
+    );
+    try {
+      return await fn();
+    } finally {
+      await world.ctx.sql.query(`UPDATE budget_cycles SET submission_deadline = $2 WHERE year = $1`, [
+        forYear,
+        previous,
+      ]);
+    }
+  };
+
+  /** Finance sends a version with a file of its own (a version is sent with at least one), while the cycle is locked. */
+  const sendVersion = async (id: string, forYear = year) => {
     await budgetFile(world, 'NV-FIN1', `/budget-versions/${id}/attachments`);
 
-    return call().post('NV-FIN1', `/budget-versions/${id}/submission`);
+    return withLockedCycle(forYear, () => call().post('NV-FIN1', `/budget-versions/${id}/submission`));
   };
 
   const versionState = async (id: string) =>
@@ -74,8 +94,10 @@ describe('MF-4 ngân sách năm: nháp → mở → BM-10 → chốt → phiên 
       );
       expect(row).toEqual({ currency: 'VND', reserve_percent: 10, cost_center_code: 'CC-DES', state: 'DRAFT' });
 
-      // A version is sent with a file of its own (`BUDGET_VERSION.ATTACHMENT_REQUIRED` without one).
-      const bare = await call().post('NV-FIN1', `/budget-versions/${version.id}/submission`);
+      // A version is sent with a file of its own (`BUDGET_VERSION.ATTACHMENT_REQUIRED` without one) once the cycle locks.
+      const bare = await withLockedCycle(year, () =>
+        call().post('NV-FIN1', `/budget-versions/${version.id}/submission`),
+      );
       expect([bare.status, call().codeOf(bare)]).toEqual([422, 'BUDGET_VERSION.ATTACHMENT_REQUIRED']);
       expect((await sendVersion(version.id)).status).toBe(200);
       expect(await versionState(version.id)).toBe('SENT');
@@ -201,7 +223,7 @@ describe('MF-4 ngân sách năm: nháp → mở → BM-10 → chốt → phiên 
       expect(created.status).toBe(201);
       const id = (wire(created).version as { id: string }).id;
 
-      const without = await call().post('NV-FIN1', `/budget-versions/${id}/submission`);
+      const without = await withLockedCycle(year, () => call().post('NV-FIN1', `/budget-versions/${id}/submission`));
       expect(without.status).toBe(422);
       expect(call().codeOf(without)).toBe('BUDGET.RESERVE_REASON_REQUIRED');
       expect(await versionState(id)).toBe('DRAFT');
@@ -225,7 +247,9 @@ describe('MF-4 ngân sách năm: nháp → mở → BM-10 → chốt → phiên 
       expect((await call().put('NV-FIN1', `/budget-versions/${id}`, { reserve: { amount: '3000000' } })).status).toBe(
         200,
       );
-      expect((await call().post('NV-FIN1', `/budget-versions/${id}/submission`)).status).toBe(200);
+      expect(
+        (await withLockedCycle(year, () => call().post('NV-FIN1', `/budget-versions/${id}/submission`))).status,
+      ).toBe(200);
       expect(await versionState(id)).toBe('SENT');
     });
 

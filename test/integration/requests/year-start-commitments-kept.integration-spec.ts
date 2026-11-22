@@ -157,7 +157,7 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
     ]);
   });
 
-  it('T-RQ2 (K2, no end): 375.000 approved on 20/11 holds 750.000 and keeps 4.500.000 (R-46); the price of 01/01 is 400.000 and the commitment is 4.800.000', async () => {
+  it('T-RQ2 (K2, no end): 375.000 approved on 20/11 holds 750.000 and keeps 4.500.000 (R-46); even when the price of 01/01 is 400.000, the commitment stays 4.500.000 at the approval price', async () => {
     const u = await unit();
     const { subscription, plan } = await planAt('K2', 375_000);
     const id = await approvedOn(u, plan, null, `${h.year}-11-20`);
@@ -167,7 +167,7 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
     await passOn();
 
     expect(await rows(id)).toEqual([
-      { year: h.next, amount_minor: '4800000', origin: 'YEAR_START', seat_monthly_minor: '400000' },
+      { year: h.next, amount_minor: '4500000', origin: 'YEAR_START', seat_monthly_minor: '375000' },
     ]);
   });
 

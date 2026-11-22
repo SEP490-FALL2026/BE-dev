@@ -37,15 +37,43 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
     };
   })();
 
-  /** The notices of the reminder for the Cost Center, with who was told and the key of the notice. */
-  const noticesOf = async (costCenterId: string) =>
+  /** The reminder notices written on the aggregated shape (`subject = null`), ordered by event key and recipient. */
+  const noticesForDay = async (day: string) =>
+    (
+      await h.ctx.sql.query<{
+        recipient_employee_id: string;
+        subject_type: string | null;
+        subject_id: string | null;
+        params: Record<string, unknown>;
+        event_key: string;
+      }>(
+        `SELECT recipient_employee_id, subject_type, subject_id, params, event_key FROM in_app_notifications
+          WHERE code = 'BUDGET_NEXT_YEAR_MISSING' AND event_key = $1 ORDER BY recipient_employee_id`,
+        [`nextYearBudget:${h.next}:${day}`],
+      )
+    ).rows;
+  const noticesAll = async () =>
     (
       await h.ctx.sql.query<{ recipient_employee_id: string; params: Record<string, unknown>; event_key: string }>(
         `SELECT recipient_employee_id, params, event_key FROM in_app_notifications
-          WHERE code = 'BUDGET_NEXT_YEAR_MISSING' AND subject_id = $1 ORDER BY event_key, recipient_employee_id`,
-        [costCenterId],
+          WHERE code = 'BUDGET_NEXT_YEAR_MISSING' ORDER BY event_key, recipient_employee_id`,
       )
     ).rows;
+  const unapprovedUnits: { head: Awaited<ReturnType<typeof h.departmentWithHead>>['head']; unitId: string }[] = [];
+  const missingCount = async () => {
+    const { rows } = await h.ctx.sql.query<{ count: string }>(
+      `SELECT count(DISTINCT cc.id)::text AS count
+         FROM cost_centers cc
+         JOIN departments d ON d.id = cc.department_id
+        WHERE d.status = 'ACTIVE' AND cc.status = 'ACTIVE'
+          AND NOT EXISTS (
+            SELECT 1 FROM budget_versions v
+             WHERE v.cost_center_id = cc.id AND v.year = $1 AND v.state = 'APPROVED'
+          )`,
+      [h.next],
+    );
+    return Number(rows[0].count);
+  };
   const passOn = (day: string) => {
     pretendBusinessToday(h.ctx.app, day);
 
@@ -55,8 +83,16 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
   const bare = async () => {
     const unit = await h.departmentWithHead(`P-NYR${(counter += 1)}`);
     await h.current((await h.budgetProposed(unit.head, unit.department.unitId, undefined, h.year)).id);
+    unapprovedUnits.push({ head: unit.head, unitId: unit.department.unitId });
 
     return unit.department.unitId;
+  };
+  const approveAllLacking = async () => {
+    while (unapprovedUnits.length > 0) {
+      const unit = unapprovedUnits.pop()!;
+      const proposal = await h.budgetProposed(unit.head, unit.unitId, undefined, h.next);
+      await h.current(proposal.id);
+    }
   };
   const bothTold = () => [h.finance.employeeId, approver].sort();
 
@@ -67,92 +103,99 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
     approver = boss.employeeId;
   }, 240000);
 
+  beforeEach(async () => {
+    await h.ctx.sql.query(`DELETE FROM in_app_notifications WHERE code = 'BUDGET_NEXT_YEAR_MISSING'`);
+  });
+
   afterAll(async () => {
     await h.stop();
   });
 
   afterEach(() => jest.restoreAllMocks());
 
-  it('tells Finance and the spending approver, once each, on 01/12, for a Cost Center with no approved budget of the year after, and not for one that has it', async () => {
-    const lacking = await bare();
+  it('tells Finance and the spending approver once each on 01/12 when at least one Cost Center lacks an approved next-year budget', async () => {
+    await bare();
     const covered = await h.departmentWithHead(`P-NYR${(counter += 1)}`);
     const proposal = await h.budgetProposed(covered.head, covered.department.unitId, undefined, h.next);
     await h.current(proposal.id);
+    const totalMissing = await missingCount();
 
     await passOn(december.first);
 
-    const told = await noticesOf(lacking);
+    const told = await noticesForDay(december.first);
     expect(told.map((notice) => notice.recipient_employee_id).sort()).toEqual(bothTold());
-    expect(told.every((notice) => notice.event_key === `nextYearBudget:${lacking}:${december.first}`)).toBe(true);
+    expect(told.every((notice) => notice.subject_type === null && notice.subject_id === null)).toBe(true);
     expect(told.map((notice) => notice.params)).toEqual([
-      { costCenterId: lacking, year: h.next },
-      { costCenterId: lacking, year: h.next },
+      { year: h.next, costCenterCount: totalMissing },
+      { year: h.next, costCenterCount: totalMissing },
     ]);
-    expect(await noticesOf(covered.department.unitId)).toEqual([]);
   });
 
   it('writes nothing the second time on the same day, and nothing more when two instances run at once', async () => {
-    const lacking = await bare();
+    await bare();
 
     await Promise.all([passOn(december.first), passOn(december.first)]);
     await passOn(december.first);
 
-    expect(await noticesOf(lacking)).toHaveLength(2);
+    expect(await noticesForDay(december.first)).toHaveLength(2);
   });
 
   it('tells again on the first Monday after, with a key of its own day, and on no day between: not the Tuesday after, not a day of November', async () => {
-    const lacking = await bare();
+    await bare();
     await passOn(december.first);
 
     await passOn(december.quietNovember);
-    expect(await noticesOf(lacking)).toHaveLength(2);
+    expect(await noticesAll()).toHaveLength(2);
     await passOn(december.tuesday);
-    expect(await noticesOf(lacking)).toHaveLength(2);
+    expect(await noticesAll()).toHaveLength(2);
     await passOn(december.monday);
 
-    const told = await noticesOf(lacking);
+    const told = await noticesAll();
     expect(told).toHaveLength(4);
     expect([...new Set(told.map((notice) => notice.event_key))]).toEqual([
-      `nextYearBudget:${lacking}:${december.first}`,
-      `nextYearBudget:${lacking}:${december.monday}`,
+      `nextYearBudget:${h.next}:${december.first}`,
+      `nextYearBudget:${h.next}:${december.monday}`,
     ]);
   });
 
-  it('goes on from January, every Monday, for the year that runs, until a version of it is approved: no end at 01/01 (B-4)', async () => {
+  it('goes on from January, every Monday, for the year that runs, until every missing Cost Center has an approved version: no end at 01/01 (B-4)', async () => {
+    await approveAllLacking();
     const unit = await h.departmentWithHead(`P-NYR${(counter += 1)}`);
     const lacking = unit.department.unitId;
+    const totalMissing = await missingCount();
     await passOn(december.first);
-    expect(await noticesOf(lacking)).toHaveLength(2);
+    expect(await noticesAll()).toHaveLength(2);
 
     await passOn(december.january);
-    const january = await noticesOf(lacking);
-    expect(january).toHaveLength(4);
-    // The year after has become the year that runs: it is the year the notice of January names.
+    const afterJan1 = await noticesAll();
+    expect(afterJan1).toHaveLength(4);
+    // The year after has become the year that runs: the notice in January still names that year.
     expect(
-      january.filter((notice) => notice.event_key.endsWith(december.january)).map((notice) => notice.params),
+      afterJan1.filter((notice) => notice.event_key.endsWith(december.january)).map((notice) => notice.params),
     ).toEqual([
-      { costCenterId: lacking, year: h.next },
-      { costCenterId: lacking, year: h.next },
+      { year: h.next, costCenterCount: totalMissing },
+      { year: h.next, costCenterCount: totalMissing },
     ]);
     await passOn(december.secondJanuary);
-    expect(await noticesOf(lacking)).toHaveLength(6);
+    expect(await noticesAll()).toHaveLength(6);
 
     const proposal = await h.budgetProposed(unit.head, lacking, undefined, h.next);
     await h.current(proposal.id);
     await passOn(addDays(december.secondJanuary, 7));
-    expect(await noticesOf(lacking)).toHaveLength(6);
+    expect(await noticesAll()).toHaveLength(6);
   });
 
-  it('stops in December once a version of the year after is approved', async () => {
+  it('stops in December once every Cost Center has an approved version of the year after', async () => {
+    await approveAllLacking();
     const unit = await h.departmentWithHead(`P-NYR${(counter += 1)}`);
     const lacking = unit.department.unitId;
     await passOn(december.first);
-    expect(await noticesOf(lacking)).toHaveLength(2);
+    expect(await noticesAll()).toHaveLength(2);
 
     const proposal = await h.budgetProposed(unit.head, lacking, undefined, h.next);
     await h.current(proposal.id);
     await passOn(december.monday);
-    expect(await noticesOf(lacking)).toHaveLength(2);
+    expect(await noticesAll()).toHaveLength(2);
   });
 
   it('sends one aggregated notice per recipient with subject null and costCenterCount across multiple missing cost centers', async () => {

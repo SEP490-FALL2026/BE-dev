@@ -22,7 +22,7 @@ interface BatchWire {
 }
 
 const key = (): string => `escalation-${randomUUID()}`;
-const post = (body: object, idempotencyKey: string | null = key(), account: ApiAccount = w.it1) => {
+const post = (body: object, idempotencyKey: string | null = key(), account: ApiAccount = w.worldItAdmin.account) => {
   const call = request(w.server()).post('/api/v1/ghost-seat-recommendations/escalations').set(w.as(account));
 
   return (idempotencyKey === null ? call : call.set('Idempotency-Key', idempotencyKey)).send(
@@ -45,8 +45,14 @@ describe('the early push of a watch to the head of the department (integration, 
   });
 
   /** A department with a head, a holder in it and a `G4` of the watch tier on the holder's seat. */
-  async function watchOf(code: string, over: { group?: 'G4'; tier?: 'MONITOR' | 'REVIEW' } = {}) {
-    const dept = await w.headedDepartment(code);
+  async function watchOf(
+    code: string,
+    over: { group?: 'G4'; tier?: 'MONITOR' | 'REVIEW'; itAdminEmployeeId?: string | null } = {},
+  ) {
+    const dept =
+      over.itAdminEmployeeId === undefined
+        ? await w.headedDepartment(code)
+        : await w.headedDepartment(code, over.itAdminEmployeeId);
     const holder = await w.seatIn(`${code}-H`, dept.departmentId);
     const id = await w.seedRecommendation({
       group: over.group ?? 'G4',
@@ -93,14 +99,14 @@ describe('the early push of a watch to the head of the department (integration, 
 
   it('audits the push by the IT Admin, with the batch and whether they are the one in charge, and the routing by the system; the note is kept with the batch only', async () => {
     const inChargeCase = await watchOf('P-ES2');
-    const otherCase = await watchOf('P-ES3');
+    const unassignedCase = await watchOf('P-ES3', { itAdminEmployeeId: null });
 
     const byInCharge = batchOf(
       await post({ recommendationIds: [inChargeCase.id], note: 'Please look.' }, key(), w.worldItAdmin.account).expect(
         201,
       ),
     );
-    const byOther = batchOf(await post({ recommendationIds: [otherCase.id] }).expect(201));
+    const byOther = batchOf(await post({ recommendationIds: [unassignedCase.id] }, key(), w.it1).expect(201));
 
     const events = async (id: string) =>
       (await w.auditOf('GHOST_SEAT_RECOMMENDATION', id)).map((event) => event.action);
@@ -118,7 +124,7 @@ describe('the early push of a watch to the head of the department (integration, 
       byInCharge: true,
     });
     expect(JSON.stringify(escalated)).not.toContain('Please look.');
-    const other = (await w.auditOf('GHOST_SEAT_RECOMMENDATION', otherCase.id)).find(
+    const other = (await w.auditOf('GHOST_SEAT_RECOMMENDATION', unassignedCase.id)).find(
       (event) => event.action === 'GHOST_SEAT.ESCALATED',
     );
     expect(other?.after).toMatchObject({ escalationId: byOther.id, hasNote: false, byInCharge: false });
@@ -287,7 +293,7 @@ describe('the early push of a watch to the head of the department (integration, 
       const shared = key();
       const first = batchOf(await post({ recommendationIds: [id] }, shared).expect(201));
 
-      const other = batchOf(await post({ recommendationIds: [id] }, shared, w.worldItAdmin.account).expect(201));
+      const other = batchOf(await post({ recommendationIds: [id] }, shared, w.it1).expect(201));
 
       expect(other.id).not.toBe(first.id);
       expect(other).toMatchObject({ replayed: false, escalated: 0, skipped: 1 });

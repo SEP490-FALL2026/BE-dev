@@ -2,6 +2,7 @@ import type { ConfigService } from '@nestjs/config';
 import type { DatabaseEnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import type { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuditApi } from '../../audit/public/audit.api';
+import type { LocalDemoBudgetCycleApi } from '../../budgets/public/local-demo-budget-cycle.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { LocalDemoAccountApi } from '../../identity-access/public/local-demo-account.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -51,16 +52,19 @@ function world(missing: string[] = [], accountState: 'present' | 'absent' = 'pre
     findAccountIdOfEmployee: (_tx: DbTx, employeeId: string) => Promise.resolve(`user-${employeeId}`),
     prepareCredential: () => Promise.resolve({ hash: 'hash', hashPolicyVersion: 1 }),
   } as unknown as IdentityAccessApi;
+  const setSubmissionDeadline = jest.fn().mockResolvedValue('2026-12-01');
+  const budgetCycles = { setSubmissionDeadline } as unknown as LocalDemoBudgetCycleApi;
   const api = new DemoAccountsApi(
     runner,
     organizationReads,
     identity,
     accounts,
+    budgetCycles,
     { record: jest.fn(() => Promise.resolve()) } as unknown as AuditApi,
     {} as ConfigService<DatabaseEnvironmentVariables, true>,
   );
 
-  return { api, perTransaction, getEmployeesByCodes };
+  return { api, perTransaction, getEmployeesByCodes, setSubmissionDeadline };
 }
 
 describe('DemoAccountsApi.describe', () => {
@@ -149,5 +153,22 @@ describe('DemoAccountsApi.create', () => {
     await expect(api.create('org-1', two, 'a-password-of-12', attribution)).rejects.toBeInstanceOf(
       DemoAccountsChangedError,
     );
+  });
+});
+
+describe('DemoAccountsApi.withLockedBudgetCycle', () => {
+  it('shifts and restores submissionDeadline in separate short transactions even when work throws', async () => {
+    const { api, setSubmissionDeadline, perTransaction } = world();
+
+    await expect(
+      api.withLockedBudgetCycle('org-1', 2026, '2026-11-30', () => {
+        expect(perTransaction).toHaveLength(1);
+        return Promise.reject(new Error('boom'));
+      }),
+    ).rejects.toThrow('boom');
+
+    expect(perTransaction).toHaveLength(2);
+    expect(setSubmissionDeadline).toHaveBeenNthCalledWith(1, expect.anything(), 'org-1', 2026, '2026-11-30');
+    expect(setSubmissionDeadline).toHaveBeenNthCalledWith(2, expect.anything(), 'org-1', 2026, '2026-12-01');
   });
 });

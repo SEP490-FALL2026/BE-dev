@@ -185,8 +185,8 @@ describe('the departure of a person, the revocations and the closing (integratio
       const second = await h.revokeRights(wire.id, {});
       expect([second.status, h.codeOf(second)]).toEqual([409, 'OFFBOARDING_CASE.NOTHING_TO_REVOKE']);
       const lockAgain = await h.revokeRights(wire.id, { accountLock: LOCK });
-      // Nothing is left to take away, which the selection says before it looks at the lock.
-      expect([lockAgain.status, h.codeOf(lockAgain)]).toEqual([409, 'OFFBOARDING_CASE.NOTHING_TO_REVOKE']);
+      // Existing active revocation tasks are still selected and refused because account lock was already recorded.
+      expect([lockAgain.status, h.codeOf(lockAgain)]).toEqual([409, 'OFFBOARDING_CASE.ALREADY_RECORDED']);
       const lockRoute = await h.lockAccount(wire.id, LOCK);
       expect([lockRoute.status, h.codeOf(lockRoute)]).toEqual([409, 'OFFBOARDING_CASE.ALREADY_RECORDED']);
     });

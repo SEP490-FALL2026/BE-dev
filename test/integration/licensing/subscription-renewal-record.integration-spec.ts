@@ -301,7 +301,7 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     expect(await periods()).toBe(before + 1);
   });
 
-  it('lets another IT Admin record for the one responsible: the audit says so and the one responsible is told (QĐ-58b)', async () => {
+  it('refuses another IT Admin while the responsible one is usable, and lets them record as a substitute once locked', async () => {
     const unit = await h.unit(2);
     const other = await handOthersToSecondItAdmin(h);
     const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
@@ -310,10 +310,22 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
       subscriptionId,
     ]);
 
-    const response = await record(
+    const refused = await record(
       { subscriptionId, choice: 'REDUCE', proposedQuantity: 2, outcome: 'AS_DECIDED', nextPeriod: nextYear(2) },
       other,
     );
+    expect([refused.status, h.codeOf(refused)]).toEqual([403, 'SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE']);
+
+    let response;
+    await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [h.it1.employeeId]);
+    try {
+      response = await record(
+        { subscriptionId, choice: 'REDUCE', proposedQuantity: 2, outcome: 'AS_DECIDED', nextPeriod: nextYear(2) },
+        other,
+      );
+    } finally {
+      await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE employee_id = $1`, [h.it1.employeeId]);
+    }
 
     expect(response.status).toBe(201);
     const id = h.dataOf<{ renewal: CaseWire }>(response).renewal.id;

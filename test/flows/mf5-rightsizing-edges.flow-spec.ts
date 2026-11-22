@@ -36,7 +36,7 @@ describe('MF-5 ghi kết quả điều chỉnh: các biên của F5-02 @MF5 @D1'
     call().data<{ adjustment: Adjustment }>(
       await call().get(code, `/subscription-renewals/adjustment?subscriptionId=${subscriptionId}`),
     ).adjustment;
-  const record = (body: Record<string, unknown>, code = 'NV-ITA1') =>
+  const record = (body: Record<string, unknown>, code = 'NV-ITA2') =>
     call().post(code, '/subscription-renewals', { subscriptionId: figma, outcome: 'AS_DECIDED', ...body });
   /** The year the vendor confirmed, starting on the renewal day (A1C-03, A1C-04). */
   const nextYear = (renewalOn: string, quantity: number) => ({
