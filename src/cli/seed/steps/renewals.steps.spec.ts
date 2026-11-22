@@ -63,14 +63,33 @@ describe('the recorded subscription adjustments', () => {
     );
     expect(() => renewalBody({ ...adjustment, suggestedChoice: null }, spec('adobe-cc-teams'))).toThrow(/choice/i);
   });
-  it('records both as ITA2, including the Zoom period owned by ITA1, and runs after the rules and decisions', () => {
+  it('records each renewal by the IT Admin responsible for its subscription, and runs after the rules and decisions', async () => {
     expect(fixture.renewals.map(({ subscription, by }) => [subscription, by])).toEqual([
       ['adobe-cc-teams', 'NV-ITA2'],
-      ['zoom-pro', 'NV-ITA2'],
+      ['zoom-pro', 'NV-ITA1'],
     ]);
     expect(fixture.subscriptions.find((row) => row.key === 'zoom-pro')!.responsible).toBe('NV-ITA1');
     const keys = demoSteps(fixture).map(({ key }) => key);
     expect(keys.indexOf(RENEWAL_STEPS[0].key)).toBeGreaterThan(keys.indexOf('ghost.decisions'));
+
+    const call = jest
+      .fn()
+      .mockImplementation((_email: string, method: string) =>
+        Promise.resolve(method === 'GET' ? { items: [], adjustment } : {}),
+      );
+    const zoomSub = fixture.subscriptions.find((row) => row.key === 'zoom-pro')!;
+    const ctx = {
+      fixture: {
+        ...fixture,
+        subscriptions: [zoomSub],
+        renewals: [{ ...spec('zoom-pro'), by: 'NV-ITA2' }],
+      },
+      mode: 'apply',
+      ids: { subscriptions: new Map([['zoom-pro', 'zoom-id']]) },
+      api: { call, signIn: jest.fn().mockResolvedValue(undefined) },
+    } as unknown as DemoRunContext;
+    await expect(RENEWAL_STEPS[0].run(ctx)).resolves.toMatchObject({ status: 'done' });
+    expect(call).toHaveBeenCalledWith('quan.ly@saoviet.example', 'POST', '/subscription-renewals', expect.anything());
   });
   it('leaves already recorded periods alone', async () => {
     const call = jest.fn().mockResolvedValue({ items: [{ id: 'renewal-1' }] });

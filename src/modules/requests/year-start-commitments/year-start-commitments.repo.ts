@@ -283,6 +283,30 @@ export class YearStartCommitmentsRepo {
   }
 
   /**
+   * Unheld approval amounts of group lines approved earlier than the prior year for non-term-limited requests in dong.
+   */
+  async keptPerpetualLines(
+    tx: DbTx,
+    requestIds: readonly string[],
+    beforeYear: number,
+  ): Promise<Map<string, Map<string, bigint>>> {
+    const kept = new Map<string, Map<string, bigint>>();
+    if (requestIds.length === 0) return kept;
+    const rows = await tx.accessRequestLineAmount.findMany({
+      where: { requestId: { in: [...requestIds] }, budgetYear: { lt: beforeYear }, held: false, currency: DONG },
+      select: { requestId: true, employeeId: true, amountMinor: true },
+      orderBy: [{ requestId: 'asc' }, { employeeId: 'asc' }, { budgetYear: 'desc' }],
+    });
+    for (const row of rows) {
+      const ofRequest = kept.get(row.requestId) ?? new Map<string, bigint>();
+      if (!ofRequest.has(row.employeeId)) ofRequest.set(row.employeeId, row.amountMinor);
+      kept.set(row.requestId, ofRequest);
+    }
+
+    return kept;
+  }
+
+  /**
    * The numbers the approval kept of the year `year` for the people of these requests for a group in a currency other than dong (a request approved
    * before the prices were all in dong): the pass does not read them, and says which it left (`BUDGET_COMMITMENT.YEAR_START_SAVED_AMOUNT_IGNORED`).
    */
@@ -291,6 +315,26 @@ export class YearStartCommitmentsRepo {
 
     return tx.accessRequestLineAmount.findMany({
       where: { requestId: { in: [...requestIds] }, budgetYear: year, held: false, currency: { not: DONG } },
+      select: { requestId: true, employeeId: true, amountMinor: true, currency: true },
+      orderBy: [{ requestId: 'asc' }, { employeeId: 'asc' }],
+    });
+  }
+
+  /** Foreign-currency unheld approval amounts for non-term-limited group requests approved before the prior year. */
+  async foreignKeptPerpetualLines(
+    tx: DbTx,
+    requestIds: readonly string[],
+    beforeYear: number,
+  ): Promise<ForeignKeptLine[]> {
+    if (requestIds.length === 0) return [];
+
+    return tx.accessRequestLineAmount.findMany({
+      where: {
+        requestId: { in: [...requestIds] },
+        budgetYear: { lt: beforeYear },
+        held: false,
+        currency: { not: DONG },
+      },
       select: { requestId: true, employeeId: true, amountMinor: true, currency: true },
       orderBy: [{ requestId: 'asc' }, { employeeId: 'asc' }],
     });

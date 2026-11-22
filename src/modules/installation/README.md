@@ -28,7 +28,8 @@ Lệnh nằm ở `src/cli/<lệnh>/` (bảng lệnh: `src/cli/commands.ts`) và 
   `IdentityAccessApi.prepareCredential` trước transaction, kế hoạch đọc lại trong transaction (đổi thì
   `DemoAccountsChangedError`), Audit `DEMO_DATASET.ACCOUNT_CREATED` + `ROLE.GRANTED` với `actorKind OPERATOR`; và
   `holdApplyLock`: khóa advisory phiên của fixture trên database (kết nối riêng, `trySessionAdvisoryLock` của
-  infrastructure) để hai `apply` không chạy cùng lúc; type ở `demo-accounts.types.ts`.
+  infrastructure) để hai `apply` không chạy cùng lúc; `withLockedBudgetCycle`: lùi tạm `submissionDeadline` qua
+  `LocalDemoBudgetCycleApi` để `ops:seed` gửi phiên bản qua HTTP API khi kỳ đã khóa rồi khôi phục hạn gốc; type ở `demo-accounts.types.ts`.
 - `InstallationInspectionApi` ([public/installation-inspection.api.ts](public/installation-inspection.api.ts)) — `inspect`: đếm và liệt kê vi phạm
   bất biến; type ở `inspection.types.ts`.
 - `MigrationPreflightApi` ([public/migration-preflight.api.ts](public/migration-preflight.api.ts)) — `judge`: lịch sử

@@ -3,6 +3,8 @@ export type RenewalProblem =
   | 'NOT_FOUND'
   /** The caller reads no renewal (an employee, the person who decides spending: `SoD-2`). */
   | 'READ_FORBIDDEN'
+  /** The caller is not the IT Admin responsible for the subscription while that admin is still active. */
+  | 'NOT_RESPONSIBLE'
   /** No renewal is recorded for it (`QĐ-49c`, `FR-1.12`(9)): `details.reason` is PERPETUAL, INTERNAL, NOT_POOL_TERM, NOT_ACTIVE, ALREADY_CONTINUED or CANCELLED (the company recorded the subscription as cancelled, `A1C-02`). */
   | 'NOT_RENEWABLE'
   /** The period has no milestone: the contract data must be completed first (`US-11-05` AC-1). */

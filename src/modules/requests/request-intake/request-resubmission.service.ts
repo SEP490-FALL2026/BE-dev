@@ -82,8 +82,9 @@ export class RequestResubmissionService {
     );
   }
 
-  /** A new need step for each returned one that something still waits on, and the request back to waiting for its head. */
+  /** A new need step for each returned one that something still waits on, or one-step conversion when a non-group requester became head. */
   private async reopenNeed(tx: DbTx, actor: AuthenticatedPrincipal, request: AccessRequestRecord, now: Date) {
+    if (await this.convertResubmissionToOneStep(tx, actor, request, now)) return;
     const waiting = await this.stepsStillWaiting(tx, request);
     if (waiting.length === 0) throw new AccessRequestNotAwaitingRevisionError();
     const reopened: string[] = [];
@@ -122,6 +123,46 @@ export class RequestResubmissionService {
         },
       ),
     );
+  }
+
+  private async convertResubmissionToOneStep(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+    now: Date,
+  ): Promise<boolean> {
+    if (request.type === 'GROUP_GRANT') return false;
+    const becameHead = await this.targets.isRequesterHead(
+      tx,
+      {
+        requesterEmployeeId: request.requesterEmployeeId,
+        departmentId: request.departmentId ?? '',
+        chainHasSpendStep: request.policy?.chain.includes('SPEND_APPROVAL') ?? false,
+        branch: request.branch,
+      },
+      now,
+    );
+    if (!becameHead) return false;
+    await this.requests.markOneStep(tx, request.id, 'REQUESTER_IS_HEAD');
+    await this.audit.record(
+      tx,
+      accessRequestAuditEvent(
+        actor,
+        request.organizationId,
+        'ACCESS_REQUEST.STEP_NOT_REQUIRED',
+        'ACCESS_REQUEST',
+        request.id,
+        {
+          requestId: request.id,
+          stepKind: 'NEED',
+          oneStepReason: 'REQUESTER_IS_HEAD',
+          requesterBecameHead: true,
+        },
+      ),
+    );
+    await this.spending.start(tx, actor, request.id, now);
+
+    return true;
   }
 
   /** The returned need steps still holding something: the last one of a request for a person, the ones holding people who wait for their need in a group. */

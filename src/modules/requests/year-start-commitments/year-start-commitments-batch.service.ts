@@ -242,16 +242,22 @@ export class YearStartCommitmentsBatchService {
       ...(await this.unclaimedSeatsOf(tx, candidates, year, keptOf)),
       ...(await this.grantedSeatsOf(tx, candidates, year, keptOf)),
     ]) {
-      seats.set(requestId, [...(seats.get(requestId) ?? []), { ...seat, approvalPrice: priceOf(requestId) }]);
+      const approvalPrice =
+        !seat.termLimited && seat.savedMinor !== null
+          ? {
+              unitPrice: { amountMinor: (seat.savedMinor + 11n) / 12n, currency: DONG },
+              billingCycle: 'MONTHLY' as const,
+            }
+          : priceOf(requestId);
+      seats.set(requestId, [...(seats.get(requestId) ?? []), { ...seat, approvalPrice }]);
     }
 
     return { seats, ignored };
   }
 
   /**
-   * What the approval of a request kept of the year for a person, as a reader of the rows of the year (`QĐ-111k`, M-13): only a number written in
-   * dong (`QĐ-111an`). A number kept in another currency (a request approved before the prices were all in dong, which the migration left as it
-   * was) is not read and not converted, and is returned in `ignored` to be said in the audit trail.
+   * What the approval of a request kept of the year for a person, reading non-term-limited requests across every year after approval
+   * and term-limited requests for the year immediately following approval; non-dong amounts are left ignored and audited.
    */
   private async keptNumbersOf(
     tx: DbTx,
@@ -259,18 +265,40 @@ export class YearStartCommitmentsBatchService {
     year: number,
   ): Promise<{ keptOf: KeptOf; ignored: IgnoredSaved[] }> {
     const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+    const isPerpetual = (candidate: YearStartCandidate) =>
+      candidate.termMonths === null && candidate.expectedEndDate === null;
     const groupIds = candidates
       .filter((candidate) => candidate.type === 'GROUP_GRANT')
       .map((candidate) => candidate.id);
+    const stalePerpetualGroupIds = candidates
+      .filter(
+        (candidate) =>
+          candidate.type === 'GROUP_GRANT' &&
+          isPerpetual(candidate) &&
+          candidate.budgetYear !== null &&
+          candidate.budgetYear < year - 1,
+      )
+      .map((candidate) => candidate.id);
     const keptLines = await this.repo.keptNextYearOfLines(tx, groupIds, year);
-    const ignored: IgnoredSaved[] = (await this.repo.foreignKeptNextYearOfLines(tx, groupIds, year)).map((line) => ({
+    if (stalePerpetualGroupIds.length > 0) {
+      for (const [reqId, lines] of await this.repo.keptPerpetualLines(tx, stalePerpetualGroupIds, year)) {
+        keptLines.set(reqId, lines);
+      }
+    }
+    const foreignLines = [
+      ...(await this.repo.foreignKeptNextYearOfLines(tx, groupIds, year)),
+      ...(stalePerpetualGroupIds.length > 0
+        ? await this.repo.foreignKeptPerpetualLines(tx, stalePerpetualGroupIds, year)
+        : []),
+    ];
+    const ignored: IgnoredSaved[] = foreignLines.map((line) => ({
       requestId: line.requestId,
       employeeId: line.employeeId,
       currency: line.currency,
       savedMinor: line.amountMinor,
     }));
     for (const candidate of candidates) {
-      const kept = candidate.type !== 'GROUP_GRANT' && candidate.budgetYear === year - 1;
+      const kept = candidate.type !== 'GROUP_GRANT' && (isPerpetual(candidate) || candidate.budgetYear === year - 1);
       if (kept && candidate.nextYearAmountMinor !== null && candidate.amountCurrency !== DONG) {
         ignored.push({
           requestId: candidate.id,
@@ -285,8 +313,9 @@ export class YearStartCommitmentsBatchService {
       const request = byId.get(requestId);
       if (request === undefined) return null;
       if (request.type === 'GROUP_GRANT') return keptLines.get(requestId)?.get(employeeId ?? '') ?? null;
+      const applicableYear = isPerpetual(request) || request.budgetYear === year - 1;
 
-      return request.budgetYear === year - 1 && request.amountCurrency === DONG ? request.nextYearAmountMinor : null;
+      return applicableYear && request.amountCurrency === DONG ? request.nextYearAmountMinor : null;
     };
 
     return { keptOf, ignored };

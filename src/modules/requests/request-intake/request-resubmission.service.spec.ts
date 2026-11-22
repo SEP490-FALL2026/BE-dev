@@ -79,11 +79,12 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
     setState: jest.fn(),
     assessmentSentBack: jest.fn(),
     reopenAssessmentStep: jest.fn(),
+    markOneStep: jest.fn(),
   };
-  const spend = { route: jest.fn() };
+  const spend = { route: jest.fn(), start: jest.fn() };
   const lines = { lock: jest.fn(), repointNeed: jest.fn() };
   const audit = { record: jest.fn() };
-  const targets = { assessmentTarget: jest.fn() };
+  const targets = { assessmentTarget: jest.fn(), isRequesterHead: jest.fn() };
   const service = new RequestResubmissionService(
     { run: (fn: (tx: unknown) => unknown) => fn(tx) } as never,
     repo as never,
@@ -98,6 +99,7 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
     repo.lockById.mockResolvedValue(viaHead);
     repo.findById.mockResolvedValue(viaHead);
     repo.addNeedStep.mockResolvedValue('step-2');
+    targets.isRequesterHead.mockResolvedValue(false);
   });
 
   it('opens a new need step for the head of the returned one and waits for the head, not for the spending approver', async () => {
@@ -139,6 +141,21 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
 
     expect(repo.addNeedStep).toHaveBeenCalledTimes(1);
     expect(lines.repointNeed).toHaveBeenCalledWith(tx, 'request', ['e1', 'e2'], 'step-2');
+    expect(targets.isRequesterHead).not.toHaveBeenCalled();
+  });
+
+  it('converts a non-group request to ONE_STEP (REQUESTER_IS_HEAD) when the requester became head before resubmission', async () => {
+    targets.isRequesterHead.mockResolvedValue(true);
+
+    await service.resubmit(actor, 'request');
+
+    expect(repo.markOneStep).toHaveBeenCalledWith(tx, 'request', 'REQUESTER_IS_HEAD');
+    expect(repo.addNeedStep).not.toHaveBeenCalled();
+    expect(spend.start).toHaveBeenCalledWith(tx, actor, 'request', expect.any(Date));
+    expect(audit.record).toHaveBeenCalledTimes(1);
+    const [, event] = audit.record.mock.calls[0] as [unknown, { action: string; after: Record<string, unknown> }];
+    expect(event.action).toBe('ACCESS_REQUEST.STEP_NOT_REQUIRED');
+    expect(event.after).toMatchObject({ requesterBecameHead: true, oneStepReason: 'REQUESTER_IS_HEAD' });
   });
 });
 

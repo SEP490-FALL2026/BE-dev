@@ -384,12 +384,13 @@ describe('a department with no head: paid requests and case B wait for one, over
       expect(await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', before.id)).toEqual([]);
     });
 
-    it('goes to the IT Admin when its requester becomes the head, as a head asking for themselves does, flagged and audited once, while a paid request of the same person keeps waiting (QĐ-103p, US-05-24, B2A-R4)', async () => {
+    it('goes to the IT Admin when its requester becomes the head, as a head asking for themselves does, flagged and audited once, and also converts a paid request of the same person to one-step (QĐ-103p, QĐ-114r, US-05-24)', async () => {
       n += 1;
       const unit = await h.departmentWithHead(`P-XH${n}`);
       const free = await h.sent(unit.member, internal);
       const sentPaid = await h.sent(unit.member, paid);
       const before = await h.stepOf(free.id, 'NEED');
+      const paidBefore = await h.stepOf(sentPaid.id, 'NEED');
       expect(before).toMatchObject({ state: 'PENDING', assignee_employee_id: unit.head.employeeId });
 
       // The Super Admin makes the requester the head of the department.
@@ -424,12 +425,25 @@ describe('a department with no head: paid requests and case B wait for one, over
       await h.sweep();
       expect(await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', before.id)).toHaveLength(1);
       expect(await h.audit('ACCESS_REQUEST.NO_NEED_APPROVER', free.id)).toHaveLength(1);
-      // A paid request is another matter (B2A-Q2): it has a spend step, so it still waits and is not flagged.
+      // A paid request of the same requester also converts to one-step with REQUESTER_IS_HEAD.
       expect(await h.stepOf(sentPaid.id, 'NEED')).toMatchObject({
-        state: 'WAITING',
-        waiting_reason: 'NO_DEPARTMENT_HEAD',
+        state: 'NOT_REQUIRED',
+        assignee_employee_id: null,
+        waiting_reason: null,
+        routing_row: 2,
       });
-      expect(await h.audit('ACCESS_REQUEST.NO_NEED_APPROVER', sentPaid.id)).toEqual([]);
+      expect(await requestRow(sentPaid.id)).toMatchObject({
+        routing_mode: 'ONE_STEP',
+        one_step_reason: 'REQUESTER_IS_HEAD',
+      });
+      const paidEnded = await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', paidBefore.id);
+      expect(paidEnded).toHaveLength(1);
+      expect(paidEnded[0].after).toMatchObject({
+        requestId: sentPaid.id,
+        stepKind: 'NEED',
+        oneStepReason: 'REQUESTER_IS_HEAD',
+        requesterBecameHead: true,
+      });
     });
 
     it('also puts right a request of its own head that waited for a head under the rule before this one: the next pass of the worker sends it on (B2A-R4)', async () => {

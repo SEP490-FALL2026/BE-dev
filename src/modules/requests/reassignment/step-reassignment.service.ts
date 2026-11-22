@@ -13,7 +13,11 @@ import {
   type ReassignmentDecision,
   type ReassignmentTrigger,
 } from '../step-routing/reassignment.policy';
-import { reassignmentAuditEvent } from './reassignment-audit.mapper';
+import {
+  queuedSpendNotRequiredEvent,
+  reassignmentAuditEvent,
+  stepWaitingAuditEvent,
+} from './reassignment-audit.mapper';
 import {
   StepReassignmentRepo,
   type ReassignableRequest,
@@ -90,6 +94,11 @@ export class StepReassignmentService {
     return this.repo.pendingNeedRequestIds(after, limit);
   }
 
+  /** Individual requests awaiting spend submission that still hold VIA_HEAD routing, checked once per daily pass. */
+  spendQueueRequestIds(): Promise<string[]> {
+    return this.repo.spendQueueRequestIds();
+  }
+
   /** Looks again at one request in a transaction of its own, so that one that fails does not hold back the others. */
   reconcileInOwnTransaction(
     requestId: string,
@@ -163,134 +172,241 @@ export class StepReassignmentService {
     context: { gone: ReadonlySet<string>; operator?: OperatorAuditActor },
     result: ReconcileResult,
   ): Promise<void> {
-    const { gone, operator } = context;
     const steps = request.steps.map((step) => ({ ...step }));
     let state = request.state;
+    const stepContext = { trigger, correlationId, now, facts, ...context };
 
     for (const step of steps) {
-      if (!OPEN.has(step.state)) continue;
-      const open: OpenStep = {
-        kind: step.kind,
-        state: step.state as 'PENDING' | 'WAITING',
-        holderEmployeeId: step.assigneeEmployeeId,
-        holderGone: step.assigneeEmployeeId !== null && gone.has(step.assigneeEmployeeId),
-        waitingReason: step.waitingReason,
-      };
-      if (open.state === 'PENDING' && !touchesHeldStep(open, trigger)) continue;
-
-      const decision = decideReassignment(open, trigger, await this.targets.targetOf(tx, request, step, facts));
-      if (decision.action === 'KEEP') {
-        if (open.state === 'WAITING') result.alerted += await this.alert(tx, request, step, correlationId);
-        continue;
-      }
-      if (decision.action === 'REWAIT') {
-        const previousReason = step.waitingReason;
-        await this.repo.rewait(tx, step.id, decision.reason);
-        step.waitingReason = decision.reason;
-        await this.audit.record(
-          tx,
-          reassignmentAuditEvent(
-            request.organizationId,
-            'ACCESS_REQUEST.STEP_WAITING_REASON_CHANGED',
-            'ACCESS_REQUEST_STEP',
-            step.id,
-            {
-              requestId: request.id,
-              stepKind: step.kind,
-              trigger: trigger.kind,
-              source: correlationId,
-              waitingReason: decision.reason,
-              // The stretch of waiting goes on: the deadline and the alert of the stretch do not start again.
-              stepCreatedAt: step.createdAt.toISOString(),
-            },
-            correlationId,
-            { waitingReason: previousReason },
-            operator,
-          ),
-        );
-        result.rewaited += 1;
-        result.alerted += await this.alert(tx, request, step, correlationId);
-        continue;
-      }
-
-      const previous = step.assigneeEmployeeId;
-      const previousReason = step.waitingReason;
-      if (decision.action === 'END_NOT_REQUIRED') {
-        await this.endNeedStep(tx, request, step, decision, { trigger, correlationId, now, operator });
-        step.state = 'NOT_REQUIRED';
-        step.assigneeEmployeeId = null;
-        step.waitingReason = null;
-        step.waitingSince = null;
-        // The one-step route of free software sets this state (`SpendRoutingService.start`).
-        state = 'AWAITING_EXECUTION';
-        result.endedNotRequired += 1;
-        continue;
-      }
-      if (decision.action === 'ASSIGN') {
-        await this.repo.assign(tx, step.id, decision.assigneeEmployeeId, decision.routingRow, now);
-        const wasWaiting = open.state === 'WAITING';
-        step.state = 'PENDING';
-        step.assigneeEmployeeId = decision.assigneeEmployeeId;
-        step.waitingReason = null;
-        step.waitingSince = null;
-        if (decision.routingRow !== null) step.routingRow = decision.routingRow;
-        state = await this.followState(tx, request.id, state, step.kind, true, wasWaiting);
-        await this.audit.record(
-          tx,
-          reassignmentAuditEvent(
-            request.organizationId,
-            wasWaiting ? 'ACCESS_REQUEST.STEP_ASSIGNED_FROM_WAIT' : 'ACCESS_REQUEST.STEP_REDETERMINED',
-            'ACCESS_REQUEST_STEP',
-            step.id,
-            {
-              requestId: request.id,
-              stepKind: step.kind,
-              trigger: trigger.kind,
-              source: correlationId,
-              assigneeEmployeeId: decision.assigneeEmployeeId,
-              // The deadline runs from here and does not start again.
-              stepCreatedAt: step.createdAt.toISOString(),
-              requestState: state,
-            },
-            correlationId,
-            { assigneeEmployeeId: previous, waitingReason: previousReason },
-            operator,
-          ),
-        );
-        if (wasWaiting) result.assignedFromWait += 1;
-        else result.redetermined += 1;
-      } else {
-        await this.repo.wait(tx, step.id, decision.reason);
-        step.state = 'WAITING';
-        step.assigneeEmployeeId = null;
-        step.waitingReason = decision.reason;
-        step.waitingSince = await this.repo.waitingSinceOf(tx, step.id);
-        state = await this.followState(tx, request.id, state, step.kind, false, false);
-        await this.audit.record(
-          tx,
-          reassignmentAuditEvent(
-            request.organizationId,
-            'ACCESS_REQUEST.STEP_WAITING',
-            'ACCESS_REQUEST_STEP',
-            step.id,
-            {
-              requestId: request.id,
-              stepKind: step.kind,
-              trigger: trigger.kind,
-              source: correlationId,
-              waitingReason: decision.reason,
-              stepCreatedAt: step.createdAt.toISOString(),
-              requestState: state,
-            },
-            correlationId,
-            { assigneeEmployeeId: previous },
-            operator,
-          ),
-        );
-        result.madeToWait += 1;
-        result.alerted += await this.alert(tx, request, step, correlationId);
-      }
+      state = await this.reconcileStep(tx, request, step, state, stepContext, result);
     }
+    await this.convertQueuedSpend(tx, request, stepContext, result);
+  }
+
+  private async reconcileStep(
+    tx: DbTx,
+    request: ReassignableRequest,
+    step: ReassignableStep,
+    currentState: string,
+    context: {
+      trigger: ReassignmentTrigger;
+      correlationId: string;
+      now: Date;
+      facts: TodayFacts;
+      gone: ReadonlySet<string>;
+      operator?: OperatorAuditActor;
+    },
+    result: ReconcileResult,
+  ): Promise<string> {
+    if (!OPEN.has(step.state)) return currentState;
+    const { trigger, correlationId, now, facts, gone, operator } = context;
+    const open: OpenStep = {
+      kind: step.kind,
+      state: step.state as 'PENDING' | 'WAITING',
+      holderEmployeeId: step.assigneeEmployeeId,
+      holderGone: step.assigneeEmployeeId !== null && gone.has(step.assigneeEmployeeId),
+      waitingReason: step.waitingReason,
+    };
+    if (open.state === 'PENDING' && !touchesHeldStep(open, trigger)) return currentState;
+
+    const decision = decideReassignment(open, trigger, await this.targets.targetOf(tx, request, step, facts));
+    if (decision.action === 'KEEP') {
+      if (open.state === 'WAITING') result.alerted += await this.alert(tx, request, step, correlationId);
+
+      return currentState;
+    }
+    if (decision.action === 'REWAIT') {
+      await this.applyRewait(tx, request, step, decision, context, result);
+
+      return currentState;
+    }
+    if (decision.action === 'END_NOT_REQUIRED') {
+      await this.endNeedStep(tx, request, step, decision, { trigger, correlationId, now, operator });
+      step.state = 'NOT_REQUIRED';
+      step.assigneeEmployeeId = null;
+      step.waitingReason = null;
+      step.waitingSince = null;
+      result.endedNotRequired += 1;
+
+      // The one-step route of free software sets this state (`SpendRoutingService.start`).
+      return 'AWAITING_EXECUTION';
+    }
+
+    return decision.action === 'ASSIGN'
+      ? this.applyAssign(tx, request, step, open, decision, currentState, context, result)
+      : this.applyWait(tx, request, step, decision, currentState, context, result);
+  }
+
+  private async applyRewait(
+    tx: DbTx,
+    request: ReassignableRequest,
+    step: ReassignableStep,
+    decision: Extract<ReassignmentDecision, { action: 'REWAIT' }>,
+    context: { trigger: ReassignmentTrigger; correlationId: string; operator?: OperatorAuditActor },
+    result: ReconcileResult,
+  ): Promise<void> {
+    const previousReason = step.waitingReason;
+    await this.repo.rewait(tx, step.id, decision.reason);
+    step.waitingReason = decision.reason;
+    await this.audit.record(
+      tx,
+      stepWaitingAuditEvent({
+        organizationId: request.organizationId,
+        action: 'ACCESS_REQUEST.STEP_WAITING_REASON_CHANGED',
+        step,
+        requestId: request.id,
+        triggerKind: context.trigger.kind,
+        waitingReason: decision.reason,
+        before: { waitingReason: previousReason },
+        correlationId: context.correlationId,
+        operator: context.operator,
+      }),
+    );
+    result.rewaited += 1;
+    result.alerted += await this.alert(tx, request, step, context.correlationId);
+  }
+
+  private async applyAssign(
+    tx: DbTx,
+    request: ReassignableRequest,
+    step: ReassignableStep,
+    open: OpenStep,
+    decision: Extract<ReassignmentDecision, { action: 'ASSIGN' }>,
+    currentState: string,
+    context: { trigger: ReassignmentTrigger; correlationId: string; now: Date; operator?: OperatorAuditActor },
+    result: ReconcileResult,
+  ): Promise<string> {
+    const previous = step.assigneeEmployeeId;
+    const previousReason = step.waitingReason;
+    const { trigger, correlationId, now, operator } = context;
+
+    await this.repo.assign(tx, step.id, decision.assigneeEmployeeId, decision.routingRow, now);
+    const wasWaiting = open.state === 'WAITING';
+    step.state = 'PENDING';
+    step.assigneeEmployeeId = decision.assigneeEmployeeId;
+    step.waitingReason = null;
+    step.waitingSince = null;
+    if (decision.routingRow !== null) step.routingRow = decision.routingRow;
+    const state = await this.followState(tx, request.id, currentState, step.kind, true, wasWaiting);
+    await this.audit.record(
+      tx,
+      reassignmentAuditEvent(
+        request.organizationId,
+        wasWaiting ? 'ACCESS_REQUEST.STEP_ASSIGNED_FROM_WAIT' : 'ACCESS_REQUEST.STEP_REDETERMINED',
+        'ACCESS_REQUEST_STEP',
+        step.id,
+        {
+          requestId: request.id,
+          stepKind: step.kind,
+          trigger: trigger.kind,
+          source: correlationId,
+          assigneeEmployeeId: decision.assigneeEmployeeId,
+          // The deadline runs from here and does not start again.
+          stepCreatedAt: step.createdAt.toISOString(),
+          requestState: state,
+        },
+        correlationId,
+        { assigneeEmployeeId: previous, waitingReason: previousReason },
+        operator,
+      ),
+    );
+    if (wasWaiting) result.assignedFromWait += 1;
+    else result.redetermined += 1;
+
+    return state;
+  }
+
+  private async applyWait(
+    tx: DbTx,
+    request: ReassignableRequest,
+    step: ReassignableStep,
+    decision: Extract<ReassignmentDecision, { action: 'WAIT' }>,
+    currentState: string,
+    context: { trigger: ReassignmentTrigger; correlationId: string; operator?: OperatorAuditActor },
+    result: ReconcileResult,
+  ): Promise<string> {
+    const previous = step.assigneeEmployeeId;
+    const { trigger, correlationId, operator } = context;
+
+    await this.repo.wait(tx, step.id, decision.reason);
+    step.state = 'WAITING';
+    step.assigneeEmployeeId = null;
+    step.waitingReason = decision.reason;
+    step.waitingSince = await this.repo.waitingSinceOf(tx, step.id);
+    const state = await this.followState(tx, request.id, currentState, step.kind, false, false);
+    await this.audit.record(
+      tx,
+      stepWaitingAuditEvent({
+        organizationId: request.organizationId,
+        action: 'ACCESS_REQUEST.STEP_WAITING',
+        step,
+        requestId: request.id,
+        triggerKind: trigger.kind,
+        waitingReason: decision.reason,
+        before: { assigneeEmployeeId: previous },
+        correlationId,
+        requestState: state,
+        operator,
+      }),
+    );
+    result.madeToWait += 1;
+    result.alerted += await this.alert(tx, request, step, correlationId);
+
+    return state;
+  }
+
+  private isQueuedSpendEligible(request: ReassignableRequest, trigger: ReassignmentTrigger): boolean {
+    if (trigger.kind !== 'HEAD_CHANGED' && trigger.kind !== 'EFFECTIVE_DATE_REACHED') return false;
+    if (
+      request.state !== 'AWAITING_SPEND_SUBMISSION' ||
+      request.type === 'GROUP_GRANT' ||
+      request.routingMode === 'ONE_STEP'
+    ) {
+      return false;
+    }
+
+    return !request.steps.some((step) => OPEN.has(step.state));
+  }
+
+  private async convertQueuedSpend(
+    tx: DbTx,
+    request: ReassignableRequest,
+    context: {
+      trigger: ReassignmentTrigger;
+      correlationId: string;
+      now: Date;
+      facts: TodayFacts;
+      operator?: OperatorAuditActor;
+    },
+    result: ReconcileResult,
+  ): Promise<void> {
+    const { trigger, correlationId, now, facts, operator } = context;
+    if (!this.isQueuedSpendEligible(request, trigger)) return;
+    const isHead = await this.targets.isRequesterHead(
+      tx,
+      {
+        requesterEmployeeId: request.requesterEmployeeId,
+        departmentId: request.departmentId,
+        chainHasSpendStep: request.chainHasSpendStep,
+        branch: request.branch,
+      },
+      now,
+      facts.today,
+    );
+    if (!isHead) return;
+    await this.repo.markOneStep(tx, request.id, 'REQUESTER_IS_HEAD');
+    const needStep = request.steps.find((step) => step.kind === 'NEED');
+    await this.audit.record(
+      tx,
+      queuedSpendNotRequiredEvent({
+        request,
+        needStep,
+        triggerKind: trigger.kind,
+        correlationId,
+        operator,
+      }),
+    );
+    await this.spending.finishConversionById(tx, request.id, now);
+    result.endedNotRequired += 1;
   }
 
   /**
@@ -320,6 +436,7 @@ export class StepReassignmentService {
           trigger: trigger.kind,
           source: correlationId,
           oneStepReason: decision.oneStepReason,
+          ...(decision.oneStepReason === 'REQUESTER_IS_HEAD' ? { requesterBecameHead: true } : {}),
           stepCreatedAt: step.createdAt.toISOString(),
         },
         correlationId,
@@ -327,7 +444,7 @@ export class StepReassignmentService {
         operator,
       ),
     );
-    await this.spending.start(tx, null, request.id, now);
+    await this.spending.finishConversionById(tx, request.id, now);
   }
 
   /** The request follows the step: waiting under control while a step waits, the state of the step once it is held. */

@@ -206,12 +206,12 @@ export const BUDGET_TEXTS = {
     vi: {
       title: 'Chưa có ngân sách năm {year}',
       message:
-        '{costCenterId:name} chưa có ngân sách năm {year} được phê duyệt. Các yêu cầu chi sẽ phải chờ đến khi có ngân sách.',
+        'Chưa có ngân sách năm {year} được phê duyệt[ của {costCenterId:name}][ cho {costCenterCount} Cost Center]. Các yêu cầu chi sẽ phải chờ đến khi có ngân sách.',
     },
     en: {
       title: 'No approved budget for {year}',
       message:
-        '{costCenterId:name} has no approved budget for {year}. Spending requests will wait until a budget is approved.',
+        'No approved budget for {year}[ for {costCenterId:name}][ across {costCenterCount} Cost Center(s)]. Spending requests will wait until a budget is approved.',
     },
   },
   BUDGET_REVIEW_DUE: {

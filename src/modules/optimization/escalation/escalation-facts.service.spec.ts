@@ -24,7 +24,8 @@ describe('EscalationFactsService.ofBatch — the long leave of a holder (FR-4.9 
       getHandingOverCases: jest.fn().mockResolvedValue([]),
     } as unknown as PersonnelApi;
     const organization = { getEmployeePlacement: jest.fn().mockResolvedValue(null) } as unknown as OrganizationReadApi;
-    const facts = new EscalationFactsService(licensing, personnel, organization);
+    const identity = { findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set()) };
+    const facts = new EscalationFactsService(licensing, personnel, organization, identity as never);
 
     const batch = await facts.ofBatch({} as DbTx, TODAY, [{ employeeId: 'E1' } as GhostSeatRecord]);
 
@@ -52,5 +53,54 @@ describe('EscalationFactsService.ofBatch — the long leave of a holder (FR-4.9 
   it('is not away on a leave that began tomorrow, nor on one that ended yesterday', async () => {
     expect(await awayAmong([leave(TOMORROW, null)])).toBe(false);
     expect(await awayAmong([leave('2026-11-01', YESTERDAY)])).toBe(false);
+  });
+
+  describe('departmentAccessOf', () => {
+    const setupAccess = (responsible: string | null, usable: readonly string[]) => {
+      const licensing = { listSeatsForRules: jest.fn() } as unknown as LicensingGhostSeatApi;
+      const personnel = {
+        getTransfersInOverlap: jest.fn(),
+        getLeaveIntervals: jest.fn(),
+        getHandingOverCases: jest.fn(),
+      } as unknown as PersonnelApi;
+      const organization = {
+        getItAdminInChargeOfDepartment: jest.fn().mockResolvedValue(responsible),
+      } as unknown as OrganizationReadApi;
+      const identity = {
+        findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(usable)),
+      };
+      const facts = new EscalationFactsService(licensing, personnel, organization, identity as never);
+      return { facts, tx: {} as DbTx };
+    };
+
+    it('allows any IT Admin when the department has no IT Admin in charge', async () => {
+      const { facts, tx } = setupAccess(null, []);
+      await expect(facts.departmentAccessOf(tx, 'dep-1', 'it-other')).resolves.toEqual({
+        allowed: true,
+        byInCharge: false,
+      });
+    });
+
+    it('allows the IT Admin in charge with byInCharge=true', async () => {
+      const { facts, tx } = setupAccess('it-1', ['it-1']);
+      await expect(facts.departmentAccessOf(tx, 'dep-1', 'it-1')).resolves.toEqual({
+        allowed: true,
+        byInCharge: true,
+      });
+    });
+
+    it('refuses another IT Admin when the one in charge is usable, and allows when unusable', async () => {
+      const active = setupAccess('it-1', ['it-1']);
+      await expect(active.facts.departmentAccessOf(active.tx, 'dep-1', 'it-other')).resolves.toEqual({
+        allowed: false,
+        byInCharge: false,
+      });
+
+      const locked = setupAccess('it-1', []);
+      await expect(locked.facts.departmentAccessOf(locked.tx, 'dep-1', 'it-other')).resolves.toEqual({
+        allowed: true,
+        byInCharge: false,
+      });
+    });
   });
 });

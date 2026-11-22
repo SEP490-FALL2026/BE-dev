@@ -88,6 +88,7 @@ flowchart BT
   identity_access -->|11| notifications
   identity_access -->|37| organization
   installation -->|6| audit
+  installation -->|2| budgets
   installation -->|2| catalog
   installation -->|2| finance
   installation -->|11| identity_access
@@ -110,7 +111,7 @@ flowchart BT
   operating_parameters -->|6| organization
   optimization -->|7| audit
   optimization -->|8| catalog
-  optimization -->|6| identity_access
+  optimization -->|7| identity_access
   optimization -->|25| licensing
   optimization -->|7| notifications
   optimization -->|6| operating_parameters
@@ -157,4 +158,4 @@ flowchart BT
   usage -->|4| requests
 ```
 
-114 module edges.
+115 module edges.

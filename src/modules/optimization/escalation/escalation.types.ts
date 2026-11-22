@@ -9,6 +9,7 @@ export const ESCALATION_SKIP_REASONS = [
   'TRANSFER_GRACE',
   'LEAVE_OR_HANDOVER',
   'NO_DEPARTMENT',
+  'NOT_IN_CHARGE',
 ] as const;
 export type EscalationSkipReason = (typeof ESCALATION_SKIP_REASONS)[number];
 
@@ -40,6 +41,8 @@ export interface EscalationFacts {
   onLeaveOrHandover: boolean;
   /** The department the holder is placed in today; null when none. */
   placementDepartmentId: string | null;
+  /** Whether the caller is permitted to escalate for that department (default true when not evaluated yet). */
+  inChargeAllowed?: boolean;
 }
 
 export type EscalationVerdict = { kind: 'ESCALATE' } | { kind: 'SKIP'; reason: EscalationSkipReason };

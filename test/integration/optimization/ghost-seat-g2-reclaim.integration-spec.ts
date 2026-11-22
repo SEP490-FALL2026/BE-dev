@@ -239,7 +239,7 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
     expect(summary.limitation).toMatch(/chưa có nguồn usage/);
   });
 
-  it('KPI-5 (DA6-39): 10 made (2 of the watch tier), 2 KEPT, 1 NEGATED of the watch tier, 1 SUPERSEDED gives 3 of 8, 37.5 %; the IT Admin is refused', async () => {
+  it('KPI-5 (DA6-39): 10 made (2 of the watch tier), 2 KEPT, 1 NEGATED of the watch tier, 1 SUPERSEDED gives 2 of 7, 28.6 %; the IT Admin is refused', async () => {
     const subscription = await w.worldSubscription(10, 'K2');
     const seats: { assignmentId: string }[] = [];
     for (let index = 0; index < 10; index += 1) seats.push(await w.leaverSeat(subscription, `E-KPI-${index}`));
@@ -286,7 +286,7 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
       byGroup: Record<string, { denominator: number; numerator: number; confidenceLabel: string }>;
     };
 
-    expect(kpi).toMatchObject({ denominator: 8, numerator: 3, ratePercent: 37.5 });
+    expect(kpi).toMatchObject({ denominator: 7, numerator: 2, ratePercent: 28.6 });
     expect(kpi.byGroup.G3).toMatchObject({ denominator: 4, numerator: 2, confidenceLabel: 'INTERNAL_DATA' });
     expect(w.codeOf(await get('/api/v1/ghost-seat-kpi5', w.it1, { from, to }).expect(403))).toBe(
       'AUTHORIZATION.FORBIDDEN',

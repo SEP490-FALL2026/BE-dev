@@ -1,10 +1,11 @@
 import { BudgetProposalBodyDto, DecisionBodyDto, VersionBodyDto } from '../../../src/modules/budgets/budget/budget.dto';
+import { BudgetFactsService } from '../../../src/modules/budgets/budget/budget-facts.service';
 import { ProposalService } from '../../../src/modules/budgets/proposal/proposal.service';
 import { VersionDecisionService } from '../../../src/modules/budgets/version/version-decision.service';
 import { VersionCreationService } from '../../../src/modules/budgets/version/version-creation.service';
 import { VersionService } from '../../../src/modules/budgets/version/version.service';
 import type { HttpTestApp } from '../http-test-app';
-import { attachedVersionFile, uploadedProposalFile } from '../budget-files';
+import { attachedVersionFile, sendingCycleLock, uploadedProposalFile } from '../budget-files';
 import { DecisionChecklists } from '../decision-checklist';
 import { principalOf, sent } from './account.builder';
 
@@ -45,7 +46,8 @@ export async function approvedBudget<T>(ctx: HttpTestApp, input: ApprovedBudgetI
       >,
     );
   await attachedVersionFile(ctx.sql, version.id, finance.employeeId);
-  await versions.send(finance, version.id);
+  const today = await ctx.app.get(BudgetFactsService, { strict: false }).today(new Date());
+  await sendingCycleLock.run(ctx.sql, version.id, today, () => versions.send(finance, version.id));
   // The decision of the spending approver answers the checklist of the step of the version all Yes (`QĐ-111ap`).
   const decider = await principalOf(ctx, input.deciderToken);
   const checklists = new DecisionChecklists();

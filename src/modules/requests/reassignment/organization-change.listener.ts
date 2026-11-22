@@ -83,6 +83,9 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
             // The internal requests of the people who sit in the department now, and everything sent for the department.
             ...(await this.repo.needRequestIdsOfRequesters(members, tx)),
             ...(await this.repo.needRequestIdsOfDepartment(change.departmentId, tx)),
+            ...(change.kind === 'HEAD_PERIOD_START'
+              ? await this.repo.spendQueueRequestIdsOfDepartment(change.departmentId, tx)
+              : []),
           ],
           trigger: { kind: 'HEAD_CHANGED', employeeId: null },
         };

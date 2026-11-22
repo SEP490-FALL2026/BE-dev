@@ -59,6 +59,7 @@ export class OffboardingRevocationService {
       const seats = blocked ? await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx) : [];
       const rights: RightFacts[] = seats.map((seat) => ({
         assignmentId: seat.assignmentId,
+        subscriptionId: seat.subscriptionId,
         hasTask: seat.revocation !== null,
         revocable: isRevocableType(seat.provisioningType),
         provisioningType: seat.provisioningType,
@@ -79,11 +80,13 @@ export class OffboardingRevocationService {
       const reason = note ? `${DEPARTURE_REVOCATION}: ${note}` : DEPARTURE_REVOCATION;
       let created = 0;
       let reasonAdded = 0;
+      // Process seats in (subscriptionId, assignmentId) order to match the cross-seat revocation lock order.
       for (const assignmentId of selected) {
         const opened = await this.openOne(tx, actor, held, assignmentId, reason);
         if (opened.created) created += 1;
         else if (opened.reasonAdded) reasonAdded += 1;
       }
+      if (created + reasonAdded === 0) throw new OffboardingRefusedError('NOTHING_TO_REVOKE');
       await this.repo.insertChange(tx, {
         caseId: held.id,
         kind: 'REVOCATIONS_OPENED',

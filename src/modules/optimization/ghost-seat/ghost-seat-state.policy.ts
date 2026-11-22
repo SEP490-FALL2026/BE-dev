@@ -83,16 +83,26 @@ export function settlementOf(input: SettlementInput): Settlement {
   return failed && input.group === 'G2' && input.state === 'RECLAIM_DECIDED' ? { kind: 'REOPEN' } : { kind: 'KEEP' };
 }
 
+/** Close reasons excluded from both numerator and denominator of KPI-5. */
+export const KPI5_EXCLUDED_REASONS: readonly GhostSeatCloseReason[] = ['LEFT_TO_EXPIRE', 'SUPERSEDED'];
+
 /**
  * `KPI-5` (`DA6-39`): the share of recommendations that were right, among those the IT Admin was asked to look at. The tier
  * _watch_ is only an observation of the IT Admin (`FR-4.12`), so it is not in the denominator; a `G1` has no tier and counts.
+ * Recommendations closed as left to expire or superseded are also excluded from KPI-5.
  */
-export function countsInKpi5(row: { group: GhostSeatGroup; tier: GhostSeatTier | null }): boolean {
+export function countsInKpi5(row: {
+  group: GhostSeatGroup;
+  tier: GhostSeatTier | null;
+  closeReason?: GhostSeatCloseReason | null;
+}): boolean {
+  if (row.closeReason != null && KPI5_EXCLUDED_REASONS.includes(row.closeReason)) return false;
+
   return row.group === 'G1' || row.group === 'G2' || row.tier === 'REVIEW' || row.tier === 'ACTION';
 }
 
-/** The reasons that make a recommendation _right_ for `KPI-5`; a later item adds its own values here. */
-export const KPI5_NUMERATOR_REASONS: readonly GhostSeatCloseReason[] = ['KEPT', 'NEGATED', 'SUPERSEDED'];
+/** The reasons that make a recommendation _right_ for `KPI-5`. */
+export const KPI5_NUMERATOR_REASONS: readonly GhostSeatCloseReason[] = ['KEPT', 'EXEMPTED', 'NEGATED'];
 
 export interface Kpi5Row {
   group: GhostSeatGroup;

@@ -8,10 +8,12 @@ import {
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
+import type { BusinessDate } from '../../../core/business-date';
 import type { DatabaseEnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { HeldSessionLock, trySessionAdvisoryLock } from '../../../infrastructure/database/session-advisory-lock';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
+import { LocalDemoBudgetCycleApi } from '../../budgets/public/local-demo-budget-cycle.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LocalDemoAccountApi } from '../../identity-access/public/local-demo-account.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -38,9 +40,32 @@ export class DemoAccountsApi {
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly accounts: LocalDemoAccountApi,
+    private readonly budgetCycles: LocalDemoBudgetCycleApi,
     private readonly audit: AuditApi,
     private readonly config: ConfigService<DatabaseEnvironmentVariables, true>,
   ) {}
+
+  /**
+   * Temporarily shifts `submissionDeadline` for `year` to `lockedDeadline` in a short transaction so HTTP submission
+   * calls observe a locked cycle, then restores the previous deadline in `finally` without holding a DB lock over HTTP.
+   */
+  async withLockedBudgetCycle<T>(
+    organizationId: string,
+    year: number,
+    lockedDeadline: BusinessDate,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    const previous = await this.runner.run((tx) =>
+      this.budgetCycles.setSubmissionDeadline(tx, organizationId, year, lockedDeadline),
+    );
+    try {
+      return await work();
+    } finally {
+      if (previous !== null) {
+        await this.runner.run((tx) => this.budgetCycles.setSubmissionDeadline(tx, organizationId, year, previous));
+      }
+    }
+  }
 
   /**
    * Holds the apply lock of a fixture on this database for as long as the run writes: a second `apply` of the same

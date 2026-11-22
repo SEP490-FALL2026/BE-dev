@@ -3,7 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
-import { crossedThresholds } from './threshold.policy';
+import { crossedByBaseDrop, crossedThresholds } from './threshold.policy';
 import { ThresholdNotifierService } from './threshold-notifier.service';
 import { ThresholdRepo, type ThresholdCrossing } from './threshold.repo';
 
@@ -16,6 +16,12 @@ export interface BudgetPair {
 /** The Cost Centers and years a change touches, with what was used of each before it: what `settle` compares the use after the change with. */
 export interface ThresholdWatch {
   readonly usedBefore: ReadonlyMap<string, bigint>;
+  readonly pairs: readonly BudgetPair[];
+}
+
+/** The effective base of each Cost Center and year before an adjustment lowers it, read under the caller's existing locks. */
+export interface BaseDropWatch {
+  readonly baseBefore: ReadonlyMap<string, bigint>;
   readonly pairs: readonly BudgetPair[];
 }
 
@@ -80,6 +86,56 @@ export class ThresholdAlertService {
         }
       }
     }
+    return this.emitCrossed(tx, crossed, now);
+  }
+
+  /**
+   * Reads the effective base of each Cost Center and year before an approved adjustment lowers it. Takes no additional locks
+   * so callers holding budget year locks preserve their existing lock ordering.
+   */
+  async watchBase(tx: DbTx, pairs: readonly BudgetPair[]): Promise<BaseDropWatch> {
+    const unique = this.uniquePairs(pairs);
+
+    return { pairs: unique, baseBefore: await this.basesOf(tx, unique) };
+  }
+
+  /** Evaluates thresholds crossed when an adjustment lowered the effective base while use stayed fixed; emits new alerts. */
+  async settleBase(tx: DbTx, watch: BaseDropWatch, now: Date = new Date()): Promise<number> {
+    if (watch.pairs.length === 0) return 0;
+    const [usedMap, baseAfterMap] = [await this.usedOf(tx, watch.pairs), await this.basesOf(tx, watch.pairs)];
+    const crossed: ThresholdCrossing[] = [];
+    for (const pair of watch.pairs) {
+      const key = heldKey(pair.costCenterId, pair.year);
+      const baseBefore = watch.baseBefore.get(key);
+      const baseAfter = baseAfterMap.get(key);
+      if (baseBefore === undefined || baseAfter === undefined) continue;
+      const used = usedMap.get(key) ?? 0n;
+      for (const threshold of crossedByBaseDrop({ used, baseBefore, baseAfter })) {
+        crossed.push({ costCenterId: pair.costCenterId, year: pair.year, threshold, baseMinor: baseAfter });
+      }
+    }
+
+    return this.emitCrossed(tx, crossed, now);
+  }
+
+  private uniquePairs(pairs: readonly BudgetPair[]): BudgetPair[] {
+    return [...new Map(pairs.map((pair) => [heldKey(pair.costCenterId, pair.year), pair])).values()].sort((a, b) =>
+      a.costCenterId < b.costCenterId ? -1 : a.costCenterId > b.costCenterId ? 1 : a.year - b.year,
+    );
+  }
+
+  private async basesOf(tx: DbTx, pairs: readonly BudgetPair[]): Promise<Map<string, bigint>> {
+    const result = new Map<string, bigint>();
+    for (const year of [...new Set(pairs.map((pair) => pair.year))].sort((a, b) => a - b)) {
+      const ids = pairs.filter((pair) => pair.year === year).map((pair) => pair.costCenterId);
+      const bases = await this.budgets.approvedOfCostCenters(ids, year, tx);
+      for (const [costCenterId, entry] of bases) result.set(heldKey(costCenterId, year), entry.baseMinor);
+    }
+
+    return result;
+  }
+
+  private async emitCrossed(tx: DbTx, crossed: ThresholdCrossing[], now: Date): Promise<number> {
     const told = await this.alerts.insertNew(tx, await this.alerts.numbered(tx, crossed), now);
     await this.notifier.told(tx, told, now);
 

@@ -41,6 +41,24 @@ export function proposalWorkRefusal(
   return state === 'DRAFT' ? 'NOT_OPEN' : state === 'LOCKED' ? 'LOCKED' : null;
 }
 
+/**
+ * Whether sending a version is refused by the cycle state today: it requires the cycle to be opened and already locked after its
+ * submission deadline. Missing or draft cycles return `NOT_OPEN`; an open cycle returns `NOT_LOCKED`.
+ */
+export function versionSubmissionRefusal(
+  cycle: { openedAt: Date | null; submissionDeadline: BusinessDate } | null,
+  today: BusinessDate,
+): 'NOT_OPEN' | 'NOT_LOCKED' | null {
+  if (cycle === null) return 'NOT_OPEN';
+  const state = cycleStateOf(cycle, today);
+
+  return state === 'DRAFT' ? 'NOT_OPEN' : state === 'OPEN' ? 'NOT_LOCKED' : null;
+}
+
+/** The reserve kept for the shared pool cannot exceed the annual ceiling of the year; equal is valid. */
+export const isReserveOverCeiling = (annualCeilingMinor: bigint, sharedPoolReserveMinor: bigint | null): boolean =>
+  sharedPoolReserveMinor !== null && sharedPoolReserveMinor > annualCeilingMinor;
+
 /** What an update asks: each field is present only when the call gave it; amounts are already in minor units. */
 export interface CycleUpdate {
   submissionDeadline?: BusinessDate;
@@ -54,6 +72,7 @@ export interface CycleUpdate {
 export type CycleChangePlan =
   | { kind: 'LOCKED' }
   | { kind: 'DEADLINES_INVALID' }
+  | { kind: 'RESERVE_OVER_CEILING' }
   | { kind: 'DEADLINE_IN_PAST' }
   | { kind: 'REASON_REQUIRED' }
   | { kind: 'NOTHING' }
@@ -79,10 +98,15 @@ function changesOf(update: CycleUpdate, stored: StoredCycle) {
   const submission = update.submissionDeadline ?? stored.submissionDeadline;
   const decision = update.decisionDeadline ?? stored.decisionDeadline;
   const priorities = update.priorities !== undefined ? update.priorities : stored.priorities;
+  const annualCeiling = update.annualCeilingMinor ?? stored.annualCeilingMinor;
+  const sharedPoolReserve =
+    update.sharedPoolReserveMinor !== undefined ? update.sharedPoolReserveMinor : stored.sharedPoolReserveMinor;
 
   return {
     submission,
     decision,
+    annualCeiling,
+    sharedPoolReserve,
     submissionMoved: submission !== stored.submissionDeadline,
     decisionMoved: decision !== stored.decisionDeadline,
     ceilingChanged: update.annualCeilingMinor !== undefined && update.annualCeilingMinor !== stored.annualCeilingMinor,
@@ -128,6 +152,7 @@ export function planCycleChange(
   if (state === 'LOCKED') return { kind: 'LOCKED' };
   const change = changesOf(update, stored);
   if (change.decision < change.submission) return { kind: 'DEADLINES_INVALID' };
+  if (isReserveOverCeiling(change.annualCeiling, change.sharedPoolReserve)) return { kind: 'RESERVE_OVER_CEILING' };
   const { submission, decision, submissionMoved, ceilingChanged, reserveChanged } = change;
   if (!anyChange(change)) return { kind: 'NOTHING' };
   if (state === 'OPEN') {
