@@ -43,6 +43,12 @@ const READERS_ONLY: ErrorResponseDeclaration = {
     'Only the IT Admin and Finance read the renewals (SUBSCRIPTION_RENEWAL.READ_FORBIDDEN); Finance does not read the seats.',
   examples: [EXAMPLES.READ_FORBIDDEN],
 };
+const RESPONSIBLE_ONLY: ErrorResponseDeclaration = {
+  status: HttpStatus.FORBIDDEN,
+  description:
+    'Only the IT Admin responsible for the subscription records its renewal unless none is assigned or the responsible admin is unusable (SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE).',
+  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_RESPONSIBLE],
+};
 const NOT_FOUND: ErrorResponseDeclaration = {
   status: HttpStatus.NOT_FOUND,
   description: 'There is no renewal with this id (SUBSCRIPTION_RENEWAL.NOT_FOUND).',
@@ -173,11 +179,11 @@ export class SubscriptionRenewalsController {
     status: HttpStatus.CREATED,
     message: 'SUBSCRIPTION_RENEWAL.OUTCOME_RECORDED',
     description:
-      'Any IT Admin records, once per period and from its point of adjustment, what was done with the vendor: the choice (renew as it is, reduce, increase or cancel) with the seats the system counts for the next period (read them first; a number that is not that count is refused, and one above it is accepted only as the vendor minimum with the evidence in note), what the vendor did (as decided, refused, did otherwise; a result the vendor has not confirmed is recorded once it has) and the new period it confirmed, which starts on the renewal day and which a renewal, a reduction or an increase must carry (only a vendor that refused a plan by the month may leave it out) and so must a cancellation the vendor refused or did otherwise (it made a period anyway: an incident is raised for it). A cancellation is accepted only when no seat is needed, none is in effect and no request for the plan is open, and needs closure.dataExported and closure.adminsTransferred. The case is written complete in one transaction (state OUTCOME_RECORDED, deciderRole IT_ADMIN_IN_CHARGE): the new period continues the old one with the seats held on its first day, a seat ending on the renewal day stays on the old period. Writing after the renewal day is allowed (a late renewal). Finance is told; the IT Admin responsible is told too when another IT Admin recorded in their place (the audit trail says so). It opens no revocation, asks no head and creates no budget commitment. releasedAssignmentIds is no longer taken.',
+      'The IT Admin responsible for the subscription (or another IT Admin when none is assigned or the responsible admin is unusable) records, once per period and from its point of adjustment, what was done with the vendor: the choice (renew as it is, reduce, increase or cancel) with the seats the system counts for the next period (read them first; a number that is not that count is refused, and one above it is accepted only as the vendor minimum with the evidence in note), what the vendor did (as decided, refused, did otherwise; a result the vendor has not confirmed is recorded once it has) and the new period it confirmed, which starts on the renewal day and which a renewal, a reduction or an increase must carry (only a vendor that refused a plan by the month may leave it out) and so must a cancellation the vendor refused or did otherwise (it made a period anyway: an incident is raised for it). A cancellation is accepted only when no seat is needed, none is in effect and no request for the plan is open, and needs closure.dataExported and closure.adminsTransferred. The case is written complete in one transaction (state OUTCOME_RECORDED, deciderRole IT_ADMIN_IN_CHARGE): the new period continues the old one with the seats held on its first day, a seat ending on the renewal day stays on the old period. Writing after the renewal day is allowed (a late renewal). Finance is told; when another IT Admin stood in for an unusable responsible admin, the audit trail records substitute = true. It opens no revocation, asks no head and creates no budget commitment. releasedAssignmentIds is no longer taken.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin records.', examples: [FORBIDDEN_EXAMPLE] },
+    RESPONSIBLE_ONLY,
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The subscription does not exist (SUBSCRIPTION_RENEWAL.NOT_FOUND).',
@@ -238,11 +244,7 @@ export class SubscriptionRenewalsController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    {
-      status: HttpStatus.FORBIDDEN,
-      description: 'Only an IT Admin records the outcome.',
-      examples: [FORBIDDEN_EXAMPLE],
-    },
+    RESPONSIBLE_ONLY,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,

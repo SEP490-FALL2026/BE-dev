@@ -1,4 +1,5 @@
 import { RenewalHarness } from '../../support/renewal-harness';
+import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
 
 const h = new RenewalHarness();
 
@@ -194,5 +195,27 @@ describe('the outcome of a case decided before the one-write rule (integration, 
     expect(accepted).toEqual(
       ['CONFLICT_SUBSTITUTE', 'IT_ADMIN_IN_CHARGE', 'OWNER_DEPARTMENT_HEAD', 'SPENDING_APPROVER'].sort(),
     );
+  });
+
+  it('refuses a non-responsible IT Admin with 403 NOT_RESPONSIBLE when the responsible admin is active, and allows when locked', async () => {
+    const other = await handOthersToSecondItAdmin(h);
+    const { subscriptionId, id } = await legacy('RENEW', undefined, 0);
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $1 WHERE id = $2`, [
+      h.it1.employeeId,
+      subscriptionId,
+    ]);
+
+    const denied = await h.outcome(id, { outcome: 'UNCONFIRMED' }, other);
+    expect([denied.status, h.codeOf(denied)]).toEqual([403, 'SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE']);
+
+    const lockedEmp = await h.person('E-RN-LEGACY-LOCKED');
+    await h.account('E-RN-LEGACY-LOCKED', lockedEmp, 'IT_ADMIN');
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $1 WHERE id = $2`, [
+      lockedEmp,
+      subscriptionId,
+    ]);
+    await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [lockedEmp]);
+
+    await h.outcome(id, { outcome: 'UNCONFIRMED' }).expect(200);
   });
 });

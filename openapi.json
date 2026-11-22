@@ -40878,7 +40878,7 @@
         },
         "responses": {
           "201": {
-            "description": "Any IT Admin records, once per period and from its point of adjustment, what was done with the vendor: the choice (renew as it is, reduce, increase or cancel) with the seats the system counts for the next period (read them first; a number that is not that count is refused, and one above it is accepted only as the vendor minimum with the evidence in note), what the vendor did (as decided, refused, did otherwise; a result the vendor has not confirmed is recorded once it has) and the new period it confirmed, which starts on the renewal day and which a renewal, a reduction or an increase must carry (only a vendor that refused a plan by the month may leave it out) and so must a cancellation the vendor refused or did otherwise (it made a period anyway: an incident is raised for it). A cancellation is accepted only when no seat is needed, none is in effect and no request for the plan is open, and needs closure.dataExported and closure.adminsTransferred. The case is written complete in one transaction (state OUTCOME_RECORDED, deciderRole IT_ADMIN_IN_CHARGE): the new period continues the old one with the seats held on its first day, a seat ending on the renewal day stays on the old period. Writing after the renewal day is allowed (a late renewal). Finance is told; the IT Admin responsible is told too when another IT Admin recorded in their place (the audit trail says so). It opens no revocation, asks no head and creates no budget commitment. releasedAssignmentIds is no longer taken.",
+            "description": "The IT Admin responsible for the subscription (or another IT Admin when none is assigned or the responsible admin is unusable) records, once per period and from its point of adjustment, what was done with the vendor: the choice (renew as it is, reduce, increase or cancel) with the seats the system counts for the next period (read them first; a number that is not that count is refused, and one above it is accepted only as the vendor minimum with the evidence in note), what the vendor did (as decided, refused, did otherwise; a result the vendor has not confirmed is recorded once it has) and the new period it confirmed, which starts on the renewal day and which a renewal, a reduction or an increase must carry (only a vendor that refused a plan by the month may leave it out) and so must a cancellation the vendor refused or did otherwise (it made a period anyway: an incident is raised for it). A cancellation is accepted only when no seat is needed, none is in effect and no request for the plan is open, and needs closure.dataExported and closure.adminsTransferred. The case is written complete in one transaction (state OUTCOME_RECORDED, deciderRole IT_ADMIN_IN_CHARGE): the new period continues the old one with the seats held on its first day, a seat ending on the renewal day stays on the old period. Writing after the renewal day is allowed (a late renewal). Finance is told; when another IT Admin stood in for an unusable responsible admin, the audit trail records substitute = true. It opens no revocation, asks no head and creates no budget commitment. releasedAssignmentIds is no longer taken.",
             "content": {
               "application/json": {
                 "schema": {
@@ -40944,7 +40944,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin records.",
+            "description": "Only the IT Admin responsible for the subscription records its renewal unless none is assigned or the responsible admin is unusable (SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40956,6 +40956,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE": {
+                    "summary": "Only the IT Admin responsible for the subscription records its renewal.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE",
+                        "message": "Only the IT Admin responsible for the subscription records its renewal.",
                         "requestId": "req_example"
                       }
                     }
@@ -41980,7 +41991,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin records the outcome.",
+            "description": "Only the IT Admin responsible for the subscription records its renewal unless none is assigned or the responsible admin is unusable (SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -41992,6 +42003,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE": {
+                    "summary": "Only the IT Admin responsible for the subscription records its renewal.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE",
+                        "message": "Only the IT Admin responsible for the subscription records its renewal.",
                         "requestId": "req_example"
                       }
                     }
@@ -136532,6 +136554,7 @@
                         "TRANSFER_GRACE",
                         "LEAVE_OR_HANDOVER",
                         "NO_DEPARTMENT",
+                        "NOT_IN_CHARGE",
                         null
                       ],
                       "description": "Why it was not pushed; null when it was.",

@@ -76,10 +76,9 @@ export class RenewalRecordTrail {
     input: { outcome: RenewalOutcomeKind; nextQuantity: number | null },
   ): Promise<void> {
     const finance = await this.parties.financeOf(tx);
-    const responsible = who.substitute ? who.responsibleItAdminEmployeeId : null;
     await this.notifier.tell(tx, {
       organizationId: recorded.organizationId,
-      recipients: [finance, responsible].filter((person) => person !== null),
+      recipients: finance === null ? [] : [finance],
       code: 'SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED',
       subject: { type: 'SUBSCRIPTION', id: recorded.subscriptionId },
       params: {

@@ -78,38 +78,58 @@ export class EscalationService {
       const id = await this.batches.claim(tx, key, { requestHash, note });
       if (id === null) return this.replay(tx, key, requestHash);
       const records = await this.repo.lockMany(tx, ids);
-      const batch = await this.facts.ofBatch(tx, day.today, [...records.values()]);
-      const results: EscalationItemResult[] = [];
-      const inCharge = new Map<string, boolean>();
-      for (const recommendationId of ids) {
-        const record = records.get(recommendationId) ?? null;
-        const verdict = escalationVerdictOf(this.facts.of(record, batch));
-        if (verdict.kind === 'SKIP' || record === null) {
-          results.push({
-            recommendationId,
-            outcome: 'SKIPPED',
-            reason: verdict.kind === 'SKIP' ? verdict.reason : 'NOT_FOUND',
-          });
-          continue;
-        }
-        const departmentId = batch.placements.get(record.employeeId ?? '') ?? '';
-        if (!inCharge.has(departmentId)) {
-          inCharge.set(departmentId, await this.facts.isInCharge(tx, departmentId, actor.employeeId));
-        }
-        results.push(
-          await this.push(tx, actor, day, record, {
-            escalationId: id,
-            departmentId,
-            hasNote: note !== null,
-            byInCharge: inCharge.get(departmentId) === true,
-          }),
-        );
-      }
+      const results = await this.evaluateItems(tx, actor, day, ids, { records, note, escalationId: id });
       await this.batches.saveResults(tx, id, results);
       await this.keepChecklist(tx, actor, day, { verdict, results, at: now });
 
       return { id, results, replayed: false };
     });
+  }
+
+  private async evaluateItems(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    day: FollowUpDay,
+    ids: readonly string[],
+    ctx: { records: Map<string, GhostSeatRecord>; note: string | null; escalationId: string },
+  ): Promise<EscalationItemResult[]> {
+    const batch = await this.facts.ofBatch(tx, day.today, [...ctx.records.values()]);
+    const results: EscalationItemResult[] = [];
+    const inCharge = new Map<string, { allowed: boolean; byInCharge: boolean }>();
+    for (const recommendationId of ids) {
+      const record = ctx.records.get(recommendationId) ?? null;
+      const facts = this.facts.of(record, batch);
+      const preliminary = escalationVerdictOf(facts);
+      if (preliminary.kind === 'SKIP' || record === null) {
+        results.push({
+          recommendationId,
+          outcome: 'SKIPPED',
+          reason: preliminary.kind === 'SKIP' ? preliminary.reason : 'NOT_FOUND',
+        });
+        continue;
+      }
+      const departmentId = batch.placements.get(record.employeeId ?? '') ?? '';
+      let access = inCharge.get(departmentId);
+      if (!access) {
+        access = await this.facts.departmentAccessOf(tx, departmentId, actor.employeeId);
+        inCharge.set(departmentId, access);
+      }
+      const verdict = escalationVerdictOf({ ...facts, inChargeAllowed: access.allowed });
+      if (verdict.kind === 'SKIP') {
+        results.push({ recommendationId, outcome: 'SKIPPED', reason: verdict.reason });
+        continue;
+      }
+      results.push(
+        await this.push(tx, actor, day, record, {
+          escalationId: ctx.escalationId,
+          departmentId,
+          hasNote: ctx.note !== null,
+          byInCharge: access.byInCharge,
+        }),
+      );
+    }
+
+    return results;
   }
 
   /** The answers of the IT Admin, kept once for each recommendation that was pushed; nothing is kept for a batch that pushed none. */

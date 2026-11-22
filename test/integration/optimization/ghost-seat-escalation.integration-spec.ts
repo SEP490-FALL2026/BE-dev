@@ -346,4 +346,42 @@ describe('the early push of a watch to the head of the department (integration, 
         .expect(401);
     });
   });
+
+  describe('IT Admin in-charge gate', () => {
+    it('skips with NOT_IN_CHARGE for another active IT Admin, allows active in-charge IT Admin, and allows substitute when locked', async () => {
+      const activeEmp = await w.person('E-ES-OWN');
+      const activeIt = await w.account('E-ES-OWN', activeEmp, 'IT_ADMIN');
+      const dept = await w.headedDepartment('P-ES-OWN', activeEmp);
+      const holder = await w.seatIn('P-ES-OWN-H', dept.departmentId);
+      const id = await w.seedRecommendation({
+        group: 'G4',
+        state: 'OPEN',
+        tier: 'MONITOR',
+        assignmentId: holder.assignmentId,
+      });
+
+      const refused = batchOf(await post({ recommendationIds: [id] }, key(), w.it1).expect(201));
+      expect(refused).toMatchObject({ escalated: 0, skipped: 1 });
+      expect(refused.results[0]).toEqual({ recommendationId: id, outcome: 'SKIPPED', reason: 'NOT_IN_CHARGE' });
+
+      const byOwner = batchOf(await post({ recommendationIds: [id] }, key(), activeIt).expect(201));
+      expect(byOwner).toMatchObject({ escalated: 1, skipped: 0 });
+      expect(byOwner.results[0]).toMatchObject({ recommendationId: id, outcome: 'ESCALATED' });
+
+      const lockedEmp = await w.person('E-ES-LCK');
+      await w.account('E-ES-LCK', lockedEmp, 'IT_ADMIN');
+      const lockedDept = await w.headedDepartment('P-ES-LCK', lockedEmp);
+      const lockedHolder = await w.seatIn('P-ES-LCK-H', lockedDept.departmentId);
+      const lockedId = await w.seedRecommendation({
+        group: 'G4',
+        state: 'OPEN',
+        tier: 'MONITOR',
+        assignmentId: lockedHolder.assignmentId,
+      });
+      await w.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [lockedEmp]);
+      const allowed = batchOf(await post({ recommendationIds: [lockedId] }, key(), w.it1).expect(201));
+      expect(allowed).toMatchObject({ escalated: 1, skipped: 0 });
+      expect(allowed.results[0]).toMatchObject({ recommendationId: lockedId, outcome: 'ESCALATED' });
+    });
+  });
 });

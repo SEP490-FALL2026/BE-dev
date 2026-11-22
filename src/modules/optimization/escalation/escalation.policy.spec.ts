@@ -66,11 +66,22 @@ describe('who the IT Admin may push early from the watch tier to the review tier
     expect(verdict({ placementDepartmentId: null })).toEqual({ kind: 'SKIP', reason: 'NO_DEPARTMENT' });
   });
 
+  it('refuses a caller who is not permitted to act for the holder department (NOT_IN_CHARGE)', () => {
+    expect(verdict({ inChargeAllowed: false })).toEqual({
+      kind: 'SKIP',
+      reason: 'NOT_IN_CHARGE',
+    });
+  });
+
   it('says the machine account before the transfer when both hold, and the seat that ended before either', () => {
     expect(verdict({ seat: { isMachineAccount: true }, inTransfer: true })).toEqual({
       kind: 'SKIP',
       reason: 'MACHINE_ACCOUNT',
     });
     expect(verdict({ seat: null, inTransfer: true })).toEqual({ kind: 'SKIP', reason: 'SEAT_ENDED' });
+    expect(verdict({ placementDepartmentId: null, inChargeAllowed: false })).toEqual({
+      kind: 'SKIP',
+      reason: 'NO_DEPARTMENT',
+    });
   });
 });
