@@ -13,11 +13,11 @@ Tracker sống qua compact context. Sonnet đọc lại file này **đầu mỗi
 | Gói  | Mục                    | Trạng thái | sha | Lệnh kiểm + kết quả | FIX-TEST thêm | Ghi chú / chưa kiểm được |
 | ---- | ---------------------- | ---------- | --- | ------------------- | ------------- | ------------------------ |
 | P1   | W1-01, W1-26           | xong       | e95991a3 | `tsc` 0; `eslint` 0; `depcruise` 0; `check-rules` 0; `jest.gates` 17/17 (335); `export-openapi` +7/-6; `jest` 15/15 (242) | `offboarding-departure.integration-spec.ts` (`lockAgain`) | Đã viết 2 I-test (`offboarding-revocation-existing-task.integration-spec.ts`, `role-duties.integration-spec.ts`); chưa chạy I/H tại máy (đợi CI) |
-| P7   | W1-11                  | chưa       |     |                     |               |                          |
+| P7   | W1-11                  | xong       |     | `tsc` 0; `eslint` 0; `depcruise` 0; `check-rules` 0; `jest.gates` 17/17 (335); `export-openapi` 0 diff; `jest` 8/8 (91) | `year-start-commitments-kept.integration-spec.ts` (`T-RQ2 (K2, no end)`) | Đã thêm I-test năm 1 & năm 2; chưa chạy I tại máy (đợi CI) |
 | P8   | W1-12, W1-13           | chưa       |     |                     |               |                          |
 | P9   | W1-14, W1-03           | chưa       |     |                     |               |                          |
 | P10  | W1-19                  | chưa       |     |                     |               |                          |
-| P11  | W1-18                  | xong       |     | `tsc` 0; `eslint` 0; `depcruise` 0; `check-rules` 0; `jest.gates` 17/17 (335); `export-openapi` 0 diff; `jest` 2/2 (20) | `ghost-seat-g2-reclaim.integration-spec.ts` (`KPI-5 (DA6-39)`) | Đã cập nhật unit `ghost-seat-state.policy.spec.ts`; `ghost-seat-g2-reclaim` chạy trên CI |
+| P11  | W1-18                  | xong       | 3e93089e | `tsc` 0; `eslint` 0; `depcruise` 0; `check-rules` 0; `jest.gates` 17/17 (335); `export-openapi` 0 diff; `jest` 2/2 (20) | `ghost-seat-g2-reclaim.integration-spec.ts` (`KPI-5 (DA6-39)`) | Đã cập nhật unit `ghost-seat-state.policy.spec.ts`; `ghost-seat-g2-reclaim` chạy trên CI |
 | P13a | W1-20, W1-22           | chưa       |     |                     |               |                          |
 | P13b | W1-23                  | chưa       |     |                     |               |                          |
 | P14  | W1-21                  | chưa       |     |                     |               |                          |

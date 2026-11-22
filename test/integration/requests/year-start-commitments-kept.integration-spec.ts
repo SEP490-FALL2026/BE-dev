@@ -304,4 +304,25 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
 
     expect((await rows(id)).map((row) => row.amount_minor)).toEqual([String(3 * 650_000)]);
   });
+
+  it('non-term-limited request keeps its approval price (100.000/month -> 1.200.000) across both year 1 and year 2 even when catalog price rises to 120.000', async () => {
+    const u = await unit();
+    const { subscription, plan } = await planAt('K2', 100_000);
+    const id = await approvedOn(u, plan, null, `${h.year}-11-20`);
+    expect(await kept(id)).toEqual({ amount_minor: '200000', next_year_amount_minor: '1200000' });
+
+    await setPrice(subscription, 120_000);
+    await passOn(`${h.next}-01-01`);
+    await passOn(`${h.next + 1}-01-01`);
+
+    const committed = await h.ctx.sql.query<CommitmentRow>(
+      `SELECT year, amount_minor::text, origin::text, seat_monthly_minor::text
+         FROM budget_commitments WHERE request_id = $1 ORDER BY year`,
+      [id],
+    );
+    expect(committed.rows).toEqual([
+      { year: h.next, amount_minor: '1200000', origin: 'YEAR_START', seat_monthly_minor: '100000' },
+      { year: h.next + 1, amount_minor: '1200000', origin: 'YEAR_START', seat_monthly_minor: '100000' },
+    ]);
+  });
 });

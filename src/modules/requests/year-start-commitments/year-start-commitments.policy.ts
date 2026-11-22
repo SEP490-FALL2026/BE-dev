@@ -81,23 +81,40 @@ export function seatCountsOn(seat: YearStartSeat, yearStart: BusinessDate): bool
   return last === null || last >= yearStart;
 }
 
+const ceilDiv = (dividend: bigint, divisor: bigint): bigint => (dividend + divisor - 1n) / divisor;
+
+function approvalPriceOfSeat(seat: YearStartSeat): Pick<YearStartPrice, 'unitPrice' | 'billingCycle'> | null {
+  if (seat.approvalPrice !== null) return seat.approvalPrice;
+  if (!seat.termLimited && seat.savedMinor !== null) {
+    return { unitPrice: { amountMinor: ceilDiv(seat.savedMinor, 12n), currency: DONG }, billingCycle: 'MONTHLY' };
+  }
+
+  return null;
+}
+
+function approvalMonthlyOfNonTermSeat(seat: YearStartSeat): bigint | null {
+  if (seat.termLimited || seat.savedMinor === null) return null;
+  const monthly = seat.approvalPrice !== null ? monthlyPriceOf(seat.approvalPrice) : null;
+
+  return monthly ? monthly.amountMinor : ceilDiv(seat.savedMinor, 12n);
+}
+
 /**
- * What the approval kept of the seat, when the seat is of a request for months of use and the approval kept a number (`QĐ-111ak`: exactly the
- * number of the year after it kept): null for a seat that kept none (a request of an older release) and for a right with no end, which holds
- * twelve months of the price on 01/01 (R-46; the kept number is for the warning of the approval only). A seat that closes in the new year
- * before its term (a revocation, a period that closes) holds the months it has left, so the commitment never holds what nobody will use, but
- * at the price the approval counted with and never more than the approval kept: the price of 01/01 does not reach a seat that kept a number.
+ * What the approval kept of the seat (`savedMinor`): for a request for months of use, only from the year after approval; for a right
+ * with no end, across every year after approval. Returns null when nothing was kept. A seat that closes in the new year before its end
+ * holds the months it has left at the price the approval counted with, capped at `savedMinor`.
  */
 function keptAmountOf(seat: YearStartSeat, yearStart: BusinessDate): bigint | null {
-  if (!seat.termLimited || seat.savedMinor === null) return null;
+  if (seat.savedMinor === null) return null;
   const closes = seat.validUntil === null ? null : addDays(seat.validUntil, -1);
-  const closesBeforeTerm = closes !== null && (seat.expectedEndDate === null || closes < seat.expectedEndDate);
-  if (!closesBeforeTerm || seat.approvalPrice === null) return seat.savedMinor;
+  const closesBeforeEnd = closes !== null && (seat.expectedEndDate === null || closes < seat.expectedEndDate);
+  const price = closesBeforeEnd ? approvalPriceOfSeat(seat) : null;
+  if (!closesBeforeEnd || price === null) return seat.savedMinor;
 
   const monthsToClose = requestAmountOf({
     kind: 'RECURRING',
-    unitPrice: seat.approvalPrice.unitPrice,
-    billingCycle: seat.approvalPrice.billingCycle,
+    unitPrice: price.unitPrice,
+    billingCycle: price.billingCycle,
     beneficiaries: 1,
     checkDate: yearStart,
     endDate: closes,
@@ -107,14 +124,36 @@ function keptAmountOf(seat: YearStartSeat, yearStart: BusinessDate): bigint | nu
   return monthsToClose.amount.amountMinor < seat.savedMinor ? monthsToClose.amount.amountMinor : seat.savedMinor;
 }
 
+type PricedByEnd = { ok: true; total: bigint } | { ok: false; reason: 'AMOUNT_TOO_LARGE' | 'NO_PRICE' };
+
+function priceSeatsByEnd(
+  seatsByEnd: ReadonlyMap<string | null, number>,
+  price: YearStartPrice,
+  yearStart: BusinessDate,
+): PricedByEnd {
+  let total = 0n;
+  for (const [endDate, beneficiaries] of seatsByEnd) {
+    const priced = requestAmountOf({
+      kind: 'RECURRING',
+      unitPrice: price.unitPrice,
+      billingCycle: price.billingCycle,
+      beneficiaries,
+      checkDate: yearStart,
+      endDate,
+    });
+    if (priced.status === 'MISSING') {
+      return { ok: false, reason: priced.reason === 'AMOUNT_TOO_LARGE' ? 'AMOUNT_TOO_LARGE' : 'NO_PRICE' };
+    }
+    total += priced.amount.amountMinor;
+  }
+
+  return { ok: true, total };
+}
+
 /**
- * The amount of the commitment of one request on 01/01 (`QĐ-111ak`, `QĐ-111k`, M-13), the one rule of the pass and of the amount the budget
- * of the year after takes as carried over: of the seats that still stand after 31/12 (the person who left, the seat revoked, the right that
- * ended hold nothing), a seat of a request for months of use holds exactly what the approval kept of it for the year (a seat that closes before
- * its term, the months it has left at the price of the approval, no more than that); a seat with no end
- * holds twelve months of the monthly price of 01/01; a seat of an older release, which kept nothing, the months from January to the month of
- * its last day at that price, worked out with the rule of the amount of a request (`requestAmountOf`, the day it is checked on being 01/01),
- * so the two cannot disagree on a month.
+ * The amount of the commitment of one request on 01/01, the one rule of the pass and of the amount carried over into the next year: each
+ * standing seat holds what its approval kept (or prorated months on early close at the approval rate); seats without a saved number use the
+ * price on 01/01 via `requestAmountOf`.
  */
 export function yearStartAmountOf(input: {
   year: number;
@@ -132,36 +171,27 @@ export function yearStartAmountOf(input: {
   // Seats that end on the same day cost the same: one calculation for each end date, not for each seat.
   const seatsByEnd = new Map<string | null, number>();
   let total = 0n;
+  let savedMonthlyMinor: bigint | null = null;
   for (const seat of counted) {
     const kept = keptAmountOf(seat, yearStart);
     if (kept !== null) {
+      savedMonthlyMinor ??= approvalMonthlyOfNonTermSeat(seat);
       total += kept;
       continue;
     }
     const last = lastDayOfSeat(seat);
     seatsByEnd.set(last, (seatsByEnd.get(last) ?? 0) + 1);
   }
-  for (const [endDate, beneficiaries] of seatsByEnd) {
-    const priced = requestAmountOf({
-      kind: 'RECURRING',
-      unitPrice: price.unitPrice,
-      billingCycle: price.billingCycle,
-      beneficiaries,
-      checkDate: yearStart,
-      endDate,
-    });
-    if (priced.status === 'MISSING') {
-      return { status: 'SKIPPED', reason: priced.reason === 'AMOUNT_TOO_LARGE' ? 'AMOUNT_TOO_LARGE' : 'NO_PRICE' };
-    }
-    total += priced.amount.amountMinor;
-  }
+  const remainder = priceSeatsByEnd(seatsByEnd, price, yearStart);
+  if (!remainder.ok) return { status: 'SKIPPED', reason: remainder.reason };
+  total += remainder.total;
   // Each end date is within the range, the seats of all of them together may not be.
   if (total > MAX_AMOUNT_MINOR) return { status: 'SKIPPED', reason: 'AMOUNT_TOO_LARGE' };
 
   return {
     status: 'PRICED',
     amountMinor: total,
-    seatMonthlyMinor: monthly.amountMinor,
+    seatMonthlyMinor: savedMonthlyMinor ?? monthly.amountMinor,
     currency: price.unitPrice.currency,
   };
 }
