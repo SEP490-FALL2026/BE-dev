@@ -13095,7 +13095,7 @@
         },
         "responses": {
           "200": {
-            "description": "A task of the queue was made for each right chosen (all that have none when none is named), after the lock of the company account is recorded or together with it, with the standard reason of a departure (and the note the IT Admin adds); the server counts the rights. The seats stay whole until each task is done; nothing is transferred to anyone. A seat that has a task already gets the reason added.",
+            "description": "A task of the queue was made for each right chosen (all revocable seats held when none is named), after the lock of the company account is recorded or together with it, with the standard reason of a departure (and the note the IT Admin adds); the server counts the rights. The seats stay whole until each task is done; nothing is transferred to anyone. A seat that already has an open revocation task gets the departure reason added to that task instead of opening a second task.",
             "content": {
               "application/json": {
                 "schema": {
@@ -13203,7 +13203,7 @@
             }
           },
           "409": {
-            "description": "The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED, with details.problem SOURCE_REQUIRED, ASSIGNMENT_IS_SERVICE_ACCOUNT or TYPE_NOT_SUPPORTED, and details.provisioningType when it is the kind of the seat), there is nothing left to take away (NOTHING_TO_REVOKE), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
+            "description": "The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED, with details.problem SOURCE_REQUIRED, ASSIGNMENT_IS_SERVICE_ACCOUNT or TYPE_NOT_SUPPORTED, and details.provisioningType when it is the kind of the seat), there is nothing left to take away or all selected seats already carry the reason of this departure (NOTHING_TO_REVOKE), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -13326,7 +13326,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid, such as one that still sends a count or a reason (VALIDATION_ERROR), or a seat named is not held or has a task (ASSIGNMENT_NOT_AVAILABLE): nothing is made.",
+            "description": "The body is invalid, such as one that still sends a count or a reason (VALIDATION_ERROR), or a seat named is not held by the person (ASSIGNMENT_NOT_AVAILABLE): nothing is made.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -13344,12 +13344,12 @@
                     }
                   },
                   "OFFBOARDING_CASE.ASSIGNMENT_NOT_AVAILABLE": {
-                    "summary": "The seat is not held by the person or already has a revocation under way.",
+                    "summary": "The seat is not held by the person.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "OFFBOARDING_CASE.ASSIGNMENT_NOT_AVAILABLE",
-                        "message": "The seat is not held by the person or already has a revocation under way.",
+                        "message": "The seat is not held by the person.",
                         "details": { "assignmentId": "<assignment-id>" },
                         "requestId": "req_example"
                       }
@@ -105291,6 +105291,7 @@
           "data": {
             "type": "object",
             "properties": {
+              "offboardingCaseId": { "type": "string", "format": "uuid" },
               "lastWorkingDay": { "type": "string" },
               "state": { "type": "string", "enum": ["HANDING_OVER", "LEFT"] },
               "level": { "type": "string", "enum": ["LEAVING", "OVERDUE_HANDOVER"] },
@@ -105307,7 +105308,7 @@
                 ]
               }
             },
-            "required": ["lastWorkingDay", "state", "level", "roleFlags"],
+            "required": ["offboardingCaseId", "lastWorkingDay", "state", "level", "roleFlags"],
             "additionalProperties": false,
             "nullable": true
           }

@@ -12,7 +12,7 @@ Tracker sống qua compact context. Sonnet đọc lại file này **đầu mỗi
 
 | Gói  | Mục                    | Trạng thái | sha | Lệnh kiểm + kết quả | FIX-TEST thêm | Ghi chú / chưa kiểm được |
 | ---- | ---------------------- | ---------- | --- | ------------------- | ------------- | ------------------------ |
-| P1   | W1-01, W1-26           | chưa       |     |                     |               |                          |
+| P1   | W1-01, W1-26           | xong       |     | `tsc` 0; `eslint` 0; `depcruise` 0; `check-rules` 0; `jest.gates` 17/17 (335); `export-openapi` +7/-6; `jest` 15/15 (242) | `offboarding-departure.integration-spec.ts` (`lockAgain`) | Đã viết 2 I-test (`offboarding-revocation-existing-task.integration-spec.ts`, `role-duties.integration-spec.ts`); chưa chạy I/H tại máy (đợi CI) |
 | P7   | W1-11                  | chưa       |     |                     |               |                          |
 | P8   | W1-12, W1-13           | chưa       |     |                     |               |                          |
 | P9   | W1-14, W1-03           | chưa       |     |                     |               |                          |

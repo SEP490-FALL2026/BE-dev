@@ -65,7 +65,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
   TRANSFER_CANCELLATION_REQUIRED:
     'The transfer that waits ends before it takes effect: confirm that it is cancelled with the departure.',
   NOTHING_TO_REVOKE: 'There is no right left to take away.',
-  ASSIGNMENT_NOT_AVAILABLE: 'The seat is not held by the person or already has a revocation under way.',
+  ASSIGNMENT_NOT_AVAILABLE: 'The seat is not held by the person.',
   ACCOUNT_LOCK_NOT_RECORDED: 'The lock of the company account must be recorded before or with the revocations.',
   ACCOUNT_LOCK_FIRST:
     'The lock of the company account (1a) must be recorded before the lock of the mailbox for good (1b).',
