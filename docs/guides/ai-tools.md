@@ -50,4 +50,6 @@ Nguồn chính thức, đối chiếu 2026-10-07:
 
 ## Thiết kế và bàn giao
 
+Quy trình đợt code theo spec của nhóm: [quy trình code AI](quy-trinh-code-ai.md).
+
 Dùng [workspace chung](../workspace/README.md) và [roadmap](../roadmap.md). Superpowers tùy chọn; dùng mẫu/vị trí của repo, không sinh spec/plan trùng lặp. Dev ngang quyền review lẫn nhau; người hoặc AI nhận cùng tài liệu đã review, không phụ thuộc chat.
