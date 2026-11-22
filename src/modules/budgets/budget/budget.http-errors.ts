@@ -20,8 +20,10 @@ import {
   BudgetCycleDeadlinePassedError,
   BudgetCycleLockedError,
   BudgetCycleNotDraftError,
+  BudgetCycleNotLockedError,
   BudgetCycleNotOpenError,
   BudgetCycleReasonRequiredError,
+  BudgetCycleReserveOverCeilingError,
   BudgetCycleYearPastError,
   BudgetCommitmentNotFoundError,
   BudgetCommitmentRefusedError,
@@ -182,6 +184,12 @@ export function toBudgetApiException(error: unknown): unknown {
   if (error instanceof BudgetCycleNotOpenError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET_CYCLE.NOT_OPEN', error.message, { year: error.year });
   }
+  if (error instanceof BudgetCycleNotLockedError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET_CYCLE.NOT_LOCKED', error.message, { year: error.year });
+  }
+  if (error instanceof BudgetCycleReserveOverCeilingError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET_CYCLE.RESERVE_OVER_CEILING', error.message);
+  }
   if (error instanceof BudgetYearEndedError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.YEAR_ENDED', error.message, { year: error.year });
   }
@@ -320,7 +328,9 @@ export const BUDGET_ERROR_EXAMPLES = {
   CYCLE_NOT_DRAFT: example(new BudgetCycleNotDraftError(2027)),
   CYCLE_ALREADY_OPEN: example(new BudgetCycleAlreadyOpenError(2027)),
   CYCLE_DEADLINE_PASSED: example(new BudgetCycleDeadlinePassedError()),
+  CYCLE_RESERVE_OVER_CEILING: example(new BudgetCycleReserveOverCeilingError()),
   CYCLE_NOT_OPEN: example(new BudgetCycleNotOpenError(2027)),
+  CYCLE_NOT_LOCKED: example(new BudgetCycleNotLockedError(2027)),
   CURRENCY_NOT_REPORTING: example(new BudgetCurrencyError('USD', 'VND')),
   RESERVE_REASON_REQUIRED: example(new BudgetReasonRequiredError('RESERVE')),
   // Not shown yet: two writers at once answer the same code with the message given for the unique index above.

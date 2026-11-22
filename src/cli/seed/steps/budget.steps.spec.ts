@@ -67,4 +67,46 @@ describe('budget.year: the version of Finance (T9b)', () => {
     expect(eng).not.toHaveProperty('reservePercent');
     expect(eng).not.toHaveProperty('reserveReason');
   });
+
+  it('skips POST /budget-versions/:id/submission when the cycle is still OPEN and submits once it is LOCKED', async () => {
+    const runWithCycle = async (status: 'OPEN' | 'LOCKED') => {
+      const only = { ...F, budgets: [budget('ENG')] };
+      const posts: string[] = [];
+      const call = jest.fn((...[, method, path]: [string, string, string, unknown?]): Promise<unknown> => {
+        if (method === 'POST') posts.push(path);
+        if (path.startsWith('/budget-versions?')) {
+          return Promise.resolve({
+            items: [{ id: 'version-1', state: 'DRAFT', number: 1, costCenter: { id: 'cc-ENG' } }],
+            pagination: { totalPages: 1 },
+          });
+        }
+        if (path.startsWith('/budget-versions/version-1/attachments')) {
+          return Promise.resolve({ items: [{ id: 'file-1' }], pagination: { totalPages: 1 } });
+        }
+        if (path === '/budget-cycles/2026') {
+          return Promise.resolve({ year: 2026, status });
+        }
+
+        return Promise.resolve({});
+      });
+      const ctx = {
+        fixture: only,
+        today: '2026-11-17',
+        mode: 'apply',
+        api: { call, signIn: () => Promise.resolve() },
+        ids: { costCenters: new Map([['ENG', 'cc-ENG']]) },
+        demoPassword: 'x',
+      } as unknown as DemoRunContext;
+      const outcome = await step.run(ctx);
+
+      return { posts, outcome };
+    };
+
+    const whileOpen = await runWithCycle('OPEN');
+    expect(whileOpen.posts).toEqual([]);
+    expect(whileOpen.outcome.status).toBe('present');
+
+    const whileLocked = await runWithCycle('LOCKED');
+    expect(whileLocked.posts).toContain('/budget-versions/version-1/submission');
+  });
 });

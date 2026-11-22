@@ -110,7 +110,7 @@ async function turn(
   const finance = await as(ctx, financePerson(ctx));
   const version = await latestVersion(ctx, finance, costCenterId, year);
   const label = `${plan.department}-${year}`;
-  if (version) return versionTurn(ctx, { finance, label, reason: plan.reason }, version, stage);
+  if (version) return versionTurn(ctx, { finance, label, reason: plan.reason }, version, stage, year);
   const { proposal, headEmail } = await proposalOf(ctx, plan.department, costCenterId, year);
   if (!proposal) return act(ctx, 'trưởng phòng gửi BM-10', () => propose(ctx, plan, { headEmail, year }));
   if (stage === 'PROPOSAL_SUBMITTED') return { done: true, action: null };
@@ -134,8 +134,12 @@ async function versionTurn(
   by: { finance: string; label: string; reason?: string },
   version: Row,
   stage: DemoNextYear['stage'],
+  year: number,
 ): Promise<Move> {
   if (version.state === 'DRAFT') {
+    const cycle = await ctx.api.call<{ status?: string } | undefined>(by.finance, 'GET', `/budget-cycles/${year}`);
+    if (cycle?.status && cycle.status !== 'LOCKED') return { done: true, action: null };
+
     return act(ctx, 'Finance gửi phiên bản', () => sendVersion(ctx, by.finance, version.id, by.label));
   }
   if (version.state === 'SENT' && stage === 'APPROVED') {

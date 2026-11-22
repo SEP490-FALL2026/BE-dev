@@ -63721,7 +63721,7 @@
             }
           },
           "409": {
-            "description": "The version is not a draft nor sent back to Finance, or is a draft left behind by a proposal that was withdrawn or given back, so it is not changed (BUDGET.VERSION_NOT_EDITABLE).",
+            "description": "The version is not a draft nor sent back to Finance, or is a draft left behind by a proposal that was withdrawn or given back, so it is not changed (BUDGET.VERSION_NOT_EDITABLE). Sending a version also requires an open and locked budget cycle (BUDGET_CYCLE.NOT_OPEN, BUDGET_CYCLE.NOT_LOCKED), a proposal still waiting (BUDGET.PROPOSAL_NOT_SUBMITTED), matching cycle currency (BUDGET.CYCLE_CURRENCY_MISMATCH) and remaining within the annual ceiling (BUDGET_VERSION.OVER_CEILING).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -63757,6 +63757,18 @@
                       "error": {
                         "code": "BUDGET_CYCLE.NOT_OPEN",
                         "message": "The budget cycle of 2027 is not open yet.",
+                        "details": { "year": 2027 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_CYCLE.NOT_LOCKED": {
+                    "summary": "The budget cycle of 2027 is still open and has not locked yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.NOT_LOCKED",
+                        "message": "The budget cycle of 2027 is still open and has not locked yet.",
                         "details": { "year": 2027 },
                         "requestId": "req_example"
                       }
@@ -66033,7 +66045,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the decision deadline is before the submission deadline (BUDGET.CYCLE_DEADLINES_INVALID), or the amount is refused (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE).",
+            "description": "The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the decision deadline is before the submission deadline (BUDGET.CYCLE_DEADLINES_INVALID), the shared-pool reserve exceeds the annual ceiling (BUDGET_CYCLE.RESERVE_OVER_CEILING), or the amount is refused (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -66069,6 +66081,17 @@
                       "error": {
                         "code": "BUDGET.CYCLE_DEADLINES_INVALID",
                         "message": "The decision deadline cannot be before the submission deadline.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_CYCLE.RESERVE_OVER_CEILING": {
+                    "summary": "The shared-pool reserve cannot exceed the annual ceiling.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.RESERVE_OVER_CEILING",
+                        "message": "The shared-pool reserve cannot exceed the annual ceiling.",
                         "requestId": "req_example"
                       }
                     }
@@ -66696,7 +66719,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the deadlines are out of order (BUDGET.CYCLE_DEADLINES_INVALID), an open cycle is moved to a submission deadline before today (BUDGET_CYCLE.DEADLINE_PASSED), an open cycle is changed without the reason (BUDGET.CYCLE_REASON_REQUIRED), or the amount is refused.",
+            "description": "The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the deadlines are out of order (BUDGET.CYCLE_DEADLINES_INVALID), the shared-pool reserve exceeds the annual ceiling (BUDGET_CYCLE.RESERVE_OVER_CEILING), an open cycle is moved to a submission deadline before today (BUDGET_CYCLE.DEADLINE_PASSED), an open cycle is changed without the reason (BUDGET.CYCLE_REASON_REQUIRED), or the amount is refused.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -66732,6 +66755,17 @@
                       "error": {
                         "code": "BUDGET.CYCLE_DEADLINES_INVALID",
                         "message": "The decision deadline cannot be before the submission deadline.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_CYCLE.RESERVE_OVER_CEILING": {
+                    "summary": "The shared-pool reserve cannot exceed the annual ceiling.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.RESERVE_OVER_CEILING",
+                        "message": "The shared-pool reserve cannot exceed the annual ceiling.",
                         "requestId": "req_example"
                       }
                     }
