@@ -22,7 +22,9 @@ Spec, plan, prompt và tiến độ của một đợt nằm ở `docs/reviews/<
   `<loại>/<đợt>-<làn>` (ví dụ `fix/redesign-w1-biz`, `fix/redesign-w1-tech`), tách từ `dev` mới nhất.
 - Hai làn **không sửa chung file**. Gói nào đụng file của làn kia thì chuyển về làn nghiệp vụ. PLAN ghi rõ gói thuộc làn
   nào.
-- Push nhánh feature thoải mái. **Merge vào `dev` chỉ qua PR, Owner bấm merge.** `main` và deploy chỉ Owner.
+- Mỗi đợt có một **nhánh gộp** `int/<đợt>` (Owner tạo từ `dev`). Hai làn merge vào nhánh gộp, **không** vào `dev`
+  trực tiếp; `dev` chỉ nhận code đã review. Push nhánh feature thoải mái. Merge vào nhánh gộp, `dev`, `main` và deploy
+  chỉ Owner.
 - Trong một làn, AI làm **tuần tự từng gói**, không chạy song song, không worktree.
 
 ## Vòng đời một đợt
@@ -32,19 +34,26 @@ Spec, plan, prompt và tiến độ của một đợt nằm ở `docs/reviews/<
    gọi Fable phản biện khi SPEC chứa luật tiền/ngân sách/quyền cực nặng.
 2. **Code từng gói** — với mỗi gói trong PLAN: code → AI tự đọc lại diff theo SPEC → **kiểm nhanh trên máy** (dưới đây)
    → commit → ghi một dòng vào `PROGRESS.md` (gói, commit, lệnh đã chạy, nợ test).
-3. **Hết gói** — push nhánh, chạy **CI đầy đủ trên GitHub** (dưới đây). Đọc log, sửa, chạy lại job đỏ.
-4. **Review** — Opus đọc toàn bộ diff theo SPEC/BRD/QĐ và **tự đọc phần rủi ro**: migration, raw SQL, phân quyền, tiền,
-   và mọi test/gate mà AI đã sửa. Code do Gemini viết luôn qua bước này. Finding ghi vào `docs/reviews/<đợt>/REVIEW.md`.
-5. **Sửa finding** — AI sửa từng finding, kiểm nhanh, commit, push.
-6. **CI GitHub lần 2** — bắt buộc sau commit cuối, trước khi mở/merge PR.
+3. **Hết gói của làn** — push nhánh làn, chạy **CI đầy đủ trên GitHub** (dưới đây). Đọc log, sửa, chạy lại job đỏ. Làn
+   nào xong trước thì Owner merge làn đó vào `int/<đợt>` trước; làn kia cần code của nó (ví dụ phần B của làn `biz`) thì
+   `git merge origin/int/<đợt>` vào nhánh làn rồi làm tiếp.
+4. **Owner gộp hai làn** vào `int/<đợt>`, giải xung đột (`openapi.json` sinh lại bằng `pnpm openapi:export`, manifest
+   gộp tay), chạy CI đầy đủ trên nhánh gộp.
+5. **Review + audit trên nhánh gộp** — Opus đọc toàn bộ diff `dev...int/<đợt>` theo SPEC/BRD/QĐ và **tự đọc phần rủi ro**:
+   migration, raw SQL, phân quyền, tiền, mọi test/gate mà AI đã sửa (code Gemini luôn qua bước này). Kèm **merge audit**:
+   file cả hai làn cùng đụng, tương tác giữa hai làn, migration chạy trên DB rỗng và không drift (CI job `quality` kiểm).
+   Finding ghi `docs/reviews/<đợt>/REVIEW.md`, gắn làn chịu trách nhiệm.
+6. **Sửa finding** — mỗi làn sửa finding của mình trên nhánh làn (hoặc thẳng trên nhánh gộp nếu finding nằm ở chỗ gộp),
+   kiểm nhanh, commit, push; Owner merge lại vào nhánh gộp.
+7. **CI GitHub lần 2 trên nhánh gộp** — bắt buộc sau commit cuối.
    - Đỏ do **logic** ⟹ sửa, chạy lại đúng job đó.
-   - Đỏ do **nợ test** (test cũ, harness, seed — không có 500, không sai tiền/luồng) ⟹ ghi vào `PROGRESS.md` mục
-     "Nợ test cho FIX-TEST", không mở vòng review mới; sửa gộp một lần ở cuối đợt.
-7. **PR vào `dev`** — mô tả: hành vi đổi, operation đổi contract (cho FE/Mobile), migration, kết quả CI (link run), phần
-   chưa kiểm. Owner merge.
-8. **Hai làn cùng merge** — làn merge sau phải rebase/merge `dev` mới, rồi làm **merge audit**: đọc lại mọi file cả hai
-   làn cùng đụng, kiểm migration chạy được trên DB rỗng và không drift (CI job `quality`/`integration` làm việc này),
-   chạy lại CI đầy đủ.
+   - Đỏ do **nợ test** (test cũ, harness, seed — không có 500, không sai tiền/luồng) ⟹ ghi `FIX-TEST-<làn>.md`, không mở
+     vòng review mới; sửa gộp một lần ở cuối đợt.
+8. **PR `int/<đợt>` → `dev`** — mô tả: hành vi đổi, operation đổi contract, migration, link run CI, phần chưa kiểm. Owner
+   merge.
+9. **API description của đợt** — Opus viết mô tả API đổi/mới của đợt (theo màn × kiểu cấp, ví dụ request/response, lỗi)
+   vào `Docs/Figma UI-UX/API-Integration/`, đối chiếu `openapi.json` trên `dev`. Giao FE/Mobile code **ngay theo đợt**,
+   không chờ hết mọi đợt.
 
 ## Kiểm nhanh trên máy (máy yếu)
 

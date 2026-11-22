@@ -46,7 +46,7 @@ Thứ tự theo làn (PLAN mục _Hai làn_):
 
 - **tech:** P2 → P3 → P4 → P5 → P6 → P12 → P16 → P18 (phần của làn).
 - **biz:** phần A P1 → P11 → P7 → P8 → P13a → P13b → P14 → P17a → P17b. Phần B P9 → P10 → P15a → P15b **chỉ bắt đầu
-  khi** người điều phối báo làn `tech` đã merge vào `dev`: lúc đó `git fetch origin && git merge origin/dev` (không
+  khi** người điều phối báo làn `tech` đã merge vào nhánh gộp `int/redesign-w1`: lúc đó `git fetch origin && git merge origin/int/redesign-w1` (không
   rebase vì nhánh đã push), chạy lại `pnpm openapi:export`, bộ kiểm nhanh, rồi làm phần B. Cuối cùng P18.
 
 Với mỗi gói:
@@ -125,7 +125,7 @@ Dừng ngay, ghi vào `PROGRESS-<làn>.md`, báo lại cho người điều ph�
 ## 5. Không được làm
 
 - Không chạy `pnpm test:http`, `pnpm test:integration`, `pnpm test:e2e` full, seed, Docker hay migration trên DB. Không cần DB ở máy.
-- Chỉ push **nhánh làn của mình**. Không merge `dev`/`main`, không mở PR thay Owner, không deploy. CI GitHub chỉ chạy tay trên nhánh làn của mình theo mục 6.
+- Chỉ push **nhánh làn của mình**. Không merge vào `int/redesign-w1`, `dev`, `main`, không mở PR thay Owner, không deploy. CI GitHub chỉ chạy tay trên nhánh làn của mình theo mục 6.
 - Không sửa `openapi.json`, `docs/generated/*`, `src/generated/*` bằng tay; chỉ qua generator.
 - Không xóa hoặc `skip` test cũ. Không thêm `eslint-disable`, không thêm mục vào `eslint-suppressions.json`.
 - Không mở rộng phạm vi sang các việc ở SPEC §2.2 (ngoài phạm vi), kể cả khi thấy lỗi gần đó. Ghi chúng vào báo cáo cuối.

@@ -4,11 +4,11 @@ Spec: [SPEC.md](SPEC.md). Trạng thái: Proposed. Câu hỏi Owner đã chốt 
 
 - **Hai làn, hai nhánh** (quy trình: [`docs/guides/quy-trinh-code-ai.md`](../../guides/quy-trinh-code-ai.md)):
   - **Làn `tech` (Bảo)** — nhánh `fix/redesign-w1-tech`: P2 → P3 → P4 → P5 → P6 → P12 → P16.
-  - **Làn `biz` (Owner)** — nhánh `fix/redesign-w1-biz`: **phần A** P1 → P11 → P7 → P8 → P13a → P13b → P14 → P17a → P17b; **phần B** (chỉ sau khi làn `tech` đã merge vào `dev` và làn `biz` đã `git merge origin/dev`) P9 → P10 → P15a → P15b; cuối cùng P18.
+  - **Làn `biz` (Owner)** — nhánh `fix/redesign-w1-biz`: **phần A** P1 → P11 → P7 → P8 → P13a → P13b → P14 → P17a → P17b; **phần B** (chỉ sau khi Owner đã merge làn `tech` vào nhánh gộp `int/redesign-w1` và làn `biz` đã `git merge origin/int/redesign-w1`) P9 → P10 → P15a → P15b; cuối cùng P18.
   - Hai nhánh tách từ `origin/dev` mới nhất (đã chứa thư mục này). Mỗi làn một chat Sonnet/Gemini (subagent code dùng model **sonnet**), làm **tuần tự** từng gói của làn mình, không song song, không worktree.
 - **Vì sao chia như vậy** (đã đối chiếu danh sách file của từng gói): làn `tech` chỉ đụng `biz` ở hai file — `subscription-change.service.ts` (P2 ↔ P9) và `provisioning-grant-writer.service.ts` (P2 ↔ P15a) — nên P9, P10 (sau P9), P15a, P15b (sau P15a) để phần B. Chung còn lại chỉ là `openapi.json` (sinh lại) và `test/support/openapi-example-manifest.ts` (P6 ↔ P15b, gộp tay). P17a theo bảng thứ tự khóa của SPEC mục 4, không đụng file của P2.
 - **Không sửa file của làn kia.** P3 grep điểm gọi cần `tx` trên mọi module: điểm nằm trong file của gói làn `biz` ⟹ không sửa, ghi vào `PROGRESS-tech.md` mục "Bàn giao cho làn biz".
-- **Merge:** khi một nhánh merge `dev` của nhánh kia vào, file `openapi.json` lấy bản bất kỳ rồi chạy lại `pnpm openapi:export`; `openapi-example-manifest.ts` gộp tay cả hai phía. Làn merge vào `dev` sau làm merge audit (quy trình mục 8).
+- **Nhánh gộp:** Owner tạo `int/redesign-w1` từ `dev`; hai làn merge vào đó, không vào `dev` trực tiếp. **Merge:** khi một nhánh merge code của nhánh kia vào, file `openapi.json` lấy bản bất kỳ rồi chạy lại `pnpm openapi:export`; `openapi-example-manifest.ts` gộp tay cả hai phía. Review + merge audit làm trên nhánh gộp (quy trình mục 4–5).
 - **Commit:** mỗi gói một commit, hoặc vài commit nhỏ của cùng gói. Git identity của người làm, không co-author/attribution. Được push **nhánh làn của mình**; không merge `dev`, không deploy.
 - **Tracker:** `PROGRESS-tech.md` / `PROGRESS-biz.md` và `FIX-TEST-tech.md` / `FIX-TEST-biz.md` cùng thư mục — mỗi làn chỉ ghi file của mình. Sonnet đọc lại đầu mỗi gói (và ngay sau mỗi lần compact context), cập nhật cuối mỗi gói.
 
@@ -237,7 +237,7 @@ pnpm test -- <các file *.spec.ts đã chạm/thêm>
 - **Kiểm:** bộ nhanh + unit đã chạm.
 - **Xong khi:** đạt W1-17 (d), (e), (i).
 
-### P18 — Chốt đợt (S, mỗi làn làm phần của mình; làn `biz` làm thêm phần sinh lại cuối sau khi đã merge `dev`)
+### P18 — Chốt đợt (S, mỗi làn làm phần của mình; làn `biz` làm thêm phần sinh lại cuối sau khi đã merge nhánh gộp)
 
 - **Việc:**
   - `pnpm arch:routes`, `pnpm arch:graph` nếu đồ thị đổi;
@@ -248,13 +248,14 @@ pnpm test -- <các file *.spec.ts đã chạm/thêm>
 - **Kiểm:** bộ nhanh đầy đủ + `pnpm rules:format`.
 - **Xong khi:** cây sạch, mọi gói đã commit; báo cáo cho Opus review gồm: mỗi gói commit sha + lệnh kiểm đã chạy + kết quả, danh sách đổi contract (SPEC mục 5), mục FIX-TEST, câu `SELECT` của P16 cho Owner.
 
-## Sau P18 (mỗi làn)
+## Sau P18
 
-1. Push nhánh làn; chạy CI đầy đủ: `gh workflow run ci.yml --ref fix/redesign-w1-<làn>` (chạy tay = bộ đầy đủ). Đọc log (`gh run view <id> --log-failed`), sửa, chạy lại job đỏ; ghi link run vào `PROGRESS-<làn>.md`.
-2. Opus review sâu (đọc diff + tự đọc phần rủi ro; code Gemini luôn qua bước này) ⟹ `REVIEW-<làn>.md`; Sonnet/Gemini sửa finding.
-3. CI GitHub lần 2 sau commit cuối. Đỏ do nợ test ⟹ `FIX-TEST-<làn>.md`, không mở vòng review mới.
-4. PR vào `dev`, Owner merge. Làn `tech` merge trước để làn `biz` làm phần B.
+1. **Mỗi làn:** push nhánh làn; chạy CI đầy đủ `gh workflow run ci.yml --ref fix/redesign-w1-<làn>` (chạy tay = bộ đầy đủ). Đọc log (`gh run view <id> --log-failed`), sửa, chạy lại job đỏ; ghi link run vào `PROGRESS-<làn>.md`. Làn `tech` xong trước ⟹ Owner merge vào `int/redesign-w1` để làn `biz` làm phần B.
+2. **Owner gộp hai làn** vào `int/redesign-w1`, chạy CI đầy đủ trên nhánh gộp.
+3. **Opus review + audit trên nhánh gộp** (diff `dev...int/redesign-w1`; tự đọc phần rủi ro; code Gemini luôn qua bước này; merge audit hai làn) ⟹ `REVIEW.md`, finding gắn làn; mỗi làn sửa finding của mình.
+4. **CI GitHub lần 2 trên nhánh gộp** sau commit cuối. Đỏ do nợ test ⟹ `FIX-TEST-<làn>.md`, không mở vòng review mới.
 5. Owner chạy câu `SELECT` kiểm trùng số hóa đơn (SPEC W1-27) trên DB demo **trước** deploy.
-6. Gói FIX-TEST sửa test cũ theo kết quả CI; bàn giao API description (SPEC mục 5) cho FE/Mobile.
+6. PR `int/redesign-w1` → `dev`, Owner merge.
+7. **API description đợt 1** (SPEC mục 5, 20 operation) vào `Docs/Figma UI-UX/API-Integration/`, giao FE/Mobile code ngay; gói FIX-TEST sửa test cũ theo kết quả CI.
 
-Subagent code dùng model **sonnet**; không merge `dev`, không deploy.
+Subagent code dùng model **sonnet**; không merge nhánh gộp/`dev`, không deploy.
