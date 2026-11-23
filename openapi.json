@@ -9035,7 +9035,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin can reopen transfer revocations (AUTHORIZATION.FORBIDDEN).",
+            "description": "Only an acting IT Admin of the destination department can reopen transfer revocations (AUTHORIZATION.FORBIDDEN, DEPARTMENT_TRANSFER.NOT_IN_CHARGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -9050,13 +9050,24 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "DEPARTMENT_TRANSFER.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the destination department can reopen transfer revocations.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the destination department can reopen transfer revocations.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
             }
           },
           "404": {
-            "description": "The transfer does not exist (DEPARTMENT_TRANSFER.NOT_FOUND).",
+            "description": "The transfer does not exist or is outside your department scope (DEPARTMENT_TRANSFER.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },

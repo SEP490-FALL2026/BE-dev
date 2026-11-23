@@ -109,9 +109,16 @@ export class TransferRevocationService {
       await this.organization.lockEmployeeForUpdate(tx, employeeId);
       const held = await this.graces.lock(tx, transferId);
       if (!held) throw new TransferRevocationRefusedError('NOT_FOUND');
+      const access = await this.notifier.resolveTransferReopenAccess(tx, actor.employeeId, held);
+      if (!access.inReadScope) throw new TransferRevocationRefusedError('NOT_FOUND');
+      if (!access.isActing) throw new TransferRevocationRefusedError('NOT_IN_CHARGE');
       if (!revocationDue(sweptOf(held), today)) throw new TransferRevocationRefusedError('REVOCATION_NOT_DUE');
 
-      const done = await this.takeBack(tx, held, today, now, { noReopenAfterFailure: false, actor });
+      const done = await this.takeBack(tx, held, today, now, {
+        noReopenAfterFailure: false,
+        actor,
+        bySubstitute: access.bySubstitute,
+      });
       if (done.created + done.reasonAdded === 0) throw new TransferRevocationRefusedError('NOTHING_TO_REVOKE');
 
       return done;
@@ -144,7 +151,7 @@ export class TransferRevocationService {
     held: HeldTransfer,
     today: BusinessDate,
     now: Date,
-    options: { noReopenAfterFailure: boolean; actor: AuthenticatedPrincipal | SystemActor },
+    options: { noReopenAfterFailure: boolean; actor: AuthenticatedPrincipal | SystemActor; bySubstitute?: boolean },
   ): Promise<Omit<TransfersRevoked, 'closed'>> {
     const seats = await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx);
     if (held.snapshotBefore === null) await this.keepPicture(tx, held, seats, today);
@@ -171,7 +178,7 @@ export class TransferRevocationService {
         if (!(error instanceof AssignmentNotOpenError)) throw error;
       }
     }
-    if (done.created + done.reasonAdded > 0) await this.tell(tx, held, done, options.actor);
+    if (done.created + done.reasonAdded > 0) await this.tell(tx, held, done, options.actor, options.bySubstitute);
 
     return done;
   }
@@ -196,8 +203,14 @@ export class TransferRevocationService {
     held: HeldTransfer,
     done: { created: number; reasonAdded: number },
     actor: AuthenticatedPrincipal | SystemActor,
+    bySubstitute = false,
   ): Promise<void> {
-    const after = { employeeId: held.employeeId, tasksCreated: done.created, reasonsAdded: done.reasonAdded };
+    const after = {
+      employeeId: held.employeeId,
+      tasksCreated: done.created,
+      reasonsAdded: done.reasonAdded,
+      ...(bySubstitute ? { bySubstitute: true } : {}),
+    };
     const event =
       'kind' in actor && actor.kind === 'SYSTEM'
         ? personnelSystemAuditEvent(

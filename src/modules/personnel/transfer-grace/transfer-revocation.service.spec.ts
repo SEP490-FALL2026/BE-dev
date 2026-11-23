@@ -55,6 +55,7 @@ describe('TransferRevocationService', () => {
   function makeSut(options?: {
     foundEmployeeId?: string | null;
     locked?: HeldTransfer | null;
+    reopenAccess?: { inReadScope: boolean; isActing: boolean; bySubstitute: boolean };
     openRevocationResult?: {
       taskId: string;
       created: boolean;
@@ -101,7 +102,13 @@ describe('TransferRevocationService', () => {
       openRevocation,
     } as unknown as LicensingApi;
     const audit = { record: auditRecord } as unknown as AuditApi;
-    const notifier = { transferRightsRevoking: jest.fn().mockResolvedValue(undefined) } as unknown as PersonnelNotifier;
+    const resolveTransferReopenAccess = jest
+      .fn()
+      .mockResolvedValue(options?.reopenAccess ?? { inReadScope: true, isActing: true, bySubstitute: false });
+    const notifier = {
+      transferRightsRevoking: jest.fn().mockResolvedValue(undefined),
+      resolveTransferReopenAccess,
+    } as unknown as PersonnelNotifier;
     const closing = { closeIfDue: jest.fn().mockResolvedValue(false) } as unknown as TransferClosureService;
 
     const service = new TransferRevocationService(
@@ -152,6 +159,30 @@ describe('TransferRevocationService', () => {
       });
     });
 
+    it('throws NOT_FOUND when actor is outside read scope', async () => {
+      const { service, openRevocation } = makeSut({
+        reopenAccess: { inReadScope: false, isActing: false, bySubstitute: false },
+      });
+
+      await expect(service.reopen(actor, 'tr-1')).rejects.toMatchObject({
+        constructor: TransferRevocationRefusedError,
+        code: 'NOT_FOUND',
+      });
+      expect(openRevocation).not.toHaveBeenCalled();
+    });
+
+    it('throws NOT_IN_CHARGE when actor is in read scope but not acting for destination department', async () => {
+      const { service, openRevocation } = makeSut({
+        reopenAccess: { inReadScope: true, isActing: false, bySubstitute: false },
+      });
+
+      await expect(service.reopen(actor, 'tr-1')).rejects.toMatchObject({
+        constructor: TransferRevocationRefusedError,
+        code: 'NOT_IN_CHARGE',
+      });
+      expect(openRevocation).not.toHaveBeenCalled();
+    });
+
     it('throws REVOCATION_NOT_DUE when grace has not ended yet', async () => {
       const { service } = makeSut({ locked: heldTransfer({ graceEndsOn: '2026-11-25' }) });
 
@@ -186,6 +217,26 @@ describe('TransferRevocationService', () => {
       expect(auditRecord).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ action: 'DEPARTMENT_TRANSFER.REVOCATION_OPENED', actorKind: 'USER' }),
+      );
+      const recordedEvent = (auditRecord.mock.calls[0] as [unknown, { after: Record<string, unknown> }])[1];
+      expect(recordedEvent.after).not.toHaveProperty('bySubstitute');
+    });
+
+    it('records bySubstitute: true in audit after when reopened by an active substitute', async () => {
+      const { service, auditRecord } = makeSut({
+        reopenAccess: { inReadScope: true, isActing: true, bySubstitute: true },
+      });
+
+      const result = await service.reopen(actor, 'tr-1', new Date('2026-11-21T10:00:00Z'));
+
+      expect(result).toEqual({ created: 1, reasonAdded: 0 });
+      expect(auditRecord).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          action: 'DEPARTMENT_TRANSFER.REVOCATION_OPENED',
+          actorKind: 'USER',
+          after: { employeeId: 'emp-1', tasksCreated: 1, reasonsAdded: 0, bySubstitute: true },
+        }),
       );
     });
   });
