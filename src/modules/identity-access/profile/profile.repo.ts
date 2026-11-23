@@ -114,16 +114,30 @@ export class ProfileRepo {
     await tx.avatarPurge.create({ data: { organizationId, objectKey } });
   }
 
-  /** The oldest objects still to delete, read without a lock: deleting an object twice is harmless, so two instances may read the same ones. */
-  async listDuePurges(limit: number): Promise<{ id: string; objectKey: string }[]> {
-    const rows = await this.prisma.avatarPurge.findMany({
-      where: { purgedAt: null },
+  /**
+   * The oldest objects still to delete, after the row `after` when a pass goes on past rows it already tried, read without a lock: deleting an object twice is
+   * harmless, so two instances may read the same ones.
+   */
+  async listDuePurges(
+    limit: number,
+    after: { requestedAt: Date; id: string } | null = null,
+  ): Promise<{ id: string; objectKey: string; requestedAt: Date }[]> {
+    return this.prisma.avatarPurge.findMany({
+      where: {
+        purgedAt: null,
+        ...(after === null
+          ? {}
+          : {
+              OR: [
+                { requestedAt: { gt: after.requestedAt } },
+                { requestedAt: after.requestedAt, id: { gt: after.id } },
+              ],
+            }),
+      },
       orderBy: [{ requestedAt: 'asc' }, { id: 'asc' }],
       take: limit,
-      select: { id: true, objectKey: true },
+      select: { id: true, objectKey: true, requestedAt: true },
     });
-
-    return rows;
   }
 
   /** Marks the row done unless another instance did first; true when this call did. */
