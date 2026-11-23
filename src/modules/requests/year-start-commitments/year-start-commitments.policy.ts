@@ -156,6 +156,20 @@ function priceSeatsByEnd(
   return { ok: true, total };
 }
 
+/** What the seats with no number kept cost at the price of 01/01, with the price of one month of it: asked only when something of the request needs that price. */
+function priceAtToday(
+  price: YearStartPrice | null,
+  seatsByEnd: ReadonlyMap<string | null, number>,
+  yearStart: BusinessDate,
+): { ok: true; total: bigint; monthlyMinor: bigint } | { ok: false; reason: 'AMOUNT_TOO_LARGE' | 'NO_PRICE' } {
+  if (!isRecurringPriceInDong(price)) return { ok: false, reason: 'NO_PRICE' };
+  const monthly = monthlyPriceOf({ unitPrice: price.unitPrice, billingCycle: price.billingCycle });
+  if (monthly === null || monthly.amountMinor <= 0n) return { ok: false, reason: 'NO_PRICE' };
+  const remainder = priceSeatsByEnd(seatsByEnd, price, yearStart);
+
+  return remainder.ok ? { ok: true, total: remainder.total, monthlyMinor: monthly.amountMinor } : remainder;
+}
+
 /**
  * The amount of the commitment of one request on 01/01, the one rule of the pass and of the amount carried over into the next year: each
  * standing seat holds what its approval kept (or prorated months on early close at the approval rate); seats without a saved number use the
@@ -186,16 +200,12 @@ export function yearStartAmountOf(input: {
   }
   // A seat the approval kept a number for is committed at that number, whatever the plan costs today (twelve months at the price of the approval): the price of
   // 01/01 is asked only for a seat with no number kept, and for the price of a month of a seat that has no monthly price of its own.
-  const { price } = input;
   let seatMonthlyMinor = savedMonthlyMinor;
   if (seatsByEnd.size > 0 || seatMonthlyMinor === null) {
-    if (!isRecurringPriceInDong(price)) return { status: 'SKIPPED', reason: 'NO_PRICE' };
-    const monthly = monthlyPriceOf({ unitPrice: price.unitPrice, billingCycle: price.billingCycle });
-    if (monthly === null || monthly.amountMinor <= 0n) return { status: 'SKIPPED', reason: 'NO_PRICE' };
-    seatMonthlyMinor ??= monthly.amountMinor;
-    const remainder = priceSeatsByEnd(seatsByEnd, price, yearStart);
-    if (!remainder.ok) return { status: 'SKIPPED', reason: remainder.reason };
-    total += remainder.total;
+    const today = priceAtToday(input.price, seatsByEnd, yearStart);
+    if (!today.ok) return { status: 'SKIPPED', reason: today.reason };
+    total += today.total;
+    seatMonthlyMinor ??= today.monthlyMinor;
   }
   // Each end date is within the range, the seats of all of them together may not be.
   if (total > MAX_AMOUNT_MINOR) return { status: 'SKIPPED', reason: 'AMOUNT_TOO_LARGE' };
