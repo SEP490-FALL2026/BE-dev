@@ -2,9 +2,9 @@
 
 > Đọc file này trước, rồi: memory `MEMORY.md` (đặc biệt `project_redesign_2026_11_21`, `project_two_person_process`,
 > `feedback_model_roles`, `feedback_verify_before_approval` và mọi `feedback_*`); `DECISIONS.md` (lịch sử câu Owner
-> trả lời — `D:\FPT\FALL2026\Docs\Research-AI
-edesign-2026-11-21\DECISIONS.md`); sổ QĐ `D:\FPT\FALL2026\Docs\Decisions\project-decisions.md` (tới **`QĐ-118o`**). Handoff trước: `docs/reviews/coordinator-2026-11-20/HANDOFF-CHAT.md` và `D:\FPT\FALL2026\Docs\Research-AI
-edesign-2026-11-21\HANDOFF-CHAT.md`.
+> trả lời — `D:/FPT/FALL2026/Docs/Research-AI/redesign-2026-11-21/DECISIONS.md`); sổ QĐ
+> `D:/FPT/FALL2026/Docs/Decisions/project-decisions.md` (tới **`QĐ-118o`**). Handoff trước:
+> `docs/reviews/coordinator-2026-11-20/HANDOFF-CHAT.md` và `D:/FPT/FALL2026/Docs/Research-AI/redesign-2026-11-21/HANDOFF-CHAT.md`.
 > Quy trình code hai người: BE `docs/guides/quy-trinh-code-ai.md`.
 
 ## 0. Bối cảnh
