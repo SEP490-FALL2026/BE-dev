@@ -47,7 +47,7 @@ export function renderEmail(
 /** The zone a mail written before the payload carried one is read in: the one of the installation, as the organization defaults to. */
 const DEFAULT_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
-function timePartsIn(date: Date, timeZone: string, english: boolean): Map<string, string> {
+function timePartsIn(date: Date, timeZone: string): Map<string, string> {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone,
     year: 'numeric',
@@ -56,10 +56,31 @@ function timePartsIn(date: Date, timeZone: string, english: boolean): Map<string
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',
-    ...(english ? { timeZoneName: 'shortOffset' as const } : {}),
   }).formatToParts(date);
 
   return new Map(parts.map((part) => [part.type, part.value]));
+}
+
+/**
+ * The offset of the zone at that instant, written `GMT`, `GMT+7`, `GMT+5:30` or `GMT-3`. It is computed from the clock the zone shows, not read from the
+ * name the ICU data of the runtime gives it (`GMT` on one Node version, `GMT+0` on another), so the same mail reads the same everywhere.
+ */
+function offsetLabel(date: Date, parts: Map<string, string>): string {
+  const shown = Date.UTC(
+    Number(parts.get('year')),
+    Number(parts.get('month')) - 1,
+    Number(parts.get('day')),
+    Number(parts.get('hour')),
+    Number(parts.get('minute')),
+  );
+  const minuteOfInstant = Math.floor(date.getTime() / 60_000) * 60_000;
+  const minutes = Math.round((shown - minuteOfInstant) / 60_000);
+  if (minutes === 0) return 'GMT';
+  const sign = minutes < 0 ? '-' : '+';
+  const hours = Math.floor(Math.abs(minutes) / 60);
+  const rest = Math.abs(minutes) % 60;
+
+  return `GMT${sign}${hours}${rest === 0 ? '' : `:${String(rest).padStart(2, '0')}`}`;
 }
 
 /**
@@ -72,16 +93,14 @@ function localTime(value: unknown, timeZone: unknown, english: boolean): string 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   let parts: Map<string, string>;
-  let zone = typeof timeZone === 'string' && timeZone !== '' ? timeZone : DEFAULT_TIME_ZONE;
   try {
-    parts = timePartsIn(date, zone, english);
+    parts = timePartsIn(date, typeof timeZone === 'string' && timeZone !== '' ? timeZone : DEFAULT_TIME_ZONE);
   } catch {
-    zone = DEFAULT_TIME_ZONE;
-    parts = timePartsIn(date, zone, english);
+    parts = timePartsIn(date, DEFAULT_TIME_ZONE);
   }
   const text = `${parts.get('day')}/${parts.get('month')}/${parts.get('year')} ${parts.get('hour')}:${parts.get('minute')}`;
 
-  return english ? `${text} (${parts.get('timeZoneName') ?? zone})` : text;
+  return english ? `${text} (${offsetLabel(date, parts)})` : text;
 }
 
 function expiry(payload: Record<string, unknown>, english: boolean): string {

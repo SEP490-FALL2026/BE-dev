@@ -85,6 +85,28 @@ describe('email templates', () => {
       expect(reset('en')).toContain('valid until 28/11/2026 10:00 (GMT+7)');
     });
 
+    it('writes the offset of a zone with half hours and of a zone behind UTC', () => {
+      expect(reset('en', { timeZone: 'Asia/Kolkata' })).toContain('08:30 (GMT+5:30)');
+      expect(reset('en', { timeZone: 'America/Sao_Paulo' })).toContain('00:00 (GMT-3)');
+    });
+
+    it('builds the offset itself, whatever name for it the ICU data of the runtime would give', () => {
+      const real = Reflect.get(Intl.DateTimeFormat.prototype, 'formatToParts');
+      const spy = jest.spyOn(Intl.DateTimeFormat.prototype, 'formatToParts').mockImplementation(function (
+        this: Intl.DateTimeFormat,
+        date?: Date | number,
+      ) {
+        return [...real.call(this, date), { type: 'timeZoneName', value: 'GMT+0' }];
+      });
+
+      try {
+        expect(reset('en', { timeZone: 'UTC' })).toContain('03:00 (GMT)');
+        expect(reset('en')).toContain('10:00 (GMT+7)');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
     it('falls back to the default time zone when the payload names one that does not exist', () => {
       expect(reset('vi', { timeZone: 'Not/AZone' })).toContain('28/11/2026 10:00');
     });
