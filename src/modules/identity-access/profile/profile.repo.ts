@@ -114,16 +114,22 @@ export class ProfileRepo {
     await tx.avatarPurge.create({ data: { organizationId, objectKey } });
   }
 
-  /** The oldest objects still to delete, held for this transaction only: another instance skips them instead of deleting them twice. */
-  async claimPurges(tx: DbTx, limit: number): Promise<{ id: string; objectKey: string }[]> {
-    const rows = await tx.$queryRaw<{ id: string; object_key: string }[]>`
-      SELECT id, object_key FROM avatar_purges WHERE purged_at IS NULL
-       ORDER BY requested_at, id LIMIT ${limit} FOR UPDATE SKIP LOCKED`;
+  /** The oldest objects still to delete, read without a lock: deleting an object twice is harmless, so two instances may read the same ones. */
+  async listDuePurges(limit: number): Promise<{ id: string; objectKey: string }[]> {
+    const rows = await this.prisma.avatarPurge.findMany({
+      where: { purgedAt: null },
+      orderBy: [{ requestedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+      select: { id: true, objectKey: true },
+    });
 
-    return rows.map((row) => ({ id: row.id, objectKey: row.object_key }));
+    return rows;
   }
 
-  async markPurged(tx: DbTx, id: string, at: Date): Promise<void> {
-    await tx.avatarPurge.update({ where: { id }, data: { purgedAt: at } });
+  /** Marks the row done unless another instance did first; true when this call did. */
+  async markPurged(tx: DbTx, id: string, at: Date): Promise<boolean> {
+    const { count } = await tx.avatarPurge.updateMany({ where: { id, purgedAt: null }, data: { purgedAt: at } });
+
+    return count > 0;
   }
 }
