@@ -196,7 +196,12 @@ export class DecisionController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    forbidden('an IT Admin'),
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an acting IT Admin of the holder’s department may return this recommendation (GHOST_SEAT.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
+    },
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The recommendation does not exist (GHOST_SEAT.NOT_FOUND).',

@@ -98718,7 +98718,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin may do this.",
+            "description": "Only an acting IT Admin of the holder’s department may reclaim this recommendation (GHOST_SEAT.NOT_IN_CHARGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -98730,6 +98730,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.NOT_IN_CHARGE": {
+                    "summary": "Only the acting IT Admin of the holder’s department may act on this recommendation.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.NOT_IN_CHARGE",
+                        "message": "Only the acting IT Admin of the holder’s department may act on this recommendation.",
                         "requestId": "req_example"
                       }
                     }
@@ -100629,7 +100640,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin may do this.",
+            "description": "Only an acting IT Admin of the holder’s department may return this recommendation (GHOST_SEAT.NOT_IN_CHARGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -100641,6 +100652,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.NOT_IN_CHARGE": {
+                    "summary": "Only the acting IT Admin of the holder’s department may act on this recommendation.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.NOT_IN_CHARGE",
+                        "message": "Only the acting IT Admin of the holder’s department may act on this recommendation.",
                         "requestId": "req_example"
                       }
                     }

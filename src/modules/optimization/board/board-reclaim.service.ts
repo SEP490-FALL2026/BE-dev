@@ -9,7 +9,7 @@ import { GhostSeatRepo } from '../ghost-seat/ghost-seat.repo';
 import { GhostSeatService } from '../ghost-seat/ghost-seat.service';
 import type { GhostSeatRecord } from '../ghost-seat/ghost-seat.types';
 import { isReclaimable } from '../ghost-seat/ghost-seat-state.policy';
-import { GhostSeatNotFoundError, GhostSeatNotReclaimableError } from './board.errors';
+import { GhostSeatNotFoundError, GhostSeatNotInChargeError, GhostSeatNotReclaimableError } from './board.errors';
 import { BoardQueryService } from './board-query.service';
 
 /** A `G3`/`G4` the head decided to reclaim: the IT Admin may open it again once its task ended without the seat being given back. */
@@ -49,7 +49,12 @@ export class BoardReclaimService {
       const record = await this.repo.lock(tx, id);
       const organization = await this.organizationReads.getOrganization(tx);
       if (!record || record.organizationId !== organization?.id) throw new GhostSeatNotFoundError();
-      if (isReopenableDecided(record)) return this.reopen(tx, actor, record);
+      if (record.group === 'G1') throw new GhostSeatNotReclaimableError();
+      const acting = await this.ghostSeats.actingItAdminsFor(tx, record.departmentId, record.employeeId);
+      if (!acting.actors.includes(actor.employeeId)) throw new GhostSeatNotInChargeError();
+      const byInCharge = acting.inCharge === actor.employeeId;
+      const bySubstitute = acting.substitute === actor.employeeId;
+      if (isReopenableDecided(record)) return this.reopen(tx, actor, record, bySubstitute);
       if (!isReclaimable(record) || record.assignmentId === null) throw new GhostSeatNotReclaimableError();
       const opened = await this.licensing.openRevocation(tx, actor, {
         assignmentId: record.assignmentId,
@@ -61,15 +66,13 @@ export class BoardReclaimService {
           referenceId: record.id,
         },
       });
-      const inCharge = record.departmentId
-        ? await this.organizationReads.getItAdminInChargeOfDepartment(record.departmentId, tx)
-        : null;
       await this.ghostSeats.markReclaimDecided(
         tx,
         record,
         opened.taskId,
         { kind: 'USER', principal: actor },
-        inCharge === actor.employeeId,
+        byInCharge,
+        bySubstitute,
       );
 
       return { id: record.id, taskId: opened.taskId };
@@ -85,7 +88,7 @@ export class BoardReclaimService {
    * `DA6-25`) with the decision of the head as it was (the head who decided, the same reference), the same first day of the grace, and no
    * notice: the duty of the handover stays with the head who decided (`QĐ-64a`), whoever is the head now.
    */
-  private async reopen(tx: DbTx, actor: AuthenticatedPrincipal, record: GhostSeatRecord) {
+  private async reopen(tx: DbTx, actor: AuthenticatedPrincipal, record: GhostSeatRecord, bySubstitute: boolean) {
     const standing = record.revocationTaskId
       ? (await this.taskStandings.getRevocationTaskStatuses([record.revocationTaskId], tx)).get(record.revocationTaskId)
       : undefined;
@@ -105,7 +108,7 @@ export class BoardReclaimService {
       },
       ...(record.revocationNotBefore ? { timing: { notBefore: record.revocationNotBefore } } : {}),
     });
-    await this.ghostSeats.relinkTask(tx, record, opened.taskId, { kind: 'USER', principal: actor });
+    await this.ghostSeats.relinkTask(tx, record, opened.taskId, { kind: 'USER', principal: actor }, bySubstitute);
 
     return { id: record.id, taskId: opened.taskId };
   }

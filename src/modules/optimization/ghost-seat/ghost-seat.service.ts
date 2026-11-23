@@ -4,10 +4,15 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import type { AuditValue } from '../../audit/public/audit.types';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import type { ActingItAdminsResult } from '../../organization/public/organization.types';
 import { ghostSeatAuditEvent, type GhostSeatActor } from '../optimization-audit-event.mapper';
 import { GhostSeatRepo, type GhostSeatPatch } from './ghost-seat.repo';
 import { canMove, settlementOf, type SettlementInput } from './ghost-seat-state.policy';
 import type { GhostSeatCloseReason, GhostSeatRecord, NewGhostSeat } from './ghost-seat.types';
+
+const EMPTY_ACTING: ActingItAdminsResult = { inCharge: null, substitute: null, defaultAssignee: null, actors: [] };
 
 const snapshot = (record: GhostSeatRecord): { [key: string]: AuditValue } => ({
   group: record.group,
@@ -27,7 +32,32 @@ export class GhostSeatService {
   constructor(
     private readonly repo: GhostSeatRepo,
     private readonly audit: AuditApi,
+    private readonly organizationReads: OrganizationReadApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
+
+  /** Resolves acting IT Admins for the given department or, when absent, the employee's work department. */
+  async actingItAdminsFor(
+    tx: DbTx,
+    departmentId: string | null,
+    employeeId?: string | null,
+    today?: BusinessDate,
+  ): Promise<ActingItAdminsResult> {
+    let effectiveDeptId = departmentId;
+    if (!effectiveDeptId && employeeId) {
+      const resolvedToday = today ?? (await this.organizationReads.businessToday(new Date(), tx));
+      effectiveDeptId =
+        (await this.organizationReads.workDepartmentsOf([employeeId], resolvedToday, tx)).get(employeeId) ?? null;
+    }
+    if (!effectiveDeptId) return EMPTY_ACTING;
+    const byDept = await this.organizationReads.itAdminsActingFor(
+      [effectiveDeptId],
+      (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+      tx,
+    );
+
+    return byDept.get(effectiveDeptId) ?? EMPTY_ACTING;
+  }
 
   async create(tx: DbTx, input: NewGhostSeat, actor: GhostSeatActor): Promise<GhostSeatRecord> {
     const record = await this.repo.insert(tx, input);
@@ -184,18 +214,20 @@ export class GhostSeatService {
    * A reclaim the head decided (`G3`/`G4`) was closed as failed and the IT Admin opens it again: the recommendation stays `RECLAIM_DECIDED`
    * and holds the new task (`Q-95`, `DA6-25`).
    */
-  async relinkTask(tx: DbTx, record: GhostSeatRecord, taskId: string, actor: GhostSeatActor): Promise<void> {
+  async relinkTask(
+    tx: DbTx,
+    record: GhostSeatRecord,
+    taskId: string,
+    actor: GhostSeatActor,
+    bySubstitute?: boolean,
+  ): Promise<void> {
     const updated = await this.repo.update(tx, record.id, { revocationTaskId: taskId });
     await this.audit.record(
       tx,
-      ghostSeatAuditEvent(
-        actor,
-        record.organizationId,
-        'GHOST_SEAT.REOPENED',
-        record.id,
-        snapshot(record),
-        snapshot(updated),
-      ),
+      ghostSeatAuditEvent(actor, record.organizationId, 'GHOST_SEAT.REOPENED', record.id, snapshot(record), {
+        ...snapshot(updated),
+        ...(bySubstitute ? { bySubstitute: true } : {}),
+      }),
     );
   }
 
@@ -218,6 +250,7 @@ export class GhostSeatService {
     taskId: string,
     actor: GhostSeatActor,
     byInCharge?: boolean,
+    bySubstitute?: boolean,
   ): Promise<void> {
     const updated = await this.repo.update(tx, record.id, { state: 'RECLAIM_DECIDED', revocationTaskId: taskId });
     await this.audit.record(
@@ -225,6 +258,7 @@ export class GhostSeatService {
       ghostSeatAuditEvent(actor, record.organizationId, 'GHOST_SEAT.RECLAIM_OPENED', record.id, snapshot(record), {
         ...snapshot(updated),
         ...(byInCharge === undefined ? {} : { byInCharge }),
+        ...(bySubstitute ? { bySubstitute: true } : {}),
       }),
     );
   }

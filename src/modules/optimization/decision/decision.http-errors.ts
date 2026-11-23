@@ -5,6 +5,7 @@ import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examp
 import {
   GhostSeatAlreadyReturnedError,
   GhostSeatDecisionNotFoundError,
+  GhostSeatDecisionNotInChargeError,
   GhostSeatDecisionRefusedError,
   GhostSeatNotReturnableError,
   GhostSeatTaskInProgressError,
@@ -49,6 +50,9 @@ export function toDecisionApiException(error: unknown): unknown {
   if (error instanceof GhostSeatDecisionNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'GHOST_SEAT.NOT_FOUND', error.message);
   }
+  if (error instanceof GhostSeatDecisionNotInChargeError) {
+    return refuse(HttpStatus.FORBIDDEN, 'GHOST_SEAT.NOT_IN_CHARGE', error.message);
+  }
   if (error instanceof GhostSeatNotReturnableError) {
     return refuse(HttpStatus.CONFLICT, 'GHOST_SEAT.NOT_RETURNABLE', error.message);
   }
@@ -85,4 +89,5 @@ export const DECISION_ERROR_EXAMPLES = {
   NOT_RETURNABLE: example(new GhostSeatNotReturnableError()),
   ALREADY_RETURNED: example(new GhostSeatAlreadyReturnedError()),
   TASK_IN_PROGRESS: example(new GhostSeatTaskInProgressError()),
+  NOT_IN_CHARGE: example(new GhostSeatDecisionNotInChargeError()),
 } as const;

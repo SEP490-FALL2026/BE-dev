@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { isWorkingDay } from '../../../core/working-days';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { describeForOperator } from '../../../infrastructure/observability/operator-error';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { GhostSeatDecisionRepo, type GhostSeatExemptionRecord } from '../ghost-seat/ghost-seat-decision.repo';
@@ -32,6 +33,7 @@ export class DecisionReminderService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly notifications: NotificationsApi,
     private readonly routing: DecisionRoutingService,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** Tells what is overdue (on a working day only); returns how many recommendations were told. */
@@ -58,14 +60,14 @@ export class DecisionReminderService {
     if (!record || !departmentId || record.overdueNoticedAt !== null || !record.decisionDueOn) return false;
     if (record.state !== 'AWAITING_DECISION' && record.state !== 'RETURNED_TO_HEAD') return false;
     const head = (await this.organizationReads.getDepartmentHeads([departmentId], day.today, tx)).get(departmentId);
-    const inCharge = await this.organizationReads.getItAdminInChargeOfDepartment(departmentId, tx);
+    const itRecipient = await this.itRecipientOf(tx, departmentId);
     const params = {
       recommendationId: record.id,
       employeeId: record.employeeId ?? null,
       applicationId: record.applicationId,
       decisionDueOn: record.decisionDueOn,
     };
-    for (const recipient of new Set([head?.employeeId, inCharge])) {
+    for (const recipient of new Set([head?.employeeId, itRecipient])) {
       if (!recipient) continue;
       await this.notifications.notifyInApp(tx, {
         organizationId: day.organizationId,
@@ -79,6 +81,18 @@ export class DecisionReminderService {
     await this.ghostSeats.markOverdueNoticed(tx, record, day.now, SYSTEM);
 
     return true;
+  }
+
+  private async itRecipientOf(tx: DbTx, departmentId: string): Promise<string | null> {
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [departmentId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(departmentId);
+
+    return acting?.defaultAssignee ?? (await this.identity.findUsableSuperAdminEmployeeId(tx));
   }
 
   /** Ends the exemptions that are over, then tells the ones about to end; returns how many it told. */

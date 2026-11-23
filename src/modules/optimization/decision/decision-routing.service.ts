@@ -174,15 +174,22 @@ export class DecisionRoutingService {
       await this.tellSuperAdmin(tx, record, day, departmentId);
     }
     if (record.tier !== 'ACTION') return;
-    const inCharge = await this.organizationReads.getItAdminInChargeOfDepartment(departmentId, tx);
-    if (!inCharge) return;
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [departmentId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(departmentId);
+    const recipient = acting?.defaultAssignee ?? (await this.identity.findUsableSuperAdminEmployeeId(tx));
+    if (!recipient) return;
     await this.notifications.notifyInApp(tx, {
       organizationId: day.organizationId,
-      recipientEmployeeId: inCharge,
+      recipientEmployeeId: recipient,
       code: 'GHOST_SEAT_ACTION_TIER',
       subject: { type: SUBJECT, id: record.id },
       params,
-      eventKey: `GHOST_SEAT_ACTION_TIER:${inCharge}:${weekKey}`,
+      eventKey: `GHOST_SEAT_ACTION_TIER:${recipient}:${weekKey}`,
     });
   }
 

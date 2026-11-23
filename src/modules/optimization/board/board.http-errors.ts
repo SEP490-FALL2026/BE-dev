@@ -11,6 +11,7 @@ import {
 import {
   GhostSeatNotDeciderError,
   GhostSeatNotFoundError,
+  GhostSeatNotInChargeError,
   GhostSeatNotReclaimableError,
   GhostSeatPeriodInvalidError,
   GhostSeatRuleRunBusyError,
@@ -30,6 +31,9 @@ export function toGhostSeatApiException(error: unknown): unknown {
     return refuse(HttpStatus.NOT_FOUND, 'GHOST_SEAT.NOT_FOUND', error.message);
   if (error instanceof GhostSeatNotDeciderError) {
     return refuse(HttpStatus.FORBIDDEN, 'GHOST_SEAT.NOT_DECIDER', error.message);
+  }
+  if (error instanceof GhostSeatNotInChargeError) {
+    return refuse(HttpStatus.FORBIDDEN, 'GHOST_SEAT.NOT_IN_CHARGE', error.message);
   }
   if (error instanceof GhostSeatNotReclaimableError) {
     return refuse(HttpStatus.CONFLICT, 'GHOST_SEAT.NOT_RECLAIMABLE', error.message);
@@ -71,6 +75,7 @@ export const GHOST_SEAT_ERROR_EXAMPLES = {
   NOT_FOUND: example(new GhostSeatNotFoundError()),
   NOT_RECLAIMABLE: example(new GhostSeatNotReclaimableError()),
   NOT_DECIDER: example(new GhostSeatNotDeciderError()),
+  NOT_IN_CHARGE: example(new GhostSeatNotInChargeError()),
   SEAT_NOT_REVOCABLE: example(new GhostSeatSeatNotRevocableError('ASSIGNMENT_IS_SERVICE_ACCOUNT')),
   PERIOD_INVALID: example(new GhostSeatPeriodInvalidError()),
   RULE_RUN_BUSY: example(new GhostSeatRuleRunBusyError('G1_G2')),

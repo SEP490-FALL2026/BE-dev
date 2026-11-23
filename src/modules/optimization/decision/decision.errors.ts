@@ -63,6 +63,14 @@ export class GhostSeatTaskInProgressError extends Error {
   }
 }
 
+/** Only an acting IT Admin of the holder’s department (usable in-charge or appointed substitute) may act on this recommendation. */
+export class GhostSeatDecisionNotInChargeError extends Error {
+  constructor() {
+    super('Only the acting IT Admin of the holder’s department may act on this recommendation.');
+    this.name = 'GhostSeatDecisionNotInChargeError';
+  }
+}
+
 /** Whether an error of the gate of the revocation (`SBF-18`) means the seat cannot be revoked. */
 export const isSeatNotRevocable = (error: unknown): boolean =>
   error instanceof RevocationRefusedError ||

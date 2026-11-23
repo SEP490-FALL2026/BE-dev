@@ -164,7 +164,12 @@ export class BoardController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    forbidden('an IT Admin'),
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an acting IT Admin of the holder’s department may reclaim this recommendation (GHOST_SEAT.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
+    },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
