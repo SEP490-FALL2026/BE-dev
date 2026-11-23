@@ -270,4 +270,46 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
       });
     });
   });
+
+  describe('baseline phase and working admin count', () => {
+    it('lets a K2 subscription through while the baseline phase is open even when one of two recorded admins has left, and sets vendorAdminsBelowMinimum', async () => {
+      const planId = await planOf('K2');
+      await putProfile(planId).expect(200);
+      await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [it2.employeeId]);
+      try {
+        const created = h.dataOf<SubscriptionWire>(await declare(complete(planId)).expect(201));
+
+        expect(created.status).toBe('ACTIVE');
+        expect(created.vendorAdminsBelowMinimum).toBe(true);
+      } finally {
+        await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [it2.employeeId]);
+      }
+    });
+
+    it('refuses 422 SUBSCRIPTION.VENDOR_ADMINS_REQUIRED once the baseline phase is closed when one of two recorded admins has left', async () => {
+      await h.closeBaseline().expect(200);
+      const planId = await planOf('K2');
+      await putProfile(planId).expect(200);
+      await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [it2.employeeId]);
+      try {
+        const refused = await declare(complete(planId)).expect(422);
+
+        expect(h.codeOf(refused)).toBe('SUBSCRIPTION.VENDOR_ADMINS_REQUIRED');
+        expect(h.detailsOf(refused)).toEqual({ planId, given: 1, required: 2 });
+      } finally {
+        await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [it2.employeeId]);
+      }
+    });
+
+    it('activates 201 once the baseline phase is closed when two recorded admins are still working', async () => {
+      await h.closeBaseline().expect(200);
+      const planId = await planOf('K2');
+      await putProfile(planId).expect(200);
+
+      const created = h.dataOf<SubscriptionWire>(await declare(complete(planId)).expect(201));
+
+      expect(created.status).toBe('ACTIVE');
+      expect(created.vendorAdminsBelowMinimum).toBe(false);
+    });
+  });
 });

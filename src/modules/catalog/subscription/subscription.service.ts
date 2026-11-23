@@ -208,7 +208,7 @@ export class SubscriptionService {
     const priced = await this.pricing.priceToday(tx, money);
     const complete = subscriptionStatusOf(plan, input.kind, { ...state, ...priced });
     this.poolRules.assert(plan, input.kind, state, complete === 'ACTIVE');
-    if (complete === 'ACTIVE') await this.poolRules.assertVendorAdmins(tx, plan);
+    if (complete === 'ACTIVE') await this.poolRules.assertVendorAdmins(tx, plan, organizationId);
     const created = await this.subscriptions.insert(tx, {
       organizationId,
       planId: plan.id,
@@ -252,7 +252,14 @@ export class SubscriptionService {
       const state = stateOf(current);
       const missing = this.missingOf(plan, current.kind, state);
       if (missing.length > 0) throw new SubscriptionStillDraftError(missing);
-      await this.poolRules.assertActivation(tx, plan, current.kind, state, current.renewedFromId !== null);
+      await this.poolRules.assertActivation(
+        tx,
+        plan,
+        current.kind,
+        state,
+        current.renewedFromId !== null,
+        organizationId,
+      );
       await this.poolRules.assertNoLiveDuplicate(tx, plan, id, organizationId);
 
       // A draft renewal period takes the flag that prices the plan from the period it continues, now that it is active (F-012).

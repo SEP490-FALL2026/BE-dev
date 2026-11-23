@@ -113,9 +113,9 @@ export class SubscriptionPoolService {
 
   /**
    * The rules for a subscription that becomes active with the data it holds (a draft completed): the commitment, the K1 plan and the
-   * IT Admin it names, who must still work, hold the role and be able to sign in now, not only when the name was written (R-E03). A draft that is
-   * not the period of a renewal is a new subscription and also needs the vendor admins of its plan (`continuesPeriod` false); the period a renewal
-   * continues never does (`QĐ-110k`: a subscription older than the rule is only flagged, X-IT-R4). Throws the errors of `assert`,
+   * IT Admin it names, who must still work, hold the role and be able to sign in now, not only when the name was written. A draft that is
+   * not the period of a renewal is a new subscription and also needs at least two working vendor admins once the baseline phase is closed
+   * (`continuesPeriod` false); the period a renewal continues never does. Throws the errors of `assert`,
    * SubscriptionResponsibleNotItAdminError and SubscriptionVendorAdminsRequiredError.
    */
   async assertActivation(
@@ -128,40 +128,48 @@ export class SubscriptionPoolService {
       responsibleItAdminEmployeeId: string | null;
     },
     continuesPeriod: boolean,
+    organizationId: string,
   ): Promise<void> {
     this.assert(plan, kind, state, true);
     await this.requireItAdmin(state.responsibleItAdminEmployeeId as string, tx);
-    if (!continuesPeriod) await this.assertVendorAdmins(tx, plan);
+    if (!continuesPeriod) await this.assertVendorAdmins(tx, plan, organizationId);
   }
 
   /**
-   * A plan that needs admins at the vendor (`K2`, or `K4` with an admin console) is activated, or its pool made, only when its profile names at
-   * least two different ones (`QĐ-110k`, `R-53`): what was recorded is judged, the plan is locked by the caller. Throws SubscriptionVendorAdminsRequiredError.
+   * A plan that needs admins at the vendor (`K2`, or `K4` with an admin console) is activated, or its pool made, only when at least two
+   * distinct recorded IT Admins are still working once the seat baseline phase is closed (or when no baseline hook is bound); while the
+   * baseline phase is open it is let through. The plan is locked by the caller. Throws SubscriptionVendorAdminsRequiredError.
    */
-  async assertVendorAdmins(tx: DbTx, plan: LockedPlan): Promise<void> {
+  async assertVendorAdmins(tx: DbTx, plan: LockedPlan, organizationId: string): Promise<void> {
     const needs = needsVendorAdmins(plan.provisioningType, plan.hasAdminConsole);
     if (!needs) return;
+    // Nobody to say the baseline is still open: take it as closed, so nothing is let through by accident.
+    const closed = !this.baselinePhase.isBound() || (await this.baselinePhase.get().isClosed(tx, organizationId));
+    if (!closed) return;
     const profile = (await this.planFacts.vendorAdminsOf([plan.id], tx)).get(plan.id);
+    const memberIds = [...new Set(profile?.members.map((member) => member.employeeId) ?? [])];
+    const working = await this.planFacts.workingAdminsAmong(memberIds, tx);
     assertVendorAdminsRecorded({
       needs,
-      given: new Set(profile?.members.map((member) => member.employeeId) ?? []).size,
+      given: working.size,
       planId: plan.id,
     });
   }
 
   /**
-   * Judges a change of a subscription (`QĐ-103e`): the rules of the pool apply to a write that makes a draft active or touches the
+   * Judges a change of a subscription: the rules of the pool apply to a write that makes a draft active or touches the
    * commitment or the cycle; data older than the rules is otherwise left as it is. A write that
    * makes the subscription the one that prices its plan takes the flag off the others of the plan (the caller holds the plan
    * locked `FOR UPDATE`). Throws the errors of `assert` and SubscriptionPrimaryNotEligibleError.
    */
   async judgeChange(tx: DbTx, change: PoolChange): Promise<void> {
-    const { plan, current, state, input } = change;
+    const { plan, current, state, input, organizationId } = change;
     const activating = current.status === 'DRAFT' && state.status === 'ACTIVE';
     // Changing only the person who answers does not judge a commitment and cycle the write did not touch (F-009).
     const touches = input.billingCycle !== undefined || input.commitmentTermMonths !== undefined;
-    if (activating) await this.assertActivation(tx, plan, current.kind, state, current.renewedFromId !== null);
-    else if (touches) this.assert(plan, current.kind, state, false);
+    if (activating) {
+      await this.assertActivation(tx, plan, current.kind, state, current.renewedFromId !== null, organizationId);
+    } else if (touches) this.assert(plan, current.kind, state, false);
     if (input.isPrimaryForPlan) await this.makePrimary(tx, change);
   }
 
