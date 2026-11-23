@@ -281,7 +281,8 @@ describe('email outbox and dispatcher (integration, PostgreSQL + in-process SMTP
       expect(asked).toEqual([]);
       expect(received).toHaveLength(1);
       expect(received[0].to).toEqual(['stored.login@acme.vn']);
-      expect(received[0].body).toContain('2026-10-16T09:00:00.000Z');
+      // The instant of the payload is written on the clock of the organization (the payload names no zone: the default one), with its offset in English.
+      expect(received[0].body).toContain('16/10/2026 16:00 (GMT+7)');
       expect(received[0].body).not.toContain('#token=');
       expect(await rowOf(notice.id)).toMatchObject({ status: 'SENT', payload_ciphertext: null });
     });
