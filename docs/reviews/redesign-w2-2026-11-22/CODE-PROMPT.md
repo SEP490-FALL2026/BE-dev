@@ -71,7 +71,7 @@ git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management checkout -b int/r
   chạy lại `pnpm prisma:generate`, `pnpm openapi:export` + bộ kiểm nhanh, rồi làm.
 - **biz:** pha A B0 (làm ngay trên `int/redesign-w2`). Pha B **chỉ** khi người điều phối báo Owner đã merge pha 1 của làn `tech`
   vào `int/redesign-w2`: `git pull --ff-only`, `pnpm prisma:generate`, bộ kiểm nhanh, rồi B10a → B1 → B2a-1 → B2a-2 → B2b → B3a-1 →
-  B3a-2 → B3b → B4 → B5a → B5b → B5c → B6 → B7 → B8 → B10b → B10c → B10d → B10e → B10f → B10g → B11 → B9.
+  B3a-2 → B3b → B4 → B5a → B5b → B5c → B6 → B7 → B8 → B10b → B10c → B10d → B10e → B10f → B10g → B10h → B11 → B9.
 - **Chỉ sửa file trong danh sách của gói** (PLAN). Cần file của làn kia ⟹ không sửa, ghi `PROGRESS-<làn>.md` mục _Bàn giao_, làm
   tiếp phần không phụ thuộc. `devices.module.ts` chỉ làn `biz` sửa (làn `tech` ghi _Bàn giao_ cho B1).
 
@@ -88,8 +88,10 @@ git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management checkout -b int/r
    - hậu tố file, một `@Injectable` mỗi file, lỗi nghiệp vụ trong `*.errors.ts`, ánh xạ HTTP trong `*.http-errors.ts`;
    - **thứ tự khóa SPEC mục 6** (0b baseline → 0c bộ đếm → employee → phòng → máy → đăng ký → việc thu máy → khoản mua → khóa →
      kích hoạt; nhiều máy khóa trong một câu theo `id`; ngoại lệ duy nhất E4); comment đầu service ghi thứ tự khóa của nó;
-   - **QĐ-118:** việc của phòng chỉ người làm của phòng (`OrganizationReadApi.itAdminsActingFor`); không viết lại nhánh "IT khác
-     khi người phụ trách không dùng được" hay hàng việc chung ở bất kỳ đâu;
+   - **QĐ-118:** việc của phòng chỉ người làm của phòng (`OrganizationReadApi.itAdminsActingFor`); việc của người **chưa xếp
+     phòng** (phòng `NULL`) chỉ IT Super Admin chỉ định cho việc đó (`itAdminsActingForUnplacedWork`, SPEC W2-27 (e)); không viết
+     lại nhánh "IT khác khi người phụ trách không dùng được" hay hàng việc chung ở bất kỳ đâu; cờ `bySubstitute` chỉ ghi Audit
+     Trail, không thêm báo cáo/field (W2-Q9); chỉ định làm thay không kiểm trần 4 phòng, chỉ cảnh báo `itAdminLoad` (W2-Q7);
    - mọi đọc trong `runner.run` qua `tx`; không `Promise.all` trên `tx`;
    - collection mới đủ `API-LIST-DETAIL.1` (summary riêng, `pageSize` có `maximum`, thứ tự có `id`, đếm + trang một snapshot,
      projection ở repo, số câu lệnh không theo số dòng) — **không** thêm mục registry của gate;
