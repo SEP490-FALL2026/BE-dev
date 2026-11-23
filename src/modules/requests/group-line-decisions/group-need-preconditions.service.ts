@@ -59,7 +59,8 @@ export class GroupNeedPreconditions {
     const refusal = checkLineNeedDecider({
       actorEmployeeId: actor.employeeId,
       requesterEmployeeId: request.requesterEmployeeId,
-      stepEmployeeIds: open.map((line) => line.employeeId),
+      // A line the sender withdrew is nobody's request any more; one already decided still is, so its person is refused as before.
+      stepEmployeeIds: own.filter((line) => line.state !== 'WITHDRAWN').map((line) => line.employeeId),
       assigneeEmployeeId: step.assigneeEmployeeId,
       stepState: step.state,
       approves,

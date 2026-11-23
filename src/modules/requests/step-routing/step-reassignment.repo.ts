@@ -53,7 +53,8 @@ const SELECT_REQUEST = {
   departmentId: true,
   policy: true,
   beneficiaries: { select: { employeeId: true }, orderBy: { position: 'asc' } },
-  lines: { where: { state: 'AWAITING_NEED' }, select: { employeeId: true, needStepId: true } },
+  // A line the sender withdrew holds nobody; a line already decided still holds its person.
+  lines: { where: { state: { not: 'WITHDRAWN' } }, select: { employeeId: true, needStepId: true } },
   steps: {
     select: {
       id: true,
