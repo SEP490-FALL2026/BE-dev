@@ -158,7 +158,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     của chi tiết và hàng đợi — ngân sách năm sau đã duyệt trừ số năm sau đã lưu của Request đã duyệt chi, cảnh báo mềm `QĐ-111al`, chỉ người giữ bước duyệt chi đọc, S-3).
     Các route duyệt chi (`spendApprovalDecide`, `spendApprovalLineDecide`) trả 409 `BUDGET.COMMITMENT_NOT_HOLDABLE` hoặc `BUDGET.COMMITMENT_EXISTS` khi không giữ được khoản
     cam kết của quyết định (lưới an toàn sau lần kiểm ngân sách; chưa quyết gì, `spend/spend.http-errors.ts`); `spendBatchDecide` không ném mà bỏ qua mục đó với lý
-    do `COMMITMENT_NOT_HOLDABLE` và đi tiếp các mục khác.
+    do `COMMITMENT_NOT_HOLDABLE` và đi tiếp các mục khác. Lỗi tạm thời của cơ sở dữ liệu (`TransientDatabaseError`) ở một mục, kể cả khi trả cả nhóm, trả `outcome: RETRYABLE` (lý do `TRANSIENT_FAILURE`): chỉ mục đó gửi lại. Gửi lại cả lô thì mục mà bước chi gần nhất đã được chính người gọi quyết cùng quyết định trả đúng kết quả đó kèm lý do `ALREADY_DECIDED`, không ghi thêm; quyết định khác vẫn `SKIPPED` `NO_SPEND_STEP`.
 - **Request cá nhân**
   - `request-submission/` — controller `access-requests.controller.ts` (gửi, xem, đọc: US-05-01 → US-05-03) và xem trước
     (`RequestPreviewService`). Hai route của bước nhu cầu nằm ở `need-decision/` (`need-decision.controller.ts`,

@@ -51427,7 +51427,7 @@
         },
         "responses": {
           "200": {
-            "description": "Answers one checklist for the whole batch and approves or refuses the requests chosen of a batch the caller holds, one by one in the order given, or sends the whole batch back to the head (RETURN: every request the caller holds of it, with the reason of the answers No; the head drops the request at fault and sends a new batch). Each is checked and decided on its own, with its own record and the same answers. One that is not in the batch or is not the caller one, has no spend step, went back to its head when checked again (the requester and the head are told), or could not hold its commitment (COMMITMENT_NOT_HOLDABLE) is skipped with its reason and the others go on. A refusal gives one reason for all.",
+            "description": "Answers one checklist for the whole batch and approves or refuses the requests chosen of a batch the caller holds, one by one in the order given, or sends the whole batch back to the head (RETURN: every request the caller holds of it, with the reason of the answers No; the head drops the request at fault and sends a new batch). Each is checked and decided on its own, with its own record and the same answers. One that is not in the batch or is not the caller one, has no spend step, went back to its head when checked again (the requester and the head are told), or could not hold its commitment (COMMITMENT_NOT_HOLDABLE) is skipped with its reason and the others go on. A request the database could not complete for a moment answers RETRYABLE (TRANSIENT_FAILURE): nothing was written for it, send it again on its own; the others of the batch were decided. When a batch is sent again, a request the caller already decided with the same decision answers the outcome it was given with the reason ALREADY_DECIDED and nothing is written; one decided otherwise stays skipped (NO_SPEND_STEP). A refusal gives one reason for all.",
             "content": {
               "application/json": {
                 "schema": {
@@ -54115,7 +54115,7 @@
             }
           },
           "409": {
-            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN), or the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE).",
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), or the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -54669,7 +54669,7 @@
             }
           },
           "409": {
-            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN), the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE), the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).",
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE), the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -55357,7 +55357,7 @@
             }
           },
           "409": {
-            "description": "The invoice was decided already (PURCHASE_INVOICE.NOT_SUBMITTED), the person signing is the one who submitted it (PURCHASE_INVOICE.SAME_PERSON), the vendor already has an invoice with this number (PURCHASE_INVOICE.NUMBER_TAKEN), or there is nowhere to book it (PURCHASE_INVOICE.NO_PLACE).",
+            "description": "The invoice was decided already (PURCHASE_INVOICE.NOT_SUBMITTED), the person signing is the one who submitted it (PURCHASE_INVOICE.SAME_PERSON), the vendor already has an invoice with this number, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN), or there is nowhere to book it (PURCHASE_INVOICE.NO_PLACE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -119157,7 +119157,10 @@
                   "type": "object",
                   "properties": {
                     "requestId": { "type": "string", "format": "uuid" },
-                    "outcome": { "type": "string", "enum": ["APPROVED", "REJECTED", "RETURNED", "SKIPPED"] },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["APPROVED", "REJECTED", "RETURNED", "SKIPPED", "RETRYABLE"]
+                    },
                     "reason": {
                       "type": "string",
                       "enum": [
@@ -119170,6 +119173,8 @@
                         "NOT_CHECKABLE",
                         "RECHECKED_RETURNED_TO_HEAD",
                         "COMMITMENT_NOT_HOLDABLE",
+                        "TRANSIENT_FAILURE",
+                        "ALREADY_DECIDED",
                         null
                       ],
                       "nullable": true
