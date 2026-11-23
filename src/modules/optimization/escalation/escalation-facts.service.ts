@@ -79,19 +79,29 @@ export class EscalationFactsService {
   }
 
   /**
-   * Whether the caller is allowed to push a watch recommendation for the department: allowed when the caller is the IT Admin in charge,
-   * when no IT Admin is assigned, or when the assigned IT Admin is no longer usable.
+   * Whether the caller is allowed to push a watch recommendation for the department: allowed only when the caller is an acting
+   * IT Admin (usable in-charge or usable appointed substitute) of the department.
    */
   async departmentAccessOf(
     tx: DbTx,
     departmentId: string,
     actorEmployeeId: string,
-  ): Promise<{ allowed: boolean; byInCharge: boolean }> {
-    const responsible = await this.organizationReads.getItAdminInChargeOfDepartment(departmentId, tx);
-    if (responsible === null) return { allowed: true, byInCharge: false };
-    if (responsible === actorEmployeeId) return { allowed: true, byInCharge: true };
-    const usable = await this.identity.findUsableItAdminEmployeeIds([responsible], tx);
+  ): Promise<{ allowed: boolean; byInCharge: boolean; bySubstitute: boolean }> {
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [departmentId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(departmentId);
+    if (!acting || !acting.actors.includes(actorEmployeeId)) {
+      return { allowed: false, byInCharge: false, bySubstitute: false };
+    }
 
-    return { allowed: !usable.has(responsible), byInCharge: false };
+    return {
+      allowed: true,
+      byInCharge: acting.inCharge === actorEmployeeId,
+      bySubstitute: acting.substitute === actorEmployeeId && acting.inCharge !== actorEmployeeId,
+    };
   }
 }

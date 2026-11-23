@@ -298,9 +298,16 @@ export class GhostSeatService {
     tx: DbTx,
     record: GhostSeatRecord,
     actor: GhostSeatActor,
-    facts: { escalationId: string; departmentId: string; hasNote: boolean; byInCharge: boolean },
+    facts: {
+      escalationId: string;
+      departmentId: string;
+      hasNote: boolean;
+      byInCharge: boolean;
+      bySubstitute?: boolean;
+    },
   ): Promise<GhostSeatRecord> {
     const updated = await this.repo.update(tx, record.id, { tier: 'REVIEW' });
+    const { bySubstitute, ...restFacts } = facts;
     await this.audit.record(
       tx,
       ghostSeatAuditEvent(
@@ -309,7 +316,12 @@ export class GhostSeatService {
         'GHOST_SEAT.ESCALATED',
         record.id,
         { ...snapshot(record), tier: record.tier },
-        { ...snapshot(updated), tier: updated.tier, ...facts },
+        {
+          ...snapshot(updated),
+          tier: updated.tier,
+          ...restFacts,
+          ...(bySubstitute ? { bySubstitute: true } : {}),
+        },
       ),
     );
 

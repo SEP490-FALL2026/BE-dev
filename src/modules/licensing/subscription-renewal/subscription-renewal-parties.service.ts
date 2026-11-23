@@ -23,9 +23,8 @@ export class RenewalPartiesService {
   constructor(private readonly identity: IdentityAccessApi) {}
 
   /**
-   * The IT Admin of the period (`QĐ-113g`, `BB-9`): the one responsible for the subscription while they are a usable IT Admin, else the
-   * first usable IT Admin; null when there is none. No department takes part: a subscription has no owning department. The first usable
-   * IT Admin is read only when the responsible one is not usable.
+   * The IT Admin notified for the period: the one responsible for the subscription while they are a usable IT Admin, else the
+   * usable Super Admin; null when there is none. No department takes part: a subscription has no owning department.
    */
   async itAdminOf(period: { responsibleItAdminEmployeeId: string | null }, tx?: DbTx): Promise<string | null> {
     const responsible = period.responsibleItAdminEmployeeId;
@@ -36,16 +35,15 @@ export class RenewalPartiesService {
       return responsible;
     }
 
-    return this.identity.findFirstUsableItAdminEmployeeId(tx);
+    return this.identity.findUsableSuperAdminEmployeeId(tx);
   }
 
   /**
-   * Whether the IT Admin who records stands in for the one responsible for the subscription (`QĐ-104l`, `QĐ-58b`): the one responsible
-   * still works as an IT Admin and is someone else. Any IT Admin records; this only tells the audit trail and the notice who answers for it.
-   * `responsibleItAdminEmployeeId` is that person while they are usable, else null (nobody to tell, nobody replaced).
+   * Returns the usable responsible IT Admin for the subscription (`substitute` is always false since temporary substitutes are not
+   * supported per subscription). `responsibleItAdminEmployeeId` is that person while they are usable, else null.
    */
   async substituteOf(
-    actor: Pick<AuthenticatedPrincipal, 'employeeId'>,
+    _actor: Pick<AuthenticatedPrincipal, 'employeeId'>,
     period: { responsibleItAdminEmployeeId: string | null },
     tx?: DbTx,
   ): Promise<{ substitute: boolean; responsibleItAdminEmployeeId: string | null }> {
@@ -53,14 +51,12 @@ export class RenewalPartiesService {
     if (responsible === null) return { substitute: false, responsibleItAdminEmployeeId: null };
     const usable = (await this.identity.findUsableItAdminEmployeeIds([responsible], tx)).has(responsible);
 
-    return usable
-      ? { substitute: responsible !== actor.employeeId, responsibleItAdminEmployeeId: responsible }
-      : { substitute: false, responsibleItAdminEmployeeId: null };
+    return { substitute: false, responsibleItAdminEmployeeId: usable ? responsible : null };
   }
 
   /**
-   * Whether the caller is permitted to record a renewal for the subscription period: either no responsible IT Admin is set, the caller
-   * is the responsible IT Admin, or that admin is no longer usable (substitute = true for the audit trail).
+   * Whether the caller is permitted to record a renewal for the subscription period: only when the caller is the responsible
+   * IT Admin and still a usable IT Admin.
    */
   async recordingAccessOf(
     actor: Pick<AuthenticatedPrincipal, 'employeeId'>,
@@ -68,15 +64,12 @@ export class RenewalPartiesService {
     tx?: DbTx,
   ): Promise<{ allowed: boolean; substitute: boolean; responsibleItAdminEmployeeId: string | null }> {
     const responsible = period.responsibleItAdminEmployeeId;
-    if (responsible === null) return { allowed: true, substitute: false, responsibleItAdminEmployeeId: null };
-    if (responsible === actor.employeeId) {
-      return { allowed: true, substitute: false, responsibleItAdminEmployeeId: responsible };
+    if (responsible === null || responsible !== actor.employeeId) {
+      return { allowed: false, substitute: false, responsibleItAdminEmployeeId: responsible };
     }
     const usable = (await this.identity.findUsableItAdminEmployeeIds([responsible], tx)).has(responsible);
 
-    return usable
-      ? { allowed: false, substitute: false, responsibleItAdminEmployeeId: responsible }
-      : { allowed: true, substitute: true, responsibleItAdminEmployeeId: responsible };
+    return { allowed: usable, substitute: false, responsibleItAdminEmployeeId: responsible };
   }
 
   /** Finance, when they still work: who is told the result of a decision (`QĐ-94d`(2)). */

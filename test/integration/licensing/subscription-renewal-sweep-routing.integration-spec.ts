@@ -61,27 +61,16 @@ describe('who the pass tells and from which date (integration, real PostgreSQL)'
       expect(await recipients('SUBSCRIPTION_RENEWAL_ALERT', subscriptionId)).toEqual([responsible.employeeId]);
     });
 
-    it('falls back to the first usable IT Admin by employee code when none is named, or the one named is locked or has left (no department takes part, QĐ-113g)', async () => {
+    it('falls back to the usable Super Admin when none is named, or the one named is locked or has left (no department takes part)', async () => {
       const responsible = await h.account('E-IT-FALL', await h.person('E-IT-FALL'), 'IT_ADMIN');
-      /** The usable IT Admin with the smallest employee code: who the pass falls back to. */
-      const firstUsable = async (): Promise<string> => {
-        const rows = await h.ctx.sql.query<{ employee_id: string }>(
-          `SELECT u.employee_id FROM app_users u
-             JOIN employees e ON e.id = u.employee_id
-             JOIN role_grants g ON g.app_user_id = u.id AND g.role = 'IT_ADMIN' AND g.revoked_at IS NULL
-            WHERE u.status = 'ACTIVE' AND e.status = 'ACTIVE'
-            ORDER BY e.employee_code ASC LIMIT 1`,
-        );
-
-        return rows.rows[0].employee_id;
-      };
+      const superAdminId = h.seed.superAdmin.employeeId;
 
       expect(await alertedWhenResponsibleIs(responsible.employeeId)).toEqual([responsible.employeeId]);
-      expect(await alertedWhenResponsibleIs(null)).toEqual([await firstUsable()]);
+      expect(await alertedWhenResponsibleIs(null)).toEqual([superAdminId]);
 
       await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [responsible.employeeId]);
       try {
-        expect(await alertedWhenResponsibleIs(responsible.employeeId)).toEqual([await firstUsable()]);
+        expect(await alertedWhenResponsibleIs(responsible.employeeId)).toEqual([superAdminId]);
       } finally {
         await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE employee_id = $1`, [
           responsible.employeeId,
@@ -90,13 +79,13 @@ describe('who the pass tells and from which date (integration, real PostgreSQL)'
       // Left the company, the account not locked yet: no longer usable either.
       await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [responsible.employeeId]);
       try {
-        expect(await alertedWhenResponsibleIs(responsible.employeeId)).toEqual([await firstUsable()]);
+        expect(await alertedWhenResponsibleIs(responsible.employeeId)).toEqual([superAdminId]);
       } finally {
         await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [responsible.employeeId]);
       }
     });
 
-    it('tells the one named, and else a usable IT Admin of the company, for a subscription of the stock that no department owns', async () => {
+    it('tells the one named, and else the usable Super Admin, for a subscription of the stock that no department owns', async () => {
       const responsible = await h.account('E-IT-STOCK', await h.person('E-IT-STOCK'), 'IT_ADMIN');
       const stock = async (named: string | null): Promise<string> => {
         const { subscriptionId } = await year(20);
@@ -111,16 +100,9 @@ describe('who the pass tells and from which date (integration, real PostgreSQL)'
       await h.sweepOn(h.today());
 
       expect(await recipients('SUBSCRIPTION_RENEWAL_ALERT', named)).toEqual([responsible.employeeId]);
-      const usable = await h.ctx.sql.query<{ employee_id: string }>(
-        `SELECT u.employee_id FROM app_users u
-           JOIN employees e ON e.id = u.employee_id
-           JOIN role_grants g ON g.app_user_id = u.id AND g.role = 'IT_ADMIN' AND g.revoked_at IS NULL
-          WHERE u.status = 'ACTIVE' AND e.status = 'ACTIVE'`,
-      );
       const told = await recipients('SUBSCRIPTION_RENEWAL_ALERT', unnamed);
-      expect(told).toHaveLength(1);
-      expect(usable.rows.map((row) => row.employee_id)).toContain(told[0]);
-      // Nobody but an IT Admin is told the point, Finance, the spending approver and the head of no department included.
+      expect(told).toEqual([h.seed.superAdmin.employeeId]);
+      // Nobody else is told the point: Finance, the spending approver and the head of no department included.
       for (const nobody of [h.finance.employeeId, h.boss.employeeId, unit.head.employeeId]) {
         expect(told).not.toContain(nobody);
       }

@@ -293,7 +293,7 @@ export const renewalAdjustmentSchema = z.strictObject({
   openRequests: z.number().int().nonnegative(),
   /** The IT Admin who answers for the subscription while they are a usable IT Admin; null when none does. */
   responsibleItAdminEmployeeId: z.uuid().nullable(),
-  /** False when another person reads or records in place of the one responsible (it does not block anything). */
+  /** True when the caller is the usable IT Admin responsible for the subscription; false otherwise (recording is refused). */
   callerIsResponsible: z.boolean(),
   /** The case that already stands for the period (the result is recorded); null while none does. */
   recordedRenewalId: z.uuid().nullable(),

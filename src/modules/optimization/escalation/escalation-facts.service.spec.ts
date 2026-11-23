@@ -56,50 +56,76 @@ describe('EscalationFactsService.ofBatch — the long leave of a holder (FR-4.9 
   });
 
   describe('departmentAccessOf', () => {
-    const setupAccess = (responsible: string | null, usable: readonly string[]) => {
+    const setupAccess = (
+      acting: { inCharge: string | null; substitute: string | null; actors: string[] } | undefined,
+      usable: readonly string[] = [],
+    ) => {
       const licensing = { listSeatsForRules: jest.fn() } as unknown as LicensingGhostSeatApi;
       const personnel = {
         getTransfersInOverlap: jest.fn(),
         getLeaveIntervals: jest.fn(),
         getHandingOverCases: jest.fn(),
       } as unknown as PersonnelApi;
-      const organization = {
-        getItAdminInChargeOfDepartment: jest.fn().mockResolvedValue(responsible),
-      } as unknown as OrganizationReadApi;
-      const identity = {
-        findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(usable)),
-      };
+      const findUsableItAdminEmployeeIds = jest.fn().mockResolvedValue(new Set(usable));
+      const itAdminsActingFor = jest.fn(
+        async (departmentIds: readonly string[], usableAmong: (ids: readonly string[]) => Promise<Set<string>>) => {
+          await usableAmong(['probe']);
+          return acting ? new Map([[departmentIds[0], acting]]) : new Map();
+        },
+      );
+      const organization = { itAdminsActingFor } as unknown as OrganizationReadApi;
+      const identity = { findUsableItAdminEmployeeIds };
       const facts = new EscalationFactsService(licensing, personnel, organization, identity as never);
-      return { facts, tx: {} as DbTx };
+      return { facts, tx: {} as DbTx, itAdminsActingFor, findUsableItAdminEmployeeIds };
     };
 
-    it('allows any IT Admin when the department has no IT Admin in charge', async () => {
-      const { facts, tx } = setupAccess(null, []);
+    it('refuses any IT Admin when the department has no acting IT Admins (no in-charge and no substitute)', async () => {
+      const { facts, tx, itAdminsActingFor, findUsableItAdminEmployeeIds } = setupAccess(
+        { inCharge: null, substitute: null, actors: [] },
+        [],
+      );
       await expect(facts.departmentAccessOf(tx, 'dep-1', 'it-other')).resolves.toEqual({
-        allowed: true,
+        allowed: false,
         byInCharge: false,
+        bySubstitute: false,
+      });
+      expect(itAdminsActingFor).toHaveBeenCalledWith(['dep-1'], expect.any(Function), tx);
+      expect(findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['probe'], tx);
+    });
+
+    it('refuses when the department is missing from acting map', async () => {
+      const { facts, tx } = setupAccess(undefined);
+      await expect(facts.departmentAccessOf(tx, 'dep-missing', 'it-other')).resolves.toEqual({
+        allowed: false,
+        byInCharge: false,
+        bySubstitute: false,
       });
     });
 
-    it('allows the IT Admin in charge with byInCharge=true', async () => {
-      const { facts, tx } = setupAccess('it-1', ['it-1']);
+    it('allows the usable IT Admin in charge with byInCharge=true and bySubstitute=false', async () => {
+      const { facts, tx } = setupAccess({ inCharge: 'it-1', substitute: null, actors: ['it-1'] });
       await expect(facts.departmentAccessOf(tx, 'dep-1', 'it-1')).resolves.toEqual({
         allowed: true,
         byInCharge: true,
+        bySubstitute: false,
       });
     });
 
-    it('refuses another IT Admin when the one in charge is usable, and allows when unusable', async () => {
-      const active = setupAccess('it-1', ['it-1']);
-      await expect(active.facts.departmentAccessOf(active.tx, 'dep-1', 'it-other')).resolves.toEqual({
-        allowed: false,
-        byInCharge: false,
-      });
-
-      const locked = setupAccess('it-1', []);
-      await expect(locked.facts.departmentAccessOf(locked.tx, 'dep-1', 'it-other')).resolves.toEqual({
+    it('allows an appointed substitute with byInCharge=false and bySubstitute=true', async () => {
+      const { facts, tx } = setupAccess({ inCharge: null, substitute: 'it-sub', actors: ['it-sub'] });
+      await expect(facts.departmentAccessOf(tx, 'dep-1', 'it-sub')).resolves.toEqual({
         allowed: true,
         byInCharge: false,
+        bySubstitute: true,
+      });
+    });
+
+    it('refuses another IT Admin who is neither usable in-charge nor usable substitute', async () => {
+      const { facts, tx } = setupAccess({ inCharge: 'it-1', substitute: 'it-sub', actors: ['it-1', 'it-sub'] });
+      await expect(facts.departmentAccessOf(tx, 'dep-1', 'it-other')).resolves.toEqual({
+        allowed: false,
+        byInCharge: false,
+        bySubstitute: false,
       });
     });
   });

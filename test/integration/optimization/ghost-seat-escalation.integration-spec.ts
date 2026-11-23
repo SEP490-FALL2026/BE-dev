@@ -44,6 +44,25 @@ describe('the early push of a watch to the head of the department (integration, 
     await w.stop();
   });
 
+  const appointSubstitute = (departmentId: string, substituteEmployeeId: string, reason = 'Cover') =>
+    request(w.server())
+      .post(`/api/v1/departments/${departmentId}/it-substitutes`)
+      .set({ Authorization: `Bearer ${w.admin}` })
+      .send({ substituteEmployeeId, reason });
+
+  let deptOwner: { employeeId: string; account: ApiAccount; count: number } | null = null;
+  async function nextOwner(): Promise<{ employeeId: string; account: ApiAccount }> {
+    if (!deptOwner || deptOwner.count >= 4) {
+      const tag = randomUUID().slice(0, 8);
+      const employeeId = await w.person(`E-ES-IT-${tag}`);
+      const account = await w.account(`E-ES-IT-${tag}`, employeeId, 'IT_ADMIN');
+      deptOwner = { employeeId, account, count: 0 };
+    }
+    deptOwner.count += 1;
+
+    return { employeeId: deptOwner.employeeId, account: deptOwner.account };
+  }
+
   /** A department with a head, a holder in it and a `G4` of the watch tier on the holder's seat. */
   async function watchOf(
     code: string,
@@ -62,6 +81,14 @@ describe('the early push of a watch to the head of the department (integration, 
     });
 
     return { dept, holder, id };
+  }
+
+  /** A department with a dedicated acting IT Admin within the 4-department cap. */
+  async function ownedWatchOf(code: string, over: { group?: 'G4'; tier?: 'MONITOR' | 'REVIEW' } = {}) {
+    const owner = await nextOwner();
+    const watch = await watchOf(code, { ...over, itAdminEmployeeId: owner.employeeId });
+
+    return { ...watch, owner: owner.account };
   }
 
   it('pushes a watch: the tier rises to review, the head of the holder’s department is asked at once and told, the evidence stays as it was', async () => {
@@ -97,16 +124,17 @@ describe('the early push of a watch to the head of the department (integration, 
     expect(JSON.stringify(queue.items)).toContain(id);
   });
 
-  it('audits the push by the IT Admin, with the batch and whether they are the one in charge, and the routing by the system; the note is kept with the batch only', async () => {
+  it('audits the push by the IT Admin, with the batch and whether they are the one in charge or a substitute, and the routing by the system; the note is kept with the batch only', async () => {
     const inChargeCase = await watchOf('P-ES2');
-    const unassignedCase = await watchOf('P-ES3', { itAdminEmployeeId: null });
+    const substituteCase = await watchOf('P-ES3', { itAdminEmployeeId: null });
+    await appointSubstitute(substituteCase.dept.departmentId, w.it1.employeeId, 'Audit substitute').expect(201);
 
     const byInCharge = batchOf(
       await post({ recommendationIds: [inChargeCase.id], note: 'Please look.' }, key(), w.worldItAdmin.account).expect(
         201,
       ),
     );
-    const byOther = batchOf(await post({ recommendationIds: [unassignedCase.id] }, key(), w.it1).expect(201));
+    const byOther = batchOf(await post({ recommendationIds: [substituteCase.id] }, key(), w.it1).expect(201));
 
     const events = async (id: string) =>
       (await w.auditOf('GHOST_SEAT_RECOMMENDATION', id)).map((event) => event.action);
@@ -124,10 +152,15 @@ describe('the early push of a watch to the head of the department (integration, 
       byInCharge: true,
     });
     expect(JSON.stringify(escalated)).not.toContain('Please look.');
-    const other = (await w.auditOf('GHOST_SEAT_RECOMMENDATION', unassignedCase.id)).find(
+    const other = (await w.auditOf('GHOST_SEAT_RECOMMENDATION', substituteCase.id)).find(
       (event) => event.action === 'GHOST_SEAT.ESCALATED',
     );
-    expect(other?.after).toMatchObject({ escalationId: byOther.id, hasNote: false, byInCharge: false });
+    expect(other?.after).toMatchObject({
+      escalationId: byOther.id,
+      hasNote: false,
+      byInCharge: false,
+      bySubstitute: true,
+    });
     const note = await w.ctx.sql.query<{ note: string | null }>(
       `SELECT note FROM ghost_seat_escalations WHERE id = $1`,
       [byInCharge.id],
@@ -152,7 +185,7 @@ describe('the early push of a watch to the head of the department (integration, 
   });
 
   it('leaves a watch as it was when its holder began a long leave after the pass made it: LEAVE_OR_HANDOVER, the head is not told (B3A-02, FR-4.12, FR-4.9 gate 3)', async () => {
-    const { dept, holder, id } = await watchOf('P-ESL');
+    const { dept, holder, id, owner } = await ownedWatchOf('P-ESL');
     await w.ctx.sql.query(
       `INSERT INTO employee_leaves (id, organization_id, employee_id, started_on, approved_return_on, status, grounds_type,
                                     grounds_reference, grounds_issuer, grounds_issued_on, started_by_app_user_id)
@@ -161,7 +194,7 @@ describe('the early push of a watch to the head of the department (integration, 
       [w.seed.organizationId, holder.employeeId],
     );
 
-    const batch = batchOf(await post({ recommendationIds: [id] }).expect(201));
+    const batch = batchOf(await post({ recommendationIds: [id] }, key(), owner).expect(201));
 
     expect(batch).toMatchObject({ escalated: 0, skipped: 1 });
     expect(batch.results[0]).toMatchObject({ recommendationId: id, outcome: 'SKIPPED', reason: 'LEAVE_OR_HANDOVER' });
@@ -171,8 +204,8 @@ describe('the early push of a watch to the head of the department (integration, 
   });
 
   it('answers each recommendation in the order named: what is not a watch, a machine account, a holder in a transfer, a paused or closed one and an unknown id is left as it was, with its reason', async () => {
-    const good = await watchOf('P-ES5');
-    const review = await watchOf('P-ES6', { tier: 'REVIEW' });
+    const good = await ownedWatchOf('P-ES5');
+    const review = await watchOf('P-ES6', { tier: 'REVIEW', itAdminEmployeeId: null });
     const closedSeat = await w.seatIn('P-ES5-C', good.dept.departmentId);
     const closed = await w.seedRecommendation({
       group: 'G4',
@@ -188,13 +221,13 @@ describe('the early push of a watch to the head of the department (integration, 
       tier: 'ACTION',
       assignmentId: g2Seat.assignmentId,
     });
-    const machineDept = await w.headedDepartment('P-ES7');
+    const machineDept = await w.headedDepartment('P-ES7', null);
     const bot = await itAdminSeat(w, { subscriptionId: await w.worldSubscription(30, 'K2') }, 'ci-bot-es7', {
       flagged: true,
       validFrom: '2026-01-05',
     });
     const machine = await w.seedRecommendation({ group: 'G4', state: 'OPEN', tier: 'MONITOR', assignmentId: bot });
-    const moving = await watchOf('P-ES8');
+    const moving = await watchOf('P-ES8', { itAdminEmployeeId: null });
     await w.transferOf(moving.holder.employeeId, moving.dept.departmentId, machineDept.departmentId, '2026-11-01');
     const pausedSeat = await w.seatIn('P-ES5-P', good.dept.departmentId);
     const paused = await w.seedRecommendation({
@@ -206,7 +239,7 @@ describe('the early push of a watch to the head of the department (integration, 
     const unknown = randomUUID();
     const named = [unknown, machine, good.id, review.id, paused, moving.id, closed, g2];
 
-    const batch = batchOf(await post({ recommendationIds: named }).expect(201));
+    const batch = batchOf(await post({ recommendationIds: named }, key(), good.owner).expect(201));
 
     expect(batch.results.map((item) => [item.recommendationId, item.outcome, item.reason])).toEqual([
       [unknown, 'SKIPPED', 'NOT_FOUND'],
@@ -232,21 +265,21 @@ describe('the early push of a watch to the head of the department (integration, 
   });
 
   it('a seat that no longer holds a seat is left as it was (SEAT_ENDED): the next run closes the recommendation', async () => {
-    const { holder, id } = await watchOf('P-ES9');
+    const { holder, id, owner } = await ownedWatchOf('P-ES9');
     await w.ctx.sql.query(`UPDATE license_assignments SET valid_until = '2026-01-06' WHERE id = $1`, [
       holder.assignmentId,
     ]);
 
-    const batch = batchOf(await post({ recommendationIds: [id] }).expect(201));
+    const batch = batchOf(await post({ recommendationIds: [id] }, key(), owner).expect(201));
 
     expect(batch.results[0]).toMatchObject({ outcome: 'SKIPPED', reason: 'SEAT_ENDED' });
     expect((await w.ghostRows('id = $1', [id]))[0]).toMatchObject({ tier: 'MONITOR', state: 'OPEN' });
   });
 
   it('one named twice counts once', async () => {
-    const { id } = await watchOf('P-ES10');
+    const { id, owner } = await ownedWatchOf('P-ES10');
 
-    const batch = batchOf(await post({ recommendationIds: [id, id] }).expect(201));
+    const batch = batchOf(await post({ recommendationIds: [id, id] }, key(), owner).expect(201));
 
     expect(batch.results).toHaveLength(1);
     expect(batch).toMatchObject({ escalated: 1, skipped: 0 });
@@ -254,15 +287,15 @@ describe('the early push of a watch to the head of the department (integration, 
 
   describe('the Idempotency-Key', () => {
     it('answers the same result again and does nothing a second time, even after the recommendation has moved on', async () => {
-      const { dept, id } = await watchOf('P-ES11');
+      const { dept, id, owner } = await ownedWatchOf('P-ES11');
       const same = key();
-      const first = batchOf(await post({ recommendationIds: [id] }, same).expect(201));
+      const first = batchOf(await post({ recommendationIds: [id] }, same, owner).expect(201));
       await w.ctx.sql.query(
         `UPDATE ghost_seat_recommendations SET state = 'CLOSED', close_reason = 'KEPT', closed_at = now() WHERE id = $1`,
         [id],
       );
 
-      const again = batchOf(await post({ recommendationIds: [id] }, same).expect(201));
+      const again = batchOf(await post({ recommendationIds: [id] }, same, owner).expect(201));
 
       expect(again).toMatchObject({ id: first.id, replayed: true, escalated: 1, skipped: 0 });
       expect(again.results).toEqual(first.results);
@@ -274,24 +307,24 @@ describe('the early push of a watch to the head of the department (integration, 
     });
 
     it('refuses the same key for another list or another note with 409 GHOST_SEAT.ESCALATION_KEY_REUSED, and changes nothing', async () => {
-      const a = await watchOf('P-ES12');
-      const b = await watchOf('P-ES13');
+      const a = await ownedWatchOf('P-ES12');
+      const b = await ownedWatchOf('P-ES13');
       const same = key();
-      await post({ recommendationIds: [a.id] }, same).expect(201);
+      await post({ recommendationIds: [a.id] }, same, a.owner).expect(201);
 
-      expect(w.codeOf(await post({ recommendationIds: [a.id, b.id] }, same).expect(409))).toBe(
+      expect(w.codeOf(await post({ recommendationIds: [a.id, b.id] }, same, a.owner).expect(409))).toBe(
         'GHOST_SEAT.ESCALATION_KEY_REUSED',
       );
-      expect(w.codeOf(await post({ recommendationIds: [a.id], note: 'another' }, same).expect(409))).toBe(
+      expect(w.codeOf(await post({ recommendationIds: [a.id], note: 'another' }, same, a.owner).expect(409))).toBe(
         'GHOST_SEAT.ESCALATION_KEY_REUSED',
       );
       expect((await w.ghostRows('id = $1', [b.id]))[0]).toMatchObject({ tier: 'MONITOR', state: 'OPEN' });
     });
 
     it('names a key for one person: another IT Admin with the same key makes a batch of their own', async () => {
-      const { id } = await watchOf('P-ES14');
+      const { id, owner } = await ownedWatchOf('P-ES14');
       const shared = key();
-      const first = batchOf(await post({ recommendationIds: [id] }, shared).expect(201));
+      const first = batchOf(await post({ recommendationIds: [id] }, shared, owner).expect(201));
 
       const other = batchOf(await post({ recommendationIds: [id] }, shared, w.it1).expect(201));
 
@@ -301,12 +334,12 @@ describe('the early push of a watch to the head of the department (integration, 
     });
 
     it('two calls with one key at once push once: one acts, the other answers what was done', async () => {
-      const { id } = await watchOf('P-ES15');
+      const { id, owner } = await ownedWatchOf('P-ES15');
       const same = key();
 
       const [first, second] = await Promise.all([
-        post({ recommendationIds: [id] }, same),
-        post({ recommendationIds: [id] }, same),
+        post({ recommendationIds: [id] }, same, owner),
+        post({ recommendationIds: [id] }, same, owner),
       ]);
 
       expect([first.status, second.status]).toEqual([201, 201]);
@@ -354,7 +387,7 @@ describe('the early push of a watch to the head of the department (integration, 
   });
 
   describe('IT Admin in-charge gate', () => {
-    it('skips with NOT_IN_CHARGE for another active IT Admin, allows active in-charge IT Admin, and allows substitute when locked', async () => {
+    it('skips with NOT_IN_CHARGE for another IT Admin when in-charge is active, unassigned, or locked without substitute, and allows appointed substitute with audit bySubstitute=true', async () => {
       const activeEmp = await w.person('E-ES-OWN');
       const activeIt = await w.account('E-ES-OWN', activeEmp, 'IT_ADMIN');
       const dept = await w.headedDepartment('P-ES-OWN', activeEmp);
@@ -374,6 +407,15 @@ describe('the early push of a watch to the head of the department (integration, 
       expect(byOwner).toMatchObject({ escalated: 1, skipped: 0 });
       expect(byOwner.results[0]).toMatchObject({ recommendationId: id, outcome: 'ESCALATED' });
 
+      const unassigned = await watchOf('P-ES-NONE', { itAdminEmployeeId: null });
+      const refusedNone = batchOf(await post({ recommendationIds: [unassigned.id] }, key(), w.it1).expect(201));
+      expect(refusedNone).toMatchObject({ escalated: 0, skipped: 1 });
+      expect(refusedNone.results[0]).toMatchObject({
+        recommendationId: unassigned.id,
+        outcome: 'SKIPPED',
+        reason: 'NOT_IN_CHARGE',
+      });
+
       const lockedEmp = await w.person('E-ES-LCK');
       await w.account('E-ES-LCK', lockedEmp, 'IT_ADMIN');
       const lockedDept = await w.headedDepartment('P-ES-LCK', lockedEmp);
@@ -385,9 +427,22 @@ describe('the early push of a watch to the head of the department (integration, 
         assignmentId: lockedHolder.assignmentId,
       });
       await w.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [lockedEmp]);
-      const allowed = batchOf(await post({ recommendationIds: [lockedId] }, key(), w.it1).expect(201));
-      expect(allowed).toMatchObject({ escalated: 1, skipped: 0 });
-      expect(allowed.results[0]).toMatchObject({ recommendationId: lockedId, outcome: 'ESCALATED' });
+      const blockedWithoutSub = batchOf(await post({ recommendationIds: [lockedId] }, key(), w.it1).expect(201));
+      expect(blockedWithoutSub).toMatchObject({ escalated: 0, skipped: 1 });
+      expect(blockedWithoutSub.results[0]).toMatchObject({
+        recommendationId: lockedId,
+        outcome: 'SKIPPED',
+        reason: 'NOT_IN_CHARGE',
+      });
+
+      await appointSubstitute(lockedDept.departmentId, w.it1.employeeId, 'In-charge locked').expect(201);
+      const allowedBySub = batchOf(await post({ recommendationIds: [lockedId] }, key(), w.it1).expect(201));
+      expect(allowedBySub).toMatchObject({ escalated: 1, skipped: 0 });
+      expect(allowedBySub.results[0]).toMatchObject({ recommendationId: lockedId, outcome: 'ESCALATED' });
+      const subAudit = (await w.auditOf('GHOST_SEAT_RECOMMENDATION', lockedId)).find(
+        (event) => event.action === 'GHOST_SEAT.ESCALATED',
+      );
+      expect(subAudit?.after).toMatchObject({ byInCharge: false, bySubstitute: true });
     });
   });
 });

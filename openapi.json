@@ -41800,7 +41800,7 @@
         },
         "responses": {
           "201": {
-            "description": "The IT Admin responsible for the subscription (or another IT Admin when none is assigned or the responsible admin is unusable) records, once per period and from its point of adjustment, what was done with the vendor: the choice (renew as it is, reduce, increase or cancel) with the seats the system counts for the next period (read them first; a number that is not that count is refused, and one above it is accepted only as the vendor minimum with the evidence in note), what the vendor did (as decided, refused, did otherwise; a result the vendor has not confirmed is recorded once it has) and the new period it confirmed, which starts on the renewal day and which a renewal, a reduction or an increase must carry (only a vendor that refused a plan by the month may leave it out) and so must a cancellation the vendor refused or did otherwise (it made a period anyway: an incident is raised for it). A cancellation is accepted only when no seat is needed, none is in effect and no request for the plan is open, and needs closure.dataExported and closure.adminsTransferred. The case is written complete in one transaction (state OUTCOME_RECORDED, deciderRole IT_ADMIN_IN_CHARGE): the new period continues the old one with the seats held on its first day, a seat ending on the renewal day stays on the old period. Writing after the renewal day is allowed (a late renewal). Finance is told; when another IT Admin stood in for an unusable responsible admin, the audit trail records substitute = true. It opens no revocation, asks no head and creates no budget commitment. releasedAssignmentIds is no longer taken.",
+            "description": "The usable IT Admin responsible for the subscription records, once per period and from its point of adjustment, what was done with the vendor: the choice (renew as it is, reduce, increase or cancel) with the seats the system counts for the next period (read them first; a number that is not that count is refused, and one above it is accepted only as the vendor minimum with the evidence in note), what the vendor did (as decided, refused, did otherwise; a result the vendor has not confirmed is recorded once it has) and the new period it confirmed, which starts on the renewal day and which a renewal, a reduction or an increase must carry (only a vendor that refused a plan by the month may leave it out) and so must a cancellation the vendor refused or did otherwise (it made a period anyway: an incident is raised for it). A cancellation is accepted only when no seat is needed, none is in effect and no request for the plan is open, and needs closure.dataExported and closure.adminsTransferred. The case is written complete in one transaction (state OUTCOME_RECORDED, deciderRole IT_ADMIN_IN_CHARGE): the new period continues the old one with the seats held on its first day, a seat ending on the renewal day stays on the old period. Writing after the renewal day is allowed (a late renewal). Finance is told. It opens no revocation, asks no head and creates no budget commitment. releasedAssignmentIds is no longer taken.",
             "content": {
               "application/json": {
                 "schema": {
@@ -41866,7 +41866,7 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin responsible for the subscription records its renewal unless none is assigned or the responsible admin is unusable (SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE).",
+            "description": "Only the usable IT Admin responsible for the subscription records its renewal (SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -42247,7 +42247,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Read before the result is recorded, from any day (also before the point of adjustment): the point (commitment, the kind and day of the deadline, the day the point opens, the renewal day and, for a plan by the year, the red alert day), the seats the next period needs (seatsNeeded.total, the sum of the seats held past the renewal day, the continuations waiting and the grants approved and waiting; no buffer seat is added), target (the need raised to the vendor minimum, zero when nothing is needed), suggestedChoice (the choice the count points to; null when the seats bought are not known), canCancel (target 0, no seat in effect today and no request of the plan open), the IT Admin responsible, whether the caller is that person (false means the caller records in their place; it blocks nothing) and recordedRenewalId when the period already has its result. Read by the IT Admin and Finance. The write counts again under a lock: a number recorded that is not the target is refused there.",
+            "description": "Read before the result is recorded, from any day (also before the point of adjustment): the point (commitment, the kind and day of the deadline, the day the point opens, the renewal day and, for a plan by the year, the red alert day), the seats the next period needs (seatsNeeded.total, the sum of the seats held past the renewal day, the continuations waiting and the grants approved and waiting; no buffer seat is added), target (the need raised to the vendor minimum, zero when nothing is needed), suggestedChoice (the choice the count points to; null when the seats bought are not known), canCancel (target 0, no seat in effect today and no request of the plan open), the IT Admin responsible, whether the caller is that person (only that usable responsible IT Admin may record the renewal) and recordedRenewalId when the period already has its result. Read by the IT Admin and Finance. The write counts again under a lock: a number recorded that is not the target is refused there.",
             "content": {
               "application/json": {
                 "schema": {
@@ -42913,7 +42913,7 @@
             }
           },
           "403": {
-            "description": "Only the IT Admin responsible for the subscription records its renewal unless none is assigned or the responsible admin is unusable (SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE).",
+            "description": "Only the usable IT Admin responsible for the subscription records its renewal (SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },

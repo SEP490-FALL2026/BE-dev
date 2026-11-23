@@ -59,8 +59,7 @@ const errorOf = (refusal: RecordRefusal): RenewalError => new RenewalError(refus
  * The result of the adjustment of a subscription of the shared pool, recorded by the IT Admin in one write (`QĐ-103e`, `QĐ-104d`, `QĐ-106i`,
  * `SBF-20` §4.4): the choice the system counts for the next period, the decision — the IT Admin in charge decides alone, no head and no
  * spending approver — and what the vendor did, in ONE transaction under the lock of the period, so the case never waits for anybody. Only
- * the responsible IT Admin records, or another IT Admin when no responsible admin is set or the responsible admin is no longer usable (recorded
- * as substitute in the audit trail). Finance is told of the new period; a renewal the vendor made that was not chosen is told to everyone it
+ * the usable IT Admin responsible for the subscription records. Finance is told of the new period; a renewal the vendor made that was not chosen is told to everyone it
  * concerns at once. It creates no budget commitment and opens no revocation.
  */
 @Injectable()
