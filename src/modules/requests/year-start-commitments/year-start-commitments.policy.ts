@@ -163,10 +163,6 @@ export function yearStartAmountOf(input: {
   const yearStart: BusinessDate = `${input.year}-01-01`;
   const counted = input.seats.filter((seat) => seatCountsOn(seat, yearStart));
   if (counted.length === 0) return { status: 'SKIPPED', reason: 'NO_SEAT' };
-  const { price } = input;
-  if (!isRecurringPriceInDong(price)) return { status: 'SKIPPED', reason: 'NO_PRICE' };
-  const monthly = monthlyPriceOf({ unitPrice: price.unitPrice, billingCycle: price.billingCycle });
-  if (monthly === null || monthly.amountMinor <= 0n) return { status: 'SKIPPED', reason: 'NO_PRICE' };
 
   // Seats that end on the same day cost the same: one calculation for each end date, not for each seat.
   const seatsByEnd = new Map<string | null, number>();
@@ -182,18 +178,24 @@ export function yearStartAmountOf(input: {
     const last = lastDayOfSeat(seat);
     seatsByEnd.set(last, (seatsByEnd.get(last) ?? 0) + 1);
   }
-  const remainder = priceSeatsByEnd(seatsByEnd, price, yearStart);
-  if (!remainder.ok) return { status: 'SKIPPED', reason: remainder.reason };
-  total += remainder.total;
+  // A seat the approval kept a number for is committed at that number, whatever the plan costs today (twelve months at the price of the approval): the price of
+  // 01/01 is asked only for a seat with no number kept, and for the price of a month of a seat that has no monthly price of its own.
+  const { price } = input;
+  let seatMonthlyMinor = savedMonthlyMinor;
+  if (seatsByEnd.size > 0 || seatMonthlyMinor === null) {
+    if (!isRecurringPriceInDong(price)) return { status: 'SKIPPED', reason: 'NO_PRICE' };
+    const monthly = monthlyPriceOf({ unitPrice: price.unitPrice, billingCycle: price.billingCycle });
+    if (monthly === null || monthly.amountMinor <= 0n) return { status: 'SKIPPED', reason: 'NO_PRICE' };
+    seatMonthlyMinor ??= monthly.amountMinor;
+    const remainder = priceSeatsByEnd(seatsByEnd, price, yearStart);
+    if (!remainder.ok) return { status: 'SKIPPED', reason: remainder.reason };
+    total += remainder.total;
+  }
   // Each end date is within the range, the seats of all of them together may not be.
   if (total > MAX_AMOUNT_MINOR) return { status: 'SKIPPED', reason: 'AMOUNT_TOO_LARGE' };
+  if (seatMonthlyMinor === null) return { status: 'SKIPPED', reason: 'NO_PRICE' };
 
-  return {
-    status: 'PRICED',
-    amountMinor: total,
-    seatMonthlyMinor: savedMonthlyMinor ?? monthly.amountMinor,
-    currency: price.unitPrice.currency,
-  };
+  return { status: 'PRICED', amountMinor: total, seatMonthlyMinor, currency: DONG };
 }
 
 export type YearStartJudgement =
