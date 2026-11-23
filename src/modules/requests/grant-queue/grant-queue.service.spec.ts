@@ -30,7 +30,7 @@ function serviceWith(found: { plans: unknown[]; departments: unknown[] }): Grant
   const queue = { page: () => Promise.resolve({ rows: [waiting], total: 1 }) } as unknown as GrantQueueRepo;
   const catalog = { getPlanSummariesWithLogo: () => Promise.resolve(found.plans) } as unknown as CatalogApi;
   const organization = {
-    getItAdminScope: () => Promise.resolve(['d1']),
+    getItAdminActingScope: jest.fn(() => Promise.resolve(['d1'])),
     getEmployees: () => Promise.resolve([person('e1'), person('e2')]),
     getDepartmentBriefs: () => Promise.resolve(found.departments),
   } as unknown as OrganizationReadApi;

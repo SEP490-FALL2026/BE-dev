@@ -106,18 +106,19 @@ export function judgeCompletion(
   return missing.length > 0 ? { kind: 'INCOMPLETE', missing } : { kind: 'OK' };
 }
 
-export type AssessorRefusal = 'OWN_REQUEST' | 'NOT_AWAITING_ASSESSMENT';
+export type AssessorRefusal = 'OWN_REQUEST' | 'NOT_AWAITING_ASSESSMENT' | 'ASSESSMENT_NOT_IN_CHARGE';
 
 /**
- * Whether the person may fill or complete the assessment of this request now. The route already limits it to IT Admins;
- * here an IT Admin may not assess a request they asked for or are given (`SoD-4`), and only while the request waits for
- * the assessment: once it is completed it is not changed (`FR-11.2`).
+ * Whether the person may fill or complete the assessment of this request now. An IT Admin may not assess a request
+ * they asked for or are given, only while the request waits for the assessment, and only when they are currently
+ * acting for the requester’s department.
  */
 export function checkAssessor(facts: {
   actorEmployeeId: string;
   requesterEmployeeId: string;
   beneficiaryEmployeeIds: readonly string[];
   requestState: AccessRequestState;
+  actingItAdminIds: readonly string[];
 }): AssessorRefusal | null {
   if (
     facts.actorEmployeeId === facts.requesterEmployeeId ||
@@ -125,8 +126,10 @@ export function checkAssessor(facts: {
   ) {
     return 'OWN_REQUEST';
   }
+  if (facts.requestState !== 'AWAITING_IT_ASSESSMENT') return 'NOT_AWAITING_ASSESSMENT';
+  if (!facts.actingItAdminIds.includes(facts.actorEmployeeId)) return 'ASSESSMENT_NOT_IN_CHARGE';
 
-  return facts.requestState === 'AWAITING_IT_ASSESSMENT' ? null : 'NOT_AWAITING_ASSESSMENT';
+  return null;
 }
 
 /**

@@ -47664,7 +47664,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin does this, and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).",
+            "description": "Only the acting IT Admin of the requester’s department does this (ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE), and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -47687,6 +47687,17 @@
                       "error": {
                         "code": "ACCESS_REQUEST.OWN_REQUEST",
                         "message": "The assessment cannot be changed: OWN_REQUEST.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE": {
+                    "summary": "Only the acting IT Admin of the requester’s department may assess this request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE",
+                        "message": "Only the acting IT Admin of the requester’s department may assess this request.",
                         "requestId": "req_example"
                       }
                     }
@@ -48010,7 +48021,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin does this, and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).",
+            "description": "Only the acting IT Admin of the requester’s department does this (ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE), and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -48033,6 +48044,17 @@
                       "error": {
                         "code": "ACCESS_REQUEST.OWN_REQUEST",
                         "message": "The assessment cannot be changed: OWN_REQUEST.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE": {
+                    "summary": "Only the acting IT Admin of the requester’s department may assess this request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE",
+                        "message": "Only the acting IT Admin of the requester’s department may assess this request.",
                         "requestId": "req_example"
                       }
                     }
@@ -48430,7 +48452,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin does this, and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).",
+            "description": "Only the acting IT Admin of the requester’s department does this (ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE), and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -48453,6 +48475,17 @@
                       "error": {
                         "code": "ACCESS_REQUEST.OWN_REQUEST",
                         "message": "The assessment cannot be changed: OWN_REQUEST.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE": {
+                    "summary": "Only the acting IT Admin of the requester’s department may assess this request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE",
+                        "message": "Only the acting IT Admin of the requester’s department may assess this request.",
                         "requestId": "req_example"
                       }
                     }
@@ -48754,7 +48787,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin does this, and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).",
+            "description": "Only the acting IT Admin of the requester’s department does this (ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE), and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -48777,6 +48810,17 @@
                       "error": {
                         "code": "ACCESS_REQUEST.OWN_REQUEST",
                         "message": "The assessment cannot be changed: OWN_REQUEST.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE": {
+                    "summary": "Only the acting IT Admin of the requester’s department may assess this request.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE",
+                        "message": "Only the acting IT Admin of the requester’s department may assess this request.",
                         "requestId": "req_example"
                       }
                     }
@@ -49142,7 +49186,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin does this, and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST). With addToDepartmentList, the department of the request must be one the IT Admin is in charge of (DEPARTMENT.OUT_OF_SCOPE); nothing is written.",
+            "description": "Only an IT Admin does this. With addToDepartmentList, the department of the request must be one the IT Admin is acting for (DEPARTMENT.OUT_OF_SCOPE); nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },

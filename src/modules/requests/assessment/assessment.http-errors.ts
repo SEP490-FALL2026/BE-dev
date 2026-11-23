@@ -47,9 +47,18 @@ const refuse = (
 /** Maps the errors of the proposal and assessment routes; what is not theirs is mapped as a request error. */
 export function toAssessmentApiException(error: unknown): unknown {
   if (error instanceof AssessmentRefusedError) {
-    return error.reason === 'OWN_REQUEST'
-      ? refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.OWN_REQUEST', error.message)
-      : refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT', error.message);
+    if (error.reason === 'OWN_REQUEST') {
+      return refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.OWN_REQUEST', error.message);
+    }
+    if (error.reason === 'ASSESSMENT_NOT_IN_CHARGE') {
+      return refuse(
+        HttpStatus.FORBIDDEN,
+        'ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE',
+        'Only the acting IT Admin of the requester’s department may assess this request.',
+      );
+    }
+
+    return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT', error.message);
   }
   if (error instanceof AssessmentIncompleteError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ASSESSMENT.INCOMPLETE', error.message, { missing: error.missing });
@@ -145,6 +154,7 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   OWN_REQUEST: example(new AssessmentRefusedError('OWN_REQUEST')),
+  ASSESSMENT_NOT_IN_CHARGE: example(new AssessmentRefusedError('ASSESSMENT_NOT_IN_CHARGE')),
   NOT_AWAITING_ASSESSMENT: example(new AssessmentRefusedError('NOT_AWAITING_ASSESSMENT')),
   INCOMPLETE: example(new AssessmentIncompleteError(['quote'])),
   INCOMPLETE_DATA_SENSITIVITY: example(new AssessmentIncompleteError(['dataSensitivity'])),

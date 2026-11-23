@@ -139,23 +139,42 @@ describe('who may fill the assessment and when', () => {
     requesterEmployeeId: 'e1',
     beneficiaryEmployeeIds: ['e1'],
     requestState: 'AWAITING_IT_ASSESSMENT' as const,
+    actingItAdminIds: ['it1'],
   };
 
-  it('an IT Admin who is not the sender may, while the request waits for the assessment', () => {
+  it('an acting IT Admin who is not the sender may, while the request waits for the assessment', () => {
     expect(checkAssessor(facts)).toBeNull();
+    expect(checkAssessor({ ...facts, actorEmployeeId: 'sub1', actingItAdminIds: ['it1', 'sub1'] })).toBeNull();
   });
 
-  it('nobody assesses a request they asked or are given', () => {
-    expect(checkAssessor({ ...facts, actorEmployeeId: 'e1' })).toBe('OWN_REQUEST');
-    expect(checkAssessor({ ...facts, actorEmployeeId: 'e2', beneficiaryEmployeeIds: ['e2'] })).toBe('OWN_REQUEST');
+  it('nobody assesses a request they asked or are given (checked before state and acting scope)', () => {
+    expect(checkAssessor({ ...facts, actorEmployeeId: 'e1', actingItAdminIds: ['e1'] })).toBe('OWN_REQUEST');
+    expect(
+      checkAssessor({
+        ...facts,
+        actorEmployeeId: 'e1',
+        requestState: 'PENDING',
+        actingItAdminIds: [],
+      }),
+    ).toBe('OWN_REQUEST');
+    expect(
+      checkAssessor({ ...facts, actorEmployeeId: 'e2', beneficiaryEmployeeIds: ['e2'], actingItAdminIds: [] }),
+    ).toBe('OWN_REQUEST');
   });
 
   it.each(['PENDING', 'WAITING_CONTROLLED', 'AWAITING_SPEND_SUBMISSION', 'AWAITING_EXECUTION', 'REJECTED'] as const)(
-    'nobody changes it when the request is %s',
+    'nobody changes it when the request is %s (checked before acting scope)',
     (requestState) => {
-      expect(checkAssessor({ ...facts, requestState })).toBe('NOT_AWAITING_ASSESSMENT');
+      expect(checkAssessor({ ...facts, requestState, actingItAdminIds: [] })).toBe('NOT_AWAITING_ASSESSMENT');
     },
   );
+
+  it('refuses an IT Admin who is not acting for the requester department', () => {
+    expect(checkAssessor({ ...facts, actorEmployeeId: 'it2', actingItAdminIds: ['it1'] })).toBe(
+      'ASSESSMENT_NOT_IN_CHARGE',
+    );
+    expect(checkAssessor({ ...facts, actingItAdminIds: [] })).toBe('ASSESSMENT_NOT_IN_CHARGE');
+  });
 });
 
 describe('linking a request to the plan registered in the catalog (US-05-06 AC-4, AC-8)', () => {

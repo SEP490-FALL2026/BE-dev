@@ -37,11 +37,11 @@ import { ACCESS_REQUEST_ERROR_EXAMPLES as ACCESS_EXAMPLES } from '../access-requ
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const IT_ONLY_DESCRIPTION =
-  'Only an IT Admin does this, and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).';
+  'Only the acting IT Admin of the requester’s department does this (ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE), and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).';
 const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: IT_ONLY_DESCRIPTION,
-  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.OWN_REQUEST],
+  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.OWN_REQUEST, EXAMPLES.ASSESSMENT_NOT_IN_CHARGE],
 } as const;
 const NOT_FOUND_DESCRIPTION =
   'The request does not exist, is not a proposal, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND).';
@@ -350,7 +350,8 @@ export class ProposalsController {
     // The link checks no assessor, so OWN_REQUEST is not reachable; a plan that does not exist is (PLAN_NOT_FOUND).
     {
       status: HttpStatus.FORBIDDEN,
-      description: `${IT_ONLY_DESCRIPTION} With addToDepartmentList, the department of the request must be one the IT Admin is in charge of (DEPARTMENT.OUT_OF_SCOPE); nothing is written.`,
+      description:
+        'Only an IT Admin does this. With addToDepartmentList, the department of the request must be one the IT Admin is acting for (DEPARTMENT.OUT_OF_SCOPE); nothing is written.',
       examples: [FORBIDDEN_EXAMPLE, EXAMPLES.DEPARTMENT_OUT_OF_SCOPE],
     },
     {
