@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { compareSeatLockOrder } from '../../../core/seat-lock-order';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -281,12 +282,6 @@ export class DecisionService {
   }
 }
 
-function compareText(left: string, right: string): number {
-  if (left < right) return -1;
-
-  return left > right ? 1 : 0;
-}
-
 function compareSeatOrder(
   leftSeat: RuleSeat | undefined,
   leftId: string,
@@ -294,8 +289,9 @@ function compareSeatOrder(
   rightId: string,
 ): number {
   return (
-    compareText(leftSeat?.subscriptionId ?? '', rightSeat?.subscriptionId ?? '') ||
-    compareText(leftSeat?.assignmentId ?? '', rightSeat?.assignmentId ?? '') ||
-    compareText(leftId, rightId)
+    compareSeatLockOrder(
+      { subscriptionId: leftSeat?.subscriptionId ?? null, assignmentId: leftSeat?.assignmentId ?? '' },
+      { subscriptionId: rightSeat?.subscriptionId ?? null, assignmentId: rightSeat?.assignmentId ?? '' },
+    ) || (leftId < rightId ? -1 : leftId > rightId ? 1 : 0)
   );
 }

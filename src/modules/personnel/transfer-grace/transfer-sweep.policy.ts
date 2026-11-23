@@ -1,3 +1,4 @@
+import { compareSeatLockOrder } from '../../../core/seat-lock-order';
 import type { BusinessDate } from '../../../core/business-date';
 import { isRevocableType } from '../departure-deadline/departure-impact.policy';
 import { isOldRightOf } from './transfer-grace.policy';
@@ -75,10 +76,7 @@ export function rightsToTakeBack<
     .filter(
       (seat) => isOldRightOf(transfer, seat) && seat.validUntil === null && isRevocableType(seat.provisioningType),
     )
-    .sort(
-      (a, b) =>
-        (a.subscriptionId ?? '').localeCompare(b.subscriptionId ?? '') || a.assignmentId.localeCompare(b.assignmentId),
-    );
+    .sort(compareSeatLockOrder);
 }
 
 /** The ids of the rights the picture of a held transfer names; null when it has none (a transfer from before the grace). */

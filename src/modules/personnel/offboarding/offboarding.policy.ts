@@ -1,3 +1,4 @@
+import { compareSeatLockOrder } from '../../../core/seat-lock-order';
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addWorkingDays, type NonWorkingDates } from '../../../core/working-days';
 import { firstDayRefused } from '../departure-deadline/block-moment.policy';
@@ -343,14 +344,6 @@ export function namedRightsRefusal(named: readonly string[], rights: readonly Ri
   return null;
 }
 
-const compareRightOrder = (left: RightFacts, right: RightFacts): number => {
-  const leftSub = left.subscriptionId ?? '';
-  const rightSub = right.subscriptionId ?? '';
-  if (leftSub !== rightSub) return leftSub < rightSub ? -1 : 1;
-
-  return left.assignmentId < right.assignmentId ? -1 : left.assignmentId > right.assignmentId ? 1 : 0;
-};
-
 /** The rights a command selects, sorted by (subscriptionId, assignmentId), and the refusal when it cannot. */
 export function revocationSelection(facts: RevocationFacts): {
   refusal: OffboardingRefusal | null;
@@ -373,7 +366,7 @@ export function revocationSelection(facts: RevocationFacts): {
   if (!facts.lockRecorded && !facts.lockGiven) return none({ code: 'ACCOUNT_LOCK_NOT_RECORDED' });
   if (facts.lockRecorded && facts.lockGiven) return none({ code: 'ALREADY_RECORDED' });
 
-  selected.sort((a, b) => compareRightOrder(byId.get(a) as RightFacts, byId.get(b) as RightFacts));
+  selected.sort((a, b) => compareSeatLockOrder(byId.get(a) as RightFacts, byId.get(b) as RightFacts));
 
   return { refusal: null, selected };
 }

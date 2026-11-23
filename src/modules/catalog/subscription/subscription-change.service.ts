@@ -173,6 +173,11 @@ export class SubscriptionChangeService {
   /**
    * Locks every current primary subscription of the plan together with `id` in id order before locking the plan exclusively,
    * then re-reads and checks optimistic concurrency.
+   *
+   * A known narrow window: when the plan has no primary at the moment of this read, the set locked is only `id`; a renewal completed by another transaction can
+   * make another subscription the primary of the plan and commit before this one locks the plan, and the flag taken off it afterwards is written on a row this
+   * transaction did not lock. It needs a second transaction that gives a seat on that very subscription at that very moment, the write is one flag of a row
+   * whose owner is waiting for the plan, and closing it needs the set of primaries read again after the plan is locked (a change of behaviour, so left to its own item).
    */
   private async lockForPrimaryChange(tx: DbTx, id: string, expectedUpdatedAt?: Date): Promise<SubscriptionRecord> {
     const probe = await this.subscriptions.find(id, tx);
