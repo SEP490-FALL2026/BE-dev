@@ -14,6 +14,11 @@ import type { BatchDecisionResultWire } from '../spend-approval-view/spend-appro
 /** The decision of the record of approval each decision of the body writes. */
 const RECORDED_AS = { APPROVE: 'APPROVED', REJECT: 'REJECTED', RETURN: 'RETURNED' } as const;
 
+/** A request with no spend step open is refused with this reason; a request that is not there at all is not found. */
+function isNoOpenStep(error: unknown): boolean {
+  return error instanceof SpendDecisionRefusedError && error.reason === 'NO_SPEND_STEP';
+}
+
 /**
  * The spending approver decides the requests they hold in a batch together, approving or refusing them one by one, in the
  * order chosen (`US-06-01` AC-19, AC-20). Each request is decided on its own, with its own check, snapshot, record and
@@ -100,13 +105,14 @@ export class SpendBatchDecisionService {
     } catch (error) {
       if (error instanceof TransientDatabaseError)
         return { requestId, outcome: 'RETRYABLE', reason: 'TRANSIENT_FAILURE' };
-      if (error instanceof AccessRequestNotFoundError) return this.withoutOpenStep(actor, requestId, body.decision);
+      if (error instanceof AccessRequestNotFoundError) return skipped('NO_SPEND_STEP');
       if (error instanceof AccessRequestGroupUsesLinesError) {
         // A request for a group is decided for each person, never in bulk (`US-05-17`); but a return of the batch takes the whole group back.
         if (body.decision === 'RETURN') return this.returnGroup(actor, requestId, of.judged);
 
         return skipped('GROUP_NEEDS_LINES');
       }
+      if (isNoOpenStep(error)) return this.withoutOpenStep(actor, requestId, body.decision);
       if (error instanceof SpendDecisionRefusedError) return skipped(error.reason);
       // The commitment could not be held (a safety net after the check): this request is skipped, the others of the batch go on.
       if (error instanceof BudgetCommitmentNotHoldableError || error instanceof BudgetCommitmentExistsError) {
@@ -129,7 +135,9 @@ export class SpendBatchDecisionService {
     } catch (error) {
       if (error instanceof TransientDatabaseError)
         return { requestId, outcome: 'RETRYABLE', reason: 'TRANSIENT_FAILURE' };
-      if (error instanceof AccessRequestNotFoundError) return this.withoutOpenStep(actor, requestId, 'RETURN');
+      if (error instanceof AccessRequestNotFoundError)
+        return { requestId, outcome: 'SKIPPED', reason: 'NO_SPEND_STEP' };
+      if (isNoOpenStep(error)) return this.withoutOpenStep(actor, requestId, 'RETURN');
       if (error instanceof SpendDecisionRefusedError) return { requestId, outcome: 'SKIPPED', reason: error.reason };
       throw error;
     }
