@@ -189,10 +189,75 @@ model Department {
   noticesSent             PersonnelNotice[]             @relation("NoticeSenderDepartment")
   // The subscriptions the department owns (QĐ-89a) and the assignments that gave existing ones their owner.
   heldNotifications       HeldDepartmentNotification[]
+  itSubstitutes           DepartmentItSubstitute[]
 
   @@unique([organizationId, code])
   @@index([itAdminEmployeeId])
   @@map("departments")
+}
+
+enum DepartmentItSubstituteEndCause {
+  REMOVED
+  IN_CHARGE_NAMED
+  DEPARTMENT_RETIRED
+}
+
+// The IT Admin the Super Admin names to do a department's technical work while it has no IT Admin in charge, or the one in charge is
+// away (QĐ-118). At most one is in force for a department (a partial unique index in the migration). Rows are never deleted; the three
+// columns that end the appointment are written once (trigger department_it_substitutes_guard).
+model DepartmentItSubstitute {
+  id                    String                         @id @default(uuid(7)) @db.Uuid
+  organizationId        String                         @map("organization_id") @db.Uuid
+  departmentId          String                         @map("department_id") @db.Uuid
+  substituteEmployeeId  String                         @map("substitute_employee_id") @db.Uuid
+  // The IT Admin in charge when the appointment was made (a value that stays); null when the department had none.
+  replacedEmployeeId    String?                        @map("replaced_employee_id") @db.Uuid
+  reason                String
+  appointedAt           DateTime                       @map("appointed_at") @db.Timestamptz(3)
+  appointedByAppUserId  String                         @map("appointed_by_app_user_id") @db.Uuid
+  endedAt               DateTime?                      @map("ended_at") @db.Timestamptz(3)
+  endedByAppUserId      String?                        @map("ended_by_app_user_id") @db.Uuid
+  endCause              DepartmentItSubstituteEndCause? @map("end_cause")
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  substitute Employee   @relation("DepartmentItSubstituteEmployee", fields: [substituteEmployeeId], references: [id], onDelete: Restrict)
+
+  @@map("department_it_substitutes")
+}
+
+enum UnplacedWorkKind {
+  PROVISIONING_TASK
+  OFFBOARDING_CASE
+  DEVICE_RETURN_TASK
+  DEVICE
+}
+
+enum UnplacedWorkDesignationEndCause {
+  REMOVED
+  WORK_CLOSED
+}
+
+// The IT Admin the Super Admin names for one piece of technical work of a person who was never placed in a department (QĐ-118k): such
+// work has no department to work out the doer from. `workId` names the work in the module that owns it, without a foreign key.
+model UnplacedWorkItDesignation {
+  id                   String                           @id @default(uuid(7)) @db.Uuid
+  organizationId       String                           @map("organization_id") @db.Uuid
+  workKind             UnplacedWorkKind                 @map("work_kind")
+  workId               String                           @map("work_id") @db.Uuid
+  // The person of the work who has no department (the beneficiary, the person who left, the holder of the machine).
+  employeeId           String                           @map("employee_id") @db.Uuid
+  designeeEmployeeId   String                           @map("designee_employee_id") @db.Uuid
+  reason               String
+  appointedAt          DateTime                         @map("appointed_at") @db.Timestamptz(3)
+  appointedByAppUserId String                           @map("appointed_by_app_user_id") @db.Uuid
+  endedAt              DateTime?                        @map("ended_at") @db.Timestamptz(3)
+  endedByAppUserId     String?                          @map("ended_by_app_user_id") @db.Uuid
+  endCause             UnplacedWorkDesignationEndCause? @map("end_cause")
+
+  employee Employee @relation("UnplacedWorkEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+  designee Employee @relation("UnplacedWorkDesignee", fields: [designeeEmployeeId], references: [id], onDelete: Restrict)
+
+  @@map("unplaced_work_it_designations")
 }
 
 // Who heads a department, with history (US-03-06, INV-19). [validFrom, validTo) - validTo null means open.
@@ -336,6 +401,10 @@ model Employee {
   noticesAbout                    PersonnelNotice[]                   @relation("NoticeAbout")
   noticesSent                     PersonnelNotice[]                   @relation("NoticeSender")
   superAdminEventTicketsAbout     SuperAdminEventTicket[]             @relation("SuperAdminEventTicketSubject")
+  deviceReturnTasks               DeviceReturnTask[]                  @relation("DeviceReturnTaskEmployee")
+  departmentItSubstitutions       DepartmentItSubstitute[]            @relation("DepartmentItSubstituteEmployee")
+  unplacedWorkAbout               UnplacedWorkItDesignation[]         @relation("UnplacedWorkEmployee")
+  unplacedWorkDesignated          UnplacedWorkItDesignation[]         @relation("UnplacedWorkDesignee")
 
   @@unique([organizationId, employeeCode])
   @@unique([organizationId, normalizedWorkEmail])

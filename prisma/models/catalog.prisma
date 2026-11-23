@@ -183,6 +183,14 @@ model Application {
   @@map("applications")
 }
 
+// How a K4 plan is bound once bought (null for every other plan): to an account (a seat of the person), to a machine by a key, or
+// bundled with the machine and with no key at all. K1 and K2 are never bound to a machine (a CHECK in the migration).
+enum PlanKeyBinding {
+  ACCOUNT
+  DEVICE_KEY
+  DEVICE_BUNDLED
+}
+
 enum ProvisioningType {
   K1
   K2
@@ -234,12 +242,15 @@ model Plan {
   // QĐ-113a: the reference price in dong, before tax (K1/K2: one seat for one month; K4: one purchase). Both columns or none, VND, K1/K2/K4 only (CHECKs in the migration).
   referencePriceMinor    BigInt?          @map("reference_price_minor")
   referencePriceCurrency String?          @map("reference_price_currency") @db.Char(3)
+  // Set exactly on K4 plans (CHECK plans_key_binding_k4); a plan changes it only while nothing rests on it (trigger plans_keep_children_valid).
+  keyBinding        PlanKeyBinding?  @map("key_binding")
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization           Organization              @relation(fields: [organizationId], references: [id])
   application            Application               @relation(fields: [applicationId], references: [id])
   workspaceProfile       PlanWorkspaceProfile?
+  deviceActivations      DeviceActivation[]
   subscriptions          Subscription[]
   usageRate              PlanUsageRate?
   terms                  PlanTerms?

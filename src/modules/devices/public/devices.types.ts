@@ -7,7 +7,9 @@ export type DeviceRegistrationEndCause =
   | 'DEPARTURE'
   | 'EMPLOYEE_LEFT'
   /** The block of a departure took effect (the last working day is past) and the handover was cancelled: the unlock never revives it (`QĐ-100z`). */
-  | 'DEPARTURE_BLOCKED';
+  | 'DEPARTURE_BLOCKED'
+  /** The machine went back to the store. */
+  | 'RETURNED';
 
 /** Ends every open registration of a person (a machine is never held by two people, a person may hold many machines). */
 export interface EndRegistrationsOfHolderInput {

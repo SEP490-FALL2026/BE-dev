@@ -321,14 +321,69 @@ model LicenseKey {
   withdrawnAt          DateTime? @map("withdrawn_at") @db.Timestamptz(3)
   withdrawnByAppUserId String?   @map("withdrawn_by_app_user_id") @db.Uuid
   withdrawalReason     String?   @map("withdrawal_reason")
+  // How many machines the key may be on at once (1..100000), and how many were already on when it was entered (a value written once).
+  // The cap only goes up (trigger license_key_guard).
+  maxActivations         Int      @default(1) @map("max_activations")
+  initialActivationsUsed Int      @default(0) @map("initial_activations_used")
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  subscription Subscription       @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
-  assignment   LicenseAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  subscription      Subscription       @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  assignment        LicenseAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  deviceActivations DeviceActivation[]
 
   @@unique([organizationId, fingerprint])
   @@index([subscriptionId, status])
   @@map("license_keys")
+}
+
+enum DeviceActivationOrigin {
+  OPERATION
+  INITIAL
+}
+
+enum DeviceActivationEndCause {
+  DEACTIVATED
+  MOVED
+  DEVICE_DISPOSED
+  DEVICE_LOST
+  DEVICE_VOIDED
+}
+
+// The right of a machine to run a piece of software bought once (a K4 plan bound to the machine). A key of a `DEVICE_KEY` plan
+// takes one activation of its purchase; a `DEVICE_BUNDLED` plan has no key (`licenseKeyId` null). A row is opened once and closed
+// once, never deleted. The CHECKs, the partial unique index, the capacity function and the triggers are SQL in the migration.
+model DeviceActivation {
+  id                     String                    @id @default(uuid(7)) @db.Uuid
+  organizationId         String                    @map("organization_id") @db.Uuid
+  deviceId               String                    @map("device_id") @db.Uuid
+  planId                 String                    @map("plan_id") @db.Uuid
+  licenseKeyId           String?                   @map("license_key_id") @db.Uuid
+  origin                 DeviceActivationOrigin
+  // The row a move opened this one from (null for any other way in); at most one row follows from another.
+  movedFromActivationId  String?                   @unique @map("moved_from_activation_id") @db.Uuid
+  activatedOn            DateTime                  @map("activated_on") @db.Date
+  activatedAt            DateTime                  @map("activated_at") @db.Timestamptz(3)
+  activatedByAppUserId   String                    @map("activated_by_app_user_id") @db.Uuid
+  // Taken when the row was opened: the activation went past the cap of the key.
+  overActivationCap      Boolean                   @default(false) @map("over_activation_cap")
+  deactivatedOn          DateTime?                 @map("deactivated_on") @db.Date
+  deactivatedAt          DateTime?                 @map("deactivated_at") @db.Timestamptz(3)
+  endCause               DeviceActivationEndCause? @map("end_cause")
+  // Only on a closed row of a key: whether the license went back to the lot (true) or was lost with the machine (false).
+  licenseReleased        Boolean?                  @map("license_released")
+  closedByAppUserId      String?                   @map("closed_by_app_user_id") @db.Uuid
+
+  device         ManagedDevice     @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  plan           Plan              @relation(fields: [planId], references: [id], onDelete: Restrict)
+  licenseKey     LicenseKey?       @relation(fields: [licenseKeyId], references: [id], onDelete: Restrict)
+  movedFrom      DeviceActivation? @relation("DeviceActivationMove", fields: [movedFromActivationId], references: [id], onDelete: Restrict)
+  movedTo        DeviceActivation? @relation("DeviceActivationMove")
+
+  @@index([licenseKeyId])
+  @@index([planId, deactivatedAt])
+  @@index([deviceId, deactivatedAt])
+  @@map("device_activations")
 }
 
 enum HandoverConfirmerRole {
