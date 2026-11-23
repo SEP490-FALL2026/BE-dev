@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 
 /**
  * The security notice that goes out when the login email of an account moves: to the address it used and to the one it uses now, queued
@@ -10,10 +11,14 @@ import { NotificationsApi } from '../../../notifications/public/notifications.ap
  */
 @Injectable()
 export class LoginEmailChangeNotice {
-  constructor(private readonly notifications: NotificationsApi) {}
+  constructor(
+    private readonly notifications: NotificationsApi,
+    private readonly organizations: OrganizationReadApi,
+  ) {}
 
   async send(tx: DbTx, organizationId: string, moved: { previousEmail: string; currentEmail: string }): Promise<void> {
     const at = new Date().toISOString();
+    const organization = await this.organizations.getOrganization(tx);
     for (const [recipient, audience] of [
       [moved.previousEmail, 'PREVIOUS'],
       [moved.currentEmail, 'CURRENT'],
@@ -24,7 +29,7 @@ export class LoginEmailChangeNotice {
         template: 'LOGIN_EMAIL_CHANGED_NOTICE',
         locale: 'vi',
         actionTokenHash: null,
-        payload: { audience, ...moved, at },
+        payload: { audience, ...moved, at, timeZone: organization?.timeZone },
       });
     }
   }

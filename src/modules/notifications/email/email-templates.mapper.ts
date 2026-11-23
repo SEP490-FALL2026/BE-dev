@@ -44,8 +44,48 @@ export function renderEmail(
   }
 }
 
-function expiry(payload: Record<string, unknown>): string {
-  return typeof payload.expiresAt === 'string' ? payload.expiresAt : '';
+/** The zone a mail written before the payload carried one is read in: the one of the installation, as the organization defaults to. */
+const DEFAULT_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
+function timePartsIn(date: Date, timeZone: string, english: boolean): Map<string, string> {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    ...(english ? { timeZoneName: 'shortOffset' as const } : {}),
+  }).formatToParts(date);
+
+  return new Map(parts.map((part) => [part.type, part.value]));
+}
+
+/**
+ * An instant of the payload (ISO, as the writer of the mail records it) as `dd/MM/yyyy HH:mm` in the time zone of the organization the payload names, so a
+ * person reads their own clock; the English text adds the offset, for example `(GMT+7)`. What is not an instant is left as it is, and a zone that does not exist
+ * gives way to the default one.
+ */
+function localTime(value: unknown, timeZone: unknown, english: boolean): string {
+  if (typeof value !== 'string' || value === '') return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  let parts: Map<string, string>;
+  let zone = typeof timeZone === 'string' && timeZone !== '' ? timeZone : DEFAULT_TIME_ZONE;
+  try {
+    parts = timePartsIn(date, zone, english);
+  } catch {
+    zone = DEFAULT_TIME_ZONE;
+    parts = timePartsIn(date, zone, english);
+  }
+  const text = `${parts.get('day')}/${parts.get('month')}/${parts.get('year')} ${parts.get('hour')}:${parts.get('minute')}`;
+
+  return english ? `${text} (${parts.get('timeZoneName') ?? zone})` : text;
+}
+
+function expiry(payload: Record<string, unknown>, english: boolean): string {
+  return localTime(payload.expiresAt, payload.timeZone, english);
 }
 
 function renderInvitation(
@@ -55,7 +95,7 @@ function renderInvitation(
   appPublicUrl: string,
 ): RenderedEmail {
   const link = activationLink(appPublicUrl, String(payload.token));
-  const expiresAt = expiry(payload);
+  const expiresAt = expiry(payload, english);
 
   if (english) {
     return {
@@ -83,7 +123,7 @@ function renderPasswordReset(
   appPublicUrl: string,
 ): RenderedEmail {
   const link = passwordResetLink(appPublicUrl, String(payload.token));
-  const expiresAt = expiry(payload);
+  const expiresAt = expiry(payload, english);
 
   if (english) {
     return {
@@ -110,7 +150,7 @@ function renderPasswordChangedNotice(
   greeting: string,
   payload: Record<string, unknown>,
 ): RenderedEmail {
-  const at = typeof payload.at === 'string' ? payload.at : '';
+  const at = localTime(payload.at, payload.timeZone, english);
   const wasReset = payload.event === 'PASSWORD_RESET';
 
   if (english) {
@@ -141,7 +181,7 @@ function renderLoginEmailChangedNotice(
   greeting: string,
   payload: Record<string, unknown>,
 ): RenderedEmail {
-  const at = typeof payload.at === 'string' ? payload.at : '';
+  const at = localTime(payload.at, payload.timeZone, english);
   const previous = typeof payload.previousEmail === 'string' ? payload.previousEmail : '';
   const current = typeof payload.currentEmail === 'string' ? payload.currentEmail : '';
   const toPrevious = payload.audience === 'PREVIOUS';
