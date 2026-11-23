@@ -311,7 +311,12 @@ describe('W1-17: when a requester becomes head, individual paid requests convert
       expect(resubmitAudit[0].after).toMatchObject({
         requesterBecameHead: true,
         oneStepReason: 'REQUESTER_IS_HEAD',
+        trigger: 'RESUBMITTED',
       });
+      // The resubmission itself is recorded, with the state the request is in once its route started.
+      const resubmitted = await h.audit('ACCESS_REQUEST.RESUBMITTED', sent.id);
+      expect(resubmitted).toHaveLength(1);
+      expect(resubmitted[0].after).toMatchObject({ oneStep: true, requestState: 'AWAITING_SPEND_DECISION' });
     });
   });
 
