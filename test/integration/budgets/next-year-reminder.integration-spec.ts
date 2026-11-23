@@ -6,8 +6,8 @@ import { pretendBusinessToday } from '../../support/pretend-today';
 const h = new BudgetHarness();
 
 /**
- * B-4, `QĐ-111am`: on 01/12 and then every Monday until a version is approved, Finance and the spending approver are told which Cost Centers
- * have no approved budget of the year, once for each Cost Center and day: in December of the year after, from January of the year that runs.
+ * B-4, `QĐ-111am`: on 01/12 and then every Monday until a version is approved, Finance and the spending approver are told how many Cost Centers
+ * have no approved budget of the year, once for each person and day: in December of the year after, from January of the year that runs.
  * The days are those of the year of the suite: 01/12 (a Tuesday in 2026), the first Monday after it (07/12/2026), the day after that Monday,
  * which is neither, and the first Mondays of January.
  */
