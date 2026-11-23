@@ -33,17 +33,20 @@ export class ItHandoverMilestoneService {
     return this.notifier.itHandoverPending(tx, input);
   }
 
-  /** Every plan whose last admin at the vendor is the person who leaves is the common queue's work: every IT Admin is told once for it (`QĐ-110k`, X-IT.6). */
+  /** Notifies active subscription IT Admins of each plan left without a working vendor admin, or falls back to the Super Admin. */
   private async vendorAdminsLost(
     tx: DbTx,
     input: { organizationId: string; source: HandoverSource; employeeId: string },
   ): Promise<void> {
     for (const role of plansLeftWithoutAdmin(await this.catalog.vendorAdminRolesOf(input.employeeId, tx))) {
+      const responsibleItAdminEmployeeIds = await this.catalog.usableSubscriptionItAdminsOfPlan(role.planId, tx);
       await this.notifier.vendorAdminsGone(tx, {
         organizationId: input.organizationId,
         planId: role.planId,
         applicationId: role.applicationId,
         sourceId: input.source.id,
+        responsibleItAdminEmployeeIds,
+        leavingEmployeeId: input.employeeId,
       });
     }
   }

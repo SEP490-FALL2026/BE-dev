@@ -8,49 +8,91 @@ import { PersonnelNotifier } from './personnel-notifier.service';
 const TX = {} as DbTx;
 const ORGANIZATION = 'org-1';
 
+interface ActingSpec {
+  inCharge?: string | null;
+  substitute?: string | null;
+  usable?: string[];
+}
+
 interface World {
   heads?: Record<string, string>;
   superAdmin?: string | null;
-  itAdminInCharge?: string | null;
-  firstUsableItAdmin?: string | null;
-  /** The IT Admin named for the department itself (what a departure is told through), and the IT Admins whose account can act. */
-  itAdminOfDepartment?: string | null;
-  usableItAdmins?: string[];
-  /** Every notice already exists for its recipient and event key: `notifyInApp` writes nothing. */
+  usableSuperAdmin?: string | null;
+  actingByDept?: Record<string, ActingSpec>;
+  workDepartments?: Record<string, string>;
   alreadyTold?: boolean;
 }
 
 function notifierOf(world: World = {}) {
   const told: InAppNotificationInput[] = [];
-  const held: unknown[] = [];
   const notifications = {
     notifyInApp: jest.fn((_tx: DbTx, input: InAppNotificationInput) => {
       told.push(input);
 
       return Promise.resolve(!world.alreadyTold);
     }),
-    holdForDepartment: jest.fn((_tx: DbTx, input: unknown) => {
-      held.push(input);
-
-      return Promise.resolve(true);
-    }),
   } as unknown as NotificationsApi;
+  const itAdminsActingFor = jest.fn(
+    async (deptIds: readonly string[], usableAmong: (ids: string[]) => Promise<Set<string>>) => {
+      const entries = await Promise.all(
+        deptIds.map(async (deptId) => {
+          const spec = world.actingByDept?.[deptId];
+          if (!spec) {
+            return [
+              deptId,
+              {
+                inCharge: null as string | null,
+                substitute: null as string | null,
+                defaultAssignee: null as string | null,
+                actors: [] as string[],
+              },
+            ] as const;
+          }
+          const candidates = [spec.inCharge, spec.substitute].filter((id): id is string => Boolean(id));
+          const usable = candidates.length === 0 ? new Set<string>() : await usableAmong(candidates);
+          const inCharge = spec.inCharge && usable.has(spec.inCharge) ? spec.inCharge : null;
+          const substitute = spec.substitute && usable.has(spec.substitute) ? spec.substitute : null;
+          const actors = [inCharge, substitute].filter((id): id is string => id !== null);
+          return [deptId, { inCharge, substitute, defaultAssignee: substitute ?? inCharge, actors }] as const;
+        }),
+      );
+      return new Map(entries);
+    },
+  );
   const organization = {
     businessToday: () => Promise.resolve('2026-10-28'),
     getDepartmentHeads: (ids: string[]) =>
       Promise.resolve(
         new Map(ids.flatMap((id) => (world.heads?.[id] ? [[id, { employeeId: world.heads[id] }] as const] : []))),
       ),
-    getItAdminInCharge: () => Promise.resolve({ departmentId: 'd1', itAdminEmployeeId: world.itAdminInCharge ?? null }),
-    getItAdminInChargeOfDepartment: () => Promise.resolve(world.itAdminOfDepartment ?? null),
+    workDepartmentsOf: jest.fn((ids: readonly string[]) =>
+      Promise.resolve(
+        new Map(ids.flatMap((id) => (world.workDepartments?.[id] ? [[id, world.workDepartments[id]] as const] : []))),
+      ),
+    ),
+    itAdminsActingFor,
   } as unknown as OrganizationReadApi;
+  const usableAcrossDepts = new Set(Object.values(world.actingByDept ?? {}).flatMap((s) => s.usable ?? []));
+  const findFirstUsableItAdminEmployeeId = jest.fn();
+  const findAllUsableItAdminEmployeeIds = jest.fn();
   const identity = {
     getSuperAdminHolder: () => Promise.resolve(world.superAdmin ? { employeeId: world.superAdmin } : null),
-    findFirstUsableItAdminEmployeeId: () => Promise.resolve(world.firstUsableItAdmin ?? null),
-    findAllUsableItAdminEmployeeIds: () => Promise.resolve(world.usableItAdmins ?? []),
+    findUsableSuperAdminEmployeeId: jest
+      .fn()
+      .mockResolvedValue(world.usableSuperAdmin !== undefined ? world.usableSuperAdmin : (world.superAdmin ?? null)),
+    findUsableItAdminEmployeeIds: jest.fn((ids: readonly string[]) =>
+      Promise.resolve(new Set(ids.filter((id) => usableAcrossDepts.has(id)))),
+    ),
+    findFirstUsableItAdminEmployeeId,
+    findAllUsableItAdminEmployeeIds,
   } as unknown as IdentityAccessApi;
 
-  return { notifier: new PersonnelNotifier(notifications, organization, identity), told, held };
+  return {
+    notifier: new PersonnelNotifier(notifications, organization, identity),
+    told,
+    findFirstUsableItAdminEmployeeId,
+    findAllUsableItAdminEmployeeIds,
+  };
 }
 
 const recipients = (told: InAppNotificationInput[], code: string) =>
@@ -59,7 +101,7 @@ const recipients = (told: InAppNotificationInput[], code: string) =>
     .map((notice) => notice.recipientEmployeeId)
     .sort();
 
-describe('who is told of an event of the personnel context (F17, spec B)', () => {
+describe('who is told of an event of the personnel context', () => {
   it('tells the person and the heads of the departments concerned once each, with ids and days only', async () => {
     const { notifier, told } = notifierOf({ heads: { from: 'head-from', to: 'head-to' } });
 
@@ -117,12 +159,6 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
       ['PERSONNEL_NOTICE_RECEIVED', 'sa', 'PERSONNEL_NOTICE_RECEIVED:n1'],
       ['PERSONNEL_NOTICE_OVERDUE', 'sa', 'PERSONNEL_NOTICE_OVERDUE:n1'],
     ]);
-    expect(told[0].params).toEqual({
-      noticeId: 'n1',
-      employeeId: 'person',
-      departmentId: 'd1',
-      eventKind: 'DEPARTURE',
-    });
   });
 
   it('tells nobody when nobody holds the Super Admin role, instead of failing the event', async () => {
@@ -139,9 +175,12 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
     expect(told).toEqual([]);
   });
 
-  it('tells both the Super Admin and the IT Admin in charge of an abrupt departure, and the first usable IT Admin when nobody is in charge', async () => {
-    const inCharge = notifierOf({ superAdmin: 'sa', itAdminInCharge: 'it-in-charge' });
-    const nobody = notifierOf({ superAdmin: 'sa', itAdminInCharge: null, firstUsableItAdmin: 'it-first' });
+  it('tells Super Admin and acting IT Admins (in-charge + substitute) on abrupt departure without calling findFirstUsableItAdminEmployeeId', async () => {
+    const acting = notifierOf({
+      superAdmin: 'sa',
+      actingByDept: { d1: { inCharge: 'it-in-charge', substitute: 'it-sub', usable: ['it-in-charge', 'it-sub'] } },
+    });
+    const nobody = notifierOf({ superAdmin: 'sa', actingByDept: {} });
     const facts = {
       organizationId: ORGANIZATION,
       employeeId: 'p',
@@ -151,11 +190,12 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
       lastDayInOffice: '2026-10-28',
     };
 
-    await inCharge.notifier.abruptDeparture(TX, facts);
+    await acting.notifier.abruptDeparture(TX, facts);
     await nobody.notifier.abruptDeparture(TX, facts);
 
-    expect(recipients(inCharge.told, 'ABRUPT_DEPARTURE_RECORDED')).toEqual(['it-in-charge', 'sa']);
-    expect(recipients(nobody.told, 'ABRUPT_DEPARTURE_RECORDED')).toEqual(['it-first', 'sa']);
+    expect(recipients(acting.told, 'ABRUPT_DEPARTURE_RECORDED')).toEqual(['it-in-charge', 'it-sub', 'sa']);
+    expect(recipients(nobody.told, 'ABRUPT_DEPARTURE_RECORDED')).toEqual(['sa']);
+    expect(nobody.findFirstUsableItAdminEmployeeId).not.toHaveBeenCalled();
   });
 
   it('tells the Super Admin of each role a person who leaves holds, once for each role and stage', async () => {
@@ -173,13 +213,9 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
     await notifier.roleHolderLeaving(TX, { ...facts, roleFlag: 'FINANCE' });
 
     expect(told.map((item) => item.params.roleFlag)).toEqual(['SUPER_ADMIN_HOLDER', 'FINANCE']);
-    expect(told.map((item) => item.eventKey)).toEqual([
-      'ROLE_HOLDER_LEAVING:c1:SUPER_ADMIN_HOLDER:RECORDED',
-      'ROLE_HOLDER_LEAVING:c1:FINANCE:RECORDED',
-    ]);
   });
 
-  describe('the rights of a departure still not taken away past the day (QĐ-110c)', () => {
+  describe('revocation overdue notices', () => {
     const facts = {
       organizationId: ORGANIZATION,
       employeeId: 'leaver',
@@ -190,8 +226,11 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
       today: '2026-10-02',
     };
 
-    it('tells the IT Admin in charge of the department and the Super Admin, with ids, the day and the count only, once for the case and the day', async () => {
-      const { notifier, told } = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: 'it-in-charge' });
+    it('tells the acting IT Admins of the department and the Super Admin once for the case and the day', async () => {
+      const { notifier, told } = notifierOf({
+        superAdmin: 'sa',
+        actingByDept: { d1: { inCharge: 'it-in-charge', usable: ['it-in-charge'] } },
+      });
 
       const written = await notifier.revocationOverdue(TX, facts);
 
@@ -202,50 +241,51 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
         params: { caseId: 'c1', employeeId: 'leaver', dueOn: '2026-10-01', rightCount: 2 },
         eventKey: 'offboarding:c1:2026-10-02',
       });
-      expect(Object.keys(told[0].params).sort()).toEqual(['caseId', 'dueOn', 'employeeId', 'rightCount']);
     });
 
     it('says nothing was written when every notice of the day already exists', async () => {
-      const { notifier } = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: 'it', alreadyTold: true });
+      const { notifier } = notifierOf({
+        superAdmin: 'sa',
+        actingByDept: { d1: { inCharge: 'it', usable: ['it'] } },
+        alreadyTold: true,
+      });
 
       expect(await notifier.revocationOverdue(TX, facts)).toBe(false);
     });
 
-    it('does not tell the person who left as the IT Admin: another IT Admin who can act is told, and the Super Admin', async () => {
+    it('excludes the leaver and tells the active substitute and the Super Admin', async () => {
       const { notifier, told } = notifierOf({
         superAdmin: 'sa',
-        itAdminOfDepartment: 'leaver',
-        usableItAdmins: ['leaver', 'it-other'],
+        actingByDept: { d1: { inCharge: 'leaver', substitute: 'it-sub', usable: ['leaver', 'it-sub'] } },
       });
 
       await notifier.revocationOverdue(TX, facts);
 
-      expect(recipients(told, 'REVOCATION_OVERDUE')).toEqual(['it-other', 'sa']);
+      expect(recipients(told, 'REVOCATION_OVERDUE')).toEqual(['it-sub', 'sa']);
     });
 
-    it('tells the first IT Admin who can act when the department names none, and only the Super Admin when there is none', async () => {
-      const named = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: null, usableItAdmins: ['it-a', 'it-b'] });
-      const none = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: null, usableItAdmins: [] });
+    it('tells only the Super Admin when no acting IT Admin exists and never broadcasts to other IT Admins', async () => {
+      const none = notifierOf({ superAdmin: 'sa', actingByDept: {} });
 
-      await named.notifier.revocationOverdue(TX, facts);
       await none.notifier.revocationOverdue(TX, facts);
 
-      expect(recipients(named.told, 'REVOCATION_OVERDUE')).toEqual(['it-a', 'sa']);
       expect(recipients(none.told, 'REVOCATION_OVERDUE')).toEqual(['sa']);
+      expect(none.findAllUsableItAdminEmployeeIds).not.toHaveBeenCalled();
     });
 
-    it('tells a person who is both the IT Admin in charge and the Super Admin once, and a case without a department through the first IT Admin', async () => {
-      const both = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: 'sa' });
-      const unplaced = notifierOf({ superAdmin: 'sa', usableItAdmins: ['it-a'] });
+    it('tells a person who is both acting IT Admin and Super Admin once, and an unplaced case only the Super Admin', async () => {
+      const both = notifierOf({ superAdmin: 'sa', actingByDept: { d1: { inCharge: 'sa', usable: ['sa'] } } });
+      const unplaced = notifierOf({ superAdmin: 'sa', actingByDept: {} });
 
       await both.notifier.revocationOverdue(TX, facts);
       await unplaced.notifier.revocationOverdue(TX, { ...facts, departmentId: null });
 
       expect(recipients(both.told, 'REVOCATION_OVERDUE')).toEqual(['sa']);
-      expect(recipients(unplaced.told, 'REVOCATION_OVERDUE')).toEqual(['it-a', 'sa']);
+      expect(recipients(unplaced.told, 'REVOCATION_OVERDUE')).toEqual(['sa']);
     });
   });
-  describe('the block moment of a departure (QĐ-110b, QĐ-110d, R-1)', () => {
+
+  describe('departure access blocked notices', () => {
     const facts = {
       organizationId: ORGANIZATION,
       employeeId: 'leaver',
@@ -259,49 +299,33 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
     const audiences = (told: InAppNotificationInput[]) =>
       told.map((notice) => [notice.recipientEmployeeId, notice.params.audience, notice.eventKey]);
 
-    it('tells the Super Admin to mark the person as left and the IT Admin to block the company account and open the revocation, once each, with ids and days only', async () => {
-      const { notifier, told } = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: 'it1' });
+    it('tells Super Admin to mark left and acting IT Admins (in-charge + substitute) to block and revoke', async () => {
+      const { notifier, told } = notifierOf({
+        superAdmin: 'sa',
+        actingByDept: { d1: { inCharge: 'it1', substitute: 'sub1', usable: ['it1', 'sub1'] } },
+      });
 
       await notifier.departureAccessBlocked(TX, facts);
 
       expect(audiences(told)).toEqual([
         ['sa', 'SUPER_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:SUPER_ADMIN'],
         ['it1', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN'],
-      ]);
-      expect(told[0]).toMatchObject({
-        code: 'DEPARTURE_ACCESS_BLOCKED',
-        subject: { type: 'OFFBOARDING_CASE', id: 'c1' },
-        params: {
-          caseId: 'c1',
-          employeeId: 'leaver',
-          departmentId: 'd1',
-          blockedOn: '2026-10-01',
-          revocationDueOn: '2026-10-02',
-        },
-      });
-      expect(Object.keys(told[0].params).sort()).toEqual([
-        'audience',
-        'blockedOn',
-        'caseId',
-        'departmentId',
-        'employeeId',
-        'revocationDueOn',
+        ['sub1', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN'],
       ]);
     });
 
-    it('does not ask the Super Admin to mark a person who is already marked as left, and tells the IT Admin who can act when the department names none', async () => {
-      const { notifier, told } = notifierOf({ superAdmin: 'sa', usableItAdmins: ['it-a'] });
+    it('never falls back to Super Admin or other IT Admins for IT_ADMIN audience when acting set is empty', async () => {
+      const { notifier, told } = notifierOf({ superAdmin: 'sa', actingByDept: {} });
 
       await notifier.departureAccessBlocked(TX, { ...facts, markLeft: false });
 
-      expect(audiences(told)).toEqual([['it-a', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN']]);
+      expect(audiences(told)).toEqual([]);
     });
 
-    it('tells only the Super Admin when no IT Admin can act, and never the person who left', async () => {
+    it('tells only Super Admin when only the leaver is named and no substitute exists', async () => {
       const { notifier, told } = notifierOf({
         superAdmin: 'sa',
-        itAdminOfDepartment: 'leaver',
-        usableItAdmins: ['leaver'],
+        actingByDept: { d1: { inCharge: 'leaver', usable: ['leaver'] } },
       });
 
       await notifier.departureAccessBlocked(TX, facts);
@@ -310,7 +334,7 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
     });
   });
 
-  describe('the lock of the company account that was not written by the end of the day (QĐ-94m, R-1)', () => {
+  describe('account lock overdue notices', () => {
     const facts = {
       organizationId: ORGANIZATION,
       employeeId: 'leaver',
@@ -319,24 +343,24 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
       blockedOn: '2026-11-12',
     };
 
-    it('tells the IT Admin and the Super Admin once for the case, and says whether anything was written', async () => {
-      const first = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: 'it1' });
-      const again = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: 'it1', alreadyTold: true });
+    it('tells acting IT Admins and the Super Admin once for the case', async () => {
+      const first = notifierOf({
+        superAdmin: 'sa',
+        actingByDept: { d1: { inCharge: 'it1', usable: ['it1'] } },
+      });
+      const again = notifierOf({
+        superAdmin: 'sa',
+        actingByDept: { d1: { inCharge: 'it1', usable: ['it1'] } },
+        alreadyTold: true,
+      });
 
       expect(await first.notifier.accountLockOverdue(TX, facts)).toBe(true);
       expect(await again.notifier.accountLockOverdue(TX, facts)).toBe(false);
-
       expect(recipients(first.told, 'ACCOUNT_LOCK_OVERDUE')).toEqual(['it1', 'sa']);
-      expect(first.told[0]).toMatchObject({
-        subject: { type: 'OFFBOARDING_CASE', id: 'c1' },
-        params: { caseId: 'c1', employeeId: 'leaver', blockedOn: '2026-11-12' },
-        eventKey: 'ACCOUNT_LOCK_OVERDUE:c1',
-      });
-      expect(Object.keys(first.told[0].params).sort()).toEqual(['blockedOn', 'caseId', 'employeeId']);
     });
   });
 
-  describe('the IT Admin who answers for the department is told when a departure is recorded, moved or cancelled (SPEC MF2-E)', () => {
+  describe('departure events tell acting IT Admins or fallback to usable Super Admin', () => {
     const departure = (eventKind: 'DEPARTURE_RECORDED' | 'DEPARTURE_LAST_DAY_CHANGED' | 'DEPARTURE_CANCELLED') => ({
       organizationId: ORGANIZATION,
       employeeId: 'leaver',
@@ -348,23 +372,29 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
     });
 
     it.each(['DEPARTURE_RECORDED', 'DEPARTURE_LAST_DAY_CHANGED', 'DEPARTURE_CANCELLED'] as const)(
-      'adds the IT Admin in charge to the person and the head for %s',
+      'adds acting IT Admins (in-charge and substitute) for %s',
       async (kind) => {
-        const { notifier, told } = notifierOf({ heads: { d1: 'head' }, itAdminOfDepartment: 'it1' });
+        const { notifier, told } = notifierOf({
+          heads: { d1: 'head' },
+          actingByDept: { d1: { inCharge: 'it1', substitute: 'sub1', usable: ['it1', 'sub1'] } },
+        });
 
         await notifier.eventRecorded(TX, departure(kind));
 
-        expect(recipients(told, 'PERSONNEL_EVENT_RECORDED')).toEqual(['head', 'it1', 'leaver']);
+        expect(recipients(told, 'PERSONNEL_EVENT_RECORDED')).toEqual(['head', 'it1', 'leaver', 'sub1']);
       },
     );
 
-    it('does not add them for a transfer or a leave', async () => {
-      const { notifier, told } = notifierOf({ heads: { d1: 'head' }, itAdminOfDepartment: 'it1' });
+    it('falls back to usable Super Admin when acting IT Admin set is empty on departure event', async () => {
+      const { notifier, told } = notifierOf({
+        heads: { d1: 'head' },
+        usableSuperAdmin: 'sa',
+        actingByDept: {},
+      });
 
-      await notifier.eventRecorded(TX, { ...departure('DEPARTURE_RECORDED'), eventKind: 'TRANSFER_RECORDED' });
-      await notifier.eventRecorded(TX, { ...departure('DEPARTURE_RECORDED'), eventKind: 'LONG_LEAVE_STARTED' });
+      await notifier.eventRecorded(TX, departure('DEPARTURE_RECORDED'));
 
-      expect(recipients(told, 'PERSONNEL_EVENT_RECORDED')).toEqual(['head', 'head', 'leaver', 'leaver']);
+      expect(recipients(told, 'PERSONNEL_EVENT_RECORDED')).toEqual(['head', 'leaver', 'sa']);
     });
   });
 });

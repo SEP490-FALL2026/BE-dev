@@ -6,7 +6,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { expiryReminderAlert, usableOrNull } from '../licensing-alerts.policy';
+import { expiryReminderAlert } from '../licensing-alerts.policy';
 import { LicensingAlerts } from '../licensing-alerts.service';
 import type { ExpiryReminderWire } from './expiry.dto';
 import { ExpiryError } from './expiry.errors';
@@ -52,8 +52,7 @@ export class ExpiryReminderService {
     if (candidates.length === 0) return 0;
 
     const departmentOf = await this.departmentsOf(candidates, today);
-    const itAdminOf = await this.itAdminsOf(candidates, departmentOf, today);
-    const usable = await this.alerts.usableItAdmins([...itAdminOf.values()]);
+    const itAdminOf = await this.itAdminsOf([...departmentOf.values()]);
     const headOf = await this.organizationReads.getDepartmentHeads([...new Set(departmentOf.values())], today);
     let told = 0;
     for (const candidate of candidates) {
@@ -61,7 +60,7 @@ export class ExpiryReminderService {
       const owed = remindersOwed({
         holderEmployeeId: candidate.employeeId,
         headEmployeeId: departmentId ? (headOf.get(departmentId)?.employeeId ?? null) : null,
-        itAdminEmployeeId: departmentId ? usableOrNull(itAdminOf.get(departmentId) ?? null, usable) : null,
+        itAdminEmployeeId: departmentId ? (itAdminOf.get(departmentId) ?? null) : null,
       });
       told += await this.write(candidate, departmentId, owed);
     }
@@ -153,28 +152,15 @@ export class ExpiryReminderService {
     return new Map([...units].map(([employeeId, unit]) => [employeeId, unit.departmentId]));
   }
 
-  /** The IT Admin in charge of each department, read once for each department through one of its people. */
-  private async itAdminsOf(
-    candidates: readonly ReminderCandidate[],
-    departmentOf: ReadonlyMap<string, string>,
-    today: BusinessDate,
-  ): Promise<Map<string, string | null>> {
-    const representative = new Map<string, string>();
-    for (const candidate of candidates) {
-      const departmentId = departmentOf.get(candidate.employeeId);
-      if (departmentId && !representative.has(departmentId)) representative.set(departmentId, candidate.employeeId);
-    }
-    const found = await Promise.all(
-      [...representative].map(
-        async ([departmentId, employeeId]) =>
-          [
-            departmentId,
-            (await this.organizationReads.getItAdminInCharge(employeeId, today))?.itAdminEmployeeId ?? null,
-          ] as const,
-      ),
+  /** Resolves the default acting IT Admin (substitute or in-charge) for each department in one batched read. */
+  private async itAdminsOf(departmentIds: readonly string[]): Promise<Map<string, string | null>> {
+    const uniqueIds = [...new Set(departmentIds)];
+    if (uniqueIds.length === 0) return new Map();
+    const actingByDept = await this.organizationReads.itAdminsActingFor(uniqueIds, (ids) =>
+      this.alerts.usableItAdmins(ids),
     );
 
-    return new Map(found);
+    return new Map([...actingByDept].map(([departmentId, acting]) => [departmentId, acting.defaultAssignee ?? null]));
   }
 
   /** Writes the reminders of one right in one transaction, with the audit event of each new one; returns how many were new. */
