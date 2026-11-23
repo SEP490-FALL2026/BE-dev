@@ -48,4 +48,28 @@ describe('a step of a K1 checklist done before the task was made (D-64)', () => 
     expect(plan(claimAt(0, 0))?.items).toHaveLength(2);
     expect(plan(claimAt(60 * 24, 60 * 24 + 1))?.items).toHaveLength(2);
   });
+
+  it('R-3: completes as DEPARTURE when RENEWAL_DISABLED is ticked alongside all departure steps after DEPARTURE is added', () => {
+    const done = planK1Checklist({
+      type: 'K1',
+      sources: ['RETURN', 'DEPARTURE'],
+      lastOfPerson: true,
+      evidence: '',
+      claim: {
+        evidence: 'đã thu hồi đủ bước nghỉ việc',
+        items: [
+          { code: 'MAILBOX_PASSWORD_RESET', done: true, doneAt: minutesAfter(1) },
+          { code: 'SOFTWARE_FORGOT_PASSWORD', done: true, doneAt: minutesAfter(2) },
+          { code: 'SESSIONS_SIGNED_OUT', done: true, doneAt: minutesAfter(3) },
+          { code: 'RENEWAL_DISABLED', done: true, doneAt: minutesAfter(4) },
+          { code: 'EVIDENCE_RECORDED', done: true, doneAt: minutesAfter(5) },
+          { code: 'MAILBOX_LOCKED', done: true, doneAt: minutesAfter(6) },
+        ],
+      },
+    });
+
+    expect(done?.variant).toBe('DEPARTURE');
+    expect(done?.facts.doneCodes).toContain('MAILBOX_LOCKED');
+    expect(done?.facts.doneCodes).toContain('RENEWAL_DISABLED');
+  });
 });

@@ -58,10 +58,10 @@ const errorOf = (refusal: RecordRefusal): RenewalError => new RenewalError(refus
 /**
  * The result of the adjustment of a subscription of the shared pool, recorded by the IT Admin in one write (`QĐ-103e`, `QĐ-104d`, `QĐ-106i`,
  * `SBF-20` §4.4): the choice the system counts for the next period, the decision — the IT Admin in charge decides alone, no head and no
- * spending approver — and what the vendor did, in ONE transaction under the lock of the period, so the case never waits for anybody. Any IT
- * Admin records (`QĐ-58b`): the one who stands in for the IT Admin responsible says so in the audit trail and the one responsible is told.
- * Finance is told of the new period (`QĐ-106i`(3)); a renewal the vendor made that was not chosen is told to everyone it concerns at once
- * (`QĐ-106i`(4)). It creates no budget commitment (`QĐ-62s`) and opens no revocation (`SBF-18` is not called).
+ * spending approver — and what the vendor did, in ONE transaction under the lock of the period, so the case never waits for anybody. Only
+ * the responsible IT Admin records, or another IT Admin when no responsible admin is set or the responsible admin is no longer usable (recorded
+ * as substitute in the audit trail). Finance is told of the new period; a renewal the vendor made that was not chosen is told to everyone it
+ * concerns at once. It creates no budget commitment and opens no revocation.
  */
 @Injectable()
 export class RenewalRecordService {
@@ -77,7 +77,7 @@ export class RenewalRecordService {
   ) {}
 
   /**
-   * Throws RenewalError (`NOT_FOUND`, `NOT_RENEWABLE`, `CONTRACT_DATA_INCOMPLETE`, `BEFORE_ADJUSTMENT_POINT`, `QUANTITY_INVALID`,
+   * Throws RenewalError (`NOT_FOUND`, `NOT_RESPONSIBLE`, `NOT_RENEWABLE`, `CONTRACT_DATA_INCOMPLETE`, `BEFORE_ADJUSTMENT_POINT`, `QUANTITY_INVALID`,
    * `CANCEL_NOT_ALLOWED`, `QUANTITY_NOT_SEATS_NEEDED`, `VENDOR_MINIMUM_EVIDENCE_REQUIRED`, `ALREADY_PROPOSED`, `NEXT_PERIOD_REQUIRED` and the refusals of the
    * outcome: `OUTCOME_MISMATCH`, `EXCESS_NOT_REVOKED`, `SEATS_HAVE_OPEN_TASKS`, `PERIOD_REFUSED`); nothing is written then.
    */
@@ -85,9 +85,10 @@ export class RenewalRecordService {
     return this.runner.run(async (tx) => {
       const period = await this.periods.lockPeriod(tx, input.subscriptionId);
       if (!period) throw new RenewalError('NOT_FOUND');
+      const who = await this.parties.recordingAccessOf(actor, period, tx);
+      if (!who.allowed) throw new RenewalError('NOT_RESPONSIBLE');
       const today = await this.organizationReads.businessToday(now, tx);
       const checked = await this.check(tx, period, input, today);
-      const who = await this.parties.substituteOf(actor, period, tx);
       const decided = await this.writeCase(tx, actor, period, input, checked, who, { today, now });
       const result = await this.outcomes.recordIn(
         tx,

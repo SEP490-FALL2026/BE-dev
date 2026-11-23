@@ -13095,7 +13095,7 @@
         },
         "responses": {
           "200": {
-            "description": "A task of the queue was made for each right chosen (all that have none when none is named), after the lock of the company account is recorded or together with it, with the standard reason of a departure (and the note the IT Admin adds); the server counts the rights. The seats stay whole until each task is done; nothing is transferred to anyone. A seat that has a task already gets the reason added.",
+            "description": "A task of the queue was made for each right chosen (all revocable seats held when none is named), after the lock of the company account is recorded or together with it, with the standard reason of a departure (and the note the IT Admin adds); the server counts the rights. The seats stay whole until each task is done; nothing is transferred to anyone. A seat that already has an open revocation task gets the departure reason added to that task instead of opening a second task.",
             "content": {
               "application/json": {
                 "schema": {
@@ -13203,7 +13203,7 @@
             }
           },
           "409": {
-            "description": "The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED, with details.problem SOURCE_REQUIRED, ASSIGNMENT_IS_SERVICE_ACCOUNT or TYPE_NOT_SUPPORTED, and details.provisioningType when it is the kind of the seat), there is nothing left to take away (NOTHING_TO_REVOKE), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
+            "description": "The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED, with details.problem SOURCE_REQUIRED, ASSIGNMENT_IS_SERVICE_ACCOUNT or TYPE_NOT_SUPPORTED, and details.provisioningType when it is the kind of the seat), there is nothing left to take away or all selected seats already carry the reason of this departure (NOTHING_TO_REVOKE), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -13326,7 +13326,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid, such as one that still sends a count or a reason (VALIDATION_ERROR), or a seat named is not held or has a task (ASSIGNMENT_NOT_AVAILABLE): nothing is made.",
+            "description": "The body is invalid, such as one that still sends a count or a reason (VALIDATION_ERROR), or a seat named is not held by the person (ASSIGNMENT_NOT_AVAILABLE): nothing is made.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -13344,12 +13344,12 @@
                     }
                   },
                   "OFFBOARDING_CASE.ASSIGNMENT_NOT_AVAILABLE": {
-                    "summary": "The seat is not held by the person or already has a revocation under way.",
+                    "summary": "The seat is not held by the person.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "OFFBOARDING_CASE.ASSIGNMENT_NOT_AVAILABLE",
-                        "message": "The seat is not held by the person or already has a revocation under way.",
+                        "message": "The seat is not held by the person.",
                         "details": { "assignmentId": "<assignment-id>" },
                         "requestId": "req_example"
                       }
@@ -40878,7 +40878,7 @@
         },
         "responses": {
           "201": {
-            "description": "Any IT Admin records, once per period and from its point of adjustment, what was done with the vendor: the choice (renew as it is, reduce, increase or cancel) with the seats the system counts for the next period (read them first; a number that is not that count is refused, and one above it is accepted only as the vendor minimum with the evidence in note), what the vendor did (as decided, refused, did otherwise; a result the vendor has not confirmed is recorded once it has) and the new period it confirmed, which starts on the renewal day and which a renewal, a reduction or an increase must carry (only a vendor that refused a plan by the month may leave it out) and so must a cancellation the vendor refused or did otherwise (it made a period anyway: an incident is raised for it). A cancellation is accepted only when no seat is needed, none is in effect and no request for the plan is open, and needs closure.dataExported and closure.adminsTransferred. The case is written complete in one transaction (state OUTCOME_RECORDED, deciderRole IT_ADMIN_IN_CHARGE): the new period continues the old one with the seats held on its first day, a seat ending on the renewal day stays on the old period. Writing after the renewal day is allowed (a late renewal). Finance is told; the IT Admin responsible is told too when another IT Admin recorded in their place (the audit trail says so). It opens no revocation, asks no head and creates no budget commitment. releasedAssignmentIds is no longer taken.",
+            "description": "The IT Admin responsible for the subscription (or another IT Admin when none is assigned or the responsible admin is unusable) records, once per period and from its point of adjustment, what was done with the vendor: the choice (renew as it is, reduce, increase or cancel) with the seats the system counts for the next period (read them first; a number that is not that count is refused, and one above it is accepted only as the vendor minimum with the evidence in note), what the vendor did (as decided, refused, did otherwise; a result the vendor has not confirmed is recorded once it has) and the new period it confirmed, which starts on the renewal day and which a renewal, a reduction or an increase must carry (only a vendor that refused a plan by the month may leave it out) and so must a cancellation the vendor refused or did otherwise (it made a period anyway: an incident is raised for it). A cancellation is accepted only when no seat is needed, none is in effect and no request for the plan is open, and needs closure.dataExported and closure.adminsTransferred. The case is written complete in one transaction (state OUTCOME_RECORDED, deciderRole IT_ADMIN_IN_CHARGE): the new period continues the old one with the seats held on its first day, a seat ending on the renewal day stays on the old period. Writing after the renewal day is allowed (a late renewal). Finance is told; when another IT Admin stood in for an unusable responsible admin, the audit trail records substitute = true. It opens no revocation, asks no head and creates no budget commitment. releasedAssignmentIds is no longer taken.",
             "content": {
               "application/json": {
                 "schema": {
@@ -40944,7 +40944,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin records.",
+            "description": "Only the IT Admin responsible for the subscription records its renewal unless none is assigned or the responsible admin is unusable (SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40956,6 +40956,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE": {
+                    "summary": "Only the IT Admin responsible for the subscription records its renewal.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE",
+                        "message": "Only the IT Admin responsible for the subscription records its renewal.",
                         "requestId": "req_example"
                       }
                     }
@@ -41980,7 +41991,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin records the outcome.",
+            "description": "Only the IT Admin responsible for the subscription records its renewal unless none is assigned or the responsible admin is unusable (SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -41992,6 +42003,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE": {
+                    "summary": "Only the IT Admin responsible for the subscription records its renewal.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE",
+                        "message": "Only the IT Admin responsible for the subscription records its renewal.",
                         "requestId": "req_example"
                       }
                     }
@@ -63699,7 +63721,7 @@
             }
           },
           "409": {
-            "description": "The version is not a draft nor sent back to Finance, or is a draft left behind by a proposal that was withdrawn or given back, so it is not changed (BUDGET.VERSION_NOT_EDITABLE).",
+            "description": "The version is not a draft nor sent back to Finance, or is a draft left behind by a proposal that was withdrawn or given back, so it is not changed (BUDGET.VERSION_NOT_EDITABLE). Sending a version also requires an open and locked budget cycle (BUDGET_CYCLE.NOT_OPEN, BUDGET_CYCLE.NOT_LOCKED), a proposal still waiting (BUDGET.PROPOSAL_NOT_SUBMITTED), matching cycle currency (BUDGET.CYCLE_CURRENCY_MISMATCH) and remaining within the annual ceiling (BUDGET_VERSION.OVER_CEILING).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -63735,6 +63757,18 @@
                       "error": {
                         "code": "BUDGET_CYCLE.NOT_OPEN",
                         "message": "The budget cycle of 2027 is not open yet.",
+                        "details": { "year": 2027 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_CYCLE.NOT_LOCKED": {
+                    "summary": "The budget cycle of 2027 is still open and has not locked yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.NOT_LOCKED",
+                        "message": "The budget cycle of 2027 is still open and has not locked yet.",
                         "details": { "year": 2027 },
                         "requestId": "req_example"
                       }
@@ -66011,7 +66045,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the decision deadline is before the submission deadline (BUDGET.CYCLE_DEADLINES_INVALID), or the amount is refused (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE).",
+            "description": "The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the decision deadline is before the submission deadline (BUDGET.CYCLE_DEADLINES_INVALID), the shared-pool reserve exceeds the annual ceiling (BUDGET_CYCLE.RESERVE_OVER_CEILING), or the amount is refused (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -66047,6 +66081,17 @@
                       "error": {
                         "code": "BUDGET.CYCLE_DEADLINES_INVALID",
                         "message": "The decision deadline cannot be before the submission deadline.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_CYCLE.RESERVE_OVER_CEILING": {
+                    "summary": "The shared-pool reserve cannot exceed the annual ceiling.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.RESERVE_OVER_CEILING",
+                        "message": "The shared-pool reserve cannot exceed the annual ceiling.",
                         "requestId": "req_example"
                       }
                     }
@@ -66674,7 +66719,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the deadlines are out of order (BUDGET.CYCLE_DEADLINES_INVALID), an open cycle is moved to a submission deadline before today (BUDGET_CYCLE.DEADLINE_PASSED), an open cycle is changed without the reason (BUDGET.CYCLE_REASON_REQUIRED), or the amount is refused.",
+            "description": "The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the deadlines are out of order (BUDGET.CYCLE_DEADLINES_INVALID), the shared-pool reserve exceeds the annual ceiling (BUDGET_CYCLE.RESERVE_OVER_CEILING), an open cycle is moved to a submission deadline before today (BUDGET_CYCLE.DEADLINE_PASSED), an open cycle is changed without the reason (BUDGET.CYCLE_REASON_REQUIRED), or the amount is refused.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -66710,6 +66755,17 @@
                       "error": {
                         "code": "BUDGET.CYCLE_DEADLINES_INVALID",
                         "message": "The decision deadline cannot be before the submission deadline.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_CYCLE.RESERVE_OVER_CEILING": {
+                    "summary": "The shared-pool reserve cannot exceed the annual ceiling.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.RESERVE_OVER_CEILING",
+                        "message": "The shared-pool reserve cannot exceed the annual ceiling.",
                         "requestId": "req_example"
                       }
                     }
@@ -105291,6 +105347,7 @@
           "data": {
             "type": "object",
             "properties": {
+              "offboardingCaseId": { "type": "string", "format": "uuid" },
               "lastWorkingDay": { "type": "string" },
               "state": { "type": "string", "enum": ["HANDING_OVER", "LEFT"] },
               "level": { "type": "string", "enum": ["LEAVING", "OVERDUE_HANDOVER"] },
@@ -105307,7 +105364,7 @@
                 ]
               }
             },
-            "required": ["lastWorkingDay", "state", "level", "roleFlags"],
+            "required": ["offboardingCaseId", "lastWorkingDay", "state", "level", "roleFlags"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -136536,6 +136593,7 @@
                         "TRANSFER_GRACE",
                         "LEAVE_OR_HANDOVER",
                         "NO_DEPARTMENT",
+                        "NOT_IN_CHARGE",
                         null
                       ],
                       "description": "Why it was not pushed; null when it was.",

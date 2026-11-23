@@ -33,6 +33,7 @@ import { CostCenterDirectionRootCliModule } from '../../src/cli/cost-center-dire
 import { SuperAdminEventCliModule } from '../../src/modules/personnel/super-admin-event/super-admin-event-cli.module';
 import { RecordSuperAdminEventCliModule } from '../../src/cli/record-super-admin-event/record-super-admin-event-cli.module';
 import { IdentityAccessLocalSeedFacadeModule } from '../../src/modules/identity-access/identity-access-local-seed-facade.module';
+import { BudgetsLocalSeedFacadeModule } from '../../src/modules/budgets/budgets-local-seed-facade.module';
 import { IdentityAccessInspectionFacadeModule } from '../../src/modules/identity-access/identity-access-inspection-facade.module';
 import { DATABASE_SESSION_OPTIONS } from '../../src/infrastructure/database/read-only-session.module';
 import { NotificationsModule } from '../../src/modules/notifications/notifications.module';
@@ -144,8 +145,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'IdentityAccessFacadeModule: RoleGrantService',
   // H6.1: the read-only account contract of `ops:inspect`, declared only in the inspection graph.
   'IdentityAccessInspectionFacadeModule: IdentityAccessInspectionApi',
-  // H6.2: the local demo account contract of `ops:seed`, declared only in the seed graph.
+  // H6.2: the local demo account and budget cycle contracts of `ops:seed`, declared only in the seed graph.
   'IdentityAccessLocalSeedFacadeModule: LocalDemoAccountApi',
+  'BudgetsLocalSeedFacadeModule: LocalDemoBudgetCycleApi',
   'IdentityAccessModule: Symbol(ACCESS_TOKEN_VERIFIER)', // port of src/infrastructure/security
   'InstallationModule: InstallationApi',
   // H6.2: the entry service of `pnpm ops:seed`.
@@ -595,6 +597,7 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
           InspectionCliModule,
           IdentityAccessInspectionFacadeModule,
           SeedCliModule,
+          BudgetsLocalSeedFacadeModule,
           IdentityAccessLocalSeedFacadeModule,
           MigrationPreflightCliModule,
           AiAssistPurgeCliModule,
@@ -742,9 +745,11 @@ describe('the local seed graph', () => {
       expect({
         name,
         seedContract: modules.filter((module) => module === IdentityAccessLocalSeedFacadeModule).length,
+        budgetSeedContract: modules.filter((module) => module === BudgetsLocalSeedFacadeModule).length,
       }).toEqual({
         name,
         seedContract: expected,
+        budgetSeedContract: expected,
       });
     }
   });

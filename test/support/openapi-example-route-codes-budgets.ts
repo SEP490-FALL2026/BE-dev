@@ -50,7 +50,13 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     },
     budgetCycleCreate: {
       '409': ['BUDGET.CYCLE_EXISTS'],
-      '422': ['BUDGET.CYCLE_DEADLINES_INVALID', 'BUDGET.CYCLE_YEAR_PAST', 'MONEY_OUT_OF_RANGE', 'MONEY_SCALE_EXCEEDED'],
+      '422': [
+        'BUDGET.CYCLE_DEADLINES_INVALID',
+        'BUDGET.CYCLE_YEAR_PAST',
+        'BUDGET_CYCLE.RESERVE_OVER_CEILING',
+        'MONEY_OUT_OF_RANGE',
+        'MONEY_SCALE_EXCEEDED',
+      ],
     },
     budgetReviewPeriodClose: {
       '409': ['BUDGET_REVIEW.PERIOD_EXISTS', 'BUDGET_REVIEW.SEAT_MONTHS_NOT_READY'],
@@ -129,6 +135,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
         'BUDGET.CYCLE_REASON_REQUIRED',
         'BUDGET.CYCLE_YEAR_PAST',
         'BUDGET_CYCLE.DEADLINE_PASSED',
+        'BUDGET_CYCLE.RESERVE_OVER_CEILING',
         'MONEY_OUT_OF_RANGE',
         'MONEY_SCALE_EXCEEDED',
       ],
@@ -262,6 +269,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '404': ['BUDGET.VERSION_NOT_FOUND'],
       '409': [
         'BUDGET.CYCLE_CURRENCY_MISMATCH',
+        'BUDGET_CYCLE.NOT_LOCKED',
         'BUDGET_CYCLE.NOT_OPEN',
         'BUDGET_VERSION.OVER_CEILING',
         'BUDGET.PROPOSAL_NOT_SUBMITTED',

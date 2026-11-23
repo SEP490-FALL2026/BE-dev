@@ -197,7 +197,7 @@ describe('YearStartCommitmentsBatchService (BR-MF1-09e, FR-5.8(6): one batch of 
       ]);
     });
 
-    it('T-RQ2 (K2 with no end): the kept 4.500.000 is not the commitment, twelve months of the price on 01/01 (400.000) is: 4.800.000', async () => {
+    it('T-RQ2 (K2 with no end): holds kept 4.500.000 at 375.000/month when 01/01 price is 400.000', async () => {
       const { service, held } = setup({
         candidates: [candidate({ id: 'r-k2', nextYearAmountMinor: 4_500_000n })],
         seats: [heldSeat({ requestId: 'r-k2' })],
@@ -206,7 +206,7 @@ describe('YearStartCommitmentsBatchService (BR-MF1-09e, FR-5.8(6): one batch of 
 
       await service.commitBatch(tx as never, PASS, null);
 
-      expect(held()).toEqual([expect.objectContaining({ requestId: 'r-k2', amountMinor: 4_800_000n })]);
+      expect(held()).toEqual([expect.objectContaining({ amountMinor: 4_500_000n, seatMonthlyMinor: 375_000n })]);
     });
 
     it('T-XY1: a group of three that kept 4.200.000 each holds 12.600.000; the one who left on 20/12 is not counted: 8.400.000', async () => {

@@ -301,7 +301,7 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     expect(await periods()).toBe(before + 1);
   });
 
-  it('lets another IT Admin record for the one responsible: the audit says so and the one responsible is told (QĐ-58b)', async () => {
+  it('refuses another IT Admin while the responsible one is usable, and lets them record as a substitute once locked', async () => {
     const unit = await h.unit(2);
     const other = await handOthersToSecondItAdmin(h);
     const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
@@ -310,10 +310,22 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
       subscriptionId,
     ]);
 
-    const response = await record(
+    const refused = await record(
       { subscriptionId, choice: 'REDUCE', proposedQuantity: 2, outcome: 'AS_DECIDED', nextPeriod: nextYear(2) },
       other,
     );
+    expect([refused.status, h.codeOf(refused)]).toEqual([403, 'SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE']);
+
+    let response;
+    await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [h.it1.employeeId]);
+    try {
+      response = await record(
+        { subscriptionId, choice: 'REDUCE', proposedQuantity: 2, outcome: 'AS_DECIDED', nextPeriod: nextYear(2) },
+        other,
+      );
+    } finally {
+      await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE employee_id = $1`, [h.it1.employeeId]);
+    }
 
     expect(response.status).toBe(201);
     const id = h.dataOf<{ renewal: CaseWire }>(response).renewal.id;
@@ -322,7 +334,7 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     );
     expect(proposed?.after).toMatchObject({ substitute: true, responsibleItAdminEmployeeId: h.it1.employeeId });
     const told = await h.notices('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', subscriptionId);
-    expect(told.map((notice) => notice.recipient_employee_id)).toContain(h.it1.employeeId);
+    expect(told.map((notice) => notice.recipient_employee_id)).toEqual([h.finance.employeeId]);
     expect(told[0].params).toMatchObject({ renewalId: id, choice: 'REDUCE', quantity: 2, substitute: true });
   });
 
@@ -594,5 +606,45 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     // The company still ends it: the sweep and the pool read the same set as before, and the IT Admin closes the case on its own route.
     const repo = h.ctx.app.get(SubscriptionRenewalRepo, { strict: false });
     expect((await repo.endingAmong([subscriptionId])).has(subscriptionId)).toBe(true);
+  });
+
+  it('allows only the responsible IT Admin while active (else 403 NOT_RESPONSIBLE), and permits substitute when responsible is locked with no notification to them', async () => {
+    const unit = await h.unit(2);
+    const other = await handOthersToSecondItAdmin(h);
+    const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $1 WHERE id = $2`, [
+      h.it1.employeeId,
+      subscriptionId,
+    ]);
+
+    const denied = await record(
+      { subscriptionId, choice: 'REDUCE', proposedQuantity: 2, outcome: 'AS_DECIDED', nextPeriod: nextYear(2) },
+      other,
+    );
+    expect([denied.status, h.codeOf(denied)]).toEqual([403, 'SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE']);
+
+    const absentEmp = await h.person('E-RN-ABSENT');
+    await h.account('E-RN-ABSENT', absentEmp, 'IT_ADMIN');
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $1 WHERE id = $2`, [
+      absentEmp,
+      subscriptionId,
+    ]);
+    await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [absentEmp]);
+
+    const substituted = await record({
+      subscriptionId,
+      choice: 'REDUCE',
+      proposedQuantity: 2,
+      outcome: 'AS_DECIDED',
+      nextPeriod: nextYear(2),
+    });
+    expect(substituted.status).toBe(201);
+    const id = h.dataOf<{ renewal: CaseWire }>(substituted).renewal.id;
+    const proposed = (await h.auditOf('SubscriptionRenewal', id)).find(
+      (event) => event.action === 'SUBSCRIPTION_RENEWAL.PROPOSED',
+    );
+    expect(proposed?.after).toMatchObject({ substitute: true, responsibleItAdminEmployeeId: absentEmp });
+    const told = await h.notices('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', subscriptionId);
+    expect(told.map((n) => n.recipient_employee_id)).not.toContain(absentEmp);
   });
 });

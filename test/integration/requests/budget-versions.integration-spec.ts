@@ -231,17 +231,32 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
       const { proposal } = await waiting();
       const version = await h.built(proposal.id);
       await h.updateVersion(version.id, { reserve: h.money(10_000_000) }).expect(200);
-      // The route itself: the harness would attach a file first.
+      // The route itself: lock the cycle temporarily as the harness does so file validation and submission run under W1-20.
       const send = () =>
         request(h.server()).post(`/api/v1/budget-versions/${version.id}/submission`).set(h.as(h.finance));
 
-      const refused = await send().expect(422);
+      const beforeCycle = await h.ctx.sql.query<{ submission_deadline: Date }>(
+        `SELECT submission_deadline FROM budget_cycles WHERE year = $1`,
+        [h.next],
+      );
+      await h.ctx.sql.query(
+        `UPDATE budget_cycles SET submission_deadline = (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date - 1 WHERE year = $1`,
+        [h.next],
+      );
+      try {
+        const refused = await send().expect(422);
 
-      expect(h.codeOf(refused)).toBe('BUDGET_VERSION.ATTACHMENT_REQUIRED');
-      expect(await stateOf(version.id)).toBe('DRAFT');
-      expect(await proposalState(proposal.id)).toBe('SUBMITTED');
-      await attachedVersionFile(h.ctx.sql, version.id, h.finance.employeeId);
-      await send().expect(200);
+        expect(h.codeOf(refused)).toBe('BUDGET_VERSION.ATTACHMENT_REQUIRED');
+        expect(await stateOf(version.id)).toBe('DRAFT');
+        expect(await proposalState(proposal.id)).toBe('SUBMITTED');
+        await attachedVersionFile(h.ctx.sql, version.id, h.finance.employeeId);
+        await send().expect(200);
+      } finally {
+        await h.ctx.sql.query(`UPDATE budget_cycles SET submission_deadline = $2 WHERE year = $1`, [
+          h.next,
+          beforeCycle.rows[0].submission_deadline,
+        ]);
+      }
     });
 
     it('saves a draft over the ceiling and refuses to send it: 2,000 million less a reserve of 200, a total of 1,850 is 50 million over (409)', async () => {

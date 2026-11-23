@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingGhostSeatApi } from '../../licensing/public/licensing-ghost-seat.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelApi } from '../../personnel/public/personnel.api';
@@ -25,6 +26,7 @@ export class EscalationFactsService {
     private readonly licensing: LicensingGhostSeatApi,
     private readonly personnel: PersonnelApi,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** The seats that hold a seat today, the holders in a transfer in force and the departments the holders are in, of the recommendations named. */
@@ -71,8 +73,25 @@ export class EscalationFactsService {
     };
   }
 
-  /** Whether this person is the IT Admin in charge of the department: the audit says it, nothing else depends on it. */
+  /** Whether this person is the IT Admin in charge of the department: the audit says it. */
   async isInCharge(tx: DbTx, departmentId: string, employeeId: string): Promise<boolean> {
     return (await this.organizationReads.getItAdminInChargeOfDepartment(departmentId, tx)) === employeeId;
+  }
+
+  /**
+   * Whether the caller is allowed to push a watch recommendation for the department: allowed when the caller is the IT Admin in charge,
+   * when no IT Admin is assigned, or when the assigned IT Admin is no longer usable.
+   */
+  async departmentAccessOf(
+    tx: DbTx,
+    departmentId: string,
+    actorEmployeeId: string,
+  ): Promise<{ allowed: boolean; byInCharge: boolean }> {
+    const responsible = await this.organizationReads.getItAdminInChargeOfDepartment(departmentId, tx);
+    if (responsible === null) return { allowed: true, byInCharge: false };
+    if (responsible === actorEmployeeId) return { allowed: true, byInCharge: true };
+    const usable = await this.identity.findUsableItAdminEmployeeIds([responsible], tx);
+
+    return { allowed: !usable.has(responsible), byInCharge: false };
   }
 }

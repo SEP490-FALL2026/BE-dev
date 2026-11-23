@@ -53,19 +53,19 @@ export class GroupNeedPreconditions {
     const lines = await this.lines.lock(tx, request.id);
     const step = needStepOf(request.needSteps, lines, actor.employeeId);
     const own = lines.filter((line) => line.needStepId === step.id);
+    const open = own.filter((line) => line.state === 'AWAITING_NEED');
     const approves = input.lines.some((verdict) => verdict.decision === 'APPROVE');
 
     const refusal = checkLineNeedDecider({
       actorEmployeeId: actor.employeeId,
       requesterEmployeeId: request.requesterEmployeeId,
-      stepEmployeeIds: own.map((line) => line.employeeId),
+      stepEmployeeIds: open.map((line) => line.employeeId),
       assigneeEmployeeId: step.assigneeEmployeeId,
       stepState: step.state,
       approves,
     });
     if (refusal) throw new AccessRequestDecisionRefusedError(refusal);
 
-    const open = own.filter((line) => line.state === 'AWAITING_NEED');
     const mismatch = compareLines(
       open.map((line) => line.employeeId),
       input.lines.map((verdict) => verdict.employeeId),

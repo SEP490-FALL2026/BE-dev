@@ -278,8 +278,17 @@ describe('who the need step is given to by the routing table (needStepTarget)', 
     });
   });
 
-  it('leaves a paid request of the person who became the head waiting, as before: it has a spend step, and what it becomes is for the Owner to choose (B2A-Q2)', () => {
-    expect(needStepTarget(requesterIsHead, { chainHasSpendStep: true, successorRecorded: false })).toEqual(nobody);
+  it('converts an individual paid request of a requester who became the head to ONE_STEP REQUESTER_IS_HEAD, while leaving a group request waiting', () => {
+    expect(
+      needStepTarget(requesterIsHead, { chainHasSpendStep: true, successorRecorded: false, isGroupRequest: false }),
+    ).toEqual({
+      assigneeEmployeeId: null,
+      notRequired: 'REQUESTER_IS_HEAD',
+      routingRow: 2,
+    });
+    expect(
+      needStepTarget(requesterIsHead, { chainHasSpendStep: true, successorRecorded: false, isGroupRequest: true }),
+    ).toEqual(nobody);
   });
 });
 

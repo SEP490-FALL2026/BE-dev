@@ -80,11 +80,12 @@ export class BudgetCyclesController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the decision deadline is before the submission deadline (BUDGET.CYCLE_DEADLINES_INVALID), or the amount is refused (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE).',
+        'The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the decision deadline is before the submission deadline (BUDGET.CYCLE_DEADLINES_INVALID), the shared-pool reserve exceeds the annual ceiling (BUDGET_CYCLE.RESERVE_OVER_CEILING), or the amount is refused (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE).',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.CYCLE_YEAR_PAST,
         EXAMPLES.CYCLE_DEADLINES_INVALID,
+        EXAMPLES.CYCLE_RESERVE_OVER_CEILING,
         EXAMPLES.MONEY_SCALE_EXCEEDED,
         EXAMPLES.MONEY_OUT_OF_RANGE,
       ],
@@ -164,11 +165,12 @@ export class BudgetCyclesController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the deadlines are out of order (BUDGET.CYCLE_DEADLINES_INVALID), an open cycle is moved to a submission deadline before today (BUDGET_CYCLE.DEADLINE_PASSED), an open cycle is changed without the reason (BUDGET.CYCLE_REASON_REQUIRED), or the amount is refused.',
+        'The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the deadlines are out of order (BUDGET.CYCLE_DEADLINES_INVALID), the shared-pool reserve exceeds the annual ceiling (BUDGET_CYCLE.RESERVE_OVER_CEILING), an open cycle is moved to a submission deadline before today (BUDGET_CYCLE.DEADLINE_PASSED), an open cycle is changed without the reason (BUDGET.CYCLE_REASON_REQUIRED), or the amount is refused.',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.CYCLE_YEAR_PAST,
         EXAMPLES.CYCLE_DEADLINES_INVALID,
+        EXAMPLES.CYCLE_RESERVE_OVER_CEILING,
         EXAMPLES.CYCLE_DEADLINE_PASSED,
         EXAMPLES.CYCLE_REASON_REQUIRED,
         EXAMPLES.MONEY_SCALE_EXCEEDED,

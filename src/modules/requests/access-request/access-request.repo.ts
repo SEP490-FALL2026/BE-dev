@@ -33,6 +33,23 @@ function routingColumns(step: NewNeedStep, policy: RequestPolicy) {
   };
 }
 
+export async function markRequestOneStep(
+  tx: DbTx,
+  requestId: string,
+  oneStepReason: 'REQUESTER_IS_HEAD' | 'NO_DEPARTMENT_HEAD' | 'HEAD_LEFT',
+): Promise<void> {
+  const { policy } = await tx.accessRequest.findUniqueOrThrow({ where: { id: requestId }, select: { policy: true } });
+  const current = requestPolicyJson.decode(policy);
+  await tx.accessRequest.update({
+    where: { id: requestId },
+    data: {
+      routingMode: 'ONE_STEP',
+      oneStepReason,
+      policy: requestPolicyJson.encode({ ...current, chain: current.chain.filter((kind) => kind !== 'NEED') }),
+    },
+  });
+}
+
 const NEED_SEQUENCE = 1;
 
 /** The one writer of `access_requests`, `access_request_beneficiaries` and `access_request_steps`, and the read of a request. */
@@ -113,6 +130,15 @@ export class AccessRequestRepo {
 
   async setOneStepBlockedReason(tx: DbTx, id: string, reason: 'PRICE_MISSING' | null): Promise<void> {
     await tx.accessRequest.update({ where: { id }, data: { oneStepBlockedReason: reason } });
+  }
+
+  /** Marks an open request as one-step for the given reason and drops `NEED` from its policy chain. */
+  markOneStep(
+    tx: DbTx,
+    id: string,
+    oneStepReason: 'REQUESTER_IS_HEAD' | 'NO_DEPARTMENT_HEAD' | 'HEAD_LEFT',
+  ): Promise<void> {
+    return markRequestOneStep(tx, id, oneStepReason);
   }
 
   async addAssessmentStep(

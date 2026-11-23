@@ -3,6 +3,7 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { requestPolicyJson } from '../access-request/access-request.json';
+import { markRequestOneStep } from '../access-request/access-request.repo';
 import type { NeedNotRequiredReason, ReassignableStepKind } from './reassignment.policy';
 
 /** An open step as the reassignment reads it, with what the table of its kind needs to run again. */
@@ -24,6 +25,7 @@ export interface ReassignableRequest {
   id: string;
   organizationId: string;
   type: 'GRANT' | 'SERVICE_ACCOUNT' | 'RENEWAL' | 'GROUP_GRANT';
+  routingMode: 'VIA_HEAD' | 'ONE_STEP';
   /** Only the need step of a request for internal software with no fee follows where its requester is now (`FR-3.16`). */
   branch: 'INTERNAL_FREE' | 'PAID_IN_CATALOG' | 'NEW_SOFTWARE';
   state: string;
@@ -44,13 +46,14 @@ const SELECT_REQUEST = {
   id: true,
   organizationId: true,
   type: true,
+  routingMode: true,
   branch: true,
   state: true,
   requesterEmployeeId: true,
   departmentId: true,
   policy: true,
   beneficiaries: { select: { employeeId: true }, orderBy: { position: 'asc' } },
-  lines: { select: { employeeId: true, needStepId: true } },
+  lines: { where: { state: 'AWAITING_NEED' }, select: { employeeId: true, needStepId: true } },
   steps: {
     select: {
       id: true,
@@ -76,6 +79,7 @@ function toRequest(row: RequestRow): ReassignableRequest {
     id: row.id,
     organizationId: row.organizationId,
     type: row.type,
+    routingMode: row.routingMode,
     branch: row.branch,
     state: row.state,
     requesterEmployeeId: row.requesterEmployeeId,
@@ -185,6 +189,37 @@ export class StepReassignmentRepo {
     return rows.map((row) => row.request_id);
   }
 
+  /** Non-group requests awaiting spend submission in the department that have not converted to one-step yet. */
+  async spendQueueRequestIdsOfDepartment(departmentId: string, client: DbTx = this.prisma): Promise<string[]> {
+    const rows = await client.accessRequest.findMany({
+      where: {
+        departmentId,
+        state: 'AWAITING_SPEND_SUBMISSION',
+        type: { not: 'GROUP_GRANT' },
+        routingMode: { not: 'ONE_STEP' },
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => row.id);
+  }
+
+  /** All non-group requests awaiting spend submission that still hold VIA_HEAD routing, checked by the daily sweep. */
+  async spendQueueRequestIds(): Promise<string[]> {
+    const rows = await this.prisma.accessRequest.findMany({
+      where: {
+        state: 'AWAITING_SPEND_SUBMISSION',
+        type: { not: 'GROUP_GRANT' },
+        routingMode: { not: 'ONE_STEP' },
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => row.id);
+  }
+
   /** The people who hold an open step: the ones to ask whether they still work. */
   async holderIds(client: DbTx | PrismaService = this.prisma): Promise<string[]> {
     const rows = await client.$queryRaw<{ assignee_employee_id: string }[]>`
@@ -217,7 +252,13 @@ export class StepReassignmentRepo {
     if (ids.length === 0) return [];
     await tx.$queryRaw`SELECT id FROM access_requests WHERE id = ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE`;
     const rows = await tx.accessRequest.findMany({
-      where: { id: { in: ids }, steps: { some: { state: { in: [...OPEN] } } } },
+      where: {
+        id: { in: ids },
+        OR: [
+          { steps: { some: { state: { in: [...OPEN] } } } },
+          { state: 'AWAITING_SPEND_SUBMISSION', type: { not: 'GROUP_GRANT' }, routingMode: { not: 'ONE_STEP' } },
+        ],
+      },
       orderBy: { id: 'asc' },
       select: SELECT_REQUEST,
     });
@@ -279,16 +320,12 @@ export class StepReassignmentRepo {
       where: { id: stepId },
       data: { state: 'NOT_REQUIRED', assigneeEmployeeId: null, assignedAt: null, waitingReason: null, routingRow },
     });
-    const { policy } = await tx.accessRequest.findUniqueOrThrow({ where: { id: requestId }, select: { policy: true } });
-    const current = requestPolicyJson.decode(policy);
-    await tx.accessRequest.update({
-      where: { id: requestId },
-      data: {
-        routingMode: 'ONE_STEP',
-        oneStepReason,
-        policy: requestPolicyJson.encode({ ...current, chain: current.chain.filter((kind) => kind !== 'NEED') }),
-      },
-    });
+    await markRequestOneStep(tx, requestId, oneStepReason);
+  }
+
+  /** Marks a request whose need step has already closed as one-step without modifying closed steps. */
+  markOneStep(tx: DbTx, requestId: string, oneStepReason: NeedNotRequiredReason): Promise<void> {
+    return markRequestOneStep(tx, requestId, oneStepReason);
   }
 
   /** When the step began its present stretch of waiting, as the database set it when the step went to WAITING. */

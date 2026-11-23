@@ -36,6 +36,7 @@ const COMMAND_ONLY_FILES = [
   'modules/identity-access/identity-access-inspection-facade.module.ts',
   'modules/installation/inspect/inspection-cli.module.ts',
   'modules/identity-access/identity-access-local-seed-facade.module.ts',
+  'modules/budgets/budgets-local-seed-facade.module.ts',
   'modules/installation/seed/seed-cli.module.ts',
   'modules/installation/migration-preflight/migration-preflight-cli.module.ts',
   'cli/ai-purge/ai-purge-cli.module.ts',

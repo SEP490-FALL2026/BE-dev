@@ -287,14 +287,6 @@
       "count": 1
     }
   },
-  "src/modules/requests/reassignment/step-reassignment.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/modules/requests/request-view/access-request-query.service.ts": {
     "complexity": {
       "count": 1

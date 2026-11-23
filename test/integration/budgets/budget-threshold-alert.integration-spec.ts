@@ -30,12 +30,12 @@ describe('the use of a budget tells 80 and 100 percent of its base once each tim
     await h.stop();
   });
 
-  const department = async (total: number | null): Promise<Unit> => {
+  const department = async (total: number | null, reserve = 0): Promise<Unit> => {
     counter += 1;
     const unit = await h.departmentWithHead(`P-RV2-${counter}`);
     // The ceiling of the year is out of the way of every budget but the one the adjustment needs room under.
     await h.ctx.sql.query(`UPDATE budget_cycles SET annual_ceiling_minor = 1000000000000 WHERE year = $1`, [h.year]);
-    if (total !== null) await h.budgetFor(unit, { total: total * M });
+    if (total !== null) await h.budgetFor(unit, { total: total * M, reserve: reserve * M });
 
     return unit;
   };
@@ -232,4 +232,70 @@ describe('the use of a budget tells 80 and 100 percent of its base once each tim
       .run((tx) => repo.numbered(tx, [{ baseMinor, costCenterId, threshold, year }]));
     expect(next).toEqual([{ ...alert, episode: 2 }]);
   }, 120000);
+
+  describe('base drops triggered by approved adjustments', () => {
+    const approveAdjustment = async (body: object) => {
+      await h.withLockedCycle(async () => {
+        const asked = h.dataOf<{ id: string }>(
+          await request(h.server()).post('/api/v1/budget-adjustments').set(h.as(h.finance)).send(body).expect(201),
+        );
+        await request(h.server())
+          .post(`/api/v1/budget-adjustments/${asked.id}/decision`)
+          .set(h.as(h.deciderOf()))
+          .send({ decision: 'APPROVE' })
+          .expect(200);
+      });
+    };
+
+    it('emits 80% threshold alert when an approved TRANSFER lowers the source base from 75% to 85% used', async () => {
+      const source = await department(100, 20);
+      const receiver = await department(50);
+      await spend(source, 75);
+      expect(await alerts(source)).toEqual([]);
+
+      await approveAdjustment({
+        year: h.year,
+        kind: 'TRANSFER',
+        fromCostCenterId: source.department.unitId,
+        toCostCenterId: receiver.department.unitId,
+        amount: h.money(12 * M),
+        reason: 'Reallocate unused capacity',
+      });
+
+      expect(await alerts(source)).toEqual([[80, BigInt(88 * M)]]);
+      expect(await told(source, 80)).toEqual(headAndFinance(source));
+      expect(await told(source, 100)).toEqual([]);
+      expect(await alerts(receiver)).toEqual([]);
+    }, 120000);
+
+    it('emits both 80% and 100% alerts when an approved RETURN lowers the source base from 75% to 100% used, and ignores CEILING_REDUCTION', async () => {
+      const source = await department(100, 30);
+      await spend(source, 75);
+      expect(await alerts(source)).toEqual([]);
+
+      await approveAdjustment({
+        year: h.year,
+        kind: 'RETURN',
+        fromCostCenterId: source.department.unitId,
+        amount: h.money(25 * M),
+        reason: 'Return unspent allocation',
+      });
+
+      expect(await alerts(source)).toEqual([
+        [80, BigInt(75 * M)],
+        [100, BigInt(75 * M)],
+      ]);
+      expect(await told(source, 80)).toEqual(headAndFinance(source));
+      expect(await told(source, 100)).toEqual(headAndFinance(source));
+
+      await ceilingLeaving(10);
+      await approveAdjustment({
+        year: h.year,
+        kind: 'CEILING_REDUCTION',
+        amount: h.money(5 * M),
+        reason: 'Lower annual ceiling',
+      });
+      expect(await alerts(source)).toHaveLength(2);
+    }, 120000);
+  });
 });

@@ -5,7 +5,7 @@ import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/t
 import { BudgetYearEndService } from '../../src/modules/budgets/year-end/year-end.service';
 import { OrganizationHistoryApi } from '../../src/modules/organization/public/organization-history.api';
 import type { ApiAccount } from './api-accounts';
-import { afterPreparing, attachedVersionFile, withProposalFile } from './budget-files';
+import { afterPreparing, attachedVersionFile, sendingCycleLock, withProposalFile } from './budget-files';
 import { Department, Person, RequestHarness } from './request-harness';
 
 export interface ProposalWire {
@@ -191,10 +191,19 @@ export class BudgetHarness extends RequestHarness {
       .put(`/api/v1/budget-versions/${id}`)
       .set(this.as(account))
       .send('base' in body && !('baseReason' in body) ? { baseReason: 'Finance moved the base', ...body } : body);
-  /** Sends a version; one that can take a file and has none gets one first (a version is sent with one at least, `QĐ-111ac`). */
+  /**
+   * Sends a version; one that can take a file and has none gets one first (a version is sent with one at least, `QĐ-111ac`),
+   * and an open cycle is temporarily locked for the duration of the send so later tests on the same year stay open.
+   */
   sendVersion = (id: string, account: ApiAccount = this.finance) =>
-    afterPreparing(request(this.server()).post(`/api/v1/budget-versions/${id}/submission`).set(this.as(account)), () =>
-      attachedVersionFile(this.ctx.sql, id, this.finance.employeeId),
+    sendingCycleLock.wrap(
+      this.ctx.sql,
+      id,
+      this.today(),
+      afterPreparing(
+        request(this.server()).post(`/api/v1/budget-versions/${id}/submission`).set(this.as(account)),
+        () => attachedVersionFile(this.ctx.sql, id, this.finance.employeeId),
+      ),
     );
   versionHistory = (id: string, account: ApiAccount = this.finance, query: Record<string, string | number> = {}) =>
     request(this.server()).get(`/api/v1/budget-versions/${id}/history`).query(query).set(this.as(account));
