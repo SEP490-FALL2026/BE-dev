@@ -260,11 +260,16 @@ export class SaasIssuesController {
   @ApiOperation({ operationId: 'saasIssueTransition', summary: 'Move a report to its next state' })
   @ApiSuccessResponse(SaasIssueResponseDto, {
     message: 'SAAS_ISSUE.TRANSITIONED',
-    description: `An IT Admin takes the report up, waits for the reporter (a question is required) or for the vendor (the ticket code typed by hand is kept as written and nothing is sent), or resolves it (the result is required and the last day to reopen is fixed). Any IT Admin may do it; when it is not the one the report was given to, the record names both. Pointers to a grant task, a discrepancy, a return or a request are only kept: none is opened.${WEB_ONLY}`,
+    description: `Only an acting IT Admin of the reporter’s work department (appointed substitute if usable, otherwise the one in charge when usable) takes the report up, waits for the reporter (a question is required) or for the vendor (the ticket code typed by hand is kept as written and nothing is sent), or resolves it (the result is required and the last day to reopen is fixed). When an appointed substitute or a different acting IT Admin acts, the record names both. Pointers to a grant task, a discrepancy, a return or a request are only kept: none is opened.${WEB_ONLY}`,
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin handles a report.', examples: [FORBIDDEN_EXAMPLE] },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an IT Admin handles a report (AUTHORIZATION.FORBIDDEN), and only the acting IT Admin of the reporter’s work department may handle an assigned report (SAAS_ISSUE.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
+    },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
@@ -308,11 +313,16 @@ export class SaasIssuesController {
   @ApiOperation({ operationId: 'saasIssueMarkDuplicate', summary: 'Mark a report as a duplicate of another' })
   @ApiSuccessResponse(SaasIssueResponseDto, {
     message: 'SAAS_ISSUE.DUPLICATED',
-    description: `An IT Admin marks a report that is still open as a duplicate of another report, with the reason. The reporter sees the state, the link and the reason. A duplicate is final.${WEB_ONLY}`,
+    description: `Only an acting IT Admin of the reporter’s work department marks a report that is still open as a duplicate of another report, with the reason. The reporter sees the state, the link and the reason. A duplicate is final.${WEB_ONLY}`,
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    { status: HttpStatus.FORBIDDEN, description: 'Only an IT Admin marks a duplicate.', examples: [FORBIDDEN_EXAMPLE] },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an IT Admin marks a duplicate (AUTHORIZATION.FORBIDDEN), and only the acting IT Admin of the reporter’s work department may mark an assigned report as a duplicate (SAAS_ISSUE.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
+    },
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,

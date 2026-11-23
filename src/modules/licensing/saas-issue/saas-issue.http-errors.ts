@@ -44,6 +44,10 @@ const ANSWERS: Readonly<Record<SaasIssueProblem, { status: HttpStatus; message: 
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     message: 'The grant task named does not exist.',
   },
+  NOT_IN_CHARGE: {
+    status: HttpStatus.FORBIDDEN,
+    message: 'Only the acting IT Admin of the reporter’s department may handle this report.',
+  },
 };
 
 /** Maps the refusals of the routes of SaaS issues to their codes (`SAAS_ISSUE.*`); the rest goes to the licensing mapper. */
@@ -80,4 +84,5 @@ export const SAAS_ISSUE_ERROR_EXAMPLES = {
   OCCURRED_IN_FUTURE: example(new SaasIssueError('OCCURRED_IN_FUTURE')),
   SCOPE_FORBIDDEN: example(new SaasIssueError('SCOPE_FORBIDDEN')),
   LINKED_WORK_INVALID: example(new SaasIssueError('LINKED_WORK_INVALID', 'GRANT_TASK_NOT_FOUND')),
+  NOT_IN_CHARGE: example(new SaasIssueError('NOT_IN_CHARGE')),
 } as const;
