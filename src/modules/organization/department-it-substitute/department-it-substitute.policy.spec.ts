@@ -1,4 +1,11 @@
-import { actingItAdmins, itAdminLoadOf, judgeAppoint } from './department-it-substitute.policy';
+import { DepartmentItSubstituteForbiddenError } from './department-it-substitute.errors';
+import {
+  actingItAdmins,
+  assertMayManageItSubstitutes,
+  itAdminLoadOf,
+  itSubstituteListScope,
+  judgeAppoint,
+} from './department-it-substitute.policy';
 
 describe('department-it-substitute.policy', () => {
   describe('actingItAdmins', () => {
@@ -130,5 +137,20 @@ describe('department-it-substitute.policy', () => {
         });
       },
     );
+  });
+
+  describe('authorization policies', () => {
+    it('allows only SUPER_ADMIN to manage substitutes', () => {
+      expect(() => assertMayManageItSubstitutes(['SUPER_ADMIN'])).not.toThrow();
+      expect(() => assertMayManageItSubstitutes(['IT_ADMIN'])).toThrow(DepartmentItSubstituteForbiddenError);
+      expect(() => assertMayManageItSubstitutes([])).toThrow(DepartmentItSubstituteForbiddenError);
+    });
+
+    it('gives SUPER_ADMIN ALL and IT_ADMIN IT_ADMIN_SCOPE for listing substitutes, and refuses others', () => {
+      expect(itSubstituteListScope(['SUPER_ADMIN'])).toBe('ALL');
+      expect(itSubstituteListScope(['IT_ADMIN'])).toBe('IT_ADMIN_SCOPE');
+      expect(itSubstituteListScope(['SUPER_ADMIN', 'IT_ADMIN'])).toBe('ALL');
+      expect(() => itSubstituteListScope(['MANAGER'])).toThrow(DepartmentItSubstituteForbiddenError);
+    });
   });
 });

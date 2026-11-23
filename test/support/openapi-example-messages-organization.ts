@@ -5,6 +5,9 @@ export const SUCCESS_MESSAGES_ORGANIZATION: Readonly<Record<string, string>> = {
   departmentCreate: 'DEPARTMENT.CREATED',
   departmentDeactivate: 'DEPARTMENT.DEACTIVATED',
   departmentGet: 'DEPARTMENT.FETCHED',
+  departmentItSubstituteAppoint: 'DEPARTMENT_IT_SUBSTITUTE.APPOINTED',
+  departmentItSubstituteEnd: 'DEPARTMENT_IT_SUBSTITUTE.ENDED',
+  departmentItSubstituteList: 'DEPARTMENT_IT_SUBSTITUTE.LISTED',
   employeeFirstPlacementCorrect: 'EMPLOYEE.FIRST_PLACEMENT_CORRECTED',
   departmentUpdate: 'DEPARTMENT.UPDATED',
 };

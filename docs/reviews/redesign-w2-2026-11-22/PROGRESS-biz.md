@@ -20,7 +20,7 @@ mỗi gói**.
 | Gói   | Mục                                   | Trạng thái | sha | Lệnh kiểm + kết quả | FIX-TEST thêm | D-n | Ghi chú / chưa kiểm được |
 | ----- | ------------------------------------- | ---------- | --- | ------------------- | ------------- | --- | ------------------------ |
 | B0    | policy thuần (pha A)                  | xong       | 0586ed00       | `tsc --noEmit` (0), `eslint` 10 file (0), `depcruise` (0), `arch:capabilities` (0), `rules:check` (0), `test:gates` (17/17, 335 pass), `openapi:export` (0 diff), unit B0 (5/5, 143 pass) | —             | D-1 | Chưa đẩy remote (`origin/int/redesign-w2` chưa tồn tại); chạy bằng binary cục bộ do sandbox chặn đọc config `pnpm` ngoài workspace |
-| H-1   | `retireDevice` ghi `retirementKind = 'DISPOSED'` | xong | cùng commit H-1 | `eslint` 2 file (0), `tsc --noEmit` (0), `depcruise` (0), `arch:capabilities` devices (0), `rules:check` (0), `test:gates` (17/17, 335 pass), `openapi:export` (0 diff), `registry.repo.spec.ts` (1/1) | — | — | Sửa theo H-1 review T1 (tránh 500 CHECK `managed_devices_retired_complete`) |
+| H-1   | `retireDevice` ghi `retirementKind = 'DISPOSED'` | xong | 4adeab1c | `eslint` 2 file (0), `tsc --noEmit` (0), `depcruise` (0), `arch:capabilities` devices (0), `rules:check` (0), `test:gates` (17/17, 335 pass), `openapi:export` (0 diff), `registry.repo.spec.ts` (1/1) | — | — | Sửa theo H-1 review T1 (tránh 500 CHECK `managed_devices_retired_complete`) |
 | B1    | W2-03, W2-05 + đăng ký provider T2/T5 | chưa       |     |                     |               |     |                          |
 | B2a-1 | W2-06, W2-08                          | chưa       |     |                     |               |     |                          |
 | B2a-2 | W2-09                                 | chưa       |     |                     |               |     |                          |
@@ -29,7 +29,7 @@ mỗi gói**.
 | B3a-2 | W2-19 devices, W2-03 (b)              | chưa       |     |                     |               |     |                          |
 | B3b   | W2-20, W2-22                          | chưa       |     |                     |               |     |                          |
 | B4    | W2-10, W2-11, W2-12                   | chưa       |     |                     |               |     |                          |
-| B10a  | W2-27 (a), H1                         | chưa       |     |                     |               |     |                          |
+| B10a  | W2-27 (a), H1                         | xong       | cùng commit B10a | `eslint` 40 file (0), `tsc --noEmit` (0), `depcruise` (0, 2732 modules), `arch:capabilities` org (0), `rules:check` (0), `test:gates` (17/17, 335 pass), `openapi:export` (ok), unit `organization` (41/41, 374 pass); cập nhật unit `department.policy.spec.ts` / `organization-read.api.spec.ts` theo SPEC W2-27 (a), H1 | 1 dòng (`department-contract-http`) | — | I mới `department-it-substitute.integration-spec.ts` chỉ chạy trên CI |
 | B5a   | W2-14 sinh/đổi hạn/hủy, E4            | chưa       |     |                     |               |     |                          |
 | B5b   | W2-14 danh sách/hoàn tất, W2-15       | chưa       |     |                     |               |     |                          |
 | B5c   | W2-14 quá hạn/chờ, W2-26 (mã)         | chưa       |     |                     |               |     |                          |

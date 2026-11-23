@@ -6,6 +6,7 @@ import {
   assertMayChangeOrganization,
   departmentListScope,
   departmentReadVerdict,
+  itAdminActingScope,
   itAdminScope,
   memberReadVerdict,
   successorProblem,
@@ -124,6 +125,99 @@ describe('department.policy (who may do what with departments, F13, QĐ-87a, QĐ
       ]);
 
       expect([...scope]).toEqual(['was-mine']);
+    });
+
+    it('includes departments where caller is the active usable substitute, including starting departments', () => {
+      const scope = itAdminScope('minh', [
+        department({
+          id: 'des-sub',
+          itAdminEmployeeId: 'ha',
+          itAdminUsable: true,
+          substituteEmployeeId: 'minh',
+          substituteUsable: true,
+        }),
+        department({
+          id: 'starting-sub',
+          starting: true,
+          itAdminEmployeeId: 'ha',
+          itAdminUsable: false,
+          substituteEmployeeId: 'minh',
+          substituteUsable: true,
+        }),
+        department({
+          id: 'starting-no-sub',
+          starting: true,
+          itAdminEmployeeId: 'ha',
+          itAdminUsable: false,
+        }),
+        department({
+          id: 'unusable-sub',
+          itAdminEmployeeId: 'ha',
+          itAdminUsable: true,
+          substituteEmployeeId: 'minh',
+          substituteUsable: false,
+        }),
+      ]);
+
+      expect([...scope].sort()).toEqual(['des-sub', 'starting-sub']);
+    });
+  });
+
+  describe('itAdminActingScope (S2-2: acting scope has no common queue)', () => {
+    const department = (over: Partial<ItAdminScopeFacts> & { id: string }): ItAdminScopeFacts => ({
+      active: true,
+      itAdminEmployeeId: null,
+      itAdminUsable: false,
+      substituteEmployeeId: null,
+      substituteUsable: false,
+      starting: false,
+      ...over,
+    });
+
+    it('excludes DES with locked IT Admin Ha when Minh is not appointed, and includes DES once Minh is appointed (W2-27 (a))', () => {
+      const withoutAppointment = itAdminActingScope('minh', [
+        department({ id: 'des', itAdminEmployeeId: 'ha', itAdminUsable: false }),
+        department({ id: 'nobody' }),
+        department({ id: 'starting-nobody', starting: true }),
+      ]);
+      expect([...withoutAppointment]).toEqual([]);
+
+      const withAppointment = itAdminActingScope('minh', [
+        department({
+          id: 'des',
+          itAdminEmployeeId: 'ha',
+          itAdminUsable: false,
+          substituteEmployeeId: 'minh',
+          substituteUsable: true,
+        }),
+        department({ id: 'starting-nobody', starting: true }),
+      ]);
+      expect([...withAppointment]).toEqual(['des']);
+    });
+
+    it('includes active departments where caller is usable in-charge or usable substitute, and excludes retired or unusable ones', () => {
+      const scope = itAdminActingScope('me', [
+        department({ id: 'in-charge', itAdminEmployeeId: 'me', itAdminUsable: true }),
+        department({
+          id: 'sub',
+          itAdminEmployeeId: 'other',
+          itAdminUsable: true,
+          substituteEmployeeId: 'me',
+          substituteUsable: true,
+        }),
+        department({ id: 'unusable-in-charge', itAdminEmployeeId: 'me', itAdminUsable: false }),
+        department({
+          id: 'unusable-sub',
+          itAdminEmployeeId: 'other',
+          itAdminUsable: true,
+          substituteEmployeeId: 'me',
+          substituteUsable: false,
+        }),
+        department({ id: 'retired-mine', active: false, itAdminEmployeeId: 'me', itAdminUsable: true }),
+        department({ id: 'starting-mine', starting: true, itAdminEmployeeId: 'me', itAdminUsable: true }),
+      ]);
+
+      expect([...scope].sort()).toEqual(['in-charge', 'starting-mine', 'sub']);
     });
   });
 

@@ -3,6 +3,8 @@ import { normalizeDisplayName } from '../../../core/display-name';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import type { AuditValue } from '../../audit/public/audit.types';
+import type { ItAdminLoad } from '../department-it-substitute/department-it-substitute.policy';
 import { organizationAuditEvent } from '../organization-audit-event.mapper';
 import { OrganizationContextService } from '../organization-context.service';
 import { DepartmentUseService } from '../department/department-use.service';
@@ -118,7 +120,7 @@ export class DepartmentService {
     actor: AuthenticatedPrincipal,
     id: string,
     input: { name?: string; functionDescription?: string | null; itAdminEmployeeId?: string | null },
-  ): Promise<void> {
+  ): Promise<ItAdminLoad | null> {
     assertMayChangeOrganization(actor.roles);
     if (input.name === undefined && input.functionDescription === undefined && input.itAdminEmployeeId === undefined) {
       throw new DepartmentUpdateEmptyError();
@@ -128,14 +130,14 @@ export class DepartmentService {
       input.functionDescription === undefined ? undefined : normalizeFunction(input.functionDescription);
     const organization = await requireOrganization(this.context);
 
-    await this.runner.run(async (tx) => {
+    return this.runner.run(async (tx) => {
       const current = await this.repo.lock(tx, id, 'UPDATE');
       if (!current) throw new DepartmentNotFoundError();
       if (current.status !== 'ACTIVE') throw new DepartmentInactiveError();
 
       const changes: { name?: string; functionDescription?: string | null; itAdminEmployeeId?: string | null } = {};
       const before: Record<string, string | null> = {};
-      const after: Record<string, string | null> = {};
+      const after: Record<string, AuditValue> = {};
       if (name !== undefined && name !== current.name) {
         changes.name = name;
         before.name = current.name;
@@ -152,13 +154,25 @@ export class DepartmentService {
         before.itAdminEmployeeId = current.itAdmin?.employeeId ?? null;
         after.itAdminEmployeeId = input.itAdminEmployeeId;
       }
-      if (Object.keys(changes).length === 0) return;
+      if (Object.keys(changes).length === 0) return null;
 
-      await this.repo.update(tx, id, changes, new Date());
+      const now = new Date();
+      await this.repo.update(tx, id, changes, now);
+      const itAdminLoad = await this.itAdmins.onInChargeNamed(
+        tx,
+        actor,
+        organization.id,
+        id,
+        changes.itAdminEmployeeId,
+        after,
+        now,
+      );
       await this.audit.record(
         tx,
         organizationAuditEvent(actor, organization.id, 'DEPARTMENT.UPDATED', 'Department', id, before, after),
       );
+
+      return itAdminLoad;
     });
   }
 
@@ -194,7 +208,9 @@ export class DepartmentService {
         });
       }
 
-      await this.repo.deactivate(tx, id, new Date());
+      const now = new Date();
+      await this.repo.deactivate(tx, id, now);
+      await this.itAdmins.closeActiveSubstitute(tx, actor, organization.id, id, 'DEPARTMENT_RETIRED', now);
       await this.audit.record(
         tx,
         organizationAuditEvent(

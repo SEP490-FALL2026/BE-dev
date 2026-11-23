@@ -5,10 +5,13 @@ import { CostCenterCatalogueService } from '../../../src/modules/organization/co
 import { CostCenterRepo } from '../../../src/modules/organization/cost-center/cost-center.repo';
 import { DepartmentRecordService } from '../../../src/modules/organization/department/department-record.service';
 import { DepartmentHeadRepo } from '../../../src/modules/organization/department/department-head.repo';
+import { DepartmentItCoverageRepo } from '../../../src/modules/organization/department/department-it-coverage.repo';
 import { DepartmentRepo } from '../../../src/modules/organization/department/department.repo';
 import { EmployeeRecordService } from '../../../src/modules/organization/employee/employee-record.service';
 import { EmployeeDepartureRepo } from '../../../src/modules/organization/employee/employee-departure.repo';
 import { EmployeeRepo } from '../../../src/modules/organization/employee/employee.repo';
+import { EmployeeWorkDepartmentRepo } from '../../../src/modules/organization/employee/work-department/employee-work-department.repo';
+import { EmployeeWorkDepartmentService } from '../../../src/modules/organization/employee/work-department/employee-work-department.service';
 import { ImportLookupRepo } from '../../../src/modules/organization/employee/import-lookup.repo';
 import { OrganizationContextService } from '../../../src/modules/organization/organization-context.service';
 import { OrganizationRepo } from '../../../src/modules/organization/organization.repo';
@@ -54,13 +57,18 @@ describe('organization foundation (integration)', () => {
     const config = testConfig({ DATABASE_URL: database.url });
     prisma = new PrismaService(config);
     runner = new TransactionRunner(prisma, config);
-    const departments = new DepartmentRecordService(new DepartmentRepo(prisma), new DepartmentHeadRepo(prisma));
+    const departments = new DepartmentRecordService(
+      new DepartmentRepo(prisma),
+      new DepartmentHeadRepo(prisma),
+      new DepartmentItCoverageRepo(prisma),
+    );
     const organizationRepo = new OrganizationRepo(prisma);
     const employees = new EmployeeRecordService(
       new EmployeeRepo(prisma),
       new ImportLookupRepo(prisma),
       new EmployeeDepartureRepo(),
       departments,
+      new EmployeeWorkDepartmentService(new EmployeeWorkDepartmentRepo(prisma)),
     );
     const costCenters = new CostCenterCatalogueService(new CostCenterRepo(prisma));
     const changes = new OrganizationChangeService(

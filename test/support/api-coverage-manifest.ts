@@ -1,3 +1,4 @@
+import { API_COVERAGE_ORGANIZATION } from './api-coverage-manifest-organization';
 import { API_COVERAGE_PURCHASE } from './api-coverage-manifest-purchase';
 import { API_COVERAGE_REVIEW } from './api-coverage-manifest-review';
 import { POLICY_AND_PROFILE_OPERATIONS } from './api-coverage-manifest-policies';
@@ -220,23 +221,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/vendor-dictionary/normalizations',
   'GET /api/v1/vendor-dictionary/proposals',
   'POST /api/v1/vendor-dictionary/proposals/{id}/resolutions',
-  'GET /api/v1/department-warnings',
-  'GET /api/v1/departments',
-  'POST /api/v1/departments',
-  'GET /api/v1/departments/{id}',
-  'PATCH /api/v1/departments/{id}',
-  'PUT /api/v1/departments/{id}/avatar',
-  'DELETE /api/v1/departments/{id}/avatar',
-  'POST /api/v1/departments/{id}/deactivate',
-  'GET /api/v1/departments/{id}/employees',
-  'GET /api/v1/departments/{id}/employees/{employeeId}',
-  'GET /api/v1/departments/{id}/employees/{employeeId}/software-rights',
-  'GET /api/v1/departments/{id}/employees/{employeeId}/open-requests',
-  'POST /api/v1/departments/{id}/head-assignments',
-  'POST /api/v1/departments/{id}/head-vacancies',
-  'POST /api/v1/departments/{id}/successor-designations',
-  'POST /api/v1/departments/{id}/successor-clearances',
-  'GET /api/v1/departments/{id}/technical-members',
+  ...API_COVERAGE_ORGANIZATION,
   'POST /api/v1/cost-centers',
   'PATCH /api/v1/cost-centers/{id}',
   'POST /api/v1/cost-centers/{id}/deactivate',

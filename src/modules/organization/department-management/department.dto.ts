@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { itAdminLoadSchema } from '../department-it-substitute/department-it-substitute.dto';
 import { DEPARTMENT_FUNCTION_MAX_LENGTH, DEPARTMENT_NAME_MAX_LENGTH } from '../department/department.types';
 import { businessDate, responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
@@ -88,6 +89,14 @@ const departmentSchema = z.strictObject({
   itAdmin: z
     .strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string(), usable: z.boolean() })
     .nullable(),
+  itSubstitute: z
+    .strictObject({
+      id: z.uuid(),
+      employee: z.strictObject({ id: z.uuid(), fullName: z.string() }),
+      appointedAt: z.iso.datetime(),
+    })
+    .nullable(),
+  itCoverage: z.enum(['IN_CHARGE', 'SUBSTITUTE', 'NONE']),
   head: z
     .strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string(), since: z.string() })
     .nullable(),
@@ -178,6 +187,9 @@ export class VacateHeadBodyDto extends createZodDto(vacateHeadBodySchema) {}
 export class DesignateSuccessorBodyDto extends createZodDto(designateSuccessorBodySchema) {}
 export class ClearSuccessorBodyDto extends createZodDto(clearSuccessorBodySchema) {}
 export class DepartmentResponseDto extends createZodDto(successEnvelopeSchema(departmentProfileSchema)) {}
+export class DepartmentUpdateResponseDto extends createZodDto(
+  successEnvelopeSchema(departmentProfileSchema.extend({ itAdminLoad: itAdminLoadSchema.nullable() })),
+) {}
 export class DepartmentPageResponseDto extends createZodDto(successEnvelopeSchema(departmentPageSchema)) {}
 export class DepartmentMembersResponseDto extends createZodDto(successEnvelopeSchema(memberPageSchema)) {}
 export class DepartmentTechnicalMembersResponseDto extends createZodDto(

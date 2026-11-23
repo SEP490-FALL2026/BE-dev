@@ -1,0 +1,271 @@
+import { randomUUID } from 'node:crypto';
+import request from 'supertest';
+import { IdentityAccessApi } from '../../../src/modules/identity-access/public/identity-access.api';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
+import { RequestHarness } from '../../support/request-harness';
+import { insertEmployeeWithoutPlacement } from '../../support/builders/account.builder';
+import { createActivatedAccount } from '../../support/api-accounts';
+
+describe('department IT substitutes, acting scope, work departments and load warning (integration, real PostgreSQL)', () => {
+  const h = new RequestHarness();
+  let organizationReads: OrganizationReadApi;
+  let identityAccess: IdentityAccessApi;
+
+  beforeAll(async () => {
+    await h.start();
+    organizationReads = h.ctx.app.get(OrganizationReadApi);
+    identityAccess = h.ctx.app.get(IdentityAccessApi);
+  }, 240000);
+
+  afterAll(async () => {
+    await h.stop();
+  });
+
+  const appoint = (departmentId: string, body: object, token = h.admin) =>
+    request(h.server())
+      .post(`/api/v1/departments/${departmentId}/it-substitutes`)
+      .set({ Authorization: `Bearer ${token}` })
+      .send(body);
+
+  const endSubstitute = (id: string, token = h.admin) =>
+    request(h.server())
+      .post(`/api/v1/department-it-substitutes/${id}/end`)
+      .set({ Authorization: `Bearer ${token}` })
+      .send();
+
+  const listSubstitutes = (query = '', token = h.admin) =>
+    request(h.server())
+      .get(`/api/v1/department-it-substitutes${query}`)
+      .set({ Authorization: `Bearer ${token}` });
+
+  const updateDepartment = (id: string, body: object, token = h.admin) =>
+    request(h.server())
+      .patch(`/api/v1/departments/${id}`)
+      .set({ Authorization: `Bearer ${token}` })
+      .send(body);
+
+  const getDepartment = (id: string, token = h.admin) =>
+    request(h.server())
+      .get(`/api/v1/departments/${id}`)
+      .set({ Authorization: `Bearer ${token}` });
+
+  const errCode = (res: request.Response) => (res.body as { error: { code: string } }).error.code;
+  const dataOf = <T>(res: request.Response) => (res.body as { data: T }).data;
+
+  it('appoints, rejects invalid/duplicate/in-charge/inactive/forbidden, lists scoped, and ends REMOVED (W2-27 (a), (b))', async () => {
+    const dept = await h.departmentWithUnit(h.unique('DES'));
+    const ha = await h.staff(dept, h.unique('E-HA'), 'IT_ADMIN');
+    const minh = await h.staff(dept, h.unique('E-MINH'), 'IT_ADMIN');
+    const plain = await h.staff(dept, h.unique('E-EMP'), 'EMPLOYEE');
+    await updateDepartment(dept.id, { itAdminEmployeeId: ha.employeeId }).expect(200);
+
+    // IT Admin cannot appoint or end
+    expect(
+      errCode(
+        await appoint(
+          dept.id,
+          { substituteEmployeeId: minh.employeeId, reason: 'Cover' },
+          minh.account.accessToken,
+        ).expect(403),
+      ),
+    ).toBe('AUTHORIZATION.FORBIDDEN');
+
+    // Non-IT-Admin employee -> 422 NOT_USABLE_IT_ADMIN; missing department -> 404; in-charge -> 409
+    expect(
+      errCode(await appoint(dept.id, { substituteEmployeeId: plain.employeeId, reason: 'Cover' }).expect(422)),
+    ).toBe('DEPARTMENT_IT_SUBSTITUTE.NOT_USABLE_IT_ADMIN');
+    expect(
+      errCode(await appoint(randomUUID(), { substituteEmployeeId: minh.employeeId, reason: 'Cover' }).expect(404)),
+    ).toBe('DEPARTMENT.NOT_FOUND');
+    expect(errCode(await appoint(dept.id, { substituteEmployeeId: ha.employeeId, reason: 'Cover' }).expect(409))).toBe(
+      'DEPARTMENT_IT_SUBSTITUTE.IS_IN_CHARGE',
+    );
+
+    // Happy appoint -> 201 + audit
+    const created = await appoint(dept.id, { substituteEmployeeId: minh.employeeId, reason: 'Ha on leave' }).expect(
+      201,
+    );
+    const body = dataOf<{
+      substitute: { id: string; endCause: string | null; substitute: { id: string; usable: boolean } };
+      itAdminLoad: { employeeId: string; inChargeCount: number; substituteCount: number; overLimit: boolean };
+    }>(created);
+    expect(body.substitute.substitute).toMatchObject({ id: minh.employeeId, usable: true });
+    expect(body.substitute.endCause).toBeNull();
+    expect(body.itAdminLoad).toEqual({
+      employeeId: minh.employeeId,
+      inChargeCount: 0,
+      substituteCount: 1,
+      overLimit: false,
+    });
+
+    // Second active appoint -> 409 ALREADY_ACTIVE
+    expect(
+      errCode(await appoint(dept.id, { substituteEmployeeId: minh.employeeId, reason: 'Again' }).expect(409)),
+    ).toBe('DEPARTMENT_IT_SUBSTITUTE.ALREADY_ACTIVE');
+
+    // departmentGet shows itSubstitute and itCoverage = SUBSTITUTE
+    const profile = dataOf<{ itCoverage: string; itSubstitute: { id: string; employee: { id: string } } | null }>(
+      await getDepartment(dept.id).expect(200),
+    );
+    expect(profile.itCoverage).toBe('SUBSTITUTE');
+    expect(profile.itSubstitute?.id).toBe(body.substitute.id);
+
+    // List scoped to IT Admin
+    const listForMinh = dataOf<{ items: { id: string }[] }>(
+      await listSubstitutes(`?departmentId=${dept.id}&state=ACTIVE`, minh.account.accessToken).expect(200),
+    );
+    expect(listForMinh.items.map((item) => item.id)).toEqual([body.substitute.id]);
+
+    // End -> 201 REMOVED, second end -> 409 ALREADY_ENDED, missing -> 404
+    const ended = dataOf<{ endCause: string }>(await endSubstitute(body.substitute.id).expect(201));
+    expect(ended.endCause).toBe('REMOVED');
+    expect(errCode(await endSubstitute(body.substitute.id).expect(409))).toBe('DEPARTMENT_IT_SUBSTITUTE.ALREADY_ENDED');
+    expect(errCode(await endSubstitute(randomUUID()).expect(404))).toBe('DEPARTMENT_IT_SUBSTITUTE.NOT_FOUND');
+  });
+
+  it('closes active substitute with IN_CHARGE_NAMED on non-null change, keeps on null, and closes DEPARTMENT_RETIRED on deactivate (W2-27 (c), (w))', async () => {
+    const dept = await h.departmentWithUnit(h.unique('CLS'));
+    const it1 = await h.staff(dept, h.unique('E-IT1'), 'IT_ADMIN');
+    const it2 = await h.staff(dept, h.unique('E-IT2'), 'IT_ADMIN');
+    await updateDepartment(dept.id, { itAdminEmployeeId: it1.employeeId }).expect(200);
+
+    const firstSub = dataOf<{ substitute: { id: string } }>(
+      await appoint(dept.id, { substituteEmployeeId: it2.employeeId, reason: 'Leave' }).expect(201),
+    ).substitute;
+
+    // Setting itAdminEmployeeId to null keeps active substitute
+    const afterNull = dataOf<{ itSubstitute: { id: string } | null; itAdminLoad: unknown }>(
+      await updateDepartment(dept.id, { itAdminEmployeeId: null }).expect(200),
+    );
+    expect(afterNull.itSubstitute?.id).toBe(firstSub.id);
+    expect(afterNull.itAdminLoad).toBeNull();
+
+    // Naming non-null itAdminEmployeeId closes substitute with IN_CHARGE_NAMED
+    const afterNamed = dataOf<{ itSubstitute: unknown; itCoverage: string; itAdminLoad: { employeeId: string } }>(
+      await updateDepartment(dept.id, { itAdminEmployeeId: it1.employeeId }).expect(200),
+    );
+    expect(afterNamed.itSubstitute).toBeNull();
+    expect(afterNamed.itCoverage).toBe('IN_CHARGE');
+    expect(afterNamed.itAdminLoad.employeeId).toBe(it1.employeeId);
+    expect(
+      (
+        await h.ctx.sql.query<{ end_cause: string }>('SELECT end_cause FROM department_it_substitutes WHERE id = $1', [
+          firstSub.id,
+        ])
+      ).rows[0].end_cause,
+    ).toBe('IN_CHARGE_NAMED');
+
+    // Empty department deactivated closes active substitute with DEPARTMENT_RETIRED
+    const emptyDept = dataOf<{ id: string }>(
+      await request(h.server())
+        .post('/api/v1/departments')
+        .set({ Authorization: `Bearer ${h.admin}` })
+        .send({ code: h.unique('RET'), name: 'Retiring' })
+        .expect(201),
+    );
+    const secondSub = dataOf<{ substitute: { id: string } }>(
+      await appoint(emptyDept.id, { substituteEmployeeId: it2.employeeId, reason: 'Temp' }).expect(201),
+    ).substitute;
+    await request(h.server())
+      .post(`/api/v1/departments/${emptyDept.id}/deactivate`)
+      .set({ Authorization: `Bearer ${h.admin}` })
+      .send({})
+      .expect(200);
+    expect(
+      (
+        await h.ctx.sql.query<{ end_cause: string }>('SELECT end_cause FROM department_it_substitutes WHERE id = $1', [
+          secondSub.id,
+        ])
+      ).rows[0].end_cause,
+    ).toBe('DEPARTMENT_RETIRED');
+    expect(
+      errCode(await appoint(emptyDept.id, { substituteEmployeeId: it2.employeeId, reason: 'After' }).expect(409)),
+    ).toBe('DEPARTMENT_IT_SUBSTITUTE.DEPARTMENT_INACTIVE');
+  });
+
+  it('allows overLimit > 4 as soft warning on substitute appoint and departmentUpdate while keeping 4-dept hard cap for in-charge (W2-27 (p))', async () => {
+    const base = await h.departmentWithUnit(h.unique('CAP'));
+    const minh = await h.staff(base, h.unique('E-MINH-CAP'), 'IT_ADMIN');
+    const lan = await h.staff(base, h.unique('E-LAN-CAP'), 'IT_ADMIN');
+
+    const minhDepts = await Promise.all([1, 2, 3, 4].map(() => h.departmentWithUnit(h.unique('MC'))));
+    for (const d of minhDepts) await updateDepartment(d.id, { itAdminEmployeeId: minh.employeeId }).expect(200);
+
+    const fifth = await h.departmentWithUnit(h.unique('M5'));
+    expect(errCode(await updateDepartment(fifth.id, { itAdminEmployeeId: minh.employeeId }).expect(409))).toBe(
+      'DEPARTMENT.IT_ADMIN_LIMIT_REACHED',
+    );
+    const minhLoad = dataOf<{ itAdminLoad: { inChargeCount: number; substituteCount: number; overLimit: boolean } }>(
+      await appoint(fifth.id, { substituteEmployeeId: minh.employeeId, reason: 'Overflow cover' }).expect(201),
+    ).itAdminLoad;
+    expect(minhLoad).toEqual({ employeeId: minh.employeeId, inChargeCount: 4, substituteCount: 1, overLimit: true });
+
+    const lanInCharge = await Promise.all([1, 2].map(() => h.departmentWithUnit(h.unique('LI'))));
+    const lanSubs = await Promise.all([1, 2].map(() => h.departmentWithUnit(h.unique('LS'))));
+    for (const d of lanInCharge) await updateDepartment(d.id, { itAdminEmployeeId: lan.employeeId }).expect(200);
+    for (const d of lanSubs) await appoint(d.id, { substituteEmployeeId: lan.employeeId, reason: 'Sub' }).expect(201);
+
+    const lanThird = await h.departmentWithUnit(h.unique('L3'));
+    const lanLoad = dataOf<{ itAdminLoad: { inChargeCount: number; substituteCount: number; overLimit: boolean } }>(
+      await updateDepartment(lanThird.id, { itAdminEmployeeId: lan.employeeId }).expect(200),
+    ).itAdminLoad;
+    expect(lanLoad).toEqual({ employeeId: lan.employeeId, inChargeCount: 3, substituteCount: 2, overLimit: true });
+  });
+
+  it('resolves workDepartmentsOf (including leaver fallback), acting scope vs read scope, and itAdminsActingFor (S2-1, S2-2, S2-3)', async () => {
+    const dept = await h.departmentWithUnit(h.unique('SCP'));
+    const leaver = await h.staff(dept, h.unique('E-LVR'));
+    const unplacedId = await insertEmployeeWithoutPlacement(h.ctx, h.seed, {
+      code: h.unique('E-UNP'),
+      email: null,
+    });
+    const observer = await h.staff(dept, h.unique('E-OBS'), 'IT_ADMIN');
+    await h.ctx.sql.query(
+      `UPDATE employee_placements SET valid_to = $2::date WHERE employee_id = $1 AND valid_to IS NULL`,
+      [leaver.employeeId, h.today()],
+    );
+
+    const workMap = await organizationReads.workDepartmentsOf([leaver.employeeId, unplacedId], h.today());
+    expect(workMap.get(leaver.employeeId)).toBe(dept.id);
+    expect(workMap.has(unplacedId)).toBe(false);
+    expect(await organizationReads.getEmployeeIdsOfWorkDepartments([dept.id], h.today())).toContain(leaver.employeeId);
+
+    const usable = (ids: readonly string[]) => identityAccess.findUsableItAdminEmployeeIds(ids);
+    const readScope = await organizationReads.getItAdminScope(observer.employeeId, usable);
+    const actingScope = await organizationReads.getItAdminActingScope(observer.employeeId, usable);
+    expect(readScope).toContain(dept.id);
+    expect(actingScope).not.toContain(dept.id);
+
+    const actingBefore = await organizationReads.itAdminsActingFor([dept.id], usable);
+    expect(actingBefore.get(dept.id)?.actors).toEqual([]);
+  });
+
+  it('runs appoint X to D concurrently with X submitting Request for 20 rounds without 40P01 deadlock (S2-9)', async () => {
+    const dept = await h.departmentWithUnit(h.unique('CON'));
+    const head = await h.staff(dept, h.unique('E-HD'));
+    await h.makeHead(dept, head);
+    const planId = await h.plan('K5');
+    const itUserCode = h.unique('E-X');
+    const itUserId = await h.member(dept.code, itUserCode, await h.title());
+    const itUserAccount = await createActivatedAccount(h.ctx, h.seed, {
+      code: itUserCode,
+      email: `${itUserCode.toLowerCase()}@acme.vn`,
+      role: 'IT_ADMIN',
+      admin: h.admin,
+      employeeId: itUserId,
+    });
+
+    for (let round = 0; round < 20; round += 1) {
+      const targetDept = await h.departmentWithUnit(h.unique('TD'));
+      const [appointRes, submitRes] = await Promise.all([
+        appoint(targetDept.id, { substituteEmployeeId: itUserId, reason: `Round ${round}` }),
+        h.submit(
+          { planId, beneficiaryEmployeeId: itUserId, businessReason: `Need ${round}`, termMonths: 1 },
+          itUserAccount,
+        ),
+      ]);
+      expect(appointRes.status).toBe(201);
+      expect([201, 409, 422]).toContain(submitRes.status);
+    }
+  });
+});

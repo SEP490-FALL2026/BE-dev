@@ -287,7 +287,7 @@ export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     findings: ['LD-13'],
     owner: 'organization-identity-read-contracts',
     rationale:
-      'Decision 6: keep the function text (up to 1000 characters) in the list as a field needed to choose a department, or return it only from departmentGet.',
+      'Decision 6: keep the function text (up to 1000 characters) in the list as a field needed to choose a department, or return it only from departmentGet. Reviewed with W2-27 (a): gained itCoverage and itSubstitute; decision 6 is still open.',
     removeWhen: 'The Owner decides and the chosen contract ships.',
     itemProperties: [
       'avatarUrl',
@@ -300,6 +300,8 @@ export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
       'head',
       'id',
       'itAdmin',
+      'itCoverage',
+      'itSubstitute',
       'memberCount',
       'name',
       'starting',

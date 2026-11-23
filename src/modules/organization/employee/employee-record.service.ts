@@ -22,6 +22,7 @@ import {
 } from '../public/organization.types';
 import { EmployeeDepartureRepo } from './employee-departure.repo';
 import { EmployeeRepo } from './employee.repo';
+import { EmployeeWorkDepartmentService } from './work-department/employee-work-department.service';
 import { ImportLookupRepo } from './import-lookup.repo';
 
 /**
@@ -37,6 +38,7 @@ export class EmployeeRecordService {
     private readonly importLookup: ImportLookupRepo,
     private readonly departures: EmployeeDepartureRepo,
     private readonly departments: DepartmentRecordService,
+    private readonly workDepartments: EmployeeWorkDepartmentService,
   ) {}
 
   /**
@@ -137,6 +139,14 @@ export class EmployeeRecordService {
 
   lastPlacementBy(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<{ departmentId: string } | null> {
     return this.repo.lastPlacementIdsBy(employeeId, onDate, tx);
+  }
+
+  workDepartmentsOf(employeeIds: readonly string[], today: BusinessDate, tx?: DbTx): Promise<Map<string, string>> {
+    return this.workDepartments.workDepartmentsOf(employeeIds, today, tx);
+  }
+
+  employeeIdsOfWorkDepartments(departmentIds: readonly string[], today: BusinessDate, tx?: DbTx): Promise<string[]> {
+    return this.workDepartments.employeeIdsOfWorkDepartments(departmentIds, today, tx);
   }
 
   findManyByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {

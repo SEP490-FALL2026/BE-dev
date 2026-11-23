@@ -1,3 +1,6 @@
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { AuditApi } from '../../audit/public/audit.api';
+import { DepartmentItSubstituteRepo } from '../department-it-substitute/department-it-substitute.repo';
 import { DepartmentItAdminInvalidError, DepartmentItAdminLimitReachedError } from '../department/department.errors';
 import type { DepartmentRepo } from '../department/department.repo';
 import type { EmployeeRecordService } from '../employee/employee-record.service';
@@ -11,6 +14,14 @@ import { DepartmentItAdminService } from './department-it-admin.service';
  */
 describe('DepartmentItAdminService', () => {
   const tx = { name: 'tx' } as never;
+  const actor: AuthenticatedPrincipal = {
+    subject: 'user-1',
+    appUserId: 'user-1',
+    sessionId: 'sess-1',
+    employeeId: 'emp-actor',
+    directRoles: ['SUPER_ADMIN'],
+    roles: ['SUPER_ADMIN'],
+  };
   const calls: string[] = [];
   const employees = {
     lock: jest.fn((_tx: unknown, _id: string, mode: string) => {
@@ -33,7 +44,13 @@ describe('DepartmentItAdminService', () => {
 
       return Promise.resolve(3);
     }),
+    countActiveInChargeExcludingStarting: jest.fn(() => Promise.resolve(3)),
   };
+  const substitutes = {
+    endActiveForDepartment: jest.fn(),
+    countActiveBySubstitute: jest.fn(() => Promise.resolve(2)),
+  };
+  const audit = { record: jest.fn(() => Promise.resolve()) };
 
   const service = (): DepartmentItAdminService => {
     const hook = new EmployeeAccountsHook();
@@ -43,6 +60,8 @@ describe('DepartmentItAdminService', () => {
       employees as unknown as EmployeeRecordService,
       hook,
       departments as unknown as DepartmentRepo,
+      substitutes as unknown as DepartmentItSubstituteRepo,
+      audit as unknown as AuditApi,
     );
   };
 
@@ -70,5 +89,39 @@ describe('DepartmentItAdminService', () => {
 
     departments.countActiveInChargeOf.mockResolvedValueOnce(4);
     await expect(service().assertUsable(tx, 'emp-it')).rejects.toBeInstanceOf(DepartmentItAdminLimitReachedError);
+  });
+
+  it('closes active substitute on non-null in-charge naming and computes overLimit, while leaving null untouched', async () => {
+    substitutes.endActiveForDepartment.mockResolvedValueOnce({
+      id: 'sub-1',
+      department: { id: 'dep-1', name: 'D' },
+      substitute: { id: 'emp-sub', fullName: 'S' },
+    });
+    const after: Record<string, string | boolean | null> = {};
+    const load = await service().onInChargeNamed(
+      tx,
+      actor,
+      'org-1',
+      'dep-1',
+      'emp-it',
+      after,
+      new Date('2026-10-19T10:00:00Z'),
+    );
+
+    expect(substitutes.endActiveForDepartment).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({ departmentId: 'dep-1', endCause: 'IN_CHARGE_NAMED' }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({ action: 'DEPARTMENT_IT_SUBSTITUTE.ENDED' }),
+    );
+    expect(load).toEqual({ employeeId: 'emp-it', inChargeCount: 3, substituteCount: 2, overLimit: true });
+    expect(after.overLimit).toBe(true);
+
+    expect(
+      await service().onInChargeNamed(tx, actor, 'org-1', 'dep-1', null, {}, new Date('2026-10-19T10:00:00Z')),
+    ).toBeNull();
+    expect(substitutes.endActiveForDepartment).toHaveBeenCalledTimes(1);
   });
 });

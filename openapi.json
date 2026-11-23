@@ -3753,7 +3753,7 @@
               "application/json": {
                 "schema": {
                   "allOf": [
-                    { "$ref": "#/components/schemas/DepartmentResponseDto" },
+                    { "$ref": "#/components/schemas/DepartmentUpdateResponseDto" },
                     { "properties": { "message": { "example": "DEPARTMENT.UPDATED" } } }
                   ]
                 }
@@ -6633,6 +6633,683 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Take back the successor named for the head",
+        "tags": ["departments"]
+      }
+    },
+    "/api/v1/departments/{id}/it-substitutes": {
+      "post": {
+        "operationId": "departmentItSubstituteAppoint",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/AppointDepartmentItSubstituteBodyDto" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Appoints an active IT Admin as temporary substitute for the department and returns the appointment together with the IT Admin workload telemetry (warning when over 4 departments).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/AppointDepartmentItSubstituteResponseDto" },
+                    { "properties": { "message": { "example": "DEPARTMENT_IT_SUBSTITUTE.APPOINTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin appoints or ends temporary department IT Admin substitutes.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The department does not exist (DEPARTMENT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT.NOT_FOUND": {
+                    "summary": "Department not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.NOT_FOUND",
+                        "message": "Department not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The department already has an active substitute (DEPARTMENT_IT_SUBSTITUTE.ALREADY_ACTIVE), the candidate is already the IT Admin in charge (DEPARTMENT_IT_SUBSTITUTE.IS_IN_CHARGE), or the department is inactive (DEPARTMENT_IT_SUBSTITUTE.DEPARTMENT_INACTIVE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT_IT_SUBSTITUTE.ALREADY_ACTIVE": {
+                    "summary": "This department already has an active IT Admin substitute.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_IT_SUBSTITUTE.ALREADY_ACTIVE",
+                        "message": "This department already has an active IT Admin substitute.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_IT_SUBSTITUTE.IS_IN_CHARGE": {
+                    "summary": "The appointed substitute is already the IT Admin in charge of this department.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_IT_SUBSTITUTE.IS_IN_CHARGE",
+                        "message": "The appointed substitute is already the IT Admin in charge of this department.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_IT_SUBSTITUTE.DEPARTMENT_INACTIVE": {
+                    "summary": "An inactive department cannot take a temporary IT Admin substitute.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_IT_SUBSTITUTE.DEPARTMENT_INACTIVE",
+                        "message": "An inactive department cannot take a temporary IT Admin substitute.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or the candidate is not an active employee with a usable IT Admin account (DEPARTMENT_IT_SUBSTITUTE.NOT_USABLE_IT_ADMIN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_IT_SUBSTITUTE.NOT_USABLE_IT_ADMIN": {
+                    "summary": "The substitute must be an active employee with a usable account holding the IT Admin role.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_IT_SUBSTITUTE.NOT_USABLE_IT_ADMIN",
+                        "message": "The substitute must be an active employee with a usable account holding the IT Admin role.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Appoint a temporary IT Admin substitute for a department",
+        "tags": ["departments"]
+      }
+    },
+    "/api/v1/department-it-substitutes/{id}/end": {
+      "post": {
+        "operationId": "departmentItSubstituteEnd",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "201": {
+            "description": "Ends the active temporary IT Admin substitute appointment for the department.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DepartmentItSubstituteResponseDto" },
+                    { "properties": { "message": { "example": "DEPARTMENT_IT_SUBSTITUTE.ENDED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin appoints or ends temporary department IT Admin substitutes.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The substitute appointment does not exist (DEPARTMENT_IT_SUBSTITUTE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT_IT_SUBSTITUTE.NOT_FOUND": {
+                    "summary": "Department IT Admin substitute appointment not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_IT_SUBSTITUTE.NOT_FOUND",
+                        "message": "Department IT Admin substitute appointment not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The substitute appointment has already ended (DEPARTMENT_IT_SUBSTITUTE.ALREADY_ENDED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT_IT_SUBSTITUTE.ALREADY_ENDED": {
+                    "summary": "This IT Admin substitute appointment has already ended.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_IT_SUBSTITUTE.ALREADY_ENDED",
+                        "message": "This IT Admin substitute appointment has already ended.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "End a temporary department IT Admin substitute appointment",
+        "tags": ["departments"]
+      }
+    },
+    "/api/v1/department-it-substitutes": {
+      "get": {
+        "operationId": "departmentItSubstituteList",
+        "parameters": [
+          {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "ACTIVE", "type": "string", "enum": ["ACTIVE", "ENDED", "ALL"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of department IT Admin substitute appointments ordered by appointedAt descending then id. IT Admins see appointments within their read scope or naming them as substitute.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DepartmentItSubstitutePageResponseDto" },
+                    { "properties": { "message": { "example": "DEPARTMENT_IT_SUBSTITUTE.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin and the IT Admin may list department IT Admin substitutes.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List department IT Admin substitute appointments",
         "tags": ["departments"]
       }
     },
@@ -102467,6 +103144,26 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
+                    "itSubstitute": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "employee": {
+                          "type": "object",
+                          "properties": {
+                            "id": { "type": "string", "format": "uuid" },
+                            "fullName": { "type": "string" }
+                          },
+                          "required": ["id", "fullName"],
+                          "additionalProperties": false
+                        },
+                        "appointedAt": { "type": "string", "format": "date-time" }
+                      },
+                      "required": ["id", "employee", "appointedAt"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "itCoverage": { "type": "string", "enum": ["IN_CHARGE", "SUBSTITUTE", "NONE"] },
                     "head": {
                       "type": "object",
                       "properties": {
@@ -102503,6 +103200,8 @@
                     "status",
                     "costCenter",
                     "itAdmin",
+                    "itSubstitute",
+                    "itCoverage",
                     "head",
                     "avatarUrl",
                     "starting",
@@ -102595,6 +103294,23 @@
                 "additionalProperties": false,
                 "nullable": true
               },
+              "itSubstitute": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "employee": {
+                    "type": "object",
+                    "properties": { "id": { "type": "string", "format": "uuid" }, "fullName": { "type": "string" } },
+                    "required": ["id", "fullName"],
+                    "additionalProperties": false
+                  },
+                  "appointedAt": { "type": "string", "format": "date-time" }
+                },
+                "required": ["id", "employee", "appointedAt"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "itCoverage": { "type": "string", "enum": ["IN_CHARGE", "SUBSTITUTE", "NONE"] },
               "head": {
                 "type": "object",
                 "properties": {
@@ -102655,6 +103371,8 @@
               "status",
               "costCenter",
               "itAdmin",
+              "itSubstitute",
+              "itCoverage",
               "head",
               "avatarUrl",
               "starting",
@@ -102682,6 +103400,155 @@
           "function": { "type": "string", "maxLength": 1000, "nullable": true },
           "itAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true }
         },
+        "additionalProperties": false
+      },
+      "DepartmentUpdateResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "code": { "type": "string" },
+              "name": { "type": "string" },
+              "function": { "type": "string", "nullable": true },
+              "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+              "costCenter": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "code": { "type": "string" },
+                  "name": { "type": "string" },
+                  "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+                },
+                "required": ["id", "code", "name", "status"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "itAdmin": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" },
+                  "usable": { "type": "boolean" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName", "usable"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "itSubstitute": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "employee": {
+                    "type": "object",
+                    "properties": { "id": { "type": "string", "format": "uuid" }, "fullName": { "type": "string" } },
+                    "required": ["id", "fullName"],
+                    "additionalProperties": false
+                  },
+                  "appointedAt": { "type": "string", "format": "date-time" }
+                },
+                "required": ["id", "employee", "appointedAt"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "itCoverage": { "type": "string", "enum": ["IN_CHARGE", "SUBSTITUTE", "NONE"] },
+              "head": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" },
+                  "since": { "type": "string" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName", "since"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "avatarUrl": { "type": "string", "nullable": true },
+              "starting": { "type": "boolean" },
+              "memberCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "warnings": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["MISSING_HEAD", "MISSING_IT_ADMIN", "MISSING_COST_CENTER"] }
+              },
+              "effectiveFrom": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "deactivatedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "successor": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" },
+                  "since": { "type": "string" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName", "since"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "headHistory": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "employeeId": { "type": "string", "format": "uuid" },
+                    "employeeCode": { "type": "string" },
+                    "fullName": { "type": "string" },
+                    "validFrom": { "type": "string" },
+                    "validTo": { "type": "string", "nullable": true }
+                  },
+                  "required": ["employeeId", "employeeCode", "fullName", "validFrom", "validTo"],
+                  "additionalProperties": false
+                }
+              },
+              "headHistoryHasMore": { "type": "boolean" },
+              "itAdminLoad": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "inChargeCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "substituteCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "overLimit": { "type": "boolean" }
+                },
+                "required": ["employeeId", "inChargeCount", "substituteCount", "overLimit"],
+                "additionalProperties": false,
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "function",
+              "status",
+              "costCenter",
+              "itAdmin",
+              "itSubstitute",
+              "itCoverage",
+              "head",
+              "avatarUrl",
+              "starting",
+              "memberCount",
+              "warnings",
+              "effectiveFrom",
+              "createdAt",
+              "updatedAt",
+              "deactivatedAt",
+              "successor",
+              "headHistory",
+              "headHistoryHasMore",
+              "itAdminLoad"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "DeactivateDepartmentBodyDto": { "type": "object", "properties": {}, "additionalProperties": false },
@@ -102881,6 +103748,224 @@
         "additionalProperties": false
       },
       "ClearSuccessorBodyDto": { "type": "object", "properties": {}, "additionalProperties": false },
+      "AppointDepartmentItSubstituteBodyDto": {
+        "type": "object",
+        "properties": {
+          "substituteEmployeeId": { "type": "string", "format": "uuid" },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 500 }
+        },
+        "required": ["substituteEmployeeId", "reason"],
+        "additionalProperties": false
+      },
+      "AppointDepartmentItSubstituteResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "substitute": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "department": {
+                    "type": "object",
+                    "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                    "required": ["id", "name"],
+                    "additionalProperties": false
+                  },
+                  "substitute": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "fullName": { "type": "string" },
+                      "usable": { "type": "boolean" }
+                    },
+                    "required": ["id", "fullName", "usable"],
+                    "additionalProperties": false
+                  },
+                  "replaced": {
+                    "type": "object",
+                    "properties": { "id": { "type": "string", "format": "uuid" }, "fullName": { "type": "string" } },
+                    "required": ["id", "fullName"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "reason": { "type": "string" },
+                  "appointedAt": { "type": "string", "format": "date-time" },
+                  "endedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "endCause": {
+                    "type": "string",
+                    "enum": ["REMOVED", "IN_CHARGE_NAMED", "DEPARTMENT_RETIRED", null],
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "id",
+                  "department",
+                  "substitute",
+                  "replaced",
+                  "reason",
+                  "appointedAt",
+                  "endedAt",
+                  "endCause"
+                ],
+                "additionalProperties": false
+              },
+              "itAdminLoad": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "inChargeCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "substituteCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "overLimit": { "type": "boolean" }
+                },
+                "required": ["employeeId", "inChargeCount", "substituteCount", "overLimit"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["substitute", "itAdminLoad"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "DepartmentItSubstituteResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "department": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              },
+              "substitute": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "fullName": { "type": "string" },
+                  "usable": { "type": "boolean" }
+                },
+                "required": ["id", "fullName", "usable"],
+                "additionalProperties": false
+              },
+              "replaced": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "fullName": { "type": "string" } },
+                "required": ["id", "fullName"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "reason": { "type": "string" },
+              "appointedAt": { "type": "string", "format": "date-time" },
+              "endedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "endCause": {
+                "type": "string",
+                "enum": ["REMOVED", "IN_CHARGE_NAMED", "DEPARTMENT_RETIRED", null],
+                "nullable": true
+              }
+            },
+            "required": ["id", "department", "substitute", "replaced", "reason", "appointedAt", "endedAt", "endCause"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "DepartmentItSubstitutePageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "department": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "substitute": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "fullName": { "type": "string" },
+                        "usable": { "type": "boolean" }
+                      },
+                      "required": ["id", "fullName", "usable"],
+                      "additionalProperties": false
+                    },
+                    "replaced": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "fullName": { "type": "string" } },
+                      "required": ["id", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "reason": { "type": "string" },
+                    "appointedAt": { "type": "string", "format": "date-time" },
+                    "endedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "endCause": {
+                      "type": "string",
+                      "enum": ["REMOVED", "IN_CHARGE_NAMED", "DEPARTMENT_RETIRED", null],
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "department",
+                    "substitute",
+                    "replaced",
+                    "reason",
+                    "appointedAt",
+                    "endedAt",
+                    "endCause"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "RecordTransferBodyDto": {
         "type": "object",
         "properties": {

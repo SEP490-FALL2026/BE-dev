@@ -4,12 +4,16 @@ import { CostCenterCatalogueService } from './cost-center/cost-center-catalogue.
 import { CostCenterRepo } from './cost-center/cost-center.repo';
 import { DepartmentRecordService } from './department/department-record.service';
 import { DepartmentHeadRepo } from './department/department-head.repo';
+import { DepartmentItCoverageRepo } from './department/department-it-coverage.repo';
 import { DepartmentRepo } from './department/department.repo';
 import { DepartmentUseService } from './department/department-use.service';
+import { DepartmentItSubstituteRepo } from './department-it-substitute/department-it-substitute.repo';
 import { EmployeeRecordService } from './employee/employee-record.service';
 import { FirstPlacementUseService } from './employee/first-placement-correction/first-placement-use.service';
 import { EmployeeDepartureRepo } from './employee/employee-departure.repo';
 import { EmployeeRepo } from './employee/employee.repo';
+import { EmployeeWorkDepartmentRepo } from './employee/work-department/employee-work-department.repo';
+import { EmployeeWorkDepartmentService } from './employee/work-department/employee-work-department.service';
 import { ImportLookupRepo } from './employee/import-lookup.repo';
 import { AnnouncementRepo } from './change-announcement/announcement.repo';
 import { OrganizationChangeService } from './change-announcement/organization-change.service';
@@ -39,6 +43,8 @@ import {
     CostCenterCatalogueService,
     DepartmentRepo,
     DepartmentHeadRepo,
+    DepartmentItCoverageRepo,
+    DepartmentItSubstituteRepo,
     DepartmentRecordService,
     DepartmentUseService,
     OrganizationChangeListeners,
@@ -55,6 +61,8 @@ import {
     ImportLookupRepo,
     EmployeeRecordService,
     EmployeeRepo,
+    EmployeeWorkDepartmentRepo,
+    EmployeeWorkDepartmentService,
     EmployeeDepartureRepo,
   ],
   // OrganizationApi (writes, and the readers of what keeps a department or a Cost Center in use) and OrganizationReadApi (reads) are the
@@ -79,6 +87,7 @@ import {
     OrganizationRepo,
     CostCenterRepo,
     DepartmentRepo,
+    DepartmentItSubstituteRepo,
     OrganizationChangeListeners,
     DepartmentUseContributions,
     CostCenterUseContributions,

@@ -1,3 +1,5 @@
+import { DepartmentItSubstituteForbiddenError } from './department-it-substitute.errors';
+
 export interface ActingItAdminsResult {
   inCharge: string | null;
   substitute: string | null;
@@ -79,4 +81,17 @@ export function itAdminLoadOf(facts: {
     substituteCount: facts.substituteCount,
     overLimit: facts.inChargeCount + facts.substituteCount > limit,
   };
+}
+
+/** Only the Super Admin appoints or ends temporary department IT Admin substitutes. */
+export function assertMayManageItSubstitutes(roles: readonly string[]): void {
+  if (!roles.includes('SUPER_ADMIN')) throw new DepartmentItSubstituteForbiddenError();
+}
+
+/** Super Admin lists all substitute appointments; IT Admin lists those within their scope or naming them. */
+export function itSubstituteListScope(roles: readonly string[]): 'ALL' | 'IT_ADMIN_SCOPE' {
+  if (roles.includes('SUPER_ADMIN')) return 'ALL';
+  if (roles.includes('IT_ADMIN')) return 'IT_ADMIN_SCOPE';
+
+  throw new DepartmentItSubstituteForbiddenError();
 }

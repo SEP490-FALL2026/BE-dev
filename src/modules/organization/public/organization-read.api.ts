@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BusinessDate } from '../../../core/business-date';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CostCenterCatalogueService } from '../cost-center/cost-center-catalogue.service';
+import { actingItAdmins, type ActingItAdminsResult } from '../department-it-substitute/department-it-substitute.policy';
 import { DepartmentRecordService } from '../department/department-record.service';
 import { OrganizationChangeService } from '../change-announcement/organization-change.service';
 import { DepartmentHeadRecord } from '../department/department.types';
@@ -185,9 +186,64 @@ export class OrganizationReadApi {
     return this.departments.idsInChargeOf(employeeId, tx);
   }
 
-  /** What an IT Admin reads and handles: the departments that name them and, while nobody usable is named, every active one. */
+  /** What an IT Admin reads: the departments that name them, active substitute assignments, and the common queue. */
   getItAdminScope(employeeId: string, usableAmong: UsableItAdmins, tx?: DbTx): Promise<string[]> {
     return this.departments.itAdminScopeOf(employeeId, usableAmong, tx);
+  }
+
+  /** What an IT Admin may act on: active departments where they are usable in-charge or usable substitute (no common queue). */
+  getItAdminActingScope(employeeId: string, usableAmong: UsableItAdmins, tx?: DbTx): Promise<string[]> {
+    return this.departments.itAdminActingScopeOf(employeeId, usableAmong, tx);
+  }
+
+  /** Resolves acting IT Admins (usable in-charge and usable appointed substitute) for a batch of departments. */
+  async itAdminsActingFor(
+    departmentIds: readonly string[],
+    usableAmong: UsableItAdmins,
+    tx?: DbTx,
+  ): Promise<Map<string, ActingItAdminsResult>> {
+    if (departmentIds.length === 0) return new Map();
+    const uniqueIds = [...new Set(departmentIds)];
+    const records = await this.departments.findMany(uniqueIds, tx);
+    if (records.length === 0) return new Map();
+    const substitutes = await this.departments.activeItSubstitutesFor(uniqueIds, tx);
+    const subByDept = new Map(substitutes.map((sub) => [sub.departmentId, sub]));
+    const candidateIds = [
+      ...new Set([
+        ...records.flatMap((record) => (record.itAdmin ? [record.itAdmin.employeeId] : [])),
+        ...substitutes.map((sub) => sub.substituteEmployeeId),
+      ]),
+    ];
+    const usable = candidateIds.length === 0 ? new Set<string>() : await usableAmong(candidateIds);
+
+    return new Map(
+      records.map((record) => {
+        const sub = subByDept.get(record.id);
+        return [
+          record.id,
+          actingItAdmins({
+            inCharge: record.itAdmin?.employeeId ?? null,
+            inChargeUsable:
+              record.itAdmin !== null &&
+              record.itAdmin.employeeStatus === 'ACTIVE' &&
+              usable.has(record.itAdmin.employeeId),
+            substitute: sub?.substituteEmployeeId ?? null,
+            substituteUsable:
+              sub !== undefined && sub.substituteStatus === 'ACTIVE' && usable.has(sub.substituteEmployeeId),
+          }),
+        ];
+      }),
+    );
+  }
+
+  /** Work department on `today` for each employee (placement on `today`, falling back to latest placement begun by `today`). */
+  workDepartmentsOf(employeeIds: readonly string[], today: BusinessDate, tx?: DbTx): Promise<Map<string, string>> {
+    return this.employees.workDepartmentsOf(employeeIds, today, tx);
+  }
+
+  /** Employees whose work department on `today` is in `departmentIds` (current placement or latest begun by `today`). */
+  getEmployeeIdsOfWorkDepartments(departmentIds: readonly string[], today: BusinessDate, tx?: DbTx): Promise<string[]> {
+    return this.employees.employeeIdsOfWorkDepartments(departmentIds, today, tx);
   }
 
   /** Everyone placed in the department on `onDate` (default today), by employee id; null when it does not exist. */
