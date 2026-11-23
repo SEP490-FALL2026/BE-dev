@@ -73,8 +73,6 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
   beforeAll(async () => {
     await h.start();
     it2 = await buildActivatedAccount(h.ctx, h.seed, { code: 'E-IT2', email: 'it2@acme.vn', role: 'IT_ADMIN' });
-    // The gate asks two admins who work only once the baseline is closed (`QĐ-117e`: while it is being imported nothing is asked).
-    await h.closeBaseline().expect(200);
     licensedId = await declareApplication(h.ctx, h.it1.accessToken, {
       name: h.unique('Licensed app'),
       kind: 'LICENSED',
@@ -95,7 +93,28 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
     await h.stop();
   });
 
+  describe('while the baseline phase is open (QĐ-117e)', () => {
+    it('lets a K2 subscription through while the baseline phase is open even when one of two recorded admins has left, and sets vendorAdminsBelowMinimum', async () => {
+      const planId = await planOf('K2');
+      await putProfile(planId).expect(200);
+      await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [it2.employeeId]);
+      try {
+        const created = h.dataOf<SubscriptionWire>(await declare(complete(planId)).expect(201));
+
+        expect(created.status).toBe('ACTIVE');
+        expect(created.vendorAdminsBelowMinimum).toBe(true);
+      } finally {
+        await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [it2.employeeId]);
+      }
+    });
+  });
+
   describe('activating (QĐ-110k)', () => {
+    // The gate asks two admins who work only once the baseline is closed (`QĐ-117e`: while it is being imported nothing is asked): the suites after the one above need it closed.
+    beforeAll(async () => {
+      await h.closeBaseline().expect(200);
+    });
+
     it('refuses a K2 plan with no profile: 422 SUBSCRIPTION.VENDOR_ADMINS_REQUIRED, nothing is written', async () => {
       const planId = await planOf('K2');
       const before = await h.count('subscriptions');
@@ -266,20 +285,6 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
   });
 
   describe('baseline phase and working admin count', () => {
-    it('lets a K2 subscription through while the baseline phase is open even when one of two recorded admins has left, and sets vendorAdminsBelowMinimum', async () => {
-      const planId = await planOf('K2');
-      await putProfile(planId).expect(200);
-      await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [it2.employeeId]);
-      try {
-        const created = h.dataOf<SubscriptionWire>(await declare(complete(planId)).expect(201));
-
-        expect(created.status).toBe('ACTIVE');
-        expect(created.vendorAdminsBelowMinimum).toBe(true);
-      } finally {
-        await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [it2.employeeId]);
-      }
-    });
-
     it('refuses 422 SUBSCRIPTION.VENDOR_ADMINS_REQUIRED once the baseline phase is closed when one of two recorded admins has left', async () => {
       await h.closeBaseline().expect(200);
       const planId = await planOf('K2');

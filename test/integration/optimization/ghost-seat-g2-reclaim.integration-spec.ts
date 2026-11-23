@@ -406,8 +406,9 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
       const itemsB = ((resB.body as { data: { items: { recommendationId: string }[] } }).data.items ?? []).map(
         (x) => x.recommendationId,
       );
-      expect(itemsA).toEqual([...batchAIds].sort());
-      expect(itemsB).toEqual([...batchBIds].sort());
+      // Decided in the order of the locks, answered in the order the ids were sent.
+      expect(itemsA).toEqual(batchAIds);
+      expect(itemsB).toEqual(batchBIds);
     }
   });
 });

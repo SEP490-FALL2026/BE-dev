@@ -610,7 +610,7 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     expect((await repo.endingAmong([subscriptionId])).has(subscriptionId)).toBe(true);
   });
 
-  it('allows only the responsible IT Admin while active (else 403 NOT_RESPONSIBLE), and permits substitute when responsible is locked with no notification to them', async () => {
+  it('allows only the responsible IT Admin while active (else 403 NOT_RESPONSIBLE), and permits substitute when responsible is locked, telling the responsible too', async () => {
     const unit = await h.unit(2);
     const other = await handOthersToSecondItAdmin(h);
     const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
@@ -647,6 +647,8 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     );
     expect(proposed?.after).toMatchObject({ substitute: true, responsibleItAdminEmployeeId: absentEmp });
     const told = await h.notices('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', subscriptionId);
-    expect(told.map((n) => n.recipient_employee_id)).not.toContain(absentEmp);
+    const recipients = told.map((n) => n.recipient_employee_id);
+    expect(recipients).toContain(absentEmp);
+    expect(recipients).toContain(h.finance.employeeId);
   });
 });
