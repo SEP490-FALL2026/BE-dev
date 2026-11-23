@@ -501,12 +501,34 @@ describe('the system closes the transfer of a person who moved (integration, rea
       .set(h.as(it2))
       .expect(200);
     expect(h.dataOf<{ created: number; reasonAdded: number }>(reopened)).toEqual({ created: 1, reasonAdded: 0 });
-    await request(h.server()).post(`/api/v1/department-transfers/${wire.id}/revocations`).set(h.as(it2)).expect(409);
+    const again = await request(h.server())
+      .post(`/api/v1/department-transfers/${wire.id}/revocations`)
+      .set(h.as(it2))
+      .expect(409);
+    expect(h.codeOf(again)).toBe('DEPARTMENT_TRANSFER.NOTHING_TO_REVOKE');
 
     const tasksAfterReopen = await h.ctx.sql.query<{ id: string }>(
       `SELECT id FROM provisioning_tasks WHERE assignment_id = $1 AND kind = 'REVOKE'`,
       [seat],
     );
     expect(tasksAfterReopen.rowCount).toBe(2);
+  }, 240_000);
+
+  it('refuses the reopening of the revocations while the grace of the transfer has not ended: 409 REVOCATION_NOT_DUE, nothing written', async () => {
+    const { dest, person, code } = await example();
+    const seat = await h.seatOf(person, { subscriptionId: k2a }, code);
+    const wire = await h.moveToday(person, dest.department);
+
+    const refused = await request(h.server())
+      .post(`/api/v1/department-transfers/${wire.id}/revocations`)
+      .set(h.as(it2))
+      .expect(409);
+
+    expect(h.codeOf(refused)).toBe('DEPARTMENT_TRANSFER.REVOCATION_NOT_DUE');
+    const tasks = await h.ctx.sql.query(
+      `SELECT 1 FROM provisioning_tasks WHERE assignment_id = $1 AND kind = 'REVOKE'`,
+      [seat],
+    );
+    expect(tasks.rowCount).toBe(0);
   }, 240_000);
 });
