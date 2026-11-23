@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
+import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { licensingAuditEvent } from '../../licensing-audit-event.mapper';
@@ -19,6 +20,7 @@ export class ProvisioningExtensionService {
   constructor(
     private readonly tasks: ProvisioningTaskRepo,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly identity: IdentityAccessApi,
     private readonly parameters: OperatingParametersApi,
     private readonly audit: AuditApi,
   ) {}
@@ -32,7 +34,18 @@ export class ProvisioningExtensionService {
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A right was extended before installation');
     const today = await this.organizationReads.businessToday(input.now, tx);
-    const inCharge = await this.organizationReads.getItAdminInCharge(input.holderEmployeeId, today, tx);
+    const deptId = (await this.organizationReads.workDepartmentsOf([input.holderEmployeeId], today, tx)).get(
+      input.holderEmployeeId,
+    );
+    const defaultResponsibleEmployeeId = deptId
+      ? ((
+          await this.organizationReads.itAdminsActingFor(
+            [deptId],
+            (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+            tx,
+          )
+        ).get(deptId)?.defaultAssignee ?? null)
+      : null;
     // The most tries are fixed here, as for a grant: a parameter changed later reaches only the tasks made after it.
     const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT', tx)));
     const task = await this.tasks.insert(tx, {
@@ -41,7 +54,7 @@ export class ProvisioningExtensionService {
       assignmentId: input.assignmentId,
       channel: 'MANUAL',
       requestId: input.requestId,
-      defaultResponsibleEmployeeId: inCharge?.itAdminEmployeeId ?? null,
+      defaultResponsibleEmployeeId,
       createdByAppUserId: actor.appUserId,
       maxAttempts,
     });
@@ -52,7 +65,7 @@ export class ProvisioningExtensionService {
         channel: 'MANUAL',
         assignmentId: input.assignmentId,
         requestId: input.requestId,
-        defaultResponsibleEmployeeId: inCharge?.itAdminEmployeeId ?? null,
+        defaultResponsibleEmployeeId,
       }),
     );
 

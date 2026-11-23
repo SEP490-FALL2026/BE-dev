@@ -22,8 +22,8 @@ const NOT_FOUND = {
   description: 'The task does not exist (PROVISIONING_TASK.NOT_FOUND).',
   examples: [EXAMPLES.TASK_NOT_FOUND],
 } as const;
-/** The role guard, and the IT Admin who is the person revoked while another can work the task. */
-const WORKER_EXAMPLES = [FORBIDDEN_EXAMPLE, EXAMPLES.ANOTHER_IT_ADMIN_NEEDED] as const;
+/** The role guard, and callers not acting in charge of the task department. */
+const WORKER_EXAMPLES = [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE] as const;
 
 /**
  * The work an IT Admin does on a revocation: completing it, which is what gives the seat back, and cutting the access of a K1
@@ -51,7 +51,7 @@ export class RevocationTasksController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'Only an IT Admin works the queue of provisioning tasks, and an IT Admin who is the person revoked waits for another usable IT Admin (PROVISIONING.ANOTHER_IT_ADMIN_NEEDED); with none left they may.',
+        'Only an acting IT Admin (in charge or appointed substitute) for the task department may complete this revocation (PROVISIONING.NOT_IN_CHARGE).',
       examples: WORKER_EXAMPLES,
     },
     NOT_FOUND,
@@ -107,7 +107,7 @@ export class RevocationTasksController {
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.',
+      description: 'Not an IT Admin, or PROVISIONING.NOT_IN_CHARGE.',
       examples: WORKER_EXAMPLES,
     },
     NOT_FOUND,

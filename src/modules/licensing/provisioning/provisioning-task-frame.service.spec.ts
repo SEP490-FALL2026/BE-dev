@@ -5,7 +5,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { ProvisioningAnotherItAdminNeededError } from '../public/licensing.errors';
+import { ProvisioningNotInChargeError } from './provisioning.errors';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
@@ -20,19 +20,16 @@ const itAdmin = (employeeId: string): AuthenticatedPrincipal => ({
   roles: ['IT_ADMIN'],
 });
 
-/**
- * `SoD-5` (`QĐ-77m`): an IT Admin who is the beneficiary of a task works it only when no other usable IT Admin can; the others are
- * counted in the transaction of the act, the act is audited as self-executed and the Super Admin is told in that same transaction.
- *
- * This unit spec establishes what the frame does with the transaction it is given, and nothing about two transactions at once: whether
- * an account that becomes usable between the count and the commit is seen is a property of PostgreSQL (`READ COMMITTED`, no row lock on
- * the count), which a real-database barrier test would show and which is deferred by the Owner's test policy.
- */
 describe('ProvisioningTaskFrame.work', () => {
   const tx = { name: 'tx' } as unknown as DbTx;
   const repo = { lock: jest.fn(), find: jest.fn() };
-  const organization = { getOrganization: jest.fn() };
-  const identity = { countUsableItAdminsExcept: jest.fn(), findUsableSuperAdminEmployeeId: jest.fn() };
+  const organization = {
+    getOrganization: jest.fn(),
+    businessToday: jest.fn(),
+    workDepartmentsOf: jest.fn(),
+    itAdminsActingFor: jest.fn(),
+  };
+  const identity = { findUsableItAdminEmployeeIds: jest.fn(), findUsableSuperAdminEmployeeId: jest.fn() };
   const notifications = { notifyInApp: jest.fn() };
   const audit = { record: jest.fn() };
   const runner = { run: jest.fn() };
@@ -56,6 +53,16 @@ describe('ProvisioningTaskFrame.work', () => {
     order.length = 0;
     runner.run.mockImplementation((fn: (client: DbTx) => Promise<unknown>) => fn(tx));
     organization.getOrganization.mockResolvedValue(ORGANIZATION);
+    organization.businessToday.mockResolvedValue('2026-11-23');
+    organization.workDepartmentsOf.mockResolvedValue(
+      new Map([
+        ['e-employee', 'dept-1'],
+        ['e-it1', 'dept-1'],
+      ]),
+    );
+    organization.itAdminsActingFor.mockResolvedValue(
+      new Map([['dept-1', { inCharge: 'e-it1', substitute: null, defaultAssignee: 'e-it1', actors: ['e-it1'] }]]),
+    );
     repo.find.mockResolvedValue(null);
     identity.findUsableSuperAdminEmployeeId.mockResolvedValue('e-super');
     write.mockImplementation(() => {
@@ -88,13 +95,51 @@ describe('ProvisioningTaskFrame.work', () => {
     frame = module.get(ProvisioningTaskFrame);
   });
 
-  it('lets an IT Admin work their own task when no other usable IT Admin can: counted in the transaction, audited as self-executed, the Super Admin told after the write in it', async () => {
+  it('rejects an IT Admin outside acting IT Admins for the beneficiary work department with ProvisioningNotInChargeError', async () => {
+    repo.lock.mockResolvedValue(task('e-employee'));
+
+    await expect(frame.work(itAdmin('e-other'), 'task-1', action)).rejects.toBeInstanceOf(ProvisioningNotInChargeError);
+
+    expect(organization.workDepartmentsOf).toHaveBeenCalledWith(['e-employee'], '2026-11-23', tx);
+    expect(organization.itAdminsActingFor).toHaveBeenCalledWith(['dept-1'], expect.any(Function), tx);
+    expect(action.check).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the beneficiary has no work department (unplaced) and writes nothing', async () => {
+    repo.lock.mockResolvedValue(task('e-unplaced'));
+
+    await expect(frame.work(itAdmin('e-it1'), 'task-1', action)).rejects.toBeInstanceOf(ProvisioningNotInChargeError);
+
+    expect(organization.itAdminsActingFor).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('records bySubstitute: true in audit after when an appointed substitute acts on the task', async () => {
+    repo.lock.mockResolvedValue(task('e-employee'));
+    organization.itAdminsActingFor.mockResolvedValue(
+      new Map([
+        ['dept-1', { inCharge: 'e-it1', substitute: 'e-sub', defaultAssignee: 'e-sub', actors: ['e-it1', 'e-sub'] }],
+      ]),
+    );
+
+    await frame.work(itAdmin('e-sub'), 'task-1', action);
+
+    expect(audit.record).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        action: 'PROVISIONING_TASK.CLAIMED',
+        after: expect.objectContaining({ selfExecuted: false, bySubstitute: true }) as unknown,
+      }),
+    );
+  });
+
+  it('allows an acting IT Admin to work their own task without blocker, records selfExecuted and notifies Super Admin', async () => {
     repo.lock.mockResolvedValue(task('e-it1'));
-    identity.countUsableItAdminsExcept.mockResolvedValue(0);
 
     await frame.work(itAdmin('e-it1'), 'task-1', action);
 
-    expect(identity.countUsableItAdminsExcept).toHaveBeenCalledWith('e-it1', tx);
     expect(identity.findUsableSuperAdminEmployeeId).toHaveBeenCalledWith(tx);
     expect(audit.record).toHaveBeenCalledWith(
       tx,
@@ -114,35 +159,8 @@ describe('ProvisioningTaskFrame.work', () => {
     expect(order).toEqual(['write', 'audit', 'notify']);
   });
 
-  it('refuses an IT Admin their own task while another usable IT Admin can work it, and writes, audits and tells nobody', async () => {
+  it('does not notify when no Super Admin can be told, and still marks selfExecuted', async () => {
     repo.lock.mockResolvedValue(task('e-it1'));
-    identity.countUsableItAdminsExcept.mockResolvedValue(1);
-
-    await expect(frame.work(itAdmin('e-it1'), 'task-1', action)).rejects.toBeInstanceOf(
-      ProvisioningAnotherItAdminNeededError,
-    );
-
-    expect(write).not.toHaveBeenCalled();
-    expect(audit.record).not.toHaveBeenCalled();
-    expect(notifications.notifyInApp).not.toHaveBeenCalled();
-  });
-
-  it('does not count the other IT Admins, mark the act or tell anybody for a task of somebody else', async () => {
-    repo.lock.mockResolvedValue(task('e-employee'));
-
-    await frame.work(itAdmin('e-it1'), 'task-1', action);
-
-    expect(identity.countUsableItAdminsExcept).not.toHaveBeenCalled();
-    expect(audit.record).toHaveBeenCalledWith(
-      tx,
-      expect.objectContaining({ after: expect.objectContaining({ selfExecuted: false }) as unknown }),
-    );
-    expect(notifications.notifyInApp).not.toHaveBeenCalled();
-  });
-
-  it('still marks the act when no Super Admin can be told, and tells nobody', async () => {
-    repo.lock.mockResolvedValue(task('e-it1'));
-    identity.countUsableItAdminsExcept.mockResolvedValue(0);
     identity.findUsableSuperAdminEmployeeId.mockResolvedValue(null);
 
     await frame.work(itAdmin('e-it1'), 'task-1', action);

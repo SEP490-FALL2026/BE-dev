@@ -47,3 +47,14 @@ export class ProvisioningK1ChecklistError extends Error {
     this.name = 'ProvisioningK1ChecklistError';
   }
 }
+
+/**
+ * The caller is not an acting IT Admin (neither the usable IT Admin in charge nor an appointed substitute)
+ * for the department of the task's beneficiary.
+ */
+export class ProvisioningNotInChargeError extends Error {
+  constructor() {
+    super('Only the IT Admin in charge or an appointed substitute for this department may act on this task.');
+    this.name = 'ProvisioningNotInChargeError';
+  }
+}

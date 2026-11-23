@@ -48,6 +48,7 @@ import {
   ProvisioningItAdminRequiredError,
   ProvisioningK1ChecklistError,
   ProvisioningKeyError,
+  ProvisioningNotInChargeError,
 } from './provisioning.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
@@ -197,6 +198,9 @@ export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof LicenseKeyStateError) return refuse(CONFLICT, `LICENSE_KEY.${error.problem}`, error.message);
   // The same answer as the role guard of the route: the policy of the work refuses what the guard would have refused.
   if (error instanceof ProvisioningItAdminRequiredError) return new ApiException(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR);
+  if (error instanceof ProvisioningNotInChargeError) {
+    return refuse(HttpStatus.FORBIDDEN, 'PROVISIONING.NOT_IN_CHARGE', error.message);
+  }
 
   return toLicensingApiException(error);
 }
@@ -233,6 +237,7 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   EVIDENCE_REQUIRED: example(new ProvisioningEvidenceRequiredError()),
   REASON_REQUIRED: example(new ProvisioningReasonRequiredError()),
   ANOTHER_IT_ADMIN_NEEDED: example(new ProvisioningAnotherItAdminNeededError()),
+  NOT_IN_CHARGE: example(new ProvisioningNotInChargeError()),
   NOT_CLAIMABLE: example(new ProvisioningTaskStateError('NOT_CLAIMABLE')),
   NOT_IN_PROGRESS: example(new ProvisioningTaskStateError('NOT_IN_PROGRESS')),
   NOT_MANUAL: example(new ProvisioningTaskNotManualError()),

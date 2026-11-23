@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { isSystemActor, type RevocationSource, type SystemActor } from '../public/licensing.types';
@@ -14,6 +15,7 @@ export class RevocationTaskFactory {
   constructor(
     private readonly tasks: ProvisioningTaskRepo,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly identity: IdentityAccessApi,
     private readonly parameters: OperatingParametersApi,
   ) {}
 
@@ -28,7 +30,18 @@ export class RevocationTaskFactory {
     },
   ): Promise<ProvisioningTaskRecord> {
     const today = await this.organizationReads.businessToday(input.now, tx);
-    const inCharge = await this.organizationReads.getItAdminInCharge(input.assignment.employeeId, today, tx);
+    const deptId = (await this.organizationReads.workDepartmentsOf([input.assignment.employeeId], today, tx)).get(
+      input.assignment.employeeId,
+    );
+    const defaultResponsibleEmployeeId = deptId
+      ? ((
+          await this.organizationReads.itAdminsActingFor(
+            [deptId],
+            (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+            tx,
+          )
+        ).get(deptId)?.defaultAssignee ?? null)
+      : null;
     // The most tries are fixed here, as for a grant: a parameter changed later reaches only the tasks made after it.
     const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT', tx)));
 
@@ -36,7 +49,7 @@ export class RevocationTaskFactory {
       organizationId: input.organizationId,
       assignmentId: input.assignment.id,
       source: input.source,
-      defaultResponsibleEmployeeId: inCharge?.itAdminEmployeeId ?? null,
+      defaultResponsibleEmployeeId,
       creator: isSystemActor(actor) ? { system: true } : { appUserId: actor.appUserId },
       maxAttempts,
     });

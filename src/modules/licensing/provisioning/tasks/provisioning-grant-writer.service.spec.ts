@@ -8,10 +8,94 @@ import type { IdentityAccessApi } from '../../../identity-access/public/identity
 import type { RequestPartyEligibilityApi } from '../../../identity-access/public/request-party-eligibility.api';
 import type { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
+import { ProvisioningNotInChargeError } from '../provisioning.errors';
 import { ProvisioningGrantWriter } from './provisioning-grant-writer.service';
 import type { ProvisioningGrantTaskService } from './provisioning-grant-task.service';
 import { ProvisioningHolderService } from './provisioning-holder.service';
 import type { ProvisioningReplacementService } from './provisioning-replacement.service';
+
+interface WriterOverrides {
+  insertAndClaim?: jest.Mock;
+  lockPersonalEmployee?: jest.Mock;
+  claimForGrant?: jest.Mock;
+  lockSeatTarget?: jest.Mock;
+  lockLiveRevocation?: jest.Mock;
+  endReplacedRight?: jest.Mock;
+  requireActingItAdmin?: jest.Mock;
+}
+
+function makeWriter(overrides: WriterOverrides = {}) {
+  const claimForGrant =
+    overrides.claimForGrant ??
+    jest.fn(() =>
+      Promise.resolve({
+        status: 'GRANTABLE' as const,
+        seat: 'PERSONAL' as const,
+        employeeId: 'emp-1',
+        planId: 'plan-1',
+        departmentId: 'dept-1',
+        replacesAssignmentId: null,
+        expectedEndDate: null,
+        termBound: false,
+        termMonths: null,
+      }),
+    );
+
+  return new ProvisioningGrantWriter(
+    {
+      insertAndClaim:
+        overrides.insertAndClaim ??
+        jest.fn(() => Promise.resolve({ id: 'task-1', channel: 'MANUAL', defaultResponsibleEmployeeId: null })),
+    } as unknown as ProvisioningGrantTaskService,
+    {
+      lockPersonalEmployee: overrides.lockPersonalEmployee ?? jest.fn(),
+      personal: jest.fn(() => Promise.resolve({ selfExecuted: null })),
+      service: jest.fn(() => Promise.resolve({ selfExecuted: null })),
+    } as unknown as ProvisioningHolderService,
+    {
+      assertSeatTargetUsable: jest.fn(),
+      createFromRequest: jest.fn(() => Promise.resolve({ id: 'asg-1' })),
+    } as unknown as AssignmentService,
+    {
+      lockSeatTarget:
+        overrides.lockSeatTarget ??
+        jest.fn(() => Promise.resolve({ kind: 'PLAN', planId: 'plan-1', provisioningType: 'K5' })),
+    } as unknown as CatalogApi,
+    { get: () => ({ claimForGrant }) } as unknown as GrantRequestGateHook,
+    {
+      judgePurchase: jest.fn(() => Promise.resolve({ decision: { purchased: false }, stock: null })),
+    } as unknown as SharedPoolService,
+    {
+      lockLiveRevocation: overrides.lockLiveRevocation ?? jest.fn(() => Promise.resolve(null)),
+      endReplacedRight: overrides.endReplacedRight ?? jest.fn(() => Promise.resolve(null)),
+    } as unknown as ProvisioningReplacementService,
+    {
+      requireActingItAdmin: overrides.requireActingItAdmin ?? jest.fn(() => Promise.resolve({ bySubstitute: false })),
+    } as unknown as ProvisioningTaskFrame,
+  );
+}
+
+const baseInput = {
+  requestId: 'req-1',
+  beneficiaryEmployeeId: 'emp-1',
+  subscriptionId: undefined,
+  accountIdentifier: undefined,
+  responsibleEmployeeId: undefined,
+  purchase: false,
+} as never;
+
+const plannedOf = (answer: Record<string, unknown>, serviceIdentifier: string | null = null) =>
+  ({
+    answer,
+    plan: { planId: 'plan-1', provisioningType: 'K5' },
+    serviceIdentifier,
+    organization: { id: 'org-1' },
+    today: '2026-11-23',
+    inCharge: null,
+    maxAttempts: 3,
+    holderContractEnd: null,
+    holderHasTerm: false,
+  }) as never;
 
 describe('lock order in ProvisioningGrantWriter and ProvisioningHolderService', () => {
   const tx = { kind: 'tx' };
@@ -58,55 +142,12 @@ describe('lock order in ProvisioningGrantWriter and ProvisioningHolderService', 
       });
     });
 
-    const writer = new ProvisioningGrantWriter(
-      {
-        insertAndClaim: jest.fn(() =>
-          Promise.resolve({ id: 'task-1', channel: 'MANUAL', defaultResponsibleEmployeeId: null }),
-        ),
-      } as unknown as ProvisioningGrantTaskService,
-      {
-        lockPersonalEmployee,
-        personal: jest.fn(() => Promise.resolve({ selfExecuted: null })),
-      } as unknown as ProvisioningHolderService,
-      {
-        assertSeatTargetUsable: jest.fn(),
-        createFromRequest: jest.fn(() => Promise.resolve({ id: 'asg-1' })),
-      } as unknown as AssignmentService,
-      {
-        lockSeatTarget: jest.fn(() => Promise.resolve({ kind: 'PLAN', planId: 'plan-1', provisioningType: 'K5' })),
-      } as unknown as CatalogApi,
-      { get: () => ({ claimForGrant }) } as unknown as GrantRequestGateHook,
-      {
-        judgePurchase: jest.fn(() => Promise.resolve({ decision: { purchased: false }, stock: null })),
-      } as unknown as SharedPoolService,
-      {
-        lockLiveRevocation: jest.fn(() => Promise.resolve(null)),
-        endReplacedRight: jest.fn(() => Promise.resolve(null)),
-      } as unknown as ProvisioningReplacementService,
-    );
-
+    const writer = makeWriter({ lockPersonalEmployee, claimForGrant });
     await writer.write(
       tx as never,
       actor,
-      {
-        requestId: 'req-1',
-        beneficiaryEmployeeId: 'emp-1',
-        subscriptionId: undefined,
-        accountIdentifier: undefined,
-        responsibleEmployeeId: undefined,
-        purchase: false,
-      } as never,
-      {
-        answer: { seat: 'PERSONAL', employeeId: 'emp-1', planId: 'plan-1', departmentId: 'dept-1' },
-        plan: { planId: 'plan-1', provisioningType: 'K5' },
-        serviceIdentifier: null,
-        organization: { id: 'org-1' },
-        today: '2026-11-23',
-        inCharge: null,
-        maxAttempts: 3,
-        holderContractEnd: null,
-        holderHasTerm: false,
-      } as never,
+      baseInput,
+      plannedOf({ seat: 'PERSONAL', employeeId: 'emp-1', planId: 'plan-1', departmentId: 'dept-1' }),
     );
 
     expect(lockPersonalEmployee).toHaveBeenCalledWith(tx, 'emp-1');
@@ -129,60 +170,20 @@ describe('lock order in ProvisioningGrantWriter and ProvisioningHolderService', 
       }),
     );
 
-    const writer = new ProvisioningGrantWriter(
-      {
-        insertAndClaim: jest.fn(() =>
-          Promise.resolve({ id: 'task-1', channel: 'MANUAL', defaultResponsibleEmployeeId: null }),
-        ),
-      } as unknown as ProvisioningGrantTaskService,
-      {
-        lockPersonalEmployee,
-        service: jest.fn(() => Promise.resolve({ selfExecuted: null })),
-      } as unknown as ProvisioningHolderService,
-      {
-        assertSeatTargetUsable: jest.fn(),
-        createFromRequest: jest.fn(() => Promise.resolve({ id: 'asg-1' })),
-      } as unknown as AssignmentService,
-      {
-        lockSeatTarget: jest.fn(() => Promise.resolve({ kind: 'PLAN', planId: 'plan-1', provisioningType: 'K5' })),
-      } as unknown as CatalogApi,
-      { get: () => ({ claimForGrant }) } as unknown as GrantRequestGateHook,
-      {
-        judgePurchase: jest.fn(() => Promise.resolve({ decision: { purchased: false }, stock: null })),
-      } as unknown as SharedPoolService,
-      {
-        lockLiveRevocation: jest.fn(() => Promise.resolve(null)),
-        endReplacedRight: jest.fn(() => Promise.resolve(null)),
-      } as unknown as ProvisioningReplacementService,
-    );
-
+    const writer = makeWriter({ lockPersonalEmployee, claimForGrant });
     await writer.write(
       tx as never,
       actor,
-      {
-        requestId: 'req-1',
-        beneficiaryEmployeeId: 'emp-1',
-        subscriptionId: undefined,
-        accountIdentifier: undefined,
-        responsibleEmployeeId: undefined,
-        purchase: false,
-      } as never,
-      {
-        answer: {
+      baseInput,
+      plannedOf(
+        {
           seat: 'SERVICE',
           employeeId: 'emp-1',
           planId: 'plan-1',
           serviceAccount: { departmentId: 'dept-1', accountName: 'svc-1' },
         },
-        plan: { planId: 'plan-1', provisioningType: 'K5' },
-        serviceIdentifier: 'svc-1@corp.vn',
-        organization: { id: 'org-1' },
-        today: '2026-11-23',
-        inCharge: null,
-        maxAttempts: 3,
-        holderContractEnd: null,
-        holderHasTerm: false,
-      } as never,
+        'svc-1@corp.vn',
+      ),
     );
 
     expect(lockPersonalEmployee).not.toHaveBeenCalled();
@@ -223,59 +224,24 @@ describe('lock order in ProvisioningGrantWriter and ProvisioningHolderService', 
       return Promise.resolve('asg-old');
     });
 
-    const writer = new ProvisioningGrantWriter(
-      {
-        insertAndClaim: jest.fn(() =>
-          Promise.resolve({ id: 'task-1', channel: 'MANUAL', defaultResponsibleEmployeeId: null }),
-        ),
-      } as unknown as ProvisioningGrantTaskService,
-      {
-        lockPersonalEmployee,
-        personal: jest.fn(() => Promise.resolve({ selfExecuted: null })),
-      } as unknown as ProvisioningHolderService,
-      {
-        assertSeatTargetUsable: jest.fn(),
-        createFromRequest: jest.fn(() => Promise.resolve({ id: 'asg-1' })),
-      } as unknown as AssignmentService,
-      { lockSeatTarget } as unknown as CatalogApi,
-      { get: () => ({ claimForGrant }) } as unknown as GrantRequestGateHook,
-      {
-        judgePurchase: jest.fn(() => Promise.resolve({ decision: { purchased: false }, stock: null })),
-      } as unknown as SharedPoolService,
-      {
-        lockLiveRevocation,
-        endReplacedRight,
-      } as unknown as ProvisioningReplacementService,
-    );
-
+    const writer = makeWriter({
+      lockPersonalEmployee,
+      lockLiveRevocation,
+      claimForGrant,
+      lockSeatTarget,
+      endReplacedRight,
+    });
     await writer.write(
       tx as never,
       actor,
-      {
-        requestId: 'req-1',
-        beneficiaryEmployeeId: 'emp-1',
-        subscriptionId: undefined,
-        accountIdentifier: undefined,
-        responsibleEmployeeId: undefined,
-        purchase: false,
-      } as never,
-      {
-        answer: {
-          seat: 'PERSONAL',
-          employeeId: 'emp-1',
-          planId: 'plan-1',
-          departmentId: 'dept-1',
-          replacesAssignmentId: 'asg-old',
-        },
-        plan: { planId: 'plan-1', provisioningType: 'K5' },
-        serviceIdentifier: null,
-        organization: { id: 'org-1' },
-        today: '2026-11-23',
-        inCharge: null,
-        maxAttempts: 3,
-        holderContractEnd: null,
-        holderHasTerm: false,
-      } as never,
+      baseInput,
+      plannedOf({
+        seat: 'PERSONAL',
+        employeeId: 'emp-1',
+        planId: 'plan-1',
+        departmentId: 'dept-1',
+        replacesAssignmentId: 'asg-old',
+      }),
     );
 
     expect(lockLiveRevocation).toHaveBeenCalledWith(tx, 'asg-old');
@@ -313,42 +279,58 @@ describe('lock order in ProvisioningGrantWriter and ProvisioningHolderService', 
       }),
     );
 
-    const writer = new ProvisioningGrantWriter(
-      { insertAndClaim: jest.fn() } as unknown as ProvisioningGrantTaskService,
-      { lockPersonalEmployee: jest.fn() } as unknown as ProvisioningHolderService,
-      { assertSeatTargetUsable: jest.fn() } as unknown as AssignmentService,
-      { lockSeatTarget: jest.fn() } as unknown as CatalogApi,
-      { get: () => ({ claimForGrant }) } as unknown as GrantRequestGateHook,
-      { judgePurchase: jest.fn() } as unknown as SharedPoolService,
-      {
-        lockLiveRevocation: jest.fn(() => Promise.resolve(null)),
-        endReplacedRight: jest.fn(),
-      } as unknown as ProvisioningReplacementService,
-    );
-
+    const writer = makeWriter({ claimForGrant });
     await expect(
       writer.write(
         tx as never,
         actor,
-        { requestId: 'req-1', beneficiaryEmployeeId: 'emp-1', purchase: false } as never,
-        {
-          answer: {
-            seat: 'PERSONAL',
-            employeeId: 'emp-1',
-            planId: 'plan-1',
-            departmentId: 'dept-1',
-            replacesAssignmentId: 'asg-old',
-          },
-          plan: { planId: 'plan-1', provisioningType: 'K5' },
-          serviceIdentifier: null,
-          organization: { id: 'org-1' },
-          today: '2026-11-23',
-          inCharge: null,
-          maxAttempts: 3,
-          holderContractEnd: null,
-          holderHasTerm: false,
-        } as never,
+        baseInput,
+        plannedOf({
+          seat: 'PERSONAL',
+          employeeId: 'emp-1',
+          planId: 'plan-1',
+          departmentId: 'dept-1',
+          replacesAssignmentId: 'asg-old',
+        }),
       ),
     ).rejects.toEqual(new GrantRequestRefusedError('NOT_APPROVED'));
+  });
+
+  it('checks requireActingItAdmin inside tx and forwards bySubstitute to insertAndClaim; refuses before claiming request when not in charge', async () => {
+    const claimForGrant = jest.fn();
+    const insertAndClaim = jest.fn(() => Promise.resolve({ id: 'task-1' }));
+    const requireActingItAdmin = jest
+      .fn()
+      .mockRejectedValueOnce(new ProvisioningNotInChargeError())
+      .mockResolvedValueOnce({ bySubstitute: true });
+
+    const writer = makeWriter({ claimForGrant, insertAndClaim, requireActingItAdmin });
+    const planned = plannedOf({ seat: 'PERSONAL', employeeId: 'emp-1', planId: 'plan-1', departmentId: 'dept-1' });
+
+    await expect(writer.write(tx as never, actor, baseInput, planned)).rejects.toBeInstanceOf(
+      ProvisioningNotInChargeError,
+    );
+    expect(claimForGrant).not.toHaveBeenCalled();
+
+    claimForGrant.mockResolvedValue({
+      status: 'GRANTABLE' as const,
+      seat: 'PERSONAL' as const,
+      employeeId: 'emp-1',
+      planId: 'plan-1',
+      departmentId: 'dept-1',
+      replacesAssignmentId: null,
+      expectedEndDate: null,
+      termBound: false,
+      termMonths: null,
+    });
+
+    await writer.write(tx as never, actor, baseInput, planned);
+
+    expect(requireActingItAdmin).toHaveBeenCalledWith(
+      tx,
+      actor,
+      expect.objectContaining({ beneficiaryEmployeeId: 'emp-1' }),
+    );
+    expect(insertAndClaim).toHaveBeenCalledWith(tx, actor, expect.objectContaining({ bySubstitute: true }));
   });
 });

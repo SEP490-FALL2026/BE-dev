@@ -62,4 +62,26 @@ export const W2_REGISTRY_EVENTS: readonly RegistryEvent[] = [
     reason:
       'The departments of the year listed by the package: at most DEPARTMENTS_LISTED_MAX, with the total beside it.',
   },
+  {
+    registry: 'nested',
+    key: 'provisioningTaskList#actingItAdmins',
+    change: 'added',
+    to: 'bounded',
+    bound: 'ACTING_IT_ADMINS_MAX',
+    finding: 'LD-14',
+    item: 'licensing-provisioning-task-read-contracts',
+    date: '2026-11-23',
+    reason: 'Acting IT Admins of the task department on each list item: at most ACTING_IT_ADMINS_MAX.',
+  },
+  {
+    registry: 'nested',
+    key: 'provisioningTaskGet#task.actingItAdmins',
+    change: 'added',
+    to: 'bounded',
+    bound: 'ACTING_IT_ADMINS_MAX',
+    finding: 'LD-14',
+    item: 'licensing-provisioning-task-read-contracts',
+    date: '2026-11-23',
+    reason: 'Acting IT Admins of the task department on the task detail: at most ACTING_IT_ADMINS_MAX.',
+  },
 ];

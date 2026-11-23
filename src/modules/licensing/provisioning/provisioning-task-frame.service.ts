@@ -8,7 +8,8 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { ProvisioningTaskNotFoundError } from '../public/licensing.errors';
 import type { SelfExecutionMode } from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
-import { assertItAdmin, selfExecution } from './provisioning.policy';
+import { assertActingItAdmin, assertItAdmin, selfExecution } from './provisioning.policy';
+import { ProvisioningNotInChargeError } from './provisioning.errors';
 import type { ProvisioningTaskRecord } from './provisioning-task.types';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
 
@@ -40,7 +41,7 @@ export class ProvisioningTaskFrame {
     private readonly runner: TransactionRunner,
   ) {}
 
-  /** Throws ProvisioningItAdminRequiredError, ProvisioningTaskNotFoundError, what `check` throws, ProvisioningAnotherItAdminNeededError and what `write` throws. */
+  /** Throws ProvisioningItAdminRequiredError, ProvisioningTaskNotFoundError, ProvisioningNotInChargeError, what `check` throws and what `write` throws. */
   async work(
     actor: AuthenticatedPrincipal,
     id: string,
@@ -62,6 +63,10 @@ export class ProvisioningTaskFrame {
       }
       const task = await this.repo.lock(tx, id);
       if (!task) throw new ProvisioningTaskNotFoundError();
+      const { bySubstitute } = await this.requireActingItAdmin(tx, actor, {
+        beneficiaryEmployeeId: task.assignment.employeeId,
+        now,
+      });
       action.check(task);
       const mode = await this.selfExecutionMode(actor, task.assignment.employeeId, tx);
       const done = await action.write({ tx, task, organizationId: organization.id, now });
@@ -85,6 +90,7 @@ export class ProvisioningTaskFrame {
             ...done.after,
             defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
             selfExecuted: mode === 'ALLOW_SELF_EXECUTED',
+            ...(bySubstitute ? { bySubstitute: true } : {}),
           },
         ),
       );
@@ -97,22 +103,49 @@ export class ProvisioningTaskFrame {
   }
 
   /**
-   * The rule for an IT Admin who works for a person who is themselves (`QĐ-77m`): not while another usable IT Admin can, and
-   * marked as self-executed when none can. The other IT Admins are counted in the transaction of the act (`tx`), so one who is
-   * locked at the same moment is not counted (F24). Throws ProvisioningAnotherItAdminNeededError.
+   * Resolves the work department (or uses the known `departmentId`) and verifies that `actor` is an acting IT Admin
+   * for it in `tx`, returning `{ bySubstitute }` from the same read. Throws ProvisioningNotInChargeError.
    */
-  async selfExecutionMode(
+  async requireActingItAdmin(
+    tx: DbTx | undefined,
+    actor: AuthenticatedPrincipal,
+    target: { beneficiaryEmployeeId: string; departmentId?: string; now?: Date },
+  ): Promise<{ bySubstitute: boolean }> {
+    let deptId = target.departmentId;
+    if (deptId === undefined) {
+      const today = await this.organizationReads.businessToday(target.now ?? new Date(), tx);
+      deptId = (await this.organizationReads.workDepartmentsOf([target.beneficiaryEmployeeId], today, tx)).get(
+        target.beneficiaryEmployeeId,
+      );
+    }
+    if (deptId === undefined) throw new ProvisioningNotInChargeError();
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [deptId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(deptId);
+
+    return assertActingItAdmin(actor.employeeId, acting);
+  }
+
+  /**
+   * Self-execution mode when the IT Admin works for a person who is themselves: allowed for any acting
+   * IT Admin and marked as self-executed.
+   */
+  selfExecutionMode(
     actor: AuthenticatedPrincipal,
     beneficiaryEmployeeId: string,
-    tx?: DbTx,
+    _tx?: DbTx,
   ): Promise<SelfExecutionMode> {
-    const isSelf = actor.employeeId === beneficiaryEmployeeId;
-
-    return selfExecution({
-      actorEmployeeId: actor.employeeId,
-      beneficiaryEmployeeId,
-      otherUsableItAdmins: isSelf ? await this.identity.countUsableItAdminsExcept(actor.employeeId, tx) : 0,
-    });
+    void _tx;
+    return Promise.resolve(
+      selfExecution({
+        actorEmployeeId: actor.employeeId,
+        beneficiaryEmployeeId,
+      }),
+    );
   }
 
   /**

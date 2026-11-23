@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../../catalog/public/catalog.types';
+import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -41,6 +42,7 @@ export class ProvisioningGrantPlanner {
     private readonly gate: GrantRequestGateHook,
     private readonly catalog: CatalogApi,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly identity: IdentityAccessApi,
     private readonly parameters: OperatingParametersApi,
   ) {}
 
@@ -62,10 +64,7 @@ export class ProvisioningGrantPlanner {
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A provisioning task was made before installation');
     const today = await this.organizationReads.businessToday();
-    const inCharge = await this.organizationReads.getItAdminInCharge(
-      input.responsibleEmployeeId ?? answer.employeeId,
-      today,
-    );
+    const inCharge = await this.defaultInChargeOf(answer, today);
     // The most tries are fixed here: a parameter changed later reaches only the tasks made after it (US-01-04 AC-13).
     const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT')));
 
@@ -86,5 +85,21 @@ export class ProvisioningGrantPlanner {
       holderContractEnd,
       holderHasTerm,
     };
+  }
+
+  private async defaultInChargeOf(
+    answer: Extract<Awaited<ReturnType<ReturnType<GrantRequestGateHook['get']>['check']>>, { status: 'GRANTABLE' }>,
+    today: string,
+  ): Promise<{ departmentId: string; itAdminEmployeeId: string | null } | null> {
+    const deptId =
+      answer.seat === 'SERVICE'
+        ? answer.serviceAccount.departmentId
+        : ((await this.organizationReads.workDepartmentsOf([answer.employeeId], today)).get(answer.employeeId) ?? null);
+    if (!deptId) return null;
+    const acting = (
+      await this.organizationReads.itAdminsActingFor([deptId], (ids) => this.identity.findUsableItAdminEmployeeIds(ids))
+    ).get(deptId);
+
+    return { departmentId: deptId, itAdminEmployeeId: acting?.defaultAssignee ?? null };
   }
 }

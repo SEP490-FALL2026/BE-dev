@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../catalog/public/catalog.types';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type {
   AccessState,
@@ -17,7 +18,7 @@ import type {
   TaskStep,
 } from '../public/licensing.types';
 import { availableDecisions } from './failure.policy';
-import { doneWhenFor, inGeneralQueue, stepsFor } from './provisioning.policy';
+import { actingItAdminsViewOf, doneWhenFor, stepsFor, type ActingItAdminSummaryItem } from './provisioning.policy';
 import type { K1ChecklistCard } from './k1-checklist/provisioning-k1-checklist.policy';
 import { ProvisioningK1Checklist } from './k1-checklist/provisioning-k1-checklist.service';
 import { isTerminating } from './revocation.policy';
@@ -77,7 +78,8 @@ export interface TaskSummaryView {
   subscriptionId: string | null;
   accountIdentifier: string;
   defaultResponsibleEmployeeId: string | null;
-  inGeneralQueue: boolean;
+  awaitingItAdmin: boolean;
+  actingItAdmins: ActingItAdminSummaryItem[];
   /** What the reasons that stand ask of a revocation: not before a day (`notBefore`), due by a day; null for a grant and when none asked. */
   dueOn: BusinessDate | null;
   notBefore: BusinessDate | null;
@@ -139,6 +141,9 @@ interface ViewContext {
       contractEndDate?: string | null;
     }
   >;
+  employeeNames: Map<string, string>;
+  workDepartments: Map<string, string>;
+  actingByDept: Awaited<ReturnType<OrganizationReadApi['itAdminsActingFor']>>;
   plans: Map<string, SeatTarget>;
   /** The note of each plan of a revocation about what to do before the seat is taken away (`QĐ-110g`: read only, nobody confirms it). */
   notes: Map<string, string | null>;
@@ -195,6 +200,7 @@ export class ProvisioningTaskViewService {
   constructor(
     private readonly catalog: CatalogApi,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly identity: IdentityAccessApi,
     private readonly reasons: ProvisioningTaskReasonRepo,
     private readonly checklists: ProvisioningK1Checklist,
   ) {}
@@ -283,20 +289,22 @@ export class ProvisioningTaskViewService {
     };
   }
 
-  private async contextOf(records: readonly ProvisioningTaskRecord[], withReasons: boolean): Promise<ViewContext> {
-    const employeeIds = [
-      ...new Set(
-        records.flatMap((task) => [
-          task.assignment.employeeId,
-          ...(task.defaultResponsibleEmployeeId ? [task.defaultResponsibleEmployeeId] : []),
-        ]),
-      ),
-    ];
-    const employees = new Map(
-      (await this.organizationReads.getEmployees(employeeIds)).map((employee) => [employee.id, employee]),
-    );
-    const planIds = [...new Set(records.map((task) => task.assignment.planId))];
-    const plans = new Map((await this.catalog.findPlanSeatTargets(planIds)).map((plan) => [plan.planId, plan]));
+  private emptyContext(): ViewContext {
+    return {
+      employees: new Map(),
+      employeeNames: new Map(),
+      workDepartments: new Map(),
+      actingByDept: new Map(),
+      plans: new Map(),
+      notes: new Map(),
+      reasons: new Map(),
+      reasonCounts: new Map(),
+      today: '',
+      now: Date.now(),
+    };
+  }
+
+  private async revocationContextOf(records: readonly ProvisioningTaskRecord[], withReasons: boolean) {
     const revocations = records.filter((task) => task.kind === 'REVOKE');
     const revocationIds = revocations.map((task) => task.id);
     const noted = [...new Set(revocations.map((task) => task.assignment.planId))];
@@ -317,20 +325,60 @@ export class ProvisioningTaskViewService {
           [...reasons].map(([taskId, list]) => [taskId, list.filter((reason) => reason.withdrawnAt === null).length]),
         )
       : await this.reasons.countOf(revocationIds);
-    const today = revocationIds.length > 0 ? await this.organizationReads.businessToday() : '';
 
-    return { employees, plans, notes, reasons, reasonCounts, today, now: Date.now() };
+    return { notes, reasons, reasonCounts };
+  }
+
+  private async contextOf(records: readonly ProvisioningTaskRecord[], withReasons: boolean): Promise<ViewContext> {
+    if (records.length === 0) return this.emptyContext();
+    const today = await this.organizationReads.businessToday();
+    const beneficiaryIds = [...new Set(records.map((task) => task.assignment.employeeId))];
+    const workDepartments = await this.organizationReads.workDepartmentsOf(beneficiaryIds, today);
+    const deptIds = [...new Set(workDepartments.values())];
+    const actingByDept = await this.organizationReads.itAdminsActingFor(deptIds, (ids) =>
+      this.identity.findUsableItAdminEmployeeIds(ids),
+    );
+    const actingActorIds = [...actingByDept.values()].flatMap((entry) => entry.actors);
+    const employeeIds = [
+      ...new Set([
+        ...records.flatMap((task) => [
+          task.assignment.employeeId,
+          ...(task.defaultResponsibleEmployeeId ? [task.defaultResponsibleEmployeeId] : []),
+        ]),
+        ...actingActorIds,
+      ]),
+    ];
+    const employees = new Map(
+      (await this.organizationReads.getEmployees(employeeIds)).map((employee) => [employee.id, employee]),
+    );
+    const employeeNames = new Map([...employees].map(([id, employee]) => [id, employee.fullName]));
+    const planIds = [...new Set(records.map((task) => task.assignment.planId))];
+    const plans = new Map((await this.catalog.findPlanSeatTargets(planIds)).map((plan) => [plan.planId, plan]));
+    const { notes, reasons, reasonCounts } = await this.revocationContextOf(records, withReasons);
+
+    return {
+      employees,
+      employeeNames,
+      workDepartments,
+      actingByDept,
+      plans,
+      notes,
+      reasons,
+      reasonCounts,
+      today,
+      now: Date.now(),
+    };
   }
 
   private summaryOf(
     task: ProvisioningTaskRecord,
-    { employees, plans, notes, reasonCounts, today, now }: ViewContext,
+    { employees, employeeNames, workDepartments, actingByDept, plans, notes, reasonCounts, today, now }: ViewContext,
   ): TaskSummaryView {
     const beneficiary = employees.get(task.assignment.employeeId);
     const plan = plans.get(task.assignment.planId);
-    const responsible = task.defaultResponsibleEmployeeId
-      ? employees.get(task.defaultResponsibleEmployeeId)
-      : undefined;
+    const deptId = workDepartments.get(task.assignment.employeeId);
+    const acting = deptId ? actingByDept.get(deptId) : undefined;
+    const { awaitingItAdmin, actingItAdmins } = actingItAdminsViewOf(acting, employeeNames);
     const ended = task.completedAt ?? task.closedAt ?? task.failedAt;
 
     return {
@@ -345,10 +393,8 @@ export class ProvisioningTaskViewService {
       subscriptionId: task.assignment.subscriptionId,
       accountIdentifier: task.assignment.accountIdentifier,
       defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
-      inGeneralQueue: inGeneralQueue({
-        defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
-        responsibleStillWorks: responsible?.status === 'ACTIVE',
-      }),
+      awaitingItAdmin,
+      actingItAdmins,
       dueOn: task.dueOn,
       notBefore: task.notBefore,
       claimableNow: task.notBefore === null || task.notBefore <= today,

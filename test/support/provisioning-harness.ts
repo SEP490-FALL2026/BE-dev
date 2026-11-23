@@ -111,7 +111,9 @@ export interface TaskWire {
   steps: { code: string; accountIdentifier?: string; adminIdentity?: string }[];
   doneWhen: string | null;
   defaultResponsibleEmployeeId: string | null;
-  inGeneralQueue: boolean;
+  inGeneralQueue?: boolean;
+  awaitingItAdmin?: boolean;
+  actingItAdmins?: { id: string; fullName: string; bySubstitute: boolean }[];
   createdAt: string;
   claimedBy: string | null;
   claimedAt: string | null;

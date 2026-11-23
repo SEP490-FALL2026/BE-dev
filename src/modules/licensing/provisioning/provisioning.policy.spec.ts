@@ -1,6 +1,5 @@
 import {
   ProvisioningAccountIdentifierRequiredError,
-  ProvisioningAnotherItAdminNeededError,
   ProvisioningEvidenceRequiredError,
   ProvisioningPersonalAccountError,
   ProvisioningReasonRequiredError,
@@ -9,8 +8,14 @@ import {
   ProvisioningTaskStateError,
   ProvisioningTypeNotSupportedError,
 } from '../public/licensing.errors';
-import { ProvisioningItAdminRequiredError, ProvisioningKeyError } from './provisioning.errors';
 import {
+  ProvisioningItAdminRequiredError,
+  ProvisioningKeyError,
+  ProvisioningNotInChargeError,
+} from './provisioning.errors';
+import {
+  actingItAdminsViewOf,
+  assertActingItAdmin,
   assertGrantableType,
   assertItAdmin,
   assertKeyFits,
@@ -20,7 +25,6 @@ import {
   cleanEvidence,
   cleanFailureReason,
   doneWhenFor,
-  inGeneralQueue,
   nextStatus,
   selfExecution,
   stepsFor,
@@ -196,29 +200,61 @@ describe('the life of a task (US-07-02 AC-2, AC-3, AC-6)', () => {
   });
 });
 
-describe('the general queue (US-01-11 AC-4, AC-8)', () => {
-  it('holds a task nobody is in charge of, or whose person in charge no longer works', () => {
-    expect(inGeneralQueue({ defaultResponsibleEmployeeId: null, responsibleStillWorks: false })).toBe(true);
-    expect(inGeneralQueue({ defaultResponsibleEmployeeId: 'a1', responsibleStillWorks: false })).toBe(true);
-    expect(inGeneralQueue({ defaultResponsibleEmployeeId: 'a1', responsibleStillWorks: true })).toBe(false);
+describe('acting IT Admin resolution and waiting state', () => {
+  it('refuses when department acting resolution is missing or actor is not among acting actors', () => {
+    expect(() => assertActingItAdmin('it-2', undefined)).toThrow(ProvisioningNotInChargeError);
+    expect(() => assertActingItAdmin('it-2', { inCharge: 'it-1', substitute: null, actors: ['it-1'] })).toThrow(
+      ProvisioningNotInChargeError,
+    );
+    expect(() => assertActingItAdmin('it-2', { inCharge: null, substitute: null, actors: [] })).toThrow(
+      ProvisioningNotInChargeError,
+    );
+  });
+
+  it('allows usable in-charge IT Admin without substitute flag, and appointed substitute with bySubstitute=true', () => {
+    expect(assertActingItAdmin('it-1', { inCharge: 'it-1', substitute: 'it-sub', actors: ['it-1', 'it-sub'] })).toEqual(
+      { bySubstitute: false },
+    );
+    expect(
+      assertActingItAdmin('it-sub', { inCharge: 'it-1', substitute: 'it-sub', actors: ['it-1', 'it-sub'] }),
+    ).toEqual({ bySubstitute: true });
+    expect(assertActingItAdmin('it-sub', { inCharge: null, substitute: 'it-sub', actors: ['it-sub'] })).toEqual({
+      bySubstitute: true,
+    });
+  });
+
+  it('builds actingItAdmins summary and awaitingItAdmin flag from acting resolution and employee names', () => {
+    const names = new Map([
+      ['it-1', 'Ha'],
+      ['it-sub', 'Minh'],
+    ]);
+    expect(actingItAdminsViewOf({ inCharge: 'it-1', substitute: 'it-sub', actors: ['it-1', 'it-sub'] }, names)).toEqual(
+      {
+        awaitingItAdmin: false,
+        actingItAdmins: [
+          { id: 'it-1', fullName: 'Ha', bySubstitute: false },
+          { id: 'it-sub', fullName: 'Minh', bySubstitute: true },
+        ],
+      },
+    );
+    expect(actingItAdminsViewOf({ inCharge: null, substitute: null, actors: [] }, names)).toEqual({
+      awaitingItAdmin: true,
+      actingItAdmins: [],
+    });
+    expect(actingItAdminsViewOf(undefined, names)).toEqual({
+      awaitingItAdmin: true,
+      actingItAdmins: [],
+    });
   });
 });
 
-describe('an IT Admin who is the beneficiary (US-01-05 AC-12, QĐ-77m)', () => {
-  it('works on a task of someone else without any condition', () => {
-    expect(selfExecution({ actorEmployeeId: 'a2', beneficiaryEmployeeId: 'e1', otherUsableItAdmins: 0 })).toBe('ALLOW');
+describe('an IT Admin who is the beneficiary (self-execution allowed without blocker)', () => {
+  it('works on a task of someone else without marking self-executed', () => {
+    expect(selfExecution({ actorEmployeeId: 'a2', beneficiaryEmployeeId: 'e1' })).toBe('ALLOW');
   });
 
-  it('is refused while another IT Admin can do it', () => {
-    expect(() => {
-      selfExecution({ actorEmployeeId: 'a1', beneficiaryEmployeeId: 'a1', otherUsableItAdmins: 1 });
-    }).toThrow(ProvisioningAnotherItAdminNeededError);
-  });
-
-  it('may do it when no other IT Admin can, and the act is marked as self-executed', () => {
-    expect(selfExecution({ actorEmployeeId: 'a1', beneficiaryEmployeeId: 'a1', otherUsableItAdmins: 0 })).toBe(
-      'ALLOW_SELF_EXECUTED',
-    );
+  it('allows self-execution whenever actor is the beneficiary, regardless of other IT Admins', () => {
+    expect(selfExecution({ actorEmployeeId: 'a1', beneficiaryEmployeeId: 'a1' })).toBe('ALLOW_SELF_EXECUTED');
   });
 });
 

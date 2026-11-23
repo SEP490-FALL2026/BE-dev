@@ -20,10 +20,8 @@ export interface TaskPageFilter {
   claimableOn?: { today: BusinessDate; claimable: boolean };
   /** `true`: only the tasks past their due day that are not over (completed, cancelled or closed as failed); `false`: all the others. */
   overdueOn?: { today: BusinessDate; overdue: boolean };
-  /** Only the tasks this employee is in charge of by default. */
-  responsibleEmployeeId?: string;
-  /** Only the tasks nobody is in charge of, or whose person in charge is one of these (who no longer work). */
-  generalQueueOf?: readonly string[];
+  /** Only the tasks whose beneficiary employee is among these ids. */
+  beneficiaryEmployeeIds?: readonly string[];
   skip: number;
   take: number;
 }
@@ -55,19 +53,13 @@ function pageWhere(filter: TaskPageFilter): Prisma.ProvisioningTaskWhereInput {
     );
   }
   if (filter.overdueOn) and.push(overdueWhere(filter.overdueOn));
-  if (filter.generalQueueOf) {
-    and.push({
-      OR: [
-        { defaultResponsibleEmployeeId: null },
-        { defaultResponsibleEmployeeId: { in: [...filter.generalQueueOf] } },
-      ],
-    });
+  if (filter.beneficiaryEmployeeIds !== undefined) {
+    and.push({ assignment: { employeeId: { in: [...filter.beneficiaryEmployeeIds] } } });
   }
 
   return {
     ...(filter.channel ? { channel: filter.channel } : {}),
     ...(filter.status ? { status: filter.status } : {}),
-    ...(filter.responsibleEmployeeId ? { defaultResponsibleEmployeeId: filter.responsibleEmployeeId } : {}),
     ...(and.length > 0 ? { AND: and } : {}),
   };
 }
@@ -436,16 +428,6 @@ export class ProvisioningTaskRepo {
         accessEvidence: input.accessEvidence,
       },
     });
-  }
-
-  /** The people who are in charge by default of some task: a few IT Admins, to learn which of them still work. */
-  async responsibleEmployeeIds(): Promise<string[]> {
-    const groups = await this.prisma.provisioningTask.groupBy({
-      by: ['defaultResponsibleEmployeeId'],
-      where: { defaultResponsibleEmployeeId: { not: null } },
-    });
-
-    return groups.flatMap((group) => (group.defaultResponsibleEmployeeId ? [group.defaultResponsibleEmployeeId] : []));
   }
 
   /**

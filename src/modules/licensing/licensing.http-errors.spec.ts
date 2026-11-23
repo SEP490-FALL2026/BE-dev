@@ -2,6 +2,8 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../infrastructure/http/errors/api.exception';
 import { AssignmentConflictError } from './public/licensing.errors';
 import { toLicensingApiException } from './licensing.http-errors';
+import { ProvisioningNotInChargeError } from './provisioning/provisioning.errors';
+import { toProvisioningApiException } from './provisioning/provisioning.http-errors';
 
 const answerOf = (error: unknown) => {
   const answer = toLicensingApiException(error) as ApiException;
@@ -47,5 +49,12 @@ describe('details of the license assignment conflicts', () => {
     expect(capacity.body.details).toEqual({ freeSeatsInPool: 2 });
     expect(ended.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
     expect(ended.body).not.toHaveProperty('details');
+  });
+
+  it('maps ProvisioningNotInChargeError to 403 PROVISIONING.NOT_IN_CHARGE', () => {
+    const answer = toProvisioningApiException(new ProvisioningNotInChargeError()) as ApiException;
+
+    expect(answer.getStatus()).toBe(HttpStatus.FORBIDDEN);
+    expect((answer.getResponse() as { code: string }).code).toBe('PROVISIONING.NOT_IN_CHARGE');
   });
 });
