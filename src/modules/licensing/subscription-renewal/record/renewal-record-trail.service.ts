@@ -63,9 +63,9 @@ export class RenewalRecordTrail {
   }
 
   /**
-   * Finance is told of the result (with `substitute` recorded in audit/params when another IT Admin recorded for an
-   * absent or locked responsible IT Admin); the spending approver is not. A renewal the vendor made that was not chosen
-   * is told at once to the spending approver, the IT Admin of the subscription and Finance.
+   * Finance is told of the result and, when another IT Admin recorded it for the one responsible, the one responsible too (`substitute` is also kept
+   * in the audit and in the params); the spending approver is not. A renewal the vendor made that was not chosen is told at once to the spending approver,
+   * the IT Admin of the subscription and Finance.
    */
   async told(
     tx: DbTx,
@@ -76,9 +76,10 @@ export class RenewalRecordTrail {
     input: { outcome: RenewalOutcomeKind; nextQuantity: number | null },
   ): Promise<void> {
     const finance = await this.parties.financeOf(tx);
+    const responsible = who.substitute ? who.responsibleItAdminEmployeeId : null;
     await this.notifier.tell(tx, {
       organizationId: recorded.organizationId,
-      recipients: finance === null ? [] : [finance],
+      recipients: [finance, responsible].filter((person) => person !== null),
       code: 'SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED',
       subject: { type: 'SUBSCRIPTION', id: recorded.subscriptionId },
       params: {

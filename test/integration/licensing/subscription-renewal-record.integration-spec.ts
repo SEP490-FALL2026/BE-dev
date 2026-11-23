@@ -334,7 +334,9 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     );
     expect(proposed?.after).toMatchObject({ substitute: true, responsibleItAdminEmployeeId: h.it1.employeeId });
     const told = await h.notices('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', subscriptionId);
-    expect(told.map((notice) => notice.recipient_employee_id)).toEqual([h.finance.employeeId]);
+    const recipients = told.map((notice) => notice.recipient_employee_id);
+    expect(recipients).toContain(h.finance.employeeId);
+    expect(recipients).toContain(h.it1.employeeId);
     expect(told[0].params).toMatchObject({ renewalId: id, choice: 'REDUCE', quantity: 2, substitute: true });
   });
 
