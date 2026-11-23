@@ -20,7 +20,7 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
       `getCompanyEmailDomains`, `countUnmarkedChangesAsOf` (cho `ops:inspect`).
     - Phòng ban: `getDepartmentBrief(s)`, `getActiveDepartmentIds`, `lockDepartmentShared`, `lockDepartmentForEntry`, `getDepartmentMemberIds`,
       `getMemberIdsOfDepartments` (thành viên của nhiều phòng trong một câu lệnh),
-      `getDepartmentHeads`, `getHeadedDepartment`, `isDepartmentHead`, `departmentsWithoutHead`; IT Admin phụ trách:
+      `getDepartmentHeads`, `getHeadedDepartment(…, tx?)`, `isDepartmentHead(…, tx?)`, `departmentsWithoutHead`; IT Admin phụ trách:
       `getItAdminInCharge`, `getItAdminInChargeOfDepartment`, `getItAdminScope`, `getDepartmentIdsInChargeOf`.
     - Nhân viên: `getEmployee`, `getEmployeeByCode`, `getEmployeesByCodes`, `getEmployeesByWorkEmails` (theo email công việc đã chuẩn hóa, gồm
       người đã nghỉ; chỉ mã NV + email, không họ tên — usage nhà cung cấp khớp danh tính), `getEmployees`, `getEmployeePlacement`,
