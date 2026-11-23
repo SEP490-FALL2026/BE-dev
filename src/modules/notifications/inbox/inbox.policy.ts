@@ -234,6 +234,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   SPEND_BATCH_SUBMITTED: ['batchId', 'departmentId', 'sentCount'],
   // The reports of errors in SaaS rights (`FR-2.15`): ids, the code of the report and the words of its kind and states. Never what the reporter or the IT Admin wrote, because the head of the department does not read it.
   SAAS_ISSUE_SUBMITTED: ['issueId', 'issueCode', 'category', 'impact', 'applicationId'],
+  SAAS_ISSUE_AWAITING_ASSIGNEE: ['issueId', 'issueCode', 'category', 'impact', 'applicationId', 'departmentId'],
   SAAS_ISSUE_RESPONSE_OVERDUE: ['issueId', 'issueCode', 'responseDueOn'],
   SAAS_ISSUE_STATE_CHANGED: ['issueId', 'issueCode', 'fromState', 'toState', 'trigger'],
   // A case outside the process closed as a report only, and a difference with a vendor opened (`SBF-07a`, `SBF-08`): ids and the source, never the account's identifier or what it did.

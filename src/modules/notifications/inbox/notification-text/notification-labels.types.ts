@@ -76,6 +76,25 @@ const REVOCATION_SOURCE: LabelTable = {
   GHOST_SEAT: { vi: 'chỗ ít được sử dụng', en: 'rarely used seat' },
 };
 
+/** `SAAS_ISSUE_SUBMITTED` and `SAAS_ISSUE_AWAITING_ASSIGNEE` share the category and impact labels. */
+const SAAS_ISSUE_CATEGORY_AND_IMPACT: LabelsByKey = {
+  category: {
+    NO_ACCESS: { vi: 'không vào được phần mềm', en: 'no access to the software' },
+    INVITATION_OR_ACTIVATION: {
+      vi: 'lời mời hoặc kích hoạt tài khoản không dùng được',
+      en: 'invitation or account activation failed',
+    },
+    MISSING_PLAN_FEATURE: { vi: 'thiếu tính năng của gói', en: 'a feature of the plan is missing' },
+    PROVIDER_OUTAGE: { vi: 'nhà cung cấp có vẻ đang lỗi', en: 'the vendor seems to be down' },
+    OTHER: { vi: 'lỗi khác', en: 'other error' },
+  },
+  impact: {
+    UNUSABLE: { vi: 'không dùng được phần mềm', en: 'the software cannot be used' },
+    PARTIAL: { vi: 'dùng được một phần', en: 'the software works in part' },
+    QUESTION_OR_OTHER: { vi: 'câu hỏi hoặc ảnh hưởng khác', en: 'a question or another effect' },
+  },
+};
+
 /** The labels of a value that belong to one code, which win over `SHARED_LABELS`. */
 export const CODE_LABELS = {
   REQUEST_NEED_APPROVED: {
@@ -315,23 +334,8 @@ export const CODE_LABELS = {
     },
   },
   // The words of the kind and the effect of a report are the ones the form of `saasIssueSubmit` shows the reporter, shortened to fit a sentence.
-  SAAS_ISSUE_SUBMITTED: {
-    category: {
-      NO_ACCESS: { vi: 'không vào được phần mềm', en: 'no access to the software' },
-      INVITATION_OR_ACTIVATION: {
-        vi: 'lời mời hoặc kích hoạt tài khoản không dùng được',
-        en: 'invitation or account activation failed',
-      },
-      MISSING_PLAN_FEATURE: { vi: 'thiếu tính năng của gói', en: 'a feature of the plan is missing' },
-      PROVIDER_OUTAGE: { vi: 'nhà cung cấp có vẻ đang lỗi', en: 'the vendor seems to be down' },
-      OTHER: { vi: 'lỗi khác', en: 'other error' },
-    },
-    impact: {
-      UNUSABLE: { vi: 'không dùng được phần mềm', en: 'the software cannot be used' },
-      PARTIAL: { vi: 'dùng được một phần', en: 'the software works in part' },
-      QUESTION_OR_OTHER: { vi: 'câu hỏi hoặc ảnh hưởng khác', en: 'a question or another effect' },
-    },
-  },
+  SAAS_ISSUE_SUBMITTED: SAAS_ISSUE_CATEGORY_AND_IMPACT,
+  SAAS_ISSUE_AWAITING_ASSIGNEE: SAAS_ISSUE_CATEGORY_AND_IMPACT,
   SAAS_ISSUE_STATE_CHANGED: { fromState: SAAS_ISSUE_STATE, toState: SAAS_ISSUE_STATE },
   // The kind of batch that opened the differences, not the `source` filter of `vendorAccountDiscrepancyList` (D-17).
   VENDOR_ACCOUNT_DISCREPANCY_OPENED: {

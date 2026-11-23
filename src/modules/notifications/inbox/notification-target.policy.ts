@@ -99,6 +99,7 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
   VENDOR_ACCOUNT_DISCREPANCY_OPENED: route('vendorAccountDiscrepancyList'),
   DEVICE_STOP_REQUESTED: route('deviceStopRequestList'),
   DEVICE_STOP_REQUEST_OVERDUE: route('deviceStopRequestList'),
+  SAAS_ISSUE_AWAITING_ASSIGNEE: route('saasIssueList'),
 };
 
 /**

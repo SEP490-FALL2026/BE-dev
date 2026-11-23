@@ -9,15 +9,30 @@ import { nameLookupKey, nameRefsOf, renderNotificationText } from './inbox-notif
 const UUID = '00000000-0000-0000-0000-000000000000';
 const APP = '11111111-1111-4111-8111-111111111111';
 const PERSON = '22222222-2222-4222-8222-222222222222';
+const DEPT = '33333333-3333-4333-8333-333333333333';
 const names = new Map([
   [nameLookupKey('APPLICATION', APP), 'Figma'],
   [nameLookupKey('EMPLOYEE', PERSON), 'Lan'],
+  [nameLookupKey('DEPARTMENT', DEPT), 'Design'],
 ]);
 const render = (code: string, params: Record<string, unknown>, locale: 'vi' | 'en') =>
   renderNotificationText(code, params, locale, names);
 
 describe('a report of an error in a SaaS right', () => {
   const submitted = { issueId: UUID, issueCode: 'ISS-7', category: 'NO_ACCESS', impact: 'PARTIAL', applicationId: APP };
+
+  it('tells the Super Admin when an issue report awaits an IT Admin assignee, with or without department', () => {
+    expect(render('SAAS_ISSUE_AWAITING_ASSIGNEE', { ...submitted, departmentId: DEPT }, 'vi')).toEqual({
+      title: 'Phiếu báo lỗi chờ người tiếp nhận',
+      message:
+        'Phiếu ISS-7 về ứng dụng Figma (không vào được phần mềm, ảnh hưởng dùng được một phần) thuộc phòng Design chưa có IT Admin nào phụ trách hoặc làm thay để tiếp nhận.',
+    });
+    expect(render('SAAS_ISSUE_AWAITING_ASSIGNEE', { ...submitted, departmentId: null }, 'en')).toEqual({
+      title: 'Issue report awaiting assignee',
+      message:
+        'Issue report ISS-7 for Figma (no access to the software, impact the software works in part) has no IT Admin in charge or substitute to take it.',
+    });
+  });
 
   it('tells the IT Admin of a new report, with its kind and effect in words', () => {
     expect(render('SAAS_ISSUE_SUBMITTED', submitted, 'vi')).toEqual({

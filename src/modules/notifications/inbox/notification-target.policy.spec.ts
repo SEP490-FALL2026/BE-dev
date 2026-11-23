@@ -217,13 +217,19 @@ describe('notificationTarget', () => {
     }
   });
 
-  it('opens the issue report of the three notices about one, the lists of the operations notices, and nothing for a case outside the process', () => {
+  it('opens the issue report of the three notices about one, the issue list for SAAS_ISSUE_AWAITING_ASSIGNEE, the lists of the operations notices, and nothing for a case outside the process', () => {
     for (const code of ['SAAS_ISSUE_SUBMITTED', 'SAAS_ISSUE_RESPONSE_OVERDUE', 'SAAS_ISSUE_STATE_CHANGED']) {
       expect(targetOf(code, { type: 'SAAS_ISSUE', id: ID }, { issueId: ID })).toEqual({
         operationId: 'saasIssueGet',
         pathParams: { id: ID },
       });
     }
+    expect(
+      targetOf('SAAS_ISSUE_AWAITING_ASSIGNEE', { type: 'SAAS_ISSUE', id: ID }, { issueId: ID }, ['SUPER_ADMIN']),
+    ).toEqual({
+      operationId: 'saasIssueList',
+      pathParams: {},
+    });
     expect(targetOf('VENDOR_ACCOUNT_DISCREPANCY_OPENED', null, { newCount: 2 })).toEqual({
       operationId: 'vendorAccountDiscrepancyList',
       pathParams: {},

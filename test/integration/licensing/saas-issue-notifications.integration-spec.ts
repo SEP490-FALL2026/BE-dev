@@ -109,19 +109,30 @@ describe('the notices of the reports of SaaS errors, over PostgreSQL (FX-T4a, FX
 
       const issue = await h.reported(self.account, assignmentId);
 
-      expect(issue.assignedItAdmin.employeeId).toBe(self.employeeId);
+      expect(issue.assignedItAdmin?.employeeId).toBe(self.employeeId);
       expect(await noticesAbout(issue.id, 'SAAS_ISSUE_SUBMITTED')).toEqual([]);
     });
 
-    it('tells the IT Admin it fell to by the fallback when nobody is in charge', async () => {
+    it('tells the appointed substitute when nobody is in charge, and tells Super Admin when no one acts', async () => {
       restoreToday = h.pretendToday(MONDAY);
-      const { member, assignmentId } = await reporter(null);
+      const { department, member, assignmentId } = await reporter(null);
 
-      const issue = await h.reported(member.account, assignmentId);
+      const awaiting = await h.reported(member.account, assignmentId);
+      expect(awaiting.assignedItAdmin).toBeNull();
+      expect(await noticesAbout(awaiting.id, 'SAAS_ISSUE_SUBMITTED')).toEqual([]);
+      const superAdminNotices = await noticesAbout(awaiting.id, 'SAAS_ISSUE_AWAITING_ASSIGNEE');
+      expect(superAdminNotices).toHaveLength(1);
+      expect(superAdminNotices[0].event_key).toBe(`saasIssueAwaitingAssignee:${awaiting.id}`);
 
-      expect(issue.assignedByFallback).toBe(true);
-      const notices = await noticesAbout(issue.id, 'SAAS_ISSUE_SUBMITTED');
-      expect(notices.map((row) => row.recipient_employee_id)).toEqual([issue.assignedItAdmin.employeeId]);
+      await h.ctx.sql.query(
+        `INSERT INTO department_it_substitutes (id, department_id, substitute_employee_id, reason, appointed_by_app_user_id)
+         VALUES (gen_random_uuid(), $1, $2, 'Cover', $3)`,
+        [department.id, it1.employeeId, h.it1.appUserId],
+      );
+      const assigned = await h.reported(member.account, assignmentId);
+      expect(assigned.assignedByFallback).toBe(true);
+      const notices = await noticesAbout(assigned.id, 'SAAS_ISSUE_SUBMITTED');
+      expect(notices.map((row) => row.recipient_employee_id)).toEqual([assigned.assignedItAdmin?.employeeId]);
     });
   });
 
@@ -262,9 +273,14 @@ describe('the notices of the reports of SaaS errors, over PostgreSQL (FX-T4a, FX
       expect(JSON.stringify(toIt)).not.toContain('Still broken');
     });
 
-    it('tells the IT Admin a report fell to by the fallback when the reporter answers', async () => {
+    it('tells the appointed substitute when the reporter answers', async () => {
       restoreToday = h.pretendToday(MONDAY);
-      const { member, assignmentId } = await reporter(null);
+      const { department, member, assignmentId } = await reporter(null);
+      await h.ctx.sql.query(
+        `INSERT INTO department_it_substitutes (id, department_id, substitute_employee_id, reason, appointed_by_app_user_id)
+         VALUES (gen_random_uuid(), $1, $2, 'Cover', $3)`,
+        [department.id, it1.employeeId, h.it1.appUserId],
+      );
       const issue = await h.reported(member.account, assignmentId);
       expect(issue.assignedByFallback).toBe(true);
       await h.moveIssue(issue.id, { to: 'IN_PROGRESS' }, h.it1).expect(200);
@@ -273,7 +289,7 @@ describe('the notices of the reports of SaaS errors, over PostgreSQL (FX-T4a, FX
       await h.addIssueMessage(issue.id, { body: 'This' }, member.account).expect(201);
 
       const replies = (await changes(issue.id)).filter((row) => row.params.trigger === 'REPORTER_REPLY');
-      expect(replies.map((row) => row.recipient_employee_id)).toEqual([issue.assignedItAdmin.employeeId]);
+      expect(replies.map((row) => row.recipient_employee_id)).toEqual([issue.assignedItAdmin?.employeeId]);
     });
 
     it('tells the reporter once when the pass closes a report after the last day to reopen it, and not again', async () => {

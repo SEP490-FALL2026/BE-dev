@@ -562,7 +562,7 @@ model SaasIssue {
   description               String
   occurredAt                DateTime          @map("occurred_at") @db.Timestamptz(3)
   state                     SaasIssueState    @default(NEW)
-  assignedItAdminEmployeeId String            @map("assigned_it_admin_employee_id") @db.Uuid
+  assignedItAdminEmployeeId String?           @map("assigned_it_admin_employee_id") @db.Uuid
   assignedByFallback        Boolean           @default(false) @map("assigned_by_fallback")
   responseDueOn             DateTime          @map("response_due_on") @db.Date
   responseOverdueNoticedAt  DateTime?         @map("response_overdue_noticed_at") @db.Timestamptz(3)

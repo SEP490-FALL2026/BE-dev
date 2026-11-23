@@ -77,7 +77,7 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
   },
   saasIssueSubmit: {
     '403': ['SAAS_ISSUE.ASSIGNMENT_NOT_YOURS'],
-    '409': ['SAAS_ISSUE.ASSIGNMENT_NOT_OPEN', 'SAAS_ISSUE.NO_IT_ADMIN'],
+    '409': ['SAAS_ISSUE.ASSIGNMENT_NOT_OPEN'],
     '422': ['SAAS_ISSUE.OCCURRED_IN_FUTURE'],
   },
   saasIssueTransition: {

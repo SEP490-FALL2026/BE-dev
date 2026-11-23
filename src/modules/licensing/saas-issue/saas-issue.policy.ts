@@ -151,17 +151,18 @@ export function occurredProblem(occurredAt: Date, now: Date): SaasIssueProblem |
   return occurredAt.getTime() > now.getTime() ? 'OCCURRED_IN_FUTURE' : null;
 }
 
-/** The IT Admin a new report is given to: the one in charge of the department when they can act, else the first who can. */
+/** The IT Admin a new report is given to: the appointed substitute when present, else the one in charge, else null. */
 export function assigneeOf(input: {
-  inChargeEmployeeId: string | null;
-  inChargeUsable: boolean;
-  fallbackEmployeeId: string | null;
+  inCharge: string | null;
+  substitute: string | null;
 }): { employeeId: string; byFallback: boolean } | null {
-  if (input.inChargeEmployeeId && input.inChargeUsable) {
-    return { employeeId: input.inChargeEmployeeId, byFallback: false };
-  }
+  const employeeId = input.substitute ?? input.inCharge;
+  if (employeeId === null) return null;
 
-  return input.fallbackEmployeeId ? { employeeId: input.fallbackEmployeeId, byFallback: true } : null;
+  return {
+    employeeId,
+    byFallback: input.substitute !== null && input.substitute !== input.inCharge,
+  };
 }
 
 /** The day by which a new report should be taken up. */

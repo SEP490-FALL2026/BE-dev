@@ -14,7 +14,7 @@ export interface IssueWire {
   assignmentId: string;
   plan: { planId: string; planName: string; applicationName: string };
   reporter: { employeeId: string; employeeCode: string };
-  assignedItAdmin: { employeeId: string; employeeCode: string };
+  assignedItAdmin: { employeeId: string; employeeCode: string } | null;
   responseDueOn: string;
   overdue: boolean;
   createdAt: string;
@@ -56,7 +56,7 @@ export interface OptionsWire {
 export interface IssueRow {
   id: string;
   state: string;
-  assigned_it_admin_employee_id: string;
+  assigned_it_admin_employee_id: string | null;
   assigned_by_fallback: boolean;
   response_due_on: string;
   response_overdue_noticed_at: Date | null;
@@ -178,7 +178,7 @@ export class SaasIssueHarness extends ExpiryHarness {
   }
 
   /** The hourly pass, run by hand as if it were `now`. */
-  sweepIssues = (now?: Date): Promise<{ closed: number; told: number }> =>
+  sweepIssues = (now?: Date): Promise<{ assigned: number; closed: number; told: number }> =>
     this.ctx.app.get(SaasIssueSweepService, { strict: false }).run(now);
 
   /** The organization says today is `day` until the returned function is called. */

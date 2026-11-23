@@ -23,7 +23,7 @@ export interface SaasIssueRecord {
   description: string;
   occurredAt: Date;
   state: SaasIssueState;
-  assignedItAdminEmployeeId: string;
+  assignedItAdminEmployeeId: string | null;
   assignedByFallback: boolean;
   responseDueOn: BusinessDate;
   responseOverdueNoticedAt: Date | null;
@@ -62,7 +62,7 @@ export interface NewSaasIssue {
   impact: SaasIssueImpact;
   description: string;
   occurredAt: Date;
-  assignedItAdminEmployeeId: string;
+  assignedItAdminEmployeeId: string | null;
   assignedByFallback: boolean;
   responseDueOn: BusinessDate;
 }
@@ -231,6 +231,23 @@ export class SaasIssueRepo {
     return toRecord(row);
   }
 
+  /** Assigns an unassigned report to an IT Admin (allowed once by the database trigger while in NEW). */
+  async assignUnassigned(
+    tx: DbTx,
+    id: string,
+    assignee: { employeeId: string; byFallback: boolean },
+  ): Promise<SaasIssueRecord> {
+    const row = await tx.saasIssue.update({
+      where: { id },
+      data: {
+        assignedItAdminEmployeeId: assignee.employeeId,
+        assignedByFallback: assignee.byFallback,
+      },
+    });
+
+    return toRecord(row);
+  }
+
   async insertEntry(tx: DbTx, input: NewEntry): Promise<EntryRecord> {
     const row = await tx.saasIssueEntry.create({ data: { id: randomUUID(), ...input } });
 
@@ -282,6 +299,17 @@ export class SaasIssueRepo {
       }),
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
+  }
+
+  /** The new reports that have no IT Admin assigned yet, oldest first. */
+  async listUnassigned(limit: number): Promise<SaasIssueRecord[]> {
+    const rows = await this.prisma.saasIssue.findMany({
+      where: { state: 'NEW', assignedItAdminEmployeeId: null },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+
+    return rows.map(toRecord);
   }
 
   /** The resolved reports whose last day to reopen has passed, the oldest first. */

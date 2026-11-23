@@ -31,6 +31,18 @@ export const OPS_TEXTS = {
         'Issue report {issueCode} for {applicationId:name} ({category:enum}, impact {impact:enum}) was sent and assigned to you.',
     },
   },
+  SAAS_ISSUE_AWAITING_ASSIGNEE: {
+    vi: {
+      title: 'Phiếu báo lỗi chờ người tiếp nhận',
+      message:
+        'Phiếu {issueCode} về ứng dụng {applicationId:name} ({category:enum}, ảnh hưởng {impact:enum})[ thuộc phòng {departmentId:name}] chưa có IT Admin nào phụ trách hoặc làm thay để tiếp nhận.',
+    },
+    en: {
+      title: 'Issue report awaiting assignee',
+      message:
+        'Issue report {issueCode} for {applicationId:name} ({category:enum}, impact {impact:enum})[ in {departmentId:name}] has no IT Admin in charge or substitute to take it.',
+    },
+  },
   SAAS_ISSUE_RESPONSE_OVERDUE: {
     vi: {
       title: 'Phiếu báo lỗi quá hạn phản hồi',

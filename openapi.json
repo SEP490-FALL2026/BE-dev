@@ -39557,7 +39557,7 @@
         },
         "responses": {
           "201": {
-            "description": "The report is made as new and given to one IT Admin: the one in charge of the department of the reporter when they can act, otherwise the first IT Admin who can. The day it should be taken up by is fixed now from the operating parameter. No file is attached. Nothing about the right, its grant or any request changes, and nothing is sent to the vendor. This operation is for the web client only; there is no separate operation for mobile.",
+            "description": "The report is made as new and given to the acting IT Admin of the reporter's work department (appointed substitute if usable, otherwise the one in charge when usable), or created unassigned awaiting an IT Admin when nobody can act for that department. The day it should be taken up by is fixed now from the operating parameter. No file is attached. Nothing about the right, its grant or any request changes, and nothing is sent to the vendor. This operation is for the web client only; there is no separate operation for mobile.",
             "content": {
               "application/json": {
                 "schema": {
@@ -39644,7 +39644,7 @@
             }
           },
           "409": {
-            "description": "The right has ended or never took a seat (SAAS_ISSUE.ASSIGNMENT_NOT_OPEN), or no IT Admin can take the report (SAAS_ISSUE.NO_IT_ADMIN).",
+            "description": "The right has ended or never took a seat (SAAS_ISSUE.ASSIGNMENT_NOT_OPEN).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -39656,17 +39656,6 @@
                       "error": {
                         "code": "SAAS_ISSUE.ASSIGNMENT_NOT_OPEN",
                         "message": "The right has ended or never took a seat: there is nothing to report on.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SAAS_ISSUE.NO_IT_ADMIN": {
-                    "summary": "No IT Admin can take the report now.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SAAS_ISSUE.NO_IT_ADMIN",
-                        "message": "No IT Admin can take the report now.",
                         "requestId": "req_example"
                       }
                     }
@@ -113622,7 +113611,9 @@
                   "fullName": { "type": "string" }
                 },
                 "required": ["employeeId", "employeeCode", "fullName"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "The IT Admin assigned to handle the report, or null while awaiting an IT Admin.",
+                "nullable": true
               },
               "responseDueOn": { "type": "string" },
               "overdue": { "type": "boolean" },
@@ -113775,7 +113766,9 @@
                         "fullName": { "type": "string" }
                       },
                       "required": ["employeeId", "employeeCode", "fullName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "The IT Admin assigned to handle the report, or null while awaiting an IT Admin.",
+                      "nullable": true
                     },
                     "responseDueOn": { "type": "string" },
                     "overdue": { "type": "boolean" },

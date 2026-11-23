@@ -79,7 +79,7 @@ export class SaasIssuesController {
   @ApiSuccessResponse(SaasIssueResponseDto, {
     status: HttpStatus.CREATED,
     message: 'SAAS_ISSUE.SUBMITTED',
-    description: `The report is made as new and given to one IT Admin: the one in charge of the department of the reporter when they can act, otherwise the first IT Admin who can. The day it should be taken up by is fixed now from the operating parameter. No file is attached. Nothing about the right, its grant or any request changes, and nothing is sent to the vendor.${WEB_ONLY}`,
+    description: `The report is made as new and given to the acting IT Admin of the reporter's work department (appointed substitute if usable, otherwise the one in charge when usable), or created unassigned awaiting an IT Admin when nobody can act for that department. The day it should be taken up by is fixed now from the operating parameter. No file is attached. Nothing about the right, its grant or any request changes, and nothing is sent to the vendor.${WEB_ONLY}`,
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -91,9 +91,8 @@ export class SaasIssuesController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description:
-        'The right has ended or never took a seat (SAAS_ISSUE.ASSIGNMENT_NOT_OPEN), or no IT Admin can take the report (SAAS_ISSUE.NO_IT_ADMIN).',
-      examples: [EXAMPLES.ASSIGNMENT_NOT_OPEN, EXAMPLES.NO_IT_ADMIN],
+      description: 'The right has ended or never took a seat (SAAS_ISSUE.ASSIGNMENT_NOT_OPEN).',
+      examples: [EXAMPLES.ASSIGNMENT_NOT_OPEN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

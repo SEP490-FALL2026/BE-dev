@@ -52,6 +52,7 @@ const MAY_BE_ABSENT: Readonly<Partial<Record<InAppNotificationCode, readonly str
   REQUEST_WITHDRAWN: ['reason'],
   RETURN_REQUESTED: ['planId', 'source', 'handoverDueOn'],
   ROLE_HOLDER_LEAVING: ['departmentId'],
+  SAAS_ISSUE_AWAITING_ASSIGNEE: ['departmentId'],
   SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE: ['owningDepartmentId'],
   SPEND_QUEUE_REMINDER: ['cause'],
   STEP_ASSIGNED: ['stepKind'],
