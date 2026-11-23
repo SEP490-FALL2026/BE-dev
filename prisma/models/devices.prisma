@@ -8,6 +8,43 @@ enum DeviceRegistrationEndCause {
   DEPARTURE
   EMPLOYEE_LEFT
   DEPARTURE_BLOCKED
+  // The machine went back to the store; added alone in its own migration (ALTER TYPE ... ADD VALUE).
+  RETURNED
+}
+
+enum DeviceType {
+  LAP
+  PC
+  OTH
+}
+
+enum DeviceCondition {
+  USABLE
+  IN_REPAIR
+  BROKEN
+}
+
+enum DeviceRetirementKind {
+  DISPOSED
+  LOST
+}
+
+// Whether the asset code was made by the system (TYPE-YY-NNNN) or typed by a person before the generator existed.
+enum DeviceAssetCodeOrigin {
+  GENERATED
+  LEGACY
+}
+
+enum DeviceSoftwareRemoval {
+  REMOVED
+  NOT_REMOVABLE
+}
+
+enum DeviceReturnTaskState {
+  OPEN
+  RECEIVED
+  NOT_RECOVERED
+  CANCELLED
 }
 
 enum DeviceCollectorKind {
@@ -41,16 +78,32 @@ model ManagedDevice {
   normalizedAssetCode String    @map("normalized_asset_code")
   hostname            String
   os                  String
+  // Both default for now so the code that enters a machine today still works; the package that enters machines names both.
+  deviceType          DeviceType            @default(OTH) @map("device_type")
+  assetCodeOrigin     DeviceAssetCodeOrigin @default(LEGACY) @map("asset_code_origin")
+  serialNumber        String?               @map("serial_number")
+  // The search key of the serial number (as the asset code has); null exactly when the serial number is.
+  normalizedSerialNumber String?            @map("normalized_serial_number")
+  condition           DeviceCondition       @default(USABLE)
+  conditionNote       String?               @map("condition_note")
   retiredAt           DateTime? @map("retired_at") @db.Timestamptz(3)
   retirementReason    String?   @map("retirement_reason")
+  retirementKind      DeviceRetirementKind? @map("retirement_kind")
+  // A record typed by mistake is voided, never deleted (the trigger managed_devices_guard keeps it).
+  voidedAt            DateTime?             @map("voided_at") @db.Timestamptz(3)
+  voidReason          String?               @map("void_reason")
+  voidedByAppUserId   String?               @map("voided_by_app_user_id") @db.Uuid
   createdByAppUserId  String    @map("created_by_app_user_id") @db.Uuid
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   registrations DeviceRegistration[]
   credentials   DeviceCredential[]
+  returnTasks   DeviceReturnTask[]
+  activations   DeviceActivation[]
 
   @@unique([organizationId, normalizedAssetCode])
+  @@unique([organizationId, normalizedSerialNumber])
   @@map("managed_devices")
 }
 
@@ -67,6 +120,11 @@ model DeviceRegistration {
   acknowledgedFrom    DateTime?                   @map("acknowledged_from") @db.Timestamptz(3)
   // Set when a stop request was completed and the holder has not turned collection back on.
   collectionStoppedAt DateTime?                   @map("collection_stopped_at") @db.Timestamptz(3)
+  // Whether the collector is installed on the machine of this holding; it only goes from false to true while the holding is open.
+  collectorInstalled  Boolean                     @default(false) @map("collector_installed")
+  // How the holder's software was taken off, written once in the update that ends the holding.
+  softwareRemoval     DeviceSoftwareRemoval?      @map("software_removal")
+  softwareRemovalNote String?                     @map("software_removal_note")
   createdByAppUserId  String                      @map("created_by_app_user_id") @db.Uuid
   createdAt           DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
 
@@ -77,10 +135,55 @@ model DeviceRegistration {
   stopRequests     DeviceStopRequest[]
   enrollmentCodes  DeviceEnrollmentCode[]
   credentials      DeviceCredential[]
+  returnTask       DeviceReturnTask?
 
   @@index([holderEmployeeId])
   @@index([deviceId])
   @@map("device_registrations")
+}
+
+// The counter behind the asset code TYPE-YY-NNNN: one row for each (type, year), taken under a row lock (as saas_issue_counters).
+model DeviceCodeCounter {
+  deviceType DeviceType @map("device_type")
+  year       Int        @db.SmallInt
+  lastValue  Int        @map("last_value")
+
+  @@id([deviceType, year])
+  @@map("device_code_counters")
+}
+
+// The job of taking a machine back from a person who left (one for each holding). Who does it is worked out when read, from
+// `departmentId`, so a substitute named later takes the job over without any row being rewritten. The CHECKs, the partial unique index
+// and the guard trigger are SQL in the migration.
+model DeviceReturnTask {
+  id                  String                 @id @default(uuid(7)) @db.Uuid
+  organizationId      String                 @map("organization_id") @db.Uuid
+  deviceId            String                 @map("device_id") @db.Uuid
+  registrationId      String                 @unique @map("registration_id") @db.Uuid
+  employeeId          String                 @map("employee_id") @db.Uuid
+  // Values, not foreign keys: the offboarding case belongs to a higher module and the department can be left later.
+  offboardingCaseId   String                 @map("offboarding_case_id") @db.Uuid
+  departmentId        String?                @map("department_id") @db.Uuid
+  dueOn               DateTime               @map("due_on") @db.Date
+  state               DeviceReturnTaskState  @default(OPEN)
+  conditionOnReceipt  DeviceCondition?       @map("condition_on_receipt")
+  softwareRemoval     DeviceSoftwareRemoval? @map("software_removal")
+  softwareRemovalNote String?                @map("software_removal_note")
+  outcomeNote         String?                @map("outcome_note")
+  handledByAppUserId  String?                @map("handled_by_app_user_id") @db.Uuid
+  handledAt           DateTime?              @map("handled_at") @db.Timestamptz(3)
+  // The last business day the sweeper reminded about this job (one reminder for each working day).
+  overdueNoticedOn    DateTime?              @map("overdue_noticed_on") @db.Date
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  device       ManagedDevice      @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  registration DeviceRegistration @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  employee     Employee           @relation("DeviceReturnTaskEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([state, dueOn])
+  @@index([departmentId, state])
+  @@index([offboardingCaseId])
+  @@map("device_return_tasks")
 }
 
 model MonitoringNoticeVersion {

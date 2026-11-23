@@ -23,6 +23,13 @@ const WITH_APPLICATION = { application: { select: { name: true, kind: true, logo
 type PlanRow = Prisma.PlanGetPayload<{ include: typeof WITH_APPLICATION }>;
 type ProfileRow = Prisma.PlanWorkspaceProfileGetPayload<{ include: { members: true } }>;
 
+/**
+ * The binding a plan is written with: a K4 plan is bound to an account and no other plan has one (the CHECK `plans_key_binding_k4`).
+ * Until a plan can be declared with another binding, every K4 plan is bound to an account, which is what it did before bindings existed.
+ */
+const bindingOf = (provisioningType: ProvisioningType): 'ACCOUNT' | null =>
+  provisioningType === 'K4' ? 'ACCOUNT' : null;
+
 /** The reference price of a plan row (`QĐ-113a`): both columns or none (a CHECK of the table). */
 const referencePriceOf = (row: {
   referencePriceMinor: bigint | null;
@@ -91,6 +98,7 @@ export class PlanRepo {
         name: input.name,
         normalizedName: searchKey(input.name),
         provisioningType: input.provisioningType,
+        keyBinding: bindingOf(input.provisioningType),
         pricingModel: input.pricingModel,
         controlLevel: input.controlLevel,
         revocationNote: input.revocationNote,
@@ -159,7 +167,9 @@ export class PlanRepo {
       where: { id },
       data: {
         ...(changes.name !== undefined ? { name: changes.name, normalizedName: searchKey(changes.name) } : {}),
-        ...(changes.provisioningType !== undefined ? { provisioningType: changes.provisioningType } : {}),
+        ...(changes.provisioningType !== undefined
+          ? { provisioningType: changes.provisioningType, keyBinding: bindingOf(changes.provisioningType) }
+          : {}),
         ...(changes.pricingModel !== undefined ? { pricingModel: changes.pricingModel } : {}),
         ...(changes.controlLevel !== undefined ? { controlLevel: changes.controlLevel } : {}),
         ...(changes.revocationNote !== undefined ? { revocationNote: changes.revocationNote } : {}),
