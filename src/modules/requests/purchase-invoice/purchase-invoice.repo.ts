@@ -151,13 +151,22 @@ export class PurchaseInvoiceRepo {
     };
   }
 
-  /** Whether an invoice of the vendor with this number is open (not returned); the database refuses a second one in any case. */
+  /**
+   * Whether an invoice of the vendor with this number is open (not returned), whatever the case and the white space of either number; the database refuses a second one
+   * in any case. The key is the expression of the unique index `purchase_invoices_number_open_normalized_key`, written the same way: the class of white space is
+   * `[[:space:]]` and never a backslash class, which a JavaScript template would lose on the way.
+   */
   async numberIsOpen(tx: DbTx, organizationId: string, vendorId: string, number: string): Promise<boolean> {
-    return (
-      (await tx.purchaseInvoice.count({
-        where: { organizationId, vendorId, number, state: { not: 'RETURNED' } },
-      })) > 0
-    );
+    const rows = await tx.$queryRaw<{ found: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM purchase_invoices
+         WHERE organization_id = ${organizationId}::uuid
+           AND vendor_id = ${vendorId}::uuid
+           AND state <> 'RETURNED'
+           AND lower(regexp_replace(number, '[[:space:]]', '', 'g')) = lower(regexp_replace(${number}::text, '[[:space:]]', '', 'g'))
+      ) AS found`;
+
+    return rows[0]?.found === true;
   }
 
   async insert(tx: DbTx, input: NewPurchaseInvoice): Promise<PurchaseInvoiceRow> {
