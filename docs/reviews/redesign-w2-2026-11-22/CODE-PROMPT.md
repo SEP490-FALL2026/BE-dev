@@ -66,12 +66,19 @@ git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management checkout -b int/r
 
 ## 2. Thứ tự gói
 
-- **tech:** pha 1 T1 → T2 → T3 → T3b → T4 → T5, push nhánh, báo người điều phối "pha 1 xong". Pha 2 (T6 → T7) **chỉ** khi người điều
-  phối báo làn `biz` đã xong B9 trên `int/redesign-w2`: `git fetch origin && git merge origin/int/redesign-w2` (không rebase),
-  chạy lại `pnpm prisma:generate`, `pnpm openapi:export` + bộ kiểm nhanh, rồi làm.
-- **biz:** pha A B0 (làm ngay trên `int/redesign-w2`). Pha B **chỉ** khi người điều phối báo Owner đã merge pha 1 của làn `tech`
-  vào `int/redesign-w2`: `git pull --ff-only`, `pnpm prisma:generate`, bộ kiểm nhanh, rồi B10a → B1 → B2a-1 → B2a-2 → B2b → B3a-1 →
-  B3a-2 → B3b → B4 → B5a → B5b → B5c → B6 → B7 → B8 → B10b → B10c → B10d → B10e → B10f → B10g → B10h → B11 → B9.
+- **tech:** **T1 trước tiên**, xong T1 thì push nhánh và báo người điều phối "T1 xong" (làn `biz` chờ bảng của T1), rồi làm tiếp
+  T2 → T3 → T3b → T4 → T5, push, báo "pha 1 xong". Pha 2 (T6 → T7) **chỉ** khi người điều phối báo làn `biz` đã xong B9 trên
+  `int/redesign-w2`: `git fetch origin && git merge origin/int/redesign-w2` (không rebase), chạy lại `pnpm prisma:generate`,
+  `pnpm openapi:export` + bộ kiểm nhanh, rồi làm.
+- **biz:**
+  - **Pha A** (làm ngay trên `int/redesign-w2`): B0.
+  - **Pha B1** — **chỉ** khi người điều phối báo Owner đã merge **T1** của làn `tech` vào `int/redesign-w2`: `git pull --ff-only`,
+    `pnpm prisma:generate`, bộ kiểm nhanh, rồi B10a → B10b → B10c → B10d → B10e → B10f → B10g → B11 (luật QĐ-118, không cần
+    T2–T5).
+  - **Pha B2** — **chỉ** khi người điều phối báo đã merge **cả pha 1** (T2 → T5) vào `int/redesign-w2`: `git pull --ff-only`,
+    `pnpm prisma:generate`, bộ kiểm nhanh, rồi B1 → B2a-1 → B2a-2 → B2b → B3a-1 → B3a-2 → B3b → B4 → B5a → B5b → B5c → B6 → B7 →
+    B8 → B10h → B9.
+  - Xong pha B1 mà pha B2 chưa mở ⟹ push, báo cáo ngắn rồi chờ.
 - **Chỉ sửa file trong danh sách của gói** (PLAN). Cần file của làn kia ⟹ không sửa, ghi `PROGRESS-<làn>.md` mục _Bàn giao_, làm
   tiếp phần không phụ thuộc. `devices.module.ts` chỉ làn `biz` sửa (làn `tech` ghi _Bàn giao_ cho B1).
 
