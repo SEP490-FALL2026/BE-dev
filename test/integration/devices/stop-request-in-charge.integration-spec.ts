@@ -115,4 +115,26 @@ describe('stop request completion acting IT Admin enforcement (H13) (integration
       await endSubstitute(subId).expect(200);
     }
   });
+
+  it('notifies only Super Admin and no other IT Admin when in-charge IT Admin is locked and no substitute exists', async () => {
+    const deptA = await h.department(nextCode('M13A'));
+    const deptB = await h.department(nextCode('M13B'));
+    const itA = await createItAdmin(deptA.code, 'MITA');
+    await createItAdmin(deptB.code, 'MITB');
+    await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [deptA.id, itA.employeeId]);
+
+    await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE id = $1`, [itA.account.appUserId]);
+    try {
+      const { stopRequestId } = await createHolderWithStopRequest(deptA.code, 'MHLD');
+      const { rows } = await h.ctx.sql.query<{ recipient_employee_id: string }>(
+        `SELECT recipient_employee_id FROM in_app_notifications
+          WHERE code = 'DEVICE_STOP_REQUESTED' AND event_key = $1
+          ORDER BY recipient_employee_id`,
+        [`DEVICE_STOP_REQUESTED:${stopRequestId}`],
+      );
+      expect(rows.map((row) => row.recipient_employee_id)).toEqual([h.seed.superAdmin.employeeId]);
+    } finally {
+      await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE id = $1`, [itA.account.appUserId]);
+    }
+  });
 });

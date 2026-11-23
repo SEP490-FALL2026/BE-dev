@@ -37,18 +37,27 @@ export class StopRequestNotifier {
   }
 
   /**
-   * The IT Admin in charge of the department of the holder when they can act, else every IT Admin who can. Never the holder: an IT Admin
-   * asking for their own machine is not told of it, and when they are the one in charge the others who can act are (any of them handles it).
+   * Acting IT Admins of the holder's work department, excluding the holder. Falls back to the usable Super Admin
+   * (unless they are the holder) when no acting IT Admin exists or the holder has no work department.
    */
   private async recipients(tx: DbTx, holderEmployeeId: string): Promise<string[]> {
-    const placement = await this.organizationReads.getItAdminInCharge(holderEmployeeId, undefined, tx);
-    const inCharge = placement?.itAdminEmployeeId ?? null;
-    if (inCharge !== null && inCharge !== holderEmployeeId) {
-      const usable = await this.identity.findUsableItAdminEmployeeIds([inCharge], tx);
-      if (usable.has(inCharge)) return [inCharge];
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+    const deptId =
+      (await this.organizationReads.workDepartmentsOf([holderEmployeeId], today, tx)).get(holderEmployeeId) ?? null;
+    if (deptId !== null) {
+      const acting = (
+        await this.organizationReads.itAdminsActingFor(
+          [deptId],
+          (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+          tx,
+        )
+      ).get(deptId);
+      const actors = (acting?.actors ?? []).filter((id) => id !== holderEmployeeId);
+      if (actors.length > 0) return actors;
     }
 
-    return (await this.identity.findAllUsableItAdminEmployeeIds(tx)).filter((id) => id !== holderEmployeeId);
+    const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+    return superAdmin !== null && superAdmin !== holderEmployeeId ? [superAdmin] : [];
   }
 
   private async tell(
