@@ -33,7 +33,7 @@ export class EmployeeMaintenanceController {
   @ApiSuccessResponse(MaintainedEmployeeResponseDto, {
     message: 'EMPLOYEE.UPDATED',
     description:
-      'The name, work email, kind of staff, job title (free text; null clears it) or a hire date still to come were changed; the Audit Trail keeps who, when and the values before and after, and the employee and the head of their department are told. The login email, the department and the status are untouched.',
+      'The name, work email, kind of staff, job title (free text; null clears it) or a hire date still to come were changed; the Audit Trail keeps who, when and the values before and after, and the employee and the head of their department are told. The department and the status are untouched; the login email of the account of the person, if there is one, follows a new work email in the same change.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
@@ -51,7 +51,7 @@ export class EmployeeMaintenanceController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is malformed, names a field that is not an official one, among them an HR basis, which no correction takes (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST, JOB_TITLE_TOO_LONG, OPEN_ASSIGNMENT_NEEDS_EXPECTED_END — a contractor, freelancer or intern needs an expected end on every open seat).',
+        'The body is malformed, names a field that is not an official one, among them an HR basis, which no correction takes (VALIDATION_ERROR), names nothing to change (EMPLOYEE.UPDATE_EMPTY), or a value is refused (EMPLOYEE.ROW_INVALID: WORK_EMAIL_TAKEN, WORK_EMAIL_REQUIRED_FOR_ACCOUNT — the work email of a person who has an account cannot be cleared,HIRE_DATE_LOCKED, HIRE_DATE_IN_PAST, JOB_TITLE_TOO_LONG, OPEN_ASSIGNMENT_NEEDS_EXPECTED_END — a contractor, freelancer or intern needs an expected end on every open seat).',
       examples: [
         VALIDATION_EXAMPLE,
         EMPLOYEE_ERROR_EXAMPLES.EMPLOYEE_UPDATE_ROW_INVALID,

@@ -107,6 +107,7 @@ export class InstallationApi {
         organizationId: org.id,
         code: input.departmentCode,
         name: input.departmentName,
+        starting: true,
       });
       await record(org.id, 'INSTALLATION.DEPARTMENT_CREATED', 'Department', department.id, {
         code: input.departmentCode,

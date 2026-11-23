@@ -26,7 +26,7 @@ describe('the seat baseline of a subscription, from the file to the seats (e2e, 
     design = await h.departmentWithUnit('P-DES');
     // The Super Admin entered the people; the IT Admin created the subscription of 10 seats the department owns.
     for (const code of ['DES-E1', 'DES-E2', 'DES-E3']) people[code] = await h.member(design.code, code, 'Designer');
-    subscriptionId = await h.subscription(10, 'K2', design.id);
+    subscriptionId = await h.subscription(10, 'K2');
   }, 180000);
 
   afterAll(async () => {

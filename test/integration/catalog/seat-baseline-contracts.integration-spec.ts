@@ -88,7 +88,6 @@ describe('what licensing reads of catalog and organization (integration, real Po
         .post('/api/v1/subscriptions')
         .set(as(it1))
         .send({
-          ownerDepartmentId: seed.departmentId,
           planId,
           kind: 'TERM',
           // A subscription that becomes active names the months it commits to and the IT Admin who answers for it.
@@ -119,7 +118,6 @@ describe('what licensing reads of catalog and organization (integration, real Po
         status: 'DRAFT',
         missing: ['START_DATE', 'BILLING_CYCLE', 'UNIT_PRICE'],
         purchasedQuantity: 100,
-        ownerDepartmentId: seed.departmentId,
       });
     });
 
@@ -177,7 +175,6 @@ describe('what licensing reads of catalog and organization (integration, real Po
         status: null,
         missing: [],
         purchasedQuantity: null,
-        ownerDepartmentId: null,
       });
     });
 
@@ -207,11 +204,15 @@ describe('what licensing reads of catalog and organization (integration, real Po
       });
       await isLocked;
 
+      // The seats are sent with the version of a read, as a client does; the read takes no lock, so it is made while the holder has the row.
+      const seen = dataOf<{ updatedAt: string }>(
+        await request(server()).get(`/api/v1/subscriptions/${id}`).set(as(it1)).expect(200),
+      ).updatedAt;
       let patched = false;
       const patch = request(server())
         .patch(`/api/v1/subscriptions/${id}`)
         .set(as(it1))
-        .send({ purchasedQuantity: 12 })
+        .send({ purchasedQuantity: 12, expectedUpdatedAt: seen, quantityChangeReason: 'More seats needed' })
         .then((response) => {
           patched = true;
 

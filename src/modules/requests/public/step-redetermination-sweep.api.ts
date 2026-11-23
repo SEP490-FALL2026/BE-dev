@@ -90,11 +90,16 @@ export class StepRedeterminationSweepApi {
     let failed = 0;
     for (;;) {
       const page = await this.reassignment.heldNeedRequestIds(after, DAILY_PAGE);
-      if (page.length === 0) return { requests, failed };
+      if (page.length === 0) break;
       requests += page.length;
       failed += await this.each(page, 'EFFECTIVE_DATE_REACHED', correlationId, now);
       after = page[page.length - 1];
     }
+    const queued = await this.reassignment.spendQueueRequestIds();
+    requests += queued.length;
+    failed += await this.each(queued, 'EFFECTIVE_DATE_REACHED', correlationId, now);
+
+    return { requests, failed };
   }
 
   /** One transaction for each request; returns how many failed. A failure is logged by its kind, never its message. */

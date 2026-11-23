@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { buildActivatedAccount } from '../../support/builders/account.builder';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
@@ -10,7 +11,6 @@ const h = new SeatHarness();
  */
 describe('a second live subscription of a K2 or K4 plan (integration, real PostgreSQL)', () => {
   const body = (planId: string, extra: Record<string, unknown> = {}) => ({
-    ownerDepartmentId: h.seed.departmentId,
     planId,
     kind: 'TERM',
     unitPrice: { amount: '1000000', currency: 'VND' },
@@ -23,7 +23,6 @@ describe('a second live subscription of a K2 or K4 plan (integration, real Postg
   });
   /** A plan bought once is a purchase made once: a perpetual subscription with no billing cycle and no commitment (the plan of a key, `B-5`). */
   const k4Body = (planId: string) => ({
-    ownerDepartmentId: h.seed.departmentId,
     planId,
     kind: 'PERPETUAL',
     unitPrice: { amount: '1000000', currency: 'VND' },
@@ -36,11 +35,12 @@ describe('a second live subscription of a K2 or K4 plan (integration, real Postg
   const get = (id: string) => request(h.server()).get(`/api/v1/subscriptions/${id}`).set(h.as(h.it1));
   const warningsOf = (response: request.Response) => h.dataOf<{ warnings: string[] }>(response).warnings;
   const idOf = (response: request.Response) => h.dataOf<{ id: string }>(response).id;
-  const draftOf = (planId: string) =>
-    post({ ownerDepartmentId: h.seed.departmentId, planId, kind: 'TERM', purchasedQuantity: 3 });
+  const draftOf = (planId: string) => post({ planId, kind: 'TERM', purchasedQuantity: 3 });
 
   beforeAll(async () => {
     await h.start();
+    // Once the baseline is closed a plan needs two IT Admins who work at the vendor (`QĐ-114ae`): the plans of this suite name this one beside the default one.
+    await buildActivatedAccount(h.ctx, h.seed, { code: 'E-IT2', email: 'it2@acme.vn', role: 'IT_ADMIN' });
   }, 240000);
 
   afterAll(async () => {
@@ -77,11 +77,11 @@ describe('a second live subscription of a K2 or K4 plan (integration, real Postg
       // The draft renewal period of the first (the vendor confirmed it with data still missing): written by SQL, since only a renewal may point back.
       const next = (
         await h.ctx.sql.query<{ id: string }>(
-          `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity, unit_price_minor,
+          `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity, unit_price_minor,
              unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source, price_reporting_minor,
              price_reporting_currency, billing_cycle, commitment_term_months, start_date, responsible_it_admin_employee_id, auto_renew,
              allows_mid_term_reduction, renewed_from_id, updated_at)
-           SELECT gen_random_uuid(), organization_id, plan_id, owner_department_id, kind, 'DRAFT', purchased_quantity, unit_price_minor,
+           SELECT gen_random_uuid(), organization_id, plan_id, kind, 'DRAFT', purchased_quantity, unit_price_minor,
                   unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source, price_reporting_minor,
                   price_reporting_currency, billing_cycle, commitment_term_months, '2026-02-05', responsible_it_admin_employee_id, auto_renew,
                   allows_mid_term_reduction, id, now()

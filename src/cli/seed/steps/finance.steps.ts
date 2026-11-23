@@ -110,8 +110,8 @@ async function oneCycle(ctx: DemoRunContext, finance: string, year: number, plan
 }
 
 /**
- * Finance makes the budget cycle of the year and of the next one and opens each (`QĐ-111z`): a head sends `BM-10` only to an open
- * cycle. The cycle of the year after is left a draft.
+ * Finance makes the budget cycle of the year, of the next one and of the year after, and opens each (`QĐ-111z`): a head sends `BM-10` only to an
+ * open cycle.
  */
 async function cycles(ctx: DemoRunContext): Promise<StepOutcome> {
   const finance = await as(ctx, financePerson(ctx));
@@ -120,7 +120,7 @@ async function cycles(ctx: DemoRunContext): Promise<StepOutcome> {
   return summarize([
     await oneCycle(ctx, finance, year, ctx.fixture.cycle),
     await oneCycle(ctx, finance, year + 1, ctx.fixture.nextCycle),
-    await oneCycle(ctx, finance, year + 2, ctx.fixture.draftCycle),
+    await oneCycle(ctx, finance, year + 2, ctx.fixture.afterNextCycle),
   ]);
 }
 
@@ -134,7 +134,7 @@ export const FINANCE_STEPS: readonly DemoStep[] = [
   },
   {
     key: 'budget.cycles',
-    title: 'Kỳ ngân sách năm hiện hành và năm sau (mở), năm sau nữa (nháp) (Finance)',
+    title: 'Kỳ ngân sách năm hiện hành, năm sau và năm sau nữa (mở) (Finance)',
     needs: ['finance.cost-centers', 'org.heads'],
     run: cycles,
   },

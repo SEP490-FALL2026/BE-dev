@@ -23,6 +23,7 @@ const scenarioOf = (overrides: Partial<DemoRequestScenario> = {}): DemoRequestSc
   termMonths: null,
   target: 'COMPLETED',
   summary: 'x',
+  reason: 'x',
   ...overrides,
 });
 

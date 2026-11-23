@@ -4,6 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import {
   BudgetVersionAttachmentRequiredError,
   BudgetCycleCurrencyMismatchError,
+  BudgetCycleNotLockedError,
   BudgetCycleNotOpenError,
   BudgetOverAnnualCeilingError,
   BudgetVersionNotEditableError,
@@ -14,7 +15,7 @@ import { annualCheck, isEditable, versionAttachmentMissing, yearHasEnded } from 
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
-import { cycleAcceptsWork } from '../cycle/cycle.policy';
+import { versionSubmissionRefusal } from '../cycle/cycle.policy';
 import { CycleRepo, type CycleRecord } from '../cycle/cycle.repo';
 
 /**
@@ -77,9 +78,12 @@ export class VersionAccessService {
    * has ended (the sending is refused as ended later). Throws BudgetCycleNotOpenError.
    */
   async lockCycleOf(tx: DbTx, version: Pick<VersionRecord, 'organizationId' | 'year'>): Promise<CycleRecord | null> {
-    if (yearHasEnded(version.year, await this.facts.today(new Date(), tx))) return null;
+    const today = await this.facts.today(new Date(), tx);
+    if (yearHasEnded(version.year, today)) return null;
     const cycle = await this.cycles.lockByYear(tx, version.organizationId, version.year, 'UPDATE');
-    if (!cycle || !cycleAcceptsWork(cycle)) throw new BudgetCycleNotOpenError(version.year);
+    const refusal = versionSubmissionRefusal(cycle, today);
+    if (refusal === 'NOT_OPEN') throw new BudgetCycleNotOpenError(version.year);
+    if (refusal === 'NOT_LOCKED') throw new BudgetCycleNotLockedError(version.year);
 
     return cycle;
   }

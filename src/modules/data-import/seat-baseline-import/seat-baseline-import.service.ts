@@ -234,7 +234,6 @@ export class SeatBaselineImportService {
       target: {
         kind: base.target.kind,
         purchasedQuantity: base.target.purchasedQuantity,
-        ownerDepartmentId: base.target.ownerDepartmentId,
       },
       recordedOn: base.recordedOn,
       employees: new Map(

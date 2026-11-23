@@ -114,7 +114,7 @@ describe('DepartmentService', () => {
     organization.lockEmployee.mockResolvedValue(undefined);
     organization.getEmployee.mockResolvedValue(activeEmployee);
     organization.ownedBy.mockResolvedValue(noGroup);
-    organization.getDepartmentUse.mockResolvedValue({ openWork: noGroup, subscriptions: noGroup });
+    organization.getDepartmentUse.mockResolvedValue({ openWork: noGroup });
     departments.lock.mockResolvedValue({
       id: 'dep-1',
       name: 'Design',
@@ -329,15 +329,6 @@ describe('DepartmentService', () => {
         () =>
           organization.getDepartmentUse.mockResolvedValue({
             openWork: { items: items('ACCESS_REQUEST', 1), total: 1 },
-            subscriptions: noGroup,
-          }),
-      ],
-      [
-        'a subscription that owes a payment',
-        () =>
-          organization.getDepartmentUse.mockResolvedValue({
-            openWork: noGroup,
-            subscriptions: { items: items('SUBSCRIPTION', 1), total: 1 },
           }),
       ],
     ])('refuses while it still has %s, and retires nothing', async (_name, arrange) => {
@@ -348,7 +339,7 @@ describe('DepartmentService', () => {
       expect(audit.record).not.toHaveBeenCalled();
     });
 
-    it('lists each group with its first twenty and the total, all four at once', async () => {
+    it('lists each group with its first twenty and the total, all three at once', async () => {
       departments.members.mockResolvedValue({ items: [{ employeeCode: 'E1', fullName: 'A' }], total: 41 });
       organization.ownedBy.mockResolvedValue({
         items: [{ assignmentId: 'a-1', accountIdentifier: 'ci-bot' }],
@@ -356,7 +347,6 @@ describe('DepartmentService', () => {
       });
       organization.getDepartmentUse.mockResolvedValue({
         openWork: { items: items('ACCESS_REQUEST', 20), total: 57 },
-        subscriptions: { items: items('SUBSCRIPTION', 2), total: 2 },
       });
 
       const refusal: unknown = await (await service()).deactivate(superAdmin, 'dep-1').catch((error: unknown) => error);
@@ -367,7 +357,6 @@ describe('DepartmentService', () => {
       expect(groups.serviceAccounts.total).toBe(3);
       expect(groups.openWork.items).toHaveLength(20);
       expect(groups.openWork.total).toBe(57);
-      expect(groups.subscriptions.total).toBe(2);
       // Every list is asked for at most twenty, inside the transaction that holds the department.
       expect(organization.getDepartmentUse).toHaveBeenCalledWith('dep-1', '2026-10-19', 20, tx);
       expect(departments.members).toHaveBeenCalledWith(tx, 'dep-1', '2026-10-19', { skip: 0, take: 20 });

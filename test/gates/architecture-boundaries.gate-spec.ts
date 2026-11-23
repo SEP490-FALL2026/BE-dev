@@ -77,7 +77,6 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   Application: 'catalog',
   ApplicationBusinessOwner: 'catalog',
   Subscription: 'catalog',
-  SubscriptionOwnerAssignment: 'catalog',
   Plan: 'catalog',
   PlanTerms: 'catalog',
   PlanUsageRate: 'catalog',

@@ -3,6 +3,7 @@ import { addDays } from '../../../src/core/business-date';
 import { addWorkingDays } from '../../../src/core/working-days';
 import { BlockAnnouncementService } from '../../../src/modules/personnel/departure-deadline/block-announcement.service';
 import { DepartureClosureService } from '../../../src/modules/personnel/departure-closure/departure-closure.service';
+import { TransferRevocationService } from '../../../src/modules/personnel/transfer-grace/transfer-revocation.service';
 import type { ApiAccount } from '../../support/api-accounts';
 import { DashboardHarness, OVERVIEW_PATHS, type SectionWire } from '../../support/dashboard-harness';
 import type { Department, Person } from '../../support/request-harness';
@@ -22,7 +23,7 @@ interface Progress {
       | 'mailboxLockPending',
       SectionWire
     >;
-    transfers: Record<'inGrace' | 'graceEndingSoon' | 'revoking', SectionWire>;
+    transfers: Record<'inGrace' | 'graceEndingSoon' | 'revoking' | 'revocationFailed', SectionWire>;
     seatsReturned: Record<'thisMonth' | 'reusedThisMonth', SectionWire>;
     plansBelowVendorAdminMinimum: SectionWire;
   };
@@ -107,7 +108,7 @@ describe('progress of the departures and the transfers on the overviews (integra
       const holder = await person(des.department);
       const late = await h.recordedCase(holder, { lastWorkingDay: h.day(10) });
       await h.rightOf(holder, holder.code, {
-        subscriptionId: await h.subscription(10, 'K2', des.department.id),
+        subscriptionId: await h.subscription(10, 'K2'),
       });
       await h.ctx.sql.query(
         `UPDATE offboarding_cases SET last_working_day = '2026-09-30', departure_effective_on = '2026-10-01',
@@ -188,7 +189,7 @@ describe('progress of the departures and the transfers on the overviews (integra
 
       // An IT Admin who answers for a subscription leaves: the hand-over is pending until they hand it over, across the company.
       const leaver = await h.employeeIn(ops.department, `RD-LV-${(counter += 1)}`, ['IT_ADMIN']);
-      const subscriptionId = await h.subscription(10, 'K2', ops.department.id);
+      const subscriptionId = await h.subscription(10, 'K2');
       await h.ctx.sql.query('UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1', [
         subscriptionId,
         leaver.employeeId,
@@ -257,7 +258,7 @@ describe('progress of the departures and the transfers on the overviews (integra
 
   describe('the seats of the pools and the plans short of admins', () => {
     it('counts the K2 seats got back for a departure this month and the K2 grants of the pool, in the tasks of the IT Admin', async () => {
-      const k2 = await h.subscription(10, 'K2', des.department.id);
+      const k2 = await h.subscription(10, 'K2');
       const leaver = await person(des.department);
       const seat = await h.rightOf(leaver, leaver.code, { subscriptionId: k2 });
       const before = (await progressOf(OVERVIEW_PATHS.itAdmin, it1)).sections.seatsReturned;
@@ -300,7 +301,7 @@ describe('progress of the departures and the transfers on the overviews (integra
     });
 
     it('counts the plans in use that need admins and have fewer than two who work, across the company, and falls when a second admin works', async () => {
-      const k2 = await h.subscription(10, 'K2', des.department.id);
+      const k2 = await h.subscription(10, 'K2');
       const { rows } = await h.ctx.sql.query<{ plan_id: string }>('SELECT plan_id FROM subscriptions WHERE id = $1', [
         k2,
       ]);
@@ -336,6 +337,36 @@ describe('progress of the departures and the transfers on the overviews (integra
       });
       expect((await countBy(OVERVIEW_PATHS.itAdmin, it1)).count).toBe(enough);
       expect((await countBy(OVERVIEW_PATHS.itAdmin, it3.account)).count).toBe(enough);
+    });
+
+    it('counts transfers with a closed-failed revocation in revocationFailed and clears it when reopened', async () => {
+      const k2 = await h.subscription(10, 'K2');
+      const mover = await person(des.department);
+      const seat = await h.rightOf(mover, mover.code, { subscriptionId: k2 });
+      const transfer = await h.moveToday(mover, eng.department);
+      await moveGrace(transfer.id, { effective: h.day(-10), reminder: h.day(-5), ends: h.day(-1) });
+
+      await h.ctx.app.get(TransferRevocationService, { strict: false }).sweep(new Date());
+      const taskId = (
+        await h.ctx.sql.query<{ id: string }>(
+          `SELECT id FROM provisioning_tasks WHERE assignment_id = $1 AND kind = 'REVOKE'`,
+          [seat],
+        )
+      ).rows[0].id;
+      await h.claim(taskId, it2.account).expect(200);
+      await h.fail(taskId, { reason: 'Không thu hồi được' }, it2.account).expect(200);
+      await h.closeFailed(taskId, { reason: 'Không thu hồi được' }, it2.account).expect(200);
+
+      const before = (await progressOf(OVERVIEW_PATHS.itAdmin, it1)).sections.transfers.revocationFailed.count ?? 0;
+      expect(before).toBeGreaterThanOrEqual(1);
+
+      await request(h.server())
+        .post(`/api/v1/department-transfers/${transfer.id}/revocations`)
+        .set(h.as(it1))
+        .expect(200);
+
+      const after = (await progressOf(OVERVIEW_PATHS.itAdmin, it1)).sections.transfers.revocationFailed.count ?? 0;
+      expect(after).toBe(before - 1);
     });
   });
 });

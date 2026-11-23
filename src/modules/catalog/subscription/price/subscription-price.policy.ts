@@ -57,3 +57,44 @@ export function monthlyCostOf(record: Pick<SubscriptionRecord, 'billingCycle' | 
 
   return { monthlyPriceMinor: (price + months - 1n) / months, cycleMonths };
 }
+
+/** What a plan is bought at, and where that price comes from: a subscription of the plan, or the reference price of the plan itself (`QĐ-113a`). */
+export interface PlanPriceFacts {
+  kind: 'RECURRING' | 'ONE_TIME';
+  unitPrice: Money;
+  /** The unit price converted to the reporting currency when it was recorded (`M-17`); null when it was not converted. */
+  reportingUnitPrice: Money | null;
+  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
+  /** The subscription may be cut before its term ends (`QĐ-96f`): a request on it runs to the end of the fiscal year at most. */
+  allowsMidTermReduction: boolean;
+  /** `SUBSCRIPTION`: the main subscription of the plan prices it; `PLAN_REFERENCE`: the plan has none that does and its own reference price stands in (`QĐ-113a`). */
+  source: 'SUBSCRIPTION' | 'PLAN_REFERENCE';
+}
+
+/**
+ * The cycle a reference price is counted by (`QĐ-113a`): K1 and K2 give the price of one seat for one month, K4 the price of one purchase; any other
+ * kind has no reference price. It is what the catalog of requestable software counts as a price that exists.
+ */
+export function referenceCycleOf(kind: string): 'MONTHLY' | 'ONE_TIME' | undefined {
+  if (kind === 'K1' || kind === 'K2') return 'MONTHLY';
+
+  return kind === 'K4' ? 'ONE_TIME' : undefined;
+}
+
+/**
+ * The price facts the reference price of a plan gives when no subscription prices it (`QĐ-113a`): recurring by the month for K1 and K2, once for K4.
+ * Dong is the reporting currency, so the reporting price is the price itself. Null when the plan has no reference price or its kind cannot have one.
+ */
+export function referencePriceSourceOf(kind: string, price: Money | null): PlanPriceFacts | null {
+  const cycle = referenceCycleOf(kind);
+  if (price === null || cycle === undefined) return null;
+
+  return {
+    kind: cycle === 'MONTHLY' ? 'RECURRING' : 'ONE_TIME',
+    unitPrice: price,
+    reportingUnitPrice: price,
+    billingCycle: cycle === 'MONTHLY' ? 'MONTHLY' : 'OTHER',
+    allowsMidTermReduction: false,
+    source: 'PLAN_REFERENCE',
+  };
+}

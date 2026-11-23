@@ -1,3 +1,4 @@
+import request from 'supertest';
 import { renewalEndOf } from '../../../src/core/term-limit';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { ExpiryRenewalWindowService } from '../../../src/modules/licensing/expiry/expiry-renewal-window.service';
@@ -5,6 +6,7 @@ import { LicensingRenewalApi } from '../../../src/modules/licensing/public/licen
 import { YearStartCommitmentsRepo } from '../../../src/modules/requests/year-start-commitments/year-start-commitments.repo';
 import { k1Checklist } from '../../support/k1-checklist';
 import { ReturnHarness, type RenewalWire } from '../../support/return-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 const h = new ReturnHarness();
 const REASON = 'The work goes on';
@@ -16,6 +18,8 @@ const REASON = 'The work goes on';
  * record that follows the old one is written only when the IT Admin completes it. Until then the request is approved and not granted, for
  * the commitment of 01/01 too (RV-03).
  */
+afterEach(() => jest.restoreAllMocks());
+
 describe('the window and the IT extension of a renewal (integration, real PostgreSQL, BR-MF1-08)', () => {
   let internalPlan: string;
   let counter = 0;
@@ -246,6 +250,8 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
     });
 
     it('a renewal withdrawn while its extension task is open cancels the task (out of the IT queue) and leaves the right its old end', async () => {
+      // QĐ-113d: this test withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       const { unit, assignmentId, end } = await holder(10);
       const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
       await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
@@ -263,6 +269,31 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
       expect(await h.successorsOf(assignmentId)).toEqual([]);
       expect(await h.seatRow(assignmentId)).toMatchObject({ valid_until: null, expected_end_date: end });
       expect(await h.ctx.app.get(LicensingRenewalApi).hasPendingRenewal(assignmentId)).toBe(false);
+    });
+
+    it('QĐ-113d: the holder withdraws a renewal the head has not decided, and no longer once the head approved it; the list agrees', async () => {
+      const waiting = await holder(10);
+      const approvedOne = await holder(10);
+      const before = (await h.renewed(waiting.unit.member.account, body(waiting.assignmentId, 3))).request;
+      const after = (await h.renewed(approvedOne.unit.member.account, body(approvedOne.assignmentId, 3))).request;
+      const canWithdraw = async (account: typeof waiting.unit.member.account, id: string) =>
+        h
+          .dataOf<{ items: Array<{ id: string; canWithdraw: boolean }> }>(
+            await request(h.server())
+              .get('/api/v1/me/access-requests')
+              .query({ pageSize: 100 })
+              .set(h.as(account))
+              .expect(200),
+          )
+          .items.find((item) => item.id === id)?.canWithdraw;
+      expect(await canWithdraw(waiting.unit.member.account, before.id)).toBe(true);
+      await h.withdrawRequest(before.id, {}, waiting.unit.member.account).expect(200);
+
+      await h.decide(after.id, { decision: 'APPROVE' }, approvedOne.unit.head.account).expect(200);
+      const refused = await h.withdrawRequest(after.id, {}, approvedOne.unit.member.account).expect(409);
+
+      expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.WITHDRAWAL_AFTER_DECISION');
+      expect(await canWithdraw(approvedOne.unit.member.account, after.id)).toBe(false);
     });
 
     it('RV-03: a renewal approved and not extended yet counts on 01/01 as approved and not granted, to its new end', async () => {

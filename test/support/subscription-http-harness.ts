@@ -18,7 +18,6 @@ import { pricingOfBody, writeLegacyPricing } from './legacy-pricing';
 export interface SubscriptionWire {
   id: string;
   planId: string;
-  ownerDepartmentId: string;
   vendor: { id: string; name: string };
   kind: string;
   status: string;
@@ -104,24 +103,20 @@ export class SubscriptionHttpHarness {
    * it was recorded and the IT Admin named (none for `responsible: null`). The routes no longer leave such a draft (a price in dong needs no
    * rate to wait for), so the rows an earlier release stored, which only `complete` or a change of the person can still move, are written by SQL.
    */
-  wholeDraft = async (
-    planId: string,
-    over: { responsible?: string | null; day?: string; ownerDepartmentId?: string } = {},
-  ): Promise<string> => {
+  wholeDraft = async (planId: string, over: { responsible?: string | null; day?: string } = {}): Promise<string> => {
     const id = randomUUID();
     const day = over.day ?? '2026-03-15';
     await this.ctx.sql.query(
-      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity,
+      `INSERT INTO subscriptions (id, organization_id, plan_id, kind, status, purchased_quantity,
          unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source,
          price_reporting_minor, price_reporting_currency, billing_cycle, commitment_term_months, start_date, end_date,
          responsible_it_admin_employee_id)
-       VALUES ($1, $2, $3, $4, 'TERM', 'DRAFT', 5, 250000, 'VND', $5, 1, $5, 'SAME_CURRENCY', 250000, 'VND', 'ANNUAL', 12, $5,
-         '2027-03-14', $6)`,
+       VALUES ($1, $2, $3, 'TERM', 'DRAFT', 5, 250000, 'VND', $4, 1, $4, 'SAME_CURRENCY', 250000, 'VND', 'ANNUAL', 12, $4,
+         '2027-03-14', $5)`,
       [
         id,
         this.seed.organizationId,
         planId,
-        over.ownerDepartmentId ?? this.seed.departmentId,
         day,
         over.responsible === undefined ? this.it1.employeeId : over.responsible,
       ],
@@ -183,7 +178,6 @@ export class SubscriptionHttpHarness {
       .post('/api/v1/subscriptions')
       .set(this.as(account))
       .send({
-        ownerDepartmentId: this.seed.departmentId,
         responsibleItAdminEmployeeId: this.it1.employeeId,
         ...commitment,
         ...body,
@@ -195,6 +189,36 @@ export class SubscriptionHttpHarness {
 
   get = (id: string, account: ApiAccount = this.it1) =>
     request(this.server()).get(`/api/v1/subscriptions/${id}`).set(this.as(account));
+
+  /** The `updatedAt` of a subscription as a client reads it: the version an edit of its seats has to name (`expectedUpdatedAt`). */
+  subscriptionVersionOf = async (id: string, account: ApiAccount = this.it1): Promise<string> =>
+    this.dataOf<{ updatedAt: string }>(await this.get(id, account).expect(200)).updatedAt;
+
+  /**
+   * An edit that sets the seats bought, as a client makes it: on a read of the subscription (`expectedUpdatedAt`, always asked when the seats are sent) and with
+   * the reason a rise of the seats of an active pool asks for (ignored when the seats do not rise). `expected` is the status the answer must have; null asserts none.
+   */
+  changeSeats = async (
+    id: string,
+    body: object,
+    expected: number | null = 200,
+    account: ApiAccount = this.it1,
+  ): Promise<request.Response> => {
+    const response = await this.patch(
+      id,
+      {
+        expectedUpdatedAt: await this.subscriptionVersionOf(id, account),
+        quantityChangeReason: 'More seats needed',
+        ...body,
+      },
+      account,
+    );
+    if (expected !== null && response.status !== expected) {
+      throw new Error(`changeSeats: expected ${expected}, got ${response.status} ${JSON.stringify(response.body)}`);
+    }
+
+    return response;
+  };
 
   complete = (id: string, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/subscriptions/${id}/completions`).set(this.as(account));

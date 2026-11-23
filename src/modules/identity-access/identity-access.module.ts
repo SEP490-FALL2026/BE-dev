@@ -47,6 +47,8 @@ import { ProfilePurgeSweeper } from './profile/profile-purge.job';
 import { ProfilePurgeService } from './profile/profile-purge.service';
 import { ProfileQueryService } from './profile/profile-query.service';
 import { RecoveryTicketService } from './recovery/recovery-ticket.service';
+import { LoginEmailChangeNotice } from './accounts/app-users/login-email-change-app-users.service';
+import { EmployeeAccountsListener } from './accounts/employee-accounts.listener';
 import { RecoveryRepo } from './recovery/recovery.repo';
 
 @Module({
@@ -79,6 +81,8 @@ import { RecoveryRepo } from './recovery/recovery.repo';
   controllers: [AuthController, MeController, ProfileController, AppUsersController, ItAdminDirectoryController],
   providers: [
     ItAdminQueryService,
+    LoginEmailChangeNotice,
+    EmployeeAccountsListener,
     ApprovalRoleFactsService,
     AccountQueryService,
     ActionLinkRevocation,

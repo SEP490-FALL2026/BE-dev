@@ -53,41 +53,48 @@ export class GroupNeedPreconditions {
     const lines = await this.lines.lock(tx, request.id);
     const step = needStepOf(request.needSteps, lines, actor.employeeId);
     const own = lines.filter((line) => line.needStepId === step.id);
+    const open = own.filter((line) => line.state === 'AWAITING_NEED');
     const approves = input.lines.some((verdict) => verdict.decision === 'APPROVE');
 
     const refusal = checkLineNeedDecider({
       actorEmployeeId: actor.employeeId,
       requesterEmployeeId: request.requesterEmployeeId,
-      stepEmployeeIds: own.map((line) => line.employeeId),
+      // A line the sender withdrew is nobody's request any more; one already decided still is, so its person is refused as before.
+      stepEmployeeIds: own.filter((line) => line.state !== 'WITHDRAWN').map((line) => line.employeeId),
       assigneeEmployeeId: step.assigneeEmployeeId,
       stepState: step.state,
       approves,
     });
     if (refusal) throw new AccessRequestDecisionRefusedError(refusal);
 
-    const open = own.filter((line) => line.state === 'AWAITING_NEED');
     const mismatch = compareLines(
       open.map((line) => line.employeeId),
       input.lines.map((verdict) => verdict.employeeId),
     );
     if (mismatch) throw new GroupRequestLinesMismatchError(mismatch);
-    await this.assertNobodyHoldsAccess(request, input.lines);
+    await this.assertNobodyHoldsAccess(tx, request, input.lines);
 
     return { request, step, open, approves };
   }
 
   /** A person who holds a seat of the plan since the request was sent is not approved: the line is checked again (`AC-15`). */
   private async assertNobodyHoldsAccess(
+    tx: DbTx,
     request: AccessRequestRecord,
     verdicts: readonly { employeeId: string; decision: string }[],
   ): Promise<void> {
     if (request.planId === null) return;
     const holding: string[] = [];
     for (const verdict of verdicts.filter((candidate) => candidate.decision === 'APPROVE')) {
-      const { total } = await this.licensing.getSeatsHeldInPlans(verdict.employeeId, [request.planId], {
-        skip: 0,
-        take: 1,
-      });
+      const { total } = await this.licensing.getSeatsHeldInPlans(
+        verdict.employeeId,
+        [request.planId],
+        {
+          skip: 0,
+          take: 1,
+        },
+        tx,
+      );
       if (total > 0) holding.push(verdict.employeeId);
     }
     if (holding.length > 0) throw new GroupRequestLineHoldsAccessError(holding);

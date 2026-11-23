@@ -98,7 +98,7 @@ describe('cases of invoices that differ over PostgreSQL (integration; RC-1.1, T-
     serial += 1;
     const unit = await h.departmentWithHead(`P-RC${serial}`);
     await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
-    const id = await h.subscription(10, 'K2', unit.department.id);
+    const id = await h.subscription(10, 'K2');
     await h.ctx.sql.query(
       `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
       [id],

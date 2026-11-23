@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { RequesterHeadConversionService } from '../step-routing/requester-head-conversion.service';
 import { StepTargetService } from '../step-routing/step-target.service';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -38,6 +39,7 @@ export class SpendRoutingService {
     private readonly steps: SpendStepRepo,
     private readonly targets: StepTargetService,
     private readonly audit: AuditApi,
+    private readonly heads: RequesterHeadConversionService,
   ) {}
 
   /** Starts only the one-step route; VIA_HEAD keeps its normal need/batch path. */
@@ -89,6 +91,36 @@ export class SpendRoutingService {
     } else {
       await this.route(tx, null, request, 'SUBMISSION', now);
     }
+  }
+
+  /** Reloads the request after one-step conversion and finishes routing it within the caller's transaction. */
+  async finishConversionById(tx: DbTx, requestId: string, now: Date): Promise<void> {
+    const request = await this.requests.findById(requestId, tx);
+    if (request) await this.finishConversion(tx, request, now);
+  }
+
+  /** Routes a priced proposal after IT assessment: converts individual requests whose requester became head to one-step. */
+  async enterAfterAssessment(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void> {
+    let request = await this.requests.findById(requestId, tx);
+    if (!request) throw new Error(`The request ${requestId} was not found after its assessment was completed.`);
+    if (
+      request.routing?.mode !== 'ONE_STEP' &&
+      request.type !== 'GROUP_GRANT' &&
+      (await this.targets.isRequesterHead(
+        tx,
+        {
+          requesterEmployeeId: request.requesterEmployeeId,
+          departmentId: request.departmentId,
+          chainHasSpendStep: true,
+          branch: request.branch,
+        },
+        now,
+      ))
+    ) {
+      await this.heads.convert(tx, request, { kind: 'USER', actor, trigger: 'ASSESSMENT_COMPLETED' });
+      request = (await this.requests.findById(requestId, tx)) ?? request;
+    }
+    if (request.routing?.mode === 'ONE_STEP') await this.route(tx, actor, request, 'SUBMISSION', now);
   }
 
   private opensSpend(outcome: BudgetOutcome | null, oneStep: boolean): boolean {

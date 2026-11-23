@@ -30,6 +30,7 @@ export class RoleDutiesViewService {
     ).get(found.employeeId);
 
     return {
+      offboardingCaseId: found.id,
       lastWorkingDay: found.lastWorkingDay,
       state: found.state,
       level: departureLevel({ state: found.state, lastWorkingDay: found.lastWorkingDay }, today),

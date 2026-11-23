@@ -12,6 +12,8 @@ Dành cho mọi contributor, có hoặc không dùng AI. Bắt đầu từ [READ
 4. Chạy kiểm tra theo bảng dưới và đọc diff cuối.
 5. Trong PR, mô tả hành vi thay đổi, bằng chứng đã chạy và phần chưa kiểm chứng.
 
+Đợt code theo spec/plan với AI (hai làn, kiểm nhanh trên máy, full test chỉ trên CI GitHub, review, merge audit): [quy trình code AI](docs/guides/quy-trinh-code-ai.md).
+
 Bug fix cần test tái hiện lỗi ở boundary phù hợp. Refactor giữ public contract;
 không gộp tính năng hoặc nâng dependency không liên quan. Sửa tài liệu cần kiểm tra
 nội dung, link và format; không cần test giả cho một câu văn.

@@ -33,13 +33,13 @@ describe('what a request is priced by (integration, real PostgreSQL)', () => {
 
     return { department: made, member, head };
   };
-  const setUnitPrice = async (departmentId: string, planId: string, amountMinor: number | null): Promise<void> => {
+  const setUnitPrice = async (planId: string, amountMinor: number | null): Promise<void> => {
     await h.ctx.sql.query(
       `UPDATE subscriptions
-          SET unit_price_minor = $3::bigint, unit_price_currency = CASE WHEN $3::bigint IS NULL THEN NULL ELSE 'VND' END,
-              price_recorded_on = CASE WHEN $3::bigint IS NULL THEN NULL ELSE current_date END
-        WHERE owner_department_id = $1 AND plan_id = $2`,
-      [departmentId, planId, amountMinor],
+          SET unit_price_minor = $2::bigint, unit_price_currency = CASE WHEN $2::bigint IS NULL THEN NULL ELSE 'VND' END,
+              price_recorded_on = CASE WHEN $2::bigint IS NULL THEN NULL ELSE current_date END
+        WHERE plan_id = $1`,
+      [planId, amountMinor],
     );
   };
 
@@ -49,7 +49,6 @@ describe('what a request is priced by (integration, real PostgreSQL)', () => {
     const dear = await department();
     // A second subscription of the plan, dearer (allowed while the seat baseline is open): the pool is the plan's, no department owns a copy.
     await declareSubscription(h.ctx, h.it1.accessToken, {
-      ownerDepartmentId: h.seed.departmentId,
       planId: pricedPlan,
       kind: 'TERM',
       purchasedQuantity: 5,
@@ -75,7 +74,7 @@ describe('what a request is priced by (integration, real PostgreSQL)', () => {
     // Rewritten from "does not price by the subscription of another department": there is no owner whose price only counts.
     const owner = await department();
     const other = await department();
-    const planOfOwnerOnly = await h.planOf(await h.subscription(5, 'K2', owner.department.id));
+    const planOfOwnerOnly = await h.planOf(await h.subscription(5, 'K2'));
 
     const priced = await h.sent(owner.member, planOfOwnerOnly, { termMonths: 1 });
     const alsoPriced = await h.sent(other.member, planOfOwnerOnly, { termMonths: 1 });
@@ -87,8 +86,8 @@ describe('what a request is priced by (integration, real PostgreSQL)', () => {
 
   it('treats a price of nothing as no price: the request is sent with no amount and the reason, never as a request that costs 0', async () => {
     const owner = await department();
-    const planOfFree = await h.planOf(await h.subscription(5, 'K2', owner.department.id));
-    await setUnitPrice(owner.department.id, planOfFree, 0);
+    const planOfFree = await h.planOf(await h.subscription(5, 'K2'));
+    await setUnitPrice(planOfFree, 0);
 
     const sent = await h.sent(owner.member, planOfFree, { termMonths: 3 });
 

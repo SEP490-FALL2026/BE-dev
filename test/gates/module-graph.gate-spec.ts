@@ -27,14 +27,13 @@ import { InstallationModule } from '../../src/modules/installation/installation.
 import { InspectionCliModule } from '../../src/modules/installation/inspect/inspection-cli.module';
 import { SeedCliModule } from '../../src/modules/installation/seed/seed-cli.module';
 import { MigrationPreflightCliModule } from '../../src/modules/installation/migration-preflight/migration-preflight-cli.module';
-import { SubscriptionOwnerAssignmentCliModule } from '../../src/modules/catalog/subscription-owner-assignment/subscription-owner-assignment-cli.module';
-import { AssignSubscriptionOwnerCliModule } from '../../src/cli/assign-subscription-owner/assign-subscription-owner-cli.module';
 import { AiPurgeCliModule } from '../../src/cli/ai-purge/ai-purge-cli.module';
 import { AiAssistPurgeCliModule } from '../../src/modules/ai-assist/purge/ai-assist-purge-cli.module';
 import { CostCenterDirectionRootCliModule } from '../../src/cli/cost-center-direction/cost-center-direction-cli.module';
 import { SuperAdminEventCliModule } from '../../src/modules/personnel/super-admin-event/super-admin-event-cli.module';
 import { RecordSuperAdminEventCliModule } from '../../src/cli/record-super-admin-event/record-super-admin-event-cli.module';
 import { IdentityAccessLocalSeedFacadeModule } from '../../src/modules/identity-access/identity-access-local-seed-facade.module';
+import { BudgetsLocalSeedFacadeModule } from '../../src/modules/budgets/budgets-local-seed-facade.module';
 import { IdentityAccessInspectionFacadeModule } from '../../src/modules/identity-access/identity-access-inspection-facade.module';
 import { DATABASE_SESSION_OPTIONS } from '../../src/infrastructure/database/read-only-session.module';
 import { NotificationsModule } from '../../src/modules/notifications/notifications.module';
@@ -146,8 +145,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'IdentityAccessFacadeModule: RoleGrantService',
   // H6.1: the read-only account contract of `ops:inspect`, declared only in the inspection graph.
   'IdentityAccessInspectionFacadeModule: IdentityAccessInspectionApi',
-  // H6.2: the local demo account contract of `ops:seed`, declared only in the seed graph.
+  // H6.2: the local demo account and budget cycle contracts of `ops:seed`, declared only in the seed graph.
   'IdentityAccessLocalSeedFacadeModule: LocalDemoAccountApi',
+  'BudgetsLocalSeedFacadeModule: LocalDemoBudgetCycleApi',
   'IdentityAccessModule: Symbol(ACCESS_TOKEN_VERIFIER)', // port of src/infrastructure/security
   'InstallationModule: InstallationApi',
   // H6.2: the entry service of `pnpm ops:seed`.
@@ -157,8 +157,6 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'InspectionCliModule: InstallationInspectionApi',
   // P28-01 (Prompt 29): the entry service of `pnpm ops:preflight`.
   'MigrationPreflightCliModule: MigrationPreflightApi',
-  // F02: the entry service of `pnpm ops:assign-subscription-owner`.
-  'SubscriptionOwnerAssignmentCliModule: SubscriptionOwnerAssignmentApi',
   // US-15-05: the entry service of `pnpm ops:ai-purge`.
   'AiAssistPurgeCliModule: AiPurgeApi',
   // F01: the service `pnpm ops:cost-center-direction` runs and the organization facade asks (whether the link is activated).
@@ -192,6 +190,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'OrganizationModule: OrganizationChangeListeners',
   'OrganizationModule: DepartmentUseContributions',
   'OrganizationModule: CostCenterUseContributions',
+  // QĐ-113e: what refers to the first placement of a person, told by requests and personnel.
+  'OrganizationModule: FirstPlacementUseContributions',
   'OrganizationModule: DepartmentServiceAccountReaderHook',
   'OrganizationModule: DepartmentCreationWindowHook',
   'OrganizationModule: EmployeeAccountsHook',
@@ -597,10 +597,9 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
           InspectionCliModule,
           IdentityAccessInspectionFacadeModule,
           SeedCliModule,
+          BudgetsLocalSeedFacadeModule,
           IdentityAccessLocalSeedFacadeModule,
           MigrationPreflightCliModule,
-          SubscriptionOwnerAssignmentCliModule,
-          AssignSubscriptionOwnerCliModule,
           AiAssistPurgeCliModule,
           AiPurgeCliModule,
           CostCenterDirectionRootCliModule,
@@ -623,7 +622,6 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
       ['InspectionCliModule', InspectionCliModule, 1],
       ['SeedCliModule', SeedCliModule, 0],
       ['MigrationPreflightCliModule', MigrationPreflightCliModule, 1],
-      ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule, 0],
       ['AiPurgeCliModule', AiPurgeCliModule, 0],
       ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule, 0],
       ['RecordSuperAdminEventCliModule', RecordSuperAdminEventCliModule, 0],
@@ -677,28 +675,6 @@ describe('operational command graphs (docs/rules/operational-commands.md)', () =
     }
     expect(moduleNames(graph)).toContain('InstallationConfigurationModule');
     expect(moduleNames(graph)).not.toContain('ConfigurationModule');
-    expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
-  });
-
-  // rule 1, F02
-  it('the owner-assignment graph loads the database settings, the organization and the audit facades only', () => {
-    const graph = collectGraph(AssignSubscriptionOwnerCliModule);
-
-    expect(controllersOf(graph)).toEqual([]);
-    for (const forbidden of [
-      NotificationsModule,
-      IdentityAccessModule,
-      IdentityAccessRecoveryCliModule,
-      QueueInfrastructureModule,
-    ]) {
-      expect({ forbidden: forbidden.name, mounted: graph.map((node) => node.module).includes(forbidden) }).toEqual({
-        forbidden: forbidden.name,
-        mounted: false,
-      });
-    }
-    expect(moduleNames(graph)).toContain('InstallationConfigurationModule');
-    expect(moduleNames(graph)).not.toContain('ConfigurationModule');
-    expect(moduleNames(graph)).not.toContain('CatalogModule');
     expect(declarationsOf(graph, MailTransport)).toHaveLength(0);
   });
 
@@ -760,7 +736,6 @@ describe('the local seed graph', () => {
       // ops:seed writes its demo accounts through the same contract (one direct role, never a derived one).
       ['SeedCliModule', SeedCliModule, 1],
       ['MigrationPreflightCliModule', MigrationPreflightCliModule, 0],
-      ['AssignSubscriptionOwnerCliModule', AssignSubscriptionOwnerCliModule, 0],
       ['AiPurgeCliModule', AiPurgeCliModule, 0],
       ['CostCenterDirectionRootCliModule', CostCenterDirectionRootCliModule, 0],
       ['RecordSuperAdminEventCliModule', RecordSuperAdminEventCliModule, 0],
@@ -770,9 +745,11 @@ describe('the local seed graph', () => {
       expect({
         name,
         seedContract: modules.filter((module) => module === IdentityAccessLocalSeedFacadeModule).length,
+        budgetSeedContract: modules.filter((module) => module === BudgetsLocalSeedFacadeModule).length,
       }).toEqual({
         name,
         seedContract: expected,
+        budgetSeedContract: expected,
       });
     }
   });

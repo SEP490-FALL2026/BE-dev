@@ -1,3 +1,4 @@
+import { compareSeatLockOrder } from '../../../core/seat-lock-order';
 import type { BusinessDate } from '../../../core/business-date';
 import { isRevocableType } from '../departure-deadline/departure-impact.policy';
 import { isOldRightOf } from './transfer-grace.policy';
@@ -65,14 +66,17 @@ export function legacyAnnouncementDue(transfer: SweptTransfer, today: BusinessDa
 export function rightsToTakeBack<
   T extends {
     assignmentId: string;
+    subscriptionId: string | null;
     effectiveFrom: BusinessDate;
     validUntil: BusinessDate | null;
     provisioningType: string;
   },
 >(seats: readonly T[], transfer: { effectiveOn: BusinessDate; pictureIds: readonly string[] | null }): T[] {
-  return seats.filter(
-    (seat) => isOldRightOf(transfer, seat) && seat.validUntil === null && isRevocableType(seat.provisioningType),
-  );
+  return seats
+    .filter(
+      (seat) => isOldRightOf(transfer, seat) && seat.validUntil === null && isRevocableType(seat.provisioningType),
+    )
+    .sort(compareSeatLockOrder);
 }
 
 /** The ids of the rights the picture of a held transfer names; null when it has none (a transfer from before the grace). */

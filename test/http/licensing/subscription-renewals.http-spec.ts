@@ -86,6 +86,8 @@ const caseGet = jest.fn(throwing);
 const EMPTY_PAGE = { items: [], pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 } };
 /** The page of events: empty unless the test asked for a refusal. */
 const emptyPage = () => (next ? Promise.reject(next) : Promise.resolve(EMPTY_PAGE));
+/** The list of renewals: the query it is given is what the `mine` tests read. */
+const list = jest.fn<Promise<unknown>, [unknown, unknown]>(() => emptyPage());
 
 describe('subscription renewal routes (e2e, no database)', () => {
   let app: INestApplication<App>;
@@ -97,7 +99,7 @@ describe('subscription renewal routes (e2e, no database)', () => {
         {
           token: RenewalViewService,
           useValue: {
-            list: throwing,
+            list,
             get: caseGet,
             adjustmentOf,
             seatRanking: throwing,
@@ -182,6 +184,19 @@ describe('subscription renewal routes (e2e, no database)', () => {
         expect(bodyOf(response).data).toEqual(EMPTY_PAGE);
       },
     );
+
+    it('passes mine=true to the list as a flag, and refuses a value that is not true or false', async () => {
+      await request(app.getHttpServer())
+        .get('/api/v1/subscription-renewals?mine=true')
+        .set('Authorization', as(['IT_ADMIN']))
+        .expect(200);
+
+      expect(list).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ mine: true }));
+      await request(app.getHttpServer())
+        .get('/api/v1/subscription-renewals?mine=maybe')
+        .set('Authorization', as(['IT_ADMIN']))
+        .expect(422);
+    });
 
     it.each([['IT_ADMIN'], ['MANAGER'], ['FINANCE']])(
       '%s finds no route to confirm a renewal: the head confirms nothing any more (QĐ-103e)',
@@ -281,10 +296,10 @@ describe('subscription renewal routes (e2e, no database)', () => {
         ['EMPLOYEE'],
       ],
       [
-        'a head of another department reading a case',
-        new RenewalError('NOT_FOUND'),
-        404,
-        'SUBSCRIPTION_RENEWAL.NOT_FOUND',
+        'a head reading a case (only the IT Admin and Finance read)',
+        new RenewalError('READ_FORBIDDEN'),
+        403,
+        'SUBSCRIPTION_RENEWAL.READ_FORBIDDEN',
         (s) => request(s).get(`/api/v1/subscription-renewals/${ID}`),
         ['MANAGER'],
       ],

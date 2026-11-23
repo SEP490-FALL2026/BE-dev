@@ -11,7 +11,7 @@ const line = (
 
 export const FINANCE: Pick<
   DemoFixture,
-  'taxProfiles' | 'cycle' | 'nextCycle' | 'draftCycle' | 'budgets' | 'nextYear' | 'budgetLines'
+  'taxProfiles' | 'cycle' | 'nextCycle' | 'afterNextCycle' | 'budgets' | 'nextYear' | 'budgetLines'
 > = {
   /*
    * Six vendors with a declared profile, the lines simulated after the one of Figma: the foreign vendors that sell through a platform and whose
@@ -38,21 +38,23 @@ export const FINANCE: Pick<
     decisionOffsetDays: 10,
     open: true,
   },
-  // The cycle of the next year is open for a month more: the demo walks MF-4 from here (DEMO-15).
+  // The cycle of the next year is opened like the one of the year, so the heads send `BM-10` that day; its versions are sent to a cycle the seed then locks
+  // for good (the deadline moves to the day before the seed), so the next year stands as a cycle with versions does: locked, versions sent, one approved, one
+  // returned (DEMO-15).
   nextCycle: {
     annualCeiling: '500000000',
     sharedPoolReserve: '50000000',
-    submissionOffsetDays: 30,
+    submissionOffsetDays: 0,
     decisionOffsetDays: 45,
     open: true,
   },
-  // The cycle of the year after is a draft Finance has not opened yet (no head is told, nothing can be sent).
-  draftCycle: {
+  // The cycle of the year after is open for a year more: a `BM-10` waits there for Finance, and the demo walks MF-4 from it (DEMO-15).
+  afterNextCycle: {
     annualCeiling: '600000000',
     sharedPoolReserve: '60000000',
     submissionOffsetDays: 365,
     decisionOffsetDays: 380,
-    open: false,
+    open: true,
   },
   /*
    * The approved budget of the year of every department with a Cost Center and a head (`BM-10` → Finance's version → the spending
@@ -67,7 +69,7 @@ export const FINANCE: Pick<
       // What the lines of its BM-10 add up to over a year, and a little more: well over what the department spends, so it stays under.
       base: '170000000',
       light: 'UNDER',
-      note: 'Jira, GitHub, Slack cho cả phòng; ChatGPT Plus, Claude Team cho nhóm R&D.',
+      note: 'Jira, GitHub, Slack cho cả phòng; ChatGPT Plus, Claude Team (Standard và Premium) cho nhóm R&D.',
     },
     { department: 'MKT', base: '240000', note: 'Canva Teams cho nhóm nội dung.' },
     { department: 'SAL', base: '290000', note: 'Mailchimp Standard cho chiến dịch.' },
@@ -91,8 +93,9 @@ export const FINANCE: Pick<
   ],
   /*
    * Where the next year is left (DEMO-15): Engineering's budget is approved (a Request that runs into the next year shows the spending
-   * approver the soft warning of S4); Information Technology's `BM-10` waits for Finance; Marketing's version waits for the spending
-   * approver; Sales' version was returned to Finance with a reason. Design, Finance, the Board and Legal sent nothing (`noProposalSubmitted`).
+   * approver the soft warning of S4); Marketing's version waits for the spending approver; Sales' version was returned to Finance with a reason. The cycle
+   * of that year is locked, as a cycle with versions is. Information Technology's `BM-10` waits for Finance in the cycle of the year after, which is open.
+   * Design, Finance, the Board and Legal sent nothing (`noProposalSubmitted`).
    */
   nextYear: [
     {
@@ -104,6 +107,7 @@ export const FINANCE: Pick<
     },
     {
       department: 'ITO',
+      afterNext: true,
       stage: 'PROPOSAL_SUBMITTED',
       requestedAmount: '20000000',
       base: '20000000',
@@ -129,8 +133,23 @@ export const FINANCE: Pick<
       line('Jira', 'Standard', 20, 200000, 12, 'Theo dõi công việc nhóm kỹ thuật'),
       line('GitHub', 'Team', 9, 100000, 12, 'Quản lý mã nguồn cho cả phòng'),
       line('Slack', 'Pro', 8, 180000, 12, 'Trao đổi hằng ngày của nhóm'),
-      line('ChatGPT', 'Plus', 5, 500000, 12, 'Nhóm R&D thử nghiệm trợ lý AI'),
-      line('Claude', 'Team', 3, 625000, 12, 'Trợ lý AI cho nhóm R&D (gói năm quy ra tháng)'),
+      line('ChatGPT', 'Plus', 4, 500000, 12, 'Nhóm R&D thử nghiệm trợ lý AI'),
+      line(
+        'Claude',
+        'Team Standard',
+        1,
+        500000,
+        12,
+        'Trợ lý AI cho nhóm R&D (gói năm quy ra tháng, workspace Standard)',
+      ),
+      line(
+        'Claude',
+        'Team Premium',
+        1,
+        2500000,
+        12,
+        'Trợ lý AI cho trưởng nhóm R&D (gói năm quy ra tháng, workspace Premium)',
+      ),
       line('Notion', 'Business', 3, 500000, 12, 'Tài liệu kỹ thuật của nhóm'),
       line('Confluence', 'Standard', 3, 160000, 12, 'Trang tài liệu dự án'),
       line('Microsoft 365', 'Business Basic', 3, 150000, 12, 'Thư và lịch của nhân viên mới'),

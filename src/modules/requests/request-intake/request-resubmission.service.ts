@@ -12,6 +12,7 @@ import {
 import type { AccessRequestRecord, NeedStepWithDecision } from '../access-request/access-request.types';
 import { RequestLineRepo } from '../group-request/request-line.repo';
 import { SpendRoutingService } from '../spend/spend-routing.service';
+import { RequesterHeadConversionService } from '../step-routing/requester-head-conversion.service';
 import { StepTargetService } from '../step-routing/step-target.service';
 
 /** A need step that its head sent back: closed, with a record of approval that says it was returned. */
@@ -34,6 +35,7 @@ export class RequestResubmissionService {
     private readonly lines: RequestLineRepo,
     private readonly audit: AuditApi,
     private readonly targets: StepTargetService,
+    private readonly heads: RequesterHeadConversionService,
   ) {}
 
   async resubmit(actor: AuthenticatedPrincipal, id: string) {
@@ -82,8 +84,9 @@ export class RequestResubmissionService {
     );
   }
 
-  /** A new need step for each returned one that something still waits on, and the request back to waiting for its head. */
+  /** A new need step for each returned one that something still waits on, or one-step conversion when a non-group requester became head. */
   private async reopenNeed(tx: DbTx, actor: AuthenticatedPrincipal, request: AccessRequestRecord, now: Date) {
+    if (await this.convertResubmissionToOneStep(tx, actor, request, now)) return;
     const waiting = await this.stepsStillWaiting(tx, request);
     if (waiting.length === 0) throw new AccessRequestNotAwaitingRevisionError();
     const reopened: string[] = [];
@@ -122,6 +125,47 @@ export class RequestResubmissionService {
         },
       ),
     );
+  }
+
+  private async convertResubmissionToOneStep(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+    now: Date,
+  ): Promise<boolean> {
+    if (request.type === 'GROUP_GRANT') return false;
+    const becameHead = await this.targets.isRequesterHead(
+      tx,
+      {
+        requesterEmployeeId: request.requesterEmployeeId,
+        departmentId: request.departmentId ?? '',
+        chainHasSpendStep: request.policy?.chain.includes('SPEND_APPROVAL') ?? false,
+        branch: request.branch,
+      },
+      now,
+    );
+    if (!becameHead) return false;
+    await this.heads.convert(tx, request, { kind: 'USER', actor, trigger: 'RESUBMITTED' });
+    await this.spending.start(tx, actor, request.id, now);
+    // The sender sent the request again whichever way it goes on: the record says so, with where it stands once its route started.
+    const started = await this.requests.findById(request.id, tx);
+    await this.audit.record(
+      tx,
+      accessRequestAuditEvent(
+        actor,
+        request.organizationId,
+        'ACCESS_REQUEST.RESUBMITTED',
+        'ACCESS_REQUEST',
+        request.id,
+        {
+          requestId: request.id,
+          oneStep: true,
+          requestState: started?.state ?? request.state,
+        },
+      ),
+    );
+
+    return true;
   }
 
   /** The returned need steps still holding something: the last one of a request for a person, the ones holding people who wait for their need in a group. */

@@ -1,0 +1,24 @@
+# FIX-TEST — Đợt 1 thiết kế lại, làn `biz`
+
+Các test http / integration / flow cũ khẳng định hành vi trước Wave 1, không xóa, không skip. Toàn bộ 16 mục của Phần A (8 suite integration cũ, 3 flow spec cũ và 5 suite `ops:seed` theo `D-1`) đã được cập nhật assertion đúng hành vi Wave 1 hoặc mở cửa sổ khóa kỳ cho `ops:seed` trước khi vào Phần B.
+
+| Gói | File test | Ca | Lý do |
+| --- | --------- | -- | ----- |
+| P9 | `test/integration/catalog/subscription-seat-increase-http.integration-spec.ts` | `:53,:70,:79,:80,:90,:101,:110,:121,:147` & `:155-160` (`changes without the check when expectedUpdatedAt is left out`) | W1-03 bắt buộc `expectedUpdatedAt` khi có `purchasedQuantity` (thiếu → 422 `SUBSCRIPTION.VERSION_REQUIRED`) và W1-14 bắt buộc `quantityChangeReason` khi tăng K2 ACTIVE |
+| P9 | `test/integration/catalog/seat-baseline-contracts.integration-spec.ts` | `:211` (`PATCH` với `{ purchasedQuantity: 12 }`) | Thiếu `expectedUpdatedAt` và `quantityChangeReason` theo W1-03/W1-14 |
+| P9 | `test/integration/catalog/subscription-vendor-admins-http.integration-spec.ts` | `:206,:230` (`PATCH` với `purchasedQuantity: 11/12`) | Thiếu `expectedUpdatedAt` và `quantityChangeReason` theo W1-03/W1-14 |
+| P9 | `test/integration/catalog/subscription-tax-and-access-http.integration-spec.ts` | `:116,:127,:202` (`PATCH` thiếu `expectedUpdatedAt`) | `assertVersionForQuantityChange` chạy trước `runner.run` nên `:127,:202` trả 422 thay vì 404 khi thiếu `expectedUpdatedAt` |
+| P9 | `test/integration/catalog/subscription-purchase-and-drafts-http.integration-spec.ts` | `:268,:332` (`PATCH` với `purchasedQuantity` thiếu `expectedUpdatedAt` / `quantityChangeReason`) | W1-03 bắt buộc `expectedUpdatedAt` và W1-14 bắt buộc `quantityChangeReason` khi cập nhật `purchasedQuantity` |
+| P9 | `test/integration/catalog/subscription-foreign-price.integration-spec.ts` | `:78` (`PATCH` với `purchasedQuantity` thiếu `expectedUpdatedAt`) | `assertVersionForQuantityChange` trả 422 `SUBSCRIPTION.VERSION_REQUIRED` trước kiểm tra giá |
+| P9 | `test/integration/catalog/shared-pool-subscription-http.integration-spec.ts` | `:129,:294,:330` (`PATCH` với `purchasedQuantity` thiếu `expectedUpdatedAt`) | W1-03 bắt buộc `expectedUpdatedAt` khi có `purchasedQuantity` |
+| P9 | `test/integration/catalog/subscription-owner-department.integration-spec.ts` | `:63,:68` (`PATCH` với `purchasedQuantity` thiếu `expectedUpdatedAt` / `quantityChangeReason`) | W1-03/W1-14 trả 422 thay vì 200 |
+| P9 | `test/integration/catalog/seat-guards-http.integration-spec.ts` | `:80,:104,:116,:124,:161` (`PATCH` với `purchasedQuantity` thiếu `expectedUpdatedAt`) | `assertVersionForQuantityChange` trả 422 `SUBSCRIPTION.VERSION_REQUIRED` trước `QUANTITY_BELOW_OCCUPIED` |
+| P10 | `test/integration/catalog/subscription-vendor-admins-http.integration-spec.ts` | `:96-158` (`activating (QĐ-110k)`) | `SeatHarness.start()` không đóng baseline phase nên ca cũ kỳ vọng 422 khi pha khởi tạo còn mở (W1-19 cho qua khi pha mở) |
+| P10 | `test/integration/catalog/subscription-renewal-vendor-admins.integration-spec.ts` | `:98-126` (`still refuses a NEW subscription...`) | Tương tự: pha khởi tạo còn mở trong harness nên tạo thuê bao mới không còn bị chặn 422 theo W1-19 |
+| P10 | `test/integration/licensing/provisioning-grant-http.integration-spec.ts` | `:565,:583,:609` (`k2` helper khi baseline đã đóng nhưng plan thiếu 2 IT Admin đang làm việc) | W1-19 siết thành 2 IT Admin `WORKING` ở `plan_workspace_admins`; fixture test cũ chỉ có 1 IT Admin mặc định |
+| P10 | `test/integration/catalog/subscription-duplicate-plan.integration-spec.ts` | `:152,:163,:175` (sau khi đóng baseline, tạo subscription khi plan thiếu 2 IT Admin đang làm việc) | W1-19 trả 422 `SUBSCRIPTION.VENDOR_ADMINS_REQUIRED` trước kiểm tra trùng plan |
+| P10 | `test/integration/organization/seat-baseline-closing-http.integration-spec.ts` | `:94,:105` (sau khi đóng baseline, tạo subscription khi plan thiếu 2 IT Admin đang làm việc) | W1-19 trả 422 `SUBSCRIPTION.VENDOR_ADMINS_REQUIRED` khi fixture thiếu 2 IT Admin đang làm việc |
+
+## Đã sửa sau review (23/11/2026)
+
+Các ca của gói P9 và P10 ở bảng trên đã được sửa trong lượt sửa review, theo hai cách: mọi `PATCH` có `purchasedQuantity` đi qua `changeSeats` của harness (`SeatHarness`, `SubscriptionHttpHarness`: đọc `updatedAt` rồi gửi `expectedUpdatedAt` kèm `quantityChangeReason`, `404` cho thuê bao không có thì gửi `expectedUpdatedAt` tùy ý), và các suite đóng baseline rồi mới khai thuê bao có IT Admin thứ hai dùng được (`ensureVendorAdmins` chọn người thứ hai là IT Admin đang làm việc). Hai suite kiểm cổng admin của nhà cung cấp (`subscription-vendor-admins-http`, `subscription-renewal-vendor-admins`) đóng baseline trước khi kỳ vọng `422`. Ca `changes without the check when expectedUpdatedAt is left out` đổi thành ca `422 SUBSCRIPTION.VERSION_REQUIRED` (luật mới W1-03). CI run kế tiếp ghi ở `PROGRESS-biz.md`.

@@ -95,6 +95,13 @@ export class TransferGraceRepo {
     return this.page({ graceEndsOn: { gte: toDateColumn(today) }, snapshotBefore: { equals: Prisma.DbNull } }, page);
   }
 
+  /** Reads only the employee id of a transfer before locking, or null when the transfer does not exist. */
+  async findEmployeeId(id: string): Promise<string | null> {
+    const row = await this.prisma.departmentTransfer.findUnique({ where: { id }, select: { employeeId: true } });
+
+    return row?.employeeId ?? null;
+  }
+
   /** The transfer held `FOR UPDATE` until the transaction ends (the caller holds the employee first), read after the lock; null when it is gone. */
   async lock(tx: DbTx, id: string): Promise<HeldTransfer | null> {
     const locked = await tx.$queryRaw<{ id: string }[]>`

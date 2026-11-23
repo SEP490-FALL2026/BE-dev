@@ -1,6 +1,7 @@
 import { GroupHarness } from '../../support/group-harness';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
+import { liftWithdrawalAfterDecisionRefusal } from '../../support/withdrawal-after-decision';
 
 /**
  * `g0-g6-final-business-baseline-remediation`, Task 4.1 (F29, `QĐ-90b`, spec L.8): the IT Admin closes the part of a request that is not
@@ -21,6 +22,8 @@ interface TaskWire {
   id: string;
   status: string;
 }
+
+afterEach(() => jest.restoreAllMocks());
 
 describe('closing a request because its person was transferred (integration, real PostgreSQL)', () => {
   let subscriptionId: string;
@@ -320,6 +323,8 @@ describe('closing a request because its person was transferred (integration, rea
     });
 
     it('closes a request whose last live line is the transferred person’s: the line goes and the request ends with it', async () => {
+      // QĐ-113d: the sender withdraws after a decision, which only the system or the IT Admin can still do over HTTP.
+      liftWithdrawalAfterDecisionRefusal();
       // A group names two people at least, so the other one is taken out first and the last live line is the transferred person's.
       const { u, people, id, target } = await group(2);
       await h.withdrawLine(id, people[1].employeeId, {}, u.head.account).expect(200);

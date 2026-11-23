@@ -108,8 +108,8 @@ describe('the outcome of a renewal and the chain of periods (integration, real P
     // The database keeps the chain single whoever writes it.
     await expect(
       h.ctx.sql.query(
-        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, owner_department_id, renewed_from_id, start_date, updated_at)
-         SELECT gen_random_uuid(), organization_id, plan_id, kind, owner_department_id, $1, $2::date, now()
+        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, renewed_from_id, start_date, updated_at)
+         SELECT gen_random_uuid(), organization_id, plan_id, kind, $1, $2::date, now()
            FROM subscriptions WHERE id = $1`,
         [subscriptionId, h.inDays(70)],
       ),
@@ -168,8 +168,8 @@ describe('the outcome of a renewal and the chain of periods (integration, real P
     for (const parent of [a, b]) {
       await expect(
         h.ctx.sql.query(
-          `INSERT INTO subscriptions (id, organization_id, plan_id, kind, owner_department_id, renewed_from_id, start_date, updated_at)
-           SELECT gen_random_uuid(), organization_id, plan_id, kind, owner_department_id, $1, $2::date, now()
+          `INSERT INTO subscriptions (id, organization_id, plan_id, kind, renewed_from_id, start_date, updated_at)
+           SELECT gen_random_uuid(), organization_id, plan_id, kind, $1, $2::date, now()
              FROM subscriptions WHERE id = $1`,
           [parent, h.inDays(900)],
         ),

@@ -130,15 +130,15 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
       { year: 2026, n: SHARED_DEMO_V4.budgets.length },
       { year: 2027, n: SHARED_DEMO_V4.nextYear.filter((n) => n.stage !== 'PROPOSAL_SUBMITTED').length },
     ]);
-    // The seed opened the cycle of the year (deadline the day of the seed) and of the next one; the one after stays a draft.
+    // The seed opened the three cycles and locked for good the two that hold versions (the deadline moved to the day before the seed); the year after is still taking proposals.
     const cycles = await ctx.sql.query<{ year: number; opened: boolean; deadline: string }>(
       `SELECT year, opened_at IS NOT NULL AS opened, to_char(submission_deadline, 'YYYY-MM-DD') AS deadline
          FROM budget_cycles ORDER BY year`,
     );
     expect(cycles.rows).toEqual([
-      { year: 2026, opened: true, deadline: '2026-12-01' },
-      { year: 2027, opened: true, deadline: '2026-12-31' },
-      { year: 2028, opened: false, deadline: '2027-12-01' },
+      { year: 2026, opened: true, deadline: '2026-11-30' },
+      { year: 2027, opened: true, deadline: '2026-11-30' },
+      { year: 2028, opened: true, deadline: '2027-12-01' },
     ]);
 
     // R57 is cancelled by the sweep of the block moment, which may run while the suite does (its first pass is five minutes after start).
@@ -154,7 +154,7 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
       R45: 'AWAITING_REQUESTER_REVISION',
       R46: 'EXECUTING',
       R47: 'FAILED',
-      R48: 'AWAITING_IT_CLOSE',
+      R48: 'FAILED',
       R49: 'AWAITING_EXECUTION',
       R50: 'COMPLETED',
       R51: 'PENDING',

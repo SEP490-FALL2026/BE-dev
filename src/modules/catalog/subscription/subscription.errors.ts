@@ -12,14 +12,6 @@ export class SubscriptionPlanNotFoundError extends Error {
   }
 }
 
-/** The department named as the owner of a purchase does not exist or is no longer active (`QĐ-89a`). */
-export class SubscriptionOwnerDepartmentInactiveError extends Error {
-  constructor() {
-    super('The department that would own the subscription does not exist or is not active.');
-    this.name = 'SubscriptionOwnerDepartmentInactiveError';
-  }
-}
-
 /** The application of the plan is retired: a purchase of it is no longer declared (`US-04-01` AC-8, AC-9). */
 export class SubscriptionApplicationRetiredError extends Error {
   constructor() {
@@ -53,6 +45,14 @@ export class SubscriptionDatesInvalidError extends Error {
   constructor(readonly reason: string) {
     super('The dates are not in order.');
     this.name = 'SubscriptionDatesInvalidError';
+  }
+}
+
+/** The subscription changed after the client read it: its `updated_at` is no longer the one the edit was made on. */
+export class SubscriptionStaleError extends Error {
+  constructor(readonly currentUpdatedAt: Date) {
+    super('The subscription was changed by someone else since it was read: read it again before editing.');
+    this.name = 'SubscriptionStaleError';
   }
 }
 
@@ -140,14 +140,14 @@ export class SubscriptionBillingCycleUnsupportedError extends Error {
 }
 
 /** An active subscription names the IT Admin who answers for it (`QĐ-103v`(4)). */
-/** The plan needs at least two different admins at the vendor and its profile names fewer (`QĐ-110k`, `R-53`): it is not activated. */
+/** The plan needs at least two different working IT Admins at the vendor once the seat baseline is closed: it is not activated. */
 export class SubscriptionVendorAdminsRequiredError extends Error {
   constructor(
     readonly planId: string,
     readonly given: number,
     readonly required: number,
   ) {
-    super(`The plan needs at least ${required} different IT Admins who administer it at the vendor.`);
+    super(`The plan needs at least ${required} different working IT Admins who administer it at the vendor.`);
     this.name = 'SubscriptionVendorAdminsRequiredError';
   }
 }
@@ -193,5 +193,28 @@ export class SubscriptionDuplicatePlanError extends Error {
   constructor(readonly subscriptionIds: readonly string[]) {
     super('The plan already has a live subscription: add seats to it or renew it instead of declaring another.');
     this.name = 'SubscriptionDuplicatePlanError';
+  }
+}
+
+export class SubscriptionVersionRequiredError extends Error {
+  constructor() {
+    super('Send expectedUpdatedAt from the last read when changing purchasedQuantity.');
+    this.name = 'SubscriptionVersionRequiredError';
+  }
+}
+
+export class SubscriptionMidTermReductionNotAllowedError extends Error {
+  constructor() {
+    super(
+      'Reducing purchasedQuantity during a 12-month commitment is not allowed unless mid-term reduction is enabled.',
+    );
+    this.name = 'SubscriptionMidTermReductionNotAllowedError';
+  }
+}
+
+export class SubscriptionQuantityReasonRequiredError extends Error {
+  constructor() {
+    super('A quantityChangeReason is required when increasing purchasedQuantity of an active K2 subscription.');
+    this.name = 'SubscriptionQuantityReasonRequiredError';
   }
 }

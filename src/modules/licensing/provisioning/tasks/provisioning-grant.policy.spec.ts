@@ -4,16 +4,50 @@ import {
   grantPurchaseOf,
   grantTaskAudit,
   grantWarnings,
+  revocationActionForRegrant,
 } from './provisioning-grant.policy';
 
 describe('what the grant of the seat of a request is judged and recorded by (US-07-01, QĐ-89a, SoD-5)', () => {
   const answer = { employeeId: 'emp-1', planId: 'plan-1', seat: 'PERSONAL' as const };
 
-  it('goes on only when the request claimed is for the person, the plan and the kind of seat that were read before', () => {
+  it('goes on only when the request claimed is for the person, the plan, the kind of seat and the replaced right that were read before', () => {
     expect(claimMatchesAnswer({ ...answer }, answer)).toBe(true);
+    expect(
+      claimMatchesAnswer({ ...answer, replacesAssignmentId: null }, { ...answer, replacesAssignmentId: undefined }),
+    ).toBe(true);
+    expect(
+      claimMatchesAnswer(
+        { ...answer, replacesAssignmentId: 'asg-old' },
+        { ...answer, replacesAssignmentId: 'asg-old' },
+      ),
+    ).toBe(true);
+    expect(
+      claimMatchesAnswer({ ...answer, replacesAssignmentId: 'asg-old' }, { ...answer, replacesAssignmentId: null }),
+    ).toBe(false);
+    expect(
+      claimMatchesAnswer({ ...answer, replacesAssignmentId: 'asg-1' }, { ...answer, replacesAssignmentId: 'asg-2' }),
+    ).toBe(false);
     expect(claimMatchesAnswer({ ...answer, employeeId: 'emp-2' }, answer)).toBe(false);
     expect(claimMatchesAnswer({ ...answer, planId: 'plan-2' }, answer)).toBe(false);
     expect(claimMatchesAnswer({ ...answer, seat: 'SERVICE' }, answer)).toBe(false);
+  });
+
+  it.each([
+    ['no live revocation task', null, [], 'PROCEED'],
+    ['queued revocation with only TRANSFER reason', { status: 'QUEUED' }, ['TRANSFER'], 'WITHDRAW_TRANSFER'],
+    [
+      'queued revocation with multiple TRANSFER reasons',
+      { status: 'QUEUED' },
+      ['TRANSFER', 'TRANSFER'],
+      'WITHDRAW_TRANSFER',
+    ],
+    ['queued revocation with TRANSFER and DEPARTURE reasons', { status: 'QUEUED' }, ['TRANSFER', 'DEPARTURE'], 'BLOCK'],
+    ['queued revocation with no standing reason', { status: 'QUEUED' }, [], 'BLOCK'],
+    ['in-progress revocation with TRANSFER reason', { status: 'IN_PROGRESS' }, ['TRANSFER'], 'BLOCK'],
+    ['failed revocation with TRANSFER reason', { status: 'FAILED' }, ['TRANSFER'], 'BLOCK'],
+    ['completed revocation with TRANSFER reason', { status: 'COMPLETED' }, ['TRANSFER'], 'BLOCK'],
+  ] as const)('decides %s for regrant -> %s', (_name, task, sources, expected) => {
+    expect(revocationActionForRegrant(task, sources)).toBe(expected);
   });
 
   it('says in the audit entry which request the task is for, which seat, the channel and who is in charge by default', () => {

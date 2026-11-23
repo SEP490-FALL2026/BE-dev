@@ -1,29 +1,64 @@
+import type { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import type { LicensingApi } from '../../licensing/public/licensing.api';
+import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import type { AccessRequestRepo } from '../access-request/access-request.repo';
+import type { SpendStatusService } from '../spend/spend-status.service';
+import type { GroupLineWithdrawer } from './group-line-withdrawer.service';
+import type { GroupWithdrawalAftermath } from './group-withdrawal-aftermath.service';
 import {
   checkLineWithdrawal,
+  needStepOfGroup,
   hasGrantTask,
   holdsMoney,
   releasedByYear,
   withdrawalAuditOf,
   type LineWithdrawalFacts,
 } from './group-withdrawal.policy';
+import { GroupWithdrawalService } from './group-withdrawal.service';
+import type { RequestLineRepo } from './request-line.repo';
 
 const facts: LineWithdrawalFacts = {
   actorEmployeeId: 'sender',
   requesterEmployeeId: 'sender',
   actorHeadsDepartment: false,
-  lineState: 'NEED_CONFIRMED',
+  lineState: 'AWAITING_NEED',
+  needStep: 'PENDING',
+  requestState: 'PENDING',
   spendStage: null,
   reason: null,
 };
 
 describe('withdrawing one person of a request for a group (US-05-08, US-05-17 AC-10)', () => {
-  it.each(['AWAITING_NEED', 'NEED_CONFIRMED', 'APPROVED', 'EXECUTING'] as const)(
-    'lets the sender withdraw the person while their line is %s, with or without a reason',
+  it('QĐ-113d: lets the sender withdraw the person while their line awaits the need, with or without a reason', () => {
+    expect(checkLineWithdrawal(facts)).toBeNull();
+    expect(checkLineWithdrawal({ ...facts, reason: 'Not needed' })).toBeNull();
+  });
+
+  it.each(['NEED_CONFIRMED', 'APPROVED', 'EXECUTING'] as const)(
+    'QĐ-113d: refuses the sender once the line is %s, a decision was taken',
     (lineState) => {
-      expect(checkLineWithdrawal({ ...facts, lineState })).toBeNull();
-      expect(checkLineWithdrawal({ ...facts, lineState, reason: 'Not needed' })).toBeNull();
+      expect(checkLineWithdrawal({ ...facts, lineState, needStep: 'APPROVED' })).toBe('WITHDRAWAL_AFTER_DECISION');
     },
   );
+
+  it('QĐ-113d: lets the sender withdraw a person the head vouched for by sending, until the spending approver decides', () => {
+    expect(checkLineWithdrawal({ ...facts, lineState: 'NEED_CONFIRMED', needStep: 'NOT_REQUIRED' })).toBeNull();
+    expect(checkLineWithdrawal({ ...facts, lineState: 'APPROVED', needStep: 'NOT_REQUIRED' })).toBe(
+      'WITHDRAWAL_AFTER_DECISION',
+    );
+  });
+
+  it('QĐ-113d: lets the sender withdraw any open line while the request is sent back to add what is missing', () => {
+    expect(
+      checkLineWithdrawal({
+        ...facts,
+        lineState: 'NEED_CONFIRMED',
+        needStep: 'APPROVED',
+        requestState: 'AWAITING_REQUESTER_REVISION',
+      }),
+    ).toBeNull();
+  });
 
   it('refuses a person the request is for who is not the sender, whatever the state of their line', () => {
     expect(checkLineWithdrawal({ ...facts, actorEmployeeId: 'e2' })).toBe('NOT_REQUESTER');
@@ -136,5 +171,110 @@ describe('what is given back and what is recorded when people of a group are wit
       released: false,
       taskId: 'task-1',
     });
+  });
+});
+
+describe('the need step a request for a group is withdrawn by (QĐ-113d)', () => {
+  const steps = [
+    { id: 's1', state: 'PENDING' as const },
+    { id: 's2', state: 'APPROVED' as const },
+    { id: 's3', state: 'NOT_REQUIRED' as const },
+  ];
+  const first = steps[0];
+
+  it('is the open step while every live person awaits their need', () => {
+    expect(needStepOfGroup(steps, first, [{ state: 'AWAITING_NEED', needStepId: 's1' }], 'req')).toBe('PENDING');
+  });
+
+  it('is NOT_REQUIRED while the people the head vouched for wait for the spending approver', () => {
+    expect(needStepOfGroup(steps, first, [{ state: 'NEED_CONFIRMED', needStepId: 's3' }], 'req')).toBe('NOT_REQUIRED');
+  });
+
+  it('is NOT_REQUIRED for a step the sender held and approved by sending, and not for one another head approved', () => {
+    const held = [{ id: 'h1', state: 'APPROVED' as const, assigneeEmployeeId: 'req' }];
+    const line = [{ state: 'NEED_CONFIRMED' as const, needStepId: 'h1' }];
+    expect(needStepOfGroup(held, held[0], line, 'req')).toBe('NOT_REQUIRED');
+    expect(needStepOfGroup(held, held[0], line, 'someone-else')).toBe('APPROVED');
+  });
+
+  it('counts as decided as soon as one live person was decided, ended lines left out', () => {
+    const lines = [
+      { state: 'AWAITING_NEED' as const, needStepId: 's1' },
+      { state: 'APPROVED' as const, needStepId: 's2' },
+    ];
+    expect(needStepOfGroup(steps, first, lines, 'req')).toBe('APPROVED');
+    expect(needStepOfGroup(steps, first, [lines[0], { state: 'WITHDRAWN', needStepId: 's2' }], 'req')).toBe('PENDING');
+  });
+});
+
+describe('GroupWithdrawalService tx forwarding', () => {
+  const tx = { name: 'tx' } as unknown as DbTx;
+  const runner = { run: (work: (t: DbTx) => Promise<unknown>) => work(tx) } as unknown as TransactionRunner;
+  const actor = {
+    employeeId: 'emp-head',
+    appUserId: 'user-head',
+    roles: ['MANAGER'],
+    directRoles: ['MANAGER'],
+  } as unknown as AuthenticatedPrincipal;
+
+  const baseRequest = {
+    id: 'req-1',
+    type: 'GROUP_GRANT',
+    state: 'PENDING',
+    departmentId: 'dept-1',
+    requesterEmployeeId: 'emp-head',
+    beneficiaryEmployeeIds: ['emp-1'],
+    policy: { chain: ['NEED'], slaWorkingDays: 2 },
+    needStep: { state: 'PENDING', assigneeEmployeeId: 'emp-head' },
+    needSteps: [{ id: 'step-1', state: 'PENDING', assigneeEmployeeId: 'emp-head' }],
+    spendStep: null,
+    assessmentStep: null,
+    lines: [{ employeeId: 'emp-1', needStepId: 'step-1', state: 'AWAITING_NEED' }],
+  };
+
+  const makeService = () => {
+    const requests = {
+      lockById: jest.fn().mockResolvedValue(baseRequest),
+      findById: jest.fn().mockResolvedValue(baseRequest),
+    };
+    const lines = {
+      lock: jest.fn().mockResolvedValue([{ employeeId: 'emp-1', needStepId: 'step-1', state: 'AWAITING_NEED' }]),
+    };
+    const licensing = { lockGrantOfRequest: jest.fn().mockResolvedValue(undefined) };
+    const organizationReads = {
+      getHeadedDepartment: jest.fn().mockResolvedValue({ departmentId: 'dept-1' }),
+    };
+    const spendStatus = { of: jest.fn().mockResolvedValue(null) };
+    const withdrawer = { withdrawOne: jest.fn().mockResolvedValue({ kind: 'CANCELLED_BEFORE_GRANT' }) };
+    const aftermath = { after: jest.fn().mockResolvedValue(undefined) };
+
+    const service = new GroupWithdrawalService(
+      runner,
+      requests as unknown as AccessRequestRepo,
+      lines as unknown as RequestLineRepo,
+      licensing as unknown as LicensingApi,
+      organizationReads as unknown as OrganizationReadApi,
+      spendStatus as unknown as SpendStatusService,
+      withdrawer as unknown as GroupLineWithdrawer,
+      aftermath as unknown as GroupWithdrawalAftermath,
+    );
+
+    return { service, organizationReads };
+  };
+
+  it('forwards tx to getHeadedDepartment in withdrawLine', async () => {
+    const { service, organizationReads } = makeService();
+
+    await service.withdrawLine(actor, 'req-1', 'emp-1', { reason: 'No longer needed' });
+
+    expect(organizationReads.getHeadedDepartment).toHaveBeenCalledWith('emp-head', undefined, tx);
+  });
+
+  it('forwards tx to getHeadedDepartment in withdrawAll', async () => {
+    const { service, organizationReads } = makeService();
+
+    await service.withdrawAll(actor, 'req-1', { reason: 'No longer needed' });
+
+    expect(organizationReads.getHeadedDepartment).toHaveBeenCalledWith('emp-head', undefined, tx);
   });
 });

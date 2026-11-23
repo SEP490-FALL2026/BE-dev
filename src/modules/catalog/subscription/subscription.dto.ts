@@ -31,9 +31,6 @@ const originalPrice = money.meta({
 
 export const declareSubscriptionBodySchema = z.strictObject({
   planId: z.uuid(),
-  // The department that owns the purchase (QĐ-89a), never part of a change: it is not a field of PATCH. A K2/K4 purchase is the company's
-  // shared pool (QĐ-103d) and may name none; a K1 purchase must name one (SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE when it does not).
-  ownerDepartmentId: z.uuid().optional(),
   kind,
   purchasedQuantity: quantity.optional(),
   unitPrice: unitPrice.optional(),
@@ -74,6 +71,14 @@ export const updateSubscriptionBodySchema = z.strictObject({
   vendorMinimumSeats: vendorMinimumSeats.nullable().optional(),
   // Makes this the subscription that prices its plan (Q-04); the flag of the other subscriptions of the plan is taken off.
   isPrimaryForPlan: z.boolean().optional(),
+  quantityChangeReason: z.string().trim().min(1).max(500).optional().meta({
+    description:
+      'Reason for increasing purchasedQuantity on an active K2 subscription (1-500 characters after trimming; required when increasing, ignored when not increasing).',
+  }),
+  expectedUpdatedAt: z.iso.datetime({ offset: true }).optional().meta({
+    description:
+      'The updatedAt of the subscription as the client read it. Required whenever purchasedQuantity is sent (missing gives SUBSCRIPTION.VERSION_REQUIRED); when sent and no longer current the change is refused (SUBSCRIPTION.STALE) and nothing is written.',
+  }),
 });
 
 const queryFlag = z.enum(['true', 'false']).transform((value) => value === 'true');
@@ -110,8 +115,6 @@ const subscriptionSchema = z.strictObject({
   id: z.uuid(),
   planId: z.uuid(),
   planName: z.string(),
-  // The department that owns the purchase (`QĐ-89a`); null on a subscription of the shared pool that no department owns.
-  ownerDepartmentId: z.uuid().nullable(),
   applicationId: z.uuid(),
   applicationName: z.string(),
   logoUrl: z.string().nullable().meta({

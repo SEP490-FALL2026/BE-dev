@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import request from 'supertest';
+import { buildActivatedAccount } from '../../support/builders/account.builder';
 import { waitForLockWaiters } from '../../support/lock-wait';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { SeatHarness } from '../../support/seat-baseline-harness';
@@ -12,6 +13,8 @@ describe('a closed seat baseline over HTTP (integration, real PostgreSQL)', () =
 
   beforeAll(async () => {
     await h.start();
+    // Once the baseline is closed a plan needs two IT Admins who work at the vendor (`QĐ-114ae`): the plans of this suite name this one beside the default one.
+    await buildActivatedAccount(h.ctx, h.seed, { code: 'E-IT2', email: 'it2@acme.vn', role: 'IT_ADMIN' });
     pretendBusinessToday(h.ctx.app, '2026-10-01');
   }, 180000);
 

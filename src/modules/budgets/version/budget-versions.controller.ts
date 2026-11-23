@@ -251,12 +251,13 @@ export class BudgetVersionsController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: NOT_EDITABLE_DESCRIPTION,
+      description: `${NOT_EDITABLE_DESCRIPTION} Sending a version also requires an open and locked budget cycle (BUDGET_CYCLE.NOT_OPEN, BUDGET_CYCLE.NOT_LOCKED), a proposal still waiting (BUDGET.PROPOSAL_NOT_SUBMITTED), matching cycle currency (BUDGET.CYCLE_CURRENCY_MISMATCH) and remaining within the annual ceiling (BUDGET_VERSION.OVER_CEILING).`,
       // The proposal behind a first version was taken back or given back while it was being built.
       examples: [
         EXAMPLES.VERSION_NOT_EDITABLE,
         EXAMPLES.PROPOSAL_NOT_SUBMITTED,
         EXAMPLES.CYCLE_NOT_OPEN,
+        EXAMPLES.CYCLE_NOT_LOCKED,
         EXAMPLES.OVER_ANNUAL_CEILING,
         EXAMPLES.CYCLE_CURRENCY_MISMATCH,
       ],

@@ -106,7 +106,7 @@ describe('self-service belongs to every account, with one role per account', () 
         .send({ assignmentId: seat, reason: 'Work completed' })
         .expect(201);
     }
-    const subscription = await h.subscription(10, 'K2', unit.department.id);
+    const subscription = await h.subscription(10, 'K2');
     const seedSubscription = await h.subscription(10, 'K2');
     for (const person of people) {
       const target = [h.it1.employeeId, h.finance.employeeId].includes(person.employeeId)

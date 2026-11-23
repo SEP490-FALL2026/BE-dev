@@ -93,21 +93,10 @@ export class PersonnelDashboardFactsRepo {
   async transferCounts(input: {
     departmentIds?: readonly string[] | undefined;
     today: BusinessDate;
-  }): Promise<TransferDashboardFacts> {
+  }): Promise<Omit<TransferDashboardFacts, 'revocationFailed'>> {
     if (input.departmentIds?.length === 0) return { inGrace: 0, graceEndingSoon: 0, revoking: 0 };
     const day = toDateColumn(input.today);
-    const open: Prisma.DepartmentTransferWhereInput = {
-      status: 'EFFECTIVE',
-      closedAt: null,
-      ...(input.departmentIds
-        ? {
-            OR: [
-              { fromDepartmentId: { in: [...input.departmentIds] } },
-              { toDepartmentId: { in: [...input.departmentIds] } },
-            ],
-          }
-        : {}),
-    };
+    const open = this.openTransfersWhere(input.departmentIds);
     // A transfer that has no grace (it took effect before the grace existed and was not given one) is still in the grace, as the phase says.
     const keepsGrace: Prisma.DepartmentTransferWhereInput = {
       OR: [{ graceEndsOn: null }, { graceEndsOn: { gte: day } }],
@@ -123,6 +112,34 @@ export class PersonnelDashboardFactsRepo {
       }),
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
+  }
+
+  /** Ids of effective, unclosed transfers whose grace ended before `today`, in the given department scope. */
+  async revokingTransferIds(input: {
+    departmentIds?: readonly string[] | undefined;
+    today: BusinessDate;
+  }): Promise<string[]> {
+    if (input.departmentIds?.length === 0) return [];
+    const rows = await this.prisma.departmentTransfer.findMany({
+      where: {
+        AND: [this.openTransfersWhere(input.departmentIds), { graceEndsOn: { lt: toDateColumn(input.today) } }],
+      },
+      select: { id: true },
+    });
+
+    return rows.map((row) => row.id);
+  }
+
+  private openTransfersWhere(departmentIds?: readonly string[]): Prisma.DepartmentTransferWhereInput {
+    return {
+      status: 'EFFECTIVE',
+      closedAt: null,
+      ...(departmentIds
+        ? {
+            OR: [{ fromDepartmentId: { in: [...departmentIds] } }, { toDepartmentId: { in: [...departmentIds] } }],
+          }
+        : {}),
+    };
   }
 
   /**

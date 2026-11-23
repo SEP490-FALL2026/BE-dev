@@ -44,19 +44,20 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
       deadline,
       addDays(deadline, 10),
     ]);
+  const subscriptionOf = new Map<string, string>();
   /** A department of the year with a Cost Center, a subscription of 10 seats and nobody heading it. */
   const headless = async (): Promise<Department> => {
     counter += 1;
     const department = await h.departmentWithUnit(`P-BV${counter}`);
-    await h.subscription(10, 'K2', department.id);
+    subscriptionOf.set(department.id, await h.subscription(10, 'K2'));
 
     return department;
   };
   /** Six seats held on the subscription of the department, by people who are not its head (nobody is). */
   const holdSeats = async (department: Department, held: number) => {
     const { rows } = await h.ctx.sql.query<{ id: string; plan_id: string }>(
-      `SELECT id, plan_id FROM subscriptions WHERE owner_department_id = $1 AND status = 'ACTIVE' ORDER BY id`,
-      [department.id],
+      `SELECT id, plan_id FROM subscriptions WHERE id = $1`,
+      [subscriptionOf.get(department.id)],
     );
     for (let i = 0; i < held; i += 1) {
       const person = await h.staff(department, `BVS${counter}-${i}`);

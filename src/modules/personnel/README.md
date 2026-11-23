@@ -48,7 +48,8 @@ Bốn point mở của module (cả bốn do listener trong chính module đăng
   `leave/leave-notice.listener.ts`, `offboarding/offboarding-notice.listener.ts`.
 
 Đăng ký vào: `licensing.revocation` (`RevocationListeners`) — `departure-closure/mailbox-lock-revocation.listener.ts`; `organization.change-listeners` — `transfer/transfer-effective.listener.ts`; `organization.department-use-readers` —
-`event-notice/department-open-work.listener.ts`.
+`event-notice/department-open-work.listener.ts`; `organization.first-placement-use-readers` (`QĐ-113e`: điều chuyển/hồ sơ nghỉ việc của người đó chặn sửa lần xếp phòng đầu) —
+`event-notice/first-placement-personnel.listener.ts`.
 
 ## Hướng phụ thuộc giữa capability (R6)
 
@@ -92,9 +93,9 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   `graceReminderOn`, `graceWindowEnd`), quyền cũ (`heldOnOrBefore`) và giai đoạn (`transferPhase`); dùng lại `rightToRevokeOf`/`commitmentToRelease` của `departure-impact.policy.ts`.
   **Sweeper (MF3-C.1)** `TransferGraceSweeper` (`transfer-grace.job.ts`, mỗi giờ): `TransferTellingService.announceUnannounced` báo `TRANSFER_GRACE_STARTED` cho điều chuyển cũ do
   migration m-17 cho ân hạn (không có `snapshot_before`; chụp ảnh quyền rồi mới báo, nên chỉ một lần), `remind` báo người chuyển `TRANSFER_GRACE_ENDING` từ `grace_reminder_on` (claim `reminded_at`),
-  `TransferRevocationService.sweep` ngày sau `grace_ends_on` mở `LicensingApi.openRevocation` nguồn `TRANSFER` (actor `SystemActor`, `referenceKind DEPARTMENT_TRANSFER`, `referenceId` = điều chuyển) cho
+  `TransferRevocationService.sweep` ngày sau `grace_ends_on` mở `LicensingApi.openRevocation` nguồn `TRANSFER` (actor `SystemActor`, `referenceKind DEPARTMENT_TRANSFER`, `referenceId` = điều chuyển, `noReopenAfterFailure: true`) theo thứ tự `(subscriptionId, assignmentId)` cho
   mọi quyền cá nhân giữ từ ngày hiệu lực trở về trước còn hiệu lực và có tác vụ thu hồi (`rightsToTakeBack` trong `transfer-sweep.policy.ts`: K3 không có thu hồi nên không tính), giao IT phụ trách
-  phòng mới. Idempotent bằng chính cổng `openRevocation`; mỗi điều chuyển một transaction khóa nhân viên rồi điều chuyển.
+  phòng mới. Tác vụ đã đóng `CLOSED_FAILED` không bị lượt quét tự mở lại; IT Admin mở lại thủ công qua `POST /department-transfers/{id}/revocations` (`TransferRevocationController`, `TransferRevocationService.reopen` với `noReopenAfterFailure: false`). Idempotent bằng chính cổng `openRevocation`; mỗi điều chuyển một transaction khóa nhân viên rồi điều chuyển.
   **Cấp lại trong ân hạn (MF3-C.3/C.4, R-49)**: `TransferGraceHoldListener` bind `TransferGraceHoldContributions` của `requests` (quyền đang giữ ∈ `snapshot_before`, `isOldRightOf`); lúc cấp trên cùng thuê bao `licensing` kết thúc quyền cũ
   (`valid_until` = ngày cấp), nên `rightsToTakeBack` không thấy nó, `oldRights[].regranted` và kết cục `REGRANTED` đọc `LicensingApi.listRegrantedAssignments`.
   **Đóng điều chuyển (MF3-C.2, `QĐ-110r`)** `TransferClosureService.closeIfDue`: hết ân hạn và không còn quyền cũ cần thu hồi (`closureDue`) ⟹ hệ thống đóng (`closed_by_system`, không tài khoản,
@@ -154,7 +155,7 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
 - `role-duties/` — vai trò người sắp nghỉ đang giữ, vai trò Super Admin còn dùng được không;
   `me-departure-notice.controller.ts`, `super-admin-watch.controller.ts`; `RoleDutiesService`.
 - `dashboard-facts/` — số đếm cho trang tổng quan theo vai: ca nghỉ việc đang bàn giao của các phòng, thông báo của trưởng phòng chờ
-  xử lý, tiến độ nghỉ việc/điều chuyển của IT Admin/Super Admin (`progress`: `departures`, `transfers`, lịch 10 ngày làm việc —
+  xử lý, tiến độ nghỉ việc/điều chuyển của IT Admin/Super Admin (`progress`: `departures`, `transfers` gồm `revocationFailed` đếm qua `LicensingApi.listTransferIdsWithFailedRevocation`, lịch 10 ngày làm việc —
   `departure-calendar.policy.ts`; RD.1) và các cửa sổ thu hồi cho báo cáo SLA (`revocationWindows`, `lateDepartures`, `graceWindowsOf`; RD.2: hạn của điều chuyển =
   ngày làm việc đầu sau ân hạn, tính như hạn nghỉ việc vì tác vụ của nó không có `due_on`, D-99/D-124); cùng điều kiện với danh sách tương ứng. Đọc qua
   `RevocationOverdueService` và `CatalogResponsibilityApi`; chỉ ra `PersonnelDashboardApi`.

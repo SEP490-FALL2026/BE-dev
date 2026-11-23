@@ -30,6 +30,8 @@ export interface TransferDashboardFacts {
   graceEndingSoon: number;
   /** The grace is over and the rights are being taken back. */
   revoking: number;
+  /** The grace is over and at least one open right has a closed-failed transfer revocation with no live revocation task. */
+  revocationFailed: number;
 }
 
 /** What the overviews of an IT Admin and of the Super Admin read of the progress of the departures and the transfers. */

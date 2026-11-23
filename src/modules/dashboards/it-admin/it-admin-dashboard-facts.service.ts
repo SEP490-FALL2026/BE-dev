@@ -38,6 +38,7 @@ export class ItAdminDashboardFactsService {
   /** `organizationId` is null before the installation. */
   async read(input: {
     organizationId: string | null;
+    employeeId: string;
     departmentIds: readonly string[];
   }): Promise<ItAdminDashboardFacts> {
     const wastedSeats = await this.optimization.getSummary();
@@ -46,7 +47,7 @@ export class ItAdminDashboardFactsService {
     const unconfirmedDevices = input.organizationId
       ? await this.devices.countByCollectionState(input.organizationId, 'AWAITING_ACKNOWLEDGEMENT')
       : 0;
-    const missingInvoicePeriods = await this.requests.missingInvoicePeriods(input.departmentIds);
+    const missingInvoicePeriods = await this.requests.missingInvoicePeriods(input.departmentIds, input.employeeId);
 
     const outOfProcessRevocationsDue = await this.outOfProcess.revocationsDue();
 

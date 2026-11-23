@@ -264,6 +264,22 @@ export class BudgetCycleDeadlinePassedError extends Error {
   }
 }
 
+/** The reserve kept for the shared pool cannot exceed the annual ceiling of the year. */
+export class BudgetCycleReserveOverCeilingError extends Error {
+  constructor() {
+    super('The shared-pool reserve cannot exceed the annual ceiling.');
+    this.name = 'BudgetCycleReserveOverCeilingError';
+  }
+}
+
+/** Finance sends a version only once the budget cycle of the year has locked after its submission deadline. */
+export class BudgetCycleNotLockedError extends Error {
+  constructor(readonly year: number) {
+    super(`The budget cycle of ${year} is still open and has not locked yet.`);
+    this.name = 'BudgetCycleNotLockedError';
+  }
+}
+
 /** The department head proposes only once Finance opened the cycle of the year (`QĐ-111z`, was `Q-02`). */
 export class BudgetCycleNotOpenError extends Error {
   constructor(readonly year: number) {

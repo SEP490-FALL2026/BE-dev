@@ -1,6 +1,6 @@
-import type { SpendStage } from '../access-request/access-request.types';
+import type { AccessRequestState, NeedStepState, SpendStage } from '../access-request/access-request.types';
 import { headMayWithdraw, type WithdrawalRefusal } from '../access-request/withdrawal.policy';
-import type { LineState } from '../access-request/group-request.types';
+import { isEnded, type LineState } from '../access-request/group-request.types';
 
 /**
  * Who withdraws one person of a request for a group, and what that does to the money (`US-05-08`, `US-06-14` AC-14, `US-05-17`
@@ -15,6 +15,10 @@ export interface LineWithdrawalFacts {
   /** The actor heads the department of the request today. */
   actorHeadsDepartment: boolean;
   lineState: LineState;
+  /** The need step of the line: `NOT_REQUIRED` when the head who sent the request vouched for the person, so no one decides their need. */
+  needStep: NeedStepState;
+  /** The state of the whole request: sent back to its sender, every open line may be withdrawn (`QĐ-113d`). */
+  requestState: AccessRequestState;
   /** Where the request stands on its way to the spending approver. */
   spendStage: SpendStage | null;
   reason: string | null;
@@ -26,13 +30,28 @@ export function checkLineWithdrawal(facts: LineWithdrawalFacts): WithdrawalRefus
   const byHead = !byRequester && facts.actorHeadsDepartment && headMayWithdraw(facts.spendStage);
   if (!byRequester && !byHead) return 'NOT_REQUESTER';
 
-  if (facts.lineState === 'COMPLETED') return 'GRANT_COMPLETED';
-  if (facts.lineState === 'AWAITING_IT_CLOSE') return 'WITHDRAWAL_PENDING';
-  if (isEndedWithoutSeat(facts.lineState)) return 'ALREADY_ENDED';
+  const over = endedRefusal(facts.lineState);
+  if (over) return over;
   if (byHead && (facts.reason === null || facts.reason.trim() === '')) return 'REASON_REQUIRED';
+  // The sender withdraws a person only before any decision on them (`QĐ-113d`).
+  if (byRequester && !lineUndecided(facts) && facts.requestState !== 'AWAITING_REQUESTER_REVISION') {
+    return 'WITHDRAWAL_AFTER_DECISION';
+  }
 
   return null;
 }
+
+/** The refusal of a line that no longer has anything to withdraw, or null. */
+function endedRefusal(state: LineState): WithdrawalRefusal | null {
+  if (state === 'COMPLETED') return 'GRANT_COMPLETED';
+  if (state === 'AWAITING_IT_CLOSE') return 'WITHDRAWAL_PENDING';
+
+  return isEndedWithoutSeat(state) ? 'ALREADY_ENDED' : null;
+}
+
+/** No decision was taken on the person: their need awaits its head, or no one decides it and the spending approver has not decided (`QĐ-113d`). */
+export const lineUndecided = (facts: Pick<LineWithdrawalFacts, 'lineState' | 'needStep'>): boolean =>
+  facts.lineState === 'AWAITING_NEED' || (facts.lineState === 'NEED_CONFIRMED' && facts.needStep === 'NOT_REQUIRED');
 
 const isEndedWithoutSeat = (state: LineState): boolean =>
   state === 'NEED_REJECTED' ||
@@ -87,4 +106,47 @@ export function withdrawalAuditOf(
       ...(done.kind === 'WAITING_FOR_IT' ? { taskId: done.taskId } : {}),
     },
   };
+}
+
+/**
+ * The state of the need step that holds a person of a request for a group; a step that is gone counts as decided. A step the sender
+ * held and approved by sending (the head confirms the people they send for) is no decision by anyone else: it reads as `NOT_REQUIRED`,
+ * so the sender withdraws until the spending approver has decided (`QĐ-113d`).
+ */
+export function needStepOfLine(
+  steps: readonly { id: string; state: NeedStepState; assigneeEmployeeId?: string | null }[],
+  line: { needStepId: string },
+  requesterEmployeeId: string,
+): NeedStepState {
+  const step = steps.find((candidate) => candidate.id === line.needStepId);
+  if (!step) return 'APPROVED';
+
+  return step.state === 'APPROVED' && step.assigneeEmployeeId === requesterEmployeeId ? 'NOT_REQUIRED' : step.state;
+}
+
+/**
+ * The need step a request for a group is judged by when all of it is withdrawn, and when the list says whether its sender may
+ * (`QĐ-113d`): nobody was decided only while every person who has not ended is undecided (`lineUndecided`); otherwise a decision
+ * was taken and the step counts as decided. `fallback` is the step the request waits at (the first open one, else the first).
+ * A request for a group is for plans of the catalog: its chain has no IT assessment, so the spending approver decides first.
+ */
+export function needStepOfGroup(
+  steps: readonly { id: string; state: NeedStepState; assigneeEmployeeId?: string | null }[],
+  fallback: { state: NeedStepState },
+  lines: readonly { state: LineState; needStepId: string }[],
+  requesterEmployeeId: string,
+): NeedStepState {
+  const live = lines.filter((line) => !isEnded(line.state) && line.state !== 'AWAITING_IT_CLOSE');
+  if (
+    !live.every((line) =>
+      lineUndecided({ lineState: line.state, needStep: needStepOfLine(steps, line, requesterEmployeeId) }),
+    )
+  ) {
+    return 'APPROVED';
+  }
+  if (live.some((line) => line.state === 'AWAITING_NEED')) {
+    return (steps.find((step) => step.state === 'PENDING' || step.state === 'WAITING') ?? fallback).state;
+  }
+
+  return 'NOT_REQUIRED';
 }

@@ -81,3 +81,97 @@ export function withProposalFile<T extends Test>(
         held.attachmentIds = [await uploadedProposalFile(sql, employeeId)];
       });
 }
+
+/**
+ * Temporarily moves an open cycle's submission deadline to yesterday while a version submission runs, then restores it
+ * once the last concurrent send for that cycle finishes so later proposals on the same year remain open.
+ */
+export class SendingCycleLock {
+  private chain: Promise<void> = Promise.resolve();
+  private active = new Map<string, { organizationId: string; year: number; originalDeadline: string; count: number }>();
+
+  async run<T>(sql: Client, versionId: string, today: string, work: () => Promise<T>): Promise<T> {
+    const key = await this.acquire(sql, versionId, today);
+    try {
+      return await work();
+    } finally {
+      await this.release(sql, key);
+    }
+  }
+
+  wrap<T extends Test>(sql: Client, versionId: string, today: string, test: T): T {
+    const innerEnd = test.end.bind(test);
+    test.end = (callback?: Parameters<Test['end']>[0]): T => {
+      this.acquire(sql, versionId, today).then(
+        (key) =>
+          innerEnd((error, response) => {
+            this.release(sql, key).then(
+              () => callback?.(error, response),
+              (releaseError: unknown) => callback?.((error ?? releaseError) as Error, response),
+            );
+          }),
+        (acquireError: unknown) => callback?.(acquireError as Error, undefined as never),
+      );
+
+      return test;
+    };
+
+    return test;
+  }
+
+  private serialize<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.chain.then(work, work);
+    this.chain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+
+    return run;
+  }
+
+  private acquire(sql: Client, versionId: string, today: string): Promise<string | null> {
+    return this.serialize(async () => {
+      const { rows } = await sql.query<{ organizationId: string; year: number; deadline: string }>(
+        `SELECT c.organization_id AS "organizationId", c.year, c.submission_deadline::text AS deadline
+           FROM budget_versions v
+           JOIN budget_cycles c ON c.organization_id = v.organization_id AND c.year = v.year
+          WHERE v.id = $1 AND c.opened_at IS NOT NULL`,
+        [versionId],
+      );
+      if (rows.length === 0) return null;
+      const { organizationId, year, deadline } = rows[0];
+      const key = `${organizationId}:${year}`;
+      const existing = this.active.get(key);
+      if (existing) {
+        existing.count += 1;
+
+        return key;
+      }
+      if (deadline < today) return null;
+      await sql.query(
+        `UPDATE budget_cycles SET submission_deadline = $3::date - 1 WHERE organization_id = $1 AND year = $2`,
+        [organizationId, year, today],
+      );
+      this.active.set(key, { organizationId, year, originalDeadline: deadline, count: 1 });
+
+      return key;
+    });
+  }
+
+  private async release(sql: Client, key: string | null): Promise<void> {
+    if (key === null) return;
+    await this.serialize(async () => {
+      const existing = this.active.get(key);
+      if (!existing) return;
+      existing.count -= 1;
+      if (existing.count > 0) return;
+      this.active.delete(key);
+      await sql.query(
+        `UPDATE budget_cycles SET submission_deadline = $3::date WHERE organization_id = $1 AND year = $2`,
+        [existing.organizationId, existing.year, existing.originalDeadline],
+      );
+    });
+  }
+}
+
+export const sendingCycleLock = new SendingCycleLock();

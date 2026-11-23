@@ -51,6 +51,7 @@ import { VendorAdminMinimumService } from './plan/vendor-admin-minimum.service';
 import { VendorAdminRolesService } from './plan/vendor-admin-roles.service';
 import { PlanRepo } from './plan/plan.repo';
 import { PlanService } from './plan/plan.service';
+import { PlanQuotePriceService } from './plan/plan-quote-price.service';
 import { PlansController } from './plan/plans.controller';
 import { PlanTermsController } from './plan-terms/plan-terms.controller';
 import { PlanTermsRepo } from './plan-terms/plan-terms.repo';
@@ -61,14 +62,12 @@ import { RequestableSoftwareRepo } from './requestable-software/requestable-soft
 import { RequestableSoftwareService } from './requestable-software/requestable-software.service';
 import { OnboardingFactsService } from './subscription/onboarding-facts.service';
 import { SeatTargetService } from './subscription/seat-target.service';
-import { SubscriptionDepartmentUseReader } from './subscription/subscription-department-use.listener';
 import { SubscriptionFactsService } from './subscription/subscription-facts.service';
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
 import { SubscriptionPeriodRepo } from './subscription/period/subscription-period.repo';
 import { SubscriptionPeriodService } from './subscription/period/subscription-period.service';
 import { SubscriptionPeriodApi } from './public/subscription-period.api';
 import { SubscriptionSeatIncreaseService } from './subscription/seat-increase/subscription-seat-increase.service';
-import { SubscriptionObligationService } from './subscription/obligation/subscription-obligation.service';
 import { SubscriptionGrantingRepo } from './subscription/subscription-granting.repo';
 import { SubscriptionChangeGuard } from './subscription/subscription-change-guard.service';
 import { SubscriptionChangeService } from './subscription/subscription-change.service';
@@ -154,6 +153,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRepo,
     ApplicationFactsService,
     PlanService,
+    PlanQuotePriceService,
     PlanWorkspaceService,
     VendorAdminRolesService,
     VendorAdminMinimumService,
@@ -172,8 +172,6 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionPoolService,
     SubscriptionSeatIncreaseService,
     SubscriptionPricingService,
-    SubscriptionObligationService,
-    SubscriptionDepartmentUseReader,
     SubscriptionGrantingRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,

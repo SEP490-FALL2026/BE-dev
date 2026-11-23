@@ -26,7 +26,6 @@ const periodOf = (id: string, adjustment: PeriodAdjustment | null, extra: Partia
     isPrimaryForPlan: true,
     purchasedQuantity: 10,
     autoRenew: true,
-    ownerDepartmentId: null,
     responsibleItAdminEmployeeId: null,
     adjustment,
     ...extra,

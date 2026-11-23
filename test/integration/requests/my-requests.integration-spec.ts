@@ -318,7 +318,8 @@ describe('my requests: whose they are and what a row says (integration, real Pos
         state: 'AWAITING_SPEND_DECISION',
         spend: { stage: 'WAITING_SPEND_DECISION' },
         needStep: { state: 'APPROVED', assignee: null },
-        canWithdraw: true,
+        // QĐ-113d: the head decided the need, so the sender no longer withdraws.
+        canWithdraw: false,
       });
       expect(rows.get(refused)).toMatchObject({
         state: 'REJECTED',

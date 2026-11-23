@@ -240,7 +240,7 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
       serial += 1;
       const unit = await h.departmentWithHead(`P-RC2${serial}`);
       await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
-      const pooled = await h.subscription(10, 'K2', unit.department.id);
+      const pooled = await h.subscription(10, 'K2');
       await h.ctx.sql.query(
         `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
         [pooled],

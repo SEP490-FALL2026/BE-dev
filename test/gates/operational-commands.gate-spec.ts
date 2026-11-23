@@ -14,8 +14,7 @@ const databaseRolesRoot = join(sourceRoot, 'infrastructure', 'database', 'roles'
 
 /**
  * The entry points of the operational commands: the one command process `src/cli.ts` (`node dist/cli.js <command>`) and
- * each command of its table, in `src/cli/<name>/` (OD-A7). F02, F01 and F19 (g0-g6-final-business-baseline-remediation)
- * added assign-subscription-owner, cost-center-direction and record-super-admin-event.
+ * each command of its table, in `src/cli/<name>/` (OD-A7). F01 and F19 (g0-g6-final-business-baseline-remediation) added cost-center-direction and record-super-admin-event.
  */
 const COMMAND_ENTRIES = ['cli.ts', ...COMMANDS.map((command) => `cli/${command.name}/${command.name}.command.ts`)];
 const COMMAND_FOLDERS = [
@@ -24,7 +23,6 @@ const COMMAND_FOLDERS = [
   'modules/installation/inspect',
   'modules/installation/seed',
   'modules/installation/migration-preflight',
-  'modules/catalog/subscription-owner-assignment',
   'modules/ai-assist/purge',
   'modules/organization/cost-center-direction',
   'modules/personnel/super-admin-event',
@@ -38,10 +36,9 @@ const COMMAND_ONLY_FILES = [
   'modules/identity-access/identity-access-inspection-facade.module.ts',
   'modules/installation/inspect/inspection-cli.module.ts',
   'modules/identity-access/identity-access-local-seed-facade.module.ts',
+  'modules/budgets/budgets-local-seed-facade.module.ts',
   'modules/installation/seed/seed-cli.module.ts',
   'modules/installation/migration-preflight/migration-preflight-cli.module.ts',
-  'cli/assign-subscription-owner/assign-subscription-owner-cli.module.ts',
-  'modules/catalog/subscription-owner-assignment/subscription-owner-assignment-cli.module.ts',
   'cli/ai-purge/ai-purge-cli.module.ts',
   'modules/ai-assist/purge/ai-assist-purge-cli.module.ts',
   'cli/cost-center-direction/cost-center-direction-cli.module.ts',

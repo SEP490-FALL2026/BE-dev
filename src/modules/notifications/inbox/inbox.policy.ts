@@ -33,6 +33,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   REQUEST_RETURNED: ['requestId', 'by', 'reason'],
   REQUEST_IT_REJECTED: ['requestId', 'kind', 'reason', 'alternativePlanId', 'alternativeNote', 'noAlternative'],
   REQUEST_SPEND_APPROVED: ['requestId'],
+  REQUEST_READY_FOR_GRANT: ['requestId', 'beneficiaryCount'],
   REQUEST_GRANTED: ['requestId', 'accessGuide', 'homepageUrl'],
   REQUEST_FAILED: ['requestId', 'contact'],
   REQUEST_WITHDRAWN: ['requestId', 'byRequester', 'reason'],
@@ -111,8 +112,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_DECISION_DEADLINE_REMINDER: ['cycleId', 'year', 'versionCount', 'decisionDeadline'],
   BUDGET_COST_CENTER_SETUP_DUE: ['cycleId', 'year', 'departmentId'],
   BUDGET_BASELINE_VERSION_HEAD_ASSIGNED: ['versionId', 'costCenterId', 'year'],
-  // The budget of the year after is not approved yet for a Cost Center: the Cost Center and the year, never a figure.
-  BUDGET_NEXT_YEAR_MISSING: ['costCenterId', 'year'],
+  // The budgets of the year after are not approved yet: the year and how many Cost Centers wait (`costCenterId` kept for stored legacy rows).
+  BUDGET_NEXT_YEAR_MISSING: ['costCenterId', 'year', 'costCenterCount'],
   // The close of a month (`QĐ-111ae`, `QĐ-104i`): the year and month, and for the summary the period and how many Cost Centers have each light; never a figure.
   BUDGET_REVIEW_DUE: ['year', 'month'],
   BUDGET_REVIEW_SUMMARY: ['periodId', 'year', 'month', 'kind', 'greenCount', 'yellowCount', 'redCount', 'underCount'],

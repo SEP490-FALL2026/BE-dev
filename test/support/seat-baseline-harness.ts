@@ -72,6 +72,38 @@ export class SeatHarness {
   detailsOf = (response: request.Response) =>
     (response.body as { error: { details: Record<string, unknown> } }).error.details;
 
+  /** The `updatedAt` of a subscription as a client reads it: the version an edit of its seats has to name (`expectedUpdatedAt`). */
+  async subscriptionVersionOf(subscriptionId: string, account: ApiAccount = this.it1): Promise<string> {
+    return this.dataOf<{ updatedAt: string }>(
+      await request(this.server()).get(`/api/v1/subscriptions/${subscriptionId}`).set(this.as(account)).expect(200),
+    ).updatedAt;
+  }
+
+  /**
+   * An edit that sets the seats bought, as a client makes it: on a read of the subscription (`expectedUpdatedAt`, always asked when the seats are sent) and with
+   * the reason a rise of the seats of an active pool asks for (ignored when the seats do not rise). `expected` is the status the answer must have; null asserts none.
+   */
+  async changeSeats(
+    subscriptionId: string,
+    body: object,
+    expected: number | null = 200,
+    account: ApiAccount = this.it1,
+  ): Promise<request.Response> {
+    const response = await request(this.server())
+      .patch(`/api/v1/subscriptions/${subscriptionId}`)
+      .set(this.as(account))
+      .send({
+        expectedUpdatedAt: await this.subscriptionVersionOf(subscriptionId, account),
+        quantityChangeReason: 'More seats needed',
+        ...body,
+      });
+    if (expected !== null && response.status !== expected) {
+      throw new Error(`changeSeats: expected ${expected}, got ${response.status} ${JSON.stringify(response.body)}`);
+    }
+
+    return response;
+  }
+
   async start(options: Parameters<typeof createHttpTestApp>[0] = {}): Promise<void> {
     this.ctx = await createHttpTestApp(options);
     this.seed = await seedInstallation(this.ctx.app);
@@ -189,16 +221,11 @@ export class SeatHarness {
    * owned by the seed department unless a department is named: a subscription always has an owner department, and a seat sits only
    * on a subscription of its own department (`QĐ-89a`, F20), so a suite whose seats belong to another department names it.
    */
-  async subscription(
-    quantity: number | null = 100,
-    type: 'K1' | 'K2' | 'K4' = 'K2',
-    ownerDepartmentId: string = this.seed.departmentId,
-  ): Promise<string> {
+  async subscription(quantity: number | null = 100, type: 'K1' | 'K2' | 'K4' = 'K2'): Promise<string> {
     const planId = await this.plan(type, quantity === null ? 'FLAT_RATE' : 'PER_SEAT');
 
     // A K4 plan is bought once (B-5): what is written for it is a perpetual purchase, which has no billing cycle.
     return declareSubscription(this.ctx, this.it1.accessToken, {
-      ownerDepartmentId,
       planId,
       kind: type === 'K4' ? 'PERPETUAL' : 'TERM',
       unitPrice: { amount: '1000000', currency: 'VND' },
@@ -213,7 +240,6 @@ export class SeatHarness {
     const planId = await this.plan(type);
 
     return declareSubscription(this.ctx, this.it1.accessToken, {
-      ownerDepartmentId: this.seed.departmentId,
       planId,
       kind: type === 'K4' ? 'PERPETUAL' : 'TERM',
       purchasedQuantity: 10,

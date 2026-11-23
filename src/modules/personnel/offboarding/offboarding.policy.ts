@@ -1,3 +1,4 @@
+import { compareSeatLockOrder } from '../../../core/seat-lock-order';
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addWorkingDays, type NonWorkingDates } from '../../../core/working-days';
 import { firstDayRefused } from '../departure-deadline/block-moment.policy';
@@ -310,8 +311,7 @@ export function departureRevocationSource(mode: AccessBlockMode): 'DEPARTURE' | 
 /** What a revocation of the rights is taken from: the seats the person holds, and which of them can be taken away by a task. */
 export interface RightFacts {
   assignmentId: string;
-  /** A task of the queue already works on it. */
-  hasTask: boolean;
+  subscriptionId: string | null;
   /** K1, K2 and K5 have a revocation; K3 and K4 do not (yet). */
   revocable: boolean;
   provisioningType: string;
@@ -321,19 +321,19 @@ export interface RevocationFacts {
   /** The person is blocked on the day of the act ({@link isBlocked}). */
   blocked: boolean;
   closed: boolean;
-  /** The seats the caller named; undefined means every right that has no task and that a task can take away. */
+  /** The seats the caller named; undefined means every revocable seat held by the person. */
   named: readonly string[] | undefined;
   rights: readonly RightFacts[];
   lockRecorded: boolean;
   lockGiven: boolean;
 }
 
-/** The first right named that is not there or already has a task, or has no revocation (K3, K4), in the order named; null when all can be taken. */
+/** The first right named that is not there or has no revocation (K3, K4), in the order named; null when all can be taken. */
 export function namedRightsRefusal(named: readonly string[], rights: readonly RightFacts[]): OffboardingRefusal | null {
   const byId = new Map(rights.map((right) => [right.assignmentId, right]));
   for (const id of named) {
     const right = byId.get(id);
-    if (!right || right.hasTask) return { code: 'ASSIGNMENT_NOT_AVAILABLE', details: { assignmentId: id } };
+    if (!right) return { code: 'ASSIGNMENT_NOT_AVAILABLE', details: { assignmentId: id } };
     if (!right.revocable)
       return {
         code: 'REVOCATION_NOT_SUPPORTED',
@@ -344,7 +344,7 @@ export function namedRightsRefusal(named: readonly string[], rights: readonly Ri
   return null;
 }
 
-/** The rights a command selects, and the refusal when it cannot; `selected` is meaningful only without a refusal. */
+/** The rights a command selects, sorted by (subscriptionId, assignmentId), and the refusal when it cannot. */
 export function revocationSelection(facts: RevocationFacts): {
   refusal: OffboardingRefusal | null;
   selected: string[];
@@ -353,9 +353,10 @@ export function revocationSelection(facts: RevocationFacts): {
   if (!facts.blocked) return none({ code: 'CASE_NOT_BLOCKED' });
   if (facts.closed) return none({ code: 'CASE_CLOSED' });
 
+  const byId = new Map(facts.rights.map((right) => [right.assignmentId, right]));
   let selected: string[];
   if (facts.named === undefined) {
-    selected = facts.rights.filter((right) => !right.hasTask && right.revocable).map((right) => right.assignmentId);
+    selected = facts.rights.filter((right) => right.revocable).map((right) => right.assignmentId);
   } else {
     selected = [...new Set(facts.named)];
     const named = namedRightsRefusal(selected, facts.rights);
@@ -365,7 +366,9 @@ export function revocationSelection(facts: RevocationFacts): {
   if (!facts.lockRecorded && !facts.lockGiven) return none({ code: 'ACCOUNT_LOCK_NOT_RECORDED' });
   if (facts.lockRecorded && facts.lockGiven) return none({ code: 'ALREADY_RECORDED' });
 
-  return { refusal: null, selected: selected.sort() };
+  selected.sort((a, b) => compareSeatLockOrder(byId.get(a) as RightFacts, byId.get(b) as RightFacts));
+
+  return { refusal: null, selected };
 }
 
 export interface BlockerFacts {

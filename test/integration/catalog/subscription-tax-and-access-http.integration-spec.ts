@@ -199,7 +199,12 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       const created = await subscription(planId);
 
       expect(codeOf(await get(randomUUID()).expect(404))).toBe('SUBSCRIPTION.NOT_FOUND');
-      expect(codeOf(await patch(randomUUID(), { purchasedQuantity: 1 }).expect(404))).toBe('SUBSCRIPTION.NOT_FOUND');
+      // The seats are sent with the version of a read, as they always are now; a subscription that is not there answers 404 whatever the version.
+      expect(
+        codeOf(
+          await patch(randomUUID(), { purchasedQuantity: 1, expectedUpdatedAt: new Date().toISOString() }).expect(404),
+        ),
+      ).toBe('SUBSCRIPTION.NOT_FOUND');
       expect(codeOf(await complete(randomUUID()).expect(404))).toBe('SUBSCRIPTION.NOT_FOUND');
       expect(codeOf(await patch(created.id, {}).expect(422))).toBe('SUBSCRIPTION.UPDATE_EMPTY');
       for (const body of [

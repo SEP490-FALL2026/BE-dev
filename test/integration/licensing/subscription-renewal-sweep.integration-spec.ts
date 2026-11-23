@@ -184,7 +184,6 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
 
     it('records nothing when no seat is held, nor for a period recorded in time, nor once the pass no longer looks back', async () => {
       const empty = await h.term({
-        ownerDepartmentId: unit.department.id,
         quantity: 10,
         startDate: h.inDays(-300),
         noticeDeadline: h.inDays(20),
@@ -214,7 +213,6 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
 
     it('marks the end of a plan by the month that does not renew itself once its end date has passed', async () => {
       const subscriptionId = await h.term({
-        ownerDepartmentId: unit.department.id,
         quantity: 10,
         billingCycle: 'MONTHLY',
         startDate: h.inDays(-60),
@@ -240,7 +238,6 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
   describe('a plan by the month', () => {
     it('is told the point, then on its payment day that it keeps seats it does not need, the IT Admin alone', async () => {
       const subscriptionId = await h.term({
-        ownerDepartmentId: unit.department.id,
         quantity: 10,
         billingCycle: 'MONTHLY',
         startDate: h.inDays(-60),
@@ -290,7 +287,6 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
       const due = paymentDayFrom(endDate, h.today());
       expect(due < endDate).toBe(true);
       const subscriptionId = await h.term({
-        ownerDepartmentId: unit.department.id,
         quantity: 10,
         billingCycle: 'MONTHLY',
         startDate: h.inDays(-60),
@@ -320,7 +316,6 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
     it('tells nothing on the day a plan is declared to start today, the day it began is not a day of renewal', async () => {
       // Paid on the same day of the month as it starts: the grid of its renewal day holds the start day itself one month back.
       const subscriptionId = await h.term({
-        ownerDepartmentId: unit.department.id,
         quantity: 10,
         billingCycle: 'MONTHLY',
         startDate: h.today(),
@@ -340,7 +335,7 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
 
   describe('the data a period lacks', () => {
     it('warns the IT Admin once that a period with no date gives no point to alert from', async () => {
-      const undated = await h.term({ ownerDepartmentId: unit.department.id, autoRenew: true });
+      const undated = await h.term({ autoRenew: true });
 
       await h.sweepOn(h.today());
       await h.sweepOn(h.today());
@@ -355,7 +350,6 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
 
     it('warns once that a plan by the year counted from its renewal date has no deadline to cancel', async () => {
       const byRenewalDate = await h.term({
-        ownerDepartmentId: unit.department.id,
         startDate: h.inDays(-300),
         renewalDate: h.inDays(60),
         autoRenew: true,
@@ -376,7 +370,6 @@ describe('the pass over the points of adjustment (integration, real PostgreSQL)'
       const perpetual = await h.perpetual();
       const licensed = await h.term({
         type: 'K1',
-        ownerDepartmentId: unit.department.id,
         billingCycle: 'MONTHLY',
         startDate: h.inDays(-60),
         renewalDate: h.inDays(10),

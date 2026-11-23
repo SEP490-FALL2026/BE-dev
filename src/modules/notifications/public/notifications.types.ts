@@ -1,4 +1,5 @@
-export type EmailTemplate = 'ACCOUNT_INVITATION' | 'PASSWORD_RESET' | 'PASSWORD_CHANGED_NOTICE';
+export type EmailTemplate =
+  'ACCOUNT_INVITATION' | 'PASSWORD_RESET' | 'PASSWORD_CHANGED_NOTICE' | 'LOGIN_EMAIL_CHANGED_NOTICE';
 export type EmailOutboxStatus = 'PENDING' | 'SENDING' | 'SENT' | 'FAILED' | 'CANCELLED';
 
 export interface EnqueueEmailInput {
@@ -8,7 +9,7 @@ export interface EnqueueEmailInput {
   locale: string;
   /**
    * Identifies the action token behind the link; at most one mail per token. A value, not a foreign key.
-   * Null for a message that carries no link (the password-changed notice), which is sent without any
+   * Null for a message that carries no link (the password-changed and login-email-changed notices), which is sent without any
    * token check.
    */
   actionTokenHash: string | null;
@@ -55,6 +56,7 @@ export const IN_APP_NOTIFICATION_CODES = [
   'REQUEST_RETURNED',
   'REQUEST_IT_REJECTED',
   'REQUEST_SPEND_APPROVED',
+  'REQUEST_READY_FOR_GRANT',
   'REQUEST_GRANTED',
   'REQUEST_FAILED',
   'REQUEST_WITHDRAWN',

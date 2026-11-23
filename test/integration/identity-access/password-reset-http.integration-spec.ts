@@ -282,7 +282,9 @@ describe('password self-service over HTTP (integration, real PostgreSQL): reset 
         notices.rows[0].payload_key_id,
         notices.rows[0].payload_ciphertext,
       );
-      expect(Object.keys(payload).sort()).toEqual(['at', 'event', 'fullName']);
+      const organization = await h.ctx.sql.query<{ time_zone: string }>('SELECT time_zone FROM organizations LIMIT 1');
+      expect(Object.keys(payload).sort()).toEqual(['at', 'event', 'fullName', 'timeZone']);
+      expect(payload.timeZone).toBe(organization.rows[0].time_zone);
       expect(payload.event).toBe('PASSWORD_RESET');
       expect(JSON.stringify(payload)).not.toContain(link);
     });

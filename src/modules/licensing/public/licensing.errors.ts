@@ -42,8 +42,7 @@ export class SeatQuantityUnknownError extends Error {
   }
 }
 
-export type AssignmentConflict =
-  'OVERLAP' | 'IDENTIFIER_IN_USE' | 'SEAT_CAPACITY' | 'EXPECTED_END_REQUIRED' | 'SUBSCRIPTION_DEPARTMENT_MISMATCH';
+export type AssignmentConflict = 'OVERLAP' | 'IDENTIFIER_IN_USE' | 'SEAT_CAPACITY' | 'EXPECTED_END_REQUIRED';
 
 /** The database refused an assignment that the judgement had accepted: the data changed in between. */
 export class AssignmentConflictError extends Error {
@@ -54,6 +53,8 @@ export class AssignmentConflictError extends Error {
     readonly freeSeatsInPool?: number,
     /** For `OVERLAP` and `IDENTIFIER_IN_USE`: the seat that blocks, when the site that throws knows it (the database does not say it). */
     readonly conflictingAssignmentId?: string,
+    /** For `OVERLAP` blocked by a live revocation task that cannot be withdrawn automatically. */
+    readonly blockingRevocation?: { revocationTaskId: string; revocationStatus: string },
   ) {
     super(`An assignment conflicts with the data as it is now: ${conflict}.`);
     this.name = 'AssignmentConflictError';

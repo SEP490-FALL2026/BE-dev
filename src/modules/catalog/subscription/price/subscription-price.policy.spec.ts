@@ -5,6 +5,8 @@ import {
   assertPriceInDong,
   isPricedInDong,
   monthlyCostOf,
+  referenceCycleOf,
+  referencePriceSourceOf,
   uniformSnapshotOf,
 } from './subscription-price.policy';
 
@@ -137,5 +139,44 @@ describe('monthlyCostOf (the price of a seat for a month, in dong, rounded up)',
         unitPrice: { amountMinor: 10n, currency: 'USD', recordedOn: '2026-01-05' },
       }),
     ).toEqual({ monthlyPriceMinor: null, cycleMonths: 1 });
+  });
+});
+
+describe('QĐ-113a: what the reference price of a plan stands for', () => {
+  const price = { amountMinor: 500_000n, currency: 'VND' };
+
+  it.each(['K1', 'K2'] as const)('is a recurring monthly price of a %s plan', (kind) => {
+    expect(referencePriceSourceOf(kind, price)).toEqual({
+      kind: 'RECURRING',
+      unitPrice: price,
+      reportingUnitPrice: price,
+      billingCycle: 'MONTHLY',
+      allowsMidTermReduction: false,
+      source: 'PLAN_REFERENCE',
+    });
+  });
+
+  it('is the one-time price of a K4 plan', () => {
+    expect(referencePriceSourceOf('K4', price)).toEqual({
+      kind: 'ONE_TIME',
+      unitPrice: price,
+      reportingUnitPrice: price,
+      billingCycle: 'OTHER',
+      allowsMidTermReduction: false,
+      source: 'PLAN_REFERENCE',
+    });
+  });
+
+  it('tells the cycle a plan with a reference price is counted by, for the "can be priced" status of the catalog', () => {
+    expect(referenceCycleOf('K1')).toBe('MONTHLY');
+    expect(referenceCycleOf('K2')).toBe('MONTHLY');
+    expect(referenceCycleOf('K4')).toBe('ONE_TIME');
+    expect(referenceCycleOf('K5')).toBeUndefined();
+  });
+
+  it('is nothing for a plan with no price, or of a kind that costs nothing', () => {
+    expect(referencePriceSourceOf('K2', null)).toBeNull();
+    expect(referencePriceSourceOf('K5', price)).toBeNull();
+    expect(referencePriceSourceOf('K3', price)).toBeNull();
   });
 });

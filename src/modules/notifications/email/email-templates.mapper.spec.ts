@@ -34,7 +34,8 @@ describe('email templates', () => {
 
       expect(text).toContain(`https://app.acme.test/reset-password#token=${TOKEN}`);
       expect(text).not.toContain('/activate');
-      expect(text).toContain('2026-10-16T10:30:00.000Z');
+      expect(text).toContain('16/10/2026 17:30');
+      expect(text).not.toContain('2026-10-16T10:30:00.000Z');
       expect(subject).not.toMatch(/activate|kích hoạt/i);
     });
   });
@@ -48,7 +49,7 @@ describe('email templates', () => {
         APP_URL,
       );
 
-      expect(text).toContain('2026-10-16T09:00:00.000Z');
+      expect(text).toContain('16/10/2026 16:00');
       expect(text).not.toContain('#token=');
       expect(text).not.toMatch(/https?:\/\//);
       expect(text).not.toContain('undefined');
@@ -59,6 +60,99 @@ describe('email templates', () => {
       const changed = renderEmail('PASSWORD_CHANGED_NOTICE', 'en', { event: 'PASSWORD_CHANGED', at: 'T' }, APP_URL);
 
       expect(reset.text).not.toEqual(changed.text);
+    });
+  });
+
+  describe('the time in a mail is the local time of the organization', () => {
+    const instant = '2026-11-28T03:00:00.000Z';
+    const reset = (locale: string, extra: Record<string, unknown> = {}) =>
+      renderEmail('PASSWORD_RESET', locale, { token: TOKEN, expiresAt: instant, ...extra }, APP_URL).text;
+
+    it('writes dd/MM/yyyy HH:mm in Asia/Ho_Chi_Minh when the payload has no time zone (a row written before the field existed)', () => {
+      expect(reset('vi')).toContain('hiệu lực đến 28/11/2026 10:00)');
+      expect(reset('vi')).not.toContain(instant);
+    });
+
+    it('writes the same time when the payload names Asia/Ho_Chi_Minh', () => {
+      expect(reset('vi', { timeZone: 'Asia/Ho_Chi_Minh' })).toContain('28/11/2026 10:00');
+    });
+
+    it('follows the time zone the payload names', () => {
+      expect(reset('vi', { timeZone: 'UTC' })).toContain('28/11/2026 03:00');
+    });
+
+    it('names the offset in the English text', () => {
+      expect(reset('en')).toContain('valid until 28/11/2026 10:00 (GMT+7)');
+    });
+
+    it('writes the offset of a zone with half hours and of a zone behind UTC', () => {
+      expect(reset('en', { timeZone: 'Asia/Kolkata' })).toContain('08:30 (GMT+5:30)');
+      expect(reset('en', { timeZone: 'America/Sao_Paulo' })).toContain('00:00 (GMT-3)');
+    });
+
+    it('builds the offset itself, whatever name for it the ICU data of the runtime would give', () => {
+      const real = Reflect.get(Intl.DateTimeFormat.prototype, 'formatToParts');
+      const spy = jest.spyOn(Intl.DateTimeFormat.prototype, 'formatToParts').mockImplementation(function (
+        this: Intl.DateTimeFormat,
+        date?: Date | number,
+      ) {
+        return [...real.call(this, date), { type: 'timeZoneName', value: 'GMT+0' }];
+      });
+
+      try {
+        expect(reset('en', { timeZone: 'UTC' })).toContain('03:00 (GMT)');
+        expect(reset('en')).toContain('10:00 (GMT+7)');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('falls back to the default time zone when the payload names one that does not exist', () => {
+      expect(reset('vi', { timeZone: 'Not/AZone' })).toContain('28/11/2026 10:00');
+    });
+
+    it('formats the time of the notices of a changed password and a changed login email too', () => {
+      const changed = renderEmail('PASSWORD_CHANGED_NOTICE', 'vi', { event: 'PASSWORD_CHANGED', at: instant }, APP_URL);
+      const email = renderEmail(
+        'LOGIN_EMAIL_CHANGED_NOTICE',
+        'en',
+        { previousEmail: 'a@acme.test', currentEmail: 'b@acme.test', at: instant, timeZone: 'UTC' },
+        APP_URL,
+      );
+
+      expect(changed.text).toContain('lúc 28/11/2026 10:00');
+      expect(email.text).toContain('at 28/11/2026 03:00 (GMT)');
+    });
+  });
+
+  describe('LOGIN_EMAIL_CHANGED_NOTICE', () => {
+    const payload = {
+      previousEmail: 'old@acme.test',
+      currentEmail: 'new@acme.test',
+      at: '2026-11-19T09:00:00.000Z',
+      fullName: 'An',
+    };
+
+    it.each(['vi', 'en'])('names both addresses and the time, with no link or token, in %s', (locale) => {
+      const { text } = renderEmail('LOGIN_EMAIL_CHANGED_NOTICE', locale, { ...payload, audience: 'CURRENT' }, APP_URL);
+
+      expect(text).toContain('old@acme.test');
+      expect(text).toContain('new@acme.test');
+      expect(text).toContain('19/11/2026 16:00');
+      expect(text).not.toContain('#token=');
+      expect(text).not.toMatch(/https?:\/\//);
+      expect(text).not.toContain('undefined');
+    });
+
+    it('adds the warning for the previous address only', () => {
+      const previous = renderEmail('LOGIN_EMAIL_CHANGED_NOTICE', 'vi', { ...payload, audience: 'PREVIOUS' }, APP_URL);
+      const current = renderEmail('LOGIN_EMAIL_CHANGED_NOTICE', 'vi', { ...payload, audience: 'CURRENT' }, APP_URL);
+
+      expect(previous.text).toContain('Nếu bạn không yêu cầu thay đổi này, hãy liên hệ quản trị viên.');
+      expect(current.text).not.toContain('Nếu bạn không yêu cầu');
+      expect(
+        renderEmail('LOGIN_EMAIL_CHANGED_NOTICE', 'en', { ...payload, audience: 'PREVIOUS' }, APP_URL).text,
+      ).toContain('If you did not ask for this change');
     });
   });
 });

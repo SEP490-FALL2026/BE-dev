@@ -93,7 +93,28 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
     await h.stop();
   });
 
+  describe('while the baseline phase is open (QĐ-117e)', () => {
+    it('lets a K2 subscription through while the baseline phase is open even when one of two recorded admins has left, and sets vendorAdminsBelowMinimum', async () => {
+      const planId = await planOf('K2');
+      await putProfile(planId).expect(200);
+      await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [it2.employeeId]);
+      try {
+        const created = h.dataOf<SubscriptionWire>(await declare(complete(planId)).expect(201));
+
+        expect(created.status).toBe('ACTIVE');
+        expect(created.vendorAdminsBelowMinimum).toBe(true);
+      } finally {
+        await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [it2.employeeId]);
+      }
+    });
+  });
+
   describe('activating (QĐ-110k)', () => {
+    // The gate asks two admins who work only once the baseline is closed (`QĐ-117e`: while it is being imported nothing is asked): the suites after the one above need it closed.
+    beforeAll(async () => {
+      await h.closeBaseline().expect(200);
+    });
+
     it('refuses a K2 plan with no profile: 422 SUBSCRIPTION.VENDOR_ADMINS_REQUIRED, nothing is written', async () => {
       const planId = await planOf('K2');
       const before = await h.count('subscriptions');
@@ -160,7 +181,7 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
     it('asks nothing of a K1 plan', async () => {
       const planId = await planOf('K1');
 
-      await declare(complete(planId, { ownerDepartmentId: h.seed.departmentId })).expect(201);
+      await declare(complete(planId, {})).expect(201);
     });
   });
 
@@ -200,11 +221,7 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
 
         expect(view.vendorAdminsBelowMinimum).toBe(true);
         expect(view.vendorAdmins.find((admin) => admin.employeeId === it2.employeeId)?.working).toBe(false);
-        await request(h.server())
-          .patch(`/api/v1/subscriptions/${created.id}`)
-          .set(h.as(h.it1))
-          .send({ purchasedQuantity: 11 })
-          .expect(200);
+        await h.changeSeats(created.id, { purchasedQuantity: 11 });
       } finally {
         await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [it2.employeeId]);
       }
@@ -224,11 +241,7 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
         vendorAdminsBelowMinimum: true,
         ownerAccountEmailMissing: true,
       });
-      await request(h.server())
-        .patch(`/api/v1/subscriptions/${created.id}`)
-        .set(h.as(h.it1))
-        .send({ purchasedQuantity: 12 })
-        .expect(200);
+      await h.changeSeats(created.id, { purchasedQuantity: 12 });
     });
 
     it('X-IT-O4 (SPEC P19): shows Finance neither who administers the plan nor the email and the note, only the two flags', async () => {
@@ -259,9 +272,7 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
 
     it('is quiet for a plan that needs no admins: empty list, no email, no flag', async () => {
       const planId = await planOf('K1');
-      const created = h.dataOf<SubscriptionWire>(
-        await declare(complete(planId, { ownerDepartmentId: h.seed.departmentId })).expect(201),
-      );
+      const created = h.dataOf<SubscriptionWire>(await declare(complete(planId, {})).expect(201));
 
       expect(await read(created.id)).toMatchObject({
         vendorAdmins: [],
@@ -270,6 +281,34 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
         vendorAdminsBelowMinimum: false,
         ownerAccountEmailMissing: false,
       });
+    });
+  });
+
+  describe('baseline phase and working admin count', () => {
+    it('refuses 422 SUBSCRIPTION.VENDOR_ADMINS_REQUIRED once the baseline phase is closed when one of two recorded admins has left', async () => {
+      await h.closeBaseline().expect(200);
+      const planId = await planOf('K2');
+      await putProfile(planId).expect(200);
+      await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [it2.employeeId]);
+      try {
+        const refused = await declare(complete(planId)).expect(422);
+
+        expect(h.codeOf(refused)).toBe('SUBSCRIPTION.VENDOR_ADMINS_REQUIRED');
+        expect(h.detailsOf(refused)).toEqual({ planId, given: 1, required: 2 });
+      } finally {
+        await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [it2.employeeId]);
+      }
+    });
+
+    it('activates 201 once the baseline phase is closed when two recorded admins are still working', async () => {
+      await h.closeBaseline().expect(200);
+      const planId = await planOf('K2');
+      await putProfile(planId).expect(200);
+
+      const created = h.dataOf<SubscriptionWire>(await declare(complete(planId)).expect(201));
+
+      expect(created.status).toBe('ACTIVE');
+      expect(created.vendorAdminsBelowMinimum).toBe(false);
     });
   });
 });

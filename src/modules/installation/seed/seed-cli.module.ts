@@ -3,6 +3,7 @@ import { InstallationConfigurationModule } from '../../../infrastructure/config/
 import { DatabaseModule } from '../../../infrastructure/database/database.module';
 import { RuntimeDatabaseRoleModule } from '../../../infrastructure/database/runtime-role.module';
 import { AuditModule } from '../../audit/audit.module';
+import { BudgetsLocalSeedFacadeModule } from '../../budgets/budgets-local-seed-facade.module';
 import { IdentityAccessFacadeModule } from '../../identity-access/identity-access-facade.module';
 import { IdentityAccessLocalSeedFacadeModule } from '../../identity-access/identity-access-local-seed-facade.module';
 import { OrganizationModule } from '../../organization/organization.module';
@@ -22,6 +23,7 @@ import { DemoAccountsApi } from '../public/demo-accounts.api';
     RuntimeDatabaseRoleModule,
     OrganizationModule,
     AuditModule,
+    BudgetsLocalSeedFacadeModule,
     IdentityAccessFacadeModule,
     IdentityAccessLocalSeedFacadeModule,
   ],

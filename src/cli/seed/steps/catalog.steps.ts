@@ -77,7 +77,7 @@ function firstPlanBody(plan: DemoPlan): Record<string, unknown> {
   return body;
 }
 
-function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown> {
+export function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown> {
   return {
     applicationId,
     name: plan.name,
@@ -87,6 +87,8 @@ function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown
     ...(plan.revocationNote ? { revocationNote: plan.revocationNote } : {}),
     ...(plan.sharingPolicy ? { sharingPolicy: plan.sharingPolicy } : {}),
     ...(plan.hasAdminConsole !== undefined ? { hasAdminConsole: plan.hasAdminConsole } : {}),
+    // QĐ-113a: the price before tax in dong of a paid plan, the one a request falls back to when no subscription of the plan has a price.
+    ...(plan.referencePrice ? { referencePrice: { amount: plan.referencePrice, currency: 'VND' } } : {}),
   };
 }
 
@@ -200,6 +202,7 @@ async function workspaceProfiles(ctx: DemoRunContext): Promise<StepOutcome> {
 interface SubscriptionRow {
   id: string;
   status: string;
+  updatedAt: string;
 }
 
 /** Seats the baseline files put in the subscription, counted from the fixture. */
@@ -299,9 +302,6 @@ export function subscriptionBody(
   return {
     planId,
     kind: subscription.kind,
-    ...(subscription.ownerDepartment
-      ? { ownerDepartmentId: ctx.ids.departments.get(subscription.ownerDepartment) }
-      : {}),
     ...subscriptionTerms(ctx, subscription),
   };
 }
@@ -338,7 +338,10 @@ async function oneSubscription(ctx: DemoRunContext, admin: string, subscription:
   if (found.status === 'ACTIVE') return { status: created ? 'done' : 'present', label };
   if (ctx.mode === 'plan') return { status: 'planned', label: `${label} (hoàn tất bản nháp)` };
   // A draft an earlier run left is brought to the fixture's terms before it is completed.
-  await ctx.api.call(admin, 'PATCH', `/subscriptions/${found.id}`, subscriptionTerms(ctx, subscription));
+  await ctx.api.call(admin, 'PATCH', `/subscriptions/${found.id}`, {
+    ...subscriptionTerms(ctx, subscription),
+    expectedUpdatedAt: found.updatedAt,
+  });
   await ctx.api.call(admin, 'POST', `/subscriptions/${found.id}/completions`);
 
   return { status: 'done', label };

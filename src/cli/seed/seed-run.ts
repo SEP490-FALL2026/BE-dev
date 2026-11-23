@@ -247,6 +247,8 @@ function context(
       describe: (specs) => input.accounts.describe(facts.organizationId, specs),
       create: (specs) =>
         input.accounts.create(facts.organizationId, specs, input.secrets.demoAccountPassword, attribution),
+      lockBudgetCycle: (year, lockedDeadline) =>
+        input.accounts.lockBudgetCycle(facts.organizationId, year, lockedDeadline, attribution),
     },
   };
 }

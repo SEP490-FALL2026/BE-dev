@@ -85,6 +85,7 @@ const request = (key: string, requester: string, target: 'COMPLETED' | 'AWAITING
   termMonths: 9,
   target,
   summary: 'x',
+  reason: 'x',
 });
 const headedBy = (code: string) => F.people.find((person) => person.code === code)?.department;
 /** The fixture as it was before T12: no request of the Board or of Finance, so those two have nothing counted yet. */
@@ -176,6 +177,7 @@ describe('the base counted for the light a department must show (baseFor, SPEC S
           target: 'AWAITING_EXECUTION' as const,
           ...(rejectedLines ? { rejectedLines } : {}),
           summary: 'x',
+          reason: 'x',
         },
       ],
     });

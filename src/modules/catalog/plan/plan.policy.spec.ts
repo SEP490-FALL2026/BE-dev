@@ -1,6 +1,8 @@
 import {
   PlanControlLevelRequiredError,
   PlanPricingModelNotDerivedError,
+  PlanReferencePriceNotApplicableError,
+  PlanReferencePriceNotVndError,
   PlanDataLossNoteRequiredError,
   PlanNameInvalidError,
   PlanNoteInvalidError,
@@ -17,7 +19,10 @@ import {
   applicationPlanName,
   assertPlanShape,
   assertPricingModelDerived,
+  assertReferencePrice,
   assertWorkspaceShape,
+  canAdoptQuotePrice,
+  referencePriceOnKindChange,
   cleanPlanName,
   derivedPricingModel,
   cleanRevocationNote,
@@ -303,5 +308,44 @@ describe('assertPricingModelDerived (B-5: a pricing model that is sent is the on
 describe('applicationPlanName', () => {
   it('names a plan by its application and itself, with an en dash', () => {
     expect(applicationPlanName('Figma', 'Professional')).toBe('Figma – Professional');
+  });
+});
+
+describe('QĐ-113a: the reference price of a plan', () => {
+  const price = { amountMinor: 500_000n, currency: 'VND' };
+
+  it.each(['K1', 'K2', 'K4'] as const)('is accepted on a %s plan, or left out', (kind) => {
+    expect(() => assertReferencePrice(kind, price)).not.toThrow();
+    expect(() => assertReferencePrice(kind, null)).not.toThrow();
+    expect(() => assertReferencePrice(kind, { amountMinor: 0n, currency: 'VND' })).not.toThrow();
+  });
+
+  it.each(['K3', 'K5'] as const)('is refused on a %s plan', (kind) => {
+    expect(() => assertReferencePrice(kind, price)).toThrow(PlanReferencePriceNotApplicableError);
+    expect(() => assertReferencePrice(kind, null)).not.toThrow();
+  });
+
+  it('is refused in another currency than dong, with its own code', () => {
+    expect(() => assertReferencePrice('K2', { amountMinor: 1n, currency: 'USD' })).toThrow(
+      PlanReferencePriceNotVndError,
+    );
+  });
+
+  it('is cleared when the kind moves to K5 or between a per-seat kind and K4, kept otherwise', () => {
+    expect(referencePriceOnKindChange('K2', 'K5')).toBe('CLEAR');
+    expect(referencePriceOnKindChange('K2', 'K4')).toBe('CLEAR');
+    expect(referencePriceOnKindChange('K4', 'K2')).toBe('CLEAR');
+    expect(referencePriceOnKindChange('K1', 'K2')).toBe('KEEP');
+    expect(referencePriceOnKindChange('K2', 'K1')).toBe('KEEP');
+    expect(referencePriceOnKindChange('K2', 'K2')).toBe('KEEP');
+    expect(referencePriceOnKindChange('K4', 'K4')).toBe('KEEP');
+  });
+
+  it('takes a price from a quote only for a K1 or K2 plan that has none', () => {
+    expect(canAdoptQuotePrice('K1', null)).toBe(true);
+    expect(canAdoptQuotePrice('K2', null)).toBe(true);
+    expect(canAdoptQuotePrice('K4', null)).toBe(false);
+    expect(canAdoptQuotePrice('K5', null)).toBe(false);
+    expect(canAdoptQuotePrice('K2', price)).toBe(false);
   });
 });

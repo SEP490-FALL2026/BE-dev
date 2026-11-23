@@ -15,16 +15,16 @@ dashboards; gốc `src/app/app.module.ts`.
 - Facade, mỗi facade ≤ 8 phụ thuộc, tên method không đổi; consumer inject facade sở hữu method (module export các facade này):
   - `LicensingApi` ([public/licensing.api.ts](public/licensing.api.ts)) — thu hồi, task grant, ghế của người:
     - `openRevocation` — cửa duy nhất mở thu hồi một ghế cá nhân, cho mọi nguồn (trả ghế, nghỉ việc, hết hạn…); tham số
-      tùy chọn `timing { dueOn?, notBefore? }` (mốc không-trước, ân hạn do MF-5 truyền) và `notice { holder: true }` (báo
-      người giữ `REVOCATION_UPCOMING`, một lần theo `(source, referenceId)`); không truyền ⟹ hành vi như cũ.
+      tùy chọn `timing { dueOn?, notBefore? }` (mốc không-trước, ân hạn do MF-5 truyền), `notice { holder: true }` (báo
+      người giữ `REVOCATION_UPCOMING`, một lần theo `(source, referenceId)`) và `noReopenAfterFailure` (khi `true`, không mở mới nếu đã có tác vụ `CLOSED_FAILED` cùng `(source, referenceId)`); không truyền ⟹ hành vi như cũ.
     - `withdrawRevocationReason` — nguồn gỡ lý do của chính mình: còn lý do khác ⟹ `CONTINUES`; hết lý do ⟹ tác vụ
       `CANCELLED` (`NO_LONGER_APPLIES`, ghế không đổi), riêng tác vụ `IN_PROGRESS` chỉ hủy khi
       `cancelInProgressClaimedBy` đúng người nhận, ngược lại `IT_ADMIN_TO_CLOSE`; gọi lại ⟹ `NOT_FOUND`/`ALREADY_ENDED`.
       Tham số tùy chọn `operator` (thủ tục có kiểm soát): audit ghi `OPERATOR` thay vì tài khoản đứng thế.
     - `lockGrantOfRequest`, `completedGrantOfRequest`, `cancelGrantOfRequest` — task grant của một request;
       `recordProvisioningFailure` — ghi lần thử connector lỗi (US-07-04).
-    - `listPersonalSeatsOf`, `countPersonalSeatsOf`, `getSeatsHeldInPlans`, `listTerminatingAccess`,
-      `listRevocationsOpenedFor` — đọc ghế của người; `selfExecutionMode` — IT Admin có được làm việc cho chính mình
+    - `listPersonalSeatsOf`, `countPersonalSeatsOf`, `getSeatsHeldInPlans(…, tx?)`, `listTerminatingAccess`,
+      `listRevocationsOpenedFor`, `listTransferIdsWithFailedRevocation` — đọc ghế của người và tác vụ thu hồi điều chuyển đóng thất bại; `selfExecutionMode` — IT Admin có được làm việc cho chính mình
       không (`QĐ-77m`).
     - `pageHeldSoftwareOf` — phần mềm người đó đang giữ hôm nay (ghế cá nhân đã bắt đầu, chưa hỏng/hủy/hết), một trang và
       tổng, cùng snapshot `RepeatableRead`, 3 câu lệnh dù bao nhiêu ghế; trưởng phòng đọc một thành viên
@@ -170,8 +170,7 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   `seats-needed/` (số seat cần của kỳ sau, `QĐ-103e`), `outcome/` (lõi ghi kết quả: kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
   `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`; route `/{id}/outcome` chỉ còn cho ca `DECIDED` cũ), `alerts/` (điểm điều chỉnh, cảnh báo đỏ gói năm, gói tháng giữ nguyên, chất lượng dữ liệu — `renewal-adjustment-alerts.policy.ts`), `deadline/`
   (sự cố tự gia hạn/đánh dấu hết hạn theo ngày gia hạn `end`); không còn bước trưởng phòng xác nhận (route `decision` đã gỡ). Đọc theo vai ở
-  `subscription-renewal-view.service.ts` + `readScopeOf` (IT Admin, Finance đọc mọi ca kể cả thuê bao kho không phòng sở hữu; trưởng phòng chỉ
-  ca của phòng mình); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; `subscription-renewal-ranking.policy.ts`
+  `subscription-renewal-view.service.ts` + `readScopeOf` (IT Admin, Finance đọc mọi ca; thuê bao không có phòng sở hữu, `QĐ-113g`; trưởng phòng không đọc); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; `subscription-renewal-ranking.policy.ts`
   còn cho route `seat-ranking` (deprecated). Ghi kết quả không tạo khoản cam kết ngân sách (`QĐ-62s`). Cột JSON
   `subscription_renewals.decision_snapshot` đi qua codec `subscription-renewal-decision-snapshot.json.ts` (spec cạnh file).
 - Gốc module (dùng chung nhiều capability): `licensing-audit-event.mapper.ts`, `licensing.http-errors.ts`;
@@ -213,7 +212,7 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   (`public/seat-month-cost.policy.ts`: RV-07, M-10). `LicensingApi.listRightChainsOf` (`RightChain`) trả cùng hai ngày cho điều chuyển, và kết quả cấp (`GrantOutcomeFacts`) mang
   `effectiveFrom` và `expectedEndDate` của seat đã cấp (sau khi cắt một năm): Request có _Thời gian dùng_ không ghi ngày kết thúc, nên ngày cuối nó trả tiền là ngày kết thúc của seat do lệnh cấp làm
   ra, và các tháng của nó bắt đầu vào các ngày tính từ ngày bắt đầu seat (R-39). Phần ghi vào cam kết thuộc `requests` (`grant/seat-release.*`).
-- Thứ tự khóa của grant: request → thuê bao `FOR UPDATE` → plan `FOR SHARE` → người; đếm `free` không khóa thuê bao khác của plan.
+- Thứ tự khóa của grant: `employee` `FOR SHARE` (ghế cá nhân) → tác vụ thu hồi sống của quyền bị thay (nếu có) → request → thuê bao `FOR UPDATE` → plan `FOR SHARE` → assignment; đếm `free` không khóa thuê bao khác của plan. Khi cấp lại quyền trong ân hạn điều chuyển mà tác vụ thu hồi `QUEUED` chỉ mang lý do `TRANSFER`, `ProvisioningReplacementService` rút lý do để hủy tác vụ trước khi kết thúc quyền cũ; còn lý do khác hoặc tác vụ `IN_PROGRESS`/`FAILED`/`COMPLETED` thì từ chối `422 LICENSE_ASSIGNMENT.OVERLAP` kèm `details.revocationTaskId` và `revocationStatus`.
 
 ## Bất biến quan trọng
 

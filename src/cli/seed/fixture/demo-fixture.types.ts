@@ -36,6 +36,12 @@ export interface DemoPerson {
   contractEndInDays?: number;
   /** The dataset locks this person's account (`org.account-states`): the later runs do not check that account against its spec (C-1). */
   lockedInDemo?: true;
+  /**
+   * The person is entered with no department and then placed for the first time (`QĐ-93g(3)`) in this department from a day in the FUTURE
+   * (`effectiveInDays` from today), so the placement has not taken effect yet and the Super Admin can still correct it (`QĐ-113e`). With it,
+   * `department` is null (the person is in no department today).
+   */
+  firstPlacement?: { department: string; effectiveInDays: number };
 }
 
 /** A line of a people file the Super Admin imports (`SBF-01a`): the department is a code that may be wrong on purpose. */
@@ -75,6 +81,11 @@ export interface DemoPlan {
   vendorAdmin?: string;
   /** The workspace profile names no company account that owns the workspace: the subscription carries the flag `ownerAccountEmailMissing` (`QĐ-110u`). */
   withoutOwnerAccountEmail?: true;
+  /**
+   * The reference price of a paid plan in dong before tax (`QĐ-113a`): K1/K2 one seat for one month (a yearly price over 12, rounded up), K4 one purchase.
+   * Written by `withReferencePrices` from the subscription of the plan, or by hand for a plan with no subscription; K5 has none.
+   */
+  referencePrice?: string;
 }
 
 export interface DemoApplication {
@@ -117,8 +128,6 @@ export interface DemoSubscription {
   responsible: string;
   /** Seats bought on top of the baseline ones: the free seats of the pool the demo can grant from. */
   freeAfterBaseline: number;
-  /** A K1 purchase must name the department it is bought for (`SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE` otherwise); the other plans name none. */
-  ownerDepartment?: string;
   /** Seats bought when no baseline file gives the number (K1, K4, K5). */
   quantity?: number;
 }
@@ -154,7 +163,9 @@ export interface DemoSeat {
 /**
  * The budget cycle of a year (`QĐ-111z`): the annual ceiling of the software budget and the shared-pool reserve (there is no ceiling per
  * department any more). The submission deadline is `submissionOffsetDays` after the day the seed runs (0 = that very day: the cycle is open
- * on that day and locked from the next); the decision deadline `decisionOffsetDays` after it. `open: false` leaves the cycle a draft.
+ * on that day, so the heads send their `BM-10`); once a version of the year is to be sent the seed moves the deadline to the day before the seed and leaves it
+ * there, as the cycle of a year with versions is locked (`QĐ-111z`). The decision deadline is `decisionOffsetDays` after the day of the seed. `open: false`
+ * leaves the cycle a draft.
  */
 export interface DemoCycle {
   annualCeiling: string;
@@ -193,6 +204,8 @@ export interface DemoBudgetLine {
 /** Where the budget of the next year of a department is left for the demo to carry on from. */
 export interface DemoNextYear {
   department: string;
+  /** The budget is the one of the year after the next, whose cycle is open (the next year's cycle is locked, with its versions sent); absent: the next year. */
+  afterNext?: true;
   /** The amount the head asks in `BM-10`. */
   requestedAmount: string;
   note?: string;
@@ -212,6 +225,8 @@ export type DemoRequestTarget =
   | 'WAITING_CONTROLLED'
   | 'REJECTED'
   | 'WITHDRAWN'
+  /** Sent back by the head to add what is missing (`Trả về bổ sung`), then withdrawn by the requester (`QĐ-113d`). */
+  | 'WITHDRAWN_AFTER_RETURN'
   | 'AWAITING_SPEND_SUBMISSION'
   | 'AWAITING_SPEND_DECISION'
   | 'AWAITING_EXECUTION'
@@ -223,7 +238,6 @@ export type DemoRequestTarget =
   | 'IT_REJECTED'
   | 'EXECUTING'
   | 'FAILED'
-  | 'AWAITING_IT_CLOSE'
   /** Where a request is that a job may cancel later (the head of its sender is blocked): both are the end of the scenario. */
   | 'PENDING_OR_CANCELLED';
 
@@ -271,7 +285,10 @@ export interface DemoRequestScenario {
   grant?: 'POOL' | 'PURCHASE' | 'KEY';
   /** The IT Admin does the grant (default: the one in charge of the requester's department). */
   grantedBy?: string;
+  /** A note for the developer (README, report, step title); never sent to the API. */
   summary: string;
+  /** The business reason the requester writes: what the work is for, as a real person would say it. Sent as `businessReason` (or `purpose` of a proposal). */
+  reason: string;
 }
 
 /** A holder's SaaS report and the point in its handling where the demo leaves it. */
@@ -426,13 +443,13 @@ export interface DemoFixture {
     group: 'T2' | 'T3';
     lines: { taxType: string; ratePercent: string; deductible: boolean }[];
   }[];
-  /** The budget cycle of the year, then of the next one, each opened before any proposal (`QĐ-111z`); the year after stays a draft. */
+  /** The budget cycle of the year, of the next one and of the year after, each opened before any proposal (`QĐ-111z`). */
   cycle: DemoCycle;
   nextCycle: DemoCycle;
-  draftCycle: DemoCycle;
+  afterNextCycle: DemoCycle;
   /** The approved budgets of the year, one per department with a Cost Center. */
   budgets: DemoBudget[];
-  /** The budgets of the next year, each left at the stage a demo carries on from. */
+  /** The budgets of the next year and of the one after, each left at the stage a demo carries on from. */
   nextYear: DemoNextYear[];
   /** The lines of the `BM-10` file of each department (by code), this year and next; what they leave short of the amount asked is one balancing line. */
   budgetLines: Record<string, DemoBudgetLine[]>;

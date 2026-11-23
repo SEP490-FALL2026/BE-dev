@@ -3,6 +3,7 @@ import { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../../audit/public/audit.api';
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
+import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { EmployeeRecord } from '../../../organization/public/organization.types';
 import { accountAuditEvent } from './account-administration.policy';
 import { ActionLinkRevocation } from '../action-link-revocation.service';
@@ -20,6 +21,7 @@ export class InvitationMailService {
     private readonly revocation: ActionLinkRevocation,
     private readonly notifications: NotificationsApi,
     private readonly audit: AuditApi,
+    private readonly organizations: OrganizationReadApi,
   ) {}
 
   async send(
@@ -37,13 +39,20 @@ export class InvitationMailService {
       'INVITATION',
       now,
     );
+    // The mail shows the expiry in the time zone of the organization, read in this transaction.
+    const organization = await this.organizations.getOrganization(tx);
     await this.notifications.enqueueEmail(tx, {
       organizationId,
       recipient,
       template: 'ACCOUNT_INVITATION',
       locale: 'vi',
       actionTokenHash: issued.hash,
-      payload: { token: issued.token, expiresAt: issued.expiresAt.toISOString(), fullName: employee.fullName },
+      payload: {
+        token: issued.token,
+        expiresAt: issued.expiresAt.toISOString(),
+        timeZone: organization?.timeZone,
+        fullName: employee.fullName,
+      },
     });
     await this.audit.record(
       tx,

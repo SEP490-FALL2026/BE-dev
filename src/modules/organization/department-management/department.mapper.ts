@@ -18,6 +18,8 @@ export function toDepartmentWire(view: DepartmentView) {
           usable: view.itAdminUsable,
         }
       : null,
+    avatarUrl: view.avatarUrl,
+    starting: view.starting,
     head: view.head,
     memberCount: view.memberCount,
     warnings: view.warnings,

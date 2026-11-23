@@ -94,6 +94,7 @@ export class RequestPreviewService {
       canSubmit: canSubmitOf(assessed, blockedBy, limits),
       budgetYear: pricing.budgetYear,
       pricing: priceView,
+      priceSource: pricing.status === 'PRICED' ? (pricing.priceSource ?? null) : null,
       cost: await this.pricing.costView(
         pricing,
         pricing.budgetYear === null ? null : costTermOf(assessed.term, pricing.budgetYear, pricing.amountMonths),

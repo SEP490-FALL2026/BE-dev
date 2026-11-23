@@ -14,7 +14,7 @@ const k1 = (key: string, name: string, controlLevel: NonNullable<DemoPlan['contr
 });
 
 /*
- * Twelve more applications and eighteen plans of real SaaS (Q3): the names are the vendors' own, the prices (in `SUBSCRIPTIONS`) are simulated
+ * Twelve more applications and nineteen plans of real SaaS (Q3): the names are the vendors' own, the prices (in `SUBSCRIPTIONS`) are simulated
  * and near the list price. They bring what the first thirteen lacked: monthly and annual plans, a third level of control (GitHub Copilot, which
  * the company cannot control), a K4 plan with an admin console that may be shared (Visio) and one without (Sublime), a plan that loses data when
  * a user is removed (Adobe), a workspace with no company account (Notion Business), a plan with no subscription at all (Skype, retired in S21)
@@ -54,7 +54,12 @@ export const EXTRA_APPLICATIONS: DemoApplication[] = [
     'claude',
     'Claude',
     'Anthropic',
-    [k1('claude-pro', 'Claude Pro', 'PARTIAL'), k2('claude-team', 'Claude Team')],
+    [
+      k1('claude-pro', 'Claude Pro', 'PARTIAL'),
+      // QĐ-113b: the vendor sells Claude Team in two kinds of seat, so each kind is a plan of its own and a workspace of its own.
+      k2('claude-team-standard', 'Claude Team Standard'),
+      k2('claude-team-premium', 'Claude Team Premium'),
+    ],
     'SAAS',
     'HIGH',
   ),
@@ -118,7 +123,6 @@ const byMonth = (
 const k1Subscription = (key: string, amount: string, dollars: string): DemoSubscription => ({
   ...monthly(key, key, amount, 'NV-ITA1', 0),
   quantity: 0,
-  ownerDepartment: 'ENG',
   originalPrice: { amount: dollars, currency: 'USD' },
 });
 
@@ -136,11 +140,11 @@ const perpetual = (key: string, amount: string, quantity: number): DemoSubscript
 });
 
 /*
- * Sixteen subscriptions, one per plan but Skype (retired in S21) and the internal attendance plan. Their payment and renewal days are counted
+ * Seventeen subscriptions, one per plan but Skype (retired in S21) and the internal attendance plan. Their payment and renewal days are counted
  * from the day of the seed (SPEC 4.5) so that on that day and the next, some stand inside the window of SBF-20 and some outside it:
  * Zoom Pro, Confluence Standard and HubSpot are inside (monthly); Notion Plus, Confluence Premium (a declared deadline) and Adobe (red: its
  * deadline is in 5 days) are inside (annual); Microsoft 365, Notion Business and Photoshop are outside. Zoom Business's renewal day has passed
- * with the automatic renewal on, which the daily job records as an incident (§8). Claude Team has no date at all.
+ * with the automatic renewal on, which the daily job records as an incident (§8). The two Claude Team subscriptions have no date at all.
  */
 export const EXTRA_SUBSCRIPTIONS: DemoSubscription[] = [
   byMonth('m365-basic', '150000', 'NV-ITA1', 5, 20),
@@ -154,7 +158,9 @@ export const EXTRA_SUBSCRIPTIONS: DemoSubscription[] = [
   annual('adobe-cc-teams', '22000000', 'NV-ITA2', 3, { renewalInDays: 35 }),
   byMonth('adobe-photoshop', '560000', 'NV-ITA2', 2, 25),
   k1Subscription('claude-pro', '508000', '20'),
-  annual('claude-team', '7500000', 'NV-ITA1', 3, { withoutDates: true }),
+  // QĐ-113b: two workspaces, two subscriptions, each with its own price: a Standard seat is 500.000 a month billed by the year, a Premium one 2.500.000.
+  annual('claude-team-standard', '6000000', 'NV-ITA1', 2, { withoutDates: true }),
+  annual('claude-team-premium', '30000000', 'NV-ITA1', 1, { withoutDates: true }),
   k1Subscription('copilot-pro', '254000', '10'),
   perpetual('visio-pro', '13000000', 3),
   perpetual('sublime-license', '2500000', 2),
@@ -189,12 +195,12 @@ export const PLAN_TERMS: DemoPlanTerms[] = [
       note: 'Mỗi khóa cài tối đa trên hai máy của cùng một người dùng (văn bản mô phỏng).',
     },
   },
-  {
-    plan: 'claude-team',
+  ...['claude-team-standard', 'claude-team-premium'].map((plan) => ({
+    plan,
     termsUrl: 'https://www.anthropic.com',
     lastReviewedDaysAgo: 20,
     aiTraining: 'Không dùng dữ liệu khách hàng để huấn luyện (văn bản mô phỏng).',
-  },
+  })),
 ];
 
 const seatsOf = (subscription: string, holders: string[], extra: Partial<DemoSeat> = {}): DemoSeat[] =>
@@ -233,8 +239,9 @@ export const EXTRA_SEATS: DemoSeat[] = [
   ...seatsOf('adobe-cc-teams', ['NV-BOD5'], { grantedDaysAgo: 300 }),
   ...seatsOf('adobe-cc-teams', ['NV-BOD4', 'NV-BOD6'], { grantedDaysAgo: 240 }),
   ...seatsOf('adobe-photoshop', ['NV-BOD2'], { grantedDaysAgo: 120 }),
-  ...seatsOf('claude-team', ['NV-DEV5'], { grantedDaysAgo: 180 }),
-  ...seatsOf('claude-team', ['NV-DEV6', 'NV-ITO1'], { grantedDaysAgo: 120 }),
+  // The three seats of Claude Team are split between the two workspaces: no person is in both (QĐ-113b).
+  ...seatsOf('claude-team-premium', ['NV-DEV5'], { grantedDaysAgo: 180 }),
+  ...seatsOf('claude-team-standard', ['NV-DEV6', 'NV-ITO1'], { grantedDaysAgo: 120 }),
   ...seatsOf('hubspot-starter', ['NV-SALH']),
   ...seatsOf('hubspot-starter', ['NV-SAL3', 'NV-SAL4'], { grantedDaysAgo: 120 }),
 ];

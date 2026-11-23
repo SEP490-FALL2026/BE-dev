@@ -67,8 +67,7 @@ export function pointOf(
 /**
  * What the request is judged by before the seats are counted, in the order the route answers (`SBF-20` §4.4 steps 2, 4 and 5): the subscription
  * has a point (`NOT_RENEWABLE` with its reason, then `CONTRACT_DATA_INCOMPLETE` when no date gives one), the point has come (a result is recorded
- * after the renewal day too: a late renewal, `QĐ-98e`), and the quantity fits the choice. Anybody who is an IT Admin records: who answers for the
- * subscription is no check (`QĐ-58b`, step 3).
+ * after the renewal day too: a late renewal, `QĐ-98e`), and the quantity fits the choice.
  */
 export function preflightOf(input: {
   period: RenewalPeriodFacts;

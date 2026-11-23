@@ -48,7 +48,8 @@ const LINK_NOT_FOUND = {
 
 const REFUSED_STATE =
   'The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE)';
-const TAKEN_NUMBER = 'the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN)';
+const TAKEN_NUMBER =
+  'the vendor has an invoice with this number that was not returned, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN)';
 const NO_PLACE =
   'the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE)';
 const NOT_PURCHASABLE_OR_NO_PLACE = {
@@ -159,7 +160,7 @@ export class PurchaseInvoicesController {
     status: HttpStatus.CREATED,
     message: 'PURCHASE_INVOICE.SUBMITTED',
     description:
-      'The invoice is kept as it was read against its request or subscription, with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.',
+      'The invoice is kept as it was read against its request or subscription (any IT Admin may submit the invoice of a subscription period, as it has no owning department; one for a request is submitted by the IT Admin of the department of the request), with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.',
   })
   @ApiErrorResponses(...SUBMIT_ERRORS)
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: PurchaseInvoiceSubmitBodyDto) {

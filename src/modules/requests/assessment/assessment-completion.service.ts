@@ -114,9 +114,7 @@ export class AssessmentCompletionService {
 
   /** Nobody sends it on when the fallback approver or the spending approver decided its need (`US-06-14` AC-8). */
   private async enterSpend(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string): Promise<AccessRequestRecord> {
-    const priced = await this.requests.findById(requestId, tx);
-    if (!priced) throw new Error(`The request ${requestId} was not found after its assessment was completed.`);
-    if (priced.routing?.mode === 'ONE_STEP') await this.entry.route(tx, actor, priced, 'SUBMISSION', new Date());
+    await this.entry.enterAfterAssessment(tx, actor, requestId, new Date());
     const record = await this.requests.findById(requestId, tx);
     if (!record) throw new Error(`The request ${requestId} was not found after its assessment was completed.`);
 

@@ -126,7 +126,7 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
       await h.ctx.sql.query(`UPDATE subscriptions SET billing_cycle = 'QUARTERLY' WHERE id = $1`, [old.id]);
 
       const read = dataOf<PoolWire>(await get(old.id).expect(200));
-      const changed = dataOf<PoolWire>(await patch(old.id, { purchasedQuantity: 6 }).expect(200));
+      const changed = dataOf<PoolWire>(await h.changeSeats(old.id, { purchasedQuantity: 6 }));
       const refused = await patch(old.id, { billingCycle: 'OTHER' }).expect(422);
 
       expect(read).toMatchObject({ billingCycle: 'QUARTERLY', warnings: ['BILLING_CYCLE_LEGACY'] });
@@ -291,13 +291,13 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
         expect(draft).toMatchObject({ status: 'DRAFT', missing: ['QUANTITY'] });
         await revokeRole();
         try {
-          expect(codeOf(await patch(draft.id, { purchasedQuantity: 6 }).expect(422))).toBe(
+          expect(codeOf(await h.changeSeats(draft.id, { purchasedQuantity: 6 }, 422))).toBe(
             'SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN',
           );
         } finally {
           await restore();
         }
-        expect(dataOf<PoolWire>(await patch(draft.id, { purchasedQuantity: 6 }).expect(200)).status).toBe('ACTIVE');
+        expect(dataOf<PoolWire>(await h.changeSeats(draft.id, { purchasedQuantity: 6 })).status).toBe('ACTIVE');
       });
 
       it('lets the person who answers be changed alone on an old K1 subscription whose cycle is no longer accepted (F-009)', async () => {
@@ -327,7 +327,7 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
       await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = NULL WHERE id = $1`, [old.id]);
 
       const read = dataOf<PoolWire>(await get(old.id).expect(200));
-      const changed = dataOf<PoolWire>(await patch(old.id, { purchasedQuantity: 7 }).expect(200));
+      const changed = dataOf<PoolWire>(await h.changeSeats(old.id, { purchasedQuantity: 7 }));
 
       expect(read).toMatchObject({ responsibleItAdminEmployeeId: null, warnings: ['RESPONSIBLE_MISSING'] });
       expect(changed).toMatchObject({ purchasedQuantity: 7, warnings: ['RESPONSIBLE_MISSING'] });
@@ -403,9 +403,9 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
       const draft = dataOf<PoolWire>(await create({ planId, kind: 'TERM' }).expect(201));
       // A period that continues `first`, written the way a renewal writes it: the link is set when the row is made.
       await h.ctx.sql.query(
-        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, owner_department_id, renewed_from_id, start_date, updated_at)
-         VALUES (gen_random_uuid(), $1, $2, 'TERM', $3, $4, '2027-03-15', now())`,
-        [h.seed.organizationId, planId, h.seed.departmentId, first.id],
+        `INSERT INTO subscriptions (id, organization_id, plan_id, kind, renewed_from_id, start_date, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, 'TERM', $3, '2027-03-15', now())`,
+        [h.seed.organizationId, planId, first.id],
       );
 
       const notActive = await patch(draft.id, { isPrimaryForPlan: true }).expect(422);

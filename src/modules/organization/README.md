@@ -20,7 +20,7 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
       `getCompanyEmailDomains`, `countUnmarkedChangesAsOf` (cho `ops:inspect`).
     - Phòng ban: `getDepartmentBrief(s)`, `getActiveDepartmentIds`, `lockDepartmentShared`, `lockDepartmentForEntry`, `getDepartmentMemberIds`,
       `getMemberIdsOfDepartments` (thành viên của nhiều phòng trong một câu lệnh),
-      `getDepartmentHeads`, `getHeadedDepartment`, `isDepartmentHead`, `departmentsWithoutHead`; IT Admin phụ trách:
+      `getDepartmentHeads`, `getHeadedDepartment(…, tx?)`, `isDepartmentHead(…, tx?)`, `departmentsWithoutHead`; IT Admin phụ trách:
       `getItAdminInCharge`, `getItAdminInChargeOfDepartment`, `getItAdminScope`, `getDepartmentIdsInChargeOf`.
     - Nhân viên: `getEmployee`, `getEmployeeByCode`, `getEmployeesByCodes`, `getEmployeesByWorkEmails` (theo email công việc đã chuẩn hóa, gồm
       người đã nghỉ; chỉ mã NV + email, không họ tên — usage nhà cung cấp khớp danh tính), `getEmployees`, `getEmployeePlacement`,
@@ -55,8 +55,7 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
 - Mở ([public/organization.extension-points.ts](public/organization.extension-points.ts)), bên đăng ký `*.listener.ts`:
   - `OrganizationChangeListeners` (`organization.change-listeners`) — organization `department/held-notice-handover`;
     budgets `proposal/budget-head-change`; personnel `transfer/transfer-effective`; requests `reassignment/organization-change`.
-  - `DepartmentUseContributions` (`organization.department-use-readers`) — catalog
-    `subscription/subscription-department-use`; licensing `provisioning/department-use/department-open-work`; personnel
+  - `DepartmentUseContributions` (`organization.department-use-readers`) — licensing `provisioning/department-use/department-open-work`; personnel
     `event-notice/department-open-work`; requests `access-request/open-request/department-open-requests`.
   - `CostCenterUseContributions` (`organization.cost-center-use-readers`) — budgets
     `commitment/budget-cost-center-use`; requests `access-request/open-request/cost-center-open-requests`.
@@ -113,17 +112,19 @@ Từ vựng trạng thái nhân viên (`EmployeeStatus`, `EmployeeWorkState`, `E
 - Một người đã có placement thì luôn còn ít nhất một (trigger `employee_placements_keep_one`, `BEFORE DELETE`, khóa nhân viên rồi
   đếm, `23001`); người chưa xếp phòng là người không có dòng placement nào. Ngoại lệ duy nhất (`D-S17`, `D-S28`): placement cuối có
   `valid_from` sau hôm nay mà một hồ sơ nghỉ việc chưa hủy nêu trong `cancelled_placement_id` (nghỉ việc trước ngày xếp phòng).
-  Xếp phòng lần đầu: `POST /employees/{id}/first-placements` (`EmployeeFirstPlacementService`); đọc người chưa xếp phòng qua
+  Xếp phòng lần đầu: `POST /employees/{id}/first-placements` (`EmployeeFirstPlacementService`); sửa lần xếp phòng đầu: `PATCH /employees/{id}/first-placement` (`EmployeeFirstPlacementCorrectionService`, `QĐ-113e`, mục dưới); đọc người chưa xếp phòng qua
   `OrganizationReadApi.unplacedAmong`, lần xếp phòng chưa hiệu lực qua `getScheduledFirstPlacement`; người đang bàn giao bị từ
   chối `EMPLOYEE.EMPLOYEE_LEAVING`.
 - Ngày hiệu lực của phòng (`departments.effective_from`, `QĐ-104e(3)`): phòng chỉ được tạo (API) khi kỳ ngân sách năm sau tồn tại và chưa từng phát hành (hook trên); khi đó hiệu lực 01/01 năm sau. Kỳ năm hiện tại không mở cửa sổ (giữa năm không tạo phòng); chưa có kỳ nào (cài đặt) thì hiệu lực hôm nay, đường cài đặt truyền ngày theo múi giờ tổ chức. Phòng chưa hiệu lực không nhận người (xếp lần đầu, transfer ghi mới và dời ngày: 422 `DEPARTMENT.NOT_YET_EFFECTIVE` / `DEPARTMENT_TRANSFER.DEPARTMENT_NOT_YET_EFFECTIVE`; nhập tay và import báo phòng không nhận người), trưởng phòng bắt đầu đúng ngày hiệu lực; tập phòng chia Trần của một năm chỉ gồm phòng hiệu lực trong năm đó. **Rủi ro (Q-14):** Finance chậm mở/phát hành kỳ năm sau thì cửa sổ tạo phòng mở lâu; chưa có kỳ nào thì tạo phòng không bị chặn (race với lần mở kỳ đầu chỉ ở lúc khởi tạo, Finance vẫn phải chia Trần nên không lọt). Cột có `DEFAULT CURRENT_DATE` chỉ cho SQL thuần; ứng dụng luôn ghi ngày tường minh.
+- Sửa lần xếp phòng đầu (`QĐ-113e`): `PATCH /employees/{id}/first-placement` (Super Admin, không sửa hồ sơ chính mình; body `{ departmentId?, effectiveFrom?, reason }`, cần ít nhất một trong hai trường). Chỉ khi nhân viên ACTIVE, có **đúng một** placement, `valid_from` > hôm nay (ngày nghiệp vụ tổ chức) và chưa có gì tham chiếu: Request (người yêu cầu hoặc thụ hưởng, kể cả nháp) và điều chuyển/nghỉ việc qua `FirstPlacementUseContributions` (requests, personnel bổ sung khi khởi động), giai đoạn trưởng phòng/kế nhiệm do organization tự đọc (`FirstPlacementUseService`). Mã 409: `EMPLOYEE.NOT_PLACED`, `EMPLOYEE.FIRST_PLACEMENT_ALREADY_EFFECTIVE`, `EMPLOYEE.FIRST_PLACEMENT_IN_USE` (`details.usedBy`), `EMPLOYEE.EMPLOYEE_INACTIVE/LEAVING`; giá trị mới kiểm như xếp phòng lần đầu (`firstPlacementProblem`, phòng mới ACTIVE và hiệu lực tới ngày đó; chỉ đổi ngày thì phòng hiện tại đã ngừng vẫn được). `FirstPlacementUseService` fail closed: thiếu contributor `requests.requests-of-person` hoặc `personnel.transfers-and-departures` thì ném `FirstPlacementUseReaderMissingError` (500). Trigger từ chối (`55000`) lúc UPDATE → 409 `EMPLOYEE.FIRST_PLACEMENT_ALREADY_EFFECTIVE`. Đổi tại chỗ `department_id`/`valid_from` (một UPDATE, giữ id placement); migration `20261118120000_first_placement_correction` chỉ nới `employee_placements_keep_history` cho placement duy nhất, chưa hiệu lực, chưa có thông báo `PLACEMENT_START`, chưa có điều chuyển; `keep_one` không đổi. Audit `EMPLOYEE.FIRST_PLACEMENT_CORRECTED` (trước/sau, lý do); đổi phòng gửi tin _có người mới_ cho trưởng phòng và IT Admin phụ trách phòng mới, đổi ngày không gửi.
+- Ảnh đại diện phòng (`QĐ-113c`): `PUT/DELETE /departments/{id}/avatar` (Super Admin, phòng ACTIVE; multipart field `file`, png/jpeg/webp ≤ 1 MiB theo chữ ký file, kiểm ở `infrastructure/object-storage/picture-image.ts` dùng chung với ảnh nhân viên). Cột `departments.avatar_object_key/content_type/updated_at` (cùng có hoặc cùng null). Ghi object trước, đổi cột + audit `DEPARTMENT.AVATAR_CHANGED/REMOVED` trong một giao dịch, xóa object cũ **sau commit** (lỗi xóa chỉ log, không có bảng purge: organization không ghi `AvatarPurge` của identity-access). Mọi response phòng có `avatarUrl` (link ký 15 phút hoặc null); phòng ngừng hoạt động giữ ảnh nhưng không đổi được. **Giới hạn đã biết (D-1):** object mồ côi trên R2 (process chết giữa lúc ghi object và commit, hoặc xóa object cũ/mới thất bại — chỉ log) không có bảng purge để dọn; chấp nhận vì mỗi phòng một ảnh, dọn tay theo log khi cần. Upload đọc phòng (không khóa) trước khi ghi object để không ghi cho phòng không có hoặc đã ngừng; kiểm có khóa trong giao dịch vẫn quyết định.
 - INV-19: mỗi ngày một phòng có tối đa một trưởng, một người là trưởng tối đa một phòng (EXCLUDE trên
   `department_head_periods`); INV-20: trưởng thuộc phòng suốt kỳ (trigger `department_head_requires_membership`).
 - Thứ tự khóa: các phòng theo id, rồi nhân viên (`OrganizationHistoryApi.lockDepartments`).
 - Mỗi thay đổi báo đúng một lần (`@@unique([kind, subjectId])` của `organization_change_announcements`); listener ném
   lỗi thì thay đổi rollback theo.
-- Không xóa phòng ban, Cost Center, chỉ ngừng; ngừng phòng bị từ chối khi còn thành viên, service account, việc mở hoặc
-  subscription (`DepartmentInUseError`); nhóm "đang dùng" không có reader nào → `UseReaderMissingError`.
+- Không xóa phòng ban, Cost Center, chỉ ngừng; ngừng phòng bị từ chối khi còn thành viên, service account, hoặc việc mở
+  (`DepartmentInUseError`); thuê bao không có phòng đứng tên nên không chặn (`QĐ-113g`); nhóm "đang dùng" không có reader nào → `UseReaderMissingError`.
 
 ## Test
 

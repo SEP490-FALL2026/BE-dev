@@ -28,9 +28,9 @@ export class RevocationTaskFactory {
     },
   ): Promise<ProvisioningTaskRecord> {
     const today = await this.organizationReads.businessToday(input.now, tx);
-    const inCharge = await this.organizationReads.getItAdminInCharge(input.assignment.employeeId, today);
+    const inCharge = await this.organizationReads.getItAdminInCharge(input.assignment.employeeId, today, tx);
     // The most tries are fixed here, as for a grant: a parameter changed later reaches only the tasks made after it.
-    const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT')));
+    const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT', tx)));
 
     return this.tasks.insertRevocation(tx, {
       organizationId: input.organizationId,

@@ -25,14 +25,6 @@ describe('MF-5 thuê bao kho không có phòng sở hữu, phòng không có tr�
 
   it('thuê bao kho không có phòng sở hữu; trưởng phòng nghỉ, IT phụ trách ghi kết quả một lần, hồ sơ không chờ ai, Finance được báo #9 @B5', async () => {
     const subscriptionId = await call().subscriptionOf('Figma Professional');
-    expect(
-      (
-        await world.facts.one<{ owner_department_id: string | null }>(
-          `SELECT owner_department_id FROM subscriptions WHERE id = $1`,
-          [subscriptionId],
-        )
-      ).owner_department_id,
-    ).toBeNull();
 
     // The head of Design (the department of the IT Admin in charge of Figma) leaves; the Super Admin leaves the department without a head
     // (a head who leaves needs a successor, `QĐ-110h`).

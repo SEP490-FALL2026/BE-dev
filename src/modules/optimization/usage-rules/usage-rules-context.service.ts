@@ -132,7 +132,7 @@ export class UsageRulesContextService {
   }
 
   private async priceOf(planId: string): Promise<Price> {
-    const priced = await this.catalog.getPlanPrice(planId);
+    const priced = await this.catalog.getSubscriptionPlanPrice(planId);
     if (!priced || priced.kind !== 'RECURRING') return null;
 
     return {

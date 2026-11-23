@@ -87,7 +87,7 @@ export class NoticeService {
     const target = input.targetDepartmentId
       ? await this.organizationReads.getDepartmentBrief(input.targetDepartmentId, tx)
       : null;
-    const senderHead = await this.organizationReads.getHeadedDepartment(actor.employeeId, today);
+    const senderHead = await this.organizationReads.getHeadedDepartment(actor.employeeId, today, tx);
     const refusal = sendRefusal({
       kind: input.kind,
       senderEmployeeId: actor.employeeId,

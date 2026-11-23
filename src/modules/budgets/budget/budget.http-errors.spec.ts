@@ -3,6 +3,8 @@ import { Prisma } from '../../../generated/prisma/client';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import {
+  BudgetCycleNotLockedError,
+  BudgetCycleReserveOverCeilingError,
   BudgetNotAHistoryReaderError,
   BudgetNotFinanceError,
   BudgetProposalOpenError,
@@ -188,5 +190,18 @@ describe('toBudgetApiException: the answers of the budget lifecycle (F27, F37, F
     });
     expect(answer(new BudgetNotAHistoryReaderError()).status).toBe(HttpStatus.FORBIDDEN);
     expect((answer(new BudgetNotAHistoryReaderError()).body as { code: string }).code).toBe('AUTHORIZATION.FORBIDDEN');
+  });
+
+  it('maps BudgetCycleReserveOverCeilingError to 422 BUDGET_CYCLE.RESERVE_OVER_CEILING and BudgetCycleNotLockedError to 409 BUDGET_CYCLE.NOT_LOCKED', () => {
+    const reserveOver = answer(new BudgetCycleReserveOverCeilingError());
+    expect(reserveOver.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+    expect((reserveOver.body as { code: string }).code).toBe('BUDGET_CYCLE.RESERVE_OVER_CEILING');
+
+    const notLocked = answer(new BudgetCycleNotLockedError(2027));
+    expect(notLocked.status).toBe(HttpStatus.CONFLICT);
+    expect(notLocked.body).toMatchObject({
+      code: 'BUDGET_CYCLE.NOT_LOCKED',
+      details: { year: 2027 },
+    });
   });
 });

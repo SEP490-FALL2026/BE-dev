@@ -37,12 +37,18 @@ const seat = (validUntil: string | null): GrantedSeatOfRequest => ({
 });
 
 /** The batch over stand-ins: the request it locks, its seat, the price of 01/01 and the Cost Center; returns what it held. */
-async function held(request: YearStartCandidate, validUntil: string | null): Promise<object[]> {
+async function held(
+  request: YearStartCandidate,
+  validUntil: string | null,
+  options: { pass?: YearStartPassContext; keptPerpetual?: Map<string, Map<string, bigint>>; employeeId?: string } = {},
+): Promise<object[]> {
   const repo = {
     lockBatch: jest.fn().mockResolvedValue([request]),
     unclaimedSeats: jest.fn().mockResolvedValue(new Map()),
     keptNextYearOfLines: jest.fn().mockResolvedValue(new Map()),
+    keptPerpetualLines: jest.fn().mockResolvedValue(options.keptPerpetual ?? new Map()),
     foreignKeptNextYearOfLines: jest.fn().mockResolvedValue([]),
+    foreignKeptPerpetualLines: jest.fn().mockResolvedValue([]),
     renewalSuccessors: jest.fn().mockResolvedValue([]),
     renewalsThatBegan: jest.fn().mockResolvedValue(new Map()),
   };
@@ -56,7 +62,12 @@ async function held(request: YearStartCandidate, validUntil: string | null): Pro
     getPlanRevocationInfo: jest.fn().mockResolvedValue([{ planId: 'plan-1', provisioningType: 'K2' }]),
     getPlanPrice: jest.fn().mockResolvedValue(PRICE),
   };
-  const grants = { listHeldSeatsOfRequests: jest.fn().mockResolvedValue([seat(validUntil)]) };
+  const baseSeat = {
+    ...seat(validUntil),
+    employeeId: options.employeeId ?? 'e-1',
+    expectedEndDate: request.termMonths === null ? null : '2027-08-14',
+  };
+  const grants = { listHeldSeatsOfRequests: jest.fn().mockResolvedValue([baseSeat]) };
   const organization = {
     getUnitCostCenterIds: jest.fn((ids: string[]) => Promise.resolve(new Map(ids.map((id) => [id, `cc-${id}`])))),
   };
@@ -69,7 +80,7 @@ async function held(request: YearStartCandidate, validUntil: string | null): Pro
     { record: jest.fn().mockResolvedValue(undefined) } as never,
   );
 
-  await service.commitBatch(tx as never, PASS, null);
+  await service.commitBatch(tx as never, options.pass ?? PASS, null);
 
   return (budgets.holdYearStart.mock.calls[0]?.[1] as { items: object[] } | undefined)?.items ?? [];
 }
@@ -95,5 +106,38 @@ describe('YearStartCommitmentsBatchService: a seat that closes before the term i
     const dollars = candidate({ amountCurrency: 'USD', nextYearAmountMinor: 14_000n, unitPriceMinor: 2_000n });
 
     expect(await held(dollars, '2027-04-01')).toEqual([expect.objectContaining({ amountMinor: 3n * 650_000n })]);
+  });
+
+  it('keeps non-term-limited approval price and amount across year 2 and on early closure without unitPriceMinor', async () => {
+    const perpetual = candidate({
+      termMonths: null,
+      budgetYear: 2026,
+      nextYearAmountMinor: 1_200_000n,
+      unitPriceMinor: null,
+      billingCycle: null,
+    });
+    const year2: YearStartPassContext = { organizationId: 'org-1', year: 2028, now: new Date(), today: '2028-01-05' };
+
+    expect(await held(perpetual, null, { pass: year2 })).toEqual([
+      expect.objectContaining({ requestId: 'r-1', amountMinor: 1_200_000n, seatMonthlyMinor: 100_000n }),
+    ]);
+    expect(await held(perpetual, '2027-04-01')).toEqual([
+      expect.objectContaining({ requestId: 'r-1', amountMinor: 300_000n, seatMonthlyMinor: 100_000n }),
+    ]);
+
+    const perpetualGroup = candidate({
+      type: 'GROUP_GRANT',
+      termMonths: null,
+      budgetYear: 2026,
+      nextYearAmountMinor: 1_200_000n,
+      unitPriceMinor: null,
+      billingCycle: null,
+    });
+    expect(
+      await held(perpetualGroup, null, {
+        pass: year2,
+        keptPerpetual: new Map([['r-1', new Map([['e-1', 1_200_000n]])]]),
+      }),
+    ).toEqual([expect.objectContaining({ requestId: 'r-1', amountMinor: 1_200_000n, seatMonthlyMinor: 100_000n })]);
   });
 });

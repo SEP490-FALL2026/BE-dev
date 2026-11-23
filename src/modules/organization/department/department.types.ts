@@ -29,6 +29,11 @@ export interface DepartmentRecord {
   createdAt: Date;
   updatedAt: Date;
   deactivatedAt: Date | null;
+  /** The picture of the department in the storage (`QĐ-113c`); never put on the wire, only the signed link is. */
+  avatarObjectKey: string | null;
+  avatarContentType: string | null;
+  /** The department the installation created with the organization: no IT Admin takes over its work, only the one named for it reads it. */
+  starting: boolean;
 }
 
 /** Who heads a department on a day, and since when. */
@@ -54,6 +59,8 @@ export interface DepartmentView extends DepartmentRecord {
   warnings: DepartmentWarning[];
   /** Whether the IT Admin named still holds the role on a usable account. Meaningful only when `itAdmin` is set. */
   itAdminUsable: boolean;
+  /** A signed link to the picture, good for 15 minutes; null when the department has none (`QĐ-113c`). */
+  avatarUrl: string | null;
 }
 
 export interface DepartmentProfileView extends DepartmentView {

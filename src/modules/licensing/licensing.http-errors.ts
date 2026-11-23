@@ -61,17 +61,27 @@ export function toLicensingApiException(error: unknown): unknown {
     if (error.conflict === 'EXPECTED_END_REQUIRED') {
       return refuse(UNPROCESSABLE, 'LICENSE_ASSIGNMENT.EXPECTED_END_REQUIRED', error.message);
     }
-    if (error.conflict === 'SUBSCRIPTION_DEPARTMENT_MISMATCH') {
-      return refuse(UNPROCESSABLE, 'LICENSE_ASSIGNMENT.SUBSCRIPTION_DEPARTMENT_MISMATCH', error.message);
-    }
+
+    const details =
+      error.conflictingAssignmentId === undefined && error.blockingRevocation === undefined
+        ? undefined
+        : {
+            ...(error.conflictingAssignmentId === undefined
+              ? {}
+              : { conflictingAssignmentId: error.conflictingAssignmentId }),
+            ...(error.conflict === 'OVERLAP' && error.blockingRevocation !== undefined
+              ? {
+                  revocationTaskId: error.blockingRevocation.revocationTaskId,
+                  revocationStatus: error.blockingRevocation.revocationStatus,
+                }
+              : {}),
+          };
 
     return refuse(
       UNPROCESSABLE,
       error.conflict === 'IDENTIFIER_IN_USE' ? 'LICENSE_ASSIGNMENT.IDENTIFIER_IN_USE' : 'LICENSE_ASSIGNMENT.OVERLAP',
       error.message,
-      error.conflictingAssignmentId === undefined
-        ? undefined
-        : { conflictingAssignmentId: error.conflictingAssignmentId },
+      details,
     );
   }
 

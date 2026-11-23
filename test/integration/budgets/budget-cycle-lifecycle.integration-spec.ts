@@ -1,5 +1,6 @@
 import request from 'supertest';
-import { BudgetHarness } from '../../support/budget-harness';
+import { attachedVersionFile } from '../../support/budget-files';
+import { BudgetHarness, type VersionWire } from '../../support/budget-harness';
 import { addDays } from '../../support/department-harness';
 import type { ApiAccount } from '../../support/api-accounts';
 import type { Person } from '../../support/request-harness';
@@ -463,6 +464,85 @@ describe('the budget cycle: draft, open, locked (integration, real PostgreSQL)',
         .get('/api/v1/operating-parameters/FORECAST_ERROR_THRESHOLD_PERCENT/history')
         .set(h.as(h.finance))
         .expect(403);
+    });
+  });
+
+  describe('shared-pool reserve cannot exceed annual ceiling', () => {
+    it('refuses POST and PATCH in DRAFT or OPEN when shared-pool reserve exceeds annual ceiling, and allows equality', async () => {
+      const overYear = nextYear();
+      const refusedCreate = await create(
+        body(overYear, { annualCeiling: money(1000), sharedPoolReserve: money(1001) }),
+      ).expect(422);
+      expect(h.codeOf(refusedCreate)).toBe('BUDGET_CYCLE.RESERVE_OVER_CEILING');
+
+      const equalYear = nextYear();
+      const created = cycleOf(
+        await create(body(equalYear, { annualCeiling: money(1000), sharedPoolReserve: money(1000) })).expect(201),
+      );
+      expect(created.available.amount).toBe('0');
+
+      const year = nextYear();
+      await create(body(year, { annualCeiling: money(1000), sharedPoolReserve: money(100) })).expect(201);
+      expect(h.codeOf(await patch(year, { sharedPoolReserve: money(1001) }).expect(422))).toBe(
+        'BUDGET_CYCLE.RESERVE_OVER_CEILING',
+      );
+      expect(h.codeOf(await patch(year, { annualCeiling: money(99) }).expect(422))).toBe(
+        'BUDGET_CYCLE.RESERVE_OVER_CEILING',
+      );
+      await patch(year, { sharedPoolReserve: money(1000) }).expect(200);
+      await patch(year, {
+        sharedPoolReserve: money(100),
+        submissionDeadline: day(5),
+        decisionDeadline: day(15),
+      }).expect(200);
+      await open(year).expect(201);
+
+      expect(h.codeOf(await patch(year, { sharedPoolReserve: money(1001), reason: 'Too high' }).expect(422))).toBe(
+        'BUDGET_CYCLE.RESERVE_OVER_CEILING',
+      );
+      expect(h.codeOf(await patch(year, { annualCeiling: money(99), reason: 'Too low' }).expect(422))).toBe(
+        'BUDGET_CYCLE.RESERVE_OVER_CEILING',
+      );
+      const matched = cycleOf(await patch(year, { sharedPoolReserve: money(1000), reason: 'Full buffer' }).expect(200));
+      expect(matched.available.amount).toBe('0');
+    });
+  });
+
+  describe('sending a version waits for the locked budget cycle', () => {
+    it('allows draft build and update while OPEN, refuses submission with 409 BUDGET_CYCLE.NOT_LOCKED, and accepts after deadline', async () => {
+      const unit = await h.departmentWithHead(`P-VLK${(counter += 1)}`);
+      const year = nextYear();
+      await create(
+        body(year, {
+          submissionDeadline: day(5),
+          decisionDeadline: day(20),
+          annualCeiling: money(500_000_000),
+          sharedPoolReserve: money(50_000_000),
+        }),
+      ).expect(201);
+      await open(year).expect(201);
+
+      const proposal = await h.budgetProposed(unit.head, unit.department.unitId, undefined, year);
+      const draft = await h.built(proposal.id);
+      await h.updateVersion(draft.id, { reserve: money(15_000_000) }).expect(200);
+      await attachedVersionFile(h.ctx.sql, draft.id, h.finance.employeeId);
+
+      const directSend = () =>
+        request(h.server()).post(`/api/v1/budget-versions/${draft.id}/submission`).set(h.as(h.finance));
+
+      const refused = await directSend().expect(409);
+      expect(h.codeOf(refused)).toBe('BUDGET_CYCLE.NOT_LOCKED');
+      expect(
+        (
+          await h.ctx.sql.query<{ state: string }>(`SELECT state::text AS state FROM budget_versions WHERE id = $1`, [
+            draft.id,
+          ])
+        ).rows[0].state,
+      ).toBe('DRAFT');
+
+      await h.ctx.sql.query(`UPDATE budget_cycles SET submission_deadline = $2 WHERE year = $1`, [year, day(-1)]);
+      const sent = h.dataOf<{ version: VersionWire }>(await directSend().expect(200)).version;
+      expect(sent.state).toBe('SENT');
     });
   });
 });

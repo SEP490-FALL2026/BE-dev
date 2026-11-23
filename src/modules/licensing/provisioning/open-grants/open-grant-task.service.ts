@@ -30,7 +30,7 @@ export class OpenGrantTaskService {
   ): Promise<{ items: OpenGrantTask[]; total: number }> {
     const { items, total } = await this.repo.pageOf(employeeId, page, tx);
     const plans = new Map(
-      (await this.catalog.getPlanSummaries([...new Set(items.map((item) => item.planId))])).map((plan) => [
+      (await this.catalog.getPlanSummaries([...new Set(items.map((item) => item.planId))], tx)).map((plan) => [
         plan.planId,
         plan,
       ]),

@@ -25,7 +25,7 @@ const PROGRESS = progressOf({
       itHandoverPending: 1,
       mailboxLockPending: 2,
     },
-    transfers: { inGrace: 5, graceEndingSoon: 2, revoking: 1 },
+    transfers: { inGrace: 5, graceEndingSoon: 2, revoking: 1, revocationFailed: 0 },
   },
   seats: { returned: 6, reused: 3 },
   plansBelowMinimum: 2,
@@ -124,12 +124,12 @@ describe('ItAdminDashboardService', () => {
       discrepancies: { state: 'COUNTED', count: 2, sourceOperationId: 'usageNoAssignmentFindingList' },
       // US-09-01 AC-2: the machines whose holder has not acknowledged the notice, counted as `GET /devices?state=AWAITING_ACKNOWLEDGEMENT` lists them.
       unconfirmedDevices: { state: 'COUNTED', count: 4, sourceOperationId: 'deviceList' },
-      // PI-2: the periods whose invoice is five working days late, in the departments in scope, as the list of them totals.
+      // PI-2: the periods whose invoice is five working days late, in the requests of the departments in scope and the subscriptions the caller answers for, as the list of them totals.
       missingInvoicePeriods: { state: 'COUNTED', count: 7, sourceOperationId: 'purchaseInvoiceMissingPeriodList' },
       // OOP-1a: the open cases on a company asset whose revocation is due; no list answers this number alone, so it names none.
       outOfProcessRevocationsDue: { state: 'COUNTED', count: 4, sourceOperationId: null },
     });
-    expect(missingInvoicePeriods).toHaveBeenCalledWith(['d-des', 'd-ops']);
+    expect(missingInvoicePeriods).toHaveBeenCalledWith(['d-des', 'd-ops'], 'it-1');
     expect(countByCollectionState).toHaveBeenCalledWith('org-1', 'AWAITING_ACKNOWLEDGEMENT');
   });
 

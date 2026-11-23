@@ -193,6 +193,7 @@ export class DepartmentRecordService {
         id: department.id,
         active: true,
         itAdminEmployeeId: department.itAdminEmployeeId,
+        starting: department.starting,
         itAdminUsable:
           department.itAdminEmployeeId !== null &&
           department.itAdminStatus === 'ACTIVE' &&
@@ -220,8 +221,8 @@ export class DepartmentRecordService {
     return this.departments.memberIdsOfMany(departmentIds, onDate, tx);
   }
 
-  headedDepartment(employeeId: string, onDate: BusinessDate): Promise<{ departmentId: string } | null> {
-    return this.heads.headedDepartment(employeeId, onDate);
+  headedDepartment(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<{ departmentId: string } | null> {
+    return this.heads.headedDepartment(employeeId, onDate, tx);
   }
 
   headsOnDates(

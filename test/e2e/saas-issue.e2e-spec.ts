@@ -20,7 +20,7 @@ describe('a report of an error in a SaaS right, from the employee to the IT Admi
     const department = await h.departmentWithUnit('P-DES');
     await h.setItAdminInCharge(department, itAdmin);
     member = await h.staff(department, 'DES-E1');
-    const subscriptionId = await h.subscription(20, 'K2', department.id);
+    const subscriptionId = await h.subscription(20, 'K2');
     assignmentId = await h.seatOf(member, { subscriptionId });
   }, 180000);
 

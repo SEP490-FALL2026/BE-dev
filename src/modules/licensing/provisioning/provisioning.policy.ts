@@ -134,7 +134,8 @@ export function chooseAccount(input: {
   requested: string | undefined;
   companyDomains: readonly string[];
 }): string {
-  const candidate = (input.requested ?? input.workEmail)?.trim();
+  // A blank box (empty or only spaces) is the same as no address: the work email is used.
+  const candidate = (input.requested?.trim() || input.workEmail)?.trim();
   if (!candidate || !isCompanyAccount(candidate, input.companyDomains)) throw new ProvisioningPersonalAccountError();
 
   return candidate;

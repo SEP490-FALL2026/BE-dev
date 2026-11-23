@@ -43,8 +43,18 @@ export async function ensureVendorAdmins(ctx: HttpTestApp, planId: string, owner
     [planId],
   );
   if (!plan.rows[0]?.needs) return;
+  // The second admin is an IT Admin who can act when the installation has one: once the baseline is closed a plan needs two who work (`QĐ-114ae`),
+  // and a suite that closes it makes the second account before the plan. Otherwise the first employee by code, as before.
   const other = await ctx.sql.query<{ id: string }>(
-    `SELECT id FROM employees WHERE id <> $1 ORDER BY employee_code LIMIT 1`,
+    `SELECT e.id FROM employees e
+      WHERE e.id <> $1
+      ORDER BY EXISTS (
+                 SELECT 1 FROM app_users u JOIN role_grants g ON g.app_user_id = u.id
+                  WHERE u.employee_id = e.id AND u.status = 'ACTIVE' AND u.activation_state = 'ACTIVATED'
+                    AND e.status = 'ACTIVE' AND g.role = 'IT_ADMIN' AND g.revoked_at IS NULL
+               ) DESC,
+               e.employee_code
+      LIMIT 1`,
     [ownerEmployeeId],
   );
   const profile = await ctx.sql.query(

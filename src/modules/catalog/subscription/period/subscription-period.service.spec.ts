@@ -24,7 +24,6 @@ function record(extra: Partial<SubscriptionRecord> = {}): SubscriptionRecord {
     planPricingModel: 'PER_SEAT',
     planProvisioningType: 'K2',
     planHasAdminConsole: false,
-    ownerDepartmentId: null,
     applicationId: 'app-1',
     applicationName: 'Slack',
     applicationLogoUrl: null,
@@ -102,7 +101,6 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
 
     expect(facts).toMatchObject({
       subscriptionId: 'sub-1',
-      ownerDepartmentId: null,
       responsibleItAdminEmployeeId: 'emp-1',
       provisioningType: 'K2',
       commitmentTermMonths: 12,
@@ -193,13 +191,13 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
     expect(facts.adjustment).toBeNull();
   });
 
-  it('keeps the periods of a department too, with their owner', async () => {
-    subscriptions.findMany.mockResolvedValue([record({ ownerDepartmentId: 'dep-1' })]);
+  it('keeps the periods of every subscription', async () => {
+    subscriptions.findMany.mockResolvedValue([record({})]);
     subscriptions.successorsOf.mockResolvedValue(new Map([['sub-1', 'sub-2']]));
 
     const [facts] = await service.facts(['sub-1']);
 
-    expect(facts).toMatchObject({ ownerDepartmentId: 'dep-1', renewedById: 'sub-2' });
+    expect(facts).toMatchObject({ renewedById: 'sub-2' });
   });
 
   it('lists the K2 terms that run a period for the adjustment, at most 500, none that a later period continues', async () => {
@@ -246,8 +244,8 @@ describe('SubscriptionPeriodService: the periods the renewal reads, the shared p
 
       const next = await service.recordNext(tx, actor, input);
 
-      expect(subscriptions.insert).toHaveBeenCalledWith(tx, expect.objectContaining({ ownerDepartmentId: null }));
-      expect(next).toMatchObject({ subscriptionId: 'sub-2', ownerDepartmentId: null, renewedFromId: 'sub-1' });
+      expect(subscriptions.insert).toHaveBeenCalledWith(tx, expect.anything());
+      expect(next).toMatchObject({ subscriptionId: 'sub-2', renewedFromId: 'sub-1' });
     });
 
     it('reads the price where the caller says it sits in its body, so a money error points at that field of the renewal (FIX-E-R2)', async () => {

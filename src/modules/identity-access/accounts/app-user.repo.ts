@@ -381,6 +381,40 @@ export class AppUserRepo {
     });
   }
 
+  /**
+   * Moves the account to another login email and nothing else: how the address was verified, and when, stay as they were, since
+   * nobody has verified the new one (the work email of the record was corrected by the Super Admin).
+   */
+  async moveLoginEmail(
+    tx: DbTx,
+    appUserId: string,
+    input: { loginEmail: string; normalizedLoginEmail: string },
+  ): Promise<void> {
+    await tx.appUser.update({
+      where: { id: appUserId },
+      data: { loginEmail: input.loginEmail, normalizedLoginEmail: input.normalizedLoginEmail },
+    });
+  }
+
+  /** The login email of the account of this employee, read in `tx`; null when the person has no account. */
+  async findLoginEmailOfEmployee(tx: DbTx, employeeId: string): Promise<{ id: string; loginEmail: string } | null> {
+    return tx.appUser.findUnique({ where: { employeeId }, select: { id: true, loginEmail: true } });
+  }
+
+  /** The account that logs in with this normalized address in the organization, if any. */
+  async findAccountIdByNormalizedLoginEmail(
+    tx: DbTx,
+    organizationId: string,
+    normalizedLoginEmail: string,
+  ): Promise<string | null> {
+    const row = await tx.appUser.findUnique({
+      where: { organizationId_normalizedLoginEmail: { organizationId, normalizedLoginEmail } },
+      select: { id: true },
+    });
+
+    return row?.id ?? null;
+  }
+
   async findAccountIdByEmployee(tx: DbTx, employeeId: string): Promise<string | null> {
     const row = await tx.appUser.findUnique({ where: { employeeId }, select: { id: true } });
 

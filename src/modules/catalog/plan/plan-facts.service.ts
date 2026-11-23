@@ -12,7 +12,9 @@ import type {
   WorkspaceDuty,
 } from '../public/catalog.types';
 import { kpi3Percent } from './plan.policy';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { PlanRepo } from './plan.repo';
+import { PlanQuotePriceService } from './plan-quote-price.service';
 import { PlanUsageRepo } from './plan-usage.repo';
 import { notYetBlocked } from './vendor-admin-roles.policy';
 import type { PlanLookup, WorkspaceMemberRecord } from './plan.types';
@@ -34,7 +36,18 @@ export class PlanFactsService implements ApplicationPlans {
     private readonly usage: PlanUsageRepo,
     private readonly identity: IdentityAccessApi,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly quotePrices: PlanQuotePriceService,
   ) {}
+
+  /** The monthly price of the approved quote of a case B request becomes the reference price of a K1 or K2 plan that has none (`QĐ-113a`); see `PlanQuotePriceService`. */
+  adoptQuotePrice(
+    actor: AuthenticatedPrincipal,
+    planId: string,
+    price: { amountMinor: bigint; currency: string },
+    tx: DbTx,
+  ): Promise<boolean> {
+    return this.quotePrices.adopt(actor, planId, price, tx);
+  }
 
   /** Replaces what is known of the usage of the plans of the organization with what one pass of the usage rules found (`KPI-3`). */
   replaceUsageRates(

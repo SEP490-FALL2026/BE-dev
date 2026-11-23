@@ -30,7 +30,7 @@ export class RenewalSeatFactsService {
   async windowDaysOf(tx: DbTx, assignmentId: string, previousEnd: BusinessDate): Promise<number> {
     const recorded = await this.licensingRenewals.renewalWindowOf(assignmentId, previousEnd, tx);
 
-    return recorded?.windowDays ?? Number(await this.parameters.getValue('RENEWAL_WINDOW_DAYS'));
+    return recorded?.windowDays ?? Number(await this.parameters.getValue('RENEWAL_WINDOW_DAYS', tx));
   }
 
   /** Throws RenewalRequestRefusedError (the seat is not there) and RequestPartyIneligibleError. */

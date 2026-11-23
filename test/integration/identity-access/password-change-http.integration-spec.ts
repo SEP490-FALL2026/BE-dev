@@ -306,7 +306,10 @@ describe('password self-service over HTTP (integration, real PostgreSQL): the ap
         notices.rows[0].payload_ciphertext,
       );
       expect(payload.event).toBe('PASSWORD_CHANGED');
-      expect(Object.keys(payload).sort()).toEqual(['at', 'event', 'fullName']);
+      const organization = await h.ctx.sql.query<{ time_zone: string }>('SELECT time_zone FROM organizations LIMIT 1');
+      // The notice carries the zone of the organization, so the mail writes the time on the clock of the person (never the secret or the link).
+      expect(Object.keys(payload).sort()).toEqual(['at', 'event', 'fullName', 'timeZone']);
+      expect(payload.timeZone).toBe(organization.rows[0].time_zone);
 
       const events = await h.ctx.sql.query<{
         after: Record<string, unknown>;

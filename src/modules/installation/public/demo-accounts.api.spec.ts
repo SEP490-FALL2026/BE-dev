@@ -2,6 +2,7 @@ import type { ConfigService } from '@nestjs/config';
 import type { DatabaseEnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import type { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuditApi } from '../../audit/public/audit.api';
+import type { LocalDemoBudgetCycleApi } from '../../budgets/public/local-demo-budget-cycle.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { LocalDemoAccountApi } from '../../identity-access/public/local-demo-account.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -51,16 +52,20 @@ function world(missing: string[] = [], accountState: 'present' | 'absent' = 'pre
     findAccountIdOfEmployee: (_tx: DbTx, employeeId: string) => Promise.resolve(`user-${employeeId}`),
     prepareCredential: () => Promise.resolve({ hash: 'hash', hashPolicyVersion: 1 }),
   } as unknown as IdentityAccessApi;
+  const record = jest.fn(() => Promise.resolve());
+  const setSubmissionDeadline = jest.fn().mockResolvedValue({ id: 'cycle-2026', previous: '2026-12-01' });
+  const budgetCycles = { setSubmissionDeadline } as unknown as LocalDemoBudgetCycleApi;
   const api = new DemoAccountsApi(
     runner,
     organizationReads,
     identity,
     accounts,
-    { record: jest.fn(() => Promise.resolve()) } as unknown as AuditApi,
+    budgetCycles,
+    { record } as unknown as AuditApi,
     {} as ConfigService<DatabaseEnvironmentVariables, true>,
   );
 
-  return { api, perTransaction, getEmployeesByCodes };
+  return { api, perTransaction, getEmployeesByCodes, setSubmissionDeadline, record };
 }
 
 describe('DemoAccountsApi.describe', () => {
@@ -149,5 +154,48 @@ describe('DemoAccountsApi.create', () => {
     await expect(api.create('org-1', two, 'a-password-of-12', attribution)).rejects.toBeInstanceOf(
       DemoAccountsChangedError,
     );
+  });
+});
+
+describe('DemoAccountsApi.lockBudgetCycle', () => {
+  const attribution = { operatorReference: 'DEMO_DATASET:shared-demo-v4:op', environment: 'LOCAL_TEST' } as const;
+
+  it('moves the submission deadline once, in one transaction, and never puts the old one back', async () => {
+    const { api, setSubmissionDeadline, perTransaction } = world();
+
+    await api.lockBudgetCycle('org-1', 2026, '2026-11-30', attribution);
+
+    expect(perTransaction).toHaveLength(1);
+    expect(setSubmissionDeadline).toHaveBeenCalledTimes(1);
+    expect(setSubmissionDeadline).toHaveBeenCalledWith(expect.anything(), 'org-1', 2026, '2026-11-30');
+  });
+
+  it('records the move as an act of the operator, with the deadline it had and the one it has', async () => {
+    const { api, record } = world();
+
+    await api.lockBudgetCycle('org-1', 2026, '2026-11-30', attribution);
+
+    expect(record).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organizationId: 'org-1',
+        actorKind: 'OPERATOR',
+        operatorReference: 'DEMO_DATASET:shared-demo-v4:op',
+        action: 'DEMO_DATASET.BUDGET_CYCLE_LOCKED',
+        resourceType: 'BudgetCycle',
+        resourceId: 'cycle-2026',
+        before: { submissionDeadline: '2026-12-01' },
+        after: { submissionDeadline: '2026-11-30', year: 2026, environment: 'LOCAL_TEST' },
+      }),
+    );
+  });
+
+  it('writes nothing when the cycle does not exist', async () => {
+    const { api, setSubmissionDeadline, record } = world();
+    setSubmissionDeadline.mockResolvedValue(null);
+
+    await api.lockBudgetCycle('org-1', 2026, '2026-11-30', attribution);
+
+    expect(record).not.toHaveBeenCalled();
   });
 });

@@ -14,6 +14,7 @@ import {
   BudgetCycleNotDraftError,
   BudgetCycleNotFoundError,
   BudgetCycleReasonRequiredError,
+  BudgetCycleReserveOverCeilingError,
   BudgetCycleYearPastError,
 } from '../budget/budget.errors';
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
@@ -28,6 +29,7 @@ import type {
 import {
   cycleStateOf,
   isPastYear,
+  isReserveOverCeiling,
   judgeDelete,
   judgeOpening,
   planCycleChange,
@@ -91,7 +93,7 @@ export class CycleService {
 
   /**
    * Makes the cycle of a year, a draft. Throws BudgetNotFinanceError, BudgetCycleYearPastError, BudgetCycleExistsError,
-   * BudgetCycleDeadlinesInvalidError and the money errors.
+   * BudgetCycleDeadlinesInvalidError, BudgetCycleReserveOverCeilingError and the money errors.
    */
   async create(actor: AuthenticatedPrincipal, body: CreateCycleBodyDto): Promise<CycleWire> {
     this.facts.requireFinance(actor);
@@ -101,6 +103,9 @@ export class CycleService {
     const reporting = await this.facts.reportingCurrency();
     const annualCeilingMinor = await this.facts.money(body.annualCeiling, reporting, 'annualCeiling');
     const sharedPoolReserveMinor = await this.facts.money(body.sharedPoolReserve, reporting, 'sharedPoolReserve');
+    if (isReserveOverCeiling(annualCeilingMinor, sharedPoolReserveMinor)) {
+      throw new BudgetCycleReserveOverCeilingError();
+    }
     const organizationId = await this.facts.organizationId();
 
     const created = await this.runner.run(async (tx) => {
@@ -303,6 +308,8 @@ export class CycleService {
         return new BudgetCycleLockedError(year);
       case 'DEADLINES_INVALID':
         return new BudgetCycleDeadlinesInvalidError();
+      case 'RESERVE_OVER_CEILING':
+        return new BudgetCycleReserveOverCeilingError();
       case 'DEADLINE_IN_PAST':
         return new BudgetCycleDeadlinePassedError();
       case 'REASON_REQUIRED':

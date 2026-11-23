@@ -29,12 +29,13 @@ describe('SeatMonthService.chargeEndedMonths (SM1-03)', () => {
     const done = new Set<string>();
     const failing = new Set(options.failing ?? []);
     const charged: string[] = [];
-    const charge = jest.fn((_tx: unknown, subscriptionId: string, month: string) => {
-      if (failing.has(subscriptionId)) return Promise.reject(new Error(`deadlock on ${subscriptionId}`));
+    const charge = jest.fn((...args: [tx: unknown, id: string, month: string, now?: Date, onlyMissing?: boolean]) => {
+      const [, subscriptionId, month] = args;
+      if (failing.has(subscriptionId)) return Promise.reject<number | null>(new Error(`deadlock on ${subscriptionId}`));
       done.add(`${subscriptionId}|${month}`);
       charged.push(`${subscriptionId}|${month}`);
 
-      return Promise.resolve(1);
+      return Promise.resolve<number | null>(1);
     });
     const service = new SeatMonthService(
       { run: (work: (tx: unknown) => Promise<unknown>) => work({}) } as unknown as TransactionRunner,
@@ -78,6 +79,20 @@ describe('SeatMonthService.chargeEndedMonths (SM1-03)', () => {
     await service.chargeMonth('2026-01-01');
     await service.chargeMonth('2026-01-01');
     expect(charge).toHaveBeenCalledTimes(3 + 3 + 3);
+  });
+
+  it('asks for the missing ones only in a sweeper pass, and does not count a subscription another pass marked while this one waited for the lock', async () => {
+    const { service, charge } = build();
+    charge.mockImplementation((_tx: unknown, subscriptionId: string) =>
+      Promise.resolve(subscriptionId === 'B' ? null : 1),
+    );
+
+    const pass = await service.chargeEndedMonths('2026-02-10');
+
+    expect(pass).toMatchObject({ subscriptions: 2, rows: 2, failed: 0 });
+    expect(charge.mock.calls.map((call) => call[4])).toEqual([true, true, true]);
+    await service.chargeMonth('2026-01-01');
+    expect(charge.mock.calls.slice(3).map((call) => call[4])).toEqual([false, false, false]);
   });
 
   it('charges a month again whatever was charged before: closing the numbers of a month is a picture, not a lock (QĐ-111ae)', async () => {

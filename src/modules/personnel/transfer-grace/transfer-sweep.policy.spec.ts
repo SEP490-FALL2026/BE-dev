@@ -94,9 +94,10 @@ describe('rightsToTakeBack (QĐ-110p, C.1: the personal rights of the old depart
   const seat = (
     assignmentId: string,
     effectiveFrom: string,
-    extra: { validUntil?: string | null; provisioningType?: string } = {},
+    extra: { validUntil?: string | null; provisioningType?: string; subscriptionId?: string | null } = {},
   ) => ({
     assignmentId,
+    subscriptionId: extra.subscriptionId ?? null,
     effectiveFrom,
     validUntil: extra.validUntil ?? null,
     provisioningType: extra.provisioningType ?? 'K2',
@@ -137,6 +138,18 @@ describe('rightsToTakeBack (QĐ-110p, C.1: the personal rights of the old depart
 
   it('is empty for a person who holds nothing', () => {
     expect(rightsToTakeBack([], noPicture)).toEqual([]);
+  });
+
+  it('sorts the kept rights by (subscriptionId ?? "", assignmentId)', () => {
+    const seats = [
+      seat('b-2', '2026-09-01', { subscriptionId: 'sub-b' }),
+      seat('null-2', '2026-09-01', { subscriptionId: null }),
+      seat('a-1', '2026-09-01', { subscriptionId: 'sub-a' }),
+      seat('null-1', '2026-09-01', { subscriptionId: null }),
+      seat('b-1', '2026-09-01', { subscriptionId: 'sub-b' }),
+    ];
+
+    expect(ids(rightsToTakeBack(seats, noPicture))).toEqual(['null-1', 'null-2', 'a-1', 'b-1', 'b-2']);
   });
 });
 

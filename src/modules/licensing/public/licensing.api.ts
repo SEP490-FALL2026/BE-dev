@@ -280,7 +280,16 @@ export class LicensingApi {
     employeeId: string,
     planIds: readonly string[],
     page: { skip: number; take: number },
+    tx?: DbTx,
   ): Promise<{ items: AssignmentRecord[]; total: number }> {
-    return this.assignments.pageHeldOfPlans(employeeId, planIds, page);
+    return this.assignments.pageHeldOfPlans(employeeId, planIds, page, tx);
+  }
+
+  /**
+   * Returns transfer IDs that still have an open assignment whose transfer revocation closed as failed
+   * and currently has no live revocation task. One statement.
+   */
+  listTransferIdsWithFailedRevocation(transferIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.revocationView.transferIdsWithFailedRevocation(transferIds, tx);
   }
 }

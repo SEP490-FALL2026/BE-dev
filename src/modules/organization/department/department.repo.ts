@@ -20,6 +20,9 @@ interface DepartmentRow {
   updated_at: Date;
   deactivated_at: Date | null;
   effective_from: Date;
+  avatar_object_key: string | null;
+  avatar_content_type: string | null;
+  is_starting: boolean;
   cc_id: string | null;
   cc_code: string | null;
   cc_name: string | null;
@@ -32,6 +35,7 @@ interface DepartmentRow {
 
 const SELECT_DEPARTMENT = Prisma.sql`
   SELECT d.id, d.code, d.name, d.function_description, d.status, d.created_at, d.updated_at, d.deactivated_at, d.effective_from,
+         d.avatar_object_key, d.avatar_content_type, d.is_starting,
          c.id AS cc_id, c.code AS cc_code, c.name AS cc_name, c.status AS cc_status,
          e.id AS it_id, e.employee_code AS it_code, e.full_name AS it_name, e.status AS it_status
     FROM departments d
@@ -61,6 +65,9 @@ function toRecord(row: DepartmentRow): DepartmentRecord {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deactivatedAt: row.deactivated_at,
+    avatarObjectKey: row.avatar_object_key,
+    avatarContentType: row.avatar_content_type,
+    starting: row.is_starting,
   };
 }
 
@@ -114,10 +121,14 @@ export class DepartmentRepo {
 
   /** The installation's first department (`FR-9.8`): written as given, a database error is not translated. */
   async createForInstallation(tx: DbTx, input: CreateDepartmentInput): Promise<{ id: string }> {
-    const { effectiveFrom, ...rest } = input;
+    const { effectiveFrom, starting, ...rest } = input;
 
     return tx.department.create({
-      data: { ...rest, ...(effectiveFrom ? { effectiveFrom: toDateColumn(effectiveFrom) } : {}) },
+      data: {
+        ...rest,
+        ...(starting ? { starting: true } : {}),
+        ...(effectiveFrom ? { effectiveFrom: toDateColumn(effectiveFrom) } : {}),
+      },
       select: { id: true },
     });
   }
@@ -225,6 +236,21 @@ export class DepartmentRepo {
     await tx.department.update({ where: { id }, data: { ...data, updatedAt: now } });
   }
 
+  /** Points the department at a picture already written to the storage (`QĐ-113c`). */
+  async setAvatar(tx: DbTx, id: string, values: { key: string; contentType: string; at: Date }): Promise<void> {
+    await tx.department.update({
+      where: { id },
+      data: { avatarObjectKey: values.key, avatarContentType: values.contentType, avatarUpdatedAt: values.at },
+    });
+  }
+
+  async clearAvatar(tx: DbTx, id: string, now: Date): Promise<void> {
+    await tx.department.update({
+      where: { id },
+      data: { avatarObjectKey: null, avatarContentType: null, avatarUpdatedAt: null, updatedAt: now },
+    });
+  }
+
   async deactivate(tx: DbTx, id: string, now: Date): Promise<void> {
     await tx.department.update({ where: { id }, data: { status: 'INACTIVE', deactivatedAt: now, updatedAt: now } });
   }
@@ -272,15 +298,27 @@ export class DepartmentRepo {
   }
 
   /** Active departments with the IT Admin in charge they name (or none), in code order. */
-  async activeDepartmentsWithItAdmin(
-    tx?: DbTx,
-  ): Promise<
-    { id: string; code: string; name: string; itAdminEmployeeId: string | null; itAdminStatus: EmployeeStatus | null }[]
+  async activeDepartmentsWithItAdmin(tx?: DbTx): Promise<
+    {
+      id: string;
+      code: string;
+      name: string;
+      itAdminEmployeeId: string | null;
+      itAdminStatus: EmployeeStatus | null;
+      starting: boolean;
+    }[]
   > {
     const rows = await (tx ?? this.prisma).$queryRaw<
-      { id: string; code: string; name: string; it_admin_employee_id: string | null; status: EmployeeStatus | null }[]
+      {
+        id: string;
+        code: string;
+        name: string;
+        it_admin_employee_id: string | null;
+        status: EmployeeStatus | null;
+        is_starting: boolean;
+      }[]
     >`
-      SELECT d.id, d.code, d.name, d.it_admin_employee_id, e.status
+      SELECT d.id, d.code, d.name, d.it_admin_employee_id, e.status, d.is_starting
         FROM departments d LEFT JOIN employees e ON e.id = d.it_admin_employee_id
        WHERE d.status = 'ACTIVE' ORDER BY d.code, d.id`;
 
@@ -290,6 +328,7 @@ export class DepartmentRepo {
       name: row.name,
       itAdminEmployeeId: row.it_admin_employee_id,
       itAdminStatus: row.status,
+      starting: row.is_starting,
     }));
   }
 

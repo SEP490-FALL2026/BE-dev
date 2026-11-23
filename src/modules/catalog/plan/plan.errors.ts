@@ -188,3 +188,27 @@ export class PlanInUseBlocksChangeError extends Error {
     this.name = 'PlanInUseBlocksChangeError';
   }
 }
+
+/** The reference price of a plan is in dong only, as every price (`QĐ-111an`, `QĐ-113a`). */
+export class PlanReferencePriceNotVndError extends Error {
+  constructor(readonly currency: string) {
+    super('The reference price of a plan is entered in dong (VND).');
+    this.name = 'PlanReferencePriceNotVndError';
+  }
+}
+
+/** Only a plan that is paid for (K1, K2, K4) has a reference price (`QĐ-113a`): a K5 plan costs nothing and K3 cannot be declared yet. */
+export class PlanReferencePriceNotApplicableError extends Error {
+  constructor() {
+    super('Only a K1, K2 or K4 plan has a reference price.');
+    this.name = 'PlanReferencePriceNotApplicableError';
+  }
+}
+
+/** A reference price of 0 is no price: a request counts a price of 0 as missing (`QĐ-113a`), so the plan must give one above zero or none. */
+export class PlanReferencePriceNotPositiveError extends Error {
+  constructor() {
+    super('The reference price of a plan must be above zero.');
+    this.name = 'PlanReferencePriceNotPositiveError';
+  }
+}

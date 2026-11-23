@@ -2,9 +2,12 @@ import { addDays, type BusinessDate } from '../../../core/business-date';
 import { isPricedInDong } from './price/subscription-price.policy';
 import {
   SubscriptionDatesInvalidError,
+  SubscriptionMidTermReductionNotAllowedError,
   SubscriptionPerpetualHasNoTermError,
   SubscriptionPerpetualNeedsLicensedApplicationError,
   SubscriptionPlanHasNoSubscriptionError,
+  SubscriptionQuantityReasonRequiredError,
+  SubscriptionVersionRequiredError,
 } from './subscription.errors';
 import type {
   ApplicationKind,
@@ -13,6 +16,7 @@ import type {
   PlanPricingModel,
   ProvisioningType,
   SubscriptionKind,
+  SubscriptionStatus,
   SubscriptionWarning,
 } from './subscription.types';
 
@@ -291,4 +295,53 @@ export function declaredStateOf<B extends string, C extends number>(input: {
     vendorMinimumSeats: orStart<number | null>(input.vendorMinimumSeats, null),
     isPrimaryForPlan: false,
   };
+}
+
+/** An edit made on a read of the row is stale when the row's `updated_at` (kept to the millisecond, `Timestamptz(3)`) is no longer that read; no read named means no check. */
+export function isStaleEdit(expectedUpdatedAt: Date | undefined, currentUpdatedAt: Date): boolean {
+  return expectedUpdatedAt !== undefined && expectedUpdatedAt.getTime() !== currentUpdatedAt.getTime();
+}
+
+/** Requires expectedUpdatedAt whenever purchasedQuantity is included in an update. */
+export function assertVersionForQuantityChange(
+  purchasedQuantity: number | undefined,
+  expectedUpdatedAt: Date | undefined,
+): void {
+  if (purchasedQuantity !== undefined && expectedUpdatedAt === undefined) {
+    throw new SubscriptionVersionRequiredError();
+  }
+}
+
+export interface QuantityChangeInput {
+  status: SubscriptionStatus;
+  planProvisioningType: ProvisioningType;
+  currentQuantity: number | null;
+  requestedQuantity: number | undefined;
+  commitmentTermMonths: number | null;
+  allowsMidTermReduction: boolean;
+  quantityChangeReason: string | undefined;
+}
+
+/**
+ * Checks a seat-count change on an active pooled (K2) subscription using its stored term and reduction flag,
+ * returning the reason to record in the audit when seats are added and ignoring it otherwise.
+ */
+export function judgeQuantityChange(input: QuantityChangeInput): string | undefined {
+  if (input.status !== 'ACTIVE' || input.planProvisioningType !== 'K2') return undefined;
+  if (input.requestedQuantity === undefined || input.currentQuantity === null) return undefined;
+  if (input.requestedQuantity === input.currentQuantity) return undefined;
+
+  if (input.requestedQuantity < input.currentQuantity) {
+    if (input.commitmentTermMonths === 12 && !input.allowsMidTermReduction) {
+      throw new SubscriptionMidTermReductionNotAllowedError();
+    }
+
+    return undefined;
+  }
+
+  if (!input.quantityChangeReason) {
+    throw new SubscriptionQuantityReasonRequiredError();
+  }
+
+  return input.quantityChangeReason;
 }

@@ -50,9 +50,13 @@ export async function findScenarioRequest(
   return null;
 }
 
+/** The free text a scenario sends as its reason or purpose: the tag that finds it again, then the business reason (never the developer's `summary`). */
+export const requestTextOf = (ctx: DemoRunContext, scenario: DemoRequestScenario): string =>
+  `${tag(ctx, scenario.key)} ${scenario.reason}`;
+
 async function submit(ctx: DemoRunContext, scenario: DemoRequestScenario): Promise<RequestWire> {
   const requester = await as(ctx, scenario.requester);
-  const text = `${tag(ctx, scenario.key)} ${scenario.summary}`;
+  const text = requestTextOf(ctx, scenario);
   const planId = ctx.ids.plans.get(scenario.plan ?? '');
   let created: { request: RequestWire };
   if (scenario.proposal) {
@@ -91,7 +95,7 @@ async function positionOf(
   scenario: DemoRequestScenario,
   request: RequestWire,
 ): Promise<ScenarioPosition> {
-  const needsTask = request.state === 'EXECUTING' && ['FAILED', 'AWAITING_IT_CLOSE'].includes(scenario.target);
+  const needsTask = request.state === 'EXECUTING' && scenario.target === 'FAILED';
 
   return {
     state: request.state,

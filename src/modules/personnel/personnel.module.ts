@@ -29,6 +29,8 @@ import { RevocationOverdueService } from './departure-deadline/revocation-overdu
 import { DepartmentMemberQueryService } from './department-member/department-member-query.service';
 import { DepartmentOpenWorkReader } from './event-notice/department-open-work.listener';
 import { DepartmentOpenWorkRepo } from './event-notice/department-open-work.repo';
+import { FirstPlacementPersonnelReader } from './event-notice/first-placement-personnel.listener';
+import { FirstPlacementPersonnelRepo } from './event-notice/first-placement-personnel.repo';
 import { PersonnelGroundsDateService } from './personnel-grounds-date.service';
 import { PersonnelNotifier } from './event-notice/personnel-notifier.service';
 import { LeaveDepartureService } from './leave/leave-departure.service';
@@ -122,6 +124,7 @@ import { TransferPreconditions } from './transfer/transfer-preconditions.service
 import { TransferRecorder } from './transfer/transfer-recorder.service';
 import { TransferService } from './transfer/transfer.service';
 import { TransfersController } from './transfer/transfers.controller';
+import { TransferRevocationController } from './transfer-grace/transfer-revocation.controller';
 import { ItHandoverController } from './it-handover/it-handover.controller';
 import { ItHandoverMilestoneService } from './it-handover/it-handover-milestone.service';
 import { ItHandoverRecorder } from './it-handover/it-handover-recorder.listener';
@@ -169,6 +172,7 @@ import { ItHandoverViewService } from './it-handover/it-handover-view.service';
   ],
   controllers: [
     TransfersController,
+    TransferRevocationController,
     LongLeavesController,
     OffboardingController,
     DeparturePreviewController,
@@ -228,6 +232,8 @@ import { ItHandoverViewService } from './it-handover/it-handover-view.service';
     TransferRepo,
     DepartmentOpenWorkRepo,
     DepartmentOpenWorkReader,
+    FirstPlacementPersonnelRepo,
+    FirstPlacementPersonnelReader,
     PersonnelNotifier,
     TransferGuardService,
     TransferSettlementService,

@@ -1,5 +1,11 @@
 import { CODE_LABELS, SHARED_LABELS } from './notification-labels.types';
-import { NOTIFICATION_TEXTS, renderTemplate, templateVariables } from './inbox-notification-text.policy';
+import {
+  nameLookupKey,
+  NOTIFICATION_TEXTS,
+  renderNotificationText,
+  renderTemplate,
+  templateVariables,
+} from './inbox-notification-text.policy';
 import type { NotificationLocale, NotificationTexts, TextTemplate } from './notification-text.types';
 
 /** F3: the wording of the English and Vietnamese sentences, read once the labels are in: no repeated word, no wrong article, no doubled full stop. */
@@ -75,5 +81,34 @@ describe('notification sentences: wording', () => {
 
   it('keeps the helper honest: a template still lists its variables', () => {
     expect(templateVariables('A {reason}. B {x:enum}').map((v) => v.key)).toEqual(['reason', 'x']);
+  });
+
+  it('renders BUDGET_NEXT_YEAR_MISSING for both new aggregated params and legacy costCenterId params', () => {
+    const ccId = '00000000-0000-4000-8000-000000000001';
+    const names = new Map([[nameLookupKey('COST_CENTER', ccId), 'CC Engineering']]);
+
+    const viNew = renderNotificationText('BUDGET_NEXT_YEAR_MISSING', { year: 2027, costCenterCount: 3 }, 'vi', names);
+    const enNew = renderNotificationText('BUDGET_NEXT_YEAR_MISSING', { year: 2027, costCenterCount: 3 }, 'en', names);
+    expect(viNew.title).toContain('2027');
+    expect(viNew.message).toContain('3');
+    expect(viNew.message).not.toContain('không rõ tên');
+    expect(enNew.title).toContain('2027');
+    expect(enNew.message).toContain('3');
+    expect(enNew.message).not.toContain('unnamed');
+
+    const viLegacy = renderNotificationText(
+      'BUDGET_NEXT_YEAR_MISSING',
+      { year: 2027, costCenterId: ccId },
+      'vi',
+      names,
+    );
+    const enLegacy = renderNotificationText(
+      'BUDGET_NEXT_YEAR_MISSING',
+      { year: 2027, costCenterId: ccId },
+      'en',
+      names,
+    );
+    expect(viLegacy.message).toContain('CC Engineering');
+    expect(enLegacy.message).toContain('CC Engineering');
   });
 });

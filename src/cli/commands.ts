@@ -51,15 +51,6 @@ export const COMMANDS: readonly CommandEntry[] = [
     load: () => import('./preflight/preflight.command').then((m) => m.preflightCommand),
   },
   {
-    name: 'assign-subscription-owner',
-    description: 'Give one existing subscription its owner department, on an approved basis.',
-    alias: 'subscription-owner-assignment-cli',
-    load: () =>
-      import('./assign-subscription-owner/assign-subscription-owner.command').then(
-        (m) => m.assignSubscriptionOwnerCommand,
-      ),
-  },
-  {
     name: 'cost-center-direction',
     description: 'Activate the Cost Center direction, or link one Cost Center to its department.',
     alias: 'cost-center-direction-cli',

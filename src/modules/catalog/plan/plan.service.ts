@@ -1,9 +1,11 @@
+import { DONG } from '../../../core/money/money';
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { FinanceApi } from '../../finance/public/finance.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
@@ -13,6 +15,8 @@ import {
   PlanNameTakenError,
   PlanNotFoundError,
   PlanProvisioningTypeMismatchError,
+  PlanReferencePriceNotPositiveError,
+  PlanReferencePriceNotVndError,
   PlanChangeBlock,
   PlanInUseBlocksChangeError,
   PlanTermsBlockTypeChangeError,
@@ -22,10 +26,14 @@ import {
 import {
   assertPlanShape,
   assertPricingModelDerived,
+  assertReferencePrice,
+  assertReferencePriceKind,
   cleanPlanName,
   cleanRevocationNote,
   derivedPricingModel,
+  referencePriceOnKindChange,
 } from './plan.policy';
+import { planAuditSnapshot as snapshot } from './plan.mapper';
 import { PlanRepo } from './plan.repo';
 import { assertAdminConsoleApplicable } from './plan-vendor-admins.policy';
 import { PlanWorkspaceService } from './plan-workspace.service';
@@ -36,6 +44,7 @@ import type {
   PlanSummaryRecord,
   PricingModel,
   ProvisioningType,
+  ReferencePrice,
   SharingPolicy,
   WorkspaceProfileView,
 } from './plan.types';
@@ -51,6 +60,8 @@ export interface DeclarePlanInput {
   sharingPolicy?: SharingPolicy;
   /** A `K4` plan only (`R-53`); any other kind that gives it is refused. */
   hasAdminConsole?: boolean;
+  /** The price in dong before tax, as text (`QĐ-113a`): K1/K2 for one seat one month, K4 for one purchase; none for K5. */
+  referencePrice?: { amount: string; currency: string };
 }
 
 export interface UpdatePlanInput {
@@ -62,19 +73,9 @@ export interface UpdatePlanInput {
   dataLossOnRemoval?: boolean;
   sharingPolicy?: SharingPolicy | null;
   hasAdminConsole?: boolean;
+  /** `null` clears the reference price (`QĐ-113a`). */
+  referencePrice?: { amount: string; currency: string } | null;
 }
-
-const snapshot = (plan: PlanRecord) => ({
-  applicationId: plan.applicationId,
-  name: plan.name,
-  provisioningType: plan.provisioningType,
-  pricingModel: plan.pricingModel,
-  controlLevel: plan.controlLevel,
-  revocationNote: plan.revocationNote,
-  dataLossOnRemoval: plan.dataLossOnRemoval,
-  sharingPolicy: plan.sharingPolicy,
-  hasAdminConsole: plan.hasAdminConsole,
-});
 
 /**
  * The plans of an application the IT Admin declares (`US-04-02`). Declaring or changing a plan is one transaction: the
@@ -88,6 +89,7 @@ export class PlanService {
     private readonly workspace: PlanWorkspaceService,
     private readonly applications: ApplicationFactsService,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly finance: FinanceApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -137,6 +139,10 @@ export class PlanService {
         const application = await this.applications.lockShared(tx, input.applicationId);
         if (!application) throw new PlanApplicationNotFoundError();
         if (application.status === 'RETIRED') throw new PlanApplicationRetiredError();
+        // The kind is judged before the money is read, so a K5 plan with a price in dollars is not applicable, not a currency error (`QĐ-113a`).
+        const referencePrice = input.referencePrice
+          ? await this.readReferencePrice(input.provisioningType, input.referencePrice)
+          : null;
 
         const plan = {
           organizationId,
@@ -149,10 +155,12 @@ export class PlanService {
           dataLossOnRemoval: input.dataLossOnRemoval ?? false,
           sharingPolicy: input.sharingPolicy ?? null,
           hasAdminConsole: input.hasAdminConsole ?? false,
+          referencePrice,
         };
         assertPlanShape({ ...plan, applicationKind: application.kind });
         assertPricingModelDerived(input.provisioningType, input.pricingModel);
         assertAdminConsoleApplicable(plan.provisioningType, input.hasAdminConsole);
+        assertReferencePrice(plan.provisioningType, referencePrice);
 
         const created = await this.plans.insert(tx, plan);
         await this.audit.record(
@@ -185,6 +193,9 @@ export class PlanService {
       return await this.runner.run(async (tx) => {
         const current = await this.plans.lock(tx, id);
         if (!current) throw new PlanNotFoundError();
+        const sentPrice = input.referencePrice
+          ? await this.readReferencePrice(input.provisioningType ?? current.provisioningType, input.referencePrice)
+          : input.referencePrice;
 
         const next = {
           name: name ?? current.name,
@@ -198,10 +209,12 @@ export class PlanService {
           hasAdminConsole:
             input.hasAdminConsole ??
             ((input.provisioningType ?? current.provisioningType) === 'K4' ? current.hasAdminConsole : false),
+          referencePrice: this.referencePriceOf(current, input.provisioningType ?? current.provisioningType, sentPrice),
         };
         assertPlanShape({ ...next, applicationKind: current.applicationKind });
         assertPricingModelDerived(next.provisioningType, input.pricingModel);
         assertAdminConsoleApplicable(next.provisioningType, input.hasAdminConsole);
+        assertReferencePrice(next.provisioningType, next.referencePrice);
         if (
           next.provisioningType !== current.provisioningType &&
           next.provisioningType !== 'K2' &&
@@ -220,6 +233,7 @@ export class PlanService {
         if (next.dataLossOnRemoval !== current.dataLossOnRemoval) changes.dataLossOnRemoval = next.dataLossOnRemoval;
         if (next.sharingPolicy !== current.sharingPolicy) changes.sharingPolicy = next.sharingPolicy;
         if (next.hasAdminConsole !== current.hasAdminConsole) changes.hasAdminConsole = next.hasAdminConsole;
+        if (!samePrice(next.referencePrice, current.referencePrice)) changes.referencePrice = next.referencePrice;
         if (Object.keys(changes).length === 0) return current;
 
         const updated = await this.plans.update(tx, id, changes);
@@ -233,6 +247,36 @@ export class PlanService {
     } catch (error) {
       throw await this.mapWriteError(error, { planId: id, name });
     }
+  }
+
+  /**
+   * The reference price after an update (`QĐ-113a`): the one sent (`null` clears it); else the one the plan has, cleared when the kind moves to K5 or
+   * between a per-seat kind and K4 (the IT Admin enters it again; the audit of the change keeps the one cleared).
+   */
+  private referencePriceOf(
+    current: PlanRecord,
+    nextType: ProvisioningType,
+    sent: ReferencePrice | null | undefined,
+  ): ReferencePrice | null {
+    if (sent !== undefined) return sent;
+
+    return referencePriceOnKindChange(current.provisioningType, nextType) === 'CLEAR' ? null : current.referencePrice;
+  }
+
+  /**
+   * The reference price as money in dong, above zero (`QĐ-113a`: a price of 0 is no price, as a request counts it): the kind is judged first, then the
+   * currency before the amount is read (`SUBSCRIPTION.PRICE_NOT_VND`'s counterpart for a plan).
+   */
+  private async readReferencePrice(
+    type: ProvisioningType,
+    price: { amount: string; currency: string },
+  ): Promise<ReferencePrice> {
+    assertReferencePriceKind(type);
+    if (price.currency !== DONG) throw new PlanReferencePriceNotVndError(price.currency);
+    const money = await this.finance.parseMoney(price, 'referencePrice');
+    if (money.amountMinor <= 0n) throw new PlanReferencePriceNotPositiveError();
+
+    return money;
   }
 
   /** The pricing model after an update: the one named, else the one the plan has, else (the kind changed) the one the new kind implies (`B-5`). */
@@ -292,3 +336,6 @@ function changeBlockOf(error: unknown): PlanChangeBlock | null {
 
   return CHANGE_BLOCKS.find((reason) => haystack.includes(`plan_change_blocked: ${reason}`)) ?? null;
 }
+
+const samePrice = (a: ReferencePrice | null, b: ReferencePrice | null): boolean =>
+  a === null || b === null ? a === b : a.amountMinor === b.amountMinor && a.currency === b.currency;

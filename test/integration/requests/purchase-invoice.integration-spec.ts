@@ -270,6 +270,87 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     expect(stray.rowCount).toBe(1);
   });
 
+  it('compares the number of the vendor by its lower case without white space, keeps the number as written, and lets a returned invoice free its number', async () => {
+    const { requestId } = await approved();
+    const submit = async (number: string) =>
+      api('post', '', h.it1).send({
+        ...form(requestId, { vendorInvoiceNumber: number }),
+        documentIds: [await document()],
+      });
+    const code = (response: request.Response) => (response.body as { error: { code: string } }).error.code;
+    const stored = (key: string) =>
+      h.ctx.sql.query<{ id: string; number: string }>(
+        `SELECT id, number FROM purchase_invoices WHERE lower(regexp_replace(number, '[[:space:]]', '', 'g')) = $1`,
+        [key],
+      );
+
+    // INV-001 then inv - 001: both are inv-001.
+    expect((await submit('NRM-INV-001')).status).toBe(201);
+    const refusedDashes = await submit('nrm - inv - 001');
+    expect([refusedDashes.status, code(refusedDashes)]).toEqual([409, 'PURCHASE_INVOICE.NUMBER_TAKEN']);
+    // INV 001 then inv001: white space is not part of the number.
+    expect((await submit('NRM SP 001')).status).toBe(201);
+    const refusedSpaces = await submit('nrmsp001');
+    expect([refusedSpaces.status, code(refusedSpaces)]).toEqual([409, 'PURCHASE_INVOICE.NUMBER_TAKEN']);
+    // A dash is not white space: INV-001 and INV001 are two numbers.
+    expect((await submit('NRM-INV001')).status).toBe(201);
+
+    // The first one was stored exactly as it was written.
+    const first = await stored('nrm-inv-001');
+    expect(first.rows.map((row) => row.number)).toEqual(['NRM-INV-001']);
+
+    // A returned invoice is outside the index: its number may come back.
+    await h.ctx.sql.query(
+      `UPDATE purchase_invoices SET state = 'RETURNED', decided_by_employee_id = $2, decided_at = now(), return_reason = 'Sai' WHERE id = $1`,
+      [first.rows[0].id, h.finance.employeeId],
+    );
+    expect((await submit('nrm inv-001')).status).toBe(201);
+  });
+
+  it('the database itself refuses a second open invoice whose number has the same lower case without white space, and lets the number back once the first is returned', async () => {
+    const { requestId } = await approved();
+    const first = wire(
+      await api('post', '', h.it1)
+        .send({ ...form(requestId, { vendorInvoiceNumber: 'IDX 001' }), documentIds: [await document()] })
+        .expect(201),
+    );
+    const { rows: columns } = await h.ctx.sql.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'purchase_invoices' AND column_name <> 'id' ORDER BY ordinal_position`,
+    );
+    // The same row again under another number, written straight into the table, so only the index can refuse it (the route checks the number first).
+    const copyAs = async (id: string, number: string): Promise<{ code?: string; constraint?: string } | null> => {
+      const list = columns.map((column) => `"${column.column_name}"`).join(', ');
+      const values = columns
+        .map((column) => (column.column_name === 'number' ? '$2' : `"${column.column_name}"`))
+        .join(', ');
+      try {
+        await h.ctx.sql.query(
+          `INSERT INTO purchase_invoices (id, ${list}) SELECT gen_random_uuid(), ${values} FROM purchase_invoices WHERE id = $1`,
+          [id, number],
+        );
+
+        return null;
+      } catch (error) {
+        return error as { code?: string; constraint?: string };
+      }
+    };
+
+    expect(await copyAs(first.id, 'idx001')).toMatchObject({
+      code: '23505',
+      constraint: 'purchase_invoices_number_open_normalized_key',
+    });
+    expect(await copyAs(first.id, 'IDX-001')).toBeNull();
+
+    await h.ctx.sql.query(
+      `UPDATE purchase_invoices SET state = 'RETURNED', decided_by_employee_id = $2, decided_at = now(), return_reason = 'Sai' WHERE id = $1`,
+      [first.id, h.finance.employeeId],
+    );
+    // The copy of an invoice that is still open: its number is the key of the one returned, which is outside the index.
+    const open = (await h.ctx.sql.query<{ id: string }>(`SELECT id FROM purchase_invoices WHERE number = 'IDX-001'`))
+      .rows[0];
+    expect(await copyAs(open.id, 'idx 001')).toBeNull();
+  });
+
   it('refuses an invoice for a request whose software is internal and has no vendor, without guessing one, and keeps nothing', async () => {
     const { requestId } = await approved();
     const internal = await h.plan('K5');
@@ -286,7 +367,7 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
   it('reads an invoice of a subscription as a renewal with no period, for the IT Admin of the department that owns it', async () => {
     const unit = await h.departmentWithHead(`P-PIS${counter++}`);
     await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
-    const owned = await h.subscription(10, 'K2', unit.department.id);
+    const owned = await h.subscription(10, 'K2');
     await h.ctx.sql.query(
       `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
       [owned],
@@ -313,7 +394,7 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
 
   it('takes the invoice of a subscription of the shared pool, K2 or K4, from the IT Admin who answers for it and from every other IT Admin, and from nobody who is not one (PI-1c)', async () => {
     const pool = async (type: 'K2' | 'K4'): Promise<string> => {
-      const id = await takeOwnerOff(h, await h.subscription(10, type, h.seed.departmentId));
+      const id = await takeOwnerOff(h, await h.subscription(10, type));
       await h.ctx.sql.query(
         `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
         [id],
@@ -343,7 +424,7 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     for (const kept of [byResponsible, byOther, ofKey]) {
       expect(kept).toMatchObject({ label: 'RENEWAL', matchResult: 'MATCHED', chargedCostCenterId: null });
     }
-    // The preview reads it the same way, and a subscription that is not the pool's is still the IT Admin of its department's only.
+    // The preview reads it the same way, and every subscription is of the pool now: any IT Admin submits its invoice.
     expect(
       h.dataOf<Preview>(
         await api('post', '/preview', it2)
@@ -351,18 +432,14 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
           .expect(200),
       ),
     ).toMatchObject({ label: 'RENEWAL', matchResult: 'MATCHED' });
-    const unit = await h.departmentWithHead(`P-PIP${counter++}`);
-    await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
-    const owned = await h.subscription(10, 'K2', unit.department.id);
-    expect(((await submitFor(owned, it2, 404)).body as { error: { code: string } }).error.code).toBe(
-      'PURCHASE_INVOICE.LINK_NOT_FOUND',
-    );
+    const owned = await h.subscription(10, 'K2');
+    await submitFor(owned, it2, 201);
     await submitFor(k2, h.finance, 403);
     await submitFor(k2, h.boss.account, 403);
   });
 
   it('marks over an invoice of the shared pool, linked to the pool or to a K2 request, and the invoice of a renewal, by the seats bought times the price of a month times the months to the renewal day, and never refuses it (B3B-06, QĐ-103w(3), QĐ-104c(3), QĐ-104d)', async () => {
-    const pool = await takeOwnerOff(h, await h.subscription(10, 'K2', h.seed.departmentId));
+    const pool = await takeOwnerOff(h, await h.subscription(10, 'K2'));
     // 10 seats at 1.000.000 đ a month (the harness price); the renewal day is 05/12, so September has three months to it.
     await h.ctx.sql.query(
       `UPDATE subscriptions SET renewal_date = $2, original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,

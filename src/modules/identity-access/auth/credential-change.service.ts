@@ -4,6 +4,7 @@ import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import type { AuditEventInput } from '../../audit/public/audit.types';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ActionLinkRevocation } from '../accounts/action-link-revocation.service';
 import { CredentialService } from '../credentials/credential.service';
 import { AccountSnapshot } from '../public/identity-access.types';
@@ -38,6 +39,7 @@ export class CredentialChangeService {
     private readonly throttle: LoginThrottle,
     private readonly notifications: NotificationsApi,
     private readonly audit: AuditApi,
+    private readonly organizations: OrganizationReadApi,
   ) {}
 
   async replace(tx: DbTx, change: CredentialChange): Promise<void> {
@@ -49,13 +51,15 @@ export class CredentialChangeService {
     await this.sessions.revokeAllSessions(tx, account.id, event, now);
     // Getting the password back is getting the account back at once.
     await this.throttle.clear(tx, account.organizationId, this.throttle.keyFor(normalizeEmail(account.loginEmail)));
+    // The notice shows the time in the time zone of the organization; the audit event below keeps the ISO time alone.
+    const organization = await this.organizations.getOrganization(tx);
     await this.notifications.enqueueEmail(tx, {
       organizationId: account.organizationId,
       recipient: account.loginEmail,
       template: 'PASSWORD_CHANGED_NOTICE',
       locale: 'vi',
       actionTokenHash: null,
-      payload: { event, at: now.toISOString(), fullName: change.fullName },
+      payload: { event, at: now.toISOString(), timeZone: organization?.timeZone, fullName: change.fullName },
     });
     // Only the event and its time: no key may look like a secret, and none carries one (AC-9).
     await this.audit.record(tx, {

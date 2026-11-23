@@ -43,7 +43,7 @@ const seat = (requestId: string, over: Partial<GrantedSeatOfRequest> = {}): Gran
 const schedule = (over: Partial<PaymentScheduleFacts> = {}): PaymentScheduleFacts => ({
   subscriptionId: 's-1',
   planId: 'plan-k2',
-  ownerDepartmentId: 'd-1',
+  responsibleItAdminEmployeeId: 'it-1',
   billingCycle: 'MONTHLY',
   startDate: '2026-01-05',
   endDate: null,
@@ -224,7 +224,7 @@ describe('PurchaseInvoiceMissingPeriodsQueryService (PI-2, QĐ-111x, R-30)', () 
     });
   });
 
-  describe('the subscription a department owns', () => {
+  describe('the subscription an IT Admin answers for', () => {
     const owned: World = { schedules: [schedule()], today: '2026-12-14' };
 
     it('is marked for each payment day from the day the system knew it, with the due day of each', async () => {
@@ -261,10 +261,10 @@ describe('PurchaseInvoiceMissingPeriodsQueryService (PI-2, QĐ-111x, R-30)', () 
     });
   });
 
-  describe('the subscription of the shared pool, which no department owns (PI-1c)', () => {
-    const pooled: World = { schedules: [schedule({ ownerDepartmentId: null })], today: '2026-12-14' };
+  describe('the subscription periods an IT Admin sees', () => {
+    const pooled: World = { schedules: [schedule({})], today: '2026-12-14' };
 
-    it('is marked like any other, with no department on the period, for Finance and for an IT Admin of any department', async () => {
+    it('are those of the subscriptions the caller answers for, with no department; Finance sees every subscription', async () => {
       const forFinance = await serviceIn(pooled).service.pageFor(finance, all);
       const forItAdmin = await serviceIn({ ...pooled, scope: ['d-9'] }).service.pageFor(itAdmin, all);
 
@@ -273,9 +273,32 @@ describe('PurchaseInvoiceMissingPeriodsQueryService (PI-2, QĐ-111x, R-30)', () 
       expect(forItAdmin.items).toEqual(forFinance.items);
     });
 
-    it('reads no department name when no period of the page has a department, and the departments of the others', async () => {
+    it('leave out the subscriptions another IT Admin or nobody answers for, and the count follows', async () => {
+      const world: World = {
+        today: '2026-12-14',
+        schedules: [
+          schedule({ subscriptionId: 's-mine' }),
+          schedule({ subscriptionId: 's-other', responsibleItAdminEmployeeId: 'it-2' }),
+          schedule({ subscriptionId: 's-none', responsibleItAdminEmployeeId: null }),
+        ],
+      };
+      const { service } = serviceIn(world);
+
+      const mine = await service.pageFor(itAdmin, all);
+      const everything = await service.pageFor(finance, all);
+
+      expect(new Set(mine.items.map((row) => row.subscriptionId))).toEqual(new Set(['s-mine']));
+      expect(new Set(everything.items.map((row) => row.subscriptionId))).toEqual(
+        new Set(['s-mine', 's-other', 's-none']),
+      );
+      expect(
+        await service.countOf({ kind: 'DEPARTMENTS', departmentIds: [], responsibleItAdminEmployeeId: 'it-2' }),
+      ).toBe(3);
+    });
+
+    it('reads no department name for a subscription period: it has no owning department', async () => {
       const mixed: World = {
-        schedules: [schedule({ ownerDepartmentId: null }), schedule({ subscriptionId: 's-2' })],
+        schedules: [schedule({}), schedule({ subscriptionId: 's-2' })],
         today: '2026-12-14',
       };
       const { items } = await serviceIn(mixed).service.pageFor(finance, all);
@@ -286,9 +309,9 @@ describe('PurchaseInvoiceMissingPeriodsQueryService (PI-2, QĐ-111x, R-30)', () 
         null,
       ]);
       expect(items.filter((row) => row.subscriptionId === 's-2').map((row) => row.department)).toEqual([
-        { id: 'd-1', name: 'Department d-1' },
-        { id: 'd-1', name: 'Department d-1' },
-        { id: 'd-1', name: 'Department d-1' },
+        null,
+        null,
+        null,
       ]);
     });
   });
@@ -305,10 +328,10 @@ describe('PurchaseInvoiceMissingPeriodsQueryService (PI-2, QĐ-111x, R-30)', () 
       expect(forIt.completedTermGrants).toHaveBeenCalledWith(
         expect.objectContaining({ departmentIds: ['d-1', 'd-2'] }),
       );
-      expect(forIt.listPaymentSchedules).toHaveBeenCalledWith(['d-1', 'd-2']);
+      expect(forIt.listPaymentSchedules).toHaveBeenCalledWith();
       expect(forFinance.getItAdminScope).not.toHaveBeenCalled();
       expect(forFinance.completedTermGrants).toHaveBeenCalledWith(expect.objectContaining({ departmentIds: null }));
-      expect(forFinance.listPaymentSchedules).toHaveBeenCalledWith(null);
+      expect(forFinance.listPaymentSchedules).toHaveBeenCalledWith();
     });
 
     it('counts the periods of the departments it is given: the total the list answers for them', async () => {
@@ -319,8 +342,14 @@ describe('PurchaseInvoiceMissingPeriodsQueryService (PI-2, QĐ-111x, R-30)', () 
         today: '2026-12-14',
       });
 
-      expect(await world.service.countOf({ kind: 'DEPARTMENTS', departmentIds: ['d-1'] })).toBe(4);
-      expect(world.listPaymentSchedules).toHaveBeenCalledWith(['d-1']);
+      expect(
+        await world.service.countOf({
+          kind: 'DEPARTMENTS',
+          departmentIds: ['d-1'],
+          responsibleItAdminEmployeeId: 'it-1',
+        }),
+      ).toBe(4);
+      expect(world.listPaymentSchedules).toHaveBeenCalledWith();
     });
 
     it('puts the oldest due day first, then the link and the month, and pages after the count', async () => {
