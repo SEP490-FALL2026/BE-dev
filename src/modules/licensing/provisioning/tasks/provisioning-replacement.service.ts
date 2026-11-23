@@ -55,6 +55,12 @@ export class ProvisioningReplacementService {
     });
     if (!canEnd) return null;
 
+    // The lock taken before the grant sees only the tasks of revocation that were committed then. One that another transaction (a reclaim, a return) committed
+    // since is seen here, with the subscription held: the right is then that task's to end, and a grant that ended it too would leave the task working an account the
+    // new right uses.
+    if (lockedRevocation === null && (await this.tasks.hasLiveRevocation(tx, replacesAssignmentId))) {
+      throw new AssignmentConflictError('OVERLAP', 0, undefined, replacesAssignmentId);
+    }
     await this.resolveRevocation(tx, actor, replacesAssignmentId, lockedRevocation);
 
     const ended = await this.assignments.endReplacedByGrant(tx, actor, {

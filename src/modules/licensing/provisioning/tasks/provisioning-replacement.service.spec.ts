@@ -63,11 +63,40 @@ describe('ProvisioningReplacementService', () => {
     expect(listOf).not.toHaveBeenCalled();
   });
 
+  it('refuses with OVERLAP, and ends nothing, when a task of revocation of the old right was committed after the lock looked for one', async () => {
+    const endReplacedByGrant = jest.fn();
+    const reportRightReplaced = jest.fn();
+    const service = new ProvisioningReplacementService(
+      { hasLiveRevocation: jest.fn(() => Promise.resolve(true)) } as unknown as ProvisioningTaskRepo,
+      {} as unknown as ProvisioningTaskReasonRepo,
+      {} as unknown as ForRevocationWithdrawalService,
+      {
+        canEndReplacedByGrant: jest.fn(() => Promise.resolve(true)),
+        endReplacedByGrant,
+      } as unknown as AssignmentService,
+      { get: () => ({ reportRightReplaced }) } as unknown as GrantRequestGateHook,
+    );
+
+    const attempt = service.endReplacedRight(tx, actor, {
+      claimed,
+      target,
+      requestId: 'req-1',
+      today: '2026-11-23',
+      organizationId: 'org-1',
+      lockedRevocation: null,
+    });
+
+    await expect(attempt).rejects.toMatchObject({ name: 'AssignmentConflictError', conflict: 'OVERLAP' });
+    expect(endReplacedByGrant).not.toHaveBeenCalled();
+    expect(reportRightReplaced).not.toHaveBeenCalled();
+  });
+
   it('ends the old right and reports it when lockedRevocation is null', async () => {
     const endReplacedByGrant = jest.fn(() => Promise.resolve('asg-old'));
     const reportRightReplaced = jest.fn(() => Promise.resolve());
+    const hasLiveRevocation = jest.fn(() => Promise.resolve(false));
     const service = new ProvisioningReplacementService(
-      {} as unknown as ProvisioningTaskRepo,
+      { hasLiveRevocation } as unknown as ProvisioningTaskRepo,
       {} as unknown as ProvisioningTaskReasonRepo,
       {} as unknown as ForRevocationWithdrawalService,
       {
@@ -86,6 +115,7 @@ describe('ProvisioningReplacementService', () => {
       lockedRevocation: null,
     });
 
+    expect(hasLiveRevocation).toHaveBeenCalledWith(tx, 'asg-old');
     expect(result).toBe('asg-old');
     expect(endReplacedByGrant).toHaveBeenCalledWith(tx, actor, {
       organizationId: 'org-1',
