@@ -110,7 +110,10 @@ export class RegistryRepo {
   }
 
   async retireDevice(tx: DbTx, id: string, retiredAt: Date, reason: string): Promise<void> {
-    await tx.managedDevice.update({ where: { id }, data: { retiredAt, retirementReason: reason } });
+    await tx.managedDevice.update({
+      where: { id },
+      data: { retiredAt, retirementReason: reason, retirementKind: 'DISPOSED' },
+    });
   }
 
   async findRegistration(id: string, tx?: DbTx): Promise<RegistrationRecord | null> {

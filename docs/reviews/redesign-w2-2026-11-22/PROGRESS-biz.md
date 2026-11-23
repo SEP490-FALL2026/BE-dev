@@ -19,7 +19,8 @@ mỗi gói**.
 
 | Gói   | Mục                                   | Trạng thái | sha | Lệnh kiểm + kết quả | FIX-TEST thêm | D-n | Ghi chú / chưa kiểm được |
 | ----- | ------------------------------------- | ---------- | --- | ------------------- | ------------- | --- | ------------------------ |
-| B0    | policy thuần (pha A)                  | xong       | cùng commit B0 | `tsc --noEmit` (0), `eslint` 10 file (0), `depcruise` (0), `arch:capabilities` (0), `rules:check` (0), `test:gates` (17/17, 335 pass), `openapi:export` (0 diff), unit B0 (5/5, 143 pass) | —             | D-1 | Chưa đẩy remote (`origin/int/redesign-w2` chưa tồn tại); chạy bằng binary cục bộ do sandbox chặn đọc config `pnpm` ngoài workspace |
+| B0    | policy thuần (pha A)                  | xong       | 0586ed00       | `tsc --noEmit` (0), `eslint` 10 file (0), `depcruise` (0), `arch:capabilities` (0), `rules:check` (0), `test:gates` (17/17, 335 pass), `openapi:export` (0 diff), unit B0 (5/5, 143 pass) | —             | D-1 | Chưa đẩy remote (`origin/int/redesign-w2` chưa tồn tại); chạy bằng binary cục bộ do sandbox chặn đọc config `pnpm` ngoài workspace |
+| H-1   | `retireDevice` ghi `retirementKind = 'DISPOSED'` | xong | cùng commit H-1 | `eslint` 2 file (0), `tsc --noEmit` (0), `depcruise` (0), `arch:capabilities` devices (0), `rules:check` (0), `test:gates` (17/17, 335 pass), `openapi:export` (0 diff), `registry.repo.spec.ts` (1/1) | — | — | Sửa theo H-1 review T1 (tránh 500 CHECK `managed_devices_retired_complete`) |
 | B1    | W2-03, W2-05 + đăng ký provider T2/T5 | chưa       |     |                     |               |     |                          |
 | B2a-1 | W2-06, W2-08                          | chưa       |     |                     |               |     |                          |
 | B2a-2 | W2-09                                 | chưa       |     |                     |               |     |                          |
