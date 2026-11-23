@@ -163,7 +163,9 @@ export interface DemoSeat {
 /**
  * The budget cycle of a year (`QĐ-111z`): the annual ceiling of the software budget and the shared-pool reserve (there is no ceiling per
  * department any more). The submission deadline is `submissionOffsetDays` after the day the seed runs (0 = that very day: the cycle is open
- * on that day and locked from the next); the decision deadline `decisionOffsetDays` after it. `open: false` leaves the cycle a draft.
+ * on that day, so the heads send their `BM-10`); once a version of the year is to be sent the seed moves the deadline to the day before the seed and leaves it
+ * there, as the cycle of a year with versions is locked (`QĐ-111z`). The decision deadline is `decisionOffsetDays` after the day of the seed. `open: false`
+ * leaves the cycle a draft.
  */
 export interface DemoCycle {
   annualCeiling: string;
@@ -202,6 +204,8 @@ export interface DemoBudgetLine {
 /** Where the budget of the next year of a department is left for the demo to carry on from. */
 export interface DemoNextYear {
   department: string;
+  /** The budget is the one of the year after the next, whose cycle is open (the next year's cycle is locked, with its versions sent); absent: the next year. */
+  afterNext?: true;
   /** The amount the head asks in `BM-10`. */
   requestedAmount: string;
   note?: string;
@@ -439,13 +443,13 @@ export interface DemoFixture {
     group: 'T2' | 'T3';
     lines: { taxType: string; ratePercent: string; deductible: boolean }[];
   }[];
-  /** The budget cycle of the year, then of the next one, each opened before any proposal (`QĐ-111z`); the year after stays a draft. */
+  /** The budget cycle of the year, of the next one and of the year after, each opened before any proposal (`QĐ-111z`). */
   cycle: DemoCycle;
   nextCycle: DemoCycle;
-  draftCycle: DemoCycle;
+  afterNextCycle: DemoCycle;
   /** The approved budgets of the year, one per department with a Cost Center. */
   budgets: DemoBudget[];
-  /** The budgets of the next year, each left at the stage a demo carries on from. */
+  /** The budgets of the next year and of the one after, each left at the stage a demo carries on from. */
   nextYear: DemoNextYear[];
   /** The lines of the `BM-10` file of each department (by code), this year and next; what they leave short of the amount asked is one balancing line. */
   budgetLines: Record<string, DemoBudgetLine[]>;

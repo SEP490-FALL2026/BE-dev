@@ -11,7 +11,7 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
 
 - `BudgetsReadApi` (`public/budgets-read.api.ts`) — `yearFacts` chỉ đọc, cùng `BudgetFactsRepo` với `BudgetsApi`.
   `BudgetsReadFacadeModule` dùng cho kiểm ngân sách trong worker, không controller hoặc listener vòng đời.
-- `LocalDemoBudgetCycleApi` (`public/local-demo-budget-cycle.api.ts`) — `setSubmissionDeadline` qua `BudgetsLocalSeedFacadeModule` cho đồ thị lệnh seed (khóa tạm kỳ để gửi phiên bản qua API rồi trả lại hạn nộp).
+- `LocalDemoBudgetCycleApi` (`public/local-demo-budget-cycle.api.ts`) — `setSubmissionDeadline` qua `BudgetsLocalSeedFacadeModule` cho đồ thị lệnh seed (đưa hạn nộp của kỳ về một ngày đã qua và để nguyên, để seed gửi phiên bản cho kỳ đã khóa thật; trả về id kỳ và hạn cũ cho Audit của lệnh).
 
 - `BudgetsApi` ([public/budgets.api.ts](public/budgets.api.ts)) — những gì request đọc và giữ; không hàm nào sửa
   ngân sách:

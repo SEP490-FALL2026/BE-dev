@@ -60,7 +60,7 @@ describe('budget.year and budget.next-year (T9b)', () => {
       today: '2026-11-17',
       mode: 'apply',
       api: { call, signIn: () => Promise.resolve() },
-      accounts: { withLockedBudgetCycle: jest.fn((_y, _d, work: () => Promise<unknown>) => work()) },
+      accounts: { lockBudgetCycle: jest.fn(() => Promise.resolve()) },
       ids: { costCenters: new Map([[department, `cc-${department}`]]) },
       demoPassword: 'x',
     } as unknown as DemoRunContext;
@@ -81,7 +81,7 @@ describe('budget.year and budget.next-year (T9b)', () => {
     expect(eng).not.toHaveProperty('reserveReason');
   });
 
-  it('submits all proposals and drafts across departments while OPEN, wraps draft submissions in one temporary lock window, then decides and restores', async () => {
+  it('submits all proposals and drafts across departments while OPEN, locks the cycle once and for good before the drafts are sent, then decides in the cycle that stays locked', async () => {
     const events: string[] = [];
     const lockedCalls: { year: number; deadline: string }[] = [];
     const versions = new Map<string, string>([
@@ -129,23 +129,19 @@ describe('budget.year and budget.next-year (T9b)', () => {
 
       return Promise.resolve({});
     });
-    const withLockedBudgetCycle = jest.fn(async <T>(year: number, deadline: string, work: () => Promise<T>) => {
+    const lockBudgetCycle = jest.fn((year: number, deadline: string) => {
       lockedCalls.push({ year, deadline });
       cycleLocked = true;
       events.push(`lock:${year}:${deadline}`);
-      try {
-        return await work();
-      } finally {
-        cycleLocked = false;
-        events.push(`unlock:${year}`);
-      }
+
+      return Promise.resolve();
     });
     const ctx = {
       fixture: only,
       today: '2026-11-17',
       mode: 'apply',
       api: { call, signIn: () => Promise.resolve() },
-      accounts: { withLockedBudgetCycle },
+      accounts: { lockBudgetCycle },
       ids: {
         costCenters: new Map([
           ['ENG', 'cc-ENG'],
@@ -163,14 +159,13 @@ describe('budget.year and budget.next-year (T9b)', () => {
       'lock:2026:2026-11-16',
       'submit:/budget-versions/ver-ENG/submission:LOCKED',
       'submit:/budget-versions/ver-MKT/submission:LOCKED',
-      'unlock:2026',
-      'decide:/budget-versions/ver-ENG/decision:OPEN',
-      'decide:/budget-versions/ver-MKT/decision:OPEN',
+      'decide:/budget-versions/ver-ENG/decision:LOCKED',
+      'decide:/budget-versions/ver-MKT/decision:LOCKED',
     ]);
   });
 
-  it('does not call withLockedBudgetCycle in plan mode, when already LOCKED, or when versions are already settled', async () => {
-    const withLockedBudgetCycle = jest.fn(async <T>(_y: number, _d: string, work: () => Promise<T>) => work());
+  it('does not lock the cycle in plan mode, when already LOCKED, or when versions are already settled', async () => {
+    const lockBudgetCycle = jest.fn(() => Promise.resolve());
     const callFor = (cycleStatus: 'OPEN' | 'LOCKED', initialVersionState: string) => {
       let currentState = initialVersionState;
       return jest.fn((...[, method, path]: [string, string, string, unknown?]): Promise<unknown> => {
@@ -195,64 +190,72 @@ describe('budget.year and budget.next-year (T9b)', () => {
       today: '2026-11-17',
       mode: 'plan',
       api: { call: callFor('OPEN', 'DRAFT'), signIn: () => Promise.resolve() },
-      accounts: { withLockedBudgetCycle },
+      accounts: { lockBudgetCycle },
       ids: { costCenters: new Map([['ENG', 'cc-ENG']]) },
       demoPassword: 'x',
     } as unknown as DemoRunContext);
     expect(planOutcome.status).toBe('planned');
-    expect(withLockedBudgetCycle).not.toHaveBeenCalled();
+    expect(lockBudgetCycle).not.toHaveBeenCalled();
 
     const lockedApply = await yearStep.run({
       fixture: { ...F, budgets: [budget('ENG')] },
       today: '2026-11-17',
       mode: 'apply',
       api: { call: callFor('LOCKED', 'DRAFT'), signIn: () => Promise.resolve() },
-      accounts: { withLockedBudgetCycle },
+      accounts: { lockBudgetCycle },
       ids: { costCenters: new Map([['ENG', 'cc-ENG']]) },
       demoPassword: 'x',
     } as unknown as DemoRunContext);
     expect(lockedApply.status).toBe('done');
-    expect(withLockedBudgetCycle).not.toHaveBeenCalled();
+    expect(lockBudgetCycle).not.toHaveBeenCalled();
 
     const rerunOutcome = await yearStep.run({
       fixture: { ...F, budgets: [budget('ENG')] },
       today: '2026-11-17',
       mode: 'apply',
       api: { call: callFor('OPEN', 'APPROVED'), signIn: () => Promise.resolve() },
-      accounts: { withLockedBudgetCycle },
+      accounts: { lockBudgetCycle },
       ids: { costCenters: new Map([['ENG', 'cc-ENG']]) },
       demoPassword: 'x',
     } as unknown as DemoRunContext);
     expect(rerunOutcome.status).toBe('present');
-    expect(withLockedBudgetCycle).not.toHaveBeenCalled();
+    expect(lockBudgetCycle).not.toHaveBeenCalled();
   });
 
-  it('keeps PROPOSAL_SUBMITTED plans out of draft submission while still submitting nextYear draft versions inside one lock window', async () => {
-    const proposalsCreated: string[] = [];
+  it('locks the cycle of the next year once and for good for its draft versions, and leaves the BM-10 that waits for Finance in the open cycle of the year after', async () => {
+    const proposals: { cc: string; year: number }[] = [];
     const submissions: string[] = [];
     const versions = new Map<string, string>();
-    const withLockedBudgetCycle = jest.fn(async <T>(_y: number, _d: string, work: () => Promise<T>) => work());
-    const call = jest.fn((...[, method, path]: [string, string, string, unknown?]): Promise<unknown> => {
+    const lockBudgetCycle = jest.fn(() => Promise.resolve());
+    // The heads send in the order of the fixture: the three of the next year, then the one of the year after.
+    const heads = ['cc-ENG', 'cc-MKT', 'cc-SAL', 'cc-ITO'];
+    const yearOfPath = (path: string) => Number(/year=(\d+)/.exec(path)?.[1]);
+    const call = jest.fn((...[, method, path, body]: [string, string, string, unknown?]): Promise<unknown> => {
       if (path.startsWith('/budget-proposals?')) {
         return Promise.resolve({
-          items: proposalsCreated.map((cc) => ({ id: `prop-${cc}`, state: 'SUBMITTED', costCenter: { id: cc } })),
+          items: proposals
+            .filter((proposal) => proposal.year === yearOfPath(path))
+            .map((proposal) => ({ id: `prop-${proposal.cc}`, state: 'SUBMITTED', costCenter: { id: proposal.cc } })),
           pagination: { totalPages: 1 },
         });
       }
       if (method === 'POST' && path === '/budget-proposals/attachments') return Promise.resolve({ id: 'prop-file' });
       if (method === 'POST' && path === '/budget-proposals') {
-        const nextCc = ['cc-ENG', 'cc-ITO', 'cc-MKT', 'cc-SAL'].find((cc) => !proposalsCreated.includes(cc))!;
-        proposalsCreated.push(nextCc);
-        return Promise.resolve({ id: `prop-${nextCc}` });
+        const year = (body as { year: number }).year;
+        proposals.push({ cc: heads[proposals.length], year });
+        return Promise.resolve({ id: `prop-${heads[proposals.length - 1]}` });
       }
       if (path.startsWith('/budget-versions?')) {
         return Promise.resolve({
-          items: [...versions.entries()].map(([cc, state]) => ({
-            id: `ver-${cc}`,
-            state,
-            number: 1,
-            costCenter: { id: cc },
-          })),
+          items:
+            yearOfPath(path) === 2027
+              ? [...versions.entries()].map(([cc, state]) => ({
+                  id: `ver-${cc}`,
+                  state,
+                  number: 1,
+                  costCenter: { id: cc },
+                }))
+              : [],
           pagination: { totalPages: 1 },
         });
       }
@@ -280,7 +283,7 @@ describe('budget.year and budget.next-year (T9b)', () => {
       today: '2026-11-17',
       mode: 'apply',
       api: { call, signIn: () => Promise.resolve() },
-      accounts: { withLockedBudgetCycle },
+      accounts: { lockBudgetCycle },
       ids: {
         costCenters: new Map([
           ['ENG', 'cc-ENG'],
@@ -295,8 +298,14 @@ describe('budget.year and budget.next-year (T9b)', () => {
     const outcome = await nextYearStep.run(ctx);
 
     expect(outcome.status).toBe('done');
-    expect(withLockedBudgetCycle).toHaveBeenCalledTimes(1);
-    expect(withLockedBudgetCycle).toHaveBeenCalledWith(2027, '2026-11-16', expect.any(Function));
+    expect(lockBudgetCycle).toHaveBeenCalledTimes(1);
+    expect(lockBudgetCycle).toHaveBeenCalledWith(2027, '2026-11-16');
+    expect(proposals).toEqual([
+      { cc: 'cc-ENG', year: 2027 },
+      { cc: 'cc-MKT', year: 2027 },
+      { cc: 'cc-SAL', year: 2027 },
+      { cc: 'cc-ITO', year: 2028 },
+    ]);
     expect(submissions).toEqual([
       '/budget-versions/ver-cc-ENG/submission',
       '/budget-versions/ver-cc-MKT/submission',

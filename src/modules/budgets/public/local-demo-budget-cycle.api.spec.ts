@@ -6,7 +6,7 @@ describe('LocalDemoBudgetCycleApi', () => {
   const tx = {} as DbTx;
   const orgId = 'org-1';
 
-  it('locks the cycle row, updates submissionDeadline, and returns the previous deadline', async () => {
+  it('locks the cycle row, updates submissionDeadline, and returns the cycle id with the previous deadline', async () => {
     const lockByYear = jest.fn().mockResolvedValue({
       id: 'cycle-2026',
       organizationId: orgId,
@@ -16,9 +16,9 @@ describe('LocalDemoBudgetCycleApi', () => {
     const update = jest.fn().mockResolvedValue(undefined);
     const api = new LocalDemoBudgetCycleApi({ lockByYear, update } as unknown as CycleRepo);
 
-    const previous = await api.setSubmissionDeadline(tx, orgId, 2026, '2026-11-30');
+    const moved = await api.setSubmissionDeadline(tx, orgId, 2026, '2026-11-30');
 
-    expect(previous).toBe('2026-12-01');
+    expect(moved).toEqual({ id: 'cycle-2026', previous: '2026-12-01' });
     expect(lockByYear).toHaveBeenCalledWith(tx, orgId, 2026, 'UPDATE');
     expect(update).toHaveBeenCalledWith(tx, 'cycle-2026', {
       submissionDeadline: '2026-11-30',
@@ -30,9 +30,9 @@ describe('LocalDemoBudgetCycleApi', () => {
     const update = jest.fn();
     const api = new LocalDemoBudgetCycleApi({ lockByYear, update } as unknown as CycleRepo);
 
-    const previous = await api.setSubmissionDeadline(tx, orgId, 2026, '2026-11-30');
+    const moved = await api.setSubmissionDeadline(tx, orgId, 2026, '2026-11-30');
 
-    expect(previous).toBeNull();
+    expect(moved).toBeNull();
     expect(update).not.toHaveBeenCalled();
   });
 });

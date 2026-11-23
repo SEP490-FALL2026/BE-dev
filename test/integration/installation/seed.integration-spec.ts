@@ -199,7 +199,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
       R58: 'AWAITING_SPEND_DECISION',
     });
     // Every department with a Cost Center and a head holds the approved budget of this year (BM-10 → version → decision); of next year
-    // each department of the fixture stands at its stage (DEMO-15) and Information Technology's BM-10 waits for Finance.
+    // each department of the fixture stands at its stage (DEMO-15) and Information Technology's BM-10 waits for Finance in the open cycle of the year after.
     const year = new Date().getFullYear();
     const versions = await ctx.sql.query<{ code: string; year: number; state: string }>(
       `SELECT c.code, v.year, v.state::text AS state FROM budget_versions v JOIN cost_centers c ON c.id = v.cost_center_id
@@ -222,17 +222,19 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     const proposals = await ctx.sql.query<{ code: string; state: string }>(
       `SELECT c.code, p.state::text AS state FROM budget_proposals p JOIN cost_centers c ON c.id = p.cost_center_id
         WHERE p.year = $1 AND p.state = 'SUBMITTED' ORDER BY c.code`,
-      [year + 1],
+      [year + 2],
     );
     expect(proposals.rows).toEqual([{ code: 'CC-ITO', state: 'SUBMITTED' }]);
-    // The cycles of the year and the next are open, the one after a draft (`QĐ-111z`).
-    const cycles = await ctx.sql.query<{ year: number; opened: boolean }>(
-      'SELECT year, opened_at IS NOT NULL AS opened FROM budget_cycles ORDER BY year',
+    // All three cycles are opened (`QĐ-111z`); the year and the next hold versions, so they are locked for good (their deadline has passed), and the one after is still taking proposals.
+    const cycles = await ctx.sql.query<{ year: number; opened: boolean; locked: boolean }>(
+      `SELECT year, opened_at IS NOT NULL AS opened,
+              submission_deadline < (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS locked
+         FROM budget_cycles ORDER BY year`,
     );
     expect(cycles.rows).toEqual([
-      { year, opened: true },
-      { year: year + 1, opened: true },
-      { year: year + 2, opened: false },
+      { year, opened: true, locked: true },
+      { year: year + 1, opened: true, locked: true },
+      { year: year + 2, opened: true, locked: false },
     ]);
     // Heads hold MANAGER as a direct grant and the spending approver holds SPENDING_APPROVER, nothing derived (QĐ-93a).
     const grants = await ctx.sql.query<{ code: string; role: string }>(

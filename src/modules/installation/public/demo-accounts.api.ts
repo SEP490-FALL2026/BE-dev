@@ -46,25 +46,31 @@ export class DemoAccountsApi {
   ) {}
 
   /**
-   * Temporarily shifts `submissionDeadline` for `year` to `lockedDeadline` in a short transaction so HTTP submission
-   * calls observe a locked cycle, then restores the previous deadline in `finally` without holding a DB lock over HTTP.
+   * Moves the submission deadline of the cycle of `year` to `lockedDeadline`, a day that has passed, and leaves it there: the cycle is locked for good, as the day
+   * after its deadline makes it, so the versions the dataset sends through the API go to a cycle that is really locked and stay consistent with it. One short
+   * transaction, no lock held over HTTP; the move is recorded as an act of the operator, since no route moves a deadline into the past.
    */
-  async withLockedBudgetCycle<T>(
+  async lockBudgetCycle(
     organizationId: string,
     year: number,
     lockedDeadline: BusinessDate,
-    work: () => Promise<T>,
-  ): Promise<T> {
-    const previous = await this.runner.run((tx) =>
-      this.budgetCycles.setSubmissionDeadline(tx, organizationId, year, lockedDeadline),
-    );
-    try {
-      return await work();
-    } finally {
-      if (previous !== null) {
-        await this.runner.run((tx) => this.budgetCycles.setSubmissionDeadline(tx, organizationId, year, previous));
-      }
-    }
+    attribution: DemoAccountsAttribution,
+  ): Promise<void> {
+    await this.runner.run(async (tx) => {
+      const moved = await this.budgetCycles.setSubmissionDeadline(tx, organizationId, year, lockedDeadline);
+      if (moved === null) return;
+      await this.audit.record(tx, {
+        organizationId,
+        actorKind: 'OPERATOR',
+        operatorReference: attribution.operatorReference,
+        correlationId: randomUUID(),
+        action: 'DEMO_DATASET.BUDGET_CYCLE_LOCKED',
+        resourceType: 'BudgetCycle',
+        resourceId: moved.id,
+        before: { submissionDeadline: moved.previous },
+        after: { submissionDeadline: lockedDeadline, year, environment: attribution.environment },
+      });
+    });
   }
 
   /**

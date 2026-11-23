@@ -196,7 +196,12 @@ async function collectDrafts(
   return drafts;
 }
 
-async function submitDraftsInLockedWindow(
+/**
+ * Sends the drafts of the year to the spending approver, which only a locked cycle takes (`QĐ-111z`). The dataset is made on the day its cycles are open, so the
+ * seed moves the submission deadline of the cycle to the day before and leaves it there: the cycle stays locked with the versions it holds, as the day after
+ * the deadline would have made it. A cycle already locked is left as it is.
+ */
+async function submitDraftsInLockedCycle(
   ctx: DemoRunContext,
   finance: string,
   drafts: readonly { entry: YearPlanEntry; versionId: string }[],
@@ -204,29 +209,22 @@ async function submitDraftsInLockedWindow(
 ): Promise<Set<string>> {
   if (drafts.length === 0 || ctx.mode !== 'apply') return new Set();
   const cycle = await ctx.api.call<{ status?: string } | undefined>(finance, 'GET', `/budget-cycles/${year}`);
-  const sendAll = async () => {
-    for (const draft of drafts) {
-      await sendVersion(ctx, finance, draft.versionId, `${draft.entry.department}-${year}`);
-    }
-  };
-  if (cycle?.status === 'LOCKED') await sendAll();
-  else await ctx.accounts.withLockedBudgetCycle(year, dayOffset(ctx.today, -1), sendAll);
+  if (cycle?.status !== 'LOCKED') await ctx.accounts.lockBudgetCycle(year, dayOffset(ctx.today, -1));
+  for (const draft of drafts) {
+    await sendVersion(ctx, finance, draft.versionId, `${draft.entry.department}-${year}`);
+  }
 
   return new Set(drafts.map((draft) => draft.entry.department));
 }
 
-async function runYearPlans(
-  ctx: DemoRunContext,
-  year: number,
-  entries: readonly YearPlanEntry[],
-): Promise<StepOutcome> {
+async function runYearPlans(ctx: DemoRunContext, year: number, entries: readonly YearPlanEntry[]): Promise<Result[]> {
   const finance = await as(ctx, financePerson(ctx));
   const prepared = new Map<string, { status: StepOutcome['status']; detail: string }>();
   for (const entry of entries) {
     prepared.set(entry.department, await walk(ctx, () => prepareTurn(ctx, finance, entry, year), entry.doneDetail));
   }
   const drafts = await collectDrafts(ctx, finance, entries, year);
-  const draftsSent = await submitDraftsInLockedWindow(ctx, finance, drafts, year);
+  const draftsSent = await submitDraftsInLockedCycle(ctx, finance, drafts, year);
   const results: Result[] = [];
   for (const entry of entries) {
     const first = prepared.get(entry.department)!;
@@ -239,7 +237,7 @@ async function runYearPlans(
     results.push({ status, label: `${entry.department} ${year}: ${outcome.detail}${entry.labelSuffix ?? ''}` });
   }
 
-  return summarize(results);
+  return results;
 }
 
 /**
@@ -273,19 +271,24 @@ async function currentYear(ctx: DemoRunContext): Promise<StepOutcome> {
     };
   });
 
-  return runYearPlans(ctx, year, entries);
+  return summarize(await runYearPlans(ctx, year, entries));
 }
 
-/** The budgets of the next year, each left where the demo carries on from. */
+/**
+ * The budgets of the next year and of the one after, each left where the demo carries on from. The cycle of the next year is locked by the seed once its versions
+ * are sent; the one of the year after is open, with the `BM-10` that waits for Finance.
+ */
 async function nextYear(ctx: DemoRunContext): Promise<StepOutcome> {
   const year = yearOf(ctx).year + 1;
-  const entries: YearPlanEntry[] = ctx.fixture.nextYear.map((plan) => ({
-    ...plan,
-    amount: plan.requestedAmount,
-    doneDetail: plan.stage,
-  }));
+  const entriesOf = (afterNext: boolean): YearPlanEntry[] =>
+    ctx.fixture.nextYear
+      .filter((plan) => (plan.afterNext === true) === afterNext)
+      .map((plan) => ({ ...plan, amount: plan.requestedAmount, doneDetail: plan.stage }));
 
-  return runYearPlans(ctx, year, entries);
+  return summarize([
+    ...(await runYearPlans(ctx, year, entriesOf(false))),
+    ...(await runYearPlans(ctx, year + 1, entriesOf(true))),
+  ]);
 }
 
 export function budgetSteps(): DemoStep[] {
@@ -306,7 +309,7 @@ export function budgetSteps(): DemoStep[] {
     {
       key: 'budget.next-year',
       title:
-        'Ngân sách năm sau: một phòng đã duyệt, BM-10 chờ Finance, phiên bản chờ Người duyệt chi, phiên bản bị trả về',
+        'Ngân sách năm sau (kỳ đã khóa): một phòng đã duyệt, phiên bản chờ Người duyệt chi, phiên bản bị trả về; BM-10 chờ Finance ở kỳ năm sau nữa (đang mở)',
       needs: ['budget.cycles', 'finance.cost-centers', 'catalog.plans', 'org.heads', 'org.approval-roles'],
       run: nextYear,
     },

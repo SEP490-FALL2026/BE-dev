@@ -498,18 +498,22 @@ describe('shared dataset v4: the budgets', () => {
     expect(sum(versions.map((n) => n.base))).toBeLessThanOrEqual(room(F.nextCycle));
   });
 
-  it('leaves the next year at every stage (DEMO-15), opens the year and the next, and keeps the year after a draft', () => {
+  it('leaves the next year at every stage (DEMO-15), opens the three cycles, and puts the BM-10 that waits for Finance in the cycle that stays open', () => {
     expect(new Set(F.nextYear.map((n) => n.stage))).toEqual(
       new Set(['PROPOSAL_SUBMITTED', 'VERSION_SENT', 'VERSION_RETURNED', 'APPROVED']),
     );
     expect(F.nextYear.find((n) => n.stage === 'VERSION_RETURNED')?.reason).toBeTruthy();
+    // The next year holds versions, so its cycle is locked by the seed; a BM-10 that waits for Finance can only wait in a cycle that is still open.
+    expect(F.nextYear.filter((n) => n.afterNext).map((n) => n.stage)).toEqual(['PROPOSAL_SUBMITTED']);
+    expect(F.nextYear.filter((n) => !n.afterNext).every((n) => n.stage !== 'PROPOSAL_SUBMITTED')).toBe(true);
     // Some departments with a head send nothing for the next year: the flag of no proposal.
     const heads = F.departments.filter((d) => d.costCenter !== null && d.head !== null).map((d) => d.code);
     expect(heads.filter((code) => !F.nextYear.some((n) => n.department === code)).length).toBeGreaterThan(0);
-    expect([F.cycle.open, F.nextCycle.open, F.draftCycle.open]).toEqual([true, true, false]);
-    // The cycle of the year is open on the day of the seed and locked from the next (adjustments, FIX-AD1-Q2).
-    expect(F.cycle.submissionOffsetDays).toBe(0);
-    for (const cycle of [F.cycle, F.nextCycle, F.draftCycle]) {
+    expect([F.cycle.open, F.nextCycle.open, F.afterNextCycle.open]).toEqual([true, true, true]);
+    // The cycles of the year and of the next are open on the day of the seed, for the heads to send BM-10; the seed locks them once their versions go out.
+    expect([F.cycle.submissionOffsetDays, F.nextCycle.submissionOffsetDays]).toEqual([0, 0]);
+    expect(F.afterNextCycle.submissionOffsetDays).toBeGreaterThan(0);
+    for (const cycle of [F.cycle, F.nextCycle, F.afterNextCycle]) {
       expect(cycle.decisionOffsetDays).toBeGreaterThanOrEqual(cycle.submissionOffsetDays);
     }
   });
