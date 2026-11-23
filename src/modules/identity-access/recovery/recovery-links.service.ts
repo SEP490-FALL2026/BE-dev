@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ActionLinkService } from '../accounts/action-link.service';
 import { TicketRecord } from './recovery.repo';
 
@@ -25,6 +26,7 @@ export class RecoveryLinks {
   constructor(
     private readonly links: ActionLinkService,
     private readonly notifications: NotificationsApi,
+    private readonly organizations: OrganizationReadApi,
   ) {}
 
   /** Whether the ticket has a link that can still be used and whose mail has not failed: then nothing is sent again. */
@@ -77,13 +79,19 @@ export class RecoveryLinks {
       'INVITATION',
       now,
     );
+    const organization = await this.organizations.getOrganization(tx);
     await this.notifications.enqueueEmail(tx, {
       organizationId: input.organizationId,
       recipient,
       template: 'PASSWORD_RESET',
       locale: 'vi',
       actionTokenHash: link.hash,
-      payload: { token: link.token, expiresAt: link.expiresAt.toISOString(), fullName: input.fullName },
+      payload: {
+        token: link.token,
+        expiresAt: link.expiresAt.toISOString(),
+        timeZone: organization?.timeZone,
+        fullName: input.fullName,
+      },
     });
   }
 
@@ -100,13 +108,19 @@ export class RecoveryLinks {
       'INVITATION',
       now,
     );
+    const organization = await this.organizations.getOrganization(tx);
     await this.notifications.enqueueEmail(tx, {
       organizationId: input.organizationId,
       recipient,
       template: 'ACCOUNT_INVITATION',
       locale: 'vi',
       actionTokenHash: link.hash,
-      payload: { token: link.token, expiresAt: link.expiresAt.toISOString(), fullName: input.fullName },
+      payload: {
+        token: link.token,
+        expiresAt: link.expiresAt.toISOString(),
+        timeZone: organization?.timeZone,
+        fullName: input.fullName,
+      },
     });
   }
 }

@@ -270,6 +270,43 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     expect(stray.rowCount).toBe(1);
   });
 
+  it('compares the number of the vendor by its lower case without white space, keeps the number as written, and lets a returned invoice free its number', async () => {
+    const { requestId } = await approved();
+    const submit = async (number: string) =>
+      api('post', '', h.it1).send({
+        ...form(requestId, { vendorInvoiceNumber: number }),
+        documentIds: [await document()],
+      });
+    const code = (response: request.Response) => (response.body as { error: { code: string } }).error.code;
+    const stored = (key: string) =>
+      h.ctx.sql.query<{ id: string; number: string }>(
+        `SELECT id, number FROM purchase_invoices WHERE lower(regexp_replace(number, '[[:space:]]', '', 'g')) = $1`,
+        [key],
+      );
+
+    // INV-001 then inv - 001: both are inv-001.
+    expect((await submit('NRM-INV-001')).status).toBe(201);
+    const refusedDashes = await submit('nrm - inv - 001');
+    expect([refusedDashes.status, code(refusedDashes)]).toEqual([409, 'PURCHASE_INVOICE.NUMBER_TAKEN']);
+    // INV 001 then inv001: white space is not part of the number.
+    expect((await submit('NRM SP 001')).status).toBe(201);
+    const refusedSpaces = await submit('nrmsp001');
+    expect([refusedSpaces.status, code(refusedSpaces)]).toEqual([409, 'PURCHASE_INVOICE.NUMBER_TAKEN']);
+    // A dash is not white space: INV-001 and INV001 are two numbers.
+    expect((await submit('NRM-INV001')).status).toBe(201);
+
+    // The first one was stored exactly as it was written.
+    const first = await stored('nrm-inv-001');
+    expect(first.rows.map((row) => row.number)).toEqual(['NRM-INV-001']);
+
+    // A returned invoice is outside the index: its number may come back.
+    await h.ctx.sql.query(
+      `UPDATE purchase_invoices SET state = 'RETURNED', decided_by_employee_id = $2, decided_at = now(), return_reason = 'Sai' WHERE id = $1`,
+      [first.rows[0].id, h.finance.employeeId],
+    );
+    expect((await submit('nrm inv-001')).status).toBe(201);
+  });
+
   it('refuses an invoice for a request whose software is internal and has no vendor, without guessing one, and keeps nothing', async () => {
     const { requestId } = await approved();
     const internal = await h.plan('K5');

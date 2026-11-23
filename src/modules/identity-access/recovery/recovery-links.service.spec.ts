@@ -1,5 +1,6 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { NotificationsApi } from '../../notifications/public/notifications.api';
+import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { ActionLinkService } from '../accounts/action-link.service';
 import { RecoveryLinks } from './recovery-links.service';
 
@@ -14,8 +15,13 @@ describe('RecoveryLinks recipients', () => {
 
   const links = { issue: jest.fn(), findUsableTokens: jest.fn() };
   const notifications = { enqueueEmail: jest.fn(), deliveryStates: jest.fn() };
+  const organizations = { getOrganization: jest.fn() };
   const recovery = () =>
-    new RecoveryLinks(links as unknown as ActionLinkService, notifications as unknown as NotificationsApi);
+    new RecoveryLinks(
+      links as unknown as ActionLinkService,
+      notifications as unknown as NotificationsApi,
+      organizations as unknown as OrganizationReadApi,
+    );
   const invitation = (recipient: string) => ({
     organizationId: 'org-1',
     appUserId: 'user-1',
@@ -28,6 +34,7 @@ describe('RecoveryLinks recipients', () => {
     jest.clearAllMocks();
     links.issue.mockResolvedValue(issued);
     notifications.enqueueEmail.mockResolvedValue(undefined);
+    organizations.getOrganization.mockResolvedValue({ timeZone: 'Asia/Ho_Chi_Minh' });
   });
 
   it('queues the invitation to the recipient it was given, the login email of the account', async () => {
@@ -51,6 +58,27 @@ describe('RecoveryLinks recipients', () => {
       expect.objectContaining({ recipient: 'login@acme.vn', template: 'PASSWORD_RESET' }),
     );
   });
+
+  it.each([
+    ['the invitation', () => recovery().sendInvitation(tx, invitation('login@acme.vn'), now)],
+    ['the reset link', () => recovery().sendResetLink(tx, { ...invitation('login@acme.vn'), newEmail: null }, now)],
+  ])(
+    'writes the time zone of the organization into the payload of %s, read in the transaction of the caller',
+    async (_name, send) => {
+      await send();
+
+      expect(organizations.getOrganization).toHaveBeenCalledWith(tx);
+      expect(notifications.enqueueEmail).toHaveBeenCalledWith(
+        tx,
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            expiresAt: issued.expiresAt.toISOString(),
+            timeZone: 'Asia/Ho_Chi_Minh',
+          }) as unknown,
+        }),
+      );
+    },
+  );
 
   it.each(['', '   '])(
     'refuses the invitation to the empty recipient %j before a link or a mail is written',

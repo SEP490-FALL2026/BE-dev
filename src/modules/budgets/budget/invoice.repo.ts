@@ -116,9 +116,21 @@ export class InvoiceRepo {
     return toRecord(created);
   }
 
-  /** Whether the vendor already has an invoice with this number: the database refuses a second one in any case. */
+  /**
+   * Whether the vendor already has an invoice with this number, whatever the case and the white space of either number (the key the purchase invoices compare
+   * by: `[[:space:]]`, never a backslash class a JavaScript template would lose). The unique index of the table is on the number as written and stays so; the
+   * database refuses an identical second one in any case.
+   */
   async exists(tx: DbTx, organizationId: string, vendorId: string, number: string): Promise<boolean> {
-    return (await tx.invoice.count({ where: { organizationId, vendorId, number } })) > 0;
+    const rows = await tx.$queryRaw<{ found: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM invoices
+         WHERE organization_id = ${organizationId}::uuid
+           AND vendor_id = ${vendorId}::uuid
+           AND lower(regexp_replace(number, '[[:space:]]', '', 'g')) = lower(regexp_replace(${number}::text, '[[:space:]]', '', 'g'))
+      ) AS found`;
+
+    return rows[0]?.found === true;
   }
 
   /** One page of the invoices of a commitment, the newest first; the total is read in the same snapshot as the page. */
