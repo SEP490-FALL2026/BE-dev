@@ -12,6 +12,7 @@ import {
 import type { AccessRequestRecord, NeedStepWithDecision } from '../access-request/access-request.types';
 import { RequestLineRepo } from '../group-request/request-line.repo';
 import { SpendRoutingService } from '../spend/spend-routing.service';
+import { RequesterHeadConversionService } from '../step-routing/requester-head-conversion.service';
 import { StepTargetService } from '../step-routing/step-target.service';
 
 /** A need step that its head sent back: closed, with a record of approval that says it was returned. */
@@ -34,6 +35,7 @@ export class RequestResubmissionService {
     private readonly lines: RequestLineRepo,
     private readonly audit: AuditApi,
     private readonly targets: StepTargetService,
+    private readonly heads: RequesterHeadConversionService,
   ) {}
 
   async resubmit(actor: AuthenticatedPrincipal, id: string) {
@@ -143,24 +145,25 @@ export class RequestResubmissionService {
       now,
     );
     if (!becameHead) return false;
-    await this.requests.markOneStep(tx, request.id, 'REQUESTER_IS_HEAD');
+    await this.heads.convert(tx, request, { kind: 'USER', actor, trigger: 'RESUBMITTED' });
+    await this.spending.start(tx, actor, request.id, now);
+    // The sender sent the request again whichever way it goes on: the record says so, with where it stands once its route started.
+    const started = await this.requests.findById(request.id, tx);
     await this.audit.record(
       tx,
       accessRequestAuditEvent(
         actor,
         request.organizationId,
-        'ACCESS_REQUEST.STEP_NOT_REQUIRED',
+        'ACCESS_REQUEST.RESUBMITTED',
         'ACCESS_REQUEST',
         request.id,
         {
           requestId: request.id,
-          stepKind: 'NEED',
-          oneStepReason: 'REQUESTER_IS_HEAD',
-          requesterBecameHead: true,
+          oneStep: true,
+          requestState: started?.state ?? request.state,
         },
       ),
     );
-    await this.spending.start(tx, actor, request.id, now);
 
     return true;
   }

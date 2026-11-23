@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { RequesterHeadConversionService } from '../step-routing/requester-head-conversion.service';
 import { StepTargetService } from '../step-routing/step-target.service';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -38,6 +39,7 @@ export class SpendRoutingService {
     private readonly steps: SpendStepRepo,
     private readonly targets: StepTargetService,
     private readonly audit: AuditApi,
+    private readonly heads: RequesterHeadConversionService,
   ) {}
 
   /** Starts only the one-step route; VIA_HEAD keeps its normal need/batch path. */
@@ -115,24 +117,7 @@ export class SpendRoutingService {
         now,
       ))
     ) {
-      await this.requests.markOneStep(tx, request.id, 'REQUESTER_IS_HEAD');
-      await this.audit.record(
-        tx,
-        accessRequestAuditEvent(
-          actor,
-          request.organizationId,
-          'ACCESS_REQUEST.STEP_NOT_REQUIRED',
-          'ACCESS_REQUEST',
-          request.id,
-          {
-            requestId: request.id,
-            stepKind: 'NEED',
-            trigger: 'ASSESSMENT_COMPLETED',
-            oneStepReason: 'REQUESTER_IS_HEAD',
-            requesterBecameHead: true,
-          },
-        ),
-      );
+      await this.heads.convert(tx, request, { kind: 'USER', actor, trigger: 'ASSESSMENT_COMPLETED' });
       request = (await this.requests.findById(requestId, tx)) ?? request;
     }
     if (request.routing?.mode === 'ONE_STEP') await this.route(tx, actor, request, 'SUBMISSION', now);

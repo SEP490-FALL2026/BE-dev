@@ -134,12 +134,12 @@ flowchart BT
   policies -->|4| identity_access
   policies -->|2| notifications
   policies -->|7| organization
-  requests -->|64| audit
+  requests -->|67| audit
   requests -->|32| budgets
   requests -->|43| catalog
   requests -->|11| finance
   requests -->|38| identity_access
-  requests -->|60| licensing
+  requests -->|62| licensing
   requests -->|14| notifications
   requests -->|12| operating_parameters
   requests -->|98| organization

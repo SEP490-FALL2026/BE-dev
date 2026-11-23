@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AccessRequestRepo } from './access-request/access-request.repo';
 import { AssessmentReadRepo } from './access-request/assessment-read.repo';
 import { RoutingFactsService } from './access-request/routing-facts.service';
+import { RequesterHeadConversionService } from './step-routing/requester-head-conversion.service';
 import { StepTargetService } from './step-routing/step-target.service';
 import { RepricingService } from './repricing/repricing.service';
 import { RequestTermEndsService } from './repricing/request-term-ends.service';
@@ -35,6 +36,7 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
     AssessmentReadRepo,
     RoutingFactsService,
     StepTargetService,
+    RequesterHeadConversionService,
     RepricingService,
     RequestTermEndsService,
     BudgetCheckRepo,
@@ -47,6 +49,7 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
     AssessmentReadRepo,
     RoutingFactsService,
     StepTargetService,
+    RequesterHeadConversionService,
     RepricingService,
     RequestTermEndsService,
     BudgetCheckRepo,

@@ -13,11 +13,9 @@ import {
   type ReassignmentDecision,
   type ReassignmentTrigger,
 } from '../step-routing/reassignment.policy';
-import {
-  queuedSpendNotRequiredEvent,
-  reassignmentAuditEvent,
-  stepWaitingAuditEvent,
-} from './reassignment-audit.mapper';
+import { stepWaitingAuditEvent } from './reassignment-audit.mapper';
+import { reassignmentAuditEvent } from '../step-routing/step-audit-event.mapper';
+import { RequesterHeadConversionService } from '../step-routing/requester-head-conversion.service';
 import {
   StepReassignmentRepo,
   type ReassignableRequest,
@@ -69,6 +67,7 @@ export class StepReassignmentService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly spending: SpendRoutingService,
+    private readonly heads: RequesterHeadConversionService,
   ) {}
 
   // --- what the worker looks at: the requests no event carried, each in a transaction of its own -------------------
@@ -393,17 +392,11 @@ export class StepReassignmentService {
       facts.today,
     );
     if (!isHead) return;
-    await this.repo.markOneStep(tx, request.id, 'REQUESTER_IS_HEAD');
-    const needStep = request.steps.find((step) => step.kind === 'NEED');
-    await this.audit.record(
+    await this.heads.convert(
       tx,
-      queuedSpendNotRequiredEvent({
-        request,
-        needStep,
-        triggerKind: trigger.kind,
-        correlationId,
-        operator,
-      }),
+      request,
+      { kind: 'SYSTEM', trigger: trigger.kind, correlationId, ...(operator ? { operator } : {}) },
+      request.steps.find((step) => step.kind === 'NEED'),
     );
     await this.spending.finishConversionById(tx, request.id, now);
     result.endedNotRequired += 1;
@@ -423,27 +416,11 @@ export class StepReassignmentService {
   ): Promise<void> {
     const { trigger, correlationId, now, operator } = context;
     await this.repo.endNeedStepNotRequired(tx, request.id, step.id, decision.routingRow, decision.oneStepReason);
-    await this.audit.record(
-      tx,
-      reassignmentAuditEvent(
-        request.organizationId,
-        'ACCESS_REQUEST.STEP_NOT_REQUIRED',
-        'ACCESS_REQUEST_STEP',
-        step.id,
-        {
-          requestId: request.id,
-          stepKind: step.kind,
-          trigger: trigger.kind,
-          source: correlationId,
-          oneStepReason: decision.oneStepReason,
-          ...(decision.oneStepReason === 'REQUESTER_IS_HEAD' ? { requesterBecameHead: true } : {}),
-          stepCreatedAt: step.createdAt.toISOString(),
-        },
-        correlationId,
-        { assigneeEmployeeId: step.assigneeEmployeeId, waitingReason: step.waitingReason },
-        operator,
-      ),
-    );
+    await this.heads.record(tx, request, {
+      cause: { kind: 'SYSTEM', trigger: trigger.kind, correlationId, ...(operator ? { operator } : {}) },
+      oneStepReason: decision.oneStepReason,
+      needStep: step,
+    });
     await this.spending.finishConversionById(tx, request.id, now);
   }
 

@@ -331,5 +331,12 @@ thay đổi). Trưởng phòng mới bắt đầu (`HEAD_PERIOD_START`) nhận m
 đánh dấu `ONE_STEP`/`HEAD_LEFT` trước đó. `requests-routing-facade.module.ts` ghép cổng hàm định tuyến/kiểm cho API và worker. Dữ liệu lịch sử giữ
 cột/enum cũ, ngừng ghi hành vi cũ.
 
+Người xin **vừa thành** trưởng phòng (`REQUESTER_IS_HEAD`): Request cá nhân (không phải nhóm) đi một bước ở bốn thời điểm, và cả bốn qua một chỗ,
+`step-routing/requester-head-conversion.service.ts` (đánh dấu `ONE_STEP`, một dạng audit `ACCESS_REQUEST.STEP_NOT_REQUIRED` có `requesterBecameHead`, mỗi
+thời điểm một `trigger`): (a) listener `HEAD_PERIOD_START` khóa cả hàng đợi trình của phòng (`AWAITING_SPEND_SUBMISSION`) cùng bước nhu cầu và sweep xét lại
+hằng ngày (`StepRedeterminationSweepApi.sweep`) quét thêm hàng đợi trình đó; (b) hoàn tất đánh giá IT của đề xuất phần mềm mới (`enterAfterAssessment`);
+(c) gửi lại sau khi bị trả về (audit thêm `ACCESS_REQUEST.RESUBMITTED` có `oneStep`); (d) kết thúc bước nhu cầu khi bảng định tuyến nói không ai cần quyết.
+Mỗi thời điểm tự hoàn tất theo cách riêng (mở bước chi, `route`, `start`). Request nhóm trả phí giữ nguyên; nhóm nội bộ miễn phí kết thúc bước nhu cầu như trước.
+
 Tìm định tuyến: `access-request/routing.policy.ts`; gửi lại: `request-intake/request-resubmission.service.ts`; khi mất trưởng phòng:
 `reassignment/organization-change.listener.ts`; hiển thị kết quả: `spend/spend-status.service.ts`.

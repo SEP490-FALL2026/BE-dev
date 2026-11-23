@@ -1,6 +1,7 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { SpendRoutingService } from '../spend/spend-routing.service';
+import { RequesterHeadConversionService } from '../step-routing/requester-head-conversion.service';
 
 describe('SpendRoutingService conversion & assessment entry', () => {
   const tx = {} as DbTx;
@@ -47,6 +48,7 @@ describe('SpendRoutingService conversion & assessment entry', () => {
       steps as never,
       targets as never,
       audit as never,
+      new RequesterHeadConversionService(requests as never, audit as never),
     );
 
     return { service, requests, checks, steps, targets, audit };
