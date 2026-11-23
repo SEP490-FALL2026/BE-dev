@@ -91,6 +91,7 @@ export const ROUTE_ERROR_CODES_DEVICES: Readonly<Record<string, Partial<Record<R
       '422': ['MONITORING_NOTICE.REACKNOWLEDGEMENT_REQUIRED'],
     },
     deviceStopRequestComplete: {
+      '403': ['DEVICE_STOP_REQUEST.NOT_IN_CHARGE'],
       '404': ['DEVICE_STOP_REQUEST.NOT_FOUND'],
       '409': ['DEVICE_STOP_REQUEST.NOT_OPEN'],
     },

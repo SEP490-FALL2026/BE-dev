@@ -1,0 +1,118 @@
+import request from 'supertest';
+import type { ApiAccount } from '../../support/api-accounts';
+import { DevicesHarness, type NoticeWire, type StopRequestWire } from '../../support/devices-harness';
+
+const h = new DevicesHarness();
+
+describe('stop request completion acting IT Admin enforcement (H13) (integration, real PostgreSQL)', () => {
+  let seq = 0;
+  let notice: NoticeWire;
+  let title: string;
+
+  const nextCode = (prefix: string) => `${prefix}-${(seq += 1)}`;
+  const stopOf = (response: { body: unknown }): StopRequestWire =>
+    (response.body as { data: { stopRequest: StopRequestWire } }).data.stopRequest;
+
+  const appointSubstitute = (departmentId: string, substituteEmployeeId: string, reason = 'Cover') =>
+    request(h.server())
+      .post(`/api/v1/departments/${departmentId}/it-substitutes`)
+      .set({ Authorization: `Bearer ${h.admin}` })
+      .send({ substituteEmployeeId, reason });
+
+  const endSubstitute = (substituteId: string) =>
+    request(h.server())
+      .post(`/api/v1/department-it-substitutes/${substituteId}/end`)
+      .set({ Authorization: `Bearer ${h.admin}` })
+      .send();
+
+  const createItAdmin = async (
+    deptCode: string,
+    prefix: string,
+  ): Promise<{ employeeId: string; account: ApiAccount }> => {
+    const code = nextCode(prefix);
+    const employeeId = await h.member(deptCode, code, title);
+    const account = await h.account(code, employeeId, 'IT_ADMIN');
+    return { employeeId, account };
+  };
+
+  const createHolderWithStopRequest = async (
+    deptCode: string | null,
+    prefix: string,
+  ): Promise<{ holder: ApiAccount; stopRequestId: string }> => {
+    const code = nextCode(prefix);
+    const employeeId = deptCode ? await h.member(deptCode, code, title) : await h.person(code);
+    const holder = await h.account(code, employeeId, 'EMPLOYEE');
+    const device = await h.active(holder, notice);
+    const created = stopOf(await h.requestStop(holder, device.registrationId as string).expect(201));
+    return { holder, stopRequestId: created.id };
+  };
+
+  beforeAll(async () => {
+    await h.start();
+    notice = await h.published();
+    await h.allowlisted();
+    title = await h.jobTitle('Engineer');
+  }, 300000);
+
+  afterAll(async () => {
+    await h.stop();
+  });
+
+  it('rejects unplaced holder stop request, rejects non-acting IT Admin, and allows usable in-charge IT Admin without bySubstitute', async () => {
+    const deptA = await h.department(nextCode('H13A'));
+    const deptB = await h.department(nextCode('H13B'));
+    const itA = await createItAdmin(deptA.code, 'ITA');
+    const itB = await createItAdmin(deptB.code, 'ITB');
+    await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [deptA.id, itA.employeeId]);
+    await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [deptB.id, itB.employeeId]);
+
+    const { stopRequestId: unplacedStopId } = await createHolderWithStopRequest(null, 'UNPL');
+    expect(h.codeOf(await h.completeStop(unplacedStopId, itA.account).expect(403))).toBe(
+      'DEVICE_STOP_REQUEST.NOT_IN_CHARGE',
+    );
+
+    const { stopRequestId: stopA } = await createHolderWithStopRequest(deptA.code, 'HLDA');
+    // itB is not in charge of deptA -> 403 DEVICE_STOP_REQUEST.NOT_IN_CHARGE
+    expect(h.codeOf(await h.completeStop(stopA, itB.account).expect(403))).toBe('DEVICE_STOP_REQUEST.NOT_IN_CHARGE');
+
+    // Lock itA -> still refuses itB when no acting IT Admin exists
+    await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE id = $1`, [itA.account.appUserId]);
+    try {
+      expect(h.codeOf(await h.completeStop(stopA, itB.account).expect(403))).toBe('DEVICE_STOP_REQUEST.NOT_IN_CHARGE');
+    } finally {
+      await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE id = $1`, [itA.account.appUserId]);
+    }
+
+    // Usable in-charge itA completes stop request without bySubstitute
+    const done = stopOf(await h.completeStop(stopA, itA.account).expect(200));
+    expect(done.state).toBe('COMPLETED');
+    const events = await h.auditEvents('DeviceStopRequest', stopA);
+    const completedAudit = events.find((e) => e.action === 'DEVICE_STOP_REQUEST.COMPLETED');
+    expect(completedAudit?.after).toMatchObject({ state: 'COMPLETED', selfHandled: false });
+    expect(completedAudit?.after).not.toHaveProperty('bySubstitute');
+  });
+
+  it('allows appointed substitute IT Admin to complete stop request and records bySubstitute: true in audit', async () => {
+    const dept = await h.department(nextCode('H13S'));
+    const itInCharge = await createItAdmin(dept.code, 'ITIC');
+    const itSub = await createItAdmin(dept.code, 'ITSUB');
+    await h.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+      dept.id,
+      itInCharge.employeeId,
+    ]);
+
+    const { stopRequestId } = await createHolderWithStopRequest(dept.code, 'HLDS');
+
+    const subRes = await appointSubstitute(dept.id, itSub.employeeId, 'Substitute cover').expect(201);
+    const subId = h.dataOf<{ substitute: { id: string } }>(subRes).substitute.id;
+    try {
+      const done = stopOf(await h.completeStop(stopRequestId, itSub.account).expect(200));
+      expect(done.state).toBe('COMPLETED');
+      const events = await h.auditEvents('DeviceStopRequest', stopRequestId);
+      const completedAudit = events.find((e) => e.action === 'DEVICE_STOP_REQUEST.COMPLETED');
+      expect(completedAudit?.after).toMatchObject({ state: 'COMPLETED', selfHandled: false, bySubstitute: true });
+    } finally {
+      await endSubstitute(subId).expect(200);
+    }
+  });
+});

@@ -3,7 +3,11 @@ import { ApiException } from '../../../infrastructure/http/errors/api.exception'
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { DeviceRegistrationEndedError, DeviceRegistrationNotFoundError } from '../registry/registry.errors';
-import { DeviceStopRequestNotFoundError, DeviceStopRequestNotOpenError } from './stop-request.errors';
+import {
+  DeviceStopRequestNotFoundError,
+  DeviceStopRequestNotInChargeError,
+  DeviceStopRequestNotOpenError,
+} from './stop-request.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });
@@ -23,6 +27,9 @@ export function toStopRequestApiException(error: unknown): unknown {
   if (error instanceof DeviceStopRequestNotOpenError) {
     return refuse(HttpStatus.CONFLICT, 'DEVICE_STOP_REQUEST.NOT_OPEN', error.message, { state: error.state });
   }
+  if (error instanceof DeviceStopRequestNotInChargeError) {
+    return refuse(HttpStatus.FORBIDDEN, 'DEVICE_STOP_REQUEST.NOT_IN_CHARGE', error.message);
+  }
 
   return toUnavailableApiException(error) ?? error;
 }
@@ -34,4 +41,5 @@ export const STOP_REQUEST_ERROR_EXAMPLES = {
   REGISTRATION_ENDED: example(new DeviceRegistrationEndedError()),
   STOP_REQUEST_NOT_FOUND: example(new DeviceStopRequestNotFoundError()),
   STOP_REQUEST_NOT_OPEN: example(new DeviceStopRequestNotOpenError('COMPLETED')),
+  NOT_IN_CHARGE: example(new DeviceStopRequestNotInChargeError()),
 } as const;

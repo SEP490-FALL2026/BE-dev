@@ -26,8 +26,9 @@ import { OffboardingDetailService } from './detail/offboarding-detail.service';
 const E = OFFBOARDING_ERROR_EXAMPLES;
 const FORBIDDEN = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Only an IT Admin records the lock of the account or takes the rights away (AUTHORIZATION.FORBIDDEN).',
-  examples: [FORBIDDEN_EXAMPLE],
+  description:
+    'Only an acting IT Admin of the department (usable in-charge or appointed substitute, never the leaver) may handle this offboarding case (AUTHORIZATION.FORBIDDEN, OFFBOARDING_CASE.NOT_IN_CHARGE).',
+  examples: [FORBIDDEN_EXAMPLE, E.NOT_IN_CHARGE],
 } as const;
 const COMMON = [UNAUTHENTICATED_RESPONSE, FORBIDDEN, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const NOT_FOUND = {

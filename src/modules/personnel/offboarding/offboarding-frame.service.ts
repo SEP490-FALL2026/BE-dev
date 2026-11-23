@@ -3,6 +3,7 @@ import { businessDateAt, type BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, readSqlState, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import { OrganizationApi } from '../../organization/public/organization.api';
@@ -21,6 +22,7 @@ export interface OffboardingCommandContext {
   today: BusinessDate;
   /** The day the case was written, in the calendar of the organization. */
   recordedOn: BusinessDate;
+  bySubstitute?: boolean;
 }
 
 interface FrameOptions {
@@ -45,6 +47,7 @@ export class OffboardingFrame {
     private readonly history: OrganizationHistoryApi,
     private readonly guard: TransferGuardService,
     private readonly repo: OffboardingRepo,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** An event of the person on a case. With `outer` it runs in the transaction of the caller (the controlled procedure). */
@@ -72,6 +75,7 @@ export class OffboardingFrame {
     options: FrameOptions,
     apply: (tx: DbTx, context: OffboardingCommandContext) => Promise<T>,
   ): Promise<T> {
+    let bySubstitute = false;
     return this.run(
       id,
       options,
@@ -80,8 +84,36 @@ export class OffboardingFrame {
           const refused = technicalStepRefusal(actor);
           if (refused) throw new PersonnelAccessRefusedError(refused);
         },
+        afterLocks: async (tx, held) => {
+          const readScope = await this.organizationReads.getItAdminScope(
+            actor.employeeId,
+            (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+            tx,
+          );
+          if (held.departmentId !== null && !readScope.includes(held.departmentId)) {
+            throw new OffboardingRefusedError('NOT_FOUND');
+          }
+          if (held.employeeId === actor.employeeId) {
+            throw new OffboardingRefusedError('NOT_IN_CHARGE');
+          }
+          if (held.departmentId === null) {
+            throw new OffboardingRefusedError('NOT_IN_CHARGE');
+          }
+          const acting = (
+            await this.organizationReads.itAdminsActingFor(
+              [held.departmentId],
+              (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+              tx,
+            )
+          ).get(held.departmentId);
+          const allowedActors = (acting?.actors ?? []).filter((empId) => empId !== held.employeeId);
+          if (!allowedActors.includes(actor.employeeId)) {
+            throw new OffboardingRefusedError('NOT_IN_CHARGE');
+          }
+          bySubstitute = acting?.substitute === actor.employeeId;
+        },
       },
-      apply,
+      (tx, context) => apply(tx, { ...context, bySubstitute }),
     );
   }
 
@@ -90,7 +122,7 @@ export class OffboardingFrame {
     options: FrameOptions & { outer?: DbTx | undefined },
     rules: {
       beforeLocks: (seen: OffboardingRecord) => void;
-      afterLocks?: (tx: DbTx, seen: OffboardingRecord) => Promise<void>;
+      afterLocks?: (tx: DbTx, held: OffboardingRecord) => Promise<void>;
     },
     apply: (tx: DbTx, context: OffboardingCommandContext) => Promise<T>,
   ): Promise<T> {
@@ -114,7 +146,7 @@ export class OffboardingFrame {
       if (!held) throw new OffboardingRefusedError('NOT_FOUND');
       const earlier = held.headHandover?.successorEmployeeId ?? null;
       if (options.lockDepartment && earlier && earlier !== chosen) await this.lockShared(tx, earlier);
-      await rules.afterLocks?.(tx, seen);
+      await rules.afterLocks?.(tx, held);
       const zone = (await this.organizationReads.getOrganization(tx))?.timeZone ?? 'UTC';
 
       return apply(tx, { held, today, recordedOn: businessDateAt(held.recordedAt, zone) });

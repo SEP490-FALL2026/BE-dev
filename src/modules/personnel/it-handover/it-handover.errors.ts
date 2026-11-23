@@ -3,7 +3,7 @@
  * before anything is written; the facade of the catalog refuses a person who cannot take everything over.
  */
 export type ItHandoverRefusal =
-  'NOT_FOUND' | 'SOURCE_CANCELLED' | 'NOT_YET_YOURS' | 'NOTHING_TO_HAND_OVER' | 'SAME_PERSON' | 'TARGET_NOT_IT_ADMIN';
+  'NOT_FOUND' | 'SOURCE_CANCELLED' | 'NOTHING_TO_HAND_OVER' | 'SAME_PERSON' | 'TARGET_NOT_IT_ADMIN';
 
 export class ItHandoverRefusedError extends Error {
   constructor(readonly code: ItHandoverRefusal) {

@@ -12,11 +12,6 @@ const ANSWERS: Readonly<Record<ItHandoverRefusal, { status: HttpStatus; message:
     status: HttpStatus.CONFLICT,
     message: 'The departure or the transfer was cancelled: there is nothing to hand over for it.',
   },
-  NOT_YET_YOURS: {
-    status: HttpStatus.FORBIDDEN,
-    message:
-      'Before the block of the departure or the day the transfer takes effect, only the IT Admin who is leaving hands their responsibilities over.',
-  },
   NOTHING_TO_HAND_OVER: {
     status: HttpStatus.CONFLICT,
     message: 'The IT Admin answers for no subscription and no application now.',
@@ -48,7 +43,6 @@ const example = (code: ItHandoverRefusal) => errorExampleOf(toItHandoverApiExcep
 export const IT_HANDOVER_ERROR_EXAMPLES = {
   NOT_FOUND: example('NOT_FOUND'),
   SOURCE_CANCELLED: example('SOURCE_CANCELLED'),
-  NOT_YET_YOURS: example('NOT_YET_YOURS'),
   NOTHING_TO_HAND_OVER: example('NOTHING_TO_HAND_OVER'),
   SAME_PERSON: example('SAME_PERSON'),
   TARGET_NOT_IT_ADMIN: example('TARGET_NOT_IT_ADMIN'),

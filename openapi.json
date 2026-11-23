@@ -13771,7 +13771,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin records the lock of the account or takes the rights away (AUTHORIZATION.FORBIDDEN).",
+            "description": "Only an acting IT Admin of the department (usable in-charge or appointed substitute, never the leaver) may handle this offboarding case (AUTHORIZATION.FORBIDDEN, OFFBOARDING_CASE.NOT_IN_CHARGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -13783,6 +13783,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.NOT_IN_CHARGE": {
+                    "summary": "Only the acting IT Admin of the department may handle this offboarding case.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.NOT_IN_CHARGE",
+                        "message": "Only the acting IT Admin of the department may handle this offboarding case.",
                         "requestId": "req_example"
                       }
                     }
@@ -14045,7 +14056,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin records the lock of the account or takes the rights away (AUTHORIZATION.FORBIDDEN).",
+            "description": "Only an acting IT Admin of the department (usable in-charge or appointed substitute, never the leaver) may handle this offboarding case (AUTHORIZATION.FORBIDDEN, OFFBOARDING_CASE.NOT_IN_CHARGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -14057,6 +14068,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.NOT_IN_CHARGE": {
+                    "summary": "Only the acting IT Admin of the department may handle this offboarding case.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.NOT_IN_CHARGE",
+                        "message": "Only the acting IT Admin of the department may handle this offboarding case.",
                         "requestId": "req_example"
                       }
                     }
@@ -14622,7 +14644,7 @@
         },
         "responses": {
           "200": {
-            "description": "The IT Admin who is leaving hands over before the block of the departure or the day the transfer takes effect; from then on any IT Admin does. Every subscription and every application the person answers for now goes to the IT Admin named, in one operation: the Audit Trail names the person who gave them up, the one who took them and the departure, the log of the case says so, and the one who took them is told. The case is read again for its itHandover section.",
+            "description": "Only the Super Admin hands responsibilities over. Every subscription and every application the person answers for now goes to the IT Admin named, in one operation: the Audit Trail names the person who gave them up, the one who took them and the departure, the log of the case says so, and the one who took them is told. The case is read again for its itHandover section.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14688,7 +14710,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin hands responsibilities over (AUTHORIZATION.FORBIDDEN). Before the block of the departure or the day the transfer takes effect only the IT Admin who is leaving does (IT_HANDOVER.NOT_YET_YOURS).",
+            "description": "Only the Super Admin hands responsibilities over (AUTHORIZATION.FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -14700,17 +14722,6 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "IT_HANDOVER.NOT_YET_YOURS": {
-                    "summary": "Before the block of the departure or the day the transfer takes effect, only the IT Admin who is leaving hands their responsibilities over.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "IT_HANDOVER.NOT_YET_YOURS",
-                        "message": "Before the block of the departure or the day the transfer takes effect, only the IT Admin who is leaving hands their responsibilities over.",
                         "requestId": "req_example"
                       }
                     }
@@ -14929,7 +14940,7 @@
         },
         "responses": {
           "200": {
-            "description": "The IT Admin who is leaving hands over before the block of the departure or the day the transfer takes effect; from then on any IT Admin does. Every subscription and every application the person answers for now goes to the IT Admin named, in one operation: the Audit Trail names the person who gave them up, the one who took them and the transfer, and the one who took them is told. The transfer is read again for its itHandover section.",
+            "description": "Only the Super Admin hands responsibilities over. Every subscription and every application the person answers for now goes to the IT Admin named, in one operation: the Audit Trail names the person who gave them up, the one who took them and the transfer, and the one who took them is told. The transfer is read again for its itHandover section.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14995,7 +15006,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin hands responsibilities over (AUTHORIZATION.FORBIDDEN). Before the block of the departure or the day the transfer takes effect only the IT Admin who is leaving does (IT_HANDOVER.NOT_YET_YOURS).",
+            "description": "Only the Super Admin hands responsibilities over (AUTHORIZATION.FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -15007,17 +15018,6 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "IT_HANDOVER.NOT_YET_YOURS": {
-                    "summary": "Before the block of the departure or the day the transfer takes effect, only the IT Admin who is leaving hands their responsibilities over.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "IT_HANDOVER.NOT_YET_YOURS",
-                        "message": "Before the block of the departure or the day the transfer takes effect, only the IT Admin who is leaving hands their responsibilities over.",
                         "requestId": "req_example"
                       }
                     }
@@ -77372,7 +77372,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin handles the requests to stop collection.",
+            "description": "Only an acting IT Admin of the holder department may complete this request (AUTHORIZATION.FORBIDDEN, DEVICE_STOP_REQUEST.NOT_IN_CHARGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -77384,6 +77384,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_STOP_REQUEST.NOT_IN_CHARGE": {
+                    "summary": "Only the acting IT Admin of the department may complete this request to stop collection.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_STOP_REQUEST.NOT_IN_CHARGE",
+                        "message": "Only the acting IT Admin of the department may complete this request to stop collection.",
                         "requestId": "req_example"
                       }
                     }

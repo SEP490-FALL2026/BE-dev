@@ -93,14 +93,14 @@ export class OffboardingLeftService {
 
   /** Writes who locked the company account, when and what was done, once (`QĐ-77i`). Throws OffboardingRefusedError. */
   recordAccountLock(actor: AuthenticatedPrincipal, id: string, input: AccountLockInput): Promise<OffboardingRecord> {
-    return this.frame.runTechnical(actor, id, {}, async (tx, { held, today }) => {
+    return this.frame.runTechnical(actor, id, {}, async (tx, { held, today, bySubstitute }) => {
       const block = await this.identity.findDepartureBlock(held.employeeId, tx);
       const refusal = accountLockRefusal({
         blocked: isBlocked(held, ownBlock(block, held.id), today),
         locked: held.accountLockAt !== null,
       });
       if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
-      await this.writeAccountLock(tx, actor, held, input);
+      await this.writeAccountLock(tx, actor, held, input, { bySubstitute });
 
       return (await this.repo.find(held.id, tx)) ?? held;
     });
@@ -112,6 +112,7 @@ export class OffboardingLeftService {
     actor: AuthenticatedPrincipal,
     record: OffboardingRecord,
     input: AccountLockInput,
+    options?: { bySubstitute?: boolean | undefined },
   ): Promise<void> {
     const note = input.note.trim();
     if (!(await this.repo.recordAccountLock(tx, record.id, { appUserId: actor.appUserId, note })))
@@ -126,6 +127,7 @@ export class OffboardingLeftService {
     await this.audit.changed(tx, userActor(actor), record, 'OFFBOARDING_CASE.ACCOUNT_LOCK_RECORDED', null, {
       employeeId: record.employeeId,
       urgent: record.accessBlockMode === 'BLOCK_NOW',
+      ...(options?.bySubstitute ? { bySubstitute: true } : {}),
     });
   }
 }

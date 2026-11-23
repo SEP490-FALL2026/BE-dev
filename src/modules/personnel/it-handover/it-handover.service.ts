@@ -6,7 +6,6 @@ import { ResponsibilityHandoverRefusedError } from '../../catalog/public/catalog
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { technicalStepRefusal } from '../personnel-self-action.policy';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { ItHandoverRefusedError } from './it-handover.errors';
 import { handoverRefusal, milestoneDay, milestoneReached } from './it-handover.policy';
@@ -45,14 +44,13 @@ export class ItHandoverService {
     private readonly telling: ItHandoverTellingService,
   ) {}
 
-  /** Throws PersonnelAccessRefusedError for a caller who is not an IT Admin, and ItHandoverRefusedError for everything else (nothing was written). */
+  /** Throws PersonnelAccessRefusedError for a caller who is not a Super Admin, and ItHandoverRefusedError for everything else (nothing was written). */
   async handOver(
     actor: AuthenticatedPrincipal,
     source: HandoverSource,
     toEmployeeId: string,
   ): Promise<ItHandoverResult> {
-    const forbidden = technicalStepRefusal(actor);
-    if (forbidden) throw new PersonnelAccessRefusedError(forbidden);
+    if (!actor.roles.includes('SUPER_ADMIN')) throw new PersonnelAccessRefusedError('FORBIDDEN');
 
     return this.runner.run(async (tx) => {
       const employeeId = await this.sources.employeeOf(source, tx);

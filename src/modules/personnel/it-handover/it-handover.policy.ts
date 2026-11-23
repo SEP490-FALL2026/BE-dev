@@ -2,7 +2,7 @@ import type { BusinessDate } from '../../../core/business-date';
 
 export type HandoverSourceKind = 'OFFBOARDING_CASE' | 'DEPARTMENT_TRANSFER';
 export type ItHandoverState = 'PENDING' | 'DONE';
-export type HandoverRefusal = 'SOURCE_CANCELLED' | 'NOT_YET_YOURS' | 'NOTHING_TO_HAND_OVER';
+export type HandoverRefusal = 'SOURCE_CANCELLED' | 'NOTHING_TO_HAND_OVER';
 
 /**
  * The day the technical work of the file begins and the hand-over is no longer the leaving IT Admin's alone (`R-26`): for a departure, the
@@ -26,19 +26,17 @@ export function milestoneReached(day: BusinessDate | null, today: BusinessDate):
 }
 
 /**
- * Whether an IT Admin may hand over everything the person who leaves answers for (`QĐ-110j`, `R-26`, SPEC P5), judged in this order:
- * the file was cancelled; before the milestone only the person who leaves may, from it any IT Admin; nothing is left to hand over. The role
- * of the actor is judged before this.
+ * Whether the Super Admin may hand over everything the leaving IT Admin answers for, judged in this order:
+ * the file was cancelled; nothing is left to hand over. The role of the actor is judged before this.
  */
 export function handoverRefusal(facts: {
   cancelled: boolean;
-  milestoneReached: boolean;
-  actorEmployeeId: string;
-  leavingEmployeeId: string;
+  milestoneReached?: boolean;
+  actorEmployeeId?: string;
+  leavingEmployeeId?: string;
   remaining: number;
 }): HandoverRefusal | null {
   if (facts.cancelled) return 'SOURCE_CANCELLED';
-  if (!facts.milestoneReached && facts.actorEmployeeId !== facts.leavingEmployeeId) return 'NOT_YET_YOURS';
   if (facts.remaining === 0) return 'NOTHING_TO_HAND_OVER';
 
   return null;

@@ -114,7 +114,12 @@ export class StopRequestController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    IT_ADMIN_ONLY,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an acting IT Admin of the holder department may complete this request (AUTHORIZATION.FORBIDDEN, DEVICE_STOP_REQUEST.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
+    },
     {
       status: HttpStatus.NOT_FOUND,
       description: 'The request does not exist (DEVICE_STOP_REQUEST.NOT_FOUND).',
