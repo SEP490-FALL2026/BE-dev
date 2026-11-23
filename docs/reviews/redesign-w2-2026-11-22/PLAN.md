@@ -1,7 +1,7 @@
 # PLAN — Đợt 2 thiết kế lại: sổ máy, việc thu máy, khóa theo máy, phân việc IT theo phòng (bản 2, 23/11/2026)
 
 Spec: [SPEC.md](SPEC.md) bản 2. Trạng thái: Proposed — chờ Owner duyệt bản 2. Đã áp [REVIEW-SPEC.md](REVIEW-SPEC.md),
-[OWNER-ANSWERS.md](OWNER-ANSWERS.md) (W2-Q1 = làm ngay, W2-Q2 = báo lỗi sang đợt 7, W2-Q3 → W2-Q5, RC-9, Q7 → Q9, W2-Q6 → W2-Q9) và QĐ-118 (`QĐ-118a` → `QĐ-118o`). Không còn câu mở (SPEC §14 _Đã chốt_).
+[OWNER-ANSWERS.md](OWNER-ANSWERS.md) (W2-Q1 = làm ngay, W2-Q2 = báo lỗi sang đợt 7, W2-Q3 → W2-Q5, RC-9, Q7 → Q9, W2-Q6 → W2-Q10) và QĐ-118 (`QĐ-118a` → `QĐ-118o`); REVIEW-SPEC-2 (S2-1 → S2-17, SPEC §13.4). Không còn câu mở (SPEC §14 _Đã chốt_).
 
 - **Nền:** `origin/dev` `4e029dbd` (đợt 1 đã squash vào `dev`). Hai làn tách từ `origin/dev` **mới nhất** sau khi coordinator
   đưa thư mục `docs/reviews/redesign-w2-2026-11-22/` lên `dev`.
@@ -9,12 +9,15 @@ Spec: [SPEC.md](SPEC.md) bản 2. Trạng thái: Proposed — chờ Owner duyệ
 - **Hai làn** (quy trình: [`docs/guides/quy-trinh-code-ai.md`](../../guides/quy-trinh-code-ai.md)):
   - **Làn `tech` (Bảo)** — nhánh của Bảo `feat/redesign-w2-tech` (tách từ `origin/dev`): **pha 1** T1 → T2 → T3 → T3b → T4 → T5;
     **pha 2** (sau khi làn `biz` báo B9 xong trên `int/redesign-w2`) `git merge origin/int/redesign-w2` rồi T6 → T7.
-  - **Làn `biz` (Owner)** — làm **thẳng trên `int/redesign-w2`**: **pha A** B0 (chỉ policy thuần, không cần schema); **pha B**
-    (sau khi Owner merge pha 1 của làn `tech` vào `int/redesign-w2` và làn `biz` đã `git pull`) B10a → B1 → B2a-1 → B2a-2 → B2b → B3a-1 →
-    B3a-2 → B3b → B4 → B5a → B5b → B5c → B6 → B7 → B8 → B10b → B10c → B10d → B10e → B10f → B10g → B10h → B11 → B9.
+  - **Làn `biz` (Owner)** — làm **thẳng trên `int/redesign-w2`** (S2-13, cùng CODE-PROMPT §2): **pha A** B0 (chỉ policy thuần);
+    **pha B1** (sau khi Owner merge **T1** vào `int/redesign-w2`) B10a → B10b → B10c → B10d → B10e → B10f → B10g → B11 (luật QĐ-118,
+    không file/bảng nào của T2–T5); **pha B2** (sau khi Owner merge **cả pha 1** T2 → T5) B1 → B2a-1 → B2a-2 → B2b → B3a-1 → B3a-2 →
+    B3b → B4 → B5a → B5b → B5c → B6 → B7 → B8 → B10h → B9.
   - Mỗi làn một chat Sonnet/Gemini, làm **tuần tự** từng gói, không song song, không worktree.
 - **Không sửa chung file.** Danh sách file của mỗi gói dưới đây là danh sách được phép sửa.
-  - `prisma/models/*`, `prisma/migrations/*`, `test/gates/architecture-boundaries.gate-spec.ts` — chỉ T1.
+  - `prisma/models/*`, `prisma/migrations/*`, `test/gates/architecture-boundaries.gate-spec.ts` — chỉ T1, **trừ** migration 4
+    `20261124100400_saas_issue_awaiting_assignee` + model `SaasIssue` (W2-Q10): thuộc **B10c** (biz). Không chạy song song với T1:
+    B10c ở pha B1, sau khi T1 đã merge; nullable của cột kéo theo sửa code `saas-issue` của chính B10c.
   - `src/modules/devices/devices.module.ts` — **chỉ làn `biz`** (S-29: đăng ký provider của T2/T5 chuyển vào B1; làn `tech` viết
     provider nhưng không đăng ký, ghi _Bàn giao_). Không còn file đổi chủ theo pha.
   - `src/modules/catalog/public/catalog.api.ts` — chỉ T3 (gồm `installLimitOf` cho T4).
@@ -56,47 +59,48 @@ pnpm test -- <các file *.spec.ts đã chạm/thêm>
 
 ## Gói
 
-| #     | Gói                                                                                  | Mục                                      | Cỡ  | Phụ thuộc                 | Làn  |
-| ----- | ------------------------------------------------------------------------------------ | ---------------------------------------- | --- | ------------------------- | ---- |
-| T1    | Schema + **bốn** migration                                                           | W2-01                                    | M   | —                         | tech |
-| T2    | Mã tài sản `LOẠI-NĂM-SỐ`                                                             | W2-02                                    | S   | T1                        | tech |
-| T3    | Kiểu gắn của gói + lọc _Xin phần mềm_ + `installLimitOf` (catalog)                   | W2-17, W2-18 (catalog), S-22             | S   | T1                        | tech |
-| T3b   | Chỉ Super Admin đổi IT phụ trách thuê bao (route riêng); bỏ tự nhận ứng dụng         | W2-27 H16, H14 (Owner Q7, Q8)            | S   | T3                        | tech |
-| T4    | Khóa: trần lượt, lượt đã dùng, tồn theo license, pha khởi tạo                        | W2-21                                    | M   | T1, T3                    | tech |
-| T5    | Sửa thuộc tính máy                                                                   | W2-04                                    | S   | T1                        | tech |
-| B0    | Policy thuần (pha A)                                                                 | luật của W2-05 → W2-14, W2-19, W2-27     | S   | —                         | biz  |
-| B1    | Nhập máy, danh sách, chi tiết, _Chờ thu_, `signatureMissing`; đăng ký provider T2/T5 | W2-03, W2-05, H17                        | M   | pha 1 tech, B0, B10a      | biz  |
-| B2a-1 | Giao/đổi người giữ, thu về kho                                                       | W2-06, W2-08                             | M   | B1                        | biz  |
-| B2a-2 | Tình trạng máy; dời ngừng dùng sang `lifecycle` (hành vi cũ)                         | W2-09                                    | S   | B2a-1                     | biz  |
-| B2b   | Cờ _có cài collector_ (chỉ bật)                                                      | W2-07                                    | M   | B2a-2                     | biz  |
-| B3a-1 | `licensing/device-activation`: repo, service, facade, U (không route)                | W2-19 (licensing, `SeatOccupancyReader`) | M   | T4                        | biz  |
-| B3a-2 | Route kích hoạt ở devices, ánh xạ lỗi, I                                             | W2-19 (devices), W2-03 (b), H17          | M   | B3a-1, B2b                | biz  |
-| B3b   | Gỡ, chuyển, danh sách kích hoạt, khóa bị rút                                         | W2-20, W2-22, H17                        | M   | B3a-2                     | biz  |
-| B4    | Thay máy, ngừng dùng có loại, hủy bản ghi                                            | W2-10, W2-11, W2-12                      | M   | B3b                       | biz  |
-| B10a  | Bộ giải người làm + chỉ định làm thay (organization) + phạm vi IT + `itAdminLoad`    | W2-27 (a), H1, W2-Q7                     | M   | T1                        | biz  |
-| B5a   | Việc thu máy: repo, sinh/đổi hạn/hủy, listener `personnel`, U                        | W2-14 (sinh, đổi hạn, hủy), E4           | M   | B4, B10a                  | biz  |
-| B5b   | Việc thu máy: danh sách, hoàn tất, nối `DeviceReceiptService`, dashboard             | W2-14 (danh sách, hoàn tất), W2-15, S-11 | M   | B5a                       | biz  |
-| B5c   | Việc thu máy: sweeper quá hạn, thông báo chờ/quá hạn                                 | W2-14 (quá hạn, chờ), W2-26 (mã)         | S   | B5b                       | biz  |
-| B6    | `MF-1` chặn gói gắn máy (requests) + grant 409                                       | W2-18 (requests, S-4 grant)              | S   | T3                        | biz  |
-| B7    | Nhập hiện trạng + bước checklist khởi tạo                                            | W2-13                                    | M   | B3a-2, T2, T4             | biz  |
-| B8    | Phần mềm trên màn máy, _Phần mềm của tôi_                                            | W2-23                                    | S   | B3b                       | biz  |
-| B10b  | Provisioning: bỏ hàng `GENERAL`, chỉ người làm của phòng, tự cấp                     | W2-27 H2–H4                              | M   | B10a                      | biz  |
-| B10c  | Gia hạn, báo lỗi, đẩy sớm ghost seat theo QĐ-118                                     | W2-27 H5–H7                              | M   | B10a                      | biz  |
-| B10d  | `ItCoverageSweeper` + thông báo chỉ định                                             | W2-27 (c), W2-26 (mã)                    | S   | B10a                      | biz  |
-| B10e  | QĐ-118 cho báo lỗi SaaS, đánh giá Request case B, quyết ghost seat phía IT           | W2-27 H9–H11 (Owner Q8)                  | M   | B10a                      | biz  |
-| B10f  | QĐ-118 cho bước hồ sơ nghỉ việc, dừng thu thập                                       | W2-27 H12, H13 (Owner Q8)                | S   | B10a                      | biz  |
-| B10g  | Người nhận thông báo theo QĐ-118 (tám notifier + nhắc gia hạn)                       | W2-27 H15 (Owner Q8)                     | M   | B10a, B10c                | biz  |
-| B10h  | Việc của người chưa xếp phòng: chỉ định theo việc, bộ giải, bốn chỗ gọi, thông báo   | W2-27 (e) (W2-Q8)                        | M   | B10b, B10f, B5c, B10d     | biz  |
-| B11   | RC-9: mở lại thu hồi điều chuyển                                                     | W2-28                                    | S   | B10a                      | biz  |
-| B9    | Chốt làn `biz`: tài liệu, module card, sinh lại, `FIX-TEST`                          | W2-26 (tài liệu)                         | S   | B1 → B11                  | biz  |
-| T6    | Seed theo luật mới                                                                   | W2-25                                    | M   | B9 trên `int/redesign-w2` | tech |
-| T7    | Chốt làn `tech`: `FIX-TEST`, sinh lại                                                | —                                        | S   | T6                        | tech |
+| #     | Gói                                                                                  | Mục                                      | Cỡ  | Phụ thuộc                     | Làn  |
+| ----- | ------------------------------------------------------------------------------------ | ---------------------------------------- | --- | ----------------------------- | ---- |
+| T1    | Schema + **bốn** migration (0 → 3)                                                   | W2-01                                    | M   | —                             | tech |
+| T2    | Mã tài sản `LOẠI-NĂM-SỐ`                                                             | W2-02                                    | S   | T1                            | tech |
+| T3    | Kiểu gắn của gói + lọc _Xin phần mềm_ + `installLimitOf` (catalog)                   | W2-17, W2-18 (catalog), S-22             | S   | T1                            | tech |
+| T3b   | Chỉ Super Admin đổi IT phụ trách thuê bao (route riêng); bỏ tự nhận ứng dụng         | W2-27 H16, H14 (Owner Q7, Q8)            | S   | T3                            | tech |
+| T4    | Khóa: trần lượt, lượt đã dùng, tồn theo license, pha khởi tạo                        | W2-21                                    | M   | T1, T3                        | tech |
+| T5    | Sửa thuộc tính máy                                                                   | W2-04                                    | S   | T1                            | tech |
+| B0    | Policy thuần (pha A)                                                                 | luật của W2-05 → W2-14, W2-19, W2-27     | S   | —                             | biz  |
+| B1    | Nhập máy, danh sách, chi tiết, _Chờ thu_, `signatureMissing`; đăng ký provider T2/T5 | W2-03, W2-05, H17                        | M   | pha 1 tech, B0, B10a (pha B1) | biz  |
+| B2a-1 | Giao/đổi người giữ, thu về kho                                                       | W2-06, W2-08                             | M   | B1                            | biz  |
+| B2a-2 | Tình trạng máy; dời ngừng dùng sang `lifecycle` (hành vi cũ)                         | W2-09                                    | S   | B2a-1                         | biz  |
+| B2b   | Cờ _có cài collector_ (chỉ bật)                                                      | W2-07                                    | M   | B2a-2                         | biz  |
+| B3a-1 | `licensing/device-activation`: repo, service, facade, U (không route)                | W2-19 (licensing, `SeatOccupancyReader`) | M   | T4                            | biz  |
+| B3a-2 | Route kích hoạt ở devices, ánh xạ lỗi, I                                             | W2-19 (devices), W2-03 (b), H17          | M   | B3a-1, B2b                    | biz  |
+| B3b   | Gỡ, chuyển, danh sách kích hoạt, khóa bị rút                                         | W2-20, W2-22, H17                        | M   | B3a-2                         | biz  |
+| B4    | Thay máy, ngừng dùng có loại, hủy bản ghi                                            | W2-10, W2-11, W2-12                      | M   | B3b                           | biz  |
+| B10a  | Bộ giải người làm + chỉ định làm thay (organization) + phạm vi IT + `itAdminLoad`    | W2-27 (a), H1, W2-Q7                     | M   | T1, B0                        | biz  |
+| B5a   | Việc thu máy: repo, sinh/đổi hạn/hủy, listener `personnel`, U                        | W2-14 (sinh, đổi hạn, hủy), E4           | M   | B4, B10a                      | biz  |
+| B5b   | Việc thu máy: danh sách, hoàn tất, nối `DeviceReceiptService`, dashboard             | W2-14 (danh sách, hoàn tất), W2-15, S-11 | M   | B5a                           | biz  |
+| B5c   | Việc thu máy: sweeper quá hạn, thông báo chờ/quá hạn                                 | W2-14 (quá hạn, chờ), W2-26 (mã)         | S   | B5b                           | biz  |
+| B6    | `MF-1` chặn gói gắn máy (requests) + grant 409                                       | W2-18 (requests, S-4 grant)              | S   | T3                            | biz  |
+| B7    | Nhập hiện trạng + bước checklist khởi tạo                                            | W2-13                                    | M   | B3a-2, T2, T4                 | biz  |
+| B8    | Phần mềm trên màn máy, _Phần mềm của tôi_                                            | W2-23                                    | S   | B3b                           | biz  |
+| B10b  | Provisioning: bỏ hàng `GENERAL`, chỉ người làm của phòng, tự cấp                     | W2-27 H2–H4                              | M   | B10a                          | biz  |
+| B10c  | Gia hạn, báo lỗi, đẩy sớm ghost seat theo QĐ-118                                     | W2-27 H5–H7                              | M   | B10a                          | biz  |
+| B10d  | `ItCoverageSweeper` + thông báo chỉ định                                             | W2-27 (c), W2-26 (mã)                    | S   | B10a                          | biz  |
+| B10e  | QĐ-118 cho báo lỗi SaaS, đánh giá Request case B, quyết ghost seat phía IT           | W2-27 H9–H11 (Owner Q8)                  | M   | B10a                          | biz  |
+| B10f  | QĐ-118 cho bước hồ sơ nghỉ việc, dừng thu thập                                       | W2-27 H12, H13 (Owner Q8)                | S   | B10a                          | biz  |
+| B10g  | Người nhận thông báo theo QĐ-118 (tám notifier + nhắc gia hạn)                       | W2-27 H15 (Owner Q8)                     | M   | B10a, B10c                    | biz  |
+| B10h  | Việc của người chưa xếp phòng: chỉ định theo việc, bộ giải, bốn chỗ gọi, thông báo   | W2-27 (e) (W2-Q8)                        | M   | B10b, B10f, B5c, B10d         | biz  |
+| B11   | RC-9: mở lại thu hồi điều chuyển                                                     | W2-28                                    | S   | B10a                          | biz  |
+| B9    | Chốt làn `biz`: tài liệu, module card, sinh lại, `FIX-TEST`                          | W2-26 (tài liệu)                         | S   | B1 → B11                      | biz  |
+| T6    | Seed theo luật mới                                                                   | W2-25                                    | M   | B9 trên `int/redesign-w2`     | tech |
+| T7    | Chốt làn `tech`: `FIX-TEST`, sinh lại                                                | —                                        | S   | T6                            | tech |
 
-- **Migration:** bốn thư mục, tất cả ở T1 (SPEC §3): `20261124100000_device_registration_end_cause_returned`,
+- **Migration:** năm thư mục (SPEC §3); 0 → 3 ở T1, 4 ở B10c: `20261124100000_device_registration_end_cause_returned`,
   `20261124100100_devices_register_lifecycle`, `20261124100200_device_activations`, `20261124100300_department_it_substitutes`
-  (gồm cả bảng `unplaced_work_it_designations`, W2-Q8).
+  (gồm cả bảng `unplaced_work_it_designations`, W2-Q8), `20261124100400_saas_issue_awaiting_assignee` (W2-Q10).
 - **Gỡ so với bản 1:** B8b (báo lỗi quyền gắn máy, W2-24) — dời đợt 7 (W2-Q2); migration `saas_issue_device_activation` bỏ.
-- **B10a làm đầu pha B** (W2-Q6: giao/thu máy cần bộ giải `itAdminsActingFor` từ B1). B6 độc lập với B1 → B4.
+- **B10a làm đầu pha B1** (bộ giải `itAdminsActingFor(departmentIds, usableAmong, tx?)`, phạm vi đọc/làm, phòng của việc — cần
+  cho B1 và mọi gói QĐ-118). B6 độc lập với B1 → B4.
 - **W2-Q6 (H17) làm ngay trong gói sở hữu route:** B1 (`deviceCreate` có người giữ), B2a-1 (đổi người giữ, thu về), B2a-2 (tình
   trạng, ngừng dùng), B2b (bật collector), B3a-2 (kích hoạt), B3b (gỡ, chuyển), B4 (thay máy, ngừng dùng), B7 (nhập hiện trạng có người giữ); B0 thêm `judgeDeviceActor`.
 - Owner đã trả lời Q7 (chỉ Super Admin đổi IT phụ trách thuê bao — T3b), Q8 (QĐ-118 cho mọi route/thông báo còn lại — B10e,
@@ -120,6 +124,8 @@ pnpm test -- <các file *.spec.ts đã chạm/thêm>
   `scripts/verify/merged-migrations.txt`.
 - **Kiểm:** bộ nhanh + `pnpm prisma:validate` + `pnpm prisma:generate`. Code TypeScript có sẵn phải vẫn typecheck (cột mới đều
   có mặc định hoặc nullable).
+- **REVIEW-SPEC-2:** migration 3 thêm `DEPARTMENT_RETIRED`, `WORK_CLOSED` và hai index một phần (S2-11, S2-8, S2-17).
+  Migration 4 (`saas_issue_awaiting_assignee`) **không** ở T1: thuộc B10c (xem ngoại lệ đầu PLAN).
 - **Xong khi:** W2-01 (a) → (h) có test I; gate `architecture-boundaries`, `migration-order` xanh; message commit ghi "migration 0
   `ALTER TYPE … ADD VALUE` không hoàn tác" và hai backfill (`device_type = 'OTH'`, `retirement_kind = 'DISPOSED'`).
 
@@ -162,6 +168,8 @@ pnpm test -- <các file *.spec.ts đã chạm/thêm>
   `SUBSCRIPTION.RESPONSIBLE_CHANGED`. `subscriptionCreate` giữ trường (W2-D20). Seed nào đổi người phụ trách qua `subscriptionUpdate`
   ⟹ ghi _Bàn giao_ cho T6.
 - **Kiểm:** bộ nhanh + `pnpm test -- src/modules/catalog/subscription src/modules/catalog/application-responsibility`.
+- **REVIEW-SPEC-2 (S2-4):** H14 bỏ **cả** `mayTake` lẫn `mayHandOver` của người phụ trách: chỉ Super Admin đổi người phụ trách ứng
+  dụng; tiêu chí (v) phần ứng dụng.
 - **Xong khi:** W2-27 tiêu chí (l), (n).
 
 ### T4 — Khóa: lượt, tồn theo license, pha khởi tạo (M, `tech`)
@@ -298,6 +306,14 @@ isWorkingDay })` (W2-Q4); `actingItAdmins({ inCharge, inChargeUsable, substitute
   `test/integration/organization/department-it-substitute.integration-spec.ts`.
 - **Làm:** SPEC W2-27 (a) (gồm `itAdminLoad`, W2-Q7: chỉ định không kiểm trần, trả cảnh báo; `departmentUpdate` cũng trả) và H1. Thông báo chỉ định để B10d (mã thông báo cần route đích). Kiểm `pnpm arch:capabilities --module
 organization`. Mọi I/flow khẳng định "phòng không IT ⟹ mọi IT thấy" ⟹ FIX-TEST (không chạy được ở máy).
+- **REVIEW-SPEC-2:** chữ ký `itAdminsActingFor(departmentIds, usableAmong, tx?)`, `itAdminsActingForUnplacedWork(works,
+usableAmong, tx?)`, `getItAdminActingScope(employeeId, usableAmong, tx?)` — bên gọi truyền
+  `ids => identity.findUsableItAdminEmployeeIds(ids, tx)`, **không** qua hook (S2-3). `getItAdminScope` (đọc) **giữ luật cũ** + phòng
+  làm thay; `getItAdminActingScope` mới cho route ghi/hàng việc (S2-2). Facade `workDepartmentsOf`,
+  `getEmployeeIdsOfWorkDepartments` (phòng hôm nay, không có thì lần cuối — S2-1). Chỉ định khóa employee người được chỉ định → phòng
+  (S2-9) + I đồng thời; 422 `NOT_USABLE_IT_ADMIN` (S2-14); gỡ IT phụ trách không đóng chỉ định, `departmentDeactivate` đóng
+  `DEPARTMENT_RETIRED` (S2-11). Thêm vào file: `organization/department/department-record.service.ts` (phạm vi làm),
+  `organization/employee/*` repo đọc lần xếp cuối theo lô. Tiêu chí thêm (s) phần phòng của việc, (t), (u), (w).
 - **Xong khi:** W2-27 tiêu chí (a) → (c), (p).
 
 ### B5a — Việc thu máy: sinh, đổi hạn, hủy (M, `biz`)
@@ -370,6 +386,10 @@ organization`. Mọi I/flow khẳng định "phòng không IT ⟹ mọi IT thấ
   `provisioning.errors.ts`/`provisioning.http-errors.ts` (403 `PROVISIONING.NOT_IN_CHARGE`); I mới
   `test/integration/licensing/provisioning-in-charge.integration-spec.ts`.
 - **Làm:** SPEC W2-27 H2–H4 (Owner Q9: IT phụ trách là người thụ hưởng ⟹ tự cấp, cờ _tự thực thi_ + báo Super Admin, **không chặn**; bỏ nhánh 409 `ANOTHER_IT_ADMIN_NEEDED`). Danh sách đọc người làm theo lô phòng (một lần cho cả trang).
+- **REVIEW-SPEC-2:** `provisioningTaskList` `MINE` = phạm vi làm, `ALL` = phạm vi đọc (lọc người thụ hưởng qua
+  `getEmployeeIdsOfWorkDepartments`), `provisioningTaskGet` ngoài phạm vi đọc ⟹ 404 (S2-10). Phòng của việc theo S2-1. H18 phần
+  provisioning: `revocation-task-factory.service.ts:31`, `provisioning-extension.service.ts:35`, `provisioning-grant-planner.service.ts:65`
+  chọn `substitute ?? inCharge`. Tiêu chí thêm (s), (x).
 - **Xong khi:** W2-27 tiêu chí (d), (e), (j).
 
 ### B10c — Gia hạn, báo lỗi, đẩy sớm theo QĐ-118 (M, `biz`)
@@ -379,6 +399,12 @@ organization`. Mọi I/flow khẳng định "phòng không IT ⟹ mọi IT thấ
   `saas-issue.policy.ts` (+ spec); `src/modules/optimization/escalation/escalation-facts.service.ts`, `escalation.service.ts` (+
   spec); I sửa `subscription-renewal-record.integration-spec.ts`, `ghost-seat-escalation.integration-spec.ts`.
 - **Làm:** SPEC W2-27 H5–H7 (Owner Q7: không làm thay tạm theo thuê bao; nhắc gia hạn không người phụ trách ⟹ Super Admin). Ca W1-12 (b), W1-13 "A bị khóa ⟹ ESCALATED" đổi kỳ vọng.
+- **REVIEW-SPEC-2 / Owner W2-Q10 (S2-12):** **migration 4** `prisma/migrations/20261124100400_saas_issue_awaiting_assignee/migration.sql`
+  - `prisma/models/licensing.prisma` (chỉ model `SaasIssue`: `assignedItAdminEmployeeId String?`) — ngoại lệ có chủ đích của luật
+    "prisma chỉ T1" (đầu PLAN); `pnpm prisma:validate`, `pnpm prisma:generate`. H6: phiếu chờ người tiếp nhận, `SAAS_ISSUE_AWAITING_ASSIGNEE`
+    (mã thông báo + bốn file `notifications` như B5c), lượt giao trong `SaasIssueSweeper` (`saas-issue/saas-issue.job.ts`), response
+    nullable (phá contract `saasIssueSubmit`/`Get`/`List`). Vượt ~12 file ⟹ tách `B10c-1` (gia hạn, đẩy sớm) / `B10c-2` (báo lỗi +
+    migration 4). Tiêu chí thêm (y).
 - **Xong khi:** W2-27 tiêu chí (f), (g), (h).
 
 ### B10d — Báo Super Admin, thông báo chỉ định (S, `biz`)
@@ -389,6 +415,8 @@ organization`. Mọi I/flow khẳng định "phòng không IT ⟹ mọi IT thấ
   `notifications` như B5c (ba mã `DEPARTMENT_IT_SUBSTITUTE_APPOINTED`, `_ENDED`, `DEPARTMENT_IT_COVERAGE_MISSING`); I thêm ca (i)
   vào `department-it-substitute.integration-spec.ts`.
 - **Làm:** SPEC W2-27 (c) phần thông báo, W2-26 ba mã.
+- **REVIEW-SPEC-2 (S2-8):** loại **phòng khởi tạo**; lượt (e) chỉ đọc bảng chỉ định của `organization` (chỉ định hiệu lực mà người
+  được chỉ định không dùng được) — không đọc việc của module tầng trên.
 - **Xong khi:** W2-27 tiêu chí (b phần thông báo), (i).
 
 ### B10e — QĐ-118 cho báo lỗi SaaS, đánh giá Request, ghost seat phía IT (M, `biz`)
@@ -399,6 +427,9 @@ organization`. Mọi I/flow khẳng định "phòng không IT ⟹ mọi IT thấ
   `decision/decision-return.service.ts`, errors/http-errors của ghost seat; I mới `test/integration/licensing/saas-issue-in-charge.integration-spec.ts`,
   `test/integration/requests/assessment-in-charge.integration-spec.ts`, `test/integration/optimization/ghost-seat-in-charge.integration-spec.ts`.
 - **Làm:** SPEC W2-27 (d) H9–H11. Vượt ~12 file ⟹ tách theo module, ghi _OVERNIGHT_.
+- **REVIEW-SPEC-2:** H10 theo **phòng người xin** (S2-7). H18 phần requests/optimization: `request-status-recipients.service.ts:43-45`,
+  `step-target.service.ts:36,125-129` (bước `IT_ASSESSMENT`; giao lại nhờ `WAITING_RETRY` sẵn có), `controlled-wait-query.service.ts:27`,
+  `decision-routing.service.ts:177`, `decision-reminder.service.ts:61` (S2-6). Tiêu chí thêm (u).
 - **Xong khi:** W2-27 tiêu chí (k) phần báo lỗi, đánh giá, ghost seat.
 
 ### B10f — QĐ-118 cho bước hồ sơ nghỉ việc, dừng thu thập (S, `biz`)
@@ -408,6 +439,9 @@ organization`. Mọi I/flow khẳng định "phòng không IT ⟹ mọi IT thấ
   errors, http-errors, controller mô tả); I mới `test/integration/personnel/offboarding-step-in-charge.integration-spec.ts`,
   `test/integration/devices/stop-request-in-charge.integration-spec.ts`.
 - **Làm:** SPEC W2-27 (d) H12, H13 (H12 trả 404 như route đọc, W2-D19).
+- **REVIEW-SPEC-2 (S2-4, H16b):** `src/modules/personnel/it-handover/it-handover.controller.ts` (`offboardingCaseItAdminHandover`,
+  `departmentTransferItAdminHandover` ⟹ `@RequireRoles('SUPER_ADMIN')`, mô tả 403), spec/I của it-handover; không thêm file ở
+  `offboarding/`. H12 trả 403 `OFFBOARDING_CASE.NOT_IN_CHARGE` khi trong phạm vi đọc (S2-2). Tiêu chí thêm (v).
 - **Xong khi:** W2-27 tiêu chí (k) phần hồ sơ nghỉ việc, dừng thu thập.
 
 ### B10g — Người nhận thông báo theo QĐ-118 (M, `biz`)
@@ -419,6 +453,9 @@ organization`. Mọi I/flow khẳng định "phòng không IT ⟹ mọi IT thấ
   `licensing/subscription-renewal/subscription-renewal-parties.service.ts:30` nếu B10c chưa đổi.
 - **Làm:** SPEC W2-27 H15: người nhận = người làm của phòng; rỗng ⟹ Super Admin. `seat-increase.service.ts` nằm ở `catalog/` nhưng
   không thuộc file của T3/T3b (kiểm danh sách PLAN trước khi sửa; trùng ⟹ _Bàn giao_). Vượt ~12 file ⟹ tách hai gói.
+- **REVIEW-SPEC-2:** H15b (`itHandoverPending` ⟹ Super Admin; `vendorAdminsGone`, `seat-increase` ⟹ IT phụ trách thuê bao, không
+  ⟹ Super Admin; `usage-stale-notice` giữ mọi IT, W2-D22) và H18 phần licensing: `licensing-alerts.service.ts:31-35`,
+  `expiry-reminder.service.ts:55-64,172` (S2-5, S2-6). Vượt ~12 file ⟹ tách hai gói.
 - **Xong khi:** W2-27 tiêu chí (m); unit người nhận xanh cho cả tám notifier.
 
 ### B10h — Việc của người chưa xếp phòng (M, `biz`, W2-Q8)
@@ -435,6 +472,9 @@ organization`. Mọi I/flow khẳng định "phòng không IT ⟹ mọi IT thấ
 - **Làm:** SPEC W2-27 (e), §4.3 câu phòng `NULL`, W2-26 mã `UNPLACED_WORK_WAITING`. Không viết lại hàng chung; người làm qua chỉ
   định ⟹ `bySubstitute: true`, chỉ Audit Trail (W2-Q9). Vượt ~12 file ⟹ tách B10h-1 (organization + bộ giải + route) và B10h-2
   (bốn chỗ gọi + thông báo), ghi _OVERNIGHT_.
+- **REVIEW-SPEC-2:** "chưa xếp phòng" = **chưa từng** (S2-1); khóa hai employee một câu (S2-9); 422 `NOT_USABLE_IT_ADMIN`
+  (S2-14); thông báo `UNPLACED_WORK_DESIGNATED` (S2-15); bốn chỗ đóng việc gọi `OrganizationApi.endUnplacedWorkDesignations`
+  (`WORK_CLOSED`, S2-8). Tiêu chí (q) thêm ca tác vụ thu hồi.
 - **Xong khi:** W2-27 tiêu chí (q), (r).
 
 ### B11 — RC-9 (S, `biz`)
@@ -443,6 +483,8 @@ organization`. Mọi I/flow khẳng định "phòng không IT ⟹ mọi IT thấ
   `transfer-revocation.controller.ts` (mô tả 404); **không thêm file** (thư mục 25 file); I mới hoặc thêm ca
   `test/integration/personnel/transfer-revocation-reopen.integration-spec.ts`.
 - **Làm:** SPEC W2-28.
+- **REVIEW-SPEC-2 (S2-2):** ngoài phạm vi đọc ⟹ 404; trong phạm vi đọc mà không phải người làm ⟹ 403
+  `DEPARTMENT_TRANSFER.NOT_IN_CHARGE`.
 - **Xong khi:** W2-28 tiêu chí.
 
 ### B9 — Chốt làn `biz` (S)
@@ -453,6 +495,7 @@ organization`. Mọi I/flow khẳng định "phòng không IT ⟹ mọi IT thấ
   `docs/rules/security-jobs.md` (đoạn `DeviceReturnOverdueSweeper`, `ItCoverageSweeper`, theo mẫu `StopRequestSweeper`);
   `docs/rules/database-business.md` (bảng _Thứ tự khóa chuẩn_ có sẵn `:266-300`: thêm 0b, 0c, 2b, 6b, ngoại lệ E4; không ghi lại
   tầng 8); `docs/generated/routes.md`, `docs/generated/module-graph.md` (`pnpm arch:routes`, `pnpm arch:graph`); `FIX-TEST-biz.md`.
+- **REVIEW-SPEC-2 (S2-9):** bảng thứ tự khóa ghi "chỉ định làm thay: employee (tầng 1) → phòng (tầng 2)".
 - **Kiểm:** bộ nhanh + `pnpm rules:format` + `pnpm arch:docs:check`.
 
 ### T6 — Seed theo luật mới (M, `tech`, pha 2)

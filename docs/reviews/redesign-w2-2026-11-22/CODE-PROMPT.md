@@ -10,9 +10,9 @@
 **Nhánh:** làn `tech` = nhánh của Bảo `feat/redesign-w2-tech`; làn `biz` = làm **thẳng trên** `int/redesign-w2` · **Nhánh gộp:**
 `int/redesign-w2`
 **Owner đã chốt:** W2-Q1 = khóa theo máy làm ngay (kèm S-4; đợt 2 merge trước M6 đợt 3) · W2-Q2 = báo lỗi quyền gắn máy sang
-đợt 7 (không đụng `saasIssue*`) · W2-Q3 = `NO_COLLECTOR` + `signatureMissing`, cờ collector chỉ bật · W2-Q4 = nhắc quá hạn mỗi ngày
+đợt 7 · W2-Q3 = `NO_COLLECTOR` + `signatureMissing`, cờ collector chỉ bật · W2-Q4 = nhắc quá hạn mỗi ngày
 làm việc · W2-Q5 = lượt ban đầu chung một lần nhập · RC-9 + QĐ-118 = chỉ IT phụ trách phòng hoặc người Super Admin chỉ định, bỏ hàng
-việc IT chung · Q7 = chỉ Super Admin đổi IT phụ trách thuê bao (route riêng) · Q8 = QĐ-118 cho mọi route/thông báo còn lại ngay đợt 2 · Q9 = giữ `QĐ-77m` (tự cấp, cờ tự thực thi, báo Super Admin) · W2-Q6 = giao/thu máy và kích hoạt/gỡ/chuyển quyền gắn máy theo phòng người nhận/người giữ (chuyển khác phòng cần cả hai), máy trong kho mọi IT
+việc IT chung · Q7 = chỉ Super Admin đổi IT phụ trách thuê bao (route riêng) · Q8 = QĐ-118 cho mọi route/thông báo còn lại ngay đợt 2 · Q9 = giữ `QĐ-77m` (tự cấp, cờ tự thực thi, báo Super Admin) · W2-Q6 = giao/thu máy và kích hoạt/gỡ/chuyển quyền gắn máy theo phòng người nhận/người giữ (chuyển khác phòng cần cả hai), máy trong kho mọi IT · W2-Q10 = báo lỗi SaaS khi phòng không có người làm ⟹ phiếu vẫn tạo, chờ người tiếp nhận, báo Super Admin (migration 4 ở B10c) · REVIEW-SPEC-2 đã áp (SPEC §13.4)
 
 Trả lời bằng **tiếng Việt**. Giữ nguyên tiếng Anh cho tên file, hàm, lệnh, mã lỗi và code.
 
@@ -95,8 +95,10 @@ git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management checkout -b int/r
    - hậu tố file, một `@Injectable` mỗi file, lỗi nghiệp vụ trong `*.errors.ts`, ánh xạ HTTP trong `*.http-errors.ts`;
    - **thứ tự khóa SPEC mục 6** (0b baseline → 0c bộ đếm → employee → phòng → máy → đăng ký → việc thu máy → khoản mua → khóa →
      kích hoạt; nhiều máy khóa trong một câu theo `id`; ngoại lệ duy nhất E4); comment đầu service ghi thứ tự khóa của nó;
-   - **QĐ-118:** việc của phòng chỉ người làm của phòng (`OrganizationReadApi.itAdminsActingFor`); việc của người **chưa xếp
-     phòng** (phòng `NULL`) chỉ IT Super Admin chỉ định cho việc đó (`itAdminsActingForUnplacedWork`, SPEC W2-27 (e)); không viết
+   - **QĐ-118:** việc của phòng chỉ người làm của **phòng của việc** (hôm nay, không có thì lần xếp phòng cuối) qua
+     `OrganizationReadApi.itAdminsActingFor(departmentIds, usableAmong, tx?)` — truyền `ids => identity.findUsableItAdminEmployeeIds(ids, tx)`,
+     **không** qua hook (chạy cả ở worker); route **ghi**/hàng việc dùng `getItAdminActingScope`, route **đọc** giữ `getItAdminScope`;
+     việc của người **chưa từng xếp phòng** chỉ IT Super Admin chỉ định cho việc đó (`itAdminsActingForUnplacedWork`, SPEC W2-27 (e)); không viết
      lại nhánh "IT khác khi người phụ trách không dùng được" hay hàng việc chung ở bất kỳ đâu; cờ `bySubstitute` chỉ ghi Audit
      Trail, không thêm báo cáo/field (W2-Q9); chỉ định làm thay không kiểm trần 4 phòng, chỉ cảnh báo `itAdminLoad` (W2-Q7);
    - mọi đọc trong `runner.run` qua `tx`; không `Promise.all` trên `tx`;
@@ -124,7 +126,7 @@ git -C D:/FPT/FALL2026/Code/BE-dev-software-license-management checkout -b int/r
    ```
 
    Thêm `pnpm rules:format` khi sửa `docs/rules/*.md` hoặc `src/modules/*/README.md`; `pnpm prisma:validate` **và**
-   `pnpm prisma:generate` khi sửa `prisma/` (chỉ T1). `openapi.json` đổi đúng chủ đích thì commit cùng gói.
+   `pnpm prisma:generate` khi sửa `prisma/` (T1; B10c cho migration 4). `openapi.json` đổi đúng chủ đích thì commit cùng gói.
 
 9. **Tự review diff** theo SPEC: đủ tiêu chí, không thừa phạm vi (SPEC mục 2.2), comment nói lý do (không mã `W2-xx`, `MAY-xx`,
    `KHOA-xx`, `QĐ-`), manifest OpenAPI (`test/support/openapi-example-manifest.ts`, `openapi-example-route-codes-*.ts`,
@@ -159,7 +161,7 @@ Dừng gói đó, ghi `PROGRESS-<làn>.md` kèm `file:line`, 2–3 lựa chọn 
 
 1. Luật nghiệp vụ không rõ mà mục 4 không giải được, hoặc code thật khác SPEC theo cách đổi hành vi nghiệp vụ (tiền, quyền, trạng
    thái máy/kích hoạt/việc thu máy, người được làm việc của phòng).
-2. Cần migration ngoài SPEC mục 3, sửa `prisma/models` ngoài T1, sửa migration đã merge, hoặc migration phá dữ liệu.
+2. Cần migration ngoài SPEC mục 3, sửa `prisma/models` ngoài T1 (ngoại lệ duy nhất: migration 4 + model `SaasIssue` ở B10c), sửa migration đã merge, hoặc migration phá dữ liệu.
 3. Cần cạnh module mới, extension point mới, đổi tầng, dependency npm mới.
 4. Gate chỉ xanh khi nới gate, thêm suppression hay thêm mục registry (`COLLECTION_EXCEPTIONS`, `NESTED_ARRAYS`,
    `NO_EXAMPLE_RESPONSES`, `GRAPH_WIRING_EXCEPTIONS`).
