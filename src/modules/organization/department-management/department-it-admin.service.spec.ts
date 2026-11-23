@@ -1,5 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { DepartmentItSubstituteRepo } from '../department-it-substitute/department-it-substitute.repo';
 import { DepartmentItAdminInvalidError, DepartmentItAdminLimitReachedError } from '../department/department.errors';
 import type { DepartmentRepo } from '../department/department.repo';
@@ -51,6 +52,7 @@ describe('DepartmentItAdminService', () => {
     countActiveBySubstitute: jest.fn(() => Promise.resolve(2)),
   };
   const audit = { record: jest.fn(() => Promise.resolve()) };
+  const notifications = { notifyInApp: jest.fn(() => Promise.resolve(true)) };
 
   const service = (): DepartmentItAdminService => {
     const hook = new EmployeeAccountsHook();
@@ -62,6 +64,7 @@ describe('DepartmentItAdminService', () => {
       departments as unknown as DepartmentRepo,
       substitutes as unknown as DepartmentItSubstituteRepo,
       audit as unknown as AuditApi,
+      notifications as unknown as NotificationsApi,
     );
   };
 
@@ -96,6 +99,7 @@ describe('DepartmentItAdminService', () => {
       id: 'sub-1',
       department: { id: 'dep-1', name: 'D' },
       substitute: { id: 'emp-sub', fullName: 'S' },
+      replaced: { id: 'emp-old', fullName: 'O' },
     });
     const after: Record<string, string | boolean | null> = {};
     const load = await service().onInChargeNamed(
@@ -116,12 +120,71 @@ describe('DepartmentItAdminService', () => {
       tx,
       expect.objectContaining({ action: 'DEPARTMENT_IT_SUBSTITUTE.ENDED' }),
     );
+    expect(notifications.notifyInApp).toHaveBeenCalledTimes(2);
+    expect(notifications.notifyInApp).toHaveBeenNthCalledWith(
+      1,
+      tx,
+      expect.objectContaining({
+        organizationId: 'org-1',
+        recipientEmployeeId: 'emp-sub',
+        code: 'DEPARTMENT_IT_SUBSTITUTE_ENDED',
+        subject: { type: 'DEPARTMENT', id: 'dep-1' },
+        eventKey: 'departmentItSubstituteEnded:sub-1',
+        params: {
+          substituteId: 'sub-1',
+          departmentId: 'dep-1',
+          substituteEmployeeId: 'emp-sub',
+          endCause: 'IN_CHARGE_NAMED',
+        },
+      }),
+    );
+    expect(notifications.notifyInApp).toHaveBeenNthCalledWith(
+      2,
+      tx,
+      expect.objectContaining({
+        recipientEmployeeId: 'emp-old',
+        code: 'DEPARTMENT_IT_SUBSTITUTE_ENDED',
+        eventKey: 'departmentItSubstituteEnded:sub-1',
+      }),
+    );
     expect(load).toEqual({ employeeId: 'emp-it', inChargeCount: 3, substituteCount: 2, overLimit: true });
     expect(after.overLimit).toBe(true);
 
+    notifications.notifyInApp.mockClear();
     expect(
       await service().onInChargeNamed(tx, actor, 'org-1', 'dep-1', null, {}, new Date('2026-10-19T10:00:00Z')),
     ).toBeNull();
     expect(substitutes.endActiveForDepartment).toHaveBeenCalledTimes(1);
+    expect(notifications.notifyInApp).not.toHaveBeenCalled();
+
+    substitutes.endActiveForDepartment.mockResolvedValueOnce({
+      id: 'sub-2',
+      department: { id: 'dep-1', name: 'D' },
+      substitute: { id: 'emp-sub', fullName: 'S' },
+      replaced: null,
+    });
+    await service().closeActiveSubstitute(
+      tx,
+      actor,
+      'org-1',
+      'dep-1',
+      'DEPARTMENT_RETIRED',
+      new Date('2026-10-19T10:00:00Z'),
+    );
+    expect(notifications.notifyInApp).toHaveBeenCalledTimes(1);
+    expect(notifications.notifyInApp).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        recipientEmployeeId: 'emp-sub',
+        code: 'DEPARTMENT_IT_SUBSTITUTE_ENDED',
+        eventKey: 'departmentItSubstituteEnded:sub-2',
+        params: {
+          substituteId: 'sub-2',
+          departmentId: 'dep-1',
+          substituteEmployeeId: 'emp-sub',
+          endCause: 'DEPARTMENT_RETIRED',
+        },
+      }),
+    );
   });
 });

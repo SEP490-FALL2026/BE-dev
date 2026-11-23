@@ -3,9 +3,10 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { DepartmentRecordService } from '../department/department-record.service';
 import { DepartmentNotFoundError } from '../department/department.errors';
-import { DepartmentRepo } from '../department/department.repo';
+import type { DepartmentRecord } from '../department/department.types';
 import { EmployeeRecordService } from '../employee/employee-record.service';
 import { organizationAuditEvent } from '../organization-audit-event.mapper';
 import { OrganizationContextService } from '../organization-context.service';
@@ -42,12 +43,12 @@ function throwForAppointVerdict(verdict: Exclude<AppointSubstituteVerdict, 'OK'>
 export class DepartmentItSubstituteService {
   constructor(
     private readonly repo: DepartmentItSubstituteRepo,
-    private readonly departments: DepartmentRepo,
     private readonly departmentRecords: DepartmentRecordService,
     private readonly employees: EmployeeRecordService,
     private readonly employeeAccounts: EmployeeAccountsHook,
     private readonly context: OrganizationContextService,
     private readonly audit: AuditApi,
+    private readonly notifications: NotificationsApi,
     private readonly runner: TransactionRunner,
   ) {}
 
@@ -77,7 +78,7 @@ export class DepartmentItSubstituteService {
   ): Promise<{ substitute: DepartmentItSubstituteView; itAdminLoad: ItAdminLoad }> {
     // Lock order: tier 1 employee FOR UPDATE (candidate), then tier 2 department FOR UPDATE.
     const employee = await this.lockAndReadCandidate(tx, input.substituteEmployeeId);
-    const department = await this.departments.lock(tx, departmentId, 'UPDATE');
+    const department = await this.departmentRecords.lockForUpdate(tx, departmentId);
     const replacedEmployeeId = await this.assertAppointAllowed(tx, department, employee, input.substituteEmployeeId);
 
     const created = await this.repo.insert(tx, {
@@ -90,7 +91,10 @@ export class DepartmentItSubstituteService {
       appointedByAppUserId: actor.appUserId,
     });
 
-    const inChargeCount = await this.departments.countActiveInChargeExcludingStarting(tx, input.substituteEmployeeId);
+    const inChargeCount = await this.departmentRecords.countActiveInChargeExcludingStarting(
+      tx,
+      input.substituteEmployeeId,
+    );
     const substituteCount = await this.repo.countActiveBySubstitute(tx, input.substituteEmployeeId);
     const itAdminLoad = itAdminLoadOf({ employeeId: input.substituteEmployeeId, inChargeCount, substituteCount });
 
@@ -112,13 +116,21 @@ export class DepartmentItSubstituteService {
         },
       ),
     );
+    await this.notifyAppointed(
+      tx,
+      organizationId,
+      departmentId,
+      created.id,
+      input.substituteEmployeeId,
+      replacedEmployeeId,
+    );
 
     return { substitute: { ...created, substituteUsable: true }, itAdminLoad };
   }
 
   private async assertAppointAllowed(
     tx: DbTx,
-    department: Awaited<ReturnType<DepartmentRepo['lock']>>,
+    department: DepartmentRecord | null,
     employee: Awaited<ReturnType<EmployeeRecordService['find']>>,
     candidateEmployeeId: string,
   ): Promise<string | null> {
@@ -149,7 +161,7 @@ export class DepartmentItSubstituteService {
     const ended = await this.runner.run(async (tx) => {
       const initial = await this.repo.findById(id, tx);
       if (!initial) throw new DepartmentItSubstituteNotFoundError();
-      await this.departments.lock(tx, initial.department.id, 'UPDATE');
+      await this.departmentRecords.lockForUpdate(tx, initial.department.id);
 
       const current = await this.repo.findById(id, tx);
       if (!current) throw new DepartmentItSubstituteNotFoundError();
@@ -185,6 +197,7 @@ export class DepartmentItSubstituteService {
           },
         ),
       );
+      await this.notifyEnded(tx, organization.id, updated);
 
       return updated;
     });
@@ -248,6 +261,52 @@ export class DepartmentItSubstituteService {
     const account = await this.employeeAccounts.get().inspectEmployeeAccount(tx, employeeId);
 
     return account.usable && account.roles.includes('IT_ADMIN');
+  }
+
+  private async notifyAppointed(
+    tx: DbTx,
+    organizationId: string,
+    departmentId: string,
+    substituteId: string,
+    substituteEmployeeId: string,
+    replacedEmployeeId: string | null,
+  ): Promise<void> {
+    const recipients = [
+      substituteEmployeeId,
+      ...(replacedEmployeeId !== null && replacedEmployeeId !== substituteEmployeeId ? [replacedEmployeeId] : []),
+    ];
+    for (const recipientEmployeeId of recipients) {
+      await this.notifications.notifyInApp(tx, {
+        organizationId,
+        recipientEmployeeId,
+        code: 'DEPARTMENT_IT_SUBSTITUTE_APPOINTED',
+        subject: { type: 'DEPARTMENT', id: departmentId },
+        params: { substituteId, departmentId, substituteEmployeeId, replacedEmployeeId },
+        eventKey: `departmentItSubstituteAppointed:${substituteId}`,
+      });
+    }
+  }
+
+  private async notifyEnded(tx: DbTx, organizationId: string, updated: DepartmentItSubstituteRecord): Promise<void> {
+    const recipients = [
+      updated.substitute.id,
+      ...(updated.replaced !== null && updated.replaced.id !== updated.substitute.id ? [updated.replaced.id] : []),
+    ];
+    for (const recipientEmployeeId of recipients) {
+      await this.notifications.notifyInApp(tx, {
+        organizationId,
+        recipientEmployeeId,
+        code: 'DEPARTMENT_IT_SUBSTITUTE_ENDED',
+        subject: { type: 'DEPARTMENT', id: updated.department.id },
+        params: {
+          substituteId: updated.id,
+          departmentId: updated.department.id,
+          substituteEmployeeId: updated.substitute.id,
+          endCause: 'REMOVED',
+        },
+        eventKey: `departmentItSubstituteEnded:${updated.id}`,
+      });
+    }
   }
 
   private async requireOrganization() {

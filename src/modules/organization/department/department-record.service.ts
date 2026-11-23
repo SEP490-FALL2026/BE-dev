@@ -81,12 +81,21 @@ export class DepartmentRecordService {
     return this.departments.activeDepartmentsWithoutHead(onDate, tx);
   }
 
-  activeWithItAdmin(
-    tx?: DbTx,
-  ): Promise<
-    { id: string; code: string; name: string; itAdminEmployeeId: string | null; itAdminStatus: EmployeeStatus | null }[]
+  activeWithItAdmin(tx?: DbTx): Promise<
+    {
+      id: string;
+      code: string;
+      name: string;
+      itAdminEmployeeId: string | null;
+      itAdminStatus: EmployeeStatus | null;
+      starting: boolean;
+    }[]
   > {
     return this.departments.activeDepartmentsWithItAdmin(tx);
+  }
+
+  countActiveInChargeExcludingStarting(tx: DbTx, employeeId: string): Promise<number> {
+    return this.departments.countActiveInChargeExcludingStarting(tx, employeeId);
   }
 
   /** `FOR UPDATE` on a department the caller is about to change the head of (the lock protocol: departments in id order first). */

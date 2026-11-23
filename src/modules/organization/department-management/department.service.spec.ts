@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { EmployeeNotFoundError } from '../public/organization.errors';
 import { OrganizationContextService } from '../organization-context.service';
 import { EmployeeRecordService } from '../employee/employee-record.service';
@@ -71,6 +72,7 @@ describe('DepartmentService', () => {
   const identity = { inspectEmployeeAccount: jest.fn() };
   const creationWindow = { windowOn: jest.fn() };
   const audit = { record: jest.fn() };
+  const notifications = { notifyInApp: jest.fn().mockResolvedValue(true) };
   const runner = { run: jest.fn((work: (transaction: unknown) => Promise<unknown>) => work(tx)) };
 
   async function service(): Promise<DepartmentService> {
@@ -107,6 +109,7 @@ describe('DepartmentService', () => {
         },
         { provide: DepartmentCreationWindowHook, useValue: { get: () => creationWindow } },
         { provide: AuditApi, useValue: audit },
+        { provide: NotificationsApi, useValue: notifications },
         { provide: TransactionRunner, useValue: runner },
       ],
     }).compile();

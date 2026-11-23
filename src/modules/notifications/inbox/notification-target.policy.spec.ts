@@ -243,6 +243,24 @@ describe('notificationTarget', () => {
     expect(targetOf('OUT_OF_PROCESS_CASE_REPORTED', { type: 'OUT_OF_PROCESS_CASE', id: ID }, {})).toBeNull();
   });
 
+  it('opens the substitute list for substitute notices (SUPER_ADMIN/IT_ADMIN only) and the department profile for missing IT coverage', () => {
+    const dept = { type: 'DEPARTMENT', id: ID };
+    for (const code of ['DEPARTMENT_IT_SUBSTITUTE_APPOINTED', 'DEPARTMENT_IT_SUBSTITUTE_ENDED']) {
+      for (const role of ['SUPER_ADMIN', 'IT_ADMIN']) {
+        expect(targetOf(code, dept, { departmentId: ID }, [role])).toEqual({
+          operationId: 'departmentItSubstituteList',
+          pathParams: {},
+        });
+      }
+      expect(targetOf(code, dept, { departmentId: ID }, ['EMPLOYEE'])).toBeNull();
+    }
+    expect(targetOf('DEPARTMENT_IT_COVERAGE_MISSING', dept, { departmentId: ID }, ['SUPER_ADMIN'])).toEqual({
+      operationId: 'departmentGet',
+      pathParams: { id: ID },
+    });
+    expect(targetOf('DEPARTMENT_IT_COVERAGE_MISSING', dept, { departmentId: ID }, ['EMPLOYEE'])).toBeNull();
+  });
+
   it('gives a screen without a subject when the catalogue names one', () => {
     expect(targetOf('STEP_BACKLOG_ALERT', null, { holderEmployeeId: ID })).toEqual({
       operationId: 'stepCongestionList',

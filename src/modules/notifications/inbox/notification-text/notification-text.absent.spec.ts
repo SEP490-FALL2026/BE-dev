@@ -27,6 +27,8 @@ const MAY_BE_ABSENT: Readonly<Partial<Record<InAppNotificationCode, readonly str
   BUDGET_PROPOSAL_RETURNED: ['reason'],
   BUDGET_VERSION_DECIDED: ['reason'],
   CONTROLLED_WAIT_ALERT: ['waitingReason', 'configurationHint', 'stepKind'],
+  DEPARTMENT_IT_COVERAGE_MISSING: ['inChargeEmployeeId'],
+  DEPARTMENT_IT_SUBSTITUTE_APPOINTED: ['replacedEmployeeId'],
   DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED: ['planId', 'reason'],
   DEPARTMENT_SOFTWARE_PROPOSED: ['planId'],
   DEPARTURE_ACCESS_BLOCKED: ['departmentId'],

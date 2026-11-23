@@ -1,9 +1,9 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuditApi } from '../../audit/public/audit.api';
+import type { NotificationsApi } from '../../notifications/public/notifications.api';
 import type { DepartmentRecordService } from '../department/department-record.service';
 import { DepartmentNotFoundError } from '../department/department.errors';
-import type { DepartmentRepo } from '../department/department.repo';
 import type { EmployeeRecordService } from '../employee/employee-record.service';
 import type { OrganizationContextService } from '../organization-context.service';
 import { EmployeeNotFoundError } from '../public/organization.errors';
@@ -44,11 +44,9 @@ describe('DepartmentItSubstituteService', () => {
     countActiveBySubstitute: jest.fn(),
     list: jest.fn(),
   };
-  const departments = {
-    lock: jest.fn(),
-    countActiveInChargeExcludingStarting: jest.fn(),
-  };
   const departmentRecords = {
+    lockForUpdate: jest.fn(),
+    countActiveInChargeExcludingStarting: jest.fn(),
     itAdminScopeOf: jest.fn(),
   };
   const employees = {
@@ -61,6 +59,7 @@ describe('DepartmentItSubstituteService', () => {
   };
   const context = { findOrganization: jest.fn() };
   const audit = { record: jest.fn() };
+  const notifications = { notifyInApp: jest.fn().mockResolvedValue(true) };
   const runner = { run: jest.fn((work: (t: unknown) => Promise<unknown>) => work(tx)) };
 
   const makeService = () => {
@@ -69,12 +68,12 @@ describe('DepartmentItSubstituteService', () => {
 
     return new DepartmentItSubstituteService(
       repo as unknown as DepartmentItSubstituteRepo,
-      departments as unknown as DepartmentRepo,
       departmentRecords as unknown as DepartmentRecordService,
       employees as unknown as EmployeeRecordService,
       hook,
       context as unknown as OrganizationContextService,
       audit as unknown as AuditApi,
+      notifications as unknown as NotificationsApi,
       runner as unknown as TransactionRunner,
     );
   };
@@ -104,7 +103,7 @@ describe('DepartmentItSubstituteService', () => {
       return Promise.resolve();
     });
     employees.find.mockResolvedValue({ id: 'emp-minh', status: 'ACTIVE' });
-    departments.lock.mockImplementation(() => {
+    departmentRecords.lockForUpdate.mockImplementation(() => {
       calls.push('lock:department');
 
       return Promise.resolve(activeDept);
@@ -117,7 +116,7 @@ describe('DepartmentItSubstituteService', () => {
     accounts.findUsableItAdminEmployeeIds.mockResolvedValue(new Set(['emp-minh']));
     repo.findActiveByDepartmentId.mockResolvedValue(null);
     repo.insert.mockResolvedValue(createdSub);
-    departments.countActiveInChargeExcludingStarting.mockResolvedValue(1);
+    departmentRecords.countActiveInChargeExcludingStarting.mockResolvedValue(1);
     repo.countActiveBySubstitute.mockResolvedValue(1);
     repo.findById.mockResolvedValue(createdSub);
     repo.endById.mockResolvedValue({
@@ -150,7 +149,7 @@ describe('DepartmentItSubstituteService', () => {
 
     expect(calls).toEqual(['lock:employee', 'lock:department', 'inspect:account']);
     expect(employees.lock).toHaveBeenCalledWith(tx, 'emp-minh', 'UPDATE');
-    expect(departments.lock).toHaveBeenCalledWith(tx, 'dep-1', 'UPDATE');
+    expect(departmentRecords.lockForUpdate).toHaveBeenCalledWith(tx, 'dep-1');
     expect(result.substitute.id).toBe('sub-1');
     expect(result.itAdminLoad).toEqual({
       employeeId: 'emp-minh',
@@ -171,10 +170,86 @@ describe('DepartmentItSubstituteService', () => {
         }),
       }),
     );
+    expect(notifications.notifyInApp).toHaveBeenCalledTimes(2);
+    expect(notifications.notifyInApp).toHaveBeenNthCalledWith(
+      1,
+      tx,
+      containing({
+        organizationId: 'org-1',
+        recipientEmployeeId: 'emp-minh',
+        code: 'DEPARTMENT_IT_SUBSTITUTE_APPOINTED',
+        subject: { type: 'DEPARTMENT', id: 'dep-1' },
+        eventKey: 'departmentItSubstituteAppointed:sub-1',
+        params: {
+          substituteId: 'sub-1',
+          departmentId: 'dep-1',
+          substituteEmployeeId: 'emp-minh',
+          replacedEmployeeId: 'emp-ha',
+        },
+      }),
+    );
+    expect(notifications.notifyInApp).toHaveBeenNthCalledWith(
+      2,
+      tx,
+      containing({
+        recipientEmployeeId: 'emp-ha',
+        code: 'DEPARTMENT_IT_SUBSTITUTE_APPOINTED',
+        eventKey: 'departmentItSubstituteAppointed:sub-1',
+      }),
+    );
+  });
+
+  it('notifies only the substitute on appoint and end when replacedEmployeeId is null', async () => {
+    departmentRecords.lockForUpdate.mockResolvedValueOnce({
+      id: 'dep-1',
+      name: 'Design',
+      status: 'ACTIVE',
+      itAdmin: null,
+    });
+    repo.insert.mockResolvedValueOnce({ ...createdSub, replaced: null });
+    await makeService().appoint(superAdmin, 'dep-1', { substituteEmployeeId: 'emp-minh', reason: 'Cover' });
+
+    expect(notifications.notifyInApp).toHaveBeenCalledTimes(1);
+    expect(notifications.notifyInApp).toHaveBeenCalledWith(
+      tx,
+      containing({
+        recipientEmployeeId: 'emp-minh',
+        code: 'DEPARTMENT_IT_SUBSTITUTE_APPOINTED',
+        params: containing({ replacedEmployeeId: null }),
+      }),
+    );
+
+    notifications.notifyInApp.mockClear();
+    repo.findById.mockResolvedValueOnce({ ...createdSub, replaced: null });
+    repo.findById.mockResolvedValueOnce({ ...createdSub, replaced: null });
+    repo.endById.mockResolvedValueOnce({
+      ...createdSub,
+      replaced: null,
+      endedAt: new Date(),
+      endedByAppUserId: 'app-user-1',
+      endCause: 'REMOVED',
+    });
+    await makeService().end(superAdmin, 'sub-1');
+
+    expect(notifications.notifyInApp).toHaveBeenCalledTimes(1);
+    expect(notifications.notifyInApp).toHaveBeenCalledWith(
+      tx,
+      containing({
+        recipientEmployeeId: 'emp-minh',
+        code: 'DEPARTMENT_IT_SUBSTITUTE_ENDED',
+        eventKey: 'departmentItSubstituteEnded:sub-1',
+        params: {
+          substituteId: 'sub-1',
+          departmentId: 'dep-1',
+          substituteEmployeeId: 'emp-minh',
+          endCause: 'REMOVED',
+        },
+      }),
+    );
   });
 
   it('allows over-limit substitute (>4) as warning and records overLimit: true in audit', async () => {
-    departments.countActiveInChargeExcludingStarting.mockResolvedValue(4);
+    departmentRecords.countActiveInChargeExcludingStarting.mockResolvedValue(4);
     repo.countActiveBySubstitute.mockResolvedValue(1);
 
     const result = await makeService().appoint(superAdmin, 'dep-1', {
@@ -194,12 +269,12 @@ describe('DepartmentItSubstituteService', () => {
   it('refuses missing department, inactive department, already active, is-in-charge, and non-usable IT Admin', async () => {
     const service = makeService();
 
-    departments.lock.mockResolvedValueOnce(null);
+    departmentRecords.lockForUpdate.mockResolvedValueOnce(null);
     await expect(
       service.appoint(superAdmin, 'dep-1', { substituteEmployeeId: 'emp-minh', reason: 'r' }),
     ).rejects.toBeInstanceOf(DepartmentNotFoundError);
 
-    departments.lock.mockResolvedValueOnce({ ...activeDept, status: 'INACTIVE' });
+    departmentRecords.lockForUpdate.mockResolvedValueOnce({ ...activeDept, status: 'INACTIVE' });
     await expect(
       service.appoint(superAdmin, 'dep-1', { substituteEmployeeId: 'emp-minh', reason: 'r' }),
     ).rejects.toBeInstanceOf(DepartmentItSubstituteDepartmentInactiveError);
@@ -227,7 +302,7 @@ describe('DepartmentItSubstituteService', () => {
   it('ends an active substitute by locking department FOR UPDATE, re-reading substitute, and auditing', async () => {
     const ended = await makeService().end(superAdmin, 'sub-1');
 
-    expect(departments.lock).toHaveBeenCalledWith(tx, 'dep-1', 'UPDATE');
+    expect(departmentRecords.lockForUpdate).toHaveBeenCalledWith(tx, 'dep-1');
     expect(repo.findById).toHaveBeenCalledTimes(2);
     expect(ended.endCause).toBe('REMOVED');
     expect(audit.record).toHaveBeenCalledWith(
@@ -235,6 +310,32 @@ describe('DepartmentItSubstituteService', () => {
       containing({
         action: 'DEPARTMENT_IT_SUBSTITUTE.ENDED',
         after: containing({ endCause: 'REMOVED' }),
+      }),
+    );
+    expect(notifications.notifyInApp).toHaveBeenCalledTimes(2);
+    expect(notifications.notifyInApp).toHaveBeenNthCalledWith(
+      1,
+      tx,
+      containing({
+        recipientEmployeeId: 'emp-minh',
+        code: 'DEPARTMENT_IT_SUBSTITUTE_ENDED',
+        subject: { type: 'DEPARTMENT', id: 'dep-1' },
+        eventKey: 'departmentItSubstituteEnded:sub-1',
+        params: {
+          substituteId: 'sub-1',
+          departmentId: 'dep-1',
+          substituteEmployeeId: 'emp-minh',
+          endCause: 'REMOVED',
+        },
+      }),
+    );
+    expect(notifications.notifyInApp).toHaveBeenNthCalledWith(
+      2,
+      tx,
+      containing({
+        recipientEmployeeId: 'emp-ha',
+        code: 'DEPARTMENT_IT_SUBSTITUTE_ENDED',
+        eventKey: 'departmentItSubstituteEnded:sub-1',
       }),
     );
   });

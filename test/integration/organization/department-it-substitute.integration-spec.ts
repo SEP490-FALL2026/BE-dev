@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import { ItCoverageSweepService } from '../../../src/modules/identity-access/it-coverage/it-coverage-sweep.service';
 import { IdentityAccessApi } from '../../../src/modules/identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { RequestHarness } from '../../support/request-harness';
@@ -10,11 +11,13 @@ describe('department IT substitutes, acting scope, work departments and load war
   const h = new RequestHarness();
   let organizationReads: OrganizationReadApi;
   let identityAccess: IdentityAccessApi;
+  let itCoverageSweeps: ItCoverageSweepService;
 
   beforeAll(async () => {
     await h.start();
     organizationReads = h.ctx.app.get(OrganizationReadApi);
     identityAccess = h.ctx.app.get(IdentityAccessApi);
+    itCoverageSweeps = h.ctx.app.get(ItCoverageSweepService);
   }, 240000);
 
   afterAll(async () => {
@@ -51,6 +54,16 @@ describe('department IT substitutes, acting scope, work departments and load war
 
   const errCode = (res: request.Response) => (res.body as { error: { code: string } }).error.code;
   const dataOf = <T>(res: request.Response) => (res.body as { data: T }).data;
+  const containing = (fields: object): unknown => expect.objectContaining(fields);
+  const arrayContaining = (items: unknown[]): unknown => expect.arrayContaining(items);
+  const noticesFor = async (subjectId: string, code: string) =>
+    (
+      await h.ctx.sql.query<{ recipient_employee_id: string; event_key: string; params: Record<string, unknown> }>(
+        `SELECT recipient_employee_id, event_key, params
+           FROM in_app_notifications WHERE subject_id = $1 AND code = $2 ORDER BY recipient_employee_id, id`,
+        [subjectId, code],
+      )
+    ).rows;
 
   it('appoints, rejects invalid/duplicate/in-charge/inactive/forbidden, lists scoped, and ends REMOVED (W2-27 (a), (b))', async () => {
     const dept = await h.departmentWithUnit(h.unique('DES'));
@@ -121,6 +134,33 @@ describe('department IT substitutes, acting scope, work departments and load war
     expect(ended.endCause).toBe('REMOVED');
     expect(errCode(await endSubstitute(body.substitute.id).expect(409))).toBe('DEPARTMENT_IT_SUBSTITUTE.ALREADY_ENDED');
     expect(errCode(await endSubstitute(randomUUID()).expect(404))).toBe('DEPARTMENT_IT_SUBSTITUTE.NOT_FOUND');
+
+    const appointedNotices = await noticesFor(dept.id, 'DEPARTMENT_IT_SUBSTITUTE_APPOINTED');
+    expect(appointedNotices.map((row) => row.recipient_employee_id).sort()).toEqual(
+      [ha.employeeId, minh.employeeId].sort(),
+    );
+    expect(appointedNotices[0]).toMatchObject({
+      event_key: `departmentItSubstituteAppointed:${body.substitute.id}`,
+      params: {
+        substituteId: body.substitute.id,
+        departmentId: dept.id,
+        substituteEmployeeId: minh.employeeId,
+        replacedEmployeeId: ha.employeeId,
+      },
+    });
+    const endedNotices = await noticesFor(dept.id, 'DEPARTMENT_IT_SUBSTITUTE_ENDED');
+    expect(endedNotices.map((row) => row.recipient_employee_id).sort()).toEqual(
+      [ha.employeeId, minh.employeeId].sort(),
+    );
+    expect(endedNotices[0]).toMatchObject({
+      event_key: `departmentItSubstituteEnded:${body.substitute.id}`,
+      params: {
+        substituteId: body.substitute.id,
+        departmentId: dept.id,
+        substituteEmployeeId: minh.employeeId,
+        endCause: 'REMOVED',
+      },
+    });
   });
 
   it('closes active substitute with IN_CHARGE_NAMED on non-null change, keeps on null, and closes DEPARTMENT_RETIRED on deactivate (W2-27 (c), (w))', async () => {
@@ -181,6 +221,25 @@ describe('department IT substitutes, acting scope, work departments and load war
     expect(
       errCode(await appoint(emptyDept.id, { substituteEmployeeId: it2.employeeId, reason: 'After' }).expect(409)),
     ).toBe('DEPARTMENT_IT_SUBSTITUTE.DEPARTMENT_INACTIVE');
+
+    const namedEndNotices = await noticesFor(dept.id, 'DEPARTMENT_IT_SUBSTITUTE_ENDED');
+    expect(namedEndNotices).toEqual(
+      arrayContaining([
+        containing({
+          recipient_employee_id: it2.employeeId,
+          event_key: `departmentItSubstituteEnded:${firstSub.id}`,
+          params: containing({ endCause: 'IN_CHARGE_NAMED' }),
+        }),
+      ]),
+    );
+    const retiredEndNotices = await noticesFor(emptyDept.id, 'DEPARTMENT_IT_SUBSTITUTE_ENDED');
+    expect(retiredEndNotices).toEqual([
+      containing({
+        recipient_employee_id: it2.employeeId,
+        event_key: `departmentItSubstituteEnded:${secondSub.id}`,
+        params: containing({ endCause: 'DEPARTMENT_RETIRED' }),
+      }),
+    ]);
   });
 
   it('allows overLimit > 4 as soft warning on substitute appoint and departmentUpdate while keeping 4-dept hard cap for in-charge (W2-27 (p))', async () => {
@@ -267,5 +326,68 @@ describe('department IT substitutes, acting scope, work departments and load war
       expect(appointRes.status).toBe(201);
       expect([201, 409, 422]).toContain(submitRes.status);
     }
+  });
+
+  it('alerts Super Admin once per weekday for uncovered non-starting departments and skips starting/covered/weekends (W2-27 i, S2-8)', async () => {
+    const noInCharge = await h.departmentWithUnit(h.unique('NOC'));
+    const lockedInChargeDept = await h.departmentWithUnit(h.unique('LIC'));
+    const coveredBySubDept = await h.departmentWithUnit(h.unique('SUB'));
+    const lockedIt = await h.staff(lockedInChargeDept, h.unique('E-LCK'), 'IT_ADMIN');
+    const subIt = await h.staff(coveredBySubDept, h.unique('E-SUBC'), 'IT_ADMIN');
+    await updateDepartment(lockedInChargeDept.id, { itAdminEmployeeId: lockedIt.employeeId }).expect(200);
+    await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [lockedIt.employeeId]);
+    await appoint(coveredBySubDept.id, { substituteEmployeeId: subIt.employeeId, reason: 'Cover' }).expect(201);
+
+    const startingDeptId = (
+      await h.ctx.sql.query<{ id: string }>(`SELECT id FROM departments WHERE is_starting = true LIMIT 1`)
+    ).rows[0]?.id;
+    const superAdminId = (
+      await h.ctx.sql.query<{ employee_id: string }>(
+        `SELECT u.employee_id FROM app_users u
+           JOIN role_grants g ON g.app_user_id = u.id AND g.role = 'SUPER_ADMIN' AND g.revoked_at IS NULL
+          WHERE u.status = 'ACTIVE' AND u.activation_state = 'ACTIVATED' LIMIT 1`,
+      )
+    ).rows[0].employee_id;
+
+    // Weekend pass does nothing
+    const saturday = new Date('2026-11-28T03:00:00.000Z');
+    expect(await itCoverageSweeps.run(saturday)).toEqual({ told: 0 });
+
+    // First weekday pass notifies uncovered non-starting departments once
+    const monday = new Date('2026-11-30T03:00:00.000Z');
+    const firstPass = await itCoverageSweeps.run(monday);
+    expect(firstPass.told).toBeGreaterThanOrEqual(2);
+
+    const noIcNotices = await noticesFor(noInCharge.id, 'DEPARTMENT_IT_COVERAGE_MISSING');
+    expect(noIcNotices).toEqual([
+      containing({
+        recipient_employee_id: superAdminId,
+        event_key: `departmentItCoverage:${noInCharge.id}:2026-11-30`,
+        params: containing({
+          departmentId: noInCharge.id,
+          inChargeEmployeeId: null,
+          reason: 'NO_IN_CHARGE',
+        }),
+      }),
+    ]);
+
+    const lockedIcNotices = await noticesFor(lockedInChargeDept.id, 'DEPARTMENT_IT_COVERAGE_MISSING');
+    expect(lockedIcNotices).toEqual([
+      containing({
+        recipient_employee_id: superAdminId,
+        event_key: `departmentItCoverage:${lockedInChargeDept.id}:2026-11-30`,
+        params: containing({
+          departmentId: lockedInChargeDept.id,
+          inChargeEmployeeId: lockedIt.employeeId,
+          reason: 'IN_CHARGE_NOT_USABLE',
+        }),
+      }),
+    ]);
+
+    expect(await noticesFor(coveredBySubDept.id, 'DEPARTMENT_IT_COVERAGE_MISSING')).toEqual([]);
+    if (startingDeptId) expect(await noticesFor(startingDeptId, 'DEPARTMENT_IT_COVERAGE_MISSING')).toEqual([]);
+
+    // Second pass on the same weekday sends nothing new
+    expect(await itCoverageSweeps.run(monday)).toEqual({ told: 0 });
   });
 });

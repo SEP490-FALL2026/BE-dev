@@ -4,6 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import type { AuditValue } from '../../audit/public/audit.types';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { itAdminLoadOf, type ItAdminLoad } from '../department-it-substitute/department-it-substitute.policy';
 import { DepartmentItSubstituteRepo } from '../department-it-substitute/department-it-substitute.repo';
 import { DepartmentItAdminInvalidError } from '../department/department.errors';
@@ -23,6 +24,7 @@ export class DepartmentItAdminService {
     private readonly departments: DepartmentRepo,
     private readonly substitutes: DepartmentItSubstituteRepo,
     private readonly audit: AuditApi,
+    private readonly notifications: NotificationsApi,
   ) {}
 
   /**
@@ -96,5 +98,25 @@ export class DepartmentItAdminService {
         },
       ),
     );
+
+    const recipients = [
+      ended.substitute.id,
+      ...(ended.replaced && ended.replaced.id !== ended.substitute.id ? [ended.replaced.id] : []),
+    ];
+    for (const recipientEmployeeId of recipients) {
+      await this.notifications.notifyInApp(tx, {
+        organizationId,
+        recipientEmployeeId,
+        code: 'DEPARTMENT_IT_SUBSTITUTE_ENDED',
+        subject: { type: 'DEPARTMENT', id: departmentId },
+        params: {
+          substituteId: ended.id,
+          departmentId,
+          substituteEmployeeId: ended.substitute.id,
+          endCause,
+        },
+        eventKey: `departmentItSubstituteEnded:${ended.id}`,
+      });
+    }
   }
 }

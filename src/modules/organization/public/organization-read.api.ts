@@ -22,6 +22,7 @@ import {
   EmployeeImportLookupData,
   EmployeeProfile,
   EmployeeRecord,
+  EmployeeStatus,
   ItAdminInCharge,
   OnboardingFacts,
   OwningUnit,
@@ -234,6 +235,29 @@ export class OrganizationReadApi {
         ];
       }),
     );
+  }
+
+  /** Active non-starting departments with their named IT Admin in charge and employee status, for coverage checks. */
+  async getActiveDepartmentsForItCoverage(tx?: DbTx): Promise<
+    {
+      id: string;
+      code: string;
+      name: string;
+      itAdminEmployeeId: string | null;
+      itAdminStatus: EmployeeStatus | null;
+    }[]
+  > {
+    const active = await this.departments.activeWithItAdmin(tx);
+
+    return active
+      .filter((department) => !department.starting)
+      .map((department) => ({
+        id: department.id,
+        code: department.code,
+        name: department.name,
+        itAdminEmployeeId: department.itAdminEmployeeId,
+        itAdminStatus: department.itAdminStatus,
+      }));
   }
 
   /** Work department on `today` for each employee (placement on `today`, falling back to latest placement begun by `today`). */

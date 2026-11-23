@@ -100,6 +100,9 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
   DEVICE_STOP_REQUESTED: route('deviceStopRequestList'),
   DEVICE_STOP_REQUEST_OVERDUE: route('deviceStopRequestList'),
   SAAS_ISSUE_AWAITING_ASSIGNEE: route('saasIssueList'),
+  DEPARTMENT_IT_SUBSTITUTE_APPOINTED: route('departmentItSubstituteList'),
+  DEPARTMENT_IT_SUBSTITUTE_ENDED: route('departmentItSubstituteList'),
+  DEPARTMENT_IT_COVERAGE_MISSING: route('departmentGet', { id: 'departmentId' }),
 };
 
 /**
@@ -119,6 +122,7 @@ export const ROUTE_READERS: Readonly<Record<string, readonly string[]>> = {
   budgetTable: ['FINANCE', 'SPENDING_APPROVER'],
   budgetVersionGet: ['FINANCE', 'SPENDING_APPROVER'], // service: only Finance and the spending approver read a version
   departmentGet: ['SUPER_ADMIN', 'IT_ADMIN', 'MANAGER'],
+  departmentItSubstituteList: ['SUPER_ADMIN', 'IT_ADMIN'],
   departmentSoftwareProposalList: ['IT_ADMIN', 'MANAGER'],
   departmentTransferGet: ['SUPER_ADMIN', 'IT_ADMIN'],
   departmentWarningList: ['SUPER_ADMIN', 'IT_ADMIN'],

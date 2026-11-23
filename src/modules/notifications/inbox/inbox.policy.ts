@@ -243,6 +243,10 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   // A holder asked to stop the collection of a machine (`US-09-04`, E1): ids, the deadline and its day in the time of the company; never what the machine collected.
   DEVICE_STOP_REQUESTED: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
   DEVICE_STOP_REQUEST_OVERDUE: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
+  // Temporary department IT Admin substitute appointments and daily missing coverage alerts.
+  DEPARTMENT_IT_SUBSTITUTE_APPOINTED: ['substituteId', 'departmentId', 'substituteEmployeeId', 'replacedEmployeeId'],
+  DEPARTMENT_IT_SUBSTITUTE_ENDED: ['substituteId', 'departmentId', 'substituteEmployeeId', 'endCause'],
+  DEPARTMENT_IT_COVERAGE_MISSING: ['departmentId', 'departmentName', 'inChargeEmployeeId', 'reason'],
 };
 
 /** Whether the code is one of the closed table. */

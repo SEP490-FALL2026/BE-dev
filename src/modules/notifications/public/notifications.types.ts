@@ -228,6 +228,10 @@ export const IN_APP_NOTIFICATION_CODES = [
   // A holder asked to stop the collection of a machine (`US-09-04`, E1): the IT Admin in charge, or every IT Admin who can act, is told once, and once more when the request passed its day.
   'DEVICE_STOP_REQUESTED',
   'DEVICE_STOP_REQUEST_OVERDUE',
+  // Department IT Admin substitute lifecycle and daily missing coverage alert for the Super Admin.
+  'DEPARTMENT_IT_SUBSTITUTE_APPOINTED',
+  'DEPARTMENT_IT_SUBSTITUTE_ENDED',
+  'DEPARTMENT_IT_COVERAGE_MISSING',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

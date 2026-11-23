@@ -23,6 +23,24 @@ describe('OrganizationReadApi tx forwarding', () => {
       activeItSubstitutesFor: jest
         .fn()
         .mockResolvedValue([{ departmentId: 'dept-1', substituteEmployeeId: 'minh', substituteStatus: 'ACTIVE' }]),
+      activeWithItAdmin: jest.fn().mockResolvedValue([
+        {
+          id: 'dept-start',
+          code: 'START',
+          name: 'Starting',
+          itAdminEmployeeId: null,
+          itAdminStatus: null,
+          starting: true,
+        },
+        {
+          id: 'dept-1',
+          code: 'DES',
+          name: 'Design',
+          itAdminEmployeeId: 'ha',
+          itAdminStatus: 'ACTIVE',
+          starting: false,
+        },
+      ]),
     };
     const employees = {
       workDepartmentsOf: jest.fn().mockResolvedValue(new Map([['emp-1', 'dept-1']])),
@@ -93,5 +111,22 @@ describe('OrganizationReadApi tx forwarding', () => {
 
     expect(await api.getEmployeeIdsOfWorkDepartments(['dept-1'], '2026-11-23', tx)).toEqual(['emp-1']);
     expect(employees.employeeIdsOfWorkDepartments).toHaveBeenCalledWith(['dept-1'], '2026-11-23', tx);
+  });
+
+  it('filters out starting departments and omits starting in getActiveDepartmentsForItCoverage', async () => {
+    const { api, departments } = makeApi();
+
+    const result = await api.getActiveDepartmentsForItCoverage(tx);
+
+    expect(departments.activeWithItAdmin).toHaveBeenCalledWith(tx);
+    expect(result).toEqual([
+      {
+        id: 'dept-1',
+        code: 'DES',
+        name: 'Design',
+        itAdminEmployeeId: 'ha',
+        itAdminStatus: 'ACTIVE',
+      },
+    ]);
   });
 });

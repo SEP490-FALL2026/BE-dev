@@ -354,4 +354,20 @@ export const CODE_LABELS = {
       REJECTED: { vi: 'bị từ chối', en: 'rejected' },
     },
   },
+  DEPARTMENT_IT_SUBSTITUTE_ENDED: {
+    endCause: {
+      REMOVED: { vi: 'được gỡ bỏ', en: 'removed' },
+      IN_CHARGE_NAMED: { vi: 'đã chỉ định IT Admin phụ trách', en: 'an IT Admin in charge was named' },
+      DEPARTMENT_RETIRED: { vi: 'phòng ban ngừng hoạt động', en: 'the department was retired' },
+    },
+  },
+  DEPARTMENT_IT_COVERAGE_MISSING: {
+    reason: {
+      NO_IN_CHARGE: { vi: 'chưa có IT Admin phụ trách', en: 'no IT Admin in charge is named' },
+      IN_CHARGE_NOT_USABLE: {
+        vi: 'IT Admin phụ trách hiện không thể xử lý công việc',
+        en: 'the IT Admin in charge cannot currently act',
+      },
+    },
+  },
 } satisfies Partial<Record<InAppNotificationCode, LabelsByKey>>;

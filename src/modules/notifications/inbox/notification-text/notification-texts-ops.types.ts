@@ -131,4 +131,40 @@ export const OPS_TEXTS = {
         'The collection stop request of {holderEmployeeId:name} passed its due date {dueOn:date} without being handled.',
     },
   },
+  DEPARTMENT_IT_SUBSTITUTE_APPOINTED: {
+    vi: {
+      title: 'Phân công IT Admin làm thay cho phòng',
+      message:
+        '{substituteEmployeeId:name} được chỉ định làm IT Admin thay thế cho phòng {departmentId:name}[ (thay thế cho {replacedEmployeeId:name})].',
+    },
+    en: {
+      title: 'Department IT Admin substitute appointed',
+      message:
+        '{substituteEmployeeId:name} was appointed as temporary IT Admin substitute for {departmentId:name}[ (replacing {replacedEmployeeId:name})].',
+    },
+  },
+  DEPARTMENT_IT_SUBSTITUTE_ENDED: {
+    vi: {
+      title: 'Kết thúc phân công IT Admin làm thay',
+      message:
+        'Nhiệm vụ IT Admin làm thay của {substituteEmployeeId:name} tại phòng {departmentId:name} đã kết thúc ({endCause:enum}).',
+    },
+    en: {
+      title: 'Department IT Admin substitute ended',
+      message:
+        'The temporary IT Admin substitute assignment of {substituteEmployeeId:name} for {departmentId:name} has ended ({endCause:enum}).',
+    },
+  },
+  DEPARTMENT_IT_COVERAGE_MISSING: {
+    vi: {
+      title: 'Phòng chưa có IT Admin xử lý công việc',
+      message:
+        'Phòng {departmentId:name} hiện chưa có IT Admin phụ trách hoặc làm thay có thể xử lý công việc ({reason:enum}[ — {inChargeEmployeeId:name}]). Vui lòng chỉ định IT Admin phụ trách hoặc làm thay.',
+    },
+    en: {
+      title: 'Department has no acting IT Admin',
+      message:
+        'Department {departmentId:name} has no acting IT Admin in charge or substitute right now ({reason:enum}[ — {inChargeEmployeeId:name}]). Please assign an IT Admin in charge or appoint a substitute.',
+    },
+  },
 } satisfies Partial<Record<InAppNotificationCode, NotificationTexts>>;
