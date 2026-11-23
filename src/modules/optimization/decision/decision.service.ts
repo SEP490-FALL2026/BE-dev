@@ -126,7 +126,8 @@ export class DecisionService {
     }
     await this.keepChecklist(tx, actor, found, { verdict, choice: input.choice, decidedAt: day.now });
 
-    return found.map((record) => byId.get(record.id)!);
+    // Decided in the order of the locks, answered in the order the caller sent the ids (each once).
+    return [...new Set(input.recommendationIds)].map((id) => byId.get(id)!);
   }
 
   /** The answers of the head, kept once for each recommendation decided (one batch answers once). */

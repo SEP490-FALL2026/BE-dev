@@ -90,7 +90,7 @@ describe('DecisionService batch reclaim processing order', () => {
     );
 
     expect(openedOrder).toEqual(['rec-3', 'rec-2', 'rec-1']);
-    expect(outcomes.map((o) => o.recommendationId)).toEqual(['rec-1', 'rec-2', 'rec-3']);
+    expect(outcomes.map((o) => o.recommendationId)).toEqual(['rec-2', 'rec-1', 'rec-3']);
   });
 
   it('forwards tx to getHeadedDepartment and reclaims.graceDays', async () => {
