@@ -22,7 +22,7 @@ interface Progress {
       | 'mailboxLockPending',
       SectionWire
     >;
-    transfers: Record<'inGrace' | 'graceEndingSoon' | 'revoking', SectionWire>;
+    transfers: Record<'inGrace' | 'graceEndingSoon' | 'revoking' | 'revocationFailed', SectionWire>;
     seatsReturned: Record<'thisMonth' | 'reusedThisMonth', SectionWire>;
     plansBelowVendorAdminMinimum: SectionWire;
   };
@@ -336,6 +336,33 @@ describe('progress of the departures and the transfers on the overviews (integra
       });
       expect((await countBy(OVERVIEW_PATHS.itAdmin, it1)).count).toBe(enough);
       expect((await countBy(OVERVIEW_PATHS.itAdmin, it3.account)).count).toBe(enough);
+    });
+
+    it('counts transfers with a closed-failed revocation in revocationFailed and clears it when reopened', async () => {
+      const k2 = await h.subscription(10, 'K2');
+      const mover = await person(des.department);
+      const seat = await h.rightOf(mover, mover.code, { subscriptionId: k2 });
+      const transfer = await h.moveToday(mover, eng.department);
+      await moveGrace(transfer.id, { effective: h.day(-10), reminder: h.day(-5), ends: h.day(-1) });
+
+      const taskId = await h.openTask(seat, 'REVOKE', it1.employeeId);
+      await h.ctx.sql.query(
+        `INSERT INTO provisioning_task_reasons (task_id, source, decided_role, reference_kind, reference_id)
+         VALUES ($1, 'TRANSFER', 'TRANSFER_PROCESS', 'DEPARTMENT_TRANSFER', $2)`,
+        [taskId, transfer.id],
+      );
+      await h.closeFailed(taskId, { reason: 'Không thu hồi được' }).expect(200);
+
+      const before = (await progressOf(OVERVIEW_PATHS.itAdmin, it1)).sections.transfers.revocationFailed.count ?? 0;
+      expect(before).toBeGreaterThanOrEqual(1);
+
+      await request(h.server())
+        .post(`/api/v1/department-transfers/${transfer.id}/revocations`)
+        .set(h.as(it1))
+        .expect(200);
+
+      const after = (await progressOf(OVERVIEW_PATHS.itAdmin, it1)).sections.transfers.revocationFailed.count ?? 0;
+      expect(after).toBe(before - 1);
     });
   });
 });

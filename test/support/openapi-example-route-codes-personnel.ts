@@ -104,6 +104,10 @@ export const ROUTE_ERROR_CODES_PERSONNEL: Readonly<
       'PERSONNEL.SUCCESSOR_REQUIRED',
     ],
   },
+  departmentTransferRevocationReopen: {
+    '404': ['DEPARTMENT_TRANSFER.NOT_FOUND'],
+    '409': ['DEPARTMENT_TRANSFER.NOTHING_TO_REVOKE', 'DEPARTMENT_TRANSFER.REVOCATION_NOT_DUE'],
+  },
   longLeaveChangeList: {
     '404': ['LONG_LEAVE.NOT_FOUND'],
   },

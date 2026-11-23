@@ -261,6 +261,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/department-transfers/{id}/rescheduling',
   'POST /api/v1/department-transfers/{id}/cancellation',
   'POST /api/v1/department-transfers/{id}/it-admin-handover',
+  'POST /api/v1/department-transfers/{id}/revocations',
   'GET /api/v1/assignment-expiry-queue',
   'POST /api/v1/assignment-expiry-queue/{assignmentId}/revocation',
   'GET /api/v1/assignment-expiry-reminders',

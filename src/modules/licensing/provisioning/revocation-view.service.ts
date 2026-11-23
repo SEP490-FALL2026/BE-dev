@@ -164,4 +164,8 @@ export class RevocationViewService {
   async terminatingAccess(employeeIds: readonly string[], tx?: DbTx): Promise<TerminatingAccess[]> {
     return this.reads.terminatingOf(employeeIds, await this.organizationReads.businessToday(new Date(), tx), tx);
   }
+
+  transferIdsWithFailedRevocation(transferIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.reads.listTransferIdsWithFailedRevocation(transferIds, tx);
+  }
 }

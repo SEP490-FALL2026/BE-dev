@@ -127,6 +127,14 @@ export class ProvisioningTaskFrame {
     });
   }
 
+  /** Returns the current organization id, or throws if the installation has not completed. */
+  async requireOrganizationId(tx?: DbTx): Promise<string> {
+    const organization = await this.organizationReads.getOrganization(tx);
+    if (!organization) throw new Error('A provisioning task was changed before installation');
+
+    return organization.id;
+  }
+
   private async requireOrganization() {
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A provisioning task was changed before installation');

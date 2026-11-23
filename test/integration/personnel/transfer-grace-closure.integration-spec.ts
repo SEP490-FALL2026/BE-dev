@@ -1,3 +1,4 @@
+import request from 'supertest';
 import { addDays } from '../../../src/core/business-date';
 import { graceOf } from '../../../src/modules/personnel/transfer-grace/transfer-grace.policy';
 import { TransferRevocationService } from '../../../src/modules/personnel/transfer-grace/transfer-revocation.service';
@@ -463,5 +464,46 @@ describe('the system closes the transfer of a person who moved (integration, rea
       [pending.id],
     );
     expect(count.rowCount).toBe(0);
+  }, 240_000);
+
+  it('does not reopen a closed-failed revocation automatically on sweep, and lets IT_ADMIN reopen it via POST /revocations', async () => {
+    const { dest, person, code } = await example();
+    const seat = await h.seatOf(person, { subscriptionId: k2a }, code);
+    const wire = await h.moveToday(person, dest.department);
+
+    await revocation().sweep(at(afterGrace()));
+
+    const tasksAfterFirstSweep = await h.ctx.sql.query<{ id: string }>(
+      `SELECT id FROM provisioning_tasks WHERE assignment_id = $1 AND kind = 'REVOKE'`,
+      [seat],
+    );
+    expect(tasksAfterFirstSweep.rowCount).toBe(1);
+    const firstTaskId = tasksAfterFirstSweep.rows[0].id;
+
+    await h.closeFailed(firstTaskId, { reason: 'Không liên lạc được nhà cung cấp' }).expect(200);
+
+    // Sweeping again must not reopen a new revocation task after CLOSED_FAILED.
+    await revocation().sweep(at(addDays(afterGrace(), 1)));
+    const tasksAfterSecondSweep = await h.ctx.sql.query<{ id: string }>(
+      `SELECT id FROM provisioning_tasks WHERE assignment_id = $1 AND kind = 'REVOKE'`,
+      [seat],
+    );
+    expect(tasksAfterSecondSweep.rowCount).toBe(1);
+    expect((await rowOf(wire.id)).closed).toBe(false);
+
+    // SUPER_ADMIN is forbidden (403); IT_ADMIN reopens (200) and a second call returns 409 NOTHING_TO_REVOKE.
+    await request(h.server()).post(`/api/v1/department-transfers/${wire.id}/revocations`).set(h.as(h.sa)).expect(403);
+    const reopened = await request(h.server())
+      .post(`/api/v1/department-transfers/${wire.id}/revocations`)
+      .set(h.as(it2))
+      .expect(200);
+    expect(h.dataOf<{ created: number; reasonAdded: number }>(reopened)).toEqual({ created: 1, reasonAdded: 0 });
+    await request(h.server()).post(`/api/v1/department-transfers/${wire.id}/revocations`).set(h.as(it2)).expect(409);
+
+    const tasksAfterReopen = await h.ctx.sql.query<{ id: string }>(
+      `SELECT id FROM provisioning_tasks WHERE assignment_id = $1 AND kind = 'REVOKE'`,
+      [seat],
+    );
+    expect(tasksAfterReopen.rowCount).toBe(2);
   }, 240_000);
 });

@@ -65,14 +65,20 @@ export function legacyAnnouncementDue(transfer: SweptTransfer, today: BusinessDa
 export function rightsToTakeBack<
   T extends {
     assignmentId: string;
+    subscriptionId: string | null;
     effectiveFrom: BusinessDate;
     validUntil: BusinessDate | null;
     provisioningType: string;
   },
 >(seats: readonly T[], transfer: { effectiveOn: BusinessDate; pictureIds: readonly string[] | null }): T[] {
-  return seats.filter(
-    (seat) => isOldRightOf(transfer, seat) && seat.validUntil === null && isRevocableType(seat.provisioningType),
-  );
+  return seats
+    .filter(
+      (seat) => isOldRightOf(transfer, seat) && seat.validUntil === null && isRevocableType(seat.provisioningType),
+    )
+    .sort(
+      (a, b) =>
+        (a.subscriptionId ?? '').localeCompare(b.subscriptionId ?? '') || a.assignmentId.localeCompare(b.assignmentId),
+    );
 }
 
 /** The ids of the rights the picture of a held transfer names; null when it has none (a transfer from before the grace). */

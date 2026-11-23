@@ -365,6 +365,8 @@ export interface OpenRevocationInput {
   timing?: { dueOn?: BusinessDate; notBefore?: BusinessDate };
   /** `{ holder: true }`: the person who holds the seat is told once that its revocation is coming. Nothing given: nobody is told. */
   notice?: { holder: true };
+  /** When true and the seat has no live revocation, do not open a new task if a closed-failed revocation for the same source and reference already exists. */
+  noReopenAfterFailure?: boolean;
   now?: Date;
 }
 

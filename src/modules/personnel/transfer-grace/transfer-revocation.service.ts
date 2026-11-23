@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { AssignmentNotOpenError } from '../../licensing/public/licensing.errors';
 import { LicensingApi } from '../../licensing/public/licensing.api';
@@ -9,11 +10,12 @@ import type { SystemActor } from '../../licensing/public/licensing.types';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
+import { personnelAuditEvent, personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { TransferClosureService } from './transfer-closure.service';
 import { TransferGraceRepo } from './transfer-grace.repo';
 import { heldOnOrBefore } from './transfer-grace.policy';
 import type { HeldTransfer, SweptRef } from './transfer-grace.types';
+import { TransferRevocationRefusedError } from './transfer-revocation.errors';
 import { snapshotRightOf } from './transfer-snapshot.json';
 import { pictureIdsOf, revocationDue, rightsToTakeBack, sweptOf } from './transfer-sweep.policy';
 
@@ -93,6 +95,29 @@ export class TransferRevocationService {
     return pass;
   }
 
+  /** Reopens failed transfer revocations manually when requested by an IT Admin after the grace period has ended. */
+  async reopen(
+    actor: AuthenticatedPrincipal,
+    transferId: string,
+    now: Date = new Date(),
+  ): Promise<{ created: number; reasonAdded: number }> {
+    const employeeId = await this.graces.findEmployeeId(transferId);
+    if (!employeeId) throw new TransferRevocationRefusedError('NOT_FOUND');
+
+    return this.runner.run(async (tx) => {
+      const today = await this.organizationReads.businessToday(now, tx);
+      await this.organization.lockEmployeeForUpdate(tx, employeeId);
+      const held = await this.graces.lock(tx, transferId);
+      if (!held) throw new TransferRevocationRefusedError('NOT_FOUND');
+      if (!revocationDue(sweptOf(held), today)) throw new TransferRevocationRefusedError('REVOCATION_NOT_DUE');
+
+      const done = await this.takeBack(tx, held, today, now, { noReopenAfterFailure: false, actor });
+      if (done.created + done.reasonAdded === 0) throw new TransferRevocationRefusedError('NOTHING_TO_REVOKE');
+
+      return done;
+    });
+  }
+
   /** The transfer, in a transaction of the caller that holds nothing yet: null when the transfer is not due (closed meanwhile, or the grace is not over). */
   private async withinTransaction(
     tx: DbTx,
@@ -104,7 +129,8 @@ export class TransferRevocationService {
     const held = await this.graces.lock(tx, ref.id);
     if (!held || !revocationDue(sweptOf(held), today)) return null;
 
-    const done = await this.takeBack(tx, held, today, now);
+    const system: SystemActor = { kind: 'SYSTEM', correlationId: `transfer-grace:${held.id}` };
+    const done = await this.takeBack(tx, held, today, now, { noReopenAfterFailure: true, actor: system });
     // Nothing may be left to take back (the person held nothing, or every right ended): the transfer closes now, or the person could never be moved again.
     // Read again, for the picture of the rights that taking back may have kept.
     const current = (await this.graces.lock(tx, held.id)) ?? held;
@@ -118,14 +144,14 @@ export class TransferRevocationService {
     held: HeldTransfer,
     today: BusinessDate,
     now: Date,
+    options: { noReopenAfterFailure: boolean; actor: AuthenticatedPrincipal | SystemActor },
   ): Promise<Omit<TransfersRevoked, 'closed'>> {
     const seats = await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx);
     if (held.snapshotBefore === null) await this.keepPicture(tx, held, seats, today);
-    const system: SystemActor = { kind: 'SYSTEM', correlationId: `transfer-grace:${held.id}` };
     const done = { created: 0, reasonAdded: 0 };
     for (const right of rightsToTakeBack(seats, { effectiveOn: held.effectiveOn, pictureIds: pictureIdsOf(held) })) {
       try {
-        const opened = await this.licensing.openRevocation(tx, system, {
+        const opened = await this.licensing.openRevocation(tx, options.actor, {
           assignmentId: right.assignmentId,
           source: 'TRANSFER',
           // The decision is the one of the process of the transfer, not of a person: the rights are taken back because the grace is over.
@@ -135,6 +161,7 @@ export class TransferRevocationService {
             referenceId: held.id,
           },
           context: { departmentId: held.toDepartmentId },
+          noReopenAfterFailure: options.noReopenAfterFailure,
           now,
         });
         if (opened.created) done.created += 1;
@@ -144,7 +171,7 @@ export class TransferRevocationService {
         if (!(error instanceof AssignmentNotOpenError)) throw error;
       }
     }
-    if (done.created + done.reasonAdded > 0) await this.tell(tx, held, done);
+    if (done.created + done.reasonAdded > 0) await this.tell(tx, held, done, options.actor);
 
     return done;
   }
@@ -164,19 +191,34 @@ export class TransferRevocationService {
     });
   }
 
-  private async tell(tx: DbTx, held: HeldTransfer, done: { created: number; reasonAdded: number }): Promise<void> {
-    await this.audit.record(
-      tx,
-      personnelSystemAuditEvent(
-        held.organizationId,
-        'DEPARTMENT_TRANSFER.REVOCATION_OPENED',
-        'DepartmentTransfer',
-        held.id,
-        `transfer-grace:${held.id}`,
-        null,
-        { employeeId: held.employeeId, tasksCreated: done.created, reasonsAdded: done.reasonAdded },
-      ),
-    );
+  private async tell(
+    tx: DbTx,
+    held: HeldTransfer,
+    done: { created: number; reasonAdded: number },
+    actor: AuthenticatedPrincipal | SystemActor,
+  ): Promise<void> {
+    const after = { employeeId: held.employeeId, tasksCreated: done.created, reasonsAdded: done.reasonAdded };
+    const event =
+      'kind' in actor && actor.kind === 'SYSTEM'
+        ? personnelSystemAuditEvent(
+            held.organizationId,
+            'DEPARTMENT_TRANSFER.REVOCATION_OPENED',
+            'DepartmentTransfer',
+            held.id,
+            actor.correlationId,
+            null,
+            after,
+          )
+        : personnelAuditEvent(
+            { kind: 'USER', principal: actor as AuthenticatedPrincipal },
+            held.organizationId,
+            'DEPARTMENT_TRANSFER.REVOCATION_OPENED',
+            'DepartmentTransfer',
+            held.id,
+            null,
+            after,
+          );
+    await this.audit.record(tx, event);
     await this.notifier.transferRightsRevoking(tx, {
       organizationId: held.organizationId,
       transferId: held.id,

@@ -187,6 +187,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   departmentTransferPreview: 'DEPARTMENT_TRANSFER.PREVIEWED',
   departmentTransferRecord: 'DEPARTMENT_TRANSFER.RECORDED',
   departmentTransferReschedule: 'DEPARTMENT_TRANSFER.RESCHEDULED',
+  departmentTransferRevocationReopen: 'DEPARTMENT_TRANSFER.REVOCATION_REOPENED',
   departmentWarningList: 'DEPARTMENT.WARNINGS_LISTED',
   documentAttach: 'DOCUMENT.ATTACHED',
   documentComplete: 'DOCUMENT.UPLOADED',

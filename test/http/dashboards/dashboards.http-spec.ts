@@ -31,7 +31,7 @@ const PROGRESS = {
     itHandoverPending: NO_LIST,
     mailboxLockPending: NO_LIST,
   },
-  transfers: { inGrace: NO_LIST, graceEndingSoon: NO_LIST, revoking: NO_LIST },
+  transfers: { inGrace: NO_LIST, graceEndingSoon: NO_LIST, revoking: NO_LIST, revocationFailed: NO_LIST },
   seatsReturned: { thisMonth: NO_LIST, reusedThisMonth: NO_LIST },
   plansBelowVendorAdminMinimum: NO_LIST,
 };

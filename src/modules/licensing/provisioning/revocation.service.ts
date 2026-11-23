@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentEndService } from '../assignment/assignment-end.service';
 import { SeatTargetNotFoundError } from '../public/licensing.errors';
 import {
@@ -16,6 +15,7 @@ import { assertTiming } from './revocation-open.policy';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
 import { ProvisioningTaskReasonRepo } from './provisioning-task-reason.repo';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
+import { RevocationReadRepo } from './revocation-read.repo';
 import { RevocationRecorder } from './revocation-recorder.service';
 import { RevocationTaskFactory } from './revocation-task-factory.service';
 
@@ -35,10 +35,10 @@ export class RevocationService {
     private readonly reasons: ProvisioningTaskReasonRepo,
     private readonly ending: AssignmentEndService,
     private readonly catalog: CatalogApi,
-    private readonly organizationReads: OrganizationReadApi,
     private readonly frame: ProvisioningTaskFrame,
     private readonly factory: RevocationTaskFactory,
     private readonly recorder: RevocationRecorder,
+    private readonly queries: RevocationReadRepo,
   ) {}
 
   /**
@@ -62,6 +62,10 @@ export class RevocationService {
     if (live && (await this.reasons.find(tx, live.id, source, referenceId))) {
       return { taskId: live.id, created: false, reasonAdded: false, status: live.status };
     }
+    if (!live && input.noReopenAfterFailure) {
+      const failed = await this.queries.findClosedFailedRevocationFor(tx, input.assignmentId, source, referenceId);
+      if (failed) return { taskId: failed.id, created: false, reasonAdded: false, status: 'CLOSED_FAILED' };
+    }
 
     const [plan] = await this.catalog.getPlanRevocationInfo([assignment.planId], tx);
     if (!plan) throw new SeatTargetNotFoundError('PLAN');
@@ -71,13 +75,11 @@ export class RevocationService {
       provisioningType: plan.provisioningType,
     });
     const selfExecuted = await this.selfExecuted(tx, actor, assignment.employeeId);
-    const organization = await this.organizationReads.getOrganization(tx);
-    if (!organization) throw new Error('A revocation was opened before installation');
+    const organizationId = await this.frame.requireOrganizationId(tx);
 
-    const task =
-      live ?? (await this.factory.create(tx, actor, { organizationId: organization.id, assignment, source, now }));
+    const task = live ?? (await this.factory.create(tx, actor, { organizationId, assignment, source, now }));
     await this.recorder.record(tx, actor, {
-      organizationId: organization.id,
+      organizationId,
       task,
       reused: live !== null,
       assignmentId: assignment.id,
