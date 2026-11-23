@@ -319,7 +319,7 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
     );
   });
 
-  it('never deadlocks (0 x 40P01) across 20 concurrent crossed G2 batches on [S1, S2] and [S2, S1] and preserves ids outcome order', async () => {
+  it('never deadlocks (0 x 40P01) across 20 concurrent crossed reclaim decision batches on [S1, S2] and [S2, S1] and preserves ids outcome order', async () => {
     const dept = await w.headedDepartment('P-G2-RACE');
     const sub1 = await w.worldSubscription(100, 'K2');
     const sub2 = await w.worldSubscription(100, 'K2');
@@ -335,33 +335,33 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
       const a2b = await w.seatOf(e2b, sub2);
 
       const rec1a = await w.seedRecommendation({
-        group: 'G2',
+        group: 'G4',
         state: 'AWAITING_DECISION',
-        tier: 'ACTION',
+        tier: 'REVIEW',
         assignmentId: a1a,
         deciderDepartmentId: dept.departmentId,
         decisionDueOn: addDays(w.today(), 5),
       });
       const rec2a = await w.seedRecommendation({
-        group: 'G2',
+        group: 'G4',
         state: 'AWAITING_DECISION',
-        tier: 'ACTION',
+        tier: 'REVIEW',
         assignmentId: a2a,
         deciderDepartmentId: dept.departmentId,
         decisionDueOn: addDays(w.today(), 5),
       });
       const rec1b = await w.seedRecommendation({
-        group: 'G2',
+        group: 'G4',
         state: 'AWAITING_DECISION',
-        tier: 'ACTION',
+        tier: 'REVIEW',
         assignmentId: a1b,
         deciderDepartmentId: dept.departmentId,
         decisionDueOn: addDays(w.today(), 5),
       });
       const rec2b = await w.seedRecommendation({
-        group: 'G2',
+        group: 'G4',
         state: 'AWAITING_DECISION',
-        tier: 'ACTION',
+        tier: 'REVIEW',
         assignmentId: a2b,
         deciderDepartmentId: dept.departmentId,
         decisionDueOn: addDays(w.today(), 5),
@@ -375,19 +375,31 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
         return request(w.server())
           .post('/api/v1/ghost-seat-decisions')
           .set(w.as(dept.head))
-          .send(w.checklists.withYes('5.4', { recommendationIds: batchAIds, choice: 'RECLAIM', reason: 'Batch A' }));
+          .send(
+            w.checklists.withYes('5.4', {
+              items: batchAIds.map((recommendationId) => ({ recommendationId })),
+              choice: 'RECLAIM',
+              reason: 'Batch A',
+            }),
+          );
       })();
       const callB = (async () => {
         await barrier.wait();
         return request(w.server())
           .post('/api/v1/ghost-seat-decisions')
           .set(w.as(dept.head))
-          .send(w.checklists.withYes('5.4', { recommendationIds: batchBIds, choice: 'RECLAIM', reason: 'Batch B' }));
+          .send(
+            w.checklists.withYes('5.4', {
+              items: batchBIds.map((recommendationId) => ({ recommendationId })),
+              choice: 'RECLAIM',
+              reason: 'Batch B',
+            }),
+          );
       })();
 
       const [resA, resB] = await Promise.all([callA, callB]);
-      expect(resA.status).toBe(200);
-      expect(resB.status).toBe(200);
+      expect(resA.status).toBe(201);
+      expect(resB.status).toBe(201);
       const itemsA = ((resA.body as { data: { items: { recommendationId: string }[] } }).data.items ?? []).map(
         (x) => x.recommendationId,
       );

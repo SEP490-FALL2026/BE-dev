@@ -3,6 +3,7 @@ import { addDays } from '../../../src/core/business-date';
 import { addWorkingDays } from '../../../src/core/working-days';
 import { BlockAnnouncementService } from '../../../src/modules/personnel/departure-deadline/block-announcement.service';
 import { DepartureClosureService } from '../../../src/modules/personnel/departure-closure/departure-closure.service';
+import { TransferRevocationService } from '../../../src/modules/personnel/transfer-grace/transfer-revocation.service';
 import type { ApiAccount } from '../../support/api-accounts';
 import { DashboardHarness, OVERVIEW_PATHS, type SectionWire } from '../../support/dashboard-harness';
 import type { Department, Person } from '../../support/request-harness';
@@ -345,13 +346,16 @@ describe('progress of the departures and the transfers on the overviews (integra
       const transfer = await h.moveToday(mover, eng.department);
       await moveGrace(transfer.id, { effective: h.day(-10), reminder: h.day(-5), ends: h.day(-1) });
 
-      const taskId = await h.openTask(seat, 'REVOKE', it1.employeeId);
-      await h.ctx.sql.query(
-        `INSERT INTO provisioning_task_reasons (task_id, source, decided_role, reference_kind, reference_id)
-         VALUES ($1, 'TRANSFER', 'TRANSFER_PROCESS', 'DEPARTMENT_TRANSFER', $2)`,
-        [taskId, transfer.id],
-      );
-      await h.closeFailed(taskId, { reason: 'Không thu hồi được' }).expect(200);
+      await h.ctx.app.get(TransferRevocationService, { strict: false }).sweep(new Date());
+      const taskId = (
+        await h.ctx.sql.query<{ id: string }>(
+          `SELECT id FROM provisioning_tasks WHERE assignment_id = $1 AND kind = 'REVOKE'`,
+          [seat],
+        )
+      ).rows[0].id;
+      await h.claim(taskId, it2.account).expect(200);
+      await h.fail(taskId, { reason: 'Không thu hồi được' }, it2.account).expect(200);
+      await h.closeFailed(taskId, { reason: 'Không thu hồi được' }, it2.account).expect(200);
 
       const before = (await progressOf(OVERVIEW_PATHS.itAdmin, it1)).sections.transfers.revocationFailed.count ?? 0;
       expect(before).toBeGreaterThanOrEqual(1);

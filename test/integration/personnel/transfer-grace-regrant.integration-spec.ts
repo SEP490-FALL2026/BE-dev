@@ -300,7 +300,7 @@ describe('asking again on the same subscription in the grace of a transfer (inte
     await shifted(wire.id);
     const requestId = await approvedAgain(person, dest, canva.plan);
     // The person returned the old right: a task takes it away and ends it.
-    const revTaskId = await h.open(canvaSeat, 'RETURN', { decision: { decidedRole: 'EMPLOYEE' } });
+    const { taskId: revTaskId } = await h.open(canvaSeat, 'RETURN', { decision: { decidedRole: 'EMPLOYEE' } });
 
     const refused = await h.grant({ requestId, subscriptionId: canva.subscriptionId });
 

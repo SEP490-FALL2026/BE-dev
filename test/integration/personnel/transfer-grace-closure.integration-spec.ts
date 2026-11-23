@@ -480,7 +480,9 @@ describe('the system closes the transfer of a person who moved (integration, rea
     expect(tasksAfterFirstSweep.rowCount).toBe(1);
     const firstTaskId = tasksAfterFirstSweep.rows[0].id;
 
-    await h.closeFailed(firstTaskId, { reason: 'Không liên lạc được nhà cung cấp' }).expect(200);
+    await h.claim(firstTaskId, it2).expect(200);
+    await h.fail(firstTaskId, { reason: 'Không liên lạc được nhà cung cấp' }, it2).expect(200);
+    await h.closeFailed(firstTaskId, { reason: 'Không liên lạc được nhà cung cấp' }, it2).expect(200);
 
     // Sweeping again must not reopen a new revocation task after CLOSED_FAILED.
     await revocation().sweep(at(addDays(afterGrace(), 1)));

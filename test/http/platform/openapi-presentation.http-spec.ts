@@ -279,7 +279,8 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       // 422 with AD-1.2 (ask for an adjustment, list them, decide one); 423 with RV-3.1 (a head explains a Cost Center of a quarter).
       // 426 with FX-T9a (stop-collection requests: the holder asks, the IT Admin lists and completes).
       // 429 with QĐ-113c/e (the picture of a department: put and delete; the first placement of an employee).
-      expect(operations).toHaveLength(429);
+      // 430 with the IT Admin route to reopen a closed-failed transfer revocation.
+      expect(operations).toHaveLength(430);
       expect(missing).toEqual([]);
     });
 

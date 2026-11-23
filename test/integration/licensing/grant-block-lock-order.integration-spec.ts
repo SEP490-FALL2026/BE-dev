@@ -1,4 +1,3 @@
-import { addDays } from '../../../src/core/business-date';
 import { BlockAnnouncementService } from '../../../src/modules/personnel/departure-deadline/block-announcement.service';
 import { Barrier } from '../../support/concurrency-harness';
 import { OffboardingHarness } from '../../support/offboarding-harness';
@@ -48,12 +47,8 @@ describe('Personal seat grant and departure block moment lock order (integration
       await h.sendOn([sent.id], unit.head.account).expect(201);
       await h.decideSpend(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
 
-      await h.recordedCase(employee);
       const today = h.today();
-      await h.ctx.sql.query(
-        `UPDATE offboarding_cases SET block_at = $1, block_announced_at = NULL WHERE employee_id = $2 AND state <> 'CANCELLED'`,
-        [new Date(`${addDays(today, -1)}T00:00:00Z`), employee.employeeId],
-      );
+      await h.recordedCase(employee, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: today });
 
       const barrier = new Barrier(2);
       const grantTask = (async () => {

@@ -101,15 +101,15 @@ describe('subscription quantity change rules (real PostgreSQL)', () => {
     }).expect(200);
 
     const audits = (
-      await h.ctx.sql.query<{ after_state: Record<string, unknown> }>(
-        `SELECT after_state FROM audit_events
-          WHERE action = 'SUBSCRIPTION.UPDATED' AND target_id = $1
+      await h.ctx.sql.query<{ after: Record<string, unknown> }>(
+        `SELECT after FROM audit_events
+          WHERE action = 'SUBSCRIPTION.UPDATED' AND resource_id = $1
           ORDER BY created_at DESC LIMIT 1`,
         [id],
       )
     ).rows;
     expect(audits).toHaveLength(1);
-    expect(audits[0].after_state).toMatchObject({
+    expect(audits[0].after).toMatchObject({
       quantity: 13,
       quantityChangeReason: 'New onboarding cohort',
     });
