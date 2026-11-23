@@ -12,7 +12,7 @@ const due = [
 
 /**
  * The pictures nobody points to any more are deleted outside any transaction (a slow or failing storage must not hold a database connection or row locks), and each
- * row is marked in a transaction of its own once its object is gone (`W1-07`).
+ * row is marked in a transaction of its own once its object is gone.
  */
 describe('ProfilePurgeService.purgeDue', () => {
   function build(options: { failing?: string[]; alreadyMarked?: string[] } = {}) {

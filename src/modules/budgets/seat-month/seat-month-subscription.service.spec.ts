@@ -7,7 +7,7 @@ import type { OrganizationHistoryApi } from '../../organization/public/organizat
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { CommitmentRepo } from '../budget/commitment.repo';
 import type { ThresholdAlertService } from '../threshold/threshold-alert.service';
-import { SeatMonthSeatsService } from './seat-month-seats.service';
+import { SeatMonthSeatFactsService } from './seat-month-seat-facts.service';
 import type { SeatMonthRepo } from './seat-month.repo';
 import { SeatMonthSubscriptionService } from './seat-month-subscription.service';
 
@@ -30,7 +30,7 @@ const seat: SeatOfMonth = {
 /**
  * One subscription and one month, in the transaction of the caller (`SM-1`): the seats of the subscription are read inside that transaction after the lock of the
  * month, a sweeper pass leaves alone a month some other pass marked while it waited for the lock, and a Cost Center whose commitment still waits for a budget is
- * never given its budget year to lock (`E1`: the decision of a version takes the budget year first and then updates the waiting commitments).
+ * never given its budget year to lock (exception E1 of `docs/rules/database-business.md`: the decision of a version takes the budget year first and then updates the waiting commitments).
  */
 describe('SeatMonthSubscriptionService.charge', () => {
   /** A row of the month charged before, applied to the commitment `c-2` of the Cost Center `cc-2`, which no seat of the month points at any more. */
@@ -133,7 +133,7 @@ describe('SeatMonthSubscriptionService.charge', () => {
     };
     const service = new SeatMonthSubscriptionService(
       repo as unknown as SeatMonthRepo,
-      new SeatMonthSeatsService(
+      new SeatMonthSeatFactsService(
         licensing as unknown as LicensingSeatMonthApi,
         {
           getPlacementsBetween: () =>

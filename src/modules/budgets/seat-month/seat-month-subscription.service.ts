@@ -9,13 +9,13 @@ import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { CommitmentRepo, type LockedCommitmentOfRequest } from '../budget/commitment.repo';
 import { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import { planSeatMonth, type ReturnedApplication, type SeatToCharge } from './seat-month-plan.policy';
-import { SeatMonthSeatsService } from './seat-month-seats.service';
+import { SeatMonthSeatFactsService } from './seat-month-seat-facts.service';
 import { SeatMonthRepo, type NewSeatMonthCharge, type SeatMonthChargeRecord } from './seat-month.repo';
 
 /**
  * The Cost Centers whose use the rows of before and the rows written touch, in the year of the month, except the ones this transaction has a commitment locked
  * for that still waits for a budget: the decision of a version takes the budget year of its Cost Center first and then updates the waiting commitments, so a
- * transaction that already holds one must not ask for that year (`E1`). A Cost Center with no budget has no threshold, so no alert is lost.
+ * transaction that already holds one must not ask for that year (exception E1 in `docs/rules/database-business.md`). A Cost Center with no budget has no threshold, so no alert is lost.
  */
 const costCentersOf = (
   year: number,
@@ -54,13 +54,13 @@ interface HeldCommitment {
  * written as a reversal and the commitment holds it again, so no seat-month is applied twice and the commitment of another Cost Center is never touched (`SM1-06`).
  * Locks, in the order of the module: the month of the subscription (the seats are read after it, so nobody who held the lock before can change them under this
  * charge), the commitments of the requests (by id), the ones a row of before applied to, the budget years of the Cost Centers (by id). The one exception is
- * `E1`: a Cost Center whose commitment this transaction locked and that still waits for a budget never has its budget year taken here.
+ * the one named E1 in `docs/rules/database-business.md`: a Cost Center whose commitment this transaction locked and that still waits for a budget never has its budget year taken here.
  */
 @Injectable()
 export class SeatMonthSubscriptionService {
   constructor(
     private readonly repo: SeatMonthRepo,
-    private readonly seats: SeatMonthSeatsService,
+    private readonly seats: SeatMonthSeatFactsService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly periods: SubscriptionPeriodApi,
     private readonly commitments: CommitmentRepo,

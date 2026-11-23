@@ -114,7 +114,7 @@ import { ThresholdNotifierService } from './threshold/threshold-notifier.service
 import { ThresholdRepo } from './threshold/threshold.repo';
 import { SeatMonthQueryService } from './seat-month/seat-month-query.service';
 import { SeatMonthService } from './seat-month/seat-month.service';
-import { SeatMonthSeatsService } from './seat-month/seat-month-seats.service';
+import { SeatMonthSeatFactsService } from './seat-month/seat-month-seat-facts.service';
 import { SeatMonthSubscriptionService } from './seat-month/seat-month-subscription.service';
 import { SeatMonthSweeper } from './seat-month/seat-month.job';
 import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
@@ -232,7 +232,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BudgetReviewSignatureService,
     BudgetReviewReminderService,
     BudgetReviewSweeper,
-    SeatMonthSeatsService,
+    SeatMonthSeatFactsService,
     SeatMonthSubscriptionService,
     SeatMonthService,
     SeatMonthPoolService,

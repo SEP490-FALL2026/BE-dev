@@ -13,7 +13,7 @@ import type { ProvisioningGrantTaskService } from './provisioning-grant-task.ser
 import { ProvisioningHolderService } from './provisioning-holder.service';
 import type { ProvisioningReplacementService } from './provisioning-replacement.service';
 
-describe('W1-08 lock order in ProvisioningGrantWriter and ProvisioningHolderService', () => {
+describe('lock order in ProvisioningGrantWriter and ProvisioningHolderService', () => {
   const tx = { kind: 'tx' };
   const actor = {
     appUserId: 'user-1',

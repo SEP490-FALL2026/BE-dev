@@ -49,7 +49,7 @@ describe('a step of a K1 checklist done before the task was made (D-64)', () => 
     expect(plan(claimAt(60 * 24, 60 * 24 + 1))?.items).toHaveLength(2);
   });
 
-  it('R-3: completes as DEPARTURE when RENEWAL_DISABLED is ticked alongside all departure steps after DEPARTURE is added', () => {
+  it('completes as DEPARTURE when RENEWAL_DISABLED is ticked alongside all departure steps after DEPARTURE is added', () => {
     const done = planK1Checklist({
       type: 'K1',
       sources: ['RETURN', 'DEPARTURE'],

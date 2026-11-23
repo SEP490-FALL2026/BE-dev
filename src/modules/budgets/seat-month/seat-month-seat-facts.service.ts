@@ -13,7 +13,7 @@ import type { PlacementPeriod } from './seat-month.types';
  * were placed over the month. Both are read in the transaction of the charge, after the lock of the month of the subscription, never before it.
  */
 @Injectable()
-export class SeatMonthSeatsService {
+export class SeatMonthSeatFactsService {
   constructor(
     private readonly licensing: LicensingSeatMonthApi,
     private readonly history: OrganizationHistoryApi,
