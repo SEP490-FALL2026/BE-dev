@@ -104,7 +104,7 @@ describe('subscription quantity change rules (real PostgreSQL)', () => {
       await h.ctx.sql.query<{ after: Record<string, unknown> }>(
         `SELECT after FROM audit_events
           WHERE action = 'SUBSCRIPTION.UPDATED' AND resource_id = $1
-          ORDER BY created_at DESC LIMIT 1`,
+          ORDER BY occurred_at DESC LIMIT 1`,
         [id],
       )
     ).rows;

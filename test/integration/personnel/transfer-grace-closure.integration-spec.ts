@@ -494,6 +494,7 @@ describe('the system closes the transfer of a person who moved (integration, rea
     expect((await rowOf(wire.id)).closed).toBe(false);
 
     // SUPER_ADMIN is forbidden (403); IT_ADMIN reopens (200) and a second call returns 409 NOTHING_TO_REVOKE.
+    await graceOverNow(wire.id);
     await request(h.server()).post(`/api/v1/department-transfers/${wire.id}/revocations`).set(h.as(h.sa)).expect(403);
     const reopened = await request(h.server())
       .post(`/api/v1/department-transfers/${wire.id}/revocations`)
