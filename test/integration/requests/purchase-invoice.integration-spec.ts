@@ -307,6 +307,50 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     expect((await submit('nrm inv-001')).status).toBe(201);
   });
 
+  it('the database itself refuses a second open invoice whose number has the same lower case without white space, and lets the number back once the first is returned', async () => {
+    const { requestId } = await approved();
+    const first = wire(
+      await api('post', '', h.it1)
+        .send({ ...form(requestId, { vendorInvoiceNumber: 'IDX 001' }), documentIds: [await document()] })
+        .expect(201),
+    );
+    const { rows: columns } = await h.ctx.sql.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'purchase_invoices' AND column_name <> 'id' ORDER BY ordinal_position`,
+    );
+    // The same row again under another number, written straight into the table, so only the index can refuse it (the route checks the number first).
+    const copyAs = async (id: string, number: string): Promise<{ code?: string; constraint?: string } | null> => {
+      const list = columns.map((column) => `"${column.column_name}"`).join(', ');
+      const values = columns
+        .map((column) => (column.column_name === 'number' ? '$2' : `"${column.column_name}"`))
+        .join(', ');
+      try {
+        await h.ctx.sql.query(
+          `INSERT INTO purchase_invoices (id, ${list}) SELECT gen_random_uuid(), ${values} FROM purchase_invoices WHERE id = $1`,
+          [id, number],
+        );
+
+        return null;
+      } catch (error) {
+        return error as { code?: string; constraint?: string };
+      }
+    };
+
+    expect(await copyAs(first.id, 'idx001')).toMatchObject({
+      code: '23505',
+      constraint: 'purchase_invoices_number_open_normalized_key',
+    });
+    expect(await copyAs(first.id, 'IDX-001')).toBeNull();
+
+    await h.ctx.sql.query(
+      `UPDATE purchase_invoices SET state = 'RETURNED', decided_by_employee_id = $2, decided_at = now(), return_reason = 'Sai' WHERE id = $1`,
+      [first.id, h.finance.employeeId],
+    );
+    // The copy of an invoice that is still open: its number is the key of the one returned, which is outside the index.
+    const open = (await h.ctx.sql.query<{ id: string }>(`SELECT id FROM purchase_invoices WHERE number = 'IDX-001'`))
+      .rows[0];
+    expect(await copyAs(open.id, 'idx 001')).toBeNull();
+  });
+
   it('refuses an invoice for a request whose software is internal and has no vendor, without guessing one, and keeps nothing', async () => {
     const { requestId } = await approved();
     const internal = await h.plan('K5');

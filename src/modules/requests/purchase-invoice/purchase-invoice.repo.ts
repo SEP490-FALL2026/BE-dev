@@ -380,9 +380,9 @@ export class PurchaseInvoiceRepo {
     return byInvoice;
   }
 
-  /** For each of these returned submissions, the one submitted again in its place, in one read. */
-  async resubmittedAs(ids: readonly string[]): Promise<Map<string, string>> {
-    const rows = await this.prisma.purchaseInvoice.findMany({
+  /** For each of these returned submissions, the one submitted again in its place, in one read (in `tx` when the caller is in a transaction). */
+  async resubmittedAs(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    const rows = await (tx ?? this.prisma).purchaseInvoice.findMany({
       where: { resubmissionOfId: { in: [...ids] } },
       select: { id: true, resubmissionOfId: true },
     });
