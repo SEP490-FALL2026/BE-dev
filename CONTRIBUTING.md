@@ -24,7 +24,7 @@ lệ. Hạng mục mới là một outcome kiểm chứng độc lập,
 chia theo Story chứ không theo nhóm G ([work-item sizing](docs/rules/work-item-sizing.md)), dùng
 [mẫu](docs/workspace/_template/README.md); `pnpm rules:check` kiểm cấu trúc và mục `Sizing decision` của nó.
 
-Task nhỏ không đổi nghiệp vụ/contract dùng issue/PR. Tính năng US hoặc thay đổi nhiều bước dùng [quy trình chung](docs/workspace/README.md) và [roadmap](docs/roadmap.md): giao người phụ trách → thiết kế spec/plan/test → implement và kiểm chứng → tích hợp `dev` → Owner review cuối trước `main`/production. Người phụ trách có thể tự thiết kế và code; Owner cũng có thể chuẩn bị thiết kế rồi bàn giao. Peer review của dev khác là tùy chọn, không phải gate bắt buộc. Không bắt một AI hoặc gói skill cụ thể; nếu công cụ hỗ trợ skill/subagent thì áp dụng theo quy tắc trong workspace. Quyết định kiến trúc lâu dài dùng ADR.
+Task nhỏ không đổi nghiệp vụ/contract dùng issue/PR. **Từ 17/11/2026, đợt code mới làm trong `docs/reviews/<đợt>/` theo [quy trình code AI](docs/guides/quy-trinh-code-ai.md); `docs/workspace/items` và roadmap dưới đây là quy trình cũ, chỉ để tra lịch sử.** Tính năng US hoặc thay đổi nhiều bước dùng [quy trình chung](docs/workspace/README.md) và [roadmap](docs/roadmap.md): giao người phụ trách → thiết kế spec/plan/test → implement và kiểm chứng → tích hợp `dev` → Owner review cuối trước `main`/production. Người phụ trách có thể tự thiết kế và code; Owner cũng có thể chuẩn bị thiết kế rồi bàn giao. Peer review của dev khác là tùy chọn, không phải gate bắt buộc. Không bắt một AI hoặc gói skill cụ thể; nếu công cụ hỗ trợ skill/subagent thì áp dụng theo quy tắc trong workspace. Quyết định kiến trúc lâu dài dùng ADR.
 
 ## Lệnh kiểm tra
 
