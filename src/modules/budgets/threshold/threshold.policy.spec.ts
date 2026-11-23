@@ -58,6 +58,8 @@ describe('crossedByBaseDrop (threshold crossed when a lowered base pushes use ra
 
   it('crosses nothing when already >= 80% before and still < 100%, or only 100 when rising from 85% to 100%', () => {
     expect(drop(85n, 100n, 90n)).toEqual([]);
+    // Use that stands exactly on 80 % before the drop was already there: the drop does not say it again.
+    expect(drop(80n, 100n, 90n)).toEqual([]);
     expect(drop(85n, 100n, 85n)).toEqual([100]);
   });
 

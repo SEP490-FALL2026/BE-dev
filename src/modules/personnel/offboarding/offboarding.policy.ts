@@ -311,8 +311,6 @@ export function departureRevocationSource(mode: AccessBlockMode): 'DEPARTURE' | 
 export interface RightFacts {
   assignmentId: string;
   subscriptionId: string | null;
-  /** A task of the queue already works on it. */
-  hasTask: boolean;
   /** K1, K2 and K5 have a revocation; K3 and K4 do not (yet). */
   revocable: boolean;
   provisioningType: string;

@@ -83,10 +83,16 @@ export function seatCountsOn(seat: YearStartSeat, yearStart: BusinessDate): bool
 
 const ceilDiv = (dividend: bigint, divisor: bigint): bigint => (dividend + divisor - 1n) / divisor;
 
+/** The price of a month a right with no end was approved at, from what the approval kept of the year (twelve months, rounded up to the minor unit). */
+export const approvalMonthlyFromSaved = (savedMinor: bigint): bigint => ceilDiv(savedMinor, 12n);
+
 function approvalPriceOfSeat(seat: YearStartSeat): Pick<YearStartPrice, 'unitPrice' | 'billingCycle'> | null {
   if (seat.approvalPrice !== null) return seat.approvalPrice;
   if (!seat.termLimited && seat.savedMinor !== null) {
-    return { unitPrice: { amountMinor: ceilDiv(seat.savedMinor, 12n), currency: DONG }, billingCycle: 'MONTHLY' };
+    return {
+      unitPrice: { amountMinor: approvalMonthlyFromSaved(seat.savedMinor), currency: DONG },
+      billingCycle: 'MONTHLY',
+    };
   }
 
   return null;
@@ -96,7 +102,7 @@ function approvalMonthlyOfNonTermSeat(seat: YearStartSeat): bigint | null {
   if (seat.termLimited || seat.savedMinor === null) return null;
   const monthly = seat.approvalPrice !== null ? monthlyPriceOf(seat.approvalPrice) : null;
 
-  return monthly ? monthly.amountMinor : ceilDiv(seat.savedMinor, 12n);
+  return monthly ? monthly.amountMinor : approvalMonthlyFromSaved(seat.savedMinor);
 }
 
 /**

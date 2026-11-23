@@ -173,7 +173,6 @@ describe('the revocations of the rights', () => {
   const right = (id: string, extra: Partial<RightFacts> = {}): RightFacts => ({
     assignmentId: id,
     subscriptionId: null,
-    hasTask: false,
     revocable: true,
     provisioningType: 'K2',
     ...extra,
@@ -190,13 +189,8 @@ describe('the revocations of the rights', () => {
       ...extra,
     });
 
-  it('selects every revocable right including those with an open task when none is named, sorted by (subscriptionId, assignmentId)', () => {
+  it('selects every revocable right when none is named, sorted by (subscriptionId, assignmentId)', () => {
     expect(revoke()).toEqual({ refusal: null, selected: ['a', 'b', 'c'] });
-    expect(revoke({ rights: [right('a', { hasTask: true }), right('b'), right('c')] }).selected).toEqual([
-      'a',
-      'b',
-      'c',
-    ]);
     const ordered = [
       right('z-1', { subscriptionId: 'sub-b' }),
       right('a-2', { subscriptionId: 'sub-a' }),
@@ -208,13 +202,12 @@ describe('the revocations of the rights', () => {
 
   it('refuses when there is nothing left to take away', () => {
     expect(code(revoke({ rights: [] }).refusal)).toBe('NOTHING_TO_REVOKE');
-    expect(revoke({ rights: [right('a', { hasTask: true })] })).toEqual({ refusal: null, selected: ['a'] });
     expect(code(revoke({ rights: [right('k4', { revocable: false, provisioningType: 'K4' })] }).refusal)).toBe(
       'NOTHING_TO_REVOKE',
     );
   });
 
-  it('skips a seat that has no revocation unless it is named, and allows a seat that already has a task', () => {
+  it('skips a seat that has no revocation unless it is named', () => {
     const mixed = [right('a'), right('k4', { revocable: false, provisioningType: 'K4' })];
 
     expect(revoke({ rights: mixed }).selected).toEqual(['a']);
@@ -223,14 +216,10 @@ describe('the revocations of the rights', () => {
       details: { assignmentId: 'k4', provisioningType: 'K4' },
     });
     expect(code(revoke({ named: ['zzz'] }).refusal)).toBe('ASSIGNMENT_NOT_AVAILABLE');
-    expect(revoke({ named: ['a'], rights: [right('a', { hasTask: true })] })).toEqual({
-      refusal: null,
-      selected: ['a'],
-    });
   });
 
-  it('refuses the first right named that is not there or has no revocation, while accepting one that already has a task', () => {
-    const held = [right('a'), right('t', { hasTask: true }), right('k4', { revocable: false, provisioningType: 'K4' })];
+  it('refuses the first right named that is not there or has no revocation', () => {
+    const held = [right('a'), right('t'), right('k4', { revocable: false, provisioningType: 'K4' })];
 
     expect(namedRightsRefusal(['a'], held)).toBeNull();
     expect(namedRightsRefusal(['t'], held)).toBeNull();

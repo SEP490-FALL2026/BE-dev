@@ -83,11 +83,15 @@ export function settlementOf(input: SettlementInput): Settlement {
   return failed && input.group === 'G2' && input.state === 'RECLAIM_DECIDED' ? { kind: 'REOPEN' } : { kind: 'KEEP' };
 }
 
-/** Close reasons excluded from both numerator and denominator of KPI-5. */
+/**
+ * Close reasons left out of both the numerator and the denominator of KPI-5: a recommendation left to expire, and one that a later recommendation for the same seat
+ * replaced (whatever it was: a pause, or one still open that the reclaim took over). The seat is counted once, in the recommendation that replaced it, never twice.
+ */
 export const KPI5_EXCLUDED_REASONS: readonly GhostSeatCloseReason[] = ['LEFT_TO_EXPIRE', 'SUPERSEDED'];
 
 /**
- * `KPI-5` (`DA6-39`): the share of recommendations that were right, among those the IT Admin was asked to look at. The tier
+ * `KPI-5` (`DA6-39`, `QĐ-116ba`): the share of recommendations that did not hold (the head kept the seat, an exemption was granted, or the usage of the person showed
+ * it was in use), among those the IT Admin was asked to look at. The tier
  * _watch_ is only an observation of the IT Admin (`FR-4.12`), so it is not in the denominator; a `G1` has no tier and counts.
  * Recommendations closed as left to expire or superseded are also excluded from KPI-5.
  */
@@ -101,7 +105,7 @@ export function countsInKpi5(row: {
   return row.group === 'G1' || row.group === 'G2' || row.tier === 'REVIEW' || row.tier === 'ACTION';
 }
 
-/** The reasons that make a recommendation _right_ for `KPI-5`. */
+/** The reasons that count in the numerator of `KPI-5`: the recommendation was refused or negated, so it did not hold (`QĐ-116ba`). */
 export const KPI5_NUMERATOR_REASONS: readonly GhostSeatCloseReason[] = ['KEPT', 'EXEMPTED', 'NEGATED'];
 
 export interface Kpi5Row {

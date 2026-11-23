@@ -60,7 +60,6 @@ export class OffboardingRevocationService {
       const rights: RightFacts[] = seats.map((seat) => ({
         assignmentId: seat.assignmentId,
         subscriptionId: seat.subscriptionId,
-        hasTask: seat.revocation !== null,
         revocable: isRevocableType(seat.provisioningType),
         provisioningType: seat.provisioningType,
       }));

@@ -91,6 +91,28 @@ describe('YearStartCommitmentsBatchService: a number the approval kept in anothe
     ]);
   });
 
+  it('a right with no end approved in dollars two years ago is read by the price of 01/01 too, and the audit trail says so for this year as it did for the one before', async () => {
+    const { service, held, ignored } = setup({
+      candidates: [
+        candidate({
+          id: 'r-usd',
+          nextYearAmountMinor: 14_000n,
+          amountCurrency: 'USD',
+          termMonths: null,
+          budgetYear: 2025,
+        }),
+      ],
+      unclaimed: new Map([['r-usd', [{ expectedEndDate: null, employeeId: null }]]]),
+    });
+
+    await service.commitBatch(tx as never, PASS, null);
+
+    expect(held()).toEqual([expect.objectContaining({ requestId: 'r-usd', amountMinor: 12n * 650_000n })]);
+    expect(ignored()).toEqual([
+      ['r-usd', { requestId: 'r-usd', employeeId: null, year: 2027, currency: 'USD', savedMinor: '14000' }],
+    ]);
+  });
+
   it('the same number in dong is read as ever, and nothing is said', async () => {
     const { service, held, ignored } = setup({
       candidates: [candidate({ id: 'r-vnd', nextYearAmountMinor: 4_200_000n })],

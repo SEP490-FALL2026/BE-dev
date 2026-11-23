@@ -12,6 +12,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { YearStartCommitmentsRepo, type YearStartCandidate } from './year-start-commitments.repo';
 import {
   YEAR_START_PLAN_KINDS,
+  approvalMonthlyFromSaved,
   bearingDepartmentOf,
   judgeYearStart,
   type YearStartPrice,
@@ -245,7 +246,7 @@ export class YearStartCommitmentsBatchService {
       const approvalPrice =
         !seat.termLimited && seat.savedMinor !== null
           ? {
-              unitPrice: { amountMinor: (seat.savedMinor + 11n) / 12n, currency: DONG },
+              unitPrice: { amountMinor: approvalMonthlyFromSaved(seat.savedMinor), currency: DONG },
               billingCycle: 'MONTHLY' as const,
             }
           : priceOf(requestId);
