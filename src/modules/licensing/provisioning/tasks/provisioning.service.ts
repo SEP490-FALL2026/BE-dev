@@ -82,6 +82,12 @@ export class ProvisioningService {
    */
   async claim(actor: AuthenticatedPrincipal, id: string): Promise<TaskView> {
     const task = await this.frame.work(actor, id, {
+      // The beneficiary of a grant not yet begun is held before the task is locked: a departure that blocks them holds the person first and then reaches the task.
+      beforeLock: async (tx, probe) => {
+        if (probe.kind === 'GRANT' && probe.status === 'QUEUED') {
+          await this.holders.holdBeneficiaryOfTask(tx, probe.assignment.employeeId);
+        }
+      },
       check: (locked) => nextStatus(locked.status, 'CLAIM', locked.channel),
       write: async ({ tx, task: locked, now }) => {
         if (locked.status === 'IN_PROGRESS' && locked.claimedByAppUserId === actor.appUserId) return false;

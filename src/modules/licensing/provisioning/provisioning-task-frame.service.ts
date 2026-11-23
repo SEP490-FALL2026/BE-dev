@@ -45,6 +45,8 @@ export class ProvisioningTaskFrame {
     actor: AuthenticatedPrincipal,
     id: string,
     action: {
+      /** Takes what stands above the task in the order of locks (the employee), from the task read without a lock, before the task is locked. */
+      beforeLock?: (tx: DbTx, task: ProvisioningTaskRecord) => Promise<void>;
       check: (task: ProvisioningTaskRecord) => void;
       write: (context: TaskWorkContext) => Promise<TaskWrite>;
     },
@@ -54,6 +56,10 @@ export class ProvisioningTaskFrame {
     const now = new Date();
 
     return this.runner.run(async (tx) => {
+      if (action.beforeLock) {
+        const probe = await this.repo.find(id, tx);
+        if (probe) await action.beforeLock(tx, probe);
+      }
       const task = await this.repo.lock(tx, id);
       if (!task) throw new ProvisioningTaskNotFoundError();
       action.check(task);

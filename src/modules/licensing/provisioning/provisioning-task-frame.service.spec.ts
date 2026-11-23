@@ -153,4 +153,44 @@ describe('ProvisioningTaskFrame.work', () => {
     );
     expect(notifications.notifyInApp).not.toHaveBeenCalled();
   });
+
+  describe('what an action takes before the task', () => {
+    it('reads the task without a lock and lets the action take what stands above it before the task is locked', async () => {
+      repo.find.mockResolvedValue(task('e-employee'));
+      repo.lock.mockImplementation(() => {
+        order.push('lock-task');
+
+        return Promise.resolve(task('e-employee'));
+      });
+      const beforeLock = jest.fn().mockImplementation(() => {
+        order.push('before-lock');
+
+        return Promise.resolve();
+      });
+
+      await frame.work(itAdmin('e-it1'), 'task-1', { ...action, beforeLock });
+
+      expect(beforeLock).toHaveBeenCalledWith(tx, expect.objectContaining({ id: 'task-1' }));
+      expect(order.slice(0, 3)).toEqual(['before-lock', 'lock-task', 'write']);
+    });
+
+    it('does not read the task beforehand when the action has nothing to take first', async () => {
+      repo.lock.mockResolvedValue(task('e-employee'));
+      repo.find.mockResolvedValue(task('e-employee'));
+
+      await frame.work(itAdmin('e-it1'), 'task-1', action);
+
+      expect(repo.find.mock.invocationCallOrder[0]).toBeGreaterThan(repo.lock.mock.invocationCallOrder[0]);
+    });
+
+    it('takes nothing for a task that is not there, and answers not found', async () => {
+      repo.find.mockResolvedValue(null);
+      repo.lock.mockResolvedValue(null);
+      const beforeLock = jest.fn();
+
+      await expect(frame.work(itAdmin('e-it1'), 'task-1', { ...action, beforeLock })).rejects.toThrow();
+
+      expect(beforeLock).not.toHaveBeenCalled();
+    });
+  });
 });
