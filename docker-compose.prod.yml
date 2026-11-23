@@ -42,7 +42,7 @@ services:
   # 2. BACKEND API: NestJS Core — runtime role only
   # ----------------------------------------------------------------------------
   api:
-    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    image: ${API_IMAGE:-ghcr.io/sep490-fall2026/be-dev:latest}
     container_name: slm-api
     restart: unless-stopped
     depends_on:
@@ -63,7 +63,7 @@ services:
   # 3. BACKGROUND WORKER: gửi email outbox (thăm dò PostgreSQL, không dùng Redis/BullMQ — ADR-0012, E2 = A) — runtime role
   # ----------------------------------------------------------------------------
   worker:
-    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    image: ${API_IMAGE:-ghcr.io/sep490-fall2026/be-dev:latest}
     container_name: slm-worker
     restart: unless-stopped
     command: ["node", "dist/worker.js"]
@@ -82,7 +82,7 @@ services:
   # 4. DEPLOY STEPS: preflight, prisma migrate deploy, ops:db-roles reconcile/verify, ops:inspect — deploy role
   # ----------------------------------------------------------------------------
   migrate:
-    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    image: ${API_IMAGE:-ghcr.io/sep490-fall2026/be-dev:latest}
     profiles: ["deploy"]
     environment:
       NODE_ENV: production
@@ -111,7 +111,7 @@ services:
   # 6. ROLE PROVISIONING (once, after a restore, or to rotate a password): ops:db-roles provision — cluster superuser
   # ----------------------------------------------------------------------------
   db-admin:
-    image: ${API_IMAGE:-ghcr.io/baophipham/slm-api:latest}
+    image: ${API_IMAGE:-ghcr.io/sep490-fall2026/be-dev:latest}
     profiles: ["admin"]
     command: ["node", "dist/database-roles-cli.js", "provision"]
     environment:
