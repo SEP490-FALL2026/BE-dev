@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { LicensingSeatMonthApi } from '../../licensing/public/licensing-seat-month.api';
-import type { SeatOfMonth } from '../../licensing/public/licensing-seat-month.types';
 import { SeatMonthSubscriptionService } from './seat-month-subscription.service';
 import { SeatMonthChargeError } from './seat-month.errors';
 import { endedMonthsOf } from './seat-month.policy';
@@ -64,14 +63,11 @@ export class SeatMonthService {
     now: Date,
     onlyMissing: boolean,
   ): Promise<SeatMonthResult & { firstFailure?: Error; failedIds: string[] }> {
-    const seatsBySubscription = new Map<string, SeatOfMonth[]>();
-    for (const seat of await this.licensing.getSeatsOfMonth(month)) {
-      seatsBySubscription.set(seat.subscriptionId, [...(seatsBySubscription.get(seat.subscriptionId) ?? []), seat]);
-    }
+    // Outside any transaction this only says which subscriptions to go through; the seats of each are read again in its own transaction, under the lock of
+    // its month, and a mark found only then is checked again there (`SeatMonthSubscriptionService`).
+    const seatSubscriptionIds = (await this.licensing.getSeatsOfMonth(month)).map((seat) => seat.subscriptionId);
     const marked = onlyMissing ? await this.repo.completedSubscriptionIds(month) : new Set<string>();
-    const subscriptionIds = [
-      ...new Set([...seatsBySubscription.keys(), ...(await this.repo.subscriptionIdsOfMonth(month))]),
-    ]
+    const subscriptionIds = [...new Set([...seatSubscriptionIds, ...(await this.repo.subscriptionIdsOfMonth(month))])]
       .filter((subscriptionId) => !marked.has(subscriptionId))
       .sort(byId);
     const result: SeatMonthResult & { firstFailure?: Error; failedIds: string[] } = {
@@ -82,9 +78,12 @@ export class SeatMonthService {
     };
     for (const subscriptionId of subscriptionIds) {
       try {
-        result.rows += await this.runner.run((tx) =>
-          this.subscriptions.charge(tx, subscriptionId, month, seatsBySubscription.get(subscriptionId) ?? [], now),
+        const rows = await this.runner.run((tx) =>
+          this.subscriptions.charge(tx, subscriptionId, month, now, onlyMissing),
         );
+        // A subscription another pass charged while this one waited for its lock is not counted again.
+        if (rows === null) continue;
+        result.rows += rows;
         result.subscriptions += 1;
       } catch (error) {
         result.failed += 1;

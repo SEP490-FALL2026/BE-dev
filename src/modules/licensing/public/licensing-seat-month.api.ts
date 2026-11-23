@@ -19,15 +19,16 @@ export class LicensingSeatMonthApi {
 
   /**
    * The seats of the plans of the shared pool of seats (`K2`) on a subscription that are in force on at least one day of the month of `month`
-   * (any day of it), by subscription then seat. Two reads for the plans and the seats, whatever their number.
+   * (any day of it), by subscription then seat. Two reads for the plans and the seats, whatever their number. With `subscriptionId` only the seats of
+   * that subscription are read, which is what the charge of one subscription reads inside its own transaction, under the lock of its month.
    */
-  async getSeatsOfMonth(month: BusinessDate, tx?: DbTx): Promise<SeatOfMonth[]> {
+  async getSeatsOfMonth(month: BusinessDate, tx?: DbTx, subscriptionId?: string): Promise<SeatOfMonth[]> {
     const { start, nextStart } = monthBoundsOf(month);
-    const planIds = await this.seats.planIdsTouching(start, nextStart, tx);
+    const planIds = await this.seats.planIdsTouching(start, nextStart, tx, subscriptionId);
     const pools = (await this.catalog.findPlanSeatTargets(planIds, tx))
       .filter((target) => target.provisioningType === 'K2')
       .map((target) => target.planId);
 
-    return this.seats.seatsOfPlans([...new Set(pools)], start, nextStart, tx);
+    return this.seats.seatsOfPlans([...new Set(pools)], start, nextStart, tx, subscriptionId);
   }
 }

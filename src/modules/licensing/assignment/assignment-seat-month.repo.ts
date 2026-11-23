@@ -18,10 +18,15 @@ export class AssignmentSeatMonthRepo {
     private readonly chains: AssignmentChainRepo,
   ) {}
 
-  /** The plans that have a seat on a subscription touching `[start, nextStart)`, in one statement. */
-  async planIdsTouching(start: BusinessDate, nextStart: BusinessDate, tx?: DbTx): Promise<string[]> {
+  /** The plans that have a seat on a subscription (or on `subscriptionId`, when given) touching `[start, nextStart)`, in one statement. */
+  async planIdsTouching(
+    start: BusinessDate,
+    nextStart: BusinessDate,
+    tx?: DbTx,
+    subscriptionId?: string,
+  ): Promise<string[]> {
     const rows = await (tx ?? this.prisma).licenseAssignment.findMany({
-      where: this.touching(start, nextStart),
+      where: this.touching(start, nextStart, subscriptionId),
       select: { planId: true },
       distinct: ['planId'],
     });
@@ -29,17 +34,21 @@ export class AssignmentSeatMonthRepo {
     return rows.map((row) => row.planId);
   }
 
-  /** The seats of these plans on a subscription that are in force on at least one day of `[start, nextStart)`, with the request that asked for each. */
+  /**
+   * The seats of these plans on a subscription (or on `subscriptionId`, when given) that are in force on at least one day of `[start, nextStart)`, with the
+   * request that asked for each.
+   */
   async seatsOfPlans(
     planIds: readonly string[],
     start: BusinessDate,
     nextStart: BusinessDate,
     tx?: DbTx,
+    subscriptionId?: string,
   ): Promise<SeatOfMonth[]> {
     if (planIds.length === 0) return [];
     const db = tx ?? this.prisma;
     const rows = await db.licenseAssignment.findMany({
-      where: { ...this.touching(start, nextStart), planId: { in: [...planIds] } },
+      where: { ...this.touching(start, nextStart, subscriptionId), planId: { in: [...planIds] } },
       select: {
         id: true,
         subscriptionId: true,
@@ -88,9 +97,9 @@ export class AssignmentSeatMonthRepo {
   }
 
   /** The seats on a subscription whose period reaches into the month, grants that failed or were cancelled left out (the days are checked after). */
-  private touching(start: BusinessDate, nextStart: BusinessDate) {
+  private touching(start: BusinessDate, nextStart: BusinessDate, subscriptionId?: string) {
     return {
-      subscriptionId: { not: null },
+      subscriptionId: subscriptionId ?? { not: null },
       failedAt: null,
       cancelledAt: null,
       validFrom: { lt: toDateColumn(nextStart) },
