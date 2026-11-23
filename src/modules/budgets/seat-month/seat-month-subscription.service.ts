@@ -27,9 +27,9 @@ const costCentersOf = (
     row.costCenterId === null || waiting.has(row.costCenterId) ? [] : [{ costCenterId: row.costCenterId, year }],
   );
 
-/** The Cost Centers of the commitments this transaction locked that still wait for a budget (attached to no version). */
-const waitingCostCenters = (commitmentOf: ReadonlyMap<string, LockedCommitmentOfRequest>): Set<string> =>
-  new Set([...commitmentOf.values()].filter((row) => row.attachedVersionId === null).map((row) => row.costCenterId));
+/** The Cost Centers of the commitments this transaction locked, by whichever way, that still wait for a budget (attached to no version). */
+const waitingCostCenters = (held: ReadonlyMap<string, HeldCommitment>): Set<string> =>
+  new Set([...held.values()].filter((row) => row.attachedVersionId === null).map((row) => row.costCenterId));
 
 const byId = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 const daysBetween = (from: BusinessDate, to: BusinessDate): number =>
@@ -42,6 +42,9 @@ interface HeldCommitment {
   amountMinor: bigint;
   releasedMinor: bigint;
   appliedMinor: bigint;
+  costCenterId: string;
+  /** The version it is attached to; null while it waits for a budget. */
+  attachedVersionId: string | null;
 }
 
 /**
@@ -85,8 +88,8 @@ export class SeatMonthSubscriptionService {
     if (!organization) throw new Error('The installation has no organization.');
     const year = Number(month.slice(0, 4));
     const commitmentOf = await this.lockCommitments(tx, seats, year);
-    const waiting = waitingCostCenters(commitmentOf);
     const held = await this.lockPriorCommitments(tx, before, commitmentOf);
+    const waiting = waitingCostCenters(held);
     const toCharge = await this.seats.toCharge(tx, month, seats, commitmentOf);
     const departmentIds = [...new Set([...toCharge.flatMap((seat) => this.departmentsOf(seat))])];
     const costCenterOfDepartment = await this.organizationReads.getUnitCostCenterIds(departmentIds, tx);

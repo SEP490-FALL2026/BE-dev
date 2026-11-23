@@ -33,7 +33,32 @@ const seat: SeatOfMonth = {
  * never given its budget year to lock (`E1`: the decision of a version takes the budget year first and then updates the waiting commitments).
  */
 describe('SeatMonthSubscriptionService.charge', () => {
-  function build(options: { marked?: boolean; attachedVersionId?: string | null } = {}) {
+  /** A row of the month charged before, applied to the commitment `c-2` of the Cost Center `cc-2`, which no seat of the month points at any more. */
+  const priorRowOfAnotherCommitment = {
+    id: 'row-before',
+    organizationId: 'org',
+    subscriptionId: SUBSCRIPTION,
+    assignmentId: 'a-gone',
+    employeeId: 'e-gone',
+    departmentId: 'd-2',
+    costCenterId: 'cc-2',
+    month: MONTH,
+    days: 31,
+    daysInMonth: 31,
+    monthlyPriceMinor: 3_000_000n,
+    amountMinor: 3_000_000n,
+    commitmentId: 'c-2',
+    appliedMinor: 3_000_000n,
+    computedAt: new Date('2026-01-31T00:00:00Z'),
+  };
+
+  function build(
+    options: {
+      marked?: boolean;
+      attachedVersionId?: string | null;
+      priorAttachedVersionId?: string | null;
+    } = {},
+  ) {
     const calls: string[] = [];
     const locks: string[] = [];
     const watched: { costCenterId: string; year: number }[][] = [];
@@ -43,7 +68,9 @@ describe('SeatMonthSubscriptionService.charge', () => {
         return Promise.resolve();
       }),
       isCharged: jest.fn(() => Promise.resolve(options.marked ?? false)),
-      ofSubscriptionMonth: jest.fn(() => Promise.resolve([])),
+      ofSubscriptionMonth: jest.fn(() =>
+        Promise.resolve(options.priorAttachedVersionId === undefined ? [] : [priorRowOfAnotherCommitment]),
+      ),
       deleteRows: jest.fn(() => Promise.resolve()),
       insertMany: jest.fn(() => Promise.resolve()),
       insertReversals: jest.fn(() => Promise.resolve()),
@@ -73,18 +100,19 @@ describe('SeatMonthSubscriptionService.charge', () => {
           },
         ]),
       ),
-      lockById: jest.fn(() =>
+      lockById: jest.fn((_tx: unknown, id: string) =>
         Promise.resolve({
-          id: 'c-1',
-          requestId: 'r-1',
+          id,
+          requestId: id === 'c-2' ? 'r-gone' : 'r-1',
           year: 2026,
           amountMinor: 100_000_000n,
           releasedMinor: 0n,
-          appliedMinor: 0n,
+          appliedMinor: id === 'c-2' ? 3_000_000n : 0n,
           currency: 'VND',
           state: 'HELD',
           organizationId: 'org',
-          costCenterId: 'cc-1',
+          costCenterId: id === 'c-2' ? 'cc-2' : 'cc-1',
+          attachedVersionId: id === 'c-2' ? options.priorAttachedVersionId || null : 'v-1',
         }),
       ),
       applyInvoice: jest.fn(() => Promise.resolve()),
@@ -186,5 +214,24 @@ describe('SeatMonthSubscriptionService.charge', () => {
     expect(watched).toEqual([[]]);
     expect(locks).toEqual([]);
     expect(repo.insertMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not take the budget year of the Cost Center of a commitment it locked by id, when that one still waits for a budget, nor watch its threshold', async () => {
+    const { service, locks, watched } = build({ priorAttachedVersionId: null });
+
+    await service.charge(tx, SUBSCRIPTION, MONTH, new Date());
+
+    expect(locks).not.toContain('cc-2');
+    expect(watched.flat().map((pair) => pair.costCenterId)).not.toContain('cc-2');
+    expect(locks).toContain('cc-1');
+  });
+
+  it('takes the budget year of the Cost Center of a commitment it locked by id when that one is attached to a version', async () => {
+    const { service, locks, watched } = build({ priorAttachedVersionId: 'v-2' });
+
+    await service.charge(tx, SUBSCRIPTION, MONTH, new Date());
+
+    expect(locks).toContain('cc-2');
+    expect(watched.flat().map((pair) => pair.costCenterId)).toContain('cc-2');
   });
 });
