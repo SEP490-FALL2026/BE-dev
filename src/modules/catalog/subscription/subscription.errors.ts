@@ -195,3 +195,26 @@ export class SubscriptionDuplicatePlanError extends Error {
     this.name = 'SubscriptionDuplicatePlanError';
   }
 }
+
+export class SubscriptionVersionRequiredError extends Error {
+  constructor() {
+    super('Send expectedUpdatedAt from the last read when changing purchasedQuantity.');
+    this.name = 'SubscriptionVersionRequiredError';
+  }
+}
+
+export class SubscriptionMidTermReductionNotAllowedError extends Error {
+  constructor() {
+    super(
+      'Reducing purchasedQuantity during a 12-month commitment is not allowed unless mid-term reduction is enabled.',
+    );
+    this.name = 'SubscriptionMidTermReductionNotAllowedError';
+  }
+}
+
+export class SubscriptionQuantityReasonRequiredError extends Error {
+  constructor() {
+    super('A quantityChangeReason is required when increasing purchasedQuantity of an active K2 subscription.');
+    this.name = 'SubscriptionQuantityReasonRequiredError';
+  }
+}

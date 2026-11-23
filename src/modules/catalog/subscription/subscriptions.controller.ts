@@ -42,7 +42,7 @@ const NOT_FOUND = {
   examples: [SUBSCRIPTION_ERROR_EXAMPLES.NOT_FOUND],
 } as const;
 const INVALID_UPDATE_NOTE =
-  ' An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.';
+  ' Changing purchasedQuantity requires expectedUpdatedAt (SUBSCRIPTION.VERSION_REQUIRED) and increasing it on an active K2 subscription requires quantityChangeReason (SUBSCRIPTION.QUANTITY_REASON_REQUIRED). An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.';
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
@@ -76,6 +76,8 @@ const INVALID_UPDATE = {
   examples: [
     VALIDATION_EXAMPLE,
     SUBSCRIPTION_ERROR_EXAMPLES.UPDATE_EMPTY,
+    SUBSCRIPTION_ERROR_EXAMPLES.VERSION_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.QUANTITY_REASON_REQUIRED,
     SUBSCRIPTION_ERROR_EXAMPLES.QUANTITY_BELOW_OCCUPIED,
     SUBSCRIPTION_ERROR_EXAMPLES.PERPETUAL_HAS_NO_TERM,
     SUBSCRIPTION_ERROR_EXAMPLES.DATES_INVALID,
@@ -108,8 +110,12 @@ const DUPLICATE_PLAN_CONFLICT = {
 const UPDATE_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description:
-    'The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire. When expectedUpdatedAt is sent and the subscription was changed since (by another edit, or by a seat bought for a grant), nothing is written (SUBSCRIPTION.STALE, details.currentUpdatedAt): read it again and redo the edit.',
-  examples: [SUBSCRIPTION_ERROR_EXAMPLES.PRIMARY_CONFLICT, SUBSCRIPTION_ERROR_EXAMPLES.STALE],
+    'The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire. When expectedUpdatedAt is sent and the subscription was changed since (by another edit, or by a seat bought for a grant), nothing is written (SUBSCRIPTION.STALE, details.currentUpdatedAt): read it again and redo the edit. Reducing purchasedQuantity on a 12-month active K2 subscription without mid-term reduction enabled is refused (SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED).',
+  examples: [
+    SUBSCRIPTION_ERROR_EXAMPLES.PRIMARY_CONFLICT,
+    SUBSCRIPTION_ERROR_EXAMPLES.STALE,
+    SUBSCRIPTION_ERROR_EXAMPLES.MID_TERM_REDUCTION_NOT_ALLOWED,
+  ],
 } as const;
 
 const toWire = (view: SubscriptionView) => ({

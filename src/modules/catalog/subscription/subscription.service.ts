@@ -74,6 +74,7 @@ export interface UpdateSubscriptionInput {
   responsibleItAdminEmployeeId?: string;
   vendorMinimumSeats?: number | null;
   isPrimaryForPlan?: boolean;
+  quantityChangeReason?: string;
 }
 
 /**

@@ -280,3 +280,37 @@ describe('the body of a plan the dataset declares', () => {
     expect(planBody('app-1', plan('hr-portal-access'))).not.toHaveProperty('referencePrice');
   });
 });
+
+describe('catalog.subscriptions step', () => {
+  it('sends expectedUpdatedAt from the found draft when patching its terms', async () => {
+    const step = CATALOG_STEPS.find((s) => s.key === 'catalog.subscriptions')!;
+    const call = jest.fn((_actor: string, method: string, path: string) => {
+      if (method === 'GET' && path.startsWith('/subscriptions?')) {
+        return Promise.resolve({
+          items: [{ id: 'sub-draft-1', status: 'DRAFT', updatedAt: '2026-11-10T00:00:00.000Z' }],
+          pagination: { page: 1, pageSize: 100, totalItems: 1, totalPages: 1 },
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+    const employees = new Map(SHARED_DEMO_V4.people.map((person) => [person.code, `id-${person.code}`]));
+    const plans = new Map(SHARED_DEMO_V4.applications.flatMap((app) => app.plans.map((p) => [p.key, `id-${p.key}`])));
+    const ctx = {
+      fixture: { ...SHARED_DEMO_V4, subscriptions: [SHARED_DEMO_V4.subscriptions[0]] },
+      today: '2026-11-10',
+      mode: 'apply',
+      demoPassword: 'demo',
+      tokens: new Map([['NV-ITA1', 'token-1']]),
+      ids: { employees, departments: new Map(), plans, subscriptions: new Map() },
+      api: { call, signIn: jest.fn().mockResolvedValue('token-1') },
+    } as unknown as DemoRunContext;
+
+    await step.run(ctx);
+
+    const calls = call.mock.calls as Array<[string, string, string, unknown?]>;
+    const patchCall = calls.find((c) => c[1] === 'PATCH');
+    expect(patchCall).toBeDefined();
+    expect(patchCall![2]).toBe('/subscriptions/sub-draft-1');
+    expect(patchCall![3]).toMatchObject({ expectedUpdatedAt: '2026-11-10T00:00:00.000Z' });
+  });
+});

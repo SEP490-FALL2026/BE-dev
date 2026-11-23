@@ -14,8 +14,10 @@ import {
 import { sameState, snapshotOf, stateOf } from './subscription.mapper';
 import {
   assertSubscriptionShape,
+  assertVersionForQuantityChange,
   deriveNotice,
   isStaleEdit,
+  judgeQuantityChange,
   missingDataOf,
   nextStateOf,
   noticeInputOf,
@@ -64,7 +66,10 @@ export class SubscriptionChangeService {
     input: UpdateSubscriptionInput,
     expectedUpdatedAt?: Date,
   ): Promise<SubscriptionView> {
-    if (Object.values(input).every((value) => value === undefined)) throw new SubscriptionUpdateEmptyError();
+    if (Object.entries(input).every(([key, value]) => key === 'quantityChangeReason' || value === undefined)) {
+      throw new SubscriptionUpdateEmptyError();
+    }
+    assertVersionForQuantityChange(input.purchasedQuantity, expectedUpdatedAt);
     assertDeclarableCycle(input.billingCycle);
     const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
     const originalPrice = input.originalPrice
@@ -102,6 +107,7 @@ export class SubscriptionChangeService {
       ? await this.plans.lockExclusive(tx, current.planId)
       : await this.plans.lockShared(tx, current.planId);
     if (!plan) throw new SubscriptionPlanNotFoundError();
+    const quantityChangeReason = this.quantityReasonOf(current, input);
     await this.guard.assertNotBelowOccupied(tx, id, current.purchasedQuantity, input.purchasedQuantity);
 
     const next = nextStateOf(current, input);
@@ -126,7 +132,7 @@ export class SubscriptionChangeService {
     if (sameState(state, stateOf(current))) return current;
 
     const updated = await this.subscriptions.update(tx, id, state);
-    await this.auditChange(tx, actor, { current, updated, organizationId });
+    await this.auditChange(tx, actor, { current, updated, organizationId, quantityChangeReason });
     // A rise of the seats of a K2 or K4 pool is told to the IT Admin who answers for it, whoever changed the number (`QĐ-110v`, SPEC P24).
     await this.guard.tellSeatIncrease(tx, {
       organizationId,
@@ -141,6 +147,18 @@ export class SubscriptionChangeService {
     });
 
     return updated;
+  }
+
+  private quantityReasonOf(current: SubscriptionRecord, input: UpdateSubscriptionInput): string | undefined {
+    return judgeQuantityChange({
+      status: current.status,
+      planProvisioningType: current.planProvisioningType,
+      currentQuantity: current.purchasedQuantity,
+      requestedQuantity: input.purchasedQuantity,
+      commitmentTermMonths: current.commitmentTermMonths,
+      allowsMidTermReduction: current.allowsMidTermReduction,
+      quantityChangeReason: input.quantityChangeReason,
+    });
   }
 
   /** The subscription, locked, when it is still the one the client read (`expectedUpdatedAt`); else SubscriptionNotFoundError or SubscriptionStaleError. */
@@ -188,9 +206,15 @@ export class SubscriptionChangeService {
   private async auditChange(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    changed: { current: SubscriptionRecord; updated: SubscriptionRecord; organizationId: string },
+    changed: {
+      current: SubscriptionRecord;
+      updated: SubscriptionRecord;
+      organizationId: string;
+      quantityChangeReason?: string;
+    },
   ): Promise<void> {
-    const { current, updated, organizationId } = changed;
+    const { current, updated, organizationId, quantityChangeReason } = changed;
+    const after = quantityChangeReason ? { ...snapshotOf(updated), quantityChangeReason } : snapshotOf(updated);
     await this.audit.record(
       tx,
       catalogAuditEvent(
@@ -200,7 +224,7 @@ export class SubscriptionChangeService {
         'Subscription',
         current.id,
         snapshotOf(current),
-        snapshotOf(updated),
+        after,
       ),
     );
     const before = deriveNotice(noticeInputOf(current));

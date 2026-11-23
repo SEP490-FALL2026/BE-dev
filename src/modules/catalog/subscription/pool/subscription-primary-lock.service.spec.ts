@@ -154,7 +154,12 @@ describe('Subscription primary lock order', () => {
         makeGuard(),
       );
 
-      await service.update(actor, 'sub-1', { purchasedQuantity: 6 });
+      await service.update(
+        actor,
+        'sub-1',
+        { purchasedQuantity: 6, quantityChangeReason: 'Growth' },
+        stored().updatedAt,
+      );
 
       expect(lock).toHaveBeenCalledWith(tx, 'sub-1');
       expect(lockShared).toHaveBeenCalledWith(tx, 'plan-1');
