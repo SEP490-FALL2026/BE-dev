@@ -159,12 +159,15 @@ export function needStepTarget(
   };
 }
 
-/** Whether the need step needs nobody: free software with no pending successor head, or an individual request whose requester is now head. */
+/**
+ * Whether the need step needs nobody: free software with no pending successor head, a request whose requester is now head and which is not a group
+ * with a spend step, or a request for a group of free software, whose people are held by a head already (that group is not sent on to a spend step).
+ */
 function isNotRequired(
   reason: OneStepReason,
   facts: { chainHasSpendStep: boolean; successorRecorded: boolean; isGroupRequest?: boolean },
 ): reason is NeedNotRequiredReason {
-  if (reason === 'REQUESTER_IS_HEAD') return !facts.isGroupRequest;
+  if (reason === 'REQUESTER_IS_HEAD') return !facts.isGroupRequest || !facts.chainHasSpendStep;
   if (facts.chainHasSpendStep) return false;
 
   return reason === 'NO_DEPARTMENT_HEAD' && !facts.successorRecorded;

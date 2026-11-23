@@ -290,6 +290,23 @@ describe('who the need step is given to by the routing table (needStepTarget)', 
       needStepTarget(requesterIsHead, { chainHasSpendStep: true, successorRecorded: false, isGroupRequest: true }),
     ).toEqual(nobody);
   });
+
+  it('ends the step of a request for a group of free internal software when the person its lines hold has become the head, as before: the department has a head, so the step does not wait for one', () => {
+    expect(
+      needStepTarget(requesterIsHead, { chainHasSpendStep: false, successorRecorded: false, isGroupRequest: true }),
+    ).toEqual({
+      assigneeEmployeeId: null,
+      notRequired: 'REQUESTER_IS_HEAD',
+      routingRow: 2,
+    });
+    expect(
+      needStepTarget(requesterIsHead, { chainHasSpendStep: false, successorRecorded: true, isGroupRequest: true }),
+    ).toEqual({
+      assigneeEmployeeId: null,
+      notRequired: 'REQUESTER_IS_HEAD',
+      routingRow: 2,
+    });
+  });
 });
 
 describe('what a waiting step needs to be put right (US-05-11)', () => {
