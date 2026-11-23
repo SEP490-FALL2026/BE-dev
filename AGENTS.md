@@ -47,6 +47,9 @@ Scope: this backend repository. Work from its root with the pnpm version in `pac
   (`pnpm openapi:export`, `pnpm arch:graph`, `pnpm arch:routes`).
 - Do not load every ADR, design document or external repository by default. Obtain the relevant requirement before
   inventing missing business behavior.
+- New code waves (since 17/11/2026) live in `docs/reviews/<wave>/` (SPEC, PLAN, code prompt, PROGRESS, REVIEW, handoff) per
+  [Quy trình code AI](docs/guides/quy-trinh-code-ai.md); coordinator handoffs go in `docs/reviews/coordinator-<date>/`. The
+  roadmap and `docs/workspace/items` below are the older per-slice process, kept for history.
 - For US design and implementation handoff, follow [shared planning](docs/workspace/README.md). A roadmap group `G` is
   never a spec/plan boundary: size each item by Story and outcome per
   [work-item sizing](docs/rules/work-item-sizing.md).

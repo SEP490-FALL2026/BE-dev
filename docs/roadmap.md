@@ -1,5 +1,9 @@
 # Roadmap backend
 
+> **Dừng cập nhật từ 17/11/2026 — chỉ để tra lịch sử.** Từ các đợt QĐ-103, MF-2/MF-3, QĐ-113 và đợt thiết kế lại (QĐ-114 → QĐ-118), mỗi đợt
+> code có thư mục riêng `docs/reviews/<đợt>/` (SPEC, PLAN, prompt code, PROGRESS, REVIEW, handoff) theo
+> [quy trình code AI](guides/quy-trinh-code-ai.md). Trạng thái, commit và kết quả CI của đợt nằm trong thư mục đó, không ghi ở đây.
+
 **Đối chiếu 31/10/2026:** [audit roadmap/API GAP và phân việc hai dev](reviews/roadmap-and-api-gaps-2026-10-31/README.md)
 trên BE `eb41f9c`, Docs `d6d868c`. Một số trạng thái/blocker phía dưới là lịch sử (G5/G6 đã có source, refactor đã commit);
 không dùng riêng nhãn `blocked`/`not-started` cũ để giao implement lại. Audit ghi rõ API đọc còn thiếu, G2 fiscal lock,

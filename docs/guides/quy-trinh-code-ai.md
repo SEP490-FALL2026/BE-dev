@@ -16,6 +16,9 @@
 Spec, plan, prompt và tiến độ của một đợt nằm ở `docs/reviews/<đợt>/` (`SPEC.md`, `PLAN.md`, `SONNET-PROMPT.md`,
 `PROGRESS.md`).
 
+`docs/workspace/items/` và `docs/roadmap.md` là quy trình chia lát theo Story/G cũ (tới 17/11/2026), chỉ đọc để tra lịch sử;
+không tạo item mới ở đó. Bàn giao giữa các chat điều phối nằm ở `docs/reviews/coordinator-<ngày>/HANDOFF-CHAT.md`.
+
 ## Nhánh và làn
 
 - Mỗi đợt có thể chia **hai làn**: làn nghiệp vụ (Owner) và làn kỹ thuật (Bảo), mỗi làn **một nhánh**
