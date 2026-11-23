@@ -14,8 +14,11 @@ describe('a subscription has no owning department: no finance gate on a change, 
   let k1WithoutUnit: string;
   let k2WithoutUnit: string;
 
+  /** An edit as a client makes it: the seats are sent with the version of a read and the reason a rise asks for, whatever else is changed. */
   const patch = (id: string, body: object) =>
-    request(h.server()).patch(`/api/v1/subscriptions/${id}`).set(h.as(h.it1)).send(body);
+    'purchasedQuantity' in body
+      ? h.changeSeats(id, body, null)
+      : request(h.server()).patch(`/api/v1/subscriptions/${id}`).set(h.as(h.it1)).send(body);
   const stored = async (id: string) =>
     (
       await h.ctx.sql.query<{
@@ -65,7 +68,7 @@ describe('a subscription has no owning department: no finance gate on a change, 
     });
 
     it('stores the change', async () => {
-      await patch(k1WithoutUnit, { purchasedQuantity: 20, endDate: '2029-12-31' }).expect(200);
+      expect((await patch(k1WithoutUnit, { purchasedQuantity: 20, endDate: '2029-12-31' })).status).toBe(200);
 
       expect(await stored(k1WithoutUnit)).toMatchObject({ purchased_quantity: 20, end_date: '2029-12-31' });
     });

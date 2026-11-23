@@ -75,7 +75,7 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
     for (const person of people.slice(3, 8)) await insertAssignment(person, planId, subscriptionId);
     expect(queued.status).toBe('QUEUED');
 
-    const refused = await patch(subscriptionId, { purchasedQuantity: 6 }).expect(422);
+    const refused = await h.changeSeats(subscriptionId, { purchasedQuantity: 6 }, 422);
 
     expect(h.codeOf(refused)).toBe('SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED');
     expect(h.detailsOf(refused)).toEqual({ occupied: 8, requested: 6 });
@@ -83,8 +83,8 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
     expect((await h.auditEvents('Subscription', subscriptionId)).map((event) => event.action)).not.toContain(
       'SUBSCRIPTION.UPDATED',
     );
-    await patch(subscriptionId, { purchasedQuantity: 8 }).expect(200);
-    await patch(subscriptionId, { purchasedQuantity: 12 }).expect(200);
+    await h.changeSeats(subscriptionId, { purchasedQuantity: 8 });
+    await h.changeSeats(subscriptionId, { purchasedQuantity: 12 });
     await patch(subscriptionId, { billingCycle: 'ANNUAL', commitmentTermMonths: 12 }).expect(200);
     expect(await quantityOf(subscriptionId)).toBe(12);
   });
@@ -101,11 +101,11 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
     const other = await h.subscription(5, 'K2');
     await insertAssignment(people[4], await h.planOf(other), other);
 
-    expect(h.detailsOf(await patch(subscriptionId, { purchasedQuantity: 1 }).expect(422))).toEqual({
+    expect(h.detailsOf(await h.changeSeats(subscriptionId, { purchasedQuantity: 1 }, 422))).toEqual({
       occupied: 2,
       requested: 1,
     });
-    await patch(subscriptionId, { purchasedQuantity: 2 }).expect(200);
+    await h.changeSeats(subscriptionId, { purchasedQuantity: 2 });
   });
 
   it('counts an assignment that begins later, which will hold its seat from that day', async () => {
@@ -113,7 +113,7 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
     const planId = await h.planOf(subscriptionId);
     await insertAssignment(people[0], planId, subscriptionId, { from: '2027-03-01' });
 
-    expect(h.detailsOf(await patch(subscriptionId, { purchasedQuantity: 0 }).expect(422))).toMatchObject({
+    expect(h.detailsOf(await h.changeSeats(subscriptionId, { purchasedQuantity: 0 }, 422))).toMatchObject({
       occupied: 1,
     });
   });
@@ -121,7 +121,7 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
   it('lets a subscription with no seats bought yet have them set, with nothing to compare', async () => {
     const subscriptionId = await h.subscription(null, 'K2');
 
-    await patch(subscriptionId, { purchasedQuantity: 5 }).expect(200);
+    await h.changeSeats(subscriptionId, { purchasedQuantity: 5 });
 
     expect(await quantityOf(subscriptionId)).toBe(5);
   });
@@ -133,7 +133,7 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
 
     const answers = await Promise.all([
       h.grant({ requestId: h.gate.grantable(people[1], planId), subscriptionId }),
-      patch(subscriptionId, { purchasedQuantity: 1 }),
+      h.changeSeats(subscriptionId, { purchasedQuantity: 1 }, null),
     ]);
 
     const rows = await h.ctx.sql.query<{ held: string; seats: number }>(
@@ -157,7 +157,7 @@ describe('the guards of the seats of a subscription over HTTP (integration, real
       await holder.query('SELECT id FROM subscriptions WHERE id = $1 FOR UPDATE', [subscriptionId]);
       await insertAssignment(people[1], planId, subscriptionId, { db: holder });
 
-      const pending = patch(subscriptionId, { purchasedQuantity: 1 }).then((response) => response);
+      const pending = h.changeSeats(subscriptionId, { purchasedQuantity: 1 }, 422);
       await waitForLockWaiters(h.ctx.sql, 1);
       await holder.query('COMMIT');
       const refused = await pending;

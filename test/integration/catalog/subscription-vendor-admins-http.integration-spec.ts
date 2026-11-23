@@ -73,6 +73,8 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
   beforeAll(async () => {
     await h.start();
     it2 = await buildActivatedAccount(h.ctx, h.seed, { code: 'E-IT2', email: 'it2@acme.vn', role: 'IT_ADMIN' });
+    // The gate asks two admins who work only once the baseline is closed (`QĐ-117e`: while it is being imported nothing is asked).
+    await h.closeBaseline().expect(200);
     licensedId = await declareApplication(h.ctx, h.it1.accessToken, {
       name: h.unique('Licensed app'),
       kind: 'LICENSED',
@@ -200,11 +202,7 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
 
         expect(view.vendorAdminsBelowMinimum).toBe(true);
         expect(view.vendorAdmins.find((admin) => admin.employeeId === it2.employeeId)?.working).toBe(false);
-        await request(h.server())
-          .patch(`/api/v1/subscriptions/${created.id}`)
-          .set(h.as(h.it1))
-          .send({ purchasedQuantity: 11 })
-          .expect(200);
+        await h.changeSeats(created.id, { purchasedQuantity: 11 });
       } finally {
         await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [it2.employeeId]);
       }
@@ -224,11 +222,7 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
         vendorAdminsBelowMinimum: true,
         ownerAccountEmailMissing: true,
       });
-      await request(h.server())
-        .patch(`/api/v1/subscriptions/${created.id}`)
-        .set(h.as(h.it1))
-        .send({ purchasedQuantity: 12 })
-        .expect(200);
+      await h.changeSeats(created.id, { purchasedQuantity: 12 });
     });
 
     it('X-IT-O4 (SPEC P19): shows Finance neither who administers the plan nor the email and the note, only the two flags', async () => {

@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { buildActivatedAccount } from '../../support/builders/account.builder';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 
 const h = new SeatHarness();
@@ -38,6 +39,8 @@ describe('a second live subscription of a K2 or K4 plan (integration, real Postg
 
   beforeAll(async () => {
     await h.start();
+    // Once the baseline is closed a plan needs two IT Admins who work at the vendor (`QĐ-114ae`): the plans of this suite name this one beside the default one.
+    await buildActivatedAccount(h.ctx, h.seed, { code: 'E-IT2', email: 'it2@acme.vn', role: 'IT_ADMIN' });
   }, 240000);
 
   afterAll(async () => {

@@ -97,6 +97,8 @@ describe('the vendor admins gate and the renewal of a period (integration, real 
 
   it('still refuses a NEW subscription of such a plan, by the declaration and by the completion of a draft that is not a renewal', async () => {
     const old = await oldWithoutProfile();
+    // The gate asks nothing while the baseline is still being imported (`QĐ-117e`): it is closed here, after the old subscription the other tests renew was written.
+    await h.closeBaseline().expect(200);
     const body = {
       planId: old.planId,
       kind: 'TERM',

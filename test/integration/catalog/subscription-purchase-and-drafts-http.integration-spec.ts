@@ -265,7 +265,7 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
         await patch(created.id, { originalPrice: { amount: '50.00', currency: 'USD' } }).expect(200),
       );
       expect(changed.originalPrice).toEqual({ amount: '50.00', currency: 'USD' });
-      const kept = dataOf<SubscriptionWire>(await patch(created.id, { purchasedQuantity: 11 }).expect(200));
+      const kept = dataOf<SubscriptionWire>(await h.changeSeats(created.id, { purchasedQuantity: 11 }));
       expect(kept.originalPrice).toEqual({ amount: '50.00', currency: 'USD' });
       const cleared = dataOf<SubscriptionWire>(await patch(created.id, { originalPrice: null }).expect(200));
       expect(cleared.originalPrice).toBeNull();
@@ -329,7 +329,7 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       expect(await subscription(flat.planId, whole)).toMatchObject({ status: 'ACTIVE', missing: [] });
 
       const draft = await subscription(perSeat.planId, whole);
-      const done = dataOf<SubscriptionWire>(await patch(draft.id, { purchasedQuantity: 25 }).expect(200));
+      const done = dataOf<SubscriptionWire>(await h.changeSeats(draft.id, { purchasedQuantity: 25 }));
       expect(done).toMatchObject({ status: 'ACTIVE', missing: [], purchasedQuantity: 25 });
     });
 

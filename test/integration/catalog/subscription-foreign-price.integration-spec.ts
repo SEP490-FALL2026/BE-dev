@@ -73,7 +73,7 @@ describe('a subscription still priced in a foreign currency (B1A-03, QĐ-111an)'
     const { id } = await pricedInDollars();
     const before = { row: await stored(id), audit: await audits(id) };
 
-    const response = await patch(id, { purchasedQuantity: 11 }).expect(422);
+    const response = await h.changeSeats(id, { purchasedQuantity: 11 }, 422);
 
     expect(h.codeOf(response)).toBe('SUBSCRIPTION.STILL_DRAFT');
     expect(h.detailsOf(response)).toEqual({ missing: ['UNIT_PRICE'] });
