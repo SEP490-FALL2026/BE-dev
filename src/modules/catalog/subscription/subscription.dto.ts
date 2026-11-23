@@ -71,9 +71,13 @@ export const updateSubscriptionBodySchema = z.strictObject({
   vendorMinimumSeats: vendorMinimumSeats.nullable().optional(),
   // Makes this the subscription that prices its plan (Q-04); the flag of the other subscriptions of the plan is taken off.
   isPrimaryForPlan: z.boolean().optional(),
+  quantityChangeReason: z.string().trim().min(1).max(500).optional().meta({
+    description:
+      'Reason for increasing purchasedQuantity on an active K2 subscription (1-500 characters after trimming; required when increasing, ignored when not increasing).',
+  }),
   expectedUpdatedAt: z.iso.datetime({ offset: true }).optional().meta({
     description:
-      'The updatedAt of the subscription as the client read it. When it is not the current one the change is refused (SUBSCRIPTION.STALE) and nothing is written; leave it out to change without the check.',
+      'The updatedAt of the subscription as the client read it. Required whenever purchasedQuantity is sent (missing gives SUBSCRIPTION.VERSION_REQUIRED); when sent and no longer current the change is refused (SUBSCRIPTION.STALE) and nothing is written.',
   }),
 });
 

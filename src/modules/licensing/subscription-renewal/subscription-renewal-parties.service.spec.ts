@@ -94,4 +94,46 @@ describe('the IT Admin of a renewal period (QĐ-113g, BB-9)', () => {
       expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub'], tx);
     });
   });
+
+  describe('who may record a renewal result for the subscription period', () => {
+    it('allows the responsible IT Admin directly without substitute flag', async () => {
+      const w = world(['it-sub']);
+      await expect(w.service.recordingAccessOf({ employeeId: 'it-sub' }, pool)).resolves.toEqual({
+        allowed: true,
+        substitute: false,
+        responsibleItAdminEmployeeId: 'it-sub',
+      });
+    });
+
+    it('allows any IT Admin when no responsible IT Admin is assigned', async () => {
+      const w = world([]);
+      await expect(
+        w.service.recordingAccessOf({ employeeId: 'it-other' }, { responsibleItAdminEmployeeId: null }),
+      ).resolves.toEqual({
+        allowed: true,
+        substitute: false,
+        responsibleItAdminEmployeeId: null,
+      });
+    });
+
+    it('refuses another IT Admin when the responsible IT Admin is still active and usable', async () => {
+      const w = world(['it-sub']);
+      await expect(w.service.recordingAccessOf({ employeeId: 'it-other' }, pool)).resolves.toEqual({
+        allowed: false,
+        substitute: false,
+        responsibleItAdminEmployeeId: 'it-sub',
+      });
+    });
+
+    it('allows another IT Admin with substitute=true when the responsible IT Admin is no longer usable', async () => {
+      const tx = {} as unknown as DbTx;
+      const w = world([]);
+      await expect(w.service.recordingAccessOf({ employeeId: 'it-other' }, pool, tx)).resolves.toEqual({
+        allowed: true,
+        substitute: true,
+        responsibleItAdminEmployeeId: 'it-sub',
+      });
+      expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub'], tx);
+    });
+  });
 });

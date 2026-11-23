@@ -57,7 +57,7 @@ export class GroupWithdrawalService {
       const refusal = checkLineWithdrawal({
         actorEmployeeId: actor.employeeId,
         requesterEmployeeId: request.requesterEmployeeId,
-        actorHeadsDepartment: await this.heads(actor, request),
+        actorHeadsDepartment: await this.heads(tx, actor, request),
         lineState: line.state,
         needStep: needStepOfLine(request.needSteps, line, request.requesterEmployeeId),
         requestState: request.state,
@@ -101,7 +101,7 @@ export class GroupWithdrawalService {
       const refusal = checkWithdrawal({
         actorEmployeeId: actor.employeeId,
         requesterEmployeeId: request.requesterEmployeeId,
-        actorHeadsDepartment: await this.heads(actor, request),
+        actorHeadsDepartment: await this.heads(tx, actor, request),
         state: request.state,
         needStep: needStepOfGroup(request.needSteps, request.needStep, lines, request.requesterEmployeeId),
         hasAssessmentStep: false,
@@ -138,7 +138,7 @@ export class GroupWithdrawalService {
       !request ||
       request.state === 'DRAFT' ||
       request.type !== 'GROUP_GRANT' ||
-      !((await this.heads(actor, request)) || canViewRequest(actor, viewFactsOf(request)))
+      !((await this.heads(tx, actor, request)) || canViewRequest(actor, viewFactsOf(request)))
     ) {
       throw new AccessRequestNotFoundError();
     }
@@ -146,8 +146,8 @@ export class GroupWithdrawalService {
     return request;
   }
 
-  private async heads(actor: AuthenticatedPrincipal, request: AccessRequestRecord): Promise<boolean> {
-    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId);
+  private async heads(tx: DbTx, actor: AuthenticatedPrincipal, request: AccessRequestRecord): Promise<boolean> {
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, undefined, tx);
 
     return headed?.departmentId === request.departmentId;
   }

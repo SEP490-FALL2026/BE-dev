@@ -55,6 +55,30 @@ export class StepTargetService {
     };
   }
 
+  /** Whether the requester currently heads the department that evaluates the need step of this individual request. */
+  async isRequesterHead(
+    tx: DbTx,
+    request: { requesterEmployeeId: string; departmentId: string; chainHasSpendStep: boolean; branch?: string },
+    now: Date,
+    todayArg?: BusinessDate,
+  ): Promise<boolean> {
+    const today = todayArg ?? (await this.organizationReads.businessToday(now, tx));
+    const departmentId =
+      request.branch === 'INTERNAL_FREE'
+        ? ((await this.organizationReads.getEmployeePlacement(request.requesterEmployeeId, today, tx))?.departmentId ??
+          request.departmentId)
+        : request.departmentId;
+    const { facts } = await this.routing.gather(tx, {
+      requesterEmployeeId: request.requesterEmployeeId,
+      departmentId,
+      today,
+      chainHasSpendStep: request.chainHasSpendStep,
+    });
+    const decision = routeNeedStep(facts);
+
+    return decision.outcome === 'NOT_REQUIRED' && decision.oneStepReason === 'REQUESTER_IS_HEAD';
+  }
+
   /** Who the step would be given today, or nobody and why. The step is not changed. */
   async targetOf(
     tx: DbTx,
@@ -87,6 +111,7 @@ export class StepTargetService {
         return needStepTarget(decision, {
           chainHasSpendStep: request.chainHasSpendStep,
           successorRecorded: await this.successorRecorded(tx, decision, departmentId, facts.today),
+          isGroupRequest: request.type === 'GROUP_GRANT',
         });
       }
       case 'SPEND_APPROVAL': {

@@ -19,7 +19,7 @@ export class LicensingUsageApi {
    * statements however many there are.
    */
   async listAssignmentIntervals(filter: AssignmentIntervalFilter, tx?: DbTx): Promise<AssignmentInterval[]> {
-    const organization = await this.organizationReads.getOrganization();
+    const organization = await this.organizationReads.getOrganization(tx);
     const zone = organization?.timeZone ?? 'UTC';
 
     return this.facts.intervals(filter, (instant) => businessDateAt(instant, zone), tx);

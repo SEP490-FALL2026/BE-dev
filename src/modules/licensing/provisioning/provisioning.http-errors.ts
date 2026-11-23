@@ -308,7 +308,12 @@ export const PROVISIONING_GRANT_EXAMPLES = {
     example(new ProvisioningSubscriptionError('NEXT_PERIOD_SEATS')),
     example(new SeatQuantityUnknownError()),
     example(new SeatSubscriptionDraftError(['START_DATE'])),
-    example(new AssignmentConflictError('OVERLAP', 0)),
+    example(
+      new AssignmentConflictError('OVERLAP', 0, undefined, '<assignment-id>', {
+        revocationTaskId: '<task-id>',
+        revocationStatus: 'IN_PROGRESS',
+      }),
+    ),
     example(new AssignmentConflictError('IDENTIFIER_IN_USE', 0)),
     example(new AssignmentConflictError('EXPECTED_END_REQUIRED', 0)),
     example(new PurchaseNotApplicableError()),

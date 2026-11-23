@@ -3,9 +3,11 @@ import {
   cycleAcceptsWork,
   cycleStateOf,
   isPastYear,
+  isReserveOverCeiling,
   judgeDelete,
   judgeOpening,
   planCycleChange,
+  versionSubmissionRefusal,
   windowOf,
 } from './cycle.policy';
 
@@ -193,5 +195,53 @@ describe('proposalWorkRefusal (BM-10 is sent, sent again, taken back or given ba
   it('refuses it while the cycle is a draft, or when the year has none', () => {
     expect(proposalWorkRefusal({ ...open, openedAt: null }, '2026-10-01')).toBe('NOT_OPEN');
     expect(proposalWorkRefusal(null, '2026-10-01')).toBe('NOT_OPEN');
+  });
+});
+
+describe('isReserveOverCeiling and planCycleChange reserve cap', () => {
+  const change = (state: 'DRAFT' | 'OPEN' | 'LOCKED', update: object, today = '2026-11-15') =>
+    planCycleChange(state, update, STORED, today);
+
+  it('refuses when shared-pool reserve exceeds annual ceiling, and allows when equal', () => {
+    expect(isReserveOverCeiling(1000n, 1001n)).toBe(true);
+    expect(isReserveOverCeiling(1000n, 1000n)).toBe(false);
+    expect(isReserveOverCeiling(1000n, null)).toBe(false);
+  });
+
+  it('returns RESERVE_OVER_CEILING in DRAFT and OPEN when resulting reserve exceeds ceiling', () => {
+    expect(change('DRAFT', { sharedPoolReserveMinor: 1001n })).toEqual({ kind: 'RESERVE_OVER_CEILING' });
+    expect(change('DRAFT', { annualCeilingMinor: 99n })).toEqual({ kind: 'RESERVE_OVER_CEILING' });
+    expect(change('OPEN', { sharedPoolReserveMinor: 1001n, reason: 'Higher buffer' })).toEqual({
+      kind: 'RESERVE_OVER_CEILING',
+    });
+    expect(change('OPEN', { annualCeilingMinor: 99n, reason: 'Lower cap' })).toEqual({
+      kind: 'RESERVE_OVER_CEILING',
+    });
+    expect(change('OPEN', { sharedPoolReserveMinor: 1000n, reason: 'Full buffer' })).toMatchObject({
+      kind: 'CHANGE',
+      reserveChanged: true,
+    });
+    expect(change('OPEN', { annualCeilingMinor: 100n, reason: 'Match reserve' })).toMatchObject({
+      kind: 'CHANGE',
+      ceilingChanged: true,
+    });
+  });
+});
+
+describe('versionSubmissionRefusal (version sent only after cycle is LOCKED)', () => {
+  const open = { openedAt: new Date('2026-10-01T00:00:00Z'), submissionDeadline: '2026-12-15' };
+
+  it('returns NOT_OPEN when cycle is missing or a draft', () => {
+    expect(versionSubmissionRefusal(null, '2026-12-16')).toBe('NOT_OPEN');
+    expect(versionSubmissionRefusal({ ...open, openedAt: null }, '2026-12-16')).toBe('NOT_OPEN');
+  });
+
+  it('returns NOT_LOCKED through the day of the submission deadline', () => {
+    expect(versionSubmissionRefusal(open, '2026-10-01')).toBe('NOT_LOCKED');
+    expect(versionSubmissionRefusal(open, '2026-12-15')).toBe('NOT_LOCKED');
+  });
+
+  it('allows submission from the day after the submission deadline', () => {
+    expect(versionSubmissionRefusal(open, '2026-12-16')).toBeNull();
   });
 });

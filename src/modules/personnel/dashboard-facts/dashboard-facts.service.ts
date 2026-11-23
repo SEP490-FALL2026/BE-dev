@@ -49,6 +49,13 @@ export class PersonnelDashboardFactsService {
       overdueIds: late.map((row) => row.id),
     });
 
+    const transferCounts = await this.repo.transferCounts({ departmentIds: scope.departmentIds, today });
+    const revokingIds = await this.repo.revokingTransferIds({ departmentIds: scope.departmentIds, today });
+    const failedIds =
+      revokingIds.length === 0
+        ? new Set<string>()
+        : await this.licensing.listTransferIdsWithFailedRevocation(revokingIds);
+
     return {
       calendar,
       departures: {
@@ -56,7 +63,7 @@ export class PersonnelDashboardFactsService {
         revocationOverdue: late.length,
         itHandoverPending: await this.itHandoverPending(),
       },
-      transfers: await this.repo.transferCounts({ departmentIds: scope.departmentIds, today }),
+      transfers: { ...transferCounts, revocationFailed: failedIds.size },
     };
   }
 

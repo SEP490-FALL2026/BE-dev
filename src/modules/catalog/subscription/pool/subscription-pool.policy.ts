@@ -86,13 +86,13 @@ export function assertResponsibleNamed(responsibleItAdminEmployeeId: string | nu
   if (activating && responsibleItAdminEmployeeId === null) throw new SubscriptionResponsibleRequiredError();
 }
 
-/** The fewest different admins at the vendor a plan that needs them has recorded before it is activated (`QĐ-110k`). */
+/** The fewest different working IT Admins at the vendor a plan that needs them has before it is activated. */
 const MIN_RECORDED_VENDOR_ADMINS = 2;
 
 /**
- * A subscription of a plan that needs admins at the vendor (`K2`, or `K4` with an admin console) is not activated, nor a pool made, while the
- * profile of the plan names fewer than two different ones (`QĐ-110k`, `R-53`, SPEC P19). What was recorded is judged, not who still works:
- * a person who has left only lowers the flag a reader sees (`vendorAdminFlags`). Throws SubscriptionVendorAdminsRequiredError.
+ * A subscription of a plan that needs admins at the vendor (`K2`, or `K4` with an admin console) is not activated, nor a pool made, while
+ * fewer than two different IT Admins who administer it at the vendor are still working (outside the open seat-baseline phase). Throws
+ * SubscriptionVendorAdminsRequiredError.
  */
 export function assertVendorAdminsRecorded(input: { needs: boolean; given: number; planId: string }): void {
   if (input.needs && input.given < MIN_RECORDED_VENDOR_ADMINS) {

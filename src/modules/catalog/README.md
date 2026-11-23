@@ -117,7 +117,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `SubscriptionService`, `SubscriptionChangeService` (đổi subscription; kiểm trước khi ghi ở `SubscriptionChangeGuard`),
   `SeatTargetService`, `seat-guard.policy.ts` (số lượng không dưới ghế đang chiếm); `nextStateOf`, `subscriptionStatusOf`,
   `sameUnitPrice`, `isStaleEdit` là hàm thuần trong `subscription.policy.ts`.
-  Khóa lạc quan: `PATCH /subscriptions/:id` nhận `expectedUpdatedAt` (tùy chọn); trong giao dịch đã khóa `FOR UPDATE`, khác `updated_at` hiện tại (độ chính xác ms) thì 409 `SUBSCRIPTION.STALE` + `details.currentUpdatedAt`, không ghi gì. Mọi đường ghi dòng `subscriptions` đều bump `updated_at`: Prisma `@updatedAt` (kể cả `addPoolSeat` cho cấp K1/K2/K4 và gia hạn) và SQL thô `reassignResponsible` (`updated_at = now()`); gia hạn/thu hồi ghế không có đường SQL thô nào khác. Thu hồi/kết thúc cấp phát không giảm `purchased_quantity`.
+  Khóa lạc quan & đổi số seat: `PATCH /subscriptions/:id` bắt buộc `expectedUpdatedAt` khi gửi `purchasedQuantity` (`422 SUBSCRIPTION.VERSION_REQUIRED` nếu thiếu); trong giao dịch đã khóa `FOR UPDATE`, khác `updated_at` hiện tại (độ chính xác ms) thì `409 SUBSCRIPTION.STALE` + `details.currentUpdatedAt`, không ghi gì. Với thuê bao `K2` đang `ACTIVE`, giảm `purchasedQuantity` khi kỳ cam kết đang lưu 12 tháng và `allowsMidTermReduction = false` trả `409 SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED`; tăng `purchasedQuantity` bắt buộc `quantityChangeReason` (`422 SUBSCRIPTION.QUANTITY_REASON_REQUIRED`) và ghi vào audit `SUBSCRIPTION.UPDATED`. Mọi đường ghi dòng `subscriptions` đều bump `updated_at`: Prisma `@updatedAt` (kể cả `addPoolSeat` cho cấp K1/K2/K4 và gia hạn) và SQL thô `reassignResponsible` (`updated_at = now()`); gia hạn/thu hồi ghế không có đường SQL thô nào khác. Thu hồi/kết thúc cấp phát không giảm `purchased_quantity`. Cổng ≥ 2 admin của thuê bao `K2`/`K4` có trang quản trị đếm số IT Admin còn làm việc (`workingAdminsAmong`) và chỉ chặn khi pha baseline ghế đã đóng.
   `SubscriptionPoolRulesService` giữ các luật kho dùng chung mà policy thuần không biết (ai được phụ trách thuê bao).
 - `contract/` — hợp đồng (nhà cung cấp, số, hiệu lực từ/đến — để trống là vô thời hạn —, ghi chú; không có loại hợp đồng,
   US-04-13, `QĐ-111t`) và file riêng tư trong object storage (US-04-04). `contracts.controller.ts` (danh sách, tạo, sửa kèm
@@ -151,8 +151,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   Khóa: `declareIn` khóa `plans FOR UPDATE` TRƯỚC (chưa có dòng thuê bao để khóa); `complete` khóa thuê bao `FOR UPDATE` → `plans FOR UPDATE`. Mọi
   ghi khác giữ thứ tự thuê bao → plan. F-012: `recordNext` chỉ chuyển cờ chính sang kỳ mới khi kỳ mới ghi `ACTIVE`; kỳ `DRAFT` để cờ ở kỳ cũ và
   `subscriptionComplete` chuyển cờ trong cùng transaction.
-  Thứ tự khóa của `PATCH isPrimaryForPlan`: dòng thuê bao → `plans FOR UPDATE` → gỡ cờ ở thuê bao khác. Một ghi khác đang giữ
-  dòng thuê bao đang là chính và chờ plan có thể gây deadlock (`40P01` ⟹ 503 thử lại được, không phải 409): chấp nhận ở W1.
+  Thứ tự khóa của `PATCH isPrimaryForPlan` và `complete` nối kỳ: khóa tập ứng viên thuê bao (`lockPrimaryCandidates`, gồm primary hiện tại + chính nó + `renewedFromId` theo `id`) → `plans FOR UPDATE` → cập nhật. Nhờ khóa đủ tập thuê bao trước `plans`, không còn deadlock ngược chiều với luồng giữ thuê bao rồi khóa plan.
 - Chuỗi kỳ: `subscriptions.renewed_from_id` đặt một lần lúc tạo, cùng plan/phòng sở hữu, kỳ TERM, bắt đầu sau kỳ cũ (trigger
   `subscriptions_renewal_chain`); một kỳ có tối đa một kỳ nối tiếp (unique).
 - Số lượng subscription không thấp hơn số ghế đang chiếm (`assertQuantityNotBelowOccupied`, `seat-guard.policy.ts`);

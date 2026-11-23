@@ -3,7 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { ControlledWaitRepo } from './controlled-wait.repo';
 import { alertRecipientsOf, configurationHintOf, type ReassignableStepKind } from '../step-routing/reassignment.policy';
-import { reassignmentAuditEvent } from './reassignment-audit.mapper';
+import { reassignmentAuditEvent } from '../step-routing/step-audit-event.mapper';
 
 /** A step that waits, as the alert is raised for it. */
 export interface WaitingStep {

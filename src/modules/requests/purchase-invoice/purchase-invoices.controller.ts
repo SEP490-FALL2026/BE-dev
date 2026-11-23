@@ -48,7 +48,8 @@ const LINK_NOT_FOUND = {
 
 const REFUSED_STATE =
   'The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE)';
-const TAKEN_NUMBER = 'the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN)';
+const TAKEN_NUMBER =
+  'the vendor has an invoice with this number that was not returned, whatever the case and the white space of either number (PURCHASE_INVOICE.NUMBER_TAKEN)';
 const NO_PLACE =
   'the plan of the request has no subscription of the pool that can be taken from today, so there is nowhere to book the invoice (PURCHASE_INVOICE.NO_PLACE)';
 const NOT_PURCHASABLE_OR_NO_PLACE = {

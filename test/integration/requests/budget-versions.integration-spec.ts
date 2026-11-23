@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { attachedVersionFile } from '../../support/budget-files';
+import { attachedVersionFile, sendingCycleLock } from '../../support/budget-files';
 import { BudgetHarness, Pageable, VersionWire } from '../../support/budget-harness';
 import type { Person } from '../../support/request-harness';
 
@@ -231,17 +231,19 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
       const { proposal } = await waiting();
       const version = await h.built(proposal.id);
       await h.updateVersion(version.id, { reserve: h.money(10_000_000) }).expect(200);
-      // The route itself: the harness would attach a file first.
+      // The route itself, with the cycle locked for the send as the harness does for every other send (`sendingCycleLock`).
       const send = () =>
         request(h.server()).post(`/api/v1/budget-versions/${version.id}/submission`).set(h.as(h.finance));
 
-      const refused = await send().expect(422);
+      await sendingCycleLock.run(h.ctx.sql, version.id, h.today(), async () => {
+        const refused = await send().expect(422);
 
-      expect(h.codeOf(refused)).toBe('BUDGET_VERSION.ATTACHMENT_REQUIRED');
-      expect(await stateOf(version.id)).toBe('DRAFT');
-      expect(await proposalState(proposal.id)).toBe('SUBMITTED');
-      await attachedVersionFile(h.ctx.sql, version.id, h.finance.employeeId);
-      await send().expect(200);
+        expect(h.codeOf(refused)).toBe('BUDGET_VERSION.ATTACHMENT_REQUIRED');
+        expect(await stateOf(version.id)).toBe('DRAFT');
+        expect(await proposalState(proposal.id)).toBe('SUBMITTED');
+        await attachedVersionFile(h.ctx.sql, version.id, h.finance.employeeId);
+        await send().expect(200);
+      });
     });
 
     it('saves a draft over the ceiling and refuses to send it: 2,000 million less a reserve of 200, a total of 1,850 is 50 million over (409)', async () => {

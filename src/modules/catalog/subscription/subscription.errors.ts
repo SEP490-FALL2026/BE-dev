@@ -140,14 +140,14 @@ export class SubscriptionBillingCycleUnsupportedError extends Error {
 }
 
 /** An active subscription names the IT Admin who answers for it (`QĐ-103v`(4)). */
-/** The plan needs at least two different admins at the vendor and its profile names fewer (`QĐ-110k`, `R-53`): it is not activated. */
+/** The plan needs at least two different working IT Admins at the vendor once the seat baseline is closed: it is not activated. */
 export class SubscriptionVendorAdminsRequiredError extends Error {
   constructor(
     readonly planId: string,
     readonly given: number,
     readonly required: number,
   ) {
-    super(`The plan needs at least ${required} different IT Admins who administer it at the vendor.`);
+    super(`The plan needs at least ${required} different working IT Admins who administer it at the vendor.`);
     this.name = 'SubscriptionVendorAdminsRequiredError';
   }
 }
@@ -193,5 +193,28 @@ export class SubscriptionDuplicatePlanError extends Error {
   constructor(readonly subscriptionIds: readonly string[]) {
     super('The plan already has a live subscription: add seats to it or renew it instead of declaring another.');
     this.name = 'SubscriptionDuplicatePlanError';
+  }
+}
+
+export class SubscriptionVersionRequiredError extends Error {
+  constructor() {
+    super('Send expectedUpdatedAt from the last read when changing purchasedQuantity.');
+    this.name = 'SubscriptionVersionRequiredError';
+  }
+}
+
+export class SubscriptionMidTermReductionNotAllowedError extends Error {
+  constructor() {
+    super(
+      'Reducing purchasedQuantity during a 12-month commitment is not allowed unless mid-term reduction is enabled.',
+    );
+    this.name = 'SubscriptionMidTermReductionNotAllowedError';
+  }
+}
+
+export class SubscriptionQuantityReasonRequiredError extends Error {
+  constructor() {
+    super('A quantityChangeReason is required when increasing purchasedQuantity of an active K2 subscription.');
+    this.name = 'SubscriptionQuantityReasonRequiredError';
   }
 }

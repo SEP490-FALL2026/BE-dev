@@ -1,4 +1,5 @@
 import type { Response } from 'supertest';
+import { sendingCycleLock } from '../support/budget-files';
 import { bm10Body, budgetFile } from '../support/flows/flow-budget';
 import { FlowWorld } from '../support/flows/flow-world';
 
@@ -9,14 +10,14 @@ import { FlowWorld } from '../support/flows/flow-world';
  * and the spending approver approves it or returns it with a reason. Real sign-in, the seeded dataset, the bytes of the files through the
  * fake object storage, a clock the test moves, and nothing else replaced.
  *
- * The dataset (`shared-demo-v4`, DEMO-15): the cycle of the year is open until the day of the seed and every department with a head holds
- * its approved version; the cycle of the next year is open with Engineering approved, IT's BM-10 waiting, Marketing's version sent and
- * Sales' returned; the cycle of the year after is a draft. The scenarios that send BM-10 work on the next year (Design, Finance and the
- * Board sent nothing), the whole cycle on the year after.
+ * The dataset (`shared-demo-v4`, DEMO-15): the cycles of the year and of the next one are locked (their versions were sent) and every
+ * department with a head holds its approved version for the year, Engineering for the next one too, with Marketing's version sent and
+ * Sales' returned; the cycle of the year after the next is open with IT's BM-10 waiting. The scenarios that send BM-10 work on that
+ * cycle (Design, Finance and the Board sent nothing there), the whole cycle on a year after it that the test makes.
  */
 describe('MF-4 ngân sách năm: nháp → mở → BM-10 → chốt → phiên bản → duyệt/trả về @MF4 @D1', () => {
   let world: FlowWorld;
-  /** The year the scenarios propose for: the year after the one of the clock (see the note above). */
+  /** The year the scenarios propose for: the open cycle, two years after the one of the clock (see the note above). */
   let year: number;
   let figma: string;
 
@@ -31,19 +32,25 @@ describe('MF-4 ngân sách năm: nháp → mở → BM-10 → chốt → phiên 
     return (wire(response).proposal as { id: string }).id;
   };
 
-  /** Finance sends a version with a file of its own (a version is sent with at least one). */
+  /** Finance sends a version with a file of its own (a version is sent with at least one), while the cycle is locked. */
   const sendVersion = async (id: string) => {
     await budgetFile(world, 'NV-FIN1', `/budget-versions/${id}/attachments`);
 
-    return call().post('NV-FIN1', `/budget-versions/${id}/submission`);
+    return submit(id);
   };
+
+  /** The submission of a version, with its cycle locked for the send as the fixture of the suites does (and open again after, for the BM-10 that follow). */
+  const submit = (id: string) =>
+    sendingCycleLock.run(world.ctx.sql, id, call().today(), () =>
+      call().post('NV-FIN1', `/budget-versions/${id}/submission`),
+    );
 
   const versionState = async (id: string) =>
     (await world.facts.one<{ state: string }>(`SELECT state::text FROM budget_versions WHERE id = $1`, [id])).state;
 
   beforeAll(async () => {
     world = await FlowWorld.open();
-    year = Number(call().today().slice(0, 4)) + 1;
+    year = Number(call().today().slice(0, 4)) + 2;
     figma = await call().planId('Figma Professional');
   }, 300000);
 
@@ -74,8 +81,8 @@ describe('MF-4 ngân sách năm: nháp → mở → BM-10 → chốt → phiên 
       );
       expect(row).toEqual({ currency: 'VND', reserve_percent: 10, cost_center_code: 'CC-DES', state: 'DRAFT' });
 
-      // A version is sent with a file of its own (`BUDGET_VERSION.ATTACHMENT_REQUIRED` without one).
-      const bare = await call().post('NV-FIN1', `/budget-versions/${version.id}/submission`);
+      // A version is sent with a file of its own (`BUDGET_VERSION.ATTACHMENT_REQUIRED` without one) once the cycle locks.
+      const bare = await submit(version.id);
       expect([bare.status, call().codeOf(bare)]).toEqual([422, 'BUDGET_VERSION.ATTACHMENT_REQUIRED']);
       expect((await sendVersion(version.id)).status).toBe(200);
       expect(await versionState(version.id)).toBe('SENT');
@@ -201,7 +208,7 @@ describe('MF-4 ngân sách năm: nháp → mở → BM-10 → chốt → phiên 
       expect(created.status).toBe(201);
       const id = (wire(created).version as { id: string }).id;
 
-      const without = await call().post('NV-FIN1', `/budget-versions/${id}/submission`);
+      const without = await submit(id);
       expect(without.status).toBe(422);
       expect(call().codeOf(without)).toBe('BUDGET.RESERVE_REASON_REQUIRED');
       expect(await versionState(id)).toBe('DRAFT');
@@ -225,7 +232,7 @@ describe('MF-4 ngân sách năm: nháp → mở → BM-10 → chốt → phiên 
       expect((await call().put('NV-FIN1', `/budget-versions/${id}`, { reserve: { amount: '3000000' } })).status).toBe(
         200,
       );
-      expect((await call().post('NV-FIN1', `/budget-versions/${id}/submission`)).status).toBe(200);
+      expect((await submit(id)).status).toBe(200);
       expect(await versionState(id)).toBe('SENT');
     });
 
@@ -286,7 +293,16 @@ describe('MF-4 ngân sách năm: nháp → mở → BM-10 → chốt → phiên 
   });
   describe('F4-04 vòng đời kỳ: nháp → mở → BM-10 → chốt sau hạn → phiên bản từ BM-10 hoặc số liệu nền → duyệt/trả về @MF4 @D1', () => {
     it('kỳ nháp không nhận BM-10; Finance dời hạn (nháp không cần lý do) rồi mở; trưởng phòng nộp; sau hạn kỳ khóa; Finance lập và gửi; Người duyệt chi duyệt một, trả về một #14 @B2', async () => {
+      // The dataset has no draft cycle left, so Finance makes one for the year after the open one.
       const draftYear = year + 1;
+      const made = await call().post('NV-FIN1', '/budget-cycles', {
+        year: draftYear,
+        submissionDeadline: call().inDays(400),
+        decisionDeadline: call().inDays(420),
+        annualCeiling: { amount: '600000000' },
+        sharedPoolReserve: { amount: '60000000' },
+      });
+      expect(made.status).toBe(201);
       const cycle = async () => wire(await call().get('NV-FIN1', `/budget-cycles/${draftYear}`)) as { status: string };
       expect((await cycle()).status).toBe('DRAFT');
 

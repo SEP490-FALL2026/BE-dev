@@ -272,7 +272,7 @@ export class CommitmentRepo {
   async lockById(
     tx: DbTx,
     id: string,
-  ): Promise<(CommitmentOfRequest & { requestId: string; currency: string }) | null> {
+  ): Promise<(CommitmentOfRequest & { requestId: string; currency: string; attachedVersionId: string | null }) | null> {
     const found = await tx.$queryRaw<
       Array<{ id: string }>
     >`SELECT id FROM budget_commitments WHERE id = ${id}::uuid FOR UPDATE`;
@@ -291,6 +291,7 @@ export class CommitmentRepo {
       state: row.state,
       organizationId: row.organizationId,
       costCenterId: row.costCenterId,
+      attachedVersionId: row.attachedVersionId,
     };
   }
 

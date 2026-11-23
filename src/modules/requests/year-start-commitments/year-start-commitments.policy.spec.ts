@@ -112,10 +112,49 @@ describe('BR-MF1-09: the commitment made on 01/01 for a right that goes on', () 
       });
     });
 
-    it('T-RQ2 (K2 with no end): kept 4.500.000 at 375.000 a month, and the commitment is twelve months of the price on 01/01, 400.000: 4.800.000, the kept number is for the warning only (R-46)', () => {
-      expect(amount([seat({ savedMinor: 4_500_000n })], at(400_000n))).toMatchObject({
+    it('T-RQ2 (K2 with no end): approved at 100.000/month keeping 1.200.000, 01/01 price 120.000 commits 1.200.000 with seatMonthlyMinor 100.000', () => {
+      expect(amount([seat({ savedMinor: 1_200_000n })], at(120_000n))).toEqual({
         status: 'PRICED',
-        amountMinor: 4_800_000n,
+        amountMinor: 1_200_000n,
+        seatMonthlyMinor: 100_000n,
+        currency: 'VND',
+      });
+      expect(amount([seat({ savedMinor: 4_500_000n })], at(400_000n))).toEqual({
+        status: 'PRICED',
+        amountMinor: 4_500_000n,
+        seatMonthlyMinor: 375_000n,
+        currency: 'VND',
+      });
+    });
+
+    it('QĐ-117h: seats that all kept a number need no price of 01/01 at all: a plan with no price, or one left in another currency, still commits what the approval kept', () => {
+      const kept = [seat({ savedMinor: 1_200_000n }), seat({ savedMinor: 1_200_000n })];
+      const expected = { status: 'PRICED', amountMinor: 2_400_000n, seatMonthlyMinor: 100_000n, currency: 'VND' };
+
+      expect(amount(kept, null)).toEqual(expected);
+      expect(amount(kept, { ...at(120_000n), unitPrice: { amountMinor: 5_000n, currency: 'USD' } })).toEqual(expected);
+      expect(amount(kept, { ...at(120_000n), kind: 'ONE_TIME' })).toEqual(expected);
+    });
+
+    it('QĐ-117h: a seat with no number kept still needs the price of 01/01, whichever other seat kept one', () => {
+      const mixed = [seat({ savedMinor: 1_200_000n }), seat({ savedMinor: null })];
+
+      expect(amount(mixed, null)).toEqual({ status: 'SKIPPED', reason: 'NO_PRICE' });
+      expect(amount(mixed, at(120_000n))).toMatchObject({ status: 'PRICED', amountMinor: 1_200_000n + 1_440_000n });
+    });
+
+    it('uses 01/01 price for non-term-limited request when no saved amount exists, and prorates early closure at saved approval rate', () => {
+      expect(amount([seat({ savedMinor: null })], at(120_000n))).toEqual({
+        status: 'PRICED',
+        amountMinor: 1_440_000n,
+        seatMonthlyMinor: 120_000n,
+        currency: 'VND',
+      });
+      expect(amount([seat({ savedMinor: 1_200_000n, validUntil: '2027-04-01' })], at(120_000n))).toEqual({
+        status: 'PRICED',
+        amountMinor: 300_000n,
+        seatMonthlyMinor: 100_000n,
+        currency: 'VND',
       });
     });
 

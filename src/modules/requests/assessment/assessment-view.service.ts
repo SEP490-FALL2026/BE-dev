@@ -86,7 +86,7 @@ export class AssessmentViewService {
       (id): id is string => id !== null,
     );
     const people = await this.organizationReads.getEmployees([...new Set(peopleIds)], tx);
-    const plans = planIds.length > 0 ? await this.catalog.getPlanSummaries(planIds) : [];
+    const plans = planIds.length > 0 ? await this.catalog.getPlanSummaries(planIds, tx) : [];
     const person = (id: string | null | undefined) => {
       const found = id ? people.find((candidate) => candidate.id === id) : undefined;
 

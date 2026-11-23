@@ -1,4 +1,5 @@
 import { Client } from 'pg';
+import { parseDeviceToken } from '../../../src/infrastructure/security/tokens/device-token';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { CredentialRepo } from '../../../src/modules/devices/credential/credential.repo';
@@ -301,7 +302,9 @@ describe('revoking, ending and reading credentials (integration, real PostgreSQL
     const events = await sql().query<{ action: string; actor_kind: string }>(
       `SELECT action, actor_kind FROM audit_events WHERE action LIKE 'DEVICE_CREDENTIAL%' OR action LIKE 'DEVICE_ENROLLMENT%' ORDER BY occurred_at`,
     );
-    const secret = token.split('_')[2];
+    const parsed = parseDeviceToken(token);
+    if (!parsed) throw new Error(`Malformed device token: ${token}`);
+    const secret = parsed.secret;
     const leaked = await sql().query(`SELECT 1 FROM audit_events WHERE before::text LIKE $1 OR after::text LIKE $1`, [
       `%${secret}%`,
     ]);

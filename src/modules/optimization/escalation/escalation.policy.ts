@@ -27,6 +27,7 @@ export function escalationVerdictOf(facts: EscalationFacts): EscalationVerdict {
   if (facts.inTransfer || record.state === 'PAUSED') return { kind: 'SKIP', reason: 'TRANSFER_GRACE' };
   if (facts.onLeaveOrHandover) return { kind: 'SKIP', reason: 'LEAVE_OR_HANDOVER' };
   if (facts.placementDepartmentId === null) return { kind: 'SKIP', reason: 'NO_DEPARTMENT' };
+  if (facts.inChargeAllowed === false) return { kind: 'SKIP', reason: 'NOT_IN_CHARGE' };
 
   return { kind: 'ESCALATE' };
 }

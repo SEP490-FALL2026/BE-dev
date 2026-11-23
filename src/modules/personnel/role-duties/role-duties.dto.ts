@@ -6,8 +6,9 @@ import { ROLE_FLAGS } from '../public/personnel.types';
 /** Every role flag with whether the person holds it: the wire has no list of them. */
 const roleFlagsSchema = z.record(z.enum(ROLE_FLAGS), z.boolean());
 
-/** What the person who leaves sees of their own departure: the last working day, how far it has come and the roles that need someone. */
+/** What the person who leaves sees of their own departure: the case id, last working day, how far it has come and the roles that need someone. */
 export const departureNoticeSchema = z.strictObject({
+  offboardingCaseId: z.uuid(),
   lastWorkingDay: z.string(),
   state: z.enum(['HANDING_OVER', 'LEFT']),
   level: z.enum(['LEAVING', 'OVERDUE_HANDOVER']),

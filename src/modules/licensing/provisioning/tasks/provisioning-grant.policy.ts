@@ -38,12 +38,33 @@ export function beneficiaryGrantRefusal(facts: {
   return facts.accessBlocked ? 'ACCESS_BLOCKED' : null;
 }
 
-/** Whether the request claimed in the transaction of the grant is still the one that was read before it: the same person, plan and kind of seat. */
+/** Whether the request claimed in the transaction of the grant is still the one that was read before it: the same person, plan, kind of seat and replaced assignment. */
 export const claimMatchesAnswer = (
-  claimed: { employeeId: string; planId: string; seat: string },
-  answer: { employeeId: string; planId: string; seat: string },
+  claimed: { employeeId: string; planId: string; seat: string; replacesAssignmentId?: string | null },
+  answer: { employeeId: string; planId: string; seat: string; replacesAssignmentId?: string | null },
 ): boolean =>
-  claimed.employeeId === answer.employeeId && claimed.planId === answer.planId && claimed.seat === answer.seat;
+  claimed.employeeId === answer.employeeId &&
+  claimed.planId === answer.planId &&
+  claimed.seat === answer.seat &&
+  (claimed.replacesAssignmentId ?? null) === (answer.replacesAssignmentId ?? null);
+
+export type RevocationActionForRegrant = 'PROCEED' | 'WITHDRAW_TRANSFER' | 'BLOCK';
+
+/**
+ * Decides how a regrant handles a live revocation task on the replaced right: proceed when none exists,
+ * withdraw when the task is still queued with only transfer reasons, or block otherwise.
+ */
+export function revocationActionForRegrant(
+  task: { status: string } | null,
+  reasonSources: readonly string[],
+): RevocationActionForRegrant {
+  if (task === null) return 'PROCEED';
+  if (task.status === 'QUEUED' && reasonSources.length > 0 && reasonSources.every((source) => source === 'TRANSFER')) {
+    return 'WITHDRAW_TRANSFER';
+  }
+
+  return 'BLOCK';
+}
 
 /**
  * What the audit entry `PROVISIONING_TASK.CREATED` says: the request and the seat the task is for, its channel, and who is in charge by

@@ -32,9 +32,9 @@ export class ProvisioningExtensionService {
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A right was extended before installation');
     const today = await this.organizationReads.businessToday(input.now, tx);
-    const inCharge = await this.organizationReads.getItAdminInCharge(input.holderEmployeeId, today);
+    const inCharge = await this.organizationReads.getItAdminInCharge(input.holderEmployeeId, today, tx);
     // The most tries are fixed here, as for a grant: a parameter changed later reaches only the tasks made after it.
-    const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT')));
+    const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT', tx)));
     const task = await this.tasks.insert(tx, {
       kind: 'EXTEND',
       organizationId: organization.id,

@@ -44,6 +44,9 @@ export const progressSectionsShape = {
       'Of those in the grace, the ones from the day of the reminder on: the grace ends within the reminder days (the parameter TRANSFER_GRACE_REMINDER_WORKING_DAYS).',
     ),
     revoking: section('The transfers whose grace is over and whose old rights are being taken back.'),
+    revocationFailed: section(
+      'The transfers whose grace is over that have at least one open right with a closed-failed transfer revocation and no live revocation task.',
+    ),
   }),
   seatsReturned: z.strictObject({
     thisMonth: section(

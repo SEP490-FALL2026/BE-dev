@@ -18,12 +18,15 @@ import {
   SubscriptionCommitmentTermRequiredError,
   SubscriptionK1MonthlyOnlyError,
   SubscriptionK4PerpetualOnlyError,
+  SubscriptionMidTermReductionNotAllowedError,
   SubscriptionPrimaryConflictError,
+  SubscriptionQuantityReasonRequiredError,
   SubscriptionStaleError,
   SubscriptionPrimaryNotEligibleError,
   SubscriptionResponsibleNotItAdminError,
   SubscriptionResponsibleRequiredError,
   SubscriptionVendorAdminsRequiredError,
+  SubscriptionVersionRequiredError,
   SubscriptionDatesInvalidError,
   SubscriptionDuplicatePlanError,
   SubscriptionNotFoundError,
@@ -129,6 +132,15 @@ export function toSubscriptionApiException(error: unknown): unknown {
       currentUpdatedAt: error.currentUpdatedAt.toISOString(),
     });
   }
+  if (error instanceof SubscriptionVersionRequiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.VERSION_REQUIRED', error.message);
+  }
+  if (error instanceof SubscriptionMidTermReductionNotAllowedError) {
+    return refuse(HttpStatus.CONFLICT, 'SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED', error.message);
+  }
+  if (error instanceof SubscriptionQuantityReasonRequiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.QUANTITY_REASON_REQUIRED', error.message);
+  }
   if (
     error instanceof SubscriptionPrimaryConflictError ||
     isUniqueViolation(error, 'subscriptions_one_primary_per_plan')
@@ -169,6 +181,9 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   PRIMARY_NOT_ELIGIBLE: example(new SubscriptionPrimaryNotEligibleError('NOT_ACTIVE')),
   PRIMARY_CONFLICT: example(new SubscriptionPrimaryConflictError()),
   STALE: example(new SubscriptionStaleError(new Date('2026-01-01T00:00:00.000Z'))),
+  VERSION_REQUIRED: example(new SubscriptionVersionRequiredError()),
+  MID_TERM_REDUCTION_NOT_ALLOWED: example(new SubscriptionMidTermReductionNotAllowedError()),
+  QUANTITY_REASON_REQUIRED: example(new SubscriptionQuantityReasonRequiredError()),
   DUPLICATE_PLAN: example(new SubscriptionDuplicatePlanError(['<subscription-id>'])),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2, 'unitPrice')),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError('unitPrice')),

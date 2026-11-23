@@ -12,6 +12,7 @@ import { carriedPast, seatsToCarry } from '../../assignment/assignment.policy';
 import { AssignmentService } from '../../assignment/assignment.service';
 import { licensingAuditEvent } from '../../licensing-audit-event.mapper';
 import { RenewalError } from '../subscription-renewal.errors';
+import { RenewalPartiesService } from '../subscription-renewal-parties.service';
 import { SubscriptionRenewalSeatRepo } from '../subscription-renewal-seat.repo';
 import { SubscriptionRenewalRepo } from '../subscription-renewal.repo';
 import type {
@@ -93,6 +94,7 @@ export class RenewalOutcomeService {
     private readonly seats: SubscriptionRenewalSeatRepo,
     private readonly assignments: AssignmentService,
     private readonly periods: SubscriptionPeriodApi,
+    private readonly parties: RenewalPartiesService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -107,6 +109,8 @@ export class RenewalOutcomeService {
   ): Promise<RenewalRecord> {
     return this.runner.run(async (tx) => {
       const found = await this.awaitingOutcome(tx, id);
+      const access = await this.parties.recordingAccessOf(actor, found.period, tx);
+      if (!access.allowed) throw new RenewalError('NOT_RESPONSIBLE');
       const today = await this.organizationReads.businessToday(now, tx);
 
       return (await this.recordIn(tx, actor, found, input, { today, now })).recorded;

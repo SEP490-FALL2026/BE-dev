@@ -72,6 +72,38 @@ export class SeatHarness {
   detailsOf = (response: request.Response) =>
     (response.body as { error: { details: Record<string, unknown> } }).error.details;
 
+  /** The `updatedAt` of a subscription as a client reads it: the version an edit of its seats has to name (`expectedUpdatedAt`). */
+  async subscriptionVersionOf(subscriptionId: string, account: ApiAccount = this.it1): Promise<string> {
+    return this.dataOf<{ updatedAt: string }>(
+      await request(this.server()).get(`/api/v1/subscriptions/${subscriptionId}`).set(this.as(account)).expect(200),
+    ).updatedAt;
+  }
+
+  /**
+   * An edit that sets the seats bought, as a client makes it: on a read of the subscription (`expectedUpdatedAt`, always asked when the seats are sent) and with
+   * the reason a rise of the seats of an active pool asks for (ignored when the seats do not rise). `expected` is the status the answer must have; null asserts none.
+   */
+  async changeSeats(
+    subscriptionId: string,
+    body: object,
+    expected: number | null = 200,
+    account: ApiAccount = this.it1,
+  ): Promise<request.Response> {
+    const response = await request(this.server())
+      .patch(`/api/v1/subscriptions/${subscriptionId}`)
+      .set(this.as(account))
+      .send({
+        expectedUpdatedAt: await this.subscriptionVersionOf(subscriptionId, account),
+        quantityChangeReason: 'More seats needed',
+        ...body,
+      });
+    if (expected !== null && response.status !== expected) {
+      throw new Error(`changeSeats: expected ${expected}, got ${response.status} ${JSON.stringify(response.body)}`);
+    }
+
+    return response;
+  }
+
   async start(options: Parameters<typeof createHttpTestApp>[0] = {}): Promise<void> {
     this.ctx = await createHttpTestApp(options);
     this.seed = await seedInstallation(this.ctx.app);

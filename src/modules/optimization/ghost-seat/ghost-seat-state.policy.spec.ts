@@ -73,14 +73,17 @@ describe('ghost seat state policy', () => {
     expect(closeReasonOfEndedSeat(false)).toBe('SEAT_ENDED');
   });
 
-  it('DA6-39: the watch tier of G3/G4 is not in the denominator of KPI-5; G1 and G2 are', () => {
+  it('DA6-39: the watch tier of G3/G4 and LEFT_TO_EXPIRE/SUPERSEDED closures are excluded from KPI-5 denominator; G1 and G2 are counted', () => {
     expect(countsInKpi5({ group: 'G1', tier: null })).toBe(true);
     expect(countsInKpi5({ group: 'G2', tier: 'ACTION' })).toBe(true);
     expect(countsInKpi5({ group: 'G3', tier: 'REVIEW' })).toBe(true);
     expect(countsInKpi5({ group: 'G4', tier: 'MONITOR' })).toBe(false);
+    expect(countsInKpi5({ group: 'G3', tier: 'REVIEW', closeReason: 'LEFT_TO_EXPIRE' })).toBe(false);
+    expect(countsInKpi5({ group: 'G2', tier: 'ACTION', closeReason: 'SUPERSEDED' })).toBe(false);
+    expect(countsInKpi5({ group: 'G3', tier: 'ACTION', closeReason: 'EXEMPTED' })).toBe(true);
   });
 
-  it('KPI-5: 10 made (2 of them in the watch tier), 2 KEPT, 1 NEGATED of the watch tier, 1 SUPERSEDED gives 3 of 8, 37.5 %', () => {
+  it('KPI-5: 10 made (2 in watch tier, 1 SUPERSEDED), 1 KEPT, 1 EXEMPTED, 1 NEGATED in watch tier gives 2 of 7 (28.6 %)', () => {
     const open = (group: Kpi5Row['group'], tier: Kpi5Row['tier']): Kpi5Row => ({
       group,
       tier,
@@ -95,7 +98,7 @@ describe('ghost seat state policy', () => {
     });
     const rows: Kpi5Row[] = [
       closed('G3', 'REVIEW', 'KEPT'),
-      closed('G3', 'ACTION', 'KEPT'),
+      closed('G3', 'ACTION', 'EXEMPTED'),
       closed('G4', 'MONITOR', 'NEGATED'),
       closed('G2', 'ACTION', 'SUPERSEDED'),
       open('G1', null),
@@ -108,8 +111,29 @@ describe('ghost seat state policy', () => {
 
     const figure = kpi5Of(rows);
 
-    expect(figure).toMatchObject({ denominator: 8, numerator: 3, ratePercent: 37.5 });
+    expect(figure).toMatchObject({ denominator: 7, numerator: 2, ratePercent: 28.6 });
     expect(figure.byGroup.G3).toEqual({ denominator: 3, numerator: 2, ratePercent: 66.7 });
+  });
+
+  it('KPI-5: 11 counted rows covering all 10 close reasons plus 1 open row yields denominator 9 and numerator 3 (33.3 %)', () => {
+    const rows: Kpi5Row[] = [
+      { group: 'G3', tier: 'REVIEW', state: 'CLOSED', closeReason: 'ACCEPTED' },
+      { group: 'G3', tier: 'REVIEW', state: 'CLOSED', closeReason: 'SUPERSEDED' },
+      { group: 'G3', tier: 'REVIEW', state: 'CLOSED', closeReason: 'SEAT_ENDED' },
+      { group: 'G3', tier: 'REVIEW', state: 'CLOSED', closeReason: 'FREE_SEATS_GONE' },
+      { group: 'G3', tier: 'REVIEW', state: 'CLOSED', closeReason: 'OUT_OF_SCOPE' },
+      { group: 'G3', tier: 'REVIEW', state: 'CLOSED', closeReason: 'KEPT' },
+      { group: 'G3', tier: 'REVIEW', state: 'CLOSED', closeReason: 'NEGATED' },
+      { group: 'G3', tier: 'REVIEW', state: 'CLOSED', closeReason: 'TRANSFER_SEAT_REVOKED' },
+      { group: 'G3', tier: 'REVIEW', state: 'CLOSED', closeReason: 'EXEMPTED' },
+      { group: 'G3', tier: 'REVIEW', state: 'CLOSED', closeReason: 'LEFT_TO_EXPIRE' },
+      { group: 'G3', tier: 'REVIEW', state: 'OPEN', closeReason: null },
+    ];
+
+    const figure = kpi5Of(rows);
+
+    expect(figure).toMatchObject({ denominator: 9, numerator: 3, ratePercent: 33.3 });
+    expect(figure.byGroup.G3).toEqual({ denominator: 9, numerator: 3, ratePercent: 33.3 });
   });
 
   it('KPI-5: gives no rate when nothing was recommended', () => {

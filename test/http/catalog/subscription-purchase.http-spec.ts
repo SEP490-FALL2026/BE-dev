@@ -5,6 +5,12 @@ import {
   declareSubscriptionBodySchema,
   updateSubscriptionBodySchema,
 } from '../../../src/modules/catalog/subscription/subscription.dto';
+import { SubscriptionChangeService } from '../../../src/modules/catalog/subscription/subscription-change.service';
+import {
+  SubscriptionMidTermReductionNotAllowedError,
+  SubscriptionQuantityReasonRequiredError,
+  SubscriptionVersionRequiredError,
+} from '../../../src/modules/catalog/subscription/subscription.errors';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
@@ -199,6 +205,66 @@ describe('subscription routes (e2e, no database)', () => {
         .expect(404);
 
       expect(bodyOf(response).error.code).toBe('HTTP_NOT_FOUND');
+    });
+  });
+
+  describe('PATCH /subscriptions/:id quantity change HTTP error mapping', () => {
+    let mockedApp: INestApplication<App>;
+    const update = jest.fn();
+
+    beforeAll(async () => {
+      mockedApp = await createHttpContractApp({
+        overrides: [{ token: SubscriptionChangeService, useValue: { update } }],
+      });
+    });
+
+    afterAll(async () => {
+      await mockedApp?.close();
+    });
+
+    it('accepts quantityChangeReason up to 500 trimmed chars and rejects blank or >500 chars', () => {
+      expect(updateSubscriptionBodySchema.safeParse({ quantityChangeReason: '  New hires  ' })).toMatchObject({
+        success: true,
+        data: { quantityChangeReason: 'New hires' },
+      });
+      expect(updateSubscriptionBodySchema.safeParse({ quantityChangeReason: '   ' }).success).toBe(false);
+      expect(updateSubscriptionBodySchema.safeParse({ quantityChangeReason: 'a'.repeat(501) }).success).toBe(false);
+    });
+
+    it('maps SubscriptionVersionRequiredError to 422 SUBSCRIPTION.VERSION_REQUIRED', async () => {
+      update.mockRejectedValueOnce(new SubscriptionVersionRequiredError());
+
+      const response = await request(mockedApp.getHttpServer())
+        .patch(`/api/v1/subscriptions/${ID}`)
+        .set('Authorization', bearer(principal(['IT_ADMIN'])))
+        .send({ purchasedQuantity: 10 })
+        .expect(422);
+
+      expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.VERSION_REQUIRED');
+    });
+
+    it('maps SubscriptionQuantityReasonRequiredError to 422 SUBSCRIPTION.QUANTITY_REASON_REQUIRED', async () => {
+      update.mockRejectedValueOnce(new SubscriptionQuantityReasonRequiredError());
+
+      const response = await request(mockedApp.getHttpServer())
+        .patch(`/api/v1/subscriptions/${ID}`)
+        .set('Authorization', bearer(principal(['IT_ADMIN'])))
+        .send({ purchasedQuantity: 12, expectedUpdatedAt: '2026-11-10T00:00:00.000Z' })
+        .expect(422);
+
+      expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.QUANTITY_REASON_REQUIRED');
+    });
+
+    it('maps SubscriptionMidTermReductionNotAllowedError to 409 SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED', async () => {
+      update.mockRejectedValueOnce(new SubscriptionMidTermReductionNotAllowedError());
+
+      const response = await request(mockedApp.getHttpServer())
+        .patch(`/api/v1/subscriptions/${ID}`)
+        .set('Authorization', bearer(principal(['IT_ADMIN'])))
+        .send({ purchasedQuantity: 5, expectedUpdatedAt: '2026-11-10T00:00:00.000Z' })
+        .expect(409);
+
+      expect(bodyOf(response).error.code).toBe('SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED');
     });
   });
 });

@@ -4,24 +4,32 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import type { SeatOfMonth } from '../../licensing/public/licensing-seat-month.types';
-import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { CommitmentRepo, type LockedCommitmentOfRequest } from '../budget/commitment.repo';
 import { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import { planSeatMonth, type ReturnedApplication, type SeatToCharge } from './seat-month-plan.policy';
+import { SeatMonthSeatFactsService } from './seat-month-seat-facts.service';
 import { SeatMonthRepo, type NewSeatMonthCharge, type SeatMonthChargeRecord } from './seat-month.repo';
-import type { PlacementPeriod } from './seat-month.types';
 
-/** The Cost Centers whose use the rows of before and the rows written touch, in the year of the month. */
+/**
+ * The Cost Centers whose use the rows of before and the rows written touch, in the year of the month, except the ones this transaction has a commitment locked
+ * for that still waits for a budget: the decision of a version takes the budget year of its Cost Center first and then updates the waiting commitments, so a
+ * transaction that already holds one must not ask for that year (exception E1 in `docs/rules/database-business.md`). A Cost Center with no budget has no threshold, so no alert is lost.
+ */
 const costCentersOf = (
   year: number,
   before: readonly SeatMonthChargeRecord[],
   written: readonly NewSeatMonthCharge[],
+  waiting: ReadonlySet<string>,
 ): { costCenterId: string; year: number }[] =>
   [...before, ...written].flatMap((row) =>
-    row.costCenterId === null ? [] : [{ costCenterId: row.costCenterId, year }],
+    row.costCenterId === null || waiting.has(row.costCenterId) ? [] : [{ costCenterId: row.costCenterId, year }],
   );
+
+/** The Cost Centers of the commitments this transaction locked, by whichever way, that still wait for a budget (attached to no version). */
+const waitingCostCenters = (held: ReadonlyMap<string, HeldCommitment>): Set<string> =>
+  new Set([...held.values()].filter((row) => row.attachedVersionId === null).map((row) => row.costCenterId));
 
 const byId = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 const daysBetween = (from: BusinessDate, to: BusinessDate): number =>
@@ -34,21 +42,25 @@ interface HeldCommitment {
   amountMinor: bigint;
   releasedMinor: bigint;
   appliedMinor: bigint;
+  costCenterId: string;
+  /** The version it is attached to; null while it waits for a budget. */
+  attachedVersionId: string | null;
 }
 
 /**
- * Charges one subscription for one month in the transaction of the caller (`SM-1`, see `SeatMonthService`): reads where the holders were placed, the
- * price and the commitments, lets the plan say what each department bears, what each commitment gives up and what it gets back, and replaces the rows of
- * the month. A month charged again gives the same rows and moves nothing; when a row applies less than before, or is gone, what it applied is written as a
- * reversal and the commitment holds it again, so no seat-month is applied twice and the commitment of another Cost Center is never touched (`SM1-06`).
- * Locks, in the order of the module: the month of the subscription, the commitments of the requests (by id), the ones a row of before applied to, the budget
- * years of the Cost Centers (by id).
+ * Charges one subscription for one month in the transaction of the caller (`SM-1`, see `SeatMonthService`): reads the seats of the subscription, where the
+ * holders were placed, the price and the commitments, lets the plan say what each department bears, what each commitment gives up and what it gets back, and
+ * replaces the rows of the month. A month charged again gives the same rows and moves nothing; when a row applies less than before, or is gone, what it applied is
+ * written as a reversal and the commitment holds it again, so no seat-month is applied twice and the commitment of another Cost Center is never touched (`SM1-06`).
+ * Locks, in the order of the module: the month of the subscription (the seats are read after it, so nobody who held the lock before can change them under this
+ * charge), the commitments of the requests (by id), the ones a row of before applied to, the budget years of the Cost Centers (by id). The one exception is
+ * the one named E1 in `docs/rules/database-business.md`: a Cost Center whose commitment this transaction locked and that still waits for a budget never has its budget year taken here.
  */
 @Injectable()
 export class SeatMonthSubscriptionService {
   constructor(
     private readonly repo: SeatMonthRepo,
-    private readonly history: OrganizationHistoryApi,
+    private readonly seats: SeatMonthSeatFactsService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly periods: SubscriptionPeriodApi,
     private readonly commitments: CommitmentRepo,
@@ -57,22 +69,28 @@ export class SeatMonthSubscriptionService {
     private readonly thresholds: ThresholdAlertService,
   ) {}
 
-  /** Returns the number of rows the month of the subscription has now. */
+  /**
+   * Returns the number of rows the month of the subscription has now, or null when `onlyMissing` is set and the subscription already has its mark once the lock
+   * of the month is held (a pass that waited for the lock finds the month charged by the one that held it, and leaves its rows as they are).
+   */
   async charge(
     tx: DbTx,
     subscriptionId: string,
     month: BusinessDate,
-    seats: readonly SeatOfMonth[],
     now: Date,
-  ): Promise<number> {
+    onlyMissing = false,
+  ): Promise<number | null> {
     await this.repo.lockMonthOf(tx, subscriptionId, month);
+    if (onlyMissing && (await this.repo.isCharged(tx, subscriptionId, month))) return null;
+    const seats = await this.seats.read(tx, month, subscriptionId);
     const before = await this.repo.ofSubscriptionMonth(tx, subscriptionId, month);
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('The installation has no organization.');
     const year = Number(month.slice(0, 4));
     const commitmentOf = await this.lockCommitments(tx, seats, year);
     const held = await this.lockPriorCommitments(tx, before, commitmentOf);
-    const toCharge = await this.seatsToCharge(tx, month, seats, commitmentOf);
+    const waiting = waitingCostCenters(held);
+    const toCharge = await this.seats.toCharge(tx, month, seats, commitmentOf);
     const departmentIds = [...new Set([...toCharge.flatMap((seat) => this.departmentsOf(seat))])];
     const costCenterOfDepartment = await this.organizationReads.getUnitCostCenterIds(departmentIds, tx);
     const [facts] = await this.periods.getPurchaseFacts([subscriptionId], tx);
@@ -100,8 +118,8 @@ export class SeatMonthSubscriptionService {
     }));
     // What each Cost Center uses is read before the rows are replaced and after the commitments took what they apply, to tell the threshold the month crosses (`RV-2`): the rows replace
     // the ones of before, so the use goes by what changed and never by the whole month again.
-    const watch = await this.thresholds.watch(tx, costCentersOf(year, before, written));
-    await this.replace(tx, year, before, written);
+    const watch = await this.thresholds.watch(tx, costCentersOf(year, before, written, waiting));
+    await this.replace(tx, year, before, written, waiting);
     await this.giveBack(tx, { organizationId: organization.id, subscriptionId, month, now }, plan.returned);
     await this.takeDown(tx, plan.takenByCommitment);
     await this.thresholds.settle(tx, watch, now);
@@ -124,42 +142,6 @@ export class SeatMonthSubscriptionService {
       ...seat.placements.map((period) => period.departmentId),
       ...(seat.fixedDepartmentId ? [seat.fixedDepartmentId] : []),
     ];
-  }
-
-  /** The seats with where their holders were placed over the month and the commitment of the request behind each. */
-  private async seatsToCharge(
-    tx: DbTx,
-    month: BusinessDate,
-    seats: readonly SeatOfMonth[],
-    commitmentOf: ReadonlyMap<string, LockedCommitmentOfRequest>,
-  ): Promise<SeatToCharge[]> {
-    const { start, nextStart } = monthBoundsOf(month);
-    const spans = await this.history.getPlacementsBetween(
-      [...new Set(seats.map((seat) => seat.employeeId))],
-      start,
-      nextStart,
-      tx,
-    );
-    const placements = new Map<string, PlacementPeriod[]>();
-    for (const span of spans) {
-      placements.set(span.employeeId, [
-        ...(placements.get(span.employeeId) ?? []),
-        { departmentId: span.departmentId, from: span.validFrom, to: span.validTo },
-      ]);
-    }
-
-    return seats.map((seat) => {
-      const commitment = seat.requestId === null ? undefined : commitmentOf.get(seat.requestId);
-
-      return {
-        assignmentId: seat.assignmentId,
-        employeeId: seat.employeeId,
-        fixedDepartmentId: seat.kind === 'SERVICE' ? seat.owningDepartmentId : null,
-        held: { from: seat.heldFrom, until: seat.heldUntil },
-        placements: placements.get(seat.employeeId) ?? [],
-        commitment: commitment ? { id: commitment.id, costCenterId: commitment.costCenterId } : null,
-      };
-    });
   }
 
   /** The commitment of each request for the year, its row locked, the requests by id. */
@@ -210,9 +192,10 @@ export class SeatMonthSubscriptionService {
     year: number,
     before: readonly SeatMonthChargeRecord[],
     written: readonly NewSeatMonthCharge[],
+    waiting: ReadonlySet<string>,
   ): Promise<void> {
     const costCenterIds = [...before, ...written].flatMap((row) =>
-      row.costCenterId === null ? [] : [row.costCenterId],
+      row.costCenterId === null || waiting.has(row.costCenterId) ? [] : [row.costCenterId],
     );
     for (const costCenterId of [...new Set(costCenterIds)].sort(byId))
       await this.yearLock.lock(tx, costCenterId, [year]);

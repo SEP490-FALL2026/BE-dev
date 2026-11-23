@@ -1,14 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { TransactionRunner, TransientDatabaseError } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCommitmentExistsError, BudgetCommitmentNotHoldableError } from '../../budgets/public/budgets.errors';
 import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
 import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
+import { SpendDecisionRepo } from '../spend/spend-decision.repo';
 import { SpendBatchGroupReturnService } from './spend-batch-group-return.service';
 import { SpendDecisionService, type JudgedSpendChecklist, type SpendDecisionInput } from './spend-decision.service';
 import { SpendBatchNotFoundError, SpendDecisionRefusedError } from '../spend/spend.errors';
 import type { BatchDecisionResultWire } from '../spend-approval-view/spend-approval.dto';
+
+/** The decision of the record of approval each decision of the body writes. */
+const RECORDED_AS = { APPROVE: 'APPROVED', REJECT: 'REJECTED', RETURN: 'RETURNED' } as const;
+
+/** A request with no spend step open is refused with this reason; a request that is not there at all is not found. */
+function isNoOpenStep(error: unknown): boolean {
+  return error instanceof SpendDecisionRefusedError && error.reason === 'NO_SPEND_STEP';
+}
 
 /**
  * The spending approver decides the requests they hold in a batch together, approving or refusing them one by one, in the
@@ -22,6 +31,11 @@ import type { BatchDecisionResultWire } from '../spend-approval-view/spend-appro
  * every request is decided on that judgement (a policy published meanwhile leaves no batch half decided); what it refuses is told once, and a return
  * (the only thing a No leaves besides a refusal) takes every request of the batch the person holds, a request for a group too (sent back whole, its
  * people decided by none), so a batch with a problem goes back whole and the head drops the request at fault and sends a new batch.
+ *
+ * A request whose transaction the database could not complete for a moment (a deadlock, a serialization failure) answers `RETRYABLE`: only that request is
+ * sent again, the rest of the batch was decided. A batch sent again finds the requests it already decided with no open step; when the newest spend step of
+ * one holds a record of this very person with this very decision, it answers what was decided with `ALREADY_DECIDED` and writes nothing, so the sender can
+ * send the whole batch again after a failure without a request being decided twice or counted as skipped.
  */
 @Injectable()
 export class SpendBatchDecisionService {
@@ -31,6 +45,7 @@ export class SpendBatchDecisionService {
     private readonly runner: TransactionRunner,
     private readonly checklists: PolicyChecklistApi,
     private readonly groupReturns: SpendBatchGroupReturnService,
+    private readonly spendDecisions: SpendDecisionRepo,
   ) {}
 
   /** Throws SpendBatchNotFoundError for a batch the caller holds nothing of, and what the checklist refuses. */
@@ -88,6 +103,8 @@ export class SpendBatchDecisionService {
 
       return skipped('RECHECKED_RETURNED_TO_HEAD');
     } catch (error) {
+      if (error instanceof TransientDatabaseError)
+        return { requestId, outcome: 'RETRYABLE', reason: 'TRANSIENT_FAILURE' };
       if (error instanceof AccessRequestNotFoundError) return skipped('NO_SPEND_STEP');
       if (error instanceof AccessRequestGroupUsesLinesError) {
         // A request for a group is decided for each person, never in bulk (`US-05-17`); but a return of the batch takes the whole group back.
@@ -95,6 +112,7 @@ export class SpendBatchDecisionService {
 
         return skipped('GROUP_NEEDS_LINES');
       }
+      if (isNoOpenStep(error)) return this.withoutOpenStep(actor, requestId, body.decision);
       if (error instanceof SpendDecisionRefusedError) return skipped(error.reason);
       // The commitment could not be held (a safety net after the check): this request is skipped, the others of the batch go on.
       if (error instanceof BudgetCommitmentNotHoldableError || error instanceof BudgetCommitmentExistsError) {
@@ -115,10 +133,27 @@ export class SpendBatchDecisionService {
 
       return { requestId, outcome: 'RETURNED', reason: null };
     } catch (error) {
+      if (error instanceof TransientDatabaseError)
+        return { requestId, outcome: 'RETRYABLE', reason: 'TRANSIENT_FAILURE' };
       if (error instanceof AccessRequestNotFoundError)
         return { requestId, outcome: 'SKIPPED', reason: 'NO_SPEND_STEP' };
+      if (isNoOpenStep(error)) return this.withoutOpenStep(actor, requestId, 'RETURN');
       if (error instanceof SpendDecisionRefusedError) return { requestId, outcome: 'SKIPPED', reason: error.reason };
       throw error;
     }
+  }
+
+  /** A request with no open spend step: what this person already decided on its newest step when it is the same decision, otherwise skipped. */
+  private async withoutOpenStep(
+    actor: AuthenticatedPrincipal,
+    requestId: string,
+    decision: SpendDecisionInput['decision'],
+  ): Promise<BatchDecisionResultWire> {
+    const recorded = await this.spendDecisions.decisionOfLatestStep(requestId, actor.employeeId);
+    if (recorded !== null && recorded === RECORDED_AS[decision]) {
+      return { requestId, outcome: recorded, reason: 'ALREADY_DECIDED' };
+    }
+
+    return { requestId, outcome: 'SKIPPED', reason: 'NO_SPEND_STEP' };
   }
 }

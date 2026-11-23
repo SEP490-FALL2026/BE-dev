@@ -1,3 +1,4 @@
+import { RequesterHeadConversionService } from '../step-routing/requester-head-conversion.service';
 import { RequestResubmissionService } from './request-resubmission.service';
 import {
   AccessRequestNotAwaitingRevisionError,
@@ -30,6 +31,7 @@ describe('BR-MF1-02: requester resubmission', () => {
     lines as never,
     audit as never,
     targets as never,
+    new RequesterHeadConversionService(repo as never, audit as never),
   );
   const actor = { employeeId: 'requester' } as never;
   beforeEach(() => {
@@ -79,11 +81,12 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
     setState: jest.fn(),
     assessmentSentBack: jest.fn(),
     reopenAssessmentStep: jest.fn(),
+    markOneStep: jest.fn(),
   };
-  const spend = { route: jest.fn() };
+  const spend = { route: jest.fn(), start: jest.fn() };
   const lines = { lock: jest.fn(), repointNeed: jest.fn() };
   const audit = { record: jest.fn() };
-  const targets = { assessmentTarget: jest.fn() };
+  const targets = { assessmentTarget: jest.fn(), isRequesterHead: jest.fn() };
   const service = new RequestResubmissionService(
     { run: (fn: (tx: unknown) => unknown) => fn(tx) } as never,
     repo as never,
@@ -91,6 +94,7 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
     lines as never,
     audit as never,
     targets as never,
+    new RequesterHeadConversionService(repo as never, audit as never),
   );
   const actor = { employeeId: 'requester' } as never;
   beforeEach(() => {
@@ -98,6 +102,7 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
     repo.lockById.mockResolvedValue(viaHead);
     repo.findById.mockResolvedValue(viaHead);
     repo.addNeedStep.mockResolvedValue('step-2');
+    targets.isRequesterHead.mockResolvedValue(false);
   });
 
   it('opens a new need step for the head of the returned one and waits for the head, not for the spending approver', async () => {
@@ -139,6 +144,45 @@ describe('PL-2.2 (QĐ-111ap, R-24): the sender sends on again a request the head
 
     expect(repo.addNeedStep).toHaveBeenCalledTimes(1);
     expect(lines.repointNeed).toHaveBeenCalledWith(tx, 'request', ['e1', 'e2'], 'step-2');
+    expect(targets.isRequesterHead).not.toHaveBeenCalled();
+  });
+
+  it('converts a non-group request to ONE_STEP (REQUESTER_IS_HEAD) when the requester became head before resubmission', async () => {
+    targets.isRequesterHead.mockResolvedValue(true);
+
+    await service.resubmit(actor, 'request');
+
+    expect(repo.markOneStep).toHaveBeenCalledWith(tx, 'request', 'REQUESTER_IS_HEAD');
+    expect(repo.addNeedStep).not.toHaveBeenCalled();
+    expect(spend.start).toHaveBeenCalledWith(tx, actor, 'request', expect.any(Date));
+    const events = audit.record.mock.calls.map(
+      (call) => (call as unknown as [unknown, { action: string; after: Record<string, unknown> }])[1],
+    );
+    expect(events.map((event) => event.action)).toEqual([
+      'ACCESS_REQUEST.STEP_NOT_REQUIRED',
+      'ACCESS_REQUEST.RESUBMITTED',
+    ]);
+    expect(events[0].after).toMatchObject({
+      requesterBecameHead: true,
+      oneStepReason: 'REQUESTER_IS_HEAD',
+      trigger: 'RESUBMITTED',
+    });
+  });
+
+  it('records the resubmission itself when it is converted to one step, with the state the request is in once its route started', async () => {
+    targets.isRequesterHead.mockResolvedValue(true);
+    repo.findById.mockResolvedValue({ ...viaHead, state: 'AWAITING_SPEND_DECISION' });
+
+    await service.resubmit(actor, 'request');
+
+    const resubmitted = audit.record.mock.calls
+      .map((call) => (call as unknown as [unknown, { action: string; after: Record<string, unknown> }])[1])
+      .find((event) => event.action === 'ACCESS_REQUEST.RESUBMITTED');
+    expect(resubmitted?.after).toEqual({
+      requestId: 'request',
+      oneStep: true,
+      requestState: 'AWAITING_SPEND_DECISION',
+    });
   });
 });
 
@@ -173,6 +217,7 @@ describe('PL-2.4 (QĐ-111ap, R-24): the sender sends on again a proposal the IT 
     lines as never,
     audit as never,
     targets as never,
+    new RequesterHeadConversionService(repo as never, audit as never),
   );
   const actor = { employeeId: 'requester' } as never;
   beforeEach(() => {

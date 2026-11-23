@@ -11,7 +11,7 @@ const facts: ProgressFacts = {
       itHandoverPending: 1,
       mailboxLockPending: 2,
     },
-    transfers: { inGrace: 5, graceEndingSoon: 2, revoking: 1 },
+    transfers: { inGrace: 5, graceEndingSoon: 2, revoking: 1, revocationFailed: 1 },
   },
   seats: { returned: 6, reused: 3 },
   plansBelowMinimum: 2,
@@ -60,6 +60,7 @@ describe('progressOf (SPEC P21)', () => {
     expect(progress.transfers.inGrace.count).toBe(5);
     expect(progress.transfers.graceEndingSoon.count).toBe(2);
     expect(progress.transfers.revoking.count).toBe(1);
+    expect(progress.transfers.revocationFailed.count).toBe(1);
     expect(progress.seatsReturned.thisMonth.count).toBe(6);
     expect(progress.seatsReturned.reusedThisMonth.count).toBe(3);
     expect(progress.plansBelowVendorAdminMinimum.count).toBe(2);

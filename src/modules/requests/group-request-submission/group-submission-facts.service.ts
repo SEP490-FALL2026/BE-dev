@@ -162,7 +162,7 @@ export class GroupSubmissionFactsService {
         workEmail: person?.workEmail ?? null,
         employmentType: person?.employmentType ?? 'STAFF',
         hireDate: person?.hireDate ?? today,
-        holdsAccess: person ? await this.holds(line.employeeId, input.planId) : false,
+        holdsAccess: person ? await this.holds(tx, line.employeeId, input.planId) : false,
         hasOpenRequest: open.has(line.employeeId) || verdict?.refusal === 'HAS_OPEN_REQUEST',
         openLimitReached: verdict?.refusal === 'OPEN_LIMIT_REACHED',
         isDepartmentHead: headEmployeeId !== null && line.employeeId === headEmployeeId,
@@ -222,8 +222,8 @@ export class GroupSubmissionFactsService {
     };
   }
 
-  private async holds(employeeId: string, planId: string): Promise<boolean> {
-    const { total } = await this.licensing.getSeatsHeldInPlans(employeeId, [planId], { skip: 0, take: 1 });
+  private async holds(tx: DbTx, employeeId: string, planId: string): Promise<boolean> {
+    const { total } = await this.licensing.getSeatsHeldInPlans(employeeId, [planId], { skip: 0, take: 1 }, tx);
 
     return total > 0;
   }

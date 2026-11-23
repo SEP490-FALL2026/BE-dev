@@ -106,7 +106,12 @@ describe('QĐ-113g: no owning department on a subscription', () => {
       guard,
     );
 
-    await service.update(actor, 'sub-1', { purchasedQuantity: 50, autoRenew: true });
+    await service.update(
+      actor,
+      'sub-1',
+      { purchasedQuantity: 50, autoRenew: true, quantityChangeReason: 'Growth' },
+      stored().updatedAt,
+    );
 
     expect(update).toHaveBeenCalledWith(
       tx,

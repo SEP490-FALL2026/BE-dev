@@ -96,9 +96,14 @@ describe('the vendor admins gate and the renewal of a period (integration, real 
   });
 
   it('still refuses a NEW subscription of such a plan, by the declaration and by the completion of a draft that is not a renewal', async () => {
-    const old = await oldWithoutProfile();
+    // A plan with no live subscription and no profile: once the baseline is closed a second live subscription of a plan is refused as a duplicate before anything else.
+    const planId = await h.plan('K2');
+    await h.ctx.sql.query('DELETE FROM plan_workspace_admins WHERE plan_id = $1', [planId]);
+    await h.ctx.sql.query('DELETE FROM plan_workspace_profiles WHERE plan_id = $1', [planId]);
+    // The gate asks nothing while the baseline is still being imported (`QĐ-117e`): it is closed here, after the old subscriptions the other tests renew were written.
+    await h.closeBaseline().expect(200);
     const body = {
-      planId: old.planId,
+      planId,
       kind: 'TERM',
       unitPrice: { amount: '1000000', currency: 'VND' },
       billingCycle: 'MONTHLY',

@@ -39,6 +39,14 @@ export class ProvisioningHolderService {
   ) {}
 
   /**
+   * Holds the beneficiary employee `FOR SHARE` before locking the request,
+   * keeping the standard lock order (`docs/rules/database-business.md`: employee before request).
+   */
+  lockPersonalEmployee(tx: DbTx, employeeId: string): Promise<void> {
+    return this.organizationReads.lockEmployeeForShare(tx, employeeId);
+  }
+
+  /**
    * No task to grant begins for a beneficiary who has left, nor from the day a departure blocks their access although they are not marked
    * left yet (`QĐ-77f`, `QĐ-110d`); a task already being worked is not touched. The grant and the claim of a queued task both ask it, in the
    * transaction of the act. Throws ProvisioningBeneficiaryDepartedError.
@@ -52,17 +60,27 @@ export class ProvisioningHolderService {
   }
 
   /**
+   * Holds the beneficiary of a task `FOR SHARE`, or answers false when there is no such employee. The claim of a queued task takes this before it locks the
+   * task, as a departure that blocks the person holds the employee and then reaches the task, so the two never wait for each other's lock.
+   */
+  async holdBeneficiaryOfTask(tx: DbTx, employeeId: string): Promise<boolean> {
+    try {
+      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
+    } catch (error) {
+      if (error instanceof EmployeeNotFoundError) return false;
+      throw error;
+    }
+
+    return true;
+  }
+
+  /**
    * The same for the claim of a task that is queued: the beneficiary is held `FOR SHARE` first, as the grant holds them, so a departure that
    * blocks them in another transaction either finishes before the block is read here or waits for this one. Throws
    * ProvisioningBeneficiaryDepartedError.
    */
   async requireCanBeginTask(tx: DbTx, requestId: string, employeeId: string): Promise<void> {
-    try {
-      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
-    } catch (error) {
-      if (error instanceof EmployeeNotFoundError) return;
-      throw error;
-    }
+    if (!(await this.holdBeneficiaryOfTask(tx, employeeId))) return;
     const employee = await this.organizationReads.getEmployee(employeeId, tx);
     if (employee) await this.requireCanBegin(tx, requestId, employee);
   }

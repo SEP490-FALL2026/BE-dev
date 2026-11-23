@@ -3,6 +3,7 @@ import { addDays } from '../../../src/core/business-date';
 import { addWorkingDays } from '../../../src/core/working-days';
 import { BlockAnnouncementService } from '../../../src/modules/personnel/departure-deadline/block-announcement.service';
 import { DepartureClosureService } from '../../../src/modules/personnel/departure-closure/departure-closure.service';
+import { TransferRevocationService } from '../../../src/modules/personnel/transfer-grace/transfer-revocation.service';
 import type { ApiAccount } from '../../support/api-accounts';
 import { DashboardHarness, OVERVIEW_PATHS, type SectionWire } from '../../support/dashboard-harness';
 import type { Department, Person } from '../../support/request-harness';
@@ -22,7 +23,7 @@ interface Progress {
       | 'mailboxLockPending',
       SectionWire
     >;
-    transfers: Record<'inGrace' | 'graceEndingSoon' | 'revoking', SectionWire>;
+    transfers: Record<'inGrace' | 'graceEndingSoon' | 'revoking' | 'revocationFailed', SectionWire>;
     seatsReturned: Record<'thisMonth' | 'reusedThisMonth', SectionWire>;
     plansBelowVendorAdminMinimum: SectionWire;
   };
@@ -336,6 +337,36 @@ describe('progress of the departures and the transfers on the overviews (integra
       });
       expect((await countBy(OVERVIEW_PATHS.itAdmin, it1)).count).toBe(enough);
       expect((await countBy(OVERVIEW_PATHS.itAdmin, it3.account)).count).toBe(enough);
+    });
+
+    it('counts transfers with a closed-failed revocation in revocationFailed and clears it when reopened', async () => {
+      const k2 = await h.subscription(10, 'K2');
+      const mover = await person(des.department);
+      const seat = await h.rightOf(mover, mover.code, { subscriptionId: k2 });
+      const transfer = await h.moveToday(mover, eng.department);
+      await moveGrace(transfer.id, { effective: h.day(-10), reminder: h.day(-5), ends: h.day(-1) });
+
+      await h.ctx.app.get(TransferRevocationService, { strict: false }).sweep(new Date());
+      const taskId = (
+        await h.ctx.sql.query<{ id: string }>(
+          `SELECT id FROM provisioning_tasks WHERE assignment_id = $1 AND kind = 'REVOKE'`,
+          [seat],
+        )
+      ).rows[0].id;
+      await h.claim(taskId, it2.account).expect(200);
+      await h.fail(taskId, { reason: 'Không thu hồi được' }, it2.account).expect(200);
+      await h.closeFailed(taskId, { reason: 'Không thu hồi được' }, it2.account).expect(200);
+
+      const before = (await progressOf(OVERVIEW_PATHS.itAdmin, it1)).sections.transfers.revocationFailed.count ?? 0;
+      expect(before).toBeGreaterThanOrEqual(1);
+
+      await request(h.server())
+        .post(`/api/v1/department-transfers/${transfer.id}/revocations`)
+        .set(h.as(it1))
+        .expect(200);
+
+      const after = (await progressOf(OVERVIEW_PATHS.itAdmin, it1)).sections.transfers.revocationFailed.count ?? 0;
+      expect(after).toBe(before - 1);
     });
   });
 });

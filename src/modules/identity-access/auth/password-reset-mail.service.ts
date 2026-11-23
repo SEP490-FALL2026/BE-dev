@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { EnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { EmployeeRecord } from '../../organization/public/organization.types';
 import { ActionLinkRevocation } from '../accounts/action-link-revocation.service';
 import { ActionLinkService } from '../accounts/action-link.service';
@@ -21,6 +22,7 @@ export class PasswordResetMailService {
     private readonly revocation: ActionLinkRevocation,
     private readonly notifications: NotificationsApi,
     private readonly config: ConfigService<EnvironmentVariables, true>,
+    private readonly organizations: OrganizationReadApi,
   ) {}
 
   /** Issues and mails a new reset link; false, with nothing done, when the hourly limit is reached. */
@@ -42,6 +44,8 @@ export class PasswordResetMailService {
       'PASSWORD_RESET',
       now,
     );
+    // The mail shows the expiry in the time zone of the organization, read in this transaction.
+    const organization = await this.organizations.getOrganization(tx);
     // To the email stored on the account, never to the one the caller typed.
     await this.notifications.enqueueEmail(tx, {
       organizationId: account.organizationId,
@@ -49,7 +53,12 @@ export class PasswordResetMailService {
       template: 'PASSWORD_RESET',
       locale: 'vi',
       actionTokenHash: issued.hash,
-      payload: { token: issued.token, expiresAt: issued.expiresAt.toISOString(), fullName: employee.fullName },
+      payload: {
+        token: issued.token,
+        expiresAt: issued.expiresAt.toISOString(),
+        timeZone: organization?.timeZone,
+        fullName: employee.fullName,
+      },
     });
 
     return true;

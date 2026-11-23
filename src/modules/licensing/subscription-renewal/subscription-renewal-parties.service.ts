@@ -58,6 +58,27 @@ export class RenewalPartiesService {
       : { substitute: false, responsibleItAdminEmployeeId: null };
   }
 
+  /**
+   * Whether the caller is permitted to record a renewal for the subscription period: either no responsible IT Admin is set, the caller
+   * is the responsible IT Admin, or that admin is no longer usable (substitute = true for the audit trail).
+   */
+  async recordingAccessOf(
+    actor: Pick<AuthenticatedPrincipal, 'employeeId'>,
+    period: { responsibleItAdminEmployeeId: string | null },
+    tx?: DbTx,
+  ): Promise<{ allowed: boolean; substitute: boolean; responsibleItAdminEmployeeId: string | null }> {
+    const responsible = period.responsibleItAdminEmployeeId;
+    if (responsible === null) return { allowed: true, substitute: false, responsibleItAdminEmployeeId: null };
+    if (responsible === actor.employeeId) {
+      return { allowed: true, substitute: false, responsibleItAdminEmployeeId: responsible };
+    }
+    const usable = (await this.identity.findUsableItAdminEmployeeIds([responsible], tx)).has(responsible);
+
+    return usable
+      ? { allowed: false, substitute: false, responsibleItAdminEmployeeId: responsible }
+      : { allowed: true, substitute: true, responsibleItAdminEmployeeId: responsible };
+  }
+
   /** Finance, when they still work: who is told the result of a decision (`QĐ-94d`(2)). */
   financeOf(tx?: DbTx): Promise<string | null> {
     return this.identity.findUsableFinanceEmployeeId(tx);

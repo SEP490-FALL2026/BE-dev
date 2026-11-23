@@ -1,4 +1,4 @@
-import { ALERT_THRESHOLDS, crossedThresholds } from './threshold.policy';
+import { ALERT_THRESHOLDS, crossedByBaseDrop, crossedThresholds } from './threshold.policy';
 
 const M = 1_000_000n;
 const crossed = (before: bigint, after: bigint, base: bigint) =>
@@ -41,5 +41,32 @@ describe('crossedThresholds (RV-2)', () => {
 
   it('a base that is not above nothing has no threshold', () => {
     expect(crossed(0n, 10n, 0n)).toEqual([]);
+  });
+});
+
+describe('crossedByBaseDrop (threshold crossed when a lowered base pushes use ratio to 80 or 100 percent)', () => {
+  const drop = (used: bigint, baseBefore: bigint, baseAfter: bigint) =>
+    crossedByBaseDrop({ used: used * M, baseBefore: baseBefore * M, baseAfter: baseAfter * M });
+
+  it('crosses 80 when a transfer drops usage from 75% to 85%', () => {
+    expect(drop(75n, 100n, 88n)).toEqual([80]);
+  });
+
+  it('crosses 80 and 100 in order when a return drops usage from 75% to 100%', () => {
+    expect(drop(75n, 100n, 75n)).toEqual([80, 100]);
+  });
+
+  it('crosses nothing when already >= 80% before and still < 100%, or only 100 when rising from 85% to 100%', () => {
+    expect(drop(85n, 100n, 90n)).toEqual([]);
+    // Use that stands exactly on 80 % before the drop was already there: the drop does not say it again.
+    expect(drop(80n, 100n, 90n)).toEqual([]);
+    expect(drop(85n, 100n, 85n)).toEqual([100]);
+  });
+
+  it('crosses nothing when base did not drop or base is non-positive', () => {
+    expect(drop(80n, 100n, 100n)).toEqual([]);
+    expect(drop(80n, 100n, 120n)).toEqual([]);
+    expect(drop(0n, 100n, 0n)).toEqual([]);
+    expect(drop(10n, 0n, 0n)).toEqual([]);
   });
 });

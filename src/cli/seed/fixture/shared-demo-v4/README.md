@@ -125,7 +125,8 @@ Sổ số "Mua / Đang giữ / Trống" là lúc seed xong (R01…R22 đã cấp
 ## Ngân sách (MF-4)
 
 **Năm `Y`.** Finance tạo kỳ (Trần năm 20 tỷ, Dự phòng kho 1 tỷ; không còn Trần từng phòng) với **hạn nộp = D0** rồi mở kỳ: kỳ mở trong
-ngày seed và **khóa từ D0+1** (ngày demo), nên điều chỉnh ngân sách làm được từ ngày demo (FIX-AD1-Q2, D-Z2-1). Mỗi phòng có Cost Center
+ngày seed để các trưởng phòng gửi `BM-10`; khi các phiên bản cần gửi, seed đưa hạn nộp về **D0-1** và để nguyên (kỳ **đã khóa thật**, khớp các phiên bản
+đã gửi, vì không route nào gửi phiên bản cho kỳ còn mở), nên điều chỉnh ngân sách làm được ngay từ ngày seed (FIX-AD1-Q2, D-Z2-1). Mỗi phòng có Cost Center
 **và trưởng phòng** có phiên bản **đã duyệt**: trưởng phòng tải tệp và gửi `BM-10` (một số tiền + tệp) → Finance lập phiên bản (dự phòng
 mặc định 10 % do server tính), đính tệp của phiên bản, gửi → Người duyệt chi duyệt (checklist bước `4.7`, mọi câu _Có_).
 
@@ -144,17 +145,18 @@ mặc định 10 % do server tính), đính tệp của phiên bản, gửi → 
 Các Request R10, R21, R11 xin đúng **một tháng** (`termMonths: 1`) nên giá trị luôn là một tháng giá, không phụ thuộc ngày chạy seed; các
 phòng MKT, DES, SAL không có Request nào khác giữ hoặc chờ ngân sách.
 
-**Năm `Y+1`** (DEMO-15). Kỳ mở, hạn nộp D0+30 (Trần năm 500.000.000, Dự phòng kho 50.000.000):
+**Năm `Y+1`** (DEMO-15). Kỳ mở trong ngày seed để các trưởng phòng gửi `BM-10`, rồi **khóa thật** như năm `Y` (hạn nộp D0-1) vì đã có phiên bản gửi đi
+(Trần năm 500.000.000, Dự phòng kho 50.000.000):
 
 | Phòng         | Trạng thái                           | Chi tiết                                                                        |
 | ------------- | ------------------------------------ | ------------------------------------------------------------------------------- |
 | ENG           | Phiên bản **đã duyệt** (112.000.000) | Request qua năm của ENG cho Người duyệt chi thấy **cảnh báo mềm** năm sau (S4)  |
-| ITO           | `BM-10` **đã nộp**, chờ Finance      | 20.000.000                                                                      |
 | MKT           | Phiên bản **đã gửi**                 | Chờ Người duyệt chi quyết                                                       |
 | SAL           | Phiên bản **bị trả về** (`RETURN`)   | Người duyệt chi trả về Finance kèm lý do                                        |
-| DES, FIN, BOD | **Không nộp**                        | Cờ `noProposalSubmitted`; phiên bản số liệu nền lập được sau hạn D0+30 (D-Z2-1) |
+| DES, FIN, BOD | **Không nộp**                        | Cờ `noProposalSubmitted`; phiên bản số liệu nền lập được vì kỳ đã khóa (D-Z2-1) |
 
-**Năm `Y+2`.** Kỳ **nháp** (chưa mở, hạn D0+365): Finance demo được "dời hạn, mở kỳ" (D-Z2-3).
+**Năm `Y+2`.** Kỳ **đang mở** (hạn nộp D0+365; Trần năm 600.000.000, Dự phòng kho 60.000.000): `BM-10` của ITO (20.000.000) **đã nộp, chờ Finance** lập
+phiên bản. Kỳ này thay cho kỳ nháp trước đây (D-Z2-3: Finance dời hạn rồi mở kỳ nháp), nay Owner chọn để kỳ năm sau khóa thật và cảnh chờ Finance nằm ở một kỳ còn mở.
 
 ## MF-1: Request ở mọi trạng thái
 

@@ -42,7 +42,7 @@ export class WithdrawalPreconditions {
     const request = await this.repo.lockById(tx, requestId);
     const now = new Date();
     const today = await this.organizationReads.businessToday(now, tx);
-    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, today);
+    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId, today, tx);
     const heads = headed?.departmentId === request?.departmentId;
     if (!request || !isWithdrawableBy(actor, request, heads)) throw new AccessRequestNotFoundError();
 

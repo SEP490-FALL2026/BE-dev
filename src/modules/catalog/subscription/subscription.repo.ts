@@ -244,6 +244,19 @@ export class SubscriptionRepo {
   }
 
   /**
+   * Locks every subscription currently marked primary for `planId` together with `extraIds` in one statement ordered by `id`,
+   * so concurrent primary changes or renewal completions serialize before locking the plan.
+   */
+  async lockPrimaryCandidates(tx: DbTx, planId: string, extraIds: readonly string[]): Promise<void> {
+    const uniqueIds = [...new Set(extraIds)];
+    await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM subscriptions
+       WHERE (plan_id = ${planId}::uuid AND is_primary_for_plan = true)
+          OR id = ANY(${uniqueIds}::uuid[])
+       ORDER BY id FOR UPDATE`;
+  }
+
+  /**
    * Hands every subscription that names `fromEmployeeId` responsible to `toEmployeeId` (`QĐ-111g`), in one statement: the rows are locked in
    * id order first, so two handing overs of the same IT Admin queue up and the second finds none. Returns the ids it moved, in id order.
    */

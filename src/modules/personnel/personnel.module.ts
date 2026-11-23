@@ -124,6 +124,7 @@ import { TransferPreconditions } from './transfer/transfer-preconditions.service
 import { TransferRecorder } from './transfer/transfer-recorder.service';
 import { TransferService } from './transfer/transfer.service';
 import { TransfersController } from './transfer/transfers.controller';
+import { TransferRevocationController } from './transfer-grace/transfer-revocation.controller';
 import { ItHandoverController } from './it-handover/it-handover.controller';
 import { ItHandoverMilestoneService } from './it-handover/it-handover-milestone.service';
 import { ItHandoverRecorder } from './it-handover/it-handover-recorder.listener';
@@ -171,6 +172,7 @@ import { ItHandoverViewService } from './it-handover/it-handover-view.service';
   ],
   controllers: [
     TransfersController,
+    TransferRevocationController,
     LongLeavesController,
     OffboardingController,
     DeparturePreviewController,

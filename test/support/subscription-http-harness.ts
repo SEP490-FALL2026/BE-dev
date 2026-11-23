@@ -190,6 +190,36 @@ export class SubscriptionHttpHarness {
   get = (id: string, account: ApiAccount = this.it1) =>
     request(this.server()).get(`/api/v1/subscriptions/${id}`).set(this.as(account));
 
+  /** The `updatedAt` of a subscription as a client reads it: the version an edit of its seats has to name (`expectedUpdatedAt`). */
+  subscriptionVersionOf = async (id: string, account: ApiAccount = this.it1): Promise<string> =>
+    this.dataOf<{ updatedAt: string }>(await this.get(id, account).expect(200)).updatedAt;
+
+  /**
+   * An edit that sets the seats bought, as a client makes it: on a read of the subscription (`expectedUpdatedAt`, always asked when the seats are sent) and with
+   * the reason a rise of the seats of an active pool asks for (ignored when the seats do not rise). `expected` is the status the answer must have; null asserts none.
+   */
+  changeSeats = async (
+    id: string,
+    body: object,
+    expected: number | null = 200,
+    account: ApiAccount = this.it1,
+  ): Promise<request.Response> => {
+    const response = await this.patch(
+      id,
+      {
+        expectedUpdatedAt: await this.subscriptionVersionOf(id, account),
+        quantityChangeReason: 'More seats needed',
+        ...body,
+      },
+      account,
+    );
+    if (expected !== null && response.status !== expected) {
+      throw new Error(`changeSeats: expected ${expected}, got ${response.status} ${JSON.stringify(response.body)}`);
+    }
+
+    return response;
+  };
+
   complete = (id: string, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/subscriptions/${id}/completions`).set(this.as(account));
 

@@ -44,8 +44,67 @@ export function renderEmail(
   }
 }
 
-function expiry(payload: Record<string, unknown>): string {
-  return typeof payload.expiresAt === 'string' ? payload.expiresAt : '';
+/** The zone a mail written before the payload carried one is read in: the one of the installation, as the organization defaults to. */
+const DEFAULT_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
+function timePartsIn(date: Date, timeZone: string): Map<string, string> {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+
+  return new Map(parts.map((part) => [part.type, part.value]));
+}
+
+/**
+ * The offset of the zone at that instant, written `GMT`, `GMT+7`, `GMT+5:30` or `GMT-3`. It is computed from the clock the zone shows, not read from the
+ * name the ICU data of the runtime gives it (`GMT` on one Node version, `GMT+0` on another), so the same mail reads the same everywhere.
+ */
+function offsetLabel(date: Date, parts: Map<string, string>): string {
+  const shown = Date.UTC(
+    Number(parts.get('year')),
+    Number(parts.get('month')) - 1,
+    Number(parts.get('day')),
+    Number(parts.get('hour')),
+    Number(parts.get('minute')),
+  );
+  const minuteOfInstant = Math.floor(date.getTime() / 60_000) * 60_000;
+  const minutes = Math.round((shown - minuteOfInstant) / 60_000);
+  if (minutes === 0) return 'GMT';
+  const sign = minutes < 0 ? '-' : '+';
+  const hours = Math.floor(Math.abs(minutes) / 60);
+  const rest = Math.abs(minutes) % 60;
+
+  return `GMT${sign}${hours}${rest === 0 ? '' : `:${String(rest).padStart(2, '0')}`}`;
+}
+
+/**
+ * An instant of the payload (ISO, as the writer of the mail records it) as `dd/MM/yyyy HH:mm` in the time zone of the organization the payload names, so a
+ * person reads their own clock; the English text adds the offset, for example `(GMT+7)`. What is not an instant is left as it is, and a zone that does not exist
+ * gives way to the default one.
+ */
+function localTime(value: unknown, timeZone: unknown, english: boolean): string {
+  if (typeof value !== 'string' || value === '') return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  let parts: Map<string, string>;
+  try {
+    parts = timePartsIn(date, typeof timeZone === 'string' && timeZone !== '' ? timeZone : DEFAULT_TIME_ZONE);
+  } catch {
+    parts = timePartsIn(date, DEFAULT_TIME_ZONE);
+  }
+  const text = `${parts.get('day')}/${parts.get('month')}/${parts.get('year')} ${parts.get('hour')}:${parts.get('minute')}`;
+
+  return english ? `${text} (${offsetLabel(date, parts)})` : text;
+}
+
+function expiry(payload: Record<string, unknown>, english: boolean): string {
+  return localTime(payload.expiresAt, payload.timeZone, english);
 }
 
 function renderInvitation(
@@ -55,7 +114,7 @@ function renderInvitation(
   appPublicUrl: string,
 ): RenderedEmail {
   const link = activationLink(appPublicUrl, String(payload.token));
-  const expiresAt = expiry(payload);
+  const expiresAt = expiry(payload, english);
 
   if (english) {
     return {
@@ -83,7 +142,7 @@ function renderPasswordReset(
   appPublicUrl: string,
 ): RenderedEmail {
   const link = passwordResetLink(appPublicUrl, String(payload.token));
-  const expiresAt = expiry(payload);
+  const expiresAt = expiry(payload, english);
 
   if (english) {
     return {
@@ -110,7 +169,7 @@ function renderPasswordChangedNotice(
   greeting: string,
   payload: Record<string, unknown>,
 ): RenderedEmail {
-  const at = typeof payload.at === 'string' ? payload.at : '';
+  const at = localTime(payload.at, payload.timeZone, english);
   const wasReset = payload.event === 'PASSWORD_RESET';
 
   if (english) {
@@ -141,7 +200,7 @@ function renderLoginEmailChangedNotice(
   greeting: string,
   payload: Record<string, unknown>,
 ): RenderedEmail {
-  const at = typeof payload.at === 'string' ? payload.at : '';
+  const at = localTime(payload.at, payload.timeZone, english);
   const previous = typeof payload.previousEmail === 'string' ? payload.previousEmail : '';
   const current = typeof payload.currentEmail === 'string' ? payload.currentEmail : '';
   const toPrevious = payload.audience === 'PREVIOUS';

@@ -28,7 +28,7 @@ const PROGRESS = progressOf({
       itHandoverPending: 1,
       mailboxLockPending: 2,
     },
-    transfers: { inGrace: 5, graceEndingSoon: 2, revoking: 1 },
+    transfers: { inGrace: 5, graceEndingSoon: 2, revoking: 1, revocationFailed: 0 },
   },
   seats: { returned: 6, reused: 3 },
   plansBelowMinimum: 2,

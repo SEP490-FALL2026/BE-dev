@@ -354,5 +354,16 @@ describe('RequestFactsService.assess', () => {
       // A new request for the same plan is not a renewal: a staff member sends it with no months.
       expect((await service.assess(tx, input({ termMonths: null }))).termRefusal).toBeNull();
     });
+
+    it('forwards tx to licensing.getSeatsHeldInPlans', async () => {
+      given(COST_CENTER, 'INTERNAL');
+      catalog.findPlanSeatTargets.mockResolvedValue([
+        { planId: 'p-1', applicationKind: 'INTERNAL', applicationStatus: 'ACTIVE', provisioningType: 'K1' },
+      ]);
+
+      await service.assess(tx, input({ termMonths: 3 }));
+
+      expect(licensing.getSeatsHeldInPlans).toHaveBeenCalledWith('e-1', ['p-1'], { skip: 0, take: 1 }, tx);
+    });
   });
 });

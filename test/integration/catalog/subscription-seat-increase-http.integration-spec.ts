@@ -50,7 +50,7 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
     const subscriptionId = await h.subscription(10, 'K2');
     await answerFor(subscriptionId, it2);
 
-    await patch(h.it1, subscriptionId, { purchasedQuantity: 14 }).expect(200);
+    await h.changeSeats(subscriptionId, { purchasedQuantity: 14 });
 
     const notices = await noticesOf(subscriptionId);
     expect(notices).toHaveLength(1);
@@ -67,7 +67,7 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
   it('tells nobody when the IT Admin who answers for the pool raised it themselves', async () => {
     const subscriptionId = await h.subscription(10, 'K2');
 
-    await patch(h.it1, subscriptionId, { purchasedQuantity: 12 }).expect(200);
+    await h.changeSeats(subscriptionId, { purchasedQuantity: 12 });
 
     expect(await noticesOf(subscriptionId)).toEqual([]);
   });
@@ -76,8 +76,8 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
     const subscriptionId = await h.subscription(10, 'K2');
     await answerFor(subscriptionId, it2);
 
-    await patch(h.it1, subscriptionId, { purchasedQuantity: 8 }).expect(200);
-    await patch(h.it1, subscriptionId, { purchasedQuantity: 8 }).expect(200);
+    await h.changeSeats(subscriptionId, { purchasedQuantity: 8 });
+    await h.changeSeats(subscriptionId, { purchasedQuantity: 8 });
     await patch(h.it1, subscriptionId, { autoRenew: true }).expect(200);
 
     expect(await noticesOf(subscriptionId)).toEqual([]);
@@ -87,7 +87,7 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
     const subscriptionId = await h.subscription(3, 'K4');
     await answerFor(subscriptionId, it3);
 
-    await patch(h.it1, subscriptionId, { purchasedQuantity: 5 }).expect(200);
+    await h.changeSeats(subscriptionId, { purchasedQuantity: 5 });
 
     const notices = await noticesOf(subscriptionId);
     expect(notices.map((notice) => notice.recipient_employee_id)).toEqual([it3.employeeId]);
@@ -98,7 +98,7 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
     const subscriptionId = await h.draftSubscription('K2');
     await answerFor(subscriptionId, it2);
 
-    await patch(h.it1, subscriptionId, { purchasedQuantity: 25 }).expect(200);
+    await h.changeSeats(subscriptionId, { purchasedQuantity: 25 });
 
     expect(await noticesOf(subscriptionId)).toEqual([]);
   });
@@ -107,7 +107,7 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
     const subscriptionId = await h.subscription(5, 'K1');
     await answerFor(subscriptionId, it2);
 
-    await patch(h.it1, subscriptionId, { purchasedQuantity: 9 }).expect(200);
+    await h.changeSeats(subscriptionId, { purchasedQuantity: 9 });
 
     expect(await noticesOf(subscriptionId)).toEqual([]);
   });
@@ -118,7 +118,7 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
     await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [it2.employeeId]);
     await answerFor(subscriptionId, it2);
 
-    await patch(h.it1, subscriptionId, { purchasedQuantity: 11 }).expect(200);
+    await h.changeSeats(subscriptionId, { purchasedQuantity: 11 });
 
     const told = (await noticesOf(subscriptionId)).map((notice) => notice.recipient_employee_id);
     expect(told).toEqual([it3.employeeId]);
@@ -144,19 +144,29 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
       const id = await h.subscription(4, 'K2');
       const seen = await read(id);
 
-      const first = await patch(id, { purchasedQuantity: 6, expectedUpdatedAt: seen }).expect(200);
-      const second = await patch(id, { purchasedQuantity: 5, expectedUpdatedAt: seen }).expect(409);
+      const first = await patch(id, {
+        purchasedQuantity: 6,
+        expectedUpdatedAt: seen,
+        quantityChangeReason: 'More seats',
+      }).expect(200);
+      const second = await patch(id, {
+        purchasedQuantity: 5,
+        expectedUpdatedAt: seen,
+        quantityChangeReason: 'More seats',
+      }).expect(409);
 
       expect(h.codeOf(second)).toBe('SUBSCRIPTION.STALE');
       expect(h.detailsOf(second)).toMatchObject({ currentUpdatedAt: h.dataOf<{ updatedAt: string }>(first).updatedAt });
       expect(await quantityOf(id)).toBe(6);
     });
 
-    it('changes without the check when expectedUpdatedAt is left out', async () => {
+    it('refuses a change of the seats sent with no version of a read: 422 SUBSCRIPTION.VERSION_REQUIRED, nothing written', async () => {
       const id = await h.subscription(4, 'K2');
 
-      await patch(id, { purchasedQuantity: 6 }).expect(200);
-      await patch(id, { purchasedQuantity: 5 }).expect(200);
+      const refused = await patch(id, { purchasedQuantity: 6, quantityChangeReason: 'More seats' }).expect(422);
+
+      expect(h.codeOf(refused)).toBe('SUBSCRIPTION.VERSION_REQUIRED');
+      expect(await quantityOf(id)).toBe(4);
     });
 
     it.each(['K2', 'K1'] as const)(
@@ -173,7 +183,11 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
         });
         expect(await quantityOf(id)).toBe(5);
 
-        const refused = await patch(id, { purchasedQuantity: 9, expectedUpdatedAt: seen }).expect(409);
+        const refused = await patch(id, {
+          purchasedQuantity: 9,
+          expectedUpdatedAt: seen,
+          quantityChangeReason: 'More seats',
+        }).expect(409);
         expect(h.codeOf(refused)).toBe('SUBSCRIPTION.STALE');
         expect(await quantityOf(id)).toBe(5);
       },

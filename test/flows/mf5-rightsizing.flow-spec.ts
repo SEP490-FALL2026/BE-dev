@@ -156,11 +156,10 @@ describe('F5-02 thu hồi ghế rảnh rồi IT ghi kết quả điều chỉnh 
     expect(await revocationTasksOf('NV-DES1')).toEqual([{ id: reclaimedSeat, status: 'COMPLETED' }]);
   });
 
-  it('IT Admin khác người phụ trách ghi kết quả một lần với số hệ thống tính: ca ghi đủ, không ai đề xuất, không ai xác nhận #9 @B5', async () => {
+  it('chỉ IT Admin phụ trách (NV-ITA2) ghi kết quả một lần với số hệ thống tính; IT Admin khác (NV-ITA1) bị 403 #9 @B5', async () => {
     const seen = await adjustment();
     const commitments = await world.facts.count('budget_commitments');
-
-    const recorded = await call().post('NV-ITA1', '/subscription-renewals', {
+    const body = {
       subscriptionId,
       choice: 'REDUCE',
       proposedQuantity: seen.target,
@@ -176,7 +175,12 @@ describe('F5-02 thu hồi ghế rảnh rồi IT ghi kết quả điều chỉnh 
         autoRenew: true,
         allowsMidTermReduction: false,
       },
-    });
+    };
+
+    const refused = await call().post('NV-ITA1', '/subscription-renewals', body);
+    expect([refused.status, call().codeOf(refused)]).toEqual([403, 'SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE']);
+
+    const recorded = await call().post('NV-ITA2', '/subscription-renewals', body);
 
     expect(recorded.status).toBe(201);
     const renewal = call().data<{

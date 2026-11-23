@@ -52,8 +52,8 @@ export class DecisionReclaimService {
   }
 
   /** The grace in calendar days (`QĐ-94j`). */
-  async graceDays(): Promise<number> {
-    return Number(await this.parameters.getValue(GRACE_DAYS_PARAMETER));
+  async graceDays(tx?: DbTx): Promise<number> {
+    return Number(await this.parameters.getValue(GRACE_DAYS_PARAMETER, tx));
   }
 
   /** Opens the revocation of the seat with the decision of the head; returns the task and the first day it can be taken. */

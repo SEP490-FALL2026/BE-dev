@@ -318,7 +318,7 @@ describe('the IT Admin a new subscription answers to when the declaration names 
 });
 
 describe('the vendor admins of a plan that needs them (QĐ-110k, QĐ-110u, R-53)', () => {
-  describe('assertVendorAdminsRecorded: a plan that needs admins is not activated without two different ones recorded', () => {
+  describe('assertVendorAdminsRecorded: a plan that needs admins is not activated without two working IT Admins', () => {
     it.each([[0], [1]])('refuses a plan that needs them with %i recorded', (given) => {
       expect(() => assertVendorAdminsRecorded({ needs: true, given, planId: 'p-1' })).toThrow(
         SubscriptionVendorAdminsRequiredError,

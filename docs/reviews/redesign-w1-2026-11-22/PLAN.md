@@ -3,6 +3,7 @@
 Spec: [SPEC.md](SPEC.md). Trạng thái: Proposed. Câu hỏi Owner đã chốt (W1-Q1 → W1-Q6, [SPEC mục 9](SPEC.md#9-đã-chốt)); bản sửa theo `REVIEW-FABLE.md` chờ Owner duyệt trước khi giao Sonnet.
 
 - **Hai làn, hai nhánh** (quy trình: [`docs/guides/quy-trinh-code-ai.md`](../../guides/quy-trinh-code-ai.md)):
+  - **Cập nhật đổi làn (Owner 23/11):** làn `biz` nhận thêm P2, P3 trực tiếp trên `int/redesign-w1` (làm tuần tự P2 → P3 → P9 → P10 → P15a → P15b → P18); làn `tech` còn 5 gói P4, P5, P6, P12, P16.
   - **Làn `tech` (Bảo)** — nhánh `fix/redesign-w1-tech`: P2 → P3 → P4 → P5 → P6 → P12 → P16.
   - **Làn `biz` (Owner)** — nhánh `fix/redesign-w1-biz`: **phần A** P1 → P11 → P7 → P8 → P13a → P13b → P14 → P17a → P17b; **phần B** (chỉ sau khi Owner đã merge làn `tech` vào nhánh gộp `int/redesign-w1` và làn `biz` đã `git merge origin/int/redesign-w1`) P9 → P10 → P15a → P15b; cuối cùng P18.
   - Hai nhánh tách từ `origin/dev` mới nhất (đã chứa thư mục này). Mỗi làn một chat Sonnet/Gemini (subagent code dùng model **sonnet**), làm **tuần tự** từng gói của làn mình, không song song, không worktree.

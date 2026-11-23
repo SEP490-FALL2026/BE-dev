@@ -12,6 +12,10 @@ const ANSWERS: Readonly<Record<RenewalProblem, { status: HttpStatus; message: st
     status: HttpStatus.FORBIDDEN,
     message: 'Only the IT Admin and Finance read the renewals.',
   },
+  NOT_RESPONSIBLE: {
+    status: HttpStatus.FORBIDDEN,
+    message: 'Only the IT Admin responsible for the subscription records its renewal.',
+  },
   NOT_RENEWABLE: {
     status: HttpStatus.CONFLICT,
     message:
@@ -101,6 +105,7 @@ const renewal = (problem: RenewalProblem, details?: Record<string, string | numb
 export const RENEWAL_ERROR_EXAMPLES = {
   NOT_FOUND: renewal('NOT_FOUND'),
   READ_FORBIDDEN: renewal('READ_FORBIDDEN'),
+  NOT_RESPONSIBLE: renewal('NOT_RESPONSIBLE'),
   NOT_RENEWABLE: renewal('NOT_RENEWABLE', { reason: 'ALREADY_CONTINUED' }),
   CONTRACT_DATA_INCOMPLETE: renewal('CONTRACT_DATA_INCOMPLETE'),
   ALREADY_PROPOSED: renewal('ALREADY_PROPOSED', { renewalId: '<renewal-id>' }),

@@ -23,6 +23,7 @@ interface FlaggedEvent {
   actor_kind: string;
 }
 interface NoticeWire {
+  offboardingCaseId: string;
   lastWorkingDay: string;
   state: string;
   level: string;
@@ -224,9 +225,10 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       await request(h.server()).get('/api/v1/me/departure-notice').expect(401);
       const department = await h.departmentWithUnit('P-RDN');
       const person = await h.worker(department, code());
-      await h.recordedCase(person);
+      const createdCase = await h.recordedCase(person);
 
       expect(h.dataOf<NoticeWire>(await notice(person.account).expect(200))).toMatchObject({
+        offboardingCaseId: createdCase.id,
         state: 'HANDING_OVER',
         level: 'LEAVING',
       });
@@ -460,7 +462,12 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
         holder: { workState: 'HANDING_OVER', lastWorkingDay: h.day(10) },
       });
       const mine = h.dataOf<NoticeWire>(await notice(superAdmin()).expect(200));
-      expect(mine).toMatchObject({ lastWorkingDay: h.day(10), state: 'HANDING_OVER', level: 'LEAVING' });
+      expect(mine).toMatchObject({
+        offboardingCaseId: wire.id,
+        lastWorkingDay: h.day(10),
+        state: 'HANDING_OVER',
+        level: 'LEAVING',
+      });
       expect(mine.roleFlags.SUPER_ADMIN_HOLDER).toBe(true);
       const listed = h.dataOf<{ items: FlaggedCase[] }>(
         await h.listCases('?roleFlag=SUPER_ADMIN_HOLDER&state=HANDING_OVER').expect(200),

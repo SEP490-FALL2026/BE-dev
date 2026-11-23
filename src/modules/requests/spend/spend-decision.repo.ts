@@ -100,6 +100,25 @@ export class SpendDecisionRepo {
     });
   }
 
+  /**
+   * What this person decided on the newest spend step of the request (approved, refused or sent back), read from the record of approval of that step; null when the
+   * newest step has no record or the record is somebody else's. A batch sent again asks it for a request that has no open step any more.
+   */
+  async decisionOfLatestStep(
+    requestId: string,
+    employeeId: string,
+    tx?: DbTx,
+  ): Promise<'APPROVED' | 'REJECTED' | 'RETURNED' | null> {
+    const step = await (tx ?? this.prisma).accessRequestStep.findFirst({
+      where: { requestId, kind: 'SPEND_APPROVAL' },
+      orderBy: { sequence: 'desc' },
+      select: { approvalRecord: { select: { decision: true, decidedByEmployeeId: true } } },
+    });
+    const record = step?.approvalRecord;
+
+    return record && record.decidedByEmployeeId === employeeId ? record.decision : null;
+  }
+
   /** What the approver decided, the newest if the request was decided more than once. */
   async latest(requestId: string, tx?: DbTx): Promise<(SpendDecisionRecord & { reason: string | null }) | null> {
     const db = tx ?? this.prisma;

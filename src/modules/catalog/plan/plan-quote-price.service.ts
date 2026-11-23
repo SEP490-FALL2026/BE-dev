@@ -28,7 +28,7 @@ export class PlanQuotePriceService {
     if (price.currency !== DONG || price.amountMinor <= 0n) return false;
     const current = await this.plans.lock(tx, planId);
     if (!current || !canAdoptQuotePrice(current.provisioningType, current.referencePrice)) return false;
-    const organization = await this.organizationReads.getOrganization();
+    const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('The plans were used before installation');
 
     const updated = await this.plans.update(tx, planId, { referencePrice: price });

@@ -202,6 +202,7 @@ async function workspaceProfiles(ctx: DemoRunContext): Promise<StepOutcome> {
 interface SubscriptionRow {
   id: string;
   status: string;
+  updatedAt: string;
 }
 
 /** Seats the baseline files put in the subscription, counted from the fixture. */
@@ -337,7 +338,10 @@ async function oneSubscription(ctx: DemoRunContext, admin: string, subscription:
   if (found.status === 'ACTIVE') return { status: created ? 'done' : 'present', label };
   if (ctx.mode === 'plan') return { status: 'planned', label: `${label} (hoàn tất bản nháp)` };
   // A draft an earlier run left is brought to the fixture's terms before it is completed.
-  await ctx.api.call(admin, 'PATCH', `/subscriptions/${found.id}`, subscriptionTerms(ctx, subscription));
+  await ctx.api.call(admin, 'PATCH', `/subscriptions/${found.id}`, {
+    ...subscriptionTerms(ctx, subscription),
+    expectedUpdatedAt: found.updatedAt,
+  });
   await ctx.api.call(admin, 'POST', `/subscriptions/${found.id}/completions`);
 
   return { status: 'done', label };

@@ -21,6 +21,7 @@ export interface DashboardProgress {
     inGrace: DashboardSection;
     graceEndingSoon: DashboardSection;
     revoking: DashboardSection;
+    revocationFailed: DashboardSection;
   };
   seatsReturned: {
     thisMonth: DashboardSection;
@@ -61,6 +62,7 @@ export function progressOf(facts: ProgressFacts): DashboardProgress {
       inGrace: counted(transfers.inGrace, null),
       graceEndingSoon: counted(transfers.graceEndingSoon, null),
       revoking: counted(transfers.revoking, null),
+      revocationFailed: counted(transfers.revocationFailed, null),
     },
     seatsReturned: {
       thisMonth: counted(facts.seats.returned, null),

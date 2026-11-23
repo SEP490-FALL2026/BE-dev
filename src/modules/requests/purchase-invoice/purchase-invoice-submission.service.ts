@@ -50,7 +50,7 @@ export class PurchaseInvoiceSubmissionService {
       const old = await this.invoices.lock(tx, id);
       if (!old || old.submittedByEmployeeId !== actor.employeeId) throw new PurchaseInvoiceRefusedError('NOT_FOUND');
       if (old.state !== 'RETURNED') throw new PurchaseInvoiceRefusedError('NOT_RETURNED');
-      if ((await this.invoices.resubmittedAs([old.id])).has(old.id)) {
+      if ((await this.invoices.resubmittedAs([old.id], tx)).has(old.id)) {
         throw new PurchaseInvoiceRefusedError('ALREADY_RESUBMITTED');
       }
       const link =

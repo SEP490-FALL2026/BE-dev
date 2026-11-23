@@ -209,7 +209,7 @@ export class SaasIssueService {
   private async assigneeFor(tx: DbTx, reporterEmployeeId: string, today: string) {
     const inCharge =
       (await this.organizationReads.getItAdminInCharge(reporterEmployeeId, today, tx))?.itAdminEmployeeId ?? null;
-    const usable = inCharge ? (await this.identity.findUsableItAdminEmployeeIds([inCharge])).has(inCharge) : false;
+    const usable = inCharge ? (await this.identity.findUsableItAdminEmployeeIds([inCharge], tx)).has(inCharge) : false;
 
     return assigneeOf({
       inChargeEmployeeId: inCharge,

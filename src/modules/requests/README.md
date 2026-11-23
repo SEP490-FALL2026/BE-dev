@@ -158,7 +158,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     của chi tiết và hàng đợi — ngân sách năm sau đã duyệt trừ số năm sau đã lưu của Request đã duyệt chi, cảnh báo mềm `QĐ-111al`, chỉ người giữ bước duyệt chi đọc, S-3).
     Các route duyệt chi (`spendApprovalDecide`, `spendApprovalLineDecide`) trả 409 `BUDGET.COMMITMENT_NOT_HOLDABLE` hoặc `BUDGET.COMMITMENT_EXISTS` khi không giữ được khoản
     cam kết của quyết định (lưới an toàn sau lần kiểm ngân sách; chưa quyết gì, `spend/spend.http-errors.ts`); `spendBatchDecide` không ném mà bỏ qua mục đó với lý
-    do `COMMITMENT_NOT_HOLDABLE` và đi tiếp các mục khác.
+    do `COMMITMENT_NOT_HOLDABLE` và đi tiếp các mục khác. Lỗi tạm thời của cơ sở dữ liệu (`TransientDatabaseError`) ở một mục, kể cả khi trả cả nhóm, trả `outcome: RETRYABLE` (lý do `TRANSIENT_FAILURE`): chỉ mục đó gửi lại. Gửi lại cả lô thì mục mà bước chi gần nhất đã được chính người gọi quyết cùng quyết định trả đúng kết quả đó kèm lý do `ALREADY_DECIDED`, không ghi thêm; quyết định khác vẫn `SKIPPED` `NO_SPEND_STEP`.
 - **Request cá nhân**
   - `request-submission/` — controller `access-requests.controller.ts` (gửi, xem, đọc: US-05-01 → US-05-03) và xem trước
     (`RequestPreviewService`). Hai route của bước nhu cầu nằm ở `need-decision/` (`need-decision.controller.ts`,
@@ -330,6 +330,13 @@ thay đổi). Trưởng phòng mới bắt đầu (`HEAD_PERIOD_START`) nhận m
 `OneStepConversionService` chỉ còn hoàn tất trong sweep (mỗi Request một transaction, dùng lại kiểm ngân sách chuẩn) những Request mà luật cũ đã
 đánh dấu `ONE_STEP`/`HEAD_LEFT` trước đó. `requests-routing-facade.module.ts` ghép cổng hàm định tuyến/kiểm cho API và worker. Dữ liệu lịch sử giữ
 cột/enum cũ, ngừng ghi hành vi cũ.
+
+Người xin **vừa thành** trưởng phòng (`REQUESTER_IS_HEAD`): Request cá nhân (không phải nhóm) đi một bước ở bốn thời điểm, và cả bốn qua một chỗ,
+`step-routing/requester-head-conversion.service.ts` (đánh dấu `ONE_STEP`, một dạng audit `ACCESS_REQUEST.STEP_NOT_REQUIRED` có `requesterBecameHead`, mỗi
+thời điểm một `trigger`): (a) listener `HEAD_PERIOD_START` khóa cả hàng đợi trình của phòng (`AWAITING_SPEND_SUBMISSION`) cùng bước nhu cầu và sweep xét lại
+hằng ngày (`StepRedeterminationSweepApi.sweep`) quét thêm hàng đợi trình đó; (b) hoàn tất đánh giá IT của đề xuất phần mềm mới (`enterAfterAssessment`);
+(c) gửi lại sau khi bị trả về (audit thêm `ACCESS_REQUEST.RESUBMITTED` có `oneStep`); (d) kết thúc bước nhu cầu khi bảng định tuyến nói không ai cần quyết.
+Mỗi thời điểm tự hoàn tất theo cách riêng (mở bước chi, `route`, `start`). Request nhóm trả phí giữ nguyên; nhóm nội bộ miễn phí kết thúc bước nhu cầu như trước.
 
 Tìm định tuyến: `access-request/routing.policy.ts`; gửi lại: `request-intake/request-resubmission.service.ts`; khi mất trưởng phòng:
 `reassignment/organization-change.listener.ts`; hiển thị kết quả: `spend/spend-status.service.ts`.

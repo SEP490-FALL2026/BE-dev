@@ -14,8 +14,10 @@ import {
 import { sameState, snapshotOf, stateOf } from './subscription.mapper';
 import {
   assertSubscriptionShape,
+  assertVersionForQuantityChange,
   deriveNotice,
   isStaleEdit,
+  judgeQuantityChange,
   missingDataOf,
   nextStateOf,
   noticeInputOf,
@@ -38,7 +40,7 @@ import type { UpdateSubscriptionInput } from './subscription.service';
 /**
  * A change of a subscription (`US-04-03`): a new unit price is entered in dong and recorded with today as its day and the snapshot of the
  * same currency (`QĐ-111an`); the original price a vendor quoted is only kept; the other fields are stored as they are; the owner department is not a field of a change. A write is one transaction under the locks of
- * the subscription and its plan.
+ * the subscription and its plan (see the standard lock order in `docs/rules/database-business.md`: subscription before plan).
  */
 @Injectable()
 export class SubscriptionChangeService {
@@ -64,7 +66,10 @@ export class SubscriptionChangeService {
     input: UpdateSubscriptionInput,
     expectedUpdatedAt?: Date,
   ): Promise<SubscriptionView> {
-    if (Object.values(input).every((value) => value === undefined)) throw new SubscriptionUpdateEmptyError();
+    if (Object.entries(input).every(([key, value]) => key === 'quantityChangeReason' || value === undefined)) {
+      throw new SubscriptionUpdateEmptyError();
+    }
+    assertVersionForQuantityChange(input.purchasedQuantity, expectedUpdatedAt);
     assertDeclarableCycle(input.billingCycle);
     const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
     const originalPrice = input.originalPrice
@@ -94,12 +99,15 @@ export class SubscriptionChangeService {
     },
   ): Promise<SubscriptionRecord> {
     const { input, money, originalPrice, organizationId, expectedUpdatedAt } = change;
-    const current = await this.lockFresh(tx, id, expectedUpdatedAt);
-    // The plan is locked for writing when this subscription is to price it: the subscriptions of one plan take turns (Q-04).
+    const current = input.isPrimaryForPlan
+      ? await this.lockForPrimaryChange(tx, id, expectedUpdatedAt)
+      : await this.lockFresh(tx, id, expectedUpdatedAt);
+    // The plan is locked for writing when this subscription is to price it: the subscriptions of one plan take turns.
     const plan = input.isPrimaryForPlan
       ? await this.plans.lockExclusive(tx, current.planId)
       : await this.plans.lockShared(tx, current.planId);
     if (!plan) throw new SubscriptionPlanNotFoundError();
+    const quantityChangeReason = this.quantityReasonOf(current, input);
     await this.guard.assertNotBelowOccupied(tx, id, current.purchasedQuantity, input.purchasedQuantity);
 
     const next = nextStateOf(current, input);
@@ -124,7 +132,7 @@ export class SubscriptionChangeService {
     if (sameState(state, stateOf(current))) return current;
 
     const updated = await this.subscriptions.update(tx, id, state);
-    await this.auditChange(tx, actor, { current, updated, organizationId });
+    await this.auditChange(tx, actor, { current, updated, organizationId, quantityChangeReason });
     // A rise of the seats of a K2 or K4 pool is told to the IT Admin who answers for it, whoever changed the number (`QĐ-110v`, SPEC P24).
     await this.guard.tellSeatIncrease(tx, {
       organizationId,
@@ -141,9 +149,41 @@ export class SubscriptionChangeService {
     return updated;
   }
 
+  private quantityReasonOf(current: SubscriptionRecord, input: UpdateSubscriptionInput): string | undefined {
+    return judgeQuantityChange({
+      status: current.status,
+      planProvisioningType: current.planProvisioningType,
+      currentQuantity: current.purchasedQuantity,
+      requestedQuantity: input.purchasedQuantity,
+      commitmentTermMonths: current.commitmentTermMonths,
+      allowsMidTermReduction: current.allowsMidTermReduction,
+      quantityChangeReason: input.quantityChangeReason,
+    });
+  }
+
   /** The subscription, locked, when it is still the one the client read (`expectedUpdatedAt`); else SubscriptionNotFoundError or SubscriptionStaleError. */
   private async lockFresh(tx: DbTx, id: string, expectedUpdatedAt?: Date): Promise<SubscriptionRecord> {
     const current = await this.subscriptions.lock(tx, id);
+    if (!current) throw new SubscriptionNotFoundError();
+    if (isStaleEdit(expectedUpdatedAt, current.updatedAt)) throw new SubscriptionStaleError(current.updatedAt);
+
+    return current;
+  }
+
+  /**
+   * Locks every current primary subscription of the plan together with `id` in id order before locking the plan exclusively,
+   * then re-reads and checks optimistic concurrency.
+   *
+   * A known narrow window: when the plan has no primary at the moment of this read, the set locked is only `id`; a renewal completed by another transaction can
+   * make another subscription the primary of the plan and commit before this one locks the plan, and the flag taken off it afterwards is written on a row this
+   * transaction did not lock. It needs a second transaction that gives a seat on that very subscription at that very moment, the write is one flag of a row
+   * whose owner is waiting for the plan, and closing it needs the set of primaries read again after the plan is locked (a change of behaviour, so left to its own item).
+   */
+  private async lockForPrimaryChange(tx: DbTx, id: string, expectedUpdatedAt?: Date): Promise<SubscriptionRecord> {
+    const probe = await this.subscriptions.find(id, tx);
+    if (!probe) throw new SubscriptionNotFoundError();
+    await this.subscriptions.lockPrimaryCandidates(tx, probe.planId, [id]);
+    const current = await this.subscriptions.find(id, tx);
     if (!current) throw new SubscriptionNotFoundError();
     if (isStaleEdit(expectedUpdatedAt, current.updatedAt)) throw new SubscriptionStaleError(current.updatedAt);
 
@@ -171,9 +211,15 @@ export class SubscriptionChangeService {
   private async auditChange(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    changed: { current: SubscriptionRecord; updated: SubscriptionRecord; organizationId: string },
+    changed: {
+      current: SubscriptionRecord;
+      updated: SubscriptionRecord;
+      organizationId: string;
+      quantityChangeReason?: string;
+    },
   ): Promise<void> {
-    const { current, updated, organizationId } = changed;
+    const { current, updated, organizationId, quantityChangeReason } = changed;
+    const after = quantityChangeReason ? { ...snapshotOf(updated), quantityChangeReason } : snapshotOf(updated);
     await this.audit.record(
       tx,
       catalogAuditEvent(
@@ -183,7 +229,7 @@ export class SubscriptionChangeService {
         'Subscription',
         current.id,
         snapshotOf(current),
-        snapshotOf(updated),
+        after,
       ),
     );
     const before = deriveNotice(noticeInputOf(current));

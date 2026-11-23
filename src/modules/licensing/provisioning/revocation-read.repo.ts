@@ -260,4 +260,58 @@ export class RevocationReadRepo {
         : [],
     );
   }
+
+  /**
+   * Finds the latest closed-failed revocation task of an assignment that carries an active reason
+   * matching the given source and reference, or null when none exists.
+   */
+  async findClosedFailedRevocationFor(
+    tx: DbTx,
+    assignmentId: string,
+    source: RevocationSource,
+    referenceId: string | null,
+  ): Promise<{ id: string } | null> {
+    const row = await tx.provisioningTask.findFirst({
+      where: {
+        assignmentId,
+        kind: 'REVOKE',
+        status: 'CLOSED_FAILED',
+        reasons: { some: { source, referenceId, withdrawnAt: null } },
+      },
+      select: { id: true },
+      orderBy: [{ closedAt: 'desc' }, { id: 'desc' }],
+    });
+
+    return row ? { id: row.id } : null;
+  }
+
+  /**
+   * Returns the subset of transfer IDs that have at least one open assignment with a closed-failed
+   * transfer revocation task and no live revocation task for that assignment. One SQL statement.
+   */
+  async listTransferIdsWithFailedRevocation(transferIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    if (transferIds.length === 0) return new Set();
+    const rows = await (tx ?? this.prisma).$queryRaw<{ transfer_id: string }[]>`
+      SELECT DISTINCT r.reference_id::text AS transfer_id
+        FROM provisioning_task_reasons r
+        JOIN provisioning_tasks t ON t.id = r.task_id
+        JOIN license_assignments a ON a.id = t.assignment_id
+       WHERE r.source = 'TRANSFER'
+         AND r.reference_id = ANY(${[...transferIds]}::uuid[])
+         AND r.withdrawn_at IS NULL
+         AND t.kind = 'REVOKE'
+         AND t.status = 'CLOSED_FAILED'
+         AND a.valid_until IS NULL
+         AND a.failed_at IS NULL
+         AND a.cancelled_at IS NULL
+         AND NOT EXISTS (
+           SELECT 1
+             FROM provisioning_tasks live
+            WHERE live.assignment_id = a.id
+              AND live.kind = 'REVOKE'
+              AND live.status NOT IN ('CLOSED_FAILED', 'CANCELLED')
+         )`;
+
+    return new Set(rows.map((row) => row.transfer_id));
+  }
 }

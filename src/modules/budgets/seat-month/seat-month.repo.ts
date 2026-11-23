@@ -116,6 +116,16 @@ export class SeatMonthRepo {
     return new Set(rows.map((row) => row.subscriptionId));
   }
 
+  /** Whether the subscription has its mark for the month: read under the lock of the month, it tells a pass that waited for the lock that another one charged it. */
+  async isCharged(tx: DbTx, subscriptionId: string, month: BusinessDate): Promise<boolean> {
+    const mark = await tx.seatMonthRun.findUnique({
+      where: { subscriptionId_month: { subscriptionId, month: toDateColumn(month) } },
+      select: { subscriptionId: true },
+    });
+
+    return mark !== null;
+  }
+
   /** Writes the mark that the subscription was charged for the month, or moves it when it is charged again; in the transaction of the charge. */
   async markCharged(
     tx: DbTx,

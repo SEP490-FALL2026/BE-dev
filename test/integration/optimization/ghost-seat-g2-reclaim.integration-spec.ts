@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import { addDays } from '../../../src/core/business-date';
 import type { ApiAccount } from '../../support/api-accounts';
+import { Barrier } from '../../support/concurrency-harness';
 import { GhostSeatWorld } from '../../support/ghost-seat-world';
 
 const w = new GhostSeatWorld();
@@ -239,7 +241,7 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
     expect(summary.limitation).toMatch(/chưa có nguồn usage/);
   });
 
-  it('KPI-5 (DA6-39): 10 made (2 of the watch tier), 2 KEPT, 1 NEGATED of the watch tier, 1 SUPERSEDED gives 3 of 8, 37.5 %; the IT Admin is refused', async () => {
+  it('KPI-5 (DA6-39): 10 made (2 of the watch tier), 2 KEPT, 1 NEGATED of the watch tier, 1 SUPERSEDED gives 2 of 7, 28.6 %; the IT Admin is refused', async () => {
     const subscription = await w.worldSubscription(10, 'K2');
     const seats: { assignmentId: string }[] = [];
     for (let index = 0; index < 10; index += 1) seats.push(await w.leaverSeat(subscription, `E-KPI-${index}`));
@@ -286,7 +288,7 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
       byGroup: Record<string, { denominator: number; numerator: number; confidenceLabel: string }>;
     };
 
-    expect(kpi).toMatchObject({ denominator: 8, numerator: 3, ratePercent: 37.5 });
+    expect(kpi).toMatchObject({ denominator: 7, numerator: 2, ratePercent: 28.6 });
     expect(kpi.byGroup.G3).toMatchObject({ denominator: 4, numerator: 2, confidenceLabel: 'INTERNAL_DATA' });
     expect(w.codeOf(await get('/api/v1/ghost-seat-kpi5', w.it1, { from, to }).expect(403))).toBe(
       'AUTHORIZATION.FORBIDDEN',
@@ -315,5 +317,98 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
     expect(w.codeOf(await get(`/api/v1/ghost-seat-rule-runs/${randomUUID()}/skips`).expect(404))).toBe(
       'GHOST_SEAT.NOT_FOUND',
     );
+  });
+
+  it('never deadlocks (0 x 40P01) across 20 concurrent crossed reclaim decision batches on [S1, S2] and [S2, S1] and preserves ids outcome order', async () => {
+    const dept = await w.headedDepartment('P-G2-RACE');
+    const sub1 = await w.worldSubscription(100, 'K2');
+    const sub2 = await w.worldSubscription(100, 'K2');
+
+    for (let i = 0; i < 20; i += 1) {
+      const e1a = await w.personIn(`E-G2R-1A-${i}`, dept.departmentId);
+      const e2a = await w.personIn(`E-G2R-2A-${i}`, dept.departmentId);
+      const e1b = await w.personIn(`E-G2R-1B-${i}`, dept.departmentId);
+      const e2b = await w.personIn(`E-G2R-2B-${i}`, dept.departmentId);
+      const a1a = await w.seatOf(e1a, sub1);
+      const a2a = await w.seatOf(e2a, sub2);
+      const a1b = await w.seatOf(e1b, sub1);
+      const a2b = await w.seatOf(e2b, sub2);
+
+      const rec1a = await w.seedRecommendation({
+        group: 'G4',
+        state: 'AWAITING_DECISION',
+        tier: 'REVIEW',
+        assignmentId: a1a,
+        deciderDepartmentId: dept.departmentId,
+        decisionDueOn: addDays(w.today(), 5),
+      });
+      const rec2a = await w.seedRecommendation({
+        group: 'G4',
+        state: 'AWAITING_DECISION',
+        tier: 'REVIEW',
+        assignmentId: a2a,
+        deciderDepartmentId: dept.departmentId,
+        decisionDueOn: addDays(w.today(), 5),
+      });
+      const rec1b = await w.seedRecommendation({
+        group: 'G4',
+        state: 'AWAITING_DECISION',
+        tier: 'REVIEW',
+        assignmentId: a1b,
+        deciderDepartmentId: dept.departmentId,
+        decisionDueOn: addDays(w.today(), 5),
+      });
+      const rec2b = await w.seedRecommendation({
+        group: 'G4',
+        state: 'AWAITING_DECISION',
+        tier: 'REVIEW',
+        assignmentId: a2b,
+        deciderDepartmentId: dept.departmentId,
+        decisionDueOn: addDays(w.today(), 5),
+      });
+
+      const batchAIds = [rec1a, rec2a];
+      const batchBIds = [rec2b, rec1b];
+      const barrier = new Barrier(2);
+      const callA = (async () => {
+        await barrier.wait();
+        return request(w.server())
+          .post('/api/v1/ghost-seat-decisions')
+          .set(w.as(dept.head))
+          .send(
+            w.checklists.withYes('5.4', {
+              items: batchAIds.map((recommendationId) => ({ recommendationId })),
+              choice: 'RECLAIM',
+              reason: 'Batch A',
+            }),
+          );
+      })();
+      const callB = (async () => {
+        await barrier.wait();
+        return request(w.server())
+          .post('/api/v1/ghost-seat-decisions')
+          .set(w.as(dept.head))
+          .send(
+            w.checklists.withYes('5.4', {
+              items: batchBIds.map((recommendationId) => ({ recommendationId })),
+              choice: 'RECLAIM',
+              reason: 'Batch B',
+            }),
+          );
+      })();
+
+      const [resA, resB] = await Promise.all([callA, callB]);
+      expect(resA.status).toBe(201);
+      expect(resB.status).toBe(201);
+      const itemsA = ((resA.body as { data: { items: { recommendationId: string }[] } }).data.items ?? []).map(
+        (x) => x.recommendationId,
+      );
+      const itemsB = ((resB.body as { data: { items: { recommendationId: string }[] } }).data.items ?? []).map(
+        (x) => x.recommendationId,
+      );
+      // Decided in the order of the locks, answered in the order the ids were sent.
+      expect(itemsA).toEqual(batchAIds);
+      expect(itemsB).toEqual(batchBIds);
+    }
   });
 });

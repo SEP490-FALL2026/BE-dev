@@ -18,4 +18,11 @@ describe('NOT_RENEWABLE message (F4)', () => {
 
     for (const reason of Object.keys(reasons)) expect(message).toContain(reason);
   });
+
+  it('maps NOT_RESPONSIBLE to 403 SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE', () => {
+    const exception = toRenewalApiException(new RenewalError('NOT_RESPONSIBLE')) as ApiException;
+
+    expect(exception.getStatus()).toBe(403);
+    expect(exception.getResponse()).toMatchObject({ code: 'SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE' });
+  });
 });

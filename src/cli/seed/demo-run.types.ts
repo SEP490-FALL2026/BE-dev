@@ -26,11 +26,13 @@ export interface StepOutcome {
   detail?: string;
 }
 
-/** The in-process part: the demo accounts and the employee lookup, through the installation module. */
+/** The in-process part: the demo accounts, employee lookup, and the lock of a budget cycle the versions of the dataset are sent to. */
 export interface DemoAccountsPort {
   findEmployees(codes: readonly string[]): Promise<Map<string, { id: string; status: string }>>;
   describe(specs: readonly DemoAccountSpec[]): Promise<DemoAccountPlanItem[]>;
   create(specs: readonly DemoAccountSpec[]): Promise<DemoAccountPlanItem[]>;
+  /** Moves the submission deadline of the cycle of `year` to a day that has passed and leaves it there. */
+  lockBudgetCycle(year: number, lockedDeadline: string): Promise<void>;
 }
 
 /** The ids the steps find or create, by the fixture's keys and codes. */

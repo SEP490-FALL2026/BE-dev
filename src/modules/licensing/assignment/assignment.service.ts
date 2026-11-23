@@ -133,13 +133,15 @@ export class AssignmentService {
     employeeId: string,
     planIds: readonly string[],
     page: { skip: number; take: number },
+    tx?: DbTx,
   ): Promise<{ items: AssignmentRecord[]; total: number }> {
     return this.repo.pageHeldOfPlans(
       employeeId,
       planIds,
-      await this.organizationReads.businessToday(),
+      await this.organizationReads.businessToday(new Date(), tx),
       page.skip,
       page.take,
+      tx,
     );
   }
 
@@ -320,6 +322,16 @@ export class AssignmentService {
     );
 
     return old.id;
+  }
+
+  /** Whether the old right is one a grant on this target would end if no revocation task stood in the way. */
+  async canEndReplacedByGrant(
+    tx: DbTx,
+    input: { employeeId: string; replacesAssignmentId: string; target: SeatTarget; today: BusinessDate },
+  ): Promise<boolean> {
+    const old = await this.repo.lock(tx, input.replacesAssignmentId);
+
+    return old !== null && replacedByGrant(old, { ...input, revocationUnderWay: false });
   }
 
   /** Which of these rights a later right replaced (R-49): the ones a grant ended the day it gave the person the same software again. */

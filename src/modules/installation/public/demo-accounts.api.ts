@@ -8,10 +8,12 @@ import {
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
+import type { BusinessDate } from '../../../core/business-date';
 import type { DatabaseEnvironmentVariables } from '../../../infrastructure/config/env-schema';
 import { HeldSessionLock, trySessionAdvisoryLock } from '../../../infrastructure/database/session-advisory-lock';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
+import { LocalDemoBudgetCycleApi } from '../../budgets/public/local-demo-budget-cycle.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LocalDemoAccountApi } from '../../identity-access/public/local-demo-account.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -38,9 +40,38 @@ export class DemoAccountsApi {
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly accounts: LocalDemoAccountApi,
+    private readonly budgetCycles: LocalDemoBudgetCycleApi,
     private readonly audit: AuditApi,
     private readonly config: ConfigService<DatabaseEnvironmentVariables, true>,
   ) {}
+
+  /**
+   * Moves the submission deadline of the cycle of `year` to `lockedDeadline`, a day that has passed, and leaves it there: the cycle is locked for good, as the day
+   * after its deadline makes it, so the versions the dataset sends through the API go to a cycle that is really locked and stay consistent with it. One short
+   * transaction, no lock held over HTTP; the move is recorded as an act of the operator, since no route moves a deadline into the past.
+   */
+  async lockBudgetCycle(
+    organizationId: string,
+    year: number,
+    lockedDeadline: BusinessDate,
+    attribution: DemoAccountsAttribution,
+  ): Promise<void> {
+    await this.runner.run(async (tx) => {
+      const moved = await this.budgetCycles.setSubmissionDeadline(tx, organizationId, year, lockedDeadline);
+      if (moved === null) return;
+      await this.audit.record(tx, {
+        organizationId,
+        actorKind: 'OPERATOR',
+        operatorReference: attribution.operatorReference,
+        correlationId: randomUUID(),
+        action: 'DEMO_DATASET.BUDGET_CYCLE_LOCKED',
+        resourceType: 'BudgetCycle',
+        resourceId: moved.id,
+        before: { submissionDeadline: moved.previous },
+        after: { submissionDeadline: lockedDeadline, year, environment: attribution.environment },
+      });
+    });
+  }
 
   /**
    * Holds the apply lock of a fixture on this database for as long as the run writes: a second `apply` of the same

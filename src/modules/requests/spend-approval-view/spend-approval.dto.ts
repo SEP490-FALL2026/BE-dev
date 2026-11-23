@@ -244,8 +244,12 @@ const approvalDetailSchema = z.strictObject({
 
 const resultSchema = z.strictObject({
   requestId: z.uuid(),
-  outcome: z.enum(['APPROVED', 'REJECTED', 'RETURNED', 'SKIPPED']),
-  /** Why a request was not decided: it is not in the batch or not the caller's, it was checked again and went back, and so on. */
+  /** `RETRYABLE`: this request alone could not be completed for a moment and nothing was written for it; send it again, on its own. */
+  outcome: z.enum(['APPROVED', 'REJECTED', 'RETURNED', 'SKIPPED', 'RETRYABLE']),
+  /**
+   * Why a request was not decided: it is not in the batch or not the caller's, it was checked again and went back, and so on. `ALREADY_DECIDED` goes with the
+   * outcome the caller gave the request earlier (the batch was sent again); `TRANSIENT_FAILURE` goes with `RETRYABLE`.
+   */
   reason: z
     .enum([
       'NOT_IN_BATCH',
@@ -259,6 +263,8 @@ const resultSchema = z.strictObject({
       'RECHECKED_RETURNED_TO_HEAD',
       /** The approval could not hold its commitment (a safety net after the check of the budget); the request stays as it was. */
       'COMMITMENT_NOT_HOLDABLE',
+      'TRANSIENT_FAILURE',
+      'ALREADY_DECIDED',
     ])
     .nullable(),
 });

@@ -49,7 +49,7 @@ flowchart BT
   budgets -->|8| catalog
   budgets -->|2| finance
   budgets -->|5| identity_access
-  budgets -->|5| licensing
+  budgets -->|6| licensing
   budgets -->|12| notifications
   budgets -->|4| operating_parameters
   budgets -->|23| organization
@@ -86,20 +86,21 @@ flowchart BT
   finance -->|3| organization
   identity_access -->|20| audit
   identity_access -->|11| notifications
-  identity_access -->|37| organization
+  identity_access -->|42| organization
   installation -->|6| audit
+  installation -->|2| budgets
   installation -->|2| catalog
   installation -->|2| finance
   installation -->|11| identity_access
   installation -->|8| organization
   installation -->|2| policies
   licensing -->|30| audit
-  licensing -->|56| catalog
+  licensing -->|57| catalog
   licensing -->|2| finance
   licensing -->|12| identity_access
   licensing -->|10| notifications
   licensing -->|6| operating_parameters
-  licensing -->|54| organization
+  licensing -->|53| organization
   licensing -->|4| policies
   onboarding -->|2| catalog
   onboarding -->|2| data_import
@@ -110,7 +111,7 @@ flowchart BT
   operating_parameters -->|6| organization
   optimization -->|7| audit
   optimization -->|8| catalog
-  optimization -->|6| identity_access
+  optimization -->|7| identity_access
   optimization -->|25| licensing
   optimization -->|7| notifications
   optimization -->|6| operating_parameters
@@ -133,12 +134,12 @@ flowchart BT
   policies -->|4| identity_access
   policies -->|2| notifications
   policies -->|7| organization
-  requests -->|64| audit
+  requests -->|67| audit
   requests -->|32| budgets
   requests -->|43| catalog
   requests -->|11| finance
   requests -->|38| identity_access
-  requests -->|60| licensing
+  requests -->|62| licensing
   requests -->|14| notifications
   requests -->|12| operating_parameters
   requests -->|98| organization
@@ -157,4 +158,4 @@ flowchart BT
   usage -->|4| requests
 ```
 
-114 module edges.
+115 module edges.
