@@ -97,8 +97,8 @@ describe('seat-month reads under its lock and stays out of a waiting Cost Center
   };
   const rowsOf = async (subscriptionId: string) =>
     (
-      await h.ctx.sql.query<{ days: number; amount_minor: string }>(
-        `SELECT days, amount_minor::text FROM seat_month_charges WHERE subscription_id = $1 AND month = $2 ORDER BY department_id`,
+      await h.ctx.sql.query<{ id: string; days: number; amount_minor: string; commitment_id: string | null }>(
+        `SELECT id, days, amount_minor::text, commitment_id FROM seat_month_charges WHERE subscription_id = $1 AND month = $2 ORDER BY department_id`,
         [subscriptionId, month()],
       )
     ).rows;
@@ -116,7 +116,8 @@ describe('seat-month reads under its lock and stays out of a waiting Cost Center
     const atTheLock = new Promise<void>((resolve) => (reached = resolve));
     let held = false;
     const spy = jest.spyOn(repo, 'lockMonthOf').mockImplementation(async (tx, subscriptionId, of) => {
-      if (subscriptionId === pool && !held) {
+      // The pass is held at the month the other charge writes, not at an earlier one of the same subscription.
+      if (subscriptionId === pool && of === month() && !held) {
         held = true;
         reached();
         await gate;
@@ -137,6 +138,7 @@ describe('seat-month reads under its lock and stays out of a waiting Cost Center
       release();
       await sweeper;
 
+      // The same rows, with the same ids: the pass found the mark and wrote nothing, not even the same rows again.
       expect(await rowsOf(pool)).toEqual(chargedOnRequest);
     } finally {
       release();
@@ -150,7 +152,8 @@ describe('seat-month reads under its lock and stays out of a waiting Cost Center
     const unit = await department();
     const requestId = await h.fixtureRequestId();
     await seat(pool, planId, await holder('E-SS-WAIT', unit), requestId);
-    await h.commitWaiting(unit, h.year, 10 * M);
+    // The commitment waits for a budget and is the one of the Request behind the seat, so the charge locks it and must not ask for the budget year.
+    const commitmentId = await h.commitWaiting(unit, h.year, 10 * M, requestId);
     const other: Client = new Client({ connectionString: h.ctx.database.url });
     await other.connect();
     await other.query('BEGIN');
@@ -165,7 +168,9 @@ describe('seat-month reads under its lock and stays out of a waiting Cost Center
           new Promise((_, reject) => setTimeout(() => reject(new Error('waited for the budget year')), 8000)),
         ]),
       ).resolves.toMatchObject({ failed: 0 });
-      expect(await rowsOf(pool)).toHaveLength(1);
+      const rows = await rowsOf(pool);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].commitment_id).toBe(commitmentId);
     } finally {
       await other.query('COMMIT');
       await other.end();
