@@ -1,6 +1,7 @@
 import { addDays } from '../../../src/core/business-date';
 import { TransferRevocationService } from '../../../src/modules/personnel/transfer-grace/transfer-revocation.service';
 import type { ApiAccount } from '../../support/api-accounts';
+import { Barrier } from '../../support/concurrency-harness';
 import { OffboardingHarness } from '../../support/offboarding-harness';
 import type { Person } from '../../support/request-harness';
 import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
@@ -293,18 +294,148 @@ describe('asking again on the same subscription in the grace of a transfer (inte
     expect(outcomes).toEqual({ [canvaSeat]: 'REGRANTED', [figmaSeat]: 'REVOKED' });
   }, 300_000);
 
-  it('a right a task of revocation is working is not ended by the grant: the grant meets the overlap as it always did', async () => {
+  it('a right a task of revocation with a non-transfer reason is working is not ended by the grant: the grant meets the overlap with revocation details', async () => {
     const { dest, person, canvaSeat } = await example();
     const wire = await h.moveToday(person, dest.department);
     await shifted(wire.id);
     const requestId = await approvedAgain(person, dest, canva.plan);
     // The person returned the old right: a task takes it away and ends it.
-    await h.open(canvaSeat, 'RETURN', { decision: { decidedRole: 'EMPLOYEE' } });
+    const revTaskId = await h.open(canvaSeat, 'RETURN', { decision: { decidedRole: 'EMPLOYEE' } });
 
     const refused = await h.grant({ requestId, subscriptionId: canva.subscriptionId });
 
     expect([refused.status, h.codeOf(refused)]).toEqual([422, 'LICENSE_ASSIGNMENT.OVERLAP']);
+    expect((refused.body as { error?: { details?: unknown } }).error?.details).toMatchObject({
+      conflictingAssignmentId: canvaSeat,
+      revocationTaskId: revTaskId,
+      revocationStatus: 'QUEUED',
+    });
     expect((await seatRow(canvaSeat)).valid_until).toBeNull();
+  }, 300_000);
+
+  it('regrant when a TRANSFER revocation is QUEUED withdraws it (CANCELLED), ends old right today, and closes transfer on next sweep', async () => {
+    const { dest, person, canvaSeat, figmaSeat } = await example();
+    const wire = await h.moveToday(person, dest.department);
+    const { graceEnds } = await shifted(wire.id);
+    const requestId = await approvedAgain(person, dest, canva.plan);
+
+    // Grace ends first: TRANSFER revocation tasks are queued for both Canva and Figma.
+    await revocation().sweep(at(addDays(graceEnds, 1)));
+    const canvaTaskBefore = (await revokeTasksOf(canvaSeat))[0];
+    expect(canvaTaskBefore.revocation_source).toBe('TRANSFER');
+
+    // (a) Regrant Canva: withdraws the QUEUED TRANSFER task -> CANCELLED, old seat valid_until = today.
+    const granted = await h.grant({ requestId, subscriptionId: canva.subscriptionId }).expect(201);
+    const grantTaskId = h.dataOf<{ task: { id: string } }>(granted).task.id;
+    const newSeat = await seatOfTask(grantTaskId);
+    expect(await seatRow(canvaSeat)).toMatchObject({ valid_until: h.today() });
+    expect(await seatRow(newSeat)).toMatchObject({ replaces: canvaSeat });
+    const canvaTaskAfter = (
+      await h.ctx.sql.query<{ status: string }>('SELECT status::text FROM provisioning_tasks WHERE id = $1', [
+        canvaTaskBefore.id,
+      ])
+    ).rows[0];
+    expect(canvaTaskAfter.status).toBe('CANCELLED');
+
+    // (c) Complete new grant & revoke Figma, then next sweep closes the transfer cleanly.
+    await h.claim(grantTaskId).expect(200);
+    await h.complete(grantTaskId, { evidence: 'Account regranted' }).expect(200);
+    await graceOverNow(wire.id);
+    await revokedBy((await revokeTasksOf(figmaSeat))[0].id);
+    await revocation().sweep(new Date());
+
+    expect(await closedAt(wire.id)).not.toBeNull();
+    expect((await detailOf(wire.id)).phase).toBe('CLOSED');
+  }, 300_000);
+
+  it('regrant is refused with 422 and revocation details when QUEUED TRANSFER task also has DEPARTURE reason or task is FAILED', async () => {
+    // Case 1: QUEUED TRANSFER + DEPARTURE reason
+    const c1 = await example();
+    const wire1 = await h.moveToday(c1.person, c1.dest.department);
+    const { graceEnds: grace1 } = await shifted(wire1.id);
+    const req1 = await approvedAgain(c1.person, c1.dest, canva.plan);
+    await revocation().sweep(at(addDays(grace1, 1)));
+    const rev1Id = (await revokeTasksOf(c1.canvaSeat))[0].id;
+    await h.open(c1.canvaSeat, 'DEPARTURE', { decision: { decidedRole: 'HR' } });
+
+    const refused1 = await h.grant({ requestId: req1, subscriptionId: canva.subscriptionId });
+    expect([refused1.status, h.codeOf(refused1)]).toEqual([422, 'LICENSE_ASSIGNMENT.OVERLAP']);
+    expect((refused1.body as { error?: { details?: unknown } }).error?.details).toMatchObject({
+      conflictingAssignmentId: c1.canvaSeat,
+      revocationTaskId: rev1Id,
+      revocationStatus: 'QUEUED',
+    });
+    expect((await seatRow(c1.canvaSeat)).valid_until).toBeNull();
+
+    // Case 2: TRANSFER task is FAILED
+    const c2 = await example();
+    const wire2 = await h.moveToday(c2.person, c2.dest.department);
+    const { graceEnds: grace2 } = await shifted(wire2.id);
+    const req2 = await approvedAgain(c2.person, c2.dest, canva.plan);
+    await revocation().sweep(at(addDays(grace2, 1)));
+    const rev2Id = (await revokeTasksOf(c2.canvaSeat))[0].id;
+    await h.claim(rev2Id, it2).expect(200);
+    await h.fail(rev2Id, { reason: 'Vendor API unavailable' }, it2).expect(200);
+
+    const refused2 = await h.grant({ requestId: req2, subscriptionId: canva.subscriptionId });
+    expect([refused2.status, h.codeOf(refused2)]).toEqual([422, 'LICENSE_ASSIGNMENT.OVERLAP']);
+    expect((refused2.body as { error?: { details?: unknown } }).error?.details).toMatchObject({
+      conflictingAssignmentId: c2.canvaSeat,
+      revocationTaskId: rev2Id,
+      revocationStatus: 'FAILED',
+    });
+    expect((await seatRow(c2.canvaSeat)).valid_until).toBeNull();
+  }, 300_000);
+
+  it('concurrency barrier (20 runs): regrant vs IT claiming/completing the same QUEUED TRANSFER revocation has 0 deadlocks and preserves INV-02', async () => {
+    for (let i = 0; i < 20; i++) {
+      const { dest, person, canvaSeat } = await example();
+      const wire = await h.moveToday(person, dest.department);
+      const { graceEnds } = await shifted(wire.id);
+      const requestId = await approvedAgain(person, dest, canva.plan);
+      await revocation().sweep(at(addDays(graceEnds, 1)));
+      const revTaskId = (await revokeTasksOf(canvaSeat))[0].id;
+
+      const barrier = new Barrier(2);
+      const grantAttempt = (async () => {
+        await barrier.wait();
+        return h.grant({ requestId, subscriptionId: canva.subscriptionId });
+      })();
+      const revokeAttempt = (async () => {
+        await barrier.wait();
+        const claimed = await h.claim(revTaskId, it2);
+        if (claimed.status === 200) {
+          return h.revoked(revTaskId, { completion: 'ACCOUNT_REMOVED', evidence: 'Removed' }, it2);
+        }
+        return claimed;
+      })();
+
+      const [grantRes, revokeRes] = await Promise.allSettled([grantAttempt, revokeAttempt]);
+      expect(grantRes.status).toBe('fulfilled');
+      expect(revokeRes.status).toBe('fulfilled');
+      if (grantRes.status === 'rejected') {
+        expect((grantRes.reason as { code?: unknown })?.code).not.toBe('40P01');
+      } else {
+        expect([201, 422]).toContain(grantRes.value.status);
+        expect(grantRes.value.status).not.toBe(500);
+        expect(grantRes.value.status).not.toBe(503);
+      }
+      if (revokeRes.status === 'rejected') {
+        expect((revokeRes.reason as { code?: unknown })?.code).not.toBe('40P01');
+      } else {
+        expect([200, 409]).toContain(revokeRes.value.status);
+        expect(revokeRes.value.status).not.toBe(500);
+        expect(revokeRes.value.status).not.toBe(503);
+      }
+
+      const activeSeats = await h.ctx.sql.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM license_assignments
+          WHERE employee_id = $1 AND subscription_id = $2 AND failed_at IS NULL AND cancelled_at IS NULL
+            AND (valid_until IS NULL OR valid_until > CURRENT_DATE)`,
+        [person.employeeId, canva.subscriptionId],
+      );
+      expect(Number(activeSeats.rows[0].count)).toBeLessThanOrEqual(1);
+    }
   }, 300_000);
 
   it('a grant that fails gives the old right back: the person is not left with neither, and the grace takes it back as it takes the others', async () => {

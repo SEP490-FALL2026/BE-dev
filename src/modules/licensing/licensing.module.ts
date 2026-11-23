@@ -93,6 +93,8 @@ import { ProvisioningGrantPlanner } from './provisioning/tasks/provisioning-gran
 import { ProvisioningGrantService } from './provisioning/tasks/provisioning-grant.service';
 import { ProvisioningPurchaseRefusal } from './provisioning/tasks/provisioning-purchase-refusal.service';
 import { ProvisioningGrantWriter } from './provisioning/tasks/provisioning-grant-writer.service';
+import { ProvisioningGrantTaskService } from './provisioning/tasks/provisioning-grant-task.service';
+import { ProvisioningReplacementService } from './provisioning/tasks/provisioning-replacement.service';
 import { ProvisioningService } from './provisioning/tasks/provisioning.service';
 import { ProvisioningGrantCompletion } from './provisioning/tasks/provisioning-grant-completion.service';
 import { ProvisioningTaskFrame } from './provisioning/provisioning-task-frame.service';
@@ -115,6 +117,7 @@ import { RevocationRecorder } from './provisioning/revocation-recorder.service';
 import { RevocationTaskFactory } from './provisioning/revocation-task-factory.service';
 import { RevocationService } from './provisioning/revocation.service';
 import { RevocationWithdrawalService } from './provisioning/revocation-withdrawal/revocation-withdrawal.service';
+import { ForRevocationWithdrawalService } from './provisioning/revocation-withdrawal/for-revocation-withdrawal.service';
 import { ProvisioningTaskReasonRepo } from './provisioning/provisioning-task-reason.repo';
 import { SaasIssueCalendar } from './saas-issue/saas-issue-calendar.service';
 import { SaasIssueFactsRepo } from './saas-issue/saas-issue-facts.repo';
@@ -231,6 +234,8 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     ProvisioningTaskViewService,
     ProvisioningGrantPlanner,
     ProvisioningGrantWriter,
+    ProvisioningGrantTaskService,
+    ProvisioningReplacementService,
     ProvisioningPurchaseRefusal,
     ProvisioningGrantService,
     ProvisioningService,
@@ -244,6 +249,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     RevocationRecorder,
     RevocationService,
     RevocationWithdrawalService,
+    ForRevocationWithdrawalService,
     RevocationCompletionService,
     ProvisioningK1ChecklistRepo,
     ProvisioningK1Checklist,

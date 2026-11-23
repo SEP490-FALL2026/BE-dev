@@ -324,6 +324,16 @@ export class AssignmentService {
     return old.id;
   }
 
+  /** Whether the old right is one a grant on this target would end if no revocation task stood in the way. */
+  async canEndReplacedByGrant(
+    tx: DbTx,
+    input: { employeeId: string; replacesAssignmentId: string; target: SeatTarget; today: BusinessDate },
+  ): Promise<boolean> {
+    const old = await this.repo.lock(tx, input.replacesAssignmentId);
+
+    return old !== null && replacedByGrant(old, { ...input, revocationUnderWay: false });
+  }
+
   /** Which of these rights a later right replaced (R-49): the ones a grant ended the day it gave the person the same software again. */
   regrantedAmong(ids: readonly string[], tx?: DbTx): Promise<Set<string>> {
     return this.repo.replacedAmong(ids, tx);
