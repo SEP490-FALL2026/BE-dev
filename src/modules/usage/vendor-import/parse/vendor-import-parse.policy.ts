@@ -90,6 +90,15 @@ function isListedOnly(raw: RawReportRow): boolean {
   return raw.activeDates.length === 0 && raw.lastActivityDate === null && raw.events.length === 0;
 }
 
+/**
+ * Whether a row that names no date says the person is there. A vendor that tells the last activity in a report of one row per person
+ * (`AGGREGATE`) leaves the date empty for a person who never used the application: that row is no appearance, the person was never
+ * active (`G3`). A source that only lists members, and a log of events, keep such a row as one appearance.
+ */
+function emptyRowIsAppearance(source: ReadingSource): boolean {
+  return !(source.reportShape === 'AGGREGATE' && source.capabilities.lastActivity);
+}
+
 /** The identifier of a row as it is kept (masked when empty or a secret), as it is compared, and what is wrong with it. */
 function identifierOf(
   raw: RawReportRow,
@@ -188,7 +197,7 @@ function shapeRow(raw: RawReportRow, source: ReadingSource, seen: Set<string>, r
   };
 }
 
-/** Judges the days of each row against the window, and keeps a person who is only listed as one appearance on the last day of the window. */
+/** Judges the days of each row against the window, and keeps a person who is only listed, where the source counts that as being seen, as one appearance on the last day of the window. */
 function judgeAgainstWindow(rows: readonly ReportRow[], listed: ReadonlySet<ReportRow>, window: CoverageWindow): void {
   for (const row of rows) {
     for (const day of row.days) {
@@ -204,15 +213,18 @@ function judgeAgainstWindow(rows: readonly ReportRow[], listed: ReadonlySet<Repo
 /**
  * Reads a report of a source into rows and the window it covers (`FR-4.3`, `FR-4.10`, `FR-4.11`): the file by its format, each row by the
  * template of the source, then the days of each row against the window. A row with any fault is `INVALID` as a whole; a row that names no
- * date at all (a member listed, a person with no activity) is kept as one appearance on the last day of the window, which counts as being
- * seen and never as activity. Throws UsageImportFileError.
+ * date is, for a source that only lists members or logs events, one appearance on the last day of the window (seen, never activity); for
+ * an aggregate report of a source that tells the last activity it is nothing at all: the person never was active (`FR-4.10`, `G3`).
+ * Throws UsageImportFileError.
  */
 export function parseReport(input: ParseInput): ParsedReport {
   const raw: RawReport = input.format === 'JSON' ? readJsonReport(input.text) : readCsvReport(input.text, input.source);
   const seen = new Set<string>();
   const reading = readingOf(input.source, input.organizationTimeZone);
   const rows = raw.rows.map((row) => shapeRow(row, input.source, seen, reading));
-  const listed = new Set(raw.rows.flatMap((row, index) => (isListedOnly(row) ? [rows[index]] : [])));
+  const listed = emptyRowIsAppearance(input.source)
+    ? new Set(raw.rows.flatMap((row, index) => (isListedOnly(row) ? [rows[index]] : [])))
+    : new Set<ReportRow>();
 
   const typed = Boolean(input.declared.from || input.declared.to);
   const { window, warnings } = resolveWindow({

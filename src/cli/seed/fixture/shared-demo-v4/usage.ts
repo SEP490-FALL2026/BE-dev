@@ -40,7 +40,7 @@ const FIGMA: DemoUsageSource = {
     row('NV-DES5', 2),
     row('NV-DES6', null),
     row('NV-DES7', 81),
-    row('NV-DES9', null),
+    row('NV-DES9', 20),
     row('NV-DES10', 100),
     row('NV-DES11', 75),
     row('NV-DES12', 66),
