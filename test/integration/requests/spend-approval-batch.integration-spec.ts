@@ -194,4 +194,25 @@ describe('the decision of the requests of a batch over PostgreSQL (US-06-01 AC-1
       expect(await h.state(ids[0])).toBe('AWAITING_SPEND_DECISION');
     });
   });
+
+  describe('sending the batch again', () => {
+    it('answers the outcome already given with ALREADY_DECIDED, writes nothing more, and keeps SKIPPED for a decision the caller did not give', async () => {
+      const { design } = await fresh();
+      const { ids, batchId } = await sendAll(design, [10 * M, 10 * M]);
+      const [first, second] = ids;
+      await decideAll(batchId, { decision: 'APPROVE', requestIds: [first] });
+      const before = await records(ids);
+
+      const again = await decideAll(batchId, { decision: 'APPROVE', requestIds: [first, second] });
+      const refused = await decideAll(batchId, { decision: 'REJECT', requestIds: [first], reason: 'Changed my mind' });
+
+      expect(again).toEqual([
+        { requestId: first, outcome: 'APPROVED', reason: 'ALREADY_DECIDED' },
+        { requestId: second, outcome: 'APPROVED', reason: null },
+      ]);
+      expect(refused).toEqual([{ requestId: first, outcome: 'SKIPPED', reason: 'NO_SPEND_STEP' }]);
+      expect((await records([first])).length).toBe(before.length);
+      expect(await h.state(first)).toBe('AWAITING_EXECUTION');
+    });
+  });
 });
