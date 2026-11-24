@@ -10,6 +10,11 @@ import { DEVICE_CREDENTIAL_VERIFIER } from '../../infrastructure/security/tokens
 import { AcknowledgementController } from './acknowledgement/acknowledgement.controller';
 import { AcknowledgementRepo } from './acknowledgement/acknowledgement.repo';
 import { AcknowledgementService } from './acknowledgement/acknowledgement.service';
+import { AssetCodeRepo } from './asset-code/asset-code.repo';
+import { AssetCodeService } from './asset-code/asset-code.service';
+import { DeviceAttributesController } from './attributes/device-attributes.controller';
+import { DeviceAttributesRepo } from './attributes/device-attributes.repo';
+import { DeviceAttributesService } from './attributes/device-attributes.service';
 import { CredentialController } from './credential/credential.controller';
 import { CredentialQueryService } from './credential/credential-query.service';
 import { CredentialRepo } from './credential/credential.repo';
@@ -62,6 +67,7 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
   controllers: [
     NoticeController,
     RegistryController,
+    DeviceAttributesController,
     SignatureRecordController,
     AcknowledgementController,
     MyDevicesController,
@@ -77,6 +83,10 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     RegistryQueryRepo,
     RegistryQueryService,
     RegistryService,
+    AssetCodeRepo,
+    AssetCodeService,
+    DeviceAttributesRepo,
+    DeviceAttributesService,
     RegistrationEndService,
     SignatureRecordService,
     AcknowledgementRepo,

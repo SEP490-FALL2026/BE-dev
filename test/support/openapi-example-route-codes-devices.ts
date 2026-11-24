@@ -4,8 +4,26 @@ import type { RouteErrorStatus } from './openapi-example-manifest';
 export const ROUTE_ERROR_CODES_DEVICES: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> =
   {
     deviceCreate: {
-      '409': ['DEVICE.ASSET_CODE_TAKEN', 'DEVICE.HOLDER_NOT_WORKING', 'DEVICE.REGISTRATION_OVERLAP'],
-      '422': ['DEVICE.HANDOVER_DATE_INVALID', 'DEVICE.HOLDER_NOT_FOUND'],
+      '403': ['DEVICE.NOT_IN_CHARGE'],
+      '409': [
+        'DEVICE.ASSET_CODE_EXHAUSTED',
+        'DEVICE.ASSET_CODE_TAKEN',
+        'DEVICE.HOLDER_NOT_WORKING',
+        'DEVICE.REGISTRATION_OVERLAP',
+        'DEVICE.SERIAL_TAKEN',
+      ],
+      '422': [
+        'DEVICE.HANDOVER_DATE_INVALID',
+        'DEVICE.HANDOVER_WITHOUT_HOLDER',
+        'DEVICE.HOLDER_NOT_FOUND',
+        'DEVICE_ACTIVATION.PLAN_NOT_BUNDLED',
+      ],
+    },
+    deviceUpdate: {
+      '403': ['DEVICE.NOT_IN_CHARGE'],
+      '404': ['DEVICE.NOT_FOUND'],
+      '409': ['DEVICE.ALREADY_RETIRED', 'DEVICE.SERIAL_TAKEN', 'DEVICE.STALE', 'DEVICE.VOIDED'],
+      '422': ['DEVICE.UPDATE_EMPTY'],
     },
     aiToolStatusSnapshotCreate: {
       '401': ['DEVICE.CREDENTIAL_EXPIRED', 'DEVICE.CREDENTIAL_INVALID', 'DEVICE.CREDENTIAL_REVOKED'],

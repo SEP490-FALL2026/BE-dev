@@ -1,3 +1,4 @@
+import { businessDateAt } from '../../../src/core/business-date';
 import { PrismaService } from '../../../src/infrastructure/database/prisma.service';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { DeviceAssetCodeExhaustedError } from '../../../src/modules/devices/asset-code/asset-code.errors';
@@ -100,5 +101,18 @@ describe('the counter of asset codes (integration, real PostgreSQL)', () => {
     expect(await lastValue('LAP', 2046)).toBe(9999);
     // The next year is a new count.
     expect(await runner.run((tx) => service.next(tx, 'LAP', '2047-01-01'))).toBe('LAP-47-0001');
+  });
+
+  it('uses the organization time zone on Dec 31 so UTC rollover still issues the local year code', async () => {
+    const dec31Local = businessDateAt(new Date('2026-12-31T16:59:59.000Z'), 'Asia/Ho_Chi_Minh');
+    const jan01Local = businessDateAt(new Date('2026-12-31T17:00:00.000Z'), 'Asia/Ho_Chi_Minh');
+    const utcMomentDec31Later = businessDateAt(new Date('2026-12-31T18:00:00.000Z'), 'UTC');
+
+    expect(dec31Local).toBe('2026-12-31');
+    expect(jan01Local).toBe('2027-01-01');
+    expect(utcMomentDec31Later).toBe('2026-12-31');
+
+    expect(await runner.run((tx) => service.next(tx, 'PC', dec31Local))).toBe('PC-26-0001');
+    expect(await runner.run((tx) => service.next(tx, 'PC', jan01Local))).toBe('PC-27-0001');
   });
 });

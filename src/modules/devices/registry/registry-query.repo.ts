@@ -3,21 +3,32 @@ import { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { escapeLikePattern, searchKey } from '../../../core/search-key';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import type { AssetDeviceType } from '../asset-code/asset-code.policy';
 import type { CollectionState } from '../devices-collection-state.policy';
+import type { DeviceCondition } from '../devices-custody.policy';
 import type { DeviceRegistrationEndCause } from '../public/devices.types';
 
 /** One machine as the register lists it: the machine and the registration open on it, if any. */
 export interface DeviceSummaryRow {
   id: string;
   assetCode: string;
+  deviceType: AssetDeviceType;
+  serialNumber: string | null;
+  assetCodeOrigin: 'GENERATED' | 'LEGACY';
   hostname: string;
   os: string;
+  condition: DeviceCondition;
+  retirementKind: 'DISPOSED' | 'LOST' | null;
   retiredAt: Date | null;
+  voidedAt: Date | null;
+  updatedAt: Date;
   registrationId: string | null;
   holderEmployeeId: string | null;
   validFrom: Date | null;
   acknowledgedFrom: Date | null;
   collectionStoppedAt: Date | null;
+  collectorInstalled: boolean | null;
+  hasOpenReturnTask: boolean;
   signatureRecorded: boolean;
   /** The latest instant any credential of the open registration was accepted; null while nothing was, and for a machine nobody holds. */
   lastAcceptedAt: Date | null;
@@ -33,6 +44,7 @@ export interface DeviceRegistrationRow {
   endCause: DeviceRegistrationEndCause | null;
   acknowledgedFrom: Date | null;
   collectionStoppedAt: Date | null;
+  collectorInstalled: boolean;
   signatureRecorded: boolean;
   lastAcceptedAt: Date | null;
 }
@@ -42,6 +54,10 @@ export interface DeviceListFilter {
   search?: string | undefined;
   holderEmployeeId?: string | undefined;
   state?: CollectionState | undefined;
+  custody?: 'IN_STOCK' | 'ASSIGNED' | 'AWAITING_RETURN' | 'RETIRED' | undefined;
+  condition?: DeviceCondition | undefined;
+  deviceType?: AssetDeviceType | undefined;
+  signatureMissing?: boolean | undefined;
 }
 
 export interface DeviceExtras {
@@ -54,6 +70,8 @@ export interface DeviceExtras {
     endCause: DeviceRegistrationEndCause;
   } | null;
   retirementReason: string | null;
+  conditionNote: string | null;
+  voidReason: string | null;
 }
 
 /** The same decision as `collectionStateOf`, in SQL: a list filtered by state reads exactly what the detail shows. */
@@ -64,24 +82,44 @@ const STATE_SQL = Prisma.sql`CASE
   WHEN r.acknowledged_from IS NOT NULL THEN 'ACTIVE'
   ELSE 'AWAITING_ACKNOWLEDGEMENT' END`;
 
+const OPEN_RETURN_TASK_SQL = Prisma.sql`EXISTS (SELECT 1 FROM device_return_tasks t WHERE t.device_id = d.id AND t.state = 'OPEN')`;
+
+/** The same precedence as `custodyOf` in SQL: VOIDED -> RETIRED -> AWAITING_RETURN -> ASSIGNED -> IN_STOCK. */
+const CUSTODY_SQL = Prisma.sql`CASE
+  WHEN d.voided_at IS NOT NULL THEN 'VOIDED'
+  WHEN d.retired_at IS NOT NULL THEN 'RETIRED'
+  WHEN ${OPEN_RETURN_TASK_SQL} THEN 'AWAITING_RETURN'
+  WHEN r.id IS NOT NULL THEN 'ASSIGNED'
+  ELSE 'IN_STOCK' END`;
+
 /**
  * Whether a registration has a signed record, and the last instant any of its credentials was accepted: two reads of tables the register does not
  * list, each one a sub-select of the row, so a page of any size is one statement.
  */
 const SIGNED_SQL = Prisma.sql`EXISTS (SELECT 1 FROM device_signature_records s WHERE s.registration_id = r.id)`;
+const SIGNATURE_MISSING_SQL = Prisma.sql`(r.id IS NOT NULL AND NOT ${SIGNED_SQL})`;
 const LAST_ACCEPTED_SQL = Prisma.sql`(SELECT max(c.last_accepted_at) FROM device_credentials c WHERE c.registration_id = r.id)`;
 
-const SUMMARY_COLUMNS = Prisma.sql`d.id, d.asset_code AS "assetCode", d.hostname, d.os, d.retired_at AS "retiredAt",
+const SUMMARY_COLUMNS = Prisma.sql`d.id, d.asset_code AS "assetCode", d.device_type AS "deviceType",
+  d.serial_number AS "serialNumber", d.asset_code_origin AS "assetCodeOrigin", d.hostname, d.os,
+  d.condition, d.retirement_kind AS "retirementKind", d.retired_at AS "retiredAt",
+  d.voided_at AS "voidedAt", d.updated_at AS "updatedAt",
   r.id AS "registrationId", r.holder_employee_id AS "holderEmployeeId", r.valid_from AS "validFrom",
   r.acknowledged_from AS "acknowledgedFrom", r.collection_stopped_at AS "collectionStoppedAt",
+  r.collector_installed AS "collectorInstalled",
+  ${OPEN_RETURN_TASK_SQL} AS "hasOpenReturnTask",
   ${SIGNED_SQL} AS "signatureRecorded", ${LAST_ACCEPTED_SQL} AS "lastAcceptedAt"`;
 
 const FROM_SQL = Prisma.sql`FROM managed_devices d
   LEFT JOIN device_registrations r ON r.device_id = d.id AND r.ended_at IS NULL`;
 
-function whereOf(filter: DeviceListFilter, deviceId?: string): Prisma.Sql {
+function whereOf(
+  filter: DeviceListFilter,
+  options?: { deviceId?: string | undefined; includeVoided?: boolean | undefined },
+): Prisma.Sql {
   const conditions = [Prisma.sql`d.organization_id = ${filter.organizationId}::uuid`];
-  if (deviceId) conditions.push(Prisma.sql`d.id = ${deviceId}::uuid`);
+  if (!options?.includeVoided) conditions.push(Prisma.sql`d.voided_at IS NULL`);
+  if (options?.deviceId) conditions.push(Prisma.sql`d.id = ${options.deviceId}::uuid`);
   if (filter.holderEmployeeId) conditions.push(Prisma.sql`r.holder_employee_id = ${filter.holderEmployeeId}::uuid`);
   if (filter.search) {
     const code = `%${escapeLikePattern(searchKey(filter.search))}%`;
@@ -91,6 +129,12 @@ function whereOf(filter: DeviceListFilter, deviceId?: string): Prisma.Sql {
     );
   }
   if (filter.state) conditions.push(Prisma.sql`${STATE_SQL} = ${filter.state}`);
+  if (filter.custody) conditions.push(Prisma.sql`${CUSTODY_SQL} = ${filter.custody}`);
+  if (filter.condition) conditions.push(Prisma.sql`d.condition = ${filter.condition}::"DeviceCondition"`);
+  if (filter.deviceType) conditions.push(Prisma.sql`d.device_type = ${filter.deviceType}::"DeviceType"`);
+  if (filter.signatureMissing !== undefined) {
+    conditions.push(Prisma.sql`${SIGNATURE_MISSING_SQL} = ${filter.signatureMissing}`);
+  }
 
   return Prisma.join(conditions, ' AND ');
 }
@@ -124,7 +168,7 @@ export class RegistryQueryRepo {
     );
   }
 
-  /** How many machines are in this state: the number `page` reports as its total for the same filter, with no page read. */
+  /** How many non-voided machines are in this state: the number `page` reports as its total for the same filter, with no page read. */
   async countByState(organizationId: string, state: CollectionState): Promise<number> {
     const counted = await this.prisma.$queryRaw<{ total: bigint }[]>`
       SELECT count(*) AS total ${FROM_SQL} WHERE ${whereOf({ organizationId, state })}`;
@@ -135,7 +179,7 @@ export class RegistryQueryRepo {
   async one(organizationId: string, id: string): Promise<DeviceSummaryRow | null> {
     const rows = await this.prisma.$queryRaw<DeviceSummaryRow[]>`
       SELECT ${SUMMARY_COLUMNS}
-      ${FROM_SQL} WHERE ${whereOf({ organizationId }, id)}`;
+      ${FROM_SQL} WHERE ${whereOf({ organizationId }, { deviceId: id, includeVoided: true })}`;
 
     return rows[0] ?? null;
   }
@@ -158,7 +202,8 @@ export class RegistryQueryRepo {
         const rows = await tx.$queryRaw<DeviceRegistrationRow[]>`
           SELECT r.id, r.holder_employee_id AS "holderEmployeeId", r.valid_from AS "validFrom", r.valid_until AS "validUntil",
                  r.ended_at AS "endedAt", r.end_cause AS "endCause", r.acknowledged_from AS "acknowledgedFrom",
-                 r.collection_stopped_at AS "collectionStoppedAt", ${SIGNED_SQL} AS "signatureRecorded",
+                 r.collection_stopped_at AS "collectionStoppedAt", r.collector_installed AS "collectorInstalled",
+                 ${SIGNED_SQL} AS "signatureRecorded",
                  ${LAST_ACCEPTED_SQL} AS "lastAcceptedAt"
             FROM device_registrations r WHERE r.device_id = ${deviceId}::uuid
            ORDER BY r.valid_from DESC, r.created_at DESC, r.id DESC LIMIT ${take} OFFSET ${skip}`;
@@ -198,7 +243,10 @@ export class RegistryQueryRepo {
         orderBy: [{ endedAt: 'desc' }, { id: 'desc' }],
         select: { holderEmployeeId: true, validUntil: true, endedAt: true, endCause: true },
       }),
-      this.prisma.managedDevice.findUnique({ where: { id: deviceId }, select: { retirementReason: true } }),
+      this.prisma.managedDevice.findUnique({
+        where: { id: deviceId },
+        select: { retirementReason: true, conditionNote: true, voidReason: true },
+      }),
     ]);
 
     return {
@@ -216,16 +264,22 @@ export class RegistryQueryRepo {
             recordedAt: signature.recordedAt,
           }
         : null,
-      lastEnd:
-        lastEnd?.endedAt && lastEnd.validUntil && lastEnd.endCause
-          ? {
-              holderEmployeeId: lastEnd.holderEmployeeId,
-              validUntil: fromDateColumn(lastEnd.validUntil),
-              endedAt: lastEnd.endedAt,
-              endCause: lastEnd.endCause,
-            }
-          : null,
+      lastEnd: mapLastEnd(lastEnd),
       retirementReason: device?.retirementReason ?? null,
+      conditionNote: device?.conditionNote ?? null,
+      voidReason: device?.voidReason ?? null,
     };
   }
+}
+
+function mapLastEnd(
+  lastEnd: { holderEmployeeId: string; validUntil: Date | null; endedAt: Date | null; endCause: string | null } | null,
+): DeviceExtras['lastEnd'] {
+  if (!lastEnd?.endedAt || !lastEnd.validUntil || !lastEnd.endCause) return null;
+  return {
+    holderEmployeeId: lastEnd.holderEmployeeId,
+    validUntil: fromDateColumn(lastEnd.validUntil),
+    endedAt: lastEnd.endedAt,
+    endCause: lastEnd.endCause as NonNullable<DeviceExtras['lastEnd']>['endCause'],
+  };
 }

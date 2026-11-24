@@ -74136,7 +74136,7 @@
         },
         "responses": {
           "201": {
-            "description": "The machine and its registration to the holder, waiting for the holder to acknowledge the notice.",
+            "description": "The machine with a generated asset code, placed in stock or registered to the initial holder.",
             "content": {
               "application/json": {
                 "schema": {
@@ -74202,7 +74202,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin keeps the register of machines.",
+            "description": "Only an IT Admin registers a machine; handing over to an initial holder requires an acting IT Admin of their department (DEVICE.NOT_IN_CHARGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -74217,13 +74217,24 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "DEVICE.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the holder department may change this device.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the holder department may change this device.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
             }
           },
           "409": {
-            "description": "The holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), the asset code is taken (DEVICE.ASSET_CODE_TAKEN), or the machine has a registration over those days (DEVICE.REGISTRATION_OVERLAP).",
+            "description": "The holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), the serial number is used by another machine (DEVICE.SERIAL_TAKEN), the asset code counter is exhausted (DEVICE.ASSET_CODE_EXHAUSTED), the generated asset code collided (DEVICE.ASSET_CODE_TAKEN), or the machine has an overlapping registration (DEVICE.REGISTRATION_OVERLAP).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -74235,6 +74246,28 @@
                       "error": {
                         "code": "DEVICE.HOLDER_NOT_WORKING",
                         "message": "A machine is registered to a person who works here.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.SERIAL_TAKEN": {
+                    "summary": "The serial number is already used by another machine.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.SERIAL_TAKEN",
+                        "message": "The serial number is already used by another machine.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.ASSET_CODE_EXHAUSTED": {
+                    "summary": "No asset code is left for this kind of machine this year.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.ASSET_CODE_EXHAUSTED",
+                        "message": "No asset code is left for this kind of machine this year.",
                         "requestId": "req_example"
                       }
                     }
@@ -74308,7 +74341,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the holder does not exist (DEVICE.HOLDER_NOT_FOUND) or the handover day is not between the hire date and today (DEVICE.HANDOVER_DATE_INVALID).",
+            "description": "The request is invalid (VALIDATION_ERROR), handover fields were given without a holder (DEVICE.HANDOVER_WITHOUT_HOLDER), a bundled plan is invalid (DEVICE_ACTIVATION.PLAN_NOT_BUNDLED), the holder does not exist (DEVICE.HOLDER_NOT_FOUND) or the handover day is not between the hire date and today (DEVICE.HANDOVER_DATE_INVALID).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -74321,6 +74354,28 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.HANDOVER_WITHOUT_HOLDER": {
+                    "summary": "Handover date or collector installation requires a holder.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.HANDOVER_WITHOUT_HOLDER",
+                        "message": "Handover date or collector installation requires a holder.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_ACTIVATION.PLAN_NOT_BUNDLED": {
+                    "summary": "Every bundled plan must be an active device-bundled K4 plan.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_ACTIVATION.PLAN_NOT_BUNDLED",
+                        "message": "Every bundled plan must be an active device-bundled K4 plan.",
                         "requestId": "req_example"
                       }
                     }
@@ -74406,7 +74461,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Register a company machine to a holder",
+        "summary": "Register a company machine",
         "tags": ["devices"]
       },
       "get": {
@@ -74445,6 +74500,30 @@
               "type": "string",
               "enum": ["RETIRED", "UNREGISTERED", "COLLECTION_STOPPED", "ACTIVE", "AWAITING_ACKNOWLEDGEMENT"]
             }
+          },
+          {
+            "name": "custody",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["IN_STOCK", "ASSIGNED", "AWAITING_RETURN", "RETIRED"] }
+          },
+          {
+            "name": "condition",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["USABLE", "IN_REPAIR", "BROKEN"] }
+          },
+          {
+            "name": "deviceType",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["LAP", "PC", "OTH"] }
+          },
+          {
+            "name": "signatureMissing",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] }
           }
         ],
         "responses": {
@@ -74954,6 +75033,323 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Get a company machine",
+        "tags": ["devices"]
+      },
+      "patch": {
+        "operationId": "deviceUpdate",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeviceAttributesBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The machine as it is after the correction, with its new updatedAt. A correction that changes nothing is answered the same and not audited. The asset code never changes, whatever the kind becomes. One event of the audit trail (DEVICE.UPDATED) says what each field was and what it became.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DeviceAttributesResponseDto" },
+                    { "properties": { "message": { "example": "DEVICE.UPDATED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin corrects a machine; an assigned machine or one awaiting return requires an acting IT Admin of the holder department (DEVICE.NOT_IN_CHARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the holder department may change this device.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the holder department may change this device.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The machine is not in the register (DEVICE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE.NOT_FOUND": {
+                    "summary": "The device does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_FOUND",
+                        "message": "The device does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The machine changed since it was read (DEVICE.STALE, details.currentUpdatedAt), it was voided (DEVICE.VOIDED) or taken out of use (DEVICE.ALREADY_RETIRED), or another machine has the serial number (DEVICE.SERIAL_TAKEN). Nothing is written.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE.STALE": {
+                    "summary": "The machine was changed by someone else since it was read: read it again before editing.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.STALE",
+                        "message": "The machine was changed by someone else since it was read: read it again before editing.",
+                        "details": { "currentUpdatedAt": "2026-01-01T00:00:00.000Z" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.VOIDED": {
+                    "summary": "A machine that was taken out of use or voided is not corrected any more.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.VOIDED",
+                        "message": "A machine that was taken out of use or voided is not corrected any more.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.ALREADY_RETIRED": {
+                    "summary": "A machine that was taken out of use or voided is not corrected any more.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.ALREADY_RETIRED",
+                        "message": "A machine that was taken out of use or voided is not corrected any more.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.SERIAL_TAKEN": {
+                    "summary": "The serial number is already used by another machine.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.SERIAL_TAKEN",
+                        "message": "The serial number is already used by another machine.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR: expectedUpdatedAt is required and a name, system or serial number is 1 to its limit of characters) or names no field to change (DEVICE.UPDATE_EMPTY).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.UPDATE_EMPTY": {
+                    "summary": "Name at least one field of the machine to change.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.UPDATE_EMPTY",
+                        "message": "Name at least one field of the machine to change.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Correct the name, system, serial number or kind of a machine",
         "tags": ["devices"]
       }
     },
@@ -130949,22 +131345,20 @@
       "DeviceCreateBodyDto": {
         "type": "object",
         "properties": {
-          "assetCode": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 60,
-            "description": "The asset tag; the same code in another case or with other blanks is the same machine."
-          },
+          "deviceType": { "type": "string", "enum": ["LAP", "PC", "OTH"] },
           "hostname": { "type": "string", "minLength": 1, "maxLength": 63 },
           "os": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "serialNumber": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "bundledPlanIds": { "maxItems": 20, "type": "array", "items": { "type": "string", "format": "uuid" } },
           "holderEmployeeId": { "type": "string", "format": "uuid" },
           "handedOverOn": {
             "type": "string",
             "format": "date",
             "description": "The day the machine was handed over as YYYY-MM-DD; it must exist, and it is not after today nor before the holder was hired. Today when omitted."
-          }
+          },
+          "collectorInstalled": { "type": "boolean" }
         },
-        "required": ["assetCode", "hostname", "os", "holderEmployeeId"],
+        "required": ["deviceType", "hostname", "os"],
         "additionalProperties": false
       },
       "DeviceDetailResponseDto": {
@@ -130977,8 +131371,21 @@
             "properties": {
               "id": { "type": "string", "format": "uuid" },
               "assetCode": { "type": "string" },
+              "deviceType": { "type": "string", "enum": ["LAP", "PC", "OTH"] },
+              "serialNumber": { "type": "string", "nullable": true },
+              "assetCodeOrigin": { "type": "string", "enum": ["GENERATED", "LEGACY"] },
               "hostname": { "type": "string" },
               "os": { "type": "string" },
+              "condition": { "type": "string", "enum": ["USABLE", "IN_REPAIR", "BROKEN"] },
+              "custody": { "type": "string", "enum": ["VOIDED", "RETIRED", "AWAITING_RETURN", "ASSIGNED", "IN_STOCK"] },
+              "retirementKind": { "type": "string", "enum": ["DISPOSED", "LOST", null], "nullable": true },
+              "currentDepartment": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false,
+                "nullable": true
+              },
               "holder": {
                 "type": "object",
                 "properties": {
@@ -131019,6 +131426,7 @@
                 "additionalProperties": false
               },
               "signatureRecorded": { "type": "boolean" },
+              "signatureMissing": { "type": "boolean" },
               "retiredAt": { "type": "string", "format": "date-time", "nullable": true },
               "acknowledgedFrom": { "type": "string", "format": "date-time", "nullable": true },
               "latestAcknowledgement": {
@@ -131068,32 +131476,80 @@
                   "endedAt": { "type": "string", "format": "date-time" },
                   "endCause": {
                     "type": "string",
-                    "enum": ["HOLDER_CHANGED", "DEVICE_RETIRED", "DEPARTURE", "EMPLOYEE_LEFT", "DEPARTURE_BLOCKED"]
+                    "enum": [
+                      "HOLDER_CHANGED",
+                      "DEVICE_RETIRED",
+                      "DEPARTURE",
+                      "EMPLOYEE_LEFT",
+                      "DEPARTURE_BLOCKED",
+                      "RETURNED"
+                    ]
                   }
                 },
                 "required": ["holder", "validUntil", "endedAt", "endCause"],
                 "additionalProperties": false,
                 "nullable": true
               },
-              "retirementReason": { "type": "string", "nullable": true }
+              "retirementReason": { "type": "string", "nullable": true },
+              "conditionNote": { "type": "string", "nullable": true },
+              "voidedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "voidReason": { "type": "string", "nullable": true },
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "collectorInstalled": { "type": "boolean", "nullable": true },
+              "openReturnTask": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "dueOn": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                  "departmentId": { "type": "string", "format": "uuid", "nullable": true },
+                  "actingItAdmins": {
+                    "maxItems": 2,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "fullName": { "type": "string" } },
+                      "required": ["id", "fullName"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "waiting": { "type": "boolean" }
+                },
+                "required": ["id", "dueOn", "departmentId", "actingItAdmins", "waiting"],
+                "additionalProperties": false,
+                "nullable": true
+              }
             },
             "required": [
               "id",
               "assetCode",
+              "deviceType",
+              "serialNumber",
+              "assetCodeOrigin",
               "hostname",
               "os",
+              "condition",
+              "custody",
+              "retirementKind",
+              "currentDepartment",
               "holder",
               "registrationId",
               "registeredFrom",
               "state",
               "collection",
               "signatureRecorded",
+              "signatureMissing",
               "retiredAt",
               "acknowledgedFrom",
               "latestAcknowledgement",
               "latestSignatureRecord",
               "lastEnd",
-              "retirementReason"
+              "retirementReason",
+              "conditionNote",
+              "voidedAt",
+              "voidReason",
+              "updatedAt",
+              "collectorInstalled",
+              "openReturnTask"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -131117,8 +131573,24 @@
                   "properties": {
                     "id": { "type": "string", "format": "uuid" },
                     "assetCode": { "type": "string" },
+                    "deviceType": { "type": "string", "enum": ["LAP", "PC", "OTH"] },
+                    "serialNumber": { "type": "string", "nullable": true },
+                    "assetCodeOrigin": { "type": "string", "enum": ["GENERATED", "LEGACY"] },
                     "hostname": { "type": "string" },
                     "os": { "type": "string" },
+                    "condition": { "type": "string", "enum": ["USABLE", "IN_REPAIR", "BROKEN"] },
+                    "custody": {
+                      "type": "string",
+                      "enum": ["VOIDED", "RETIRED", "AWAITING_RETURN", "ASSIGNED", "IN_STOCK"]
+                    },
+                    "retirementKind": { "type": "string", "enum": ["DISPOSED", "LOST", null], "nullable": true },
+                    "currentDepartment": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
                     "holder": {
                       "type": "object",
                       "properties": {
@@ -131165,19 +131637,28 @@
                       "additionalProperties": false
                     },
                     "signatureRecorded": { "type": "boolean" },
+                    "signatureMissing": { "type": "boolean" },
                     "retiredAt": { "type": "string", "format": "date-time", "nullable": true }
                   },
                   "required": [
                     "id",
                     "assetCode",
+                    "deviceType",
+                    "serialNumber",
+                    "assetCodeOrigin",
                     "hostname",
                     "os",
+                    "condition",
+                    "custody",
+                    "retirementKind",
+                    "currentDepartment",
                     "holder",
                     "registrationId",
                     "registeredFrom",
                     "state",
                     "collection",
                     "signatureRecorded",
+                    "signatureMissing",
                     "retiredAt"
                   ],
                   "additionalProperties": false
@@ -131254,13 +131735,16 @@
                         "DEPARTURE",
                         "EMPLOYEE_LEFT",
                         "DEPARTURE_BLOCKED",
+                        "RETURNED",
                         null
                       ],
                       "nullable": true
                     },
                     "acknowledgedFrom": { "type": "string", "format": "date-time", "nullable": true },
                     "collectionStoppedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "collectorInstalled": { "type": "boolean" },
                     "signatureRecorded": { "type": "boolean" },
+                    "signatureMissing": { "type": "boolean" },
                     "lastAcceptedAt": {
                       "type": "string",
                       "format": "date-time",
@@ -131277,7 +131761,9 @@
                     "endCause",
                     "acknowledgedFrom",
                     "collectionStoppedAt",
+                    "collectorInstalled",
                     "signatureRecorded",
+                    "signatureMissing",
                     "lastAcceptedAt"
                   ],
                   "additionalProperties": false
@@ -131318,6 +131804,60 @@
         "type": "object",
         "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 1000 } },
         "required": ["reason"],
+        "additionalProperties": false
+      },
+      "DeviceAttributesBodyDto": {
+        "type": "object",
+        "properties": {
+          "expectedUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The updatedAt of the machine as the caller read it."
+          },
+          "hostname": { "type": "string", "minLength": 1, "maxLength": 63 },
+          "os": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "serialNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "The serial number of the machine; null takes it away. One serial number belongs to one machine.",
+            "nullable": true
+          },
+          "deviceType": {
+            "description": "The kind of machine: a laptop, a desktop or another. The asset code does not change with it.",
+            "type": "string",
+            "enum": ["LAP", "PC", "OTH"]
+          }
+        },
+        "required": ["expectedUpdatedAt"],
+        "additionalProperties": false
+      },
+      "DeviceAttributesResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "assetCode": { "type": "string" },
+              "hostname": { "type": "string" },
+              "os": { "type": "string" },
+              "deviceType": { "type": "string", "enum": ["LAP", "PC", "OTH"] },
+              "serialNumber": { "type": "string", "nullable": true },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The version of the machine: the next correction names it as expectedUpdatedAt."
+              }
+            },
+            "required": ["id", "assetCode", "hostname", "os", "deviceType", "serialNumber", "updatedAt"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "SignatureRecordBodyDto": {

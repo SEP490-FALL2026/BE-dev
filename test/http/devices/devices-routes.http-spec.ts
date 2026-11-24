@@ -38,9 +38,10 @@ describe('company machine routes (http contract, no database)', () => {
   });
 
   const routes = [
-    ['post', DEVICES, { assetCode: 'AS-1', hostname: 'h', os: 'Windows 11', holderEmployeeId: ID }],
+    ['post', DEVICES, { deviceType: 'LAP', hostname: 'h', os: 'Windows 11' }],
     ['get', DEVICES, undefined],
     ['get', `${DEVICES}/${ID}`, undefined],
+    ['patch', `${DEVICES}/${ID}`, { expectedUpdatedAt: '2026-11-24T00:00:00.000Z', hostname: 'h2' }],
     ['get', `${DEVICES}/${ID}/registrations`, undefined],
     ['post', `${DEVICES}/${ID}/holder-changes`, { holderEmployeeId: ID }],
     ['post', `${DEVICES}/${ID}/retirements`, { reason: 'broken' }],
@@ -73,6 +74,11 @@ describe('company machine routes (http contract, no database)', () => {
       await as(request(server).post(DEVICES).send(routes[0][2])),
       await as(request(server).get(DEVICES)),
       await as(request(server).get(`${DEVICES}/${ID}`)),
+      await as(
+        request(server)
+          .patch(`${DEVICES}/${ID}`)
+          .send({ expectedUpdatedAt: '2026-11-24T00:00:00.000Z', hostname: 'h2' }),
+      ),
       await as(request(server).get(`${DEVICES}/${ID}/registrations`)),
       await as(request(server).post(`${DEVICES}/${ID}/holder-changes`).send({ holderEmployeeId: ID })),
       await as(request(server).post(`${DEVICES}/${ID}/retirements`).send({ reason: 'x' })),
@@ -178,9 +184,29 @@ describe('company machine routes (http contract, no database)', () => {
       DEVICES,
       { ...(routes[0][2] as object), organizationId: ID },
     ],
-    ['a machine with no holder', 'post', DEVICES, { assetCode: 'AS-1', hostname: 'h', os: 'Windows 11' }],
-    ['a handover day that is not a date', 'post', DEVICES, { ...(routes[0][2] as object), handedOverOn: '2026-02-30' }],
-    ['a blank asset code', 'post', DEVICES, { ...(routes[0][2] as object), assetCode: '   ' }],
+    [
+      'a hand-typed asset code (generated only)',
+      'post',
+      DEVICES,
+      { ...(routes[0][2] as object), assetCode: 'LAP-26-0001' },
+    ],
+    [
+      'a handover day that is not a date',
+      'post',
+      DEVICES,
+      { ...(routes[0][2] as object), holderEmployeeId: ID, handedOverOn: '2026-02-30' },
+    ],
+    ['a duplicate bundled plan id', 'post', DEVICES, { ...(routes[0][2] as object), bundledPlanIds: [ID, ID] }],
+    ['a blank hostname', 'post', DEVICES, { ...(routes[0][2] as object), hostname: '   ' }],
+    ['an unknown deviceType', 'post', DEVICES, { deviceType: 'TABLET', hostname: 'h', os: 'Android' }],
+    [
+      'an update on non-UUID id',
+      'patch',
+      `${DEVICES}/not-a-uuid`,
+      { expectedUpdatedAt: '2026-11-24T00:00:00.000Z', hostname: 'x' },
+    ],
+    ['an update with missing expectedUpdatedAt', 'patch', `${DEVICES}/${ID}`, { hostname: 'x' }],
+    ['an invalid custody filter', 'get', `${DEVICES}?custody=VOIDED`, undefined],
     ['a page size over 100', 'get', `${DEVICES}?pageSize=101`, undefined],
     ['a state that does not exist', 'get', `${DEVICES}?state=BROKEN`, undefined],
     ['an id that is not a UUID', 'get', `${DEVICES}/not-a-uuid`, undefined],
@@ -260,8 +286,22 @@ describe('company machine routes (http contract, no database)', () => {
     it.each([
       [
         'DeviceCreateBodyDto',
-        ['assetCode', 'hostname', 'os', 'holderEmployeeId', 'handedOverOn'],
-        ['assetCode', 'hostname', 'os', 'holderEmployeeId'],
+        [
+          'deviceType',
+          'hostname',
+          'os',
+          'serialNumber',
+          'bundledPlanIds',
+          'holderEmployeeId',
+          'handedOverOn',
+          'collectorInstalled',
+        ],
+        ['deviceType', 'hostname', 'os'],
+      ],
+      [
+        'DeviceAttributesBodyDto',
+        ['expectedUpdatedAt', 'hostname', 'os', 'serialNumber', 'deviceType'],
+        ['expectedUpdatedAt'],
       ],
       ['HolderChangeBodyDto', ['holderEmployeeId'], ['holderEmployeeId']],
       ['RetirementBodyDto', ['reason'], ['reason']],

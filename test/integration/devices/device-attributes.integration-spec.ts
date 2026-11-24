@@ -13,7 +13,8 @@ import {
 } from '../../../src/modules/devices/attributes/device-attributes.errors';
 import { DeviceAttributesRepo } from '../../../src/modules/devices/attributes/device-attributes.repo';
 import { DeviceAttributesService } from '../../../src/modules/devices/attributes/device-attributes.service';
-import { DeviceNotFoundError } from '../../../src/modules/devices/public/devices.errors';
+import { DeviceNotFoundError, DeviceNotInChargeError } from '../../../src/modules/devices/public/devices.errors';
+import type { IdentityAccessApi } from '../../../src/modules/identity-access/public/identity-access.api';
 import type { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { Barrier } from '../../support/concurrency-harness';
 import {
@@ -34,6 +35,8 @@ describe('the correction of the attributes of a machine (integration, real Postg
   let sql: Client;
   let prisma: PrismaService;
   let service: DeviceAttributesService;
+  let holderDept: Map<string, string>;
+  let actingByDepartment: Map<string, { inCharge: string | null; substitute: string | null; actors: string[] }>;
   const events: AuditEventInput[] = [];
   const org = randomUUID();
   const actor = {
@@ -98,12 +101,28 @@ describe('the correction of the attributes of a machine (integration, real Postg
         return Promise.resolve();
       },
     } as unknown as AuditApi;
-    const organizationReads = { getOrganization: () => Promise.resolve({ id: org }) } as unknown as OrganizationReadApi;
+    actingByDepartment = new Map();
+    holderDept = new Map();
+    const usable = new Set<string>();
+    const organizationReads = {
+      getOrganization: () => Promise.resolve({ id: org }),
+      businessToday: () => Promise.resolve('2026-11-24'),
+      workDepartmentsOf: (ids: readonly string[]) =>
+        Promise.resolve(new Map(ids.flatMap((id) => (holderDept.has(id) ? [[id, holderDept.get(id)!]] : [])))),
+      itAdminsActingFor: (deptIds: readonly string[]) =>
+        Promise.resolve(
+          new Map(deptIds.flatMap((d) => (actingByDepartment.has(d) ? [[d, actingByDepartment.get(d)!]] : []))),
+        ),
+    } as unknown as OrganizationReadApi;
+    const identity = {
+      findUsableItAdminEmployeeIds: () => Promise.resolve(usable),
+    } as unknown as IdentityAccessApi;
     service = new DeviceAttributesService(
       new DeviceAttributesRepo(),
       organizationReads,
       audit,
       new TransactionRunner(prisma, config),
+      identity,
     );
     await sql.query(
       `INSERT INTO organizations (id, name, time_zone, reporting_currency) VALUES ($1, 'Acme', 'UTC', 'VND')`,
@@ -226,4 +245,43 @@ describe('the correction of the attributes of a machine (integration, real Postg
       expect(rejected.reason).toBeInstanceOf(DeviceStaleError);
     }
   }, 120000);
+
+  it('allows any IT Admin when in stock, and restricts assigned devices to in-charge or substitute IT Admin', async () => {
+    const devId = await insertDevice('PC-26-0099');
+    const holderId = randomUUID();
+    const deptId = randomUUID();
+    const itInChargeId = randomUUID();
+    const itSubId = randomUUID();
+    const itOtherId = randomUUID();
+    await sql.query(
+      `INSERT INTO employees (id, organization_id, employee_code, full_name, work_email, normalized_work_email, hire_date, updated_at)
+       VALUES ($1, $2, 'E-ATTR-H', 'Attr Holder', 'attr-h@acme.vn', 'attr-h@acme.vn', '2025-01-01', now())`,
+      [holderId, org],
+    );
+    await sql.query(
+      `INSERT INTO device_registrations (id, organization_id, device_id, holder_employee_id, valid_from, created_by_app_user_id)
+       VALUES (gen_random_uuid(), $1, $2, $3, '2026-11-24', $4)`,
+      [org, devId, holderId, randomUUID()],
+    );
+    holderDept.set(holderId, deptId);
+    actingByDepartment.set(deptId, { inCharge: itInChargeId, substitute: itSubId, actors: [itInChargeId, itSubId] });
+
+    await expect(
+      service.change(
+        { appUserId: randomUUID(), employeeId: itOtherId, roles: ['IT_ADMIN'] } as unknown as AuthenticatedPrincipal,
+        devId,
+        { expectedUpdatedAt: await versionOf(devId), hostname: 'BLOCKED' },
+      ),
+    ).rejects.toBeInstanceOf(DeviceNotInChargeError);
+
+    const updated = await service.change(
+      { appUserId: randomUUID(), employeeId: itSubId, roles: ['IT_ADMIN'] } as unknown as AuthenticatedPrincipal,
+      devId,
+      { expectedUpdatedAt: await versionOf(devId), hostname: 'SUB-OK' },
+    );
+    expect(updated.hostname).toBe('SUB-OK');
+    expect(events[0].after).toEqual({ hostname: 'SUB-OK', bySubstitute: true });
+    holderDept.delete(holderId);
+    actingByDepartment.delete(deptId);
+  });
 });

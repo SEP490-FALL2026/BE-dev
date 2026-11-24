@@ -101,6 +101,10 @@ export class RegistryRepo {
       organizationId: string;
       assetCode: string;
       normalizedAssetCode: string;
+      assetCodeOrigin: 'GENERATED' | 'LEGACY';
+      deviceType: 'LAP' | 'PC' | 'OTH';
+      serialNumber: string | null;
+      normalizedSerialNumber: string | null;
       hostname: string;
       os: string;
       createdByAppUserId: string;
@@ -171,6 +175,7 @@ export class RegistryRepo {
       deviceId: string;
       holderEmployeeId: string;
       validFrom: BusinessDate;
+      collectorInstalled: boolean;
       createdByAppUserId: string;
     },
   ): Promise<RegistrationRecord> {

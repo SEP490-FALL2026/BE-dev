@@ -8,8 +8,15 @@ import { DocumentHarness, PDF } from './document-harness';
 export interface DeviceWire {
   id: string;
   assetCode: string;
+  deviceType: 'LAP' | 'PC' | 'OTH';
+  serialNumber: string | null;
+  assetCodeOrigin: 'GENERATED' | 'LEGACY';
   hostname: string;
   os: string;
+  condition: 'USABLE' | 'IN_REPAIR' | 'BROKEN';
+  custody: 'IN_STOCK' | 'ASSIGNED' | 'AWAITING_RETURN' | 'RETIRED' | 'VOIDED';
+  retirementKind: 'DISPOSED' | 'LOST' | null;
+  currentDepartment: { id: string; name: string } | null;
   holder: { id: string; employeeCode: string; fullName: string } | null;
   registrationId: string | null;
   registeredFrom: string | null;
@@ -19,6 +26,7 @@ export interface DeviceWire {
     lastAcceptedAt: string | null;
   };
   signatureRecorded: boolean;
+  signatureMissing: boolean;
   retiredAt: string | null;
   acknowledgedFrom?: string | null;
   latestAcknowledgement?: { noticeVersionNumber: number; acknowledgedAt: string } | null;
@@ -30,6 +38,18 @@ export interface DeviceWire {
     endCause: string;
   } | null;
   retirementReason?: string | null;
+  conditionNote?: string | null;
+  voidedAt?: string | null;
+  voidReason?: string | null;
+  updatedAt?: string;
+  collectorInstalled?: boolean | null;
+  openReturnTask?: {
+    id: string;
+    dueOn: string;
+    departmentId: string | null;
+    actingItAdmins: Array<{ id: string; fullName: string }>;
+    waiting: boolean;
+  } | null;
 }
 
 export interface NoticeWire {
@@ -104,6 +124,10 @@ export class DevicesHarness extends DocumentHarness {
    */
   override async start(options: Parameters<DocumentHarness['start']>[0] = {}): Promise<void> {
     await super.start(options);
+    await this.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+      this.seed.departmentId,
+      this.it1.employeeId,
+    ]);
     const route = Object.getOwnPropertyDescriptor(DeviceEnrollmentController.prototype, 'create')?.value as object;
     Reflect.defineMetadata('THROTTLER:LIMITdefault', 100_000, route);
   }
@@ -112,6 +136,8 @@ export class DevicesHarness extends DocumentHarness {
 
   createDevice = (body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post('/api/v1/devices').set(this.as(account)).send(body);
+  updateDevice = (id: string, body: object, account: ApiAccount = this.it1) =>
+    request(this.server()).patch(`/api/v1/devices/${id}`).set(this.as(account)).send(body);
   listDevices = (query = '', account: ApiAccount = this.it1) =>
     request(this.server()).get(`/api/v1/devices${query}`).set(this.as(account));
   getDevice = (id: string, account: ApiAccount = this.it1) =>
@@ -265,16 +291,33 @@ export class DevicesHarness extends DocumentHarness {
   /** A new asset code each call, so cases do not collide. */
   assetCode = (): string => `AS-${String((this.assets += 1)).padStart(4, '0')}`;
 
-  /** A machine registered to `holderEmployeeId`, as the IT Admin does. */
-  async registered(holderEmployeeId: string, over: object = {}): Promise<DeviceWire> {
+  /** A machine registered to `holderEmployeeId`, as the IT Admin does (places unplaced fixtures into seed department for H17). */
+  async registered(holderEmployeeId: string, over: object = {}, account: ApiAccount = this.it1): Promise<DeviceWire> {
+    this.assets += 1;
+    const placed = await this.ctx.sql.query<{ id: string }>(
+      `SELECT id FROM employee_placements WHERE employee_id = $1 AND valid_to IS NULL LIMIT 1`,
+      [holderEmployeeId],
+    );
+    if (placed.rowCount === 0) {
+      await this.ctx.sql.query(
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2020-01-01')`,
+        [this.seed.organizationId, holderEmployeeId, this.seed.departmentId],
+      );
+    }
+
     return this.dataOf<DeviceWire>(
-      await this.createDevice({
-        assetCode: this.assetCode(),
-        hostname: `DES-${this.assets}`,
-        os: 'Windows 11',
-        holderEmployeeId,
-        ...over,
-      }).expect(201),
+      await this.createDevice(
+        {
+          deviceType: 'LAP',
+          hostname: `DES-${this.assets}`,
+          os: 'Windows 11',
+          holderEmployeeId,
+          collectorInstalled: true,
+          ...over,
+        },
+        account,
+      ).expect(201),
     );
   }
 

@@ -2,8 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { DevicesApi } from '../../../src/modules/devices/public/devices.api';
+import { RegistryService } from '../../../src/modules/devices/registry/registry.service';
 import { PersonnelFileHookContributions } from '../../../src/modules/personnel/public/personnel.extension-points';
+import { principalOf } from '../../support/builders/account.builder';
 import { DevicesHarness, type DeviceWire } from '../../support/devices-harness';
+import { pretendBusinessToday } from '../../support/pretend-today';
 
 const h = new DevicesHarness();
 
@@ -32,49 +35,122 @@ describe('the register of company machines (integration, real PostgreSQL)', () =
     await h.stop();
   });
 
-  it('US-09-01 AC-1, AC-5: registers a machine to a person, today by default, and lists their machines by asset code', async () => {
+  it('US-09-01 AC-1, AC-5: registers machines to a person, generating asset codes in order, and lists by asset code', async () => {
     const e1 = await holder();
-    const second = await h.registered(e1, { assetCode: 'ZZ-0002' });
-    const first = await h.registered(e1, { assetCode: 'AA-0001', os: 'Windows 11' });
+    const first = await h.registered(e1, { deviceType: 'LAP', os: 'Windows 11' });
+    const second = await h.registered(e1, { deviceType: 'LAP' });
 
     expect(first).toMatchObject({
-      assetCode: 'AA-0001',
+      deviceType: 'LAP',
+      assetCodeOrigin: 'GENERATED',
+      condition: 'USABLE',
+      custody: 'ASSIGNED',
       state: 'AWAITING_ACKNOWLEDGEMENT',
       signatureRecorded: false,
+      signatureMissing: true,
       retiredAt: null,
       holder: { id: e1 },
+      currentDepartment: { id: h.seed.departmentId },
       registeredFrom: h.today(),
       acknowledgedFrom: null,
       lastEnd: null,
+      openReturnTask: null,
     });
+    expect(first.assetCode).toMatch(/^LAP-\d{2}-\d{4}$/);
     const page = h.dataOf<{ items: DeviceWire[]; pagination: { totalItems: number } }>(
       await h.listDevices(`?holderEmployeeId=${e1}`).expect(200),
     );
-    expect(page.items.map((item) => item.assetCode)).toEqual(['AA-0001', 'ZZ-0002']);
+    expect(page.items.map((item) => item.assetCode)).toEqual([first.assetCode, second.assetCode].sort());
     expect(page.pagination.totalItems).toBe(2);
     expect(second.holder?.id).toBe(e1);
   });
 
-  it('US-09-01 AC-3: refuses a second machine with the same asset code however it is written, and the register does not change', async () => {
-    const e = await holder();
-    await h.registered(e, { assetCode: 'AS-0042' });
+  it('W2-03: registers an in-stock laptop, enforces unique serials regardless of case/spacing, and requires holder for handover fields', async () => {
+    const spy = pretendBusinessToday(h.ctx.app, '2026-12-01');
+    let created: DeviceWire;
+    try {
+      created = h.dataOf<DeviceWire>(
+        await h
+          .createDevice({
+            deviceType: 'LAP',
+            hostname: 'DES-LT-07',
+            os: 'Windows 11',
+            serialNumber: '5CD1234XYZ',
+          })
+          .expect(201),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(created.assetCode).toMatch(/^LAP-26-\d{4}$/);
+    expect(created).toMatchObject({
+      deviceType: 'LAP',
+      assetCodeOrigin: 'GENERATED',
+      custody: 'IN_STOCK',
+      condition: 'USABLE',
+      holder: null,
+      currentDepartment: null,
+      collectorInstalled: null,
+      signatureMissing: false,
+      serialNumber: '5CD1234XYZ',
+    });
+
     const before = Number((await sql().query<{ n: string }>('SELECT count(*) AS n FROM managed_devices')).rows[0].n);
-
-    const response = await h
-      .createDevice({ assetCode: '  as-0042 ', hostname: 'x', os: 'y', holderEmployeeId: e })
+    const dup = await h
+      .createDevice({ deviceType: 'LAP', hostname: 'x', os: 'y', serialNumber: '  5cd1234xyz ' })
       .expect(409);
-
-    expect(h.codeOf(response)).toBe('DEVICE.ASSET_CODE_TAKEN');
+    expect(h.codeOf(dup)).toBe('DEVICE.SERIAL_TAKEN');
     expect(Number((await sql().query<{ n: string }>('SELECT count(*) AS n FROM managed_devices')).rows[0].n)).toBe(
       before,
     );
+
+    const noHolder = await h
+      .createDevice({ deviceType: 'LAP', hostname: 'x', os: 'y', collectorInstalled: true })
+      .expect(422);
+    expect(h.codeOf(noHolder)).toBe('DEVICE.HANDOVER_WITHOUT_HOLDER');
+
+    const otherDept = await h.department('REG-OTHER');
+    const title = await h.jobTitle('Dev');
+    const otherEmp = await h.member(otherDept.code, `E-OTH-${(holderCount.n += 1)}`, title);
+    expect(
+      h.codeOf(
+        await h.createDevice({ deviceType: 'LAP', hostname: 'x', os: 'y', holderEmployeeId: otherEmp }).expect(403),
+      ),
+    ).toBe('DEVICE.NOT_IN_CHARGE');
+  });
+
+  it('uses organization time zone on Dec 31 rollover when generating asset codes via RegistryService', async () => {
+    const actor = await principalOf(h.ctx, h.it1.accessToken);
+    const registry = h.ctx.app.get(RegistryService);
+    const idDec31 = await registry.create(
+      actor,
+      { deviceType: 'PC', hostname: 'TZ-DEC31', os: 'Linux' },
+      new Date('2026-12-31T16:59:59.000Z'),
+    );
+    const idJan01 = await registry.create(
+      actor,
+      { deviceType: 'PC', hostname: 'TZ-JAN01', os: 'Linux' },
+      new Date('2026-12-31T17:00:00.000Z'),
+    );
+
+    const dec31View = h.dataOf<DeviceWire>(await h.getDevice(idDec31).expect(200));
+    const jan01View = h.dataOf<DeviceWire>(await h.getDevice(idJan01).expect(200));
+    expect(dec31View.assetCode).toMatch(/^PC-26-\d{4}$/);
+    expect(jan01View.assetCode).toMatch(/^PC-27-\d{4}$/);
   });
 
   it('US-09-01 AC-9: a machine is not registered to a person who does not exist, is handing over, or on a day that cannot be', async () => {
     const e = await holder();
+    await h.registered(e);
     const handing = await holder();
+    await sql().query(
+      `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+       VALUES (gen_random_uuid(), $1, $2, $3, '2020-01-01')`,
+      [h.seed.organizationId, handing, h.seed.departmentId],
+    );
     await sql().query(`UPDATE employees SET work_state = 'HANDING_OVER' WHERE id = $1`, [handing]);
-    const body = (over: object) => ({ assetCode: h.assetCode(), hostname: 'h', os: 'o', holderEmployeeId: e, ...over });
+    const body = (over: object) => ({ deviceType: 'LAP', hostname: 'h', os: 'o', holderEmployeeId: e, ...over });
     const tomorrow = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
 
     expect(h.codeOf(await h.createDevice(body({ holderEmployeeId: randomUUID() })).expect(422))).toBe(
@@ -203,11 +279,15 @@ describe('the register of company machines (integration, real PostgreSQL)', () =
 
   it('lists by state and by search, a page at a time, with the total of the same snapshot', async () => {
     const e = await holder();
-    for (let index = 0; index < 12; index += 1)
-      await h.registered(e, { assetCode: `PG-${String(index).padStart(2, '0')}`, hostname: `PAGE-HOST-${index}` });
+    const createdCodes: string[] = [];
+    for (let index = 0; index < 12; index += 1) {
+      const created = await h.registered(e, { hostname: `PAGE-HOST-${index}` });
+      createdCodes.push(created.assetCode);
+    }
+    const sorted = [...createdCodes].sort();
 
     const firstPage = h.dataOf<{ items: DeviceWire[]; pagination: { totalItems: number; totalPages: number } }>(
-      await h.listDevices(`?search=pg-&pageSize=5&page=1`).expect(200),
+      await h.listDevices(`?search=PAGE-HOST-&pageSize=5&page=1`).expect(200),
     );
     const lastPage = h.dataOf<{ items: DeviceWire[] }>(
       await h.listDevices(`?search=PAGE-HOST&pageSize=5&page=3`).expect(200),
@@ -216,7 +296,7 @@ describe('the register of company machines (integration, real PostgreSQL)', () =
       await h.listDevices(`?state=AWAITING_ACKNOWLEDGEMENT&holderEmployeeId=${e}&pageSize=100`).expect(200),
     );
 
-    expect(firstPage.items.map((item) => item.assetCode)).toEqual(['PG-00', 'PG-01', 'PG-02', 'PG-03', 'PG-04']);
+    expect(firstPage.items.map((item) => item.assetCode)).toEqual(sorted.slice(0, 5));
     expect(firstPage.pagination).toMatchObject({ totalItems: 12, totalPages: 3 });
     expect(lastPage.items).toHaveLength(2);
     expect(waiting.items).toHaveLength(12);
@@ -232,6 +312,69 @@ describe('the register of company machines (integration, real PostgreSQL)', () =
     expect(
       h.dataOf<{ items: DeviceWire[] }>(await h.listDevices(`?state=ACTIVE&holderEmployeeId=${e}`).expect(200)).items,
     ).toEqual([]);
+  });
+
+  it('W2-05: supports custody, signatureMissing filters, hides VOIDED devices from lists/counts while keeping GET detail, and enforces PATCH acting IT Admin', async () => {
+    const notice = await h.published();
+    const dept2 = await h.department('REG-F3');
+    const title = await h.jobTitle('Engineer');
+    const empDept2 = await h.member(dept2.code, `E-F3-${(holderCount.n += 1)}`, title);
+    const itDept2Code = `IT-F3-${(holderCount.n += 1)}`;
+    const itDept2Id = await h.member(dept2.code, itDept2Code, title);
+    const itDept2 = await h.account(itDept2Code, itDept2Id, 'IT_ADMIN');
+    await sql().query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [dept2.id, itDept2Id]);
+
+    const assignedDept2 = await h.registered(empDept2, {}, itDept2);
+    // F3: assigned device allows dept2 IT Admin and refuses h.it1 with 403 DEVICE.NOT_IN_CHARGE.
+    expect(
+      h.codeOf(
+        await h
+          .updateDevice(assignedDept2.id, {
+            expectedUpdatedAt: assignedDept2.updatedAt,
+            hostname: 'SHOULD-FAIL',
+          })
+          .expect(403),
+      ),
+    ).toBe('DEVICE.NOT_IN_CHARGE');
+    const patchedAssigned = h.dataOf<{ hostname: string; assetCode: string }>(
+      await h
+        .updateDevice(
+          assignedDept2.id,
+          { expectedUpdatedAt: assignedDept2.updatedAt, deviceType: 'PC', hostname: 'F3-OK' },
+          itDept2,
+        )
+        .expect(200),
+    );
+    expect(patchedAssigned).toMatchObject({ assetCode: assignedDept2.assetCode, hostname: 'F3-OK' });
+
+    // signatureMissing flag and filter.
+    expect(
+      h
+        .dataOf<{ items: DeviceWire[] }>(
+          await h.listDevices(`?signatureMissing=true&holderEmployeeId=${empDept2}`).expect(200),
+        )
+        .items.map((item) => item.id),
+    ).toEqual([assignedDept2.id]);
+    await h.signed(assignedDept2.registrationId as string, notice.id);
+    expect(h.dataOf<DeviceWire>(await h.getDevice(assignedDept2.id).expect(200)).signatureMissing).toBe(false);
+
+    // VOIDED excluded from list/count but still 200 on detail and 409 DEVICE.VOIDED on PATCH.
+    const inStock = h.dataOf<DeviceWire>(
+      await h.createDevice({ deviceType: 'OTH', hostname: 'VOID-ME', os: 'Linux' }).expect(201),
+    );
+    await h.updateDevice(inStock.id, { expectedUpdatedAt: inStock.updatedAt, hostname: 'IN-STOCK-OK' }).expect(200);
+    await sql().query(
+      `UPDATE managed_devices SET voided_at = now(), void_reason = 'Duplicate entry', voided_by_app_user_id = $2 WHERE id = $1`,
+      [inStock.id, h.it1.appUserId],
+    );
+    const voidedDetail = h.dataOf<DeviceWire>(await h.getDevice(inStock.id).expect(200));
+    expect(voidedDetail).toMatchObject({ custody: 'VOIDED', voidReason: 'Duplicate entry' });
+    expect(h.dataOf<{ items: DeviceWire[] }>(await h.listDevices(`?search=IN-STOCK-OK`).expect(200)).items).toEqual([]);
+    expect(
+      h.codeOf(
+        await h.updateDevice(inStock.id, { expectedUpdatedAt: voidedDetail.updatedAt, hostname: 'X' }).expect(409),
+      ),
+    ).toBe('DEVICE.VOIDED');
   });
 
   it('TP-01, TP-02: the database refuses to move a holder, end a registration twice, delete one, open two on a machine or overlap days', async () => {

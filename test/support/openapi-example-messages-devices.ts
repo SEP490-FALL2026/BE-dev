@@ -21,6 +21,7 @@ export const SUCCESS_MESSAGES_DEVICES: Readonly<Record<string, string>> = {
   deviceStopRequestComplete: 'DEVICE_STOP_REQUEST.COMPLETED',
   deviceStopRequestList: 'DEVICE_STOP_REQUEST.LISTED',
   deviceToolStatusList: 'DEVICE_TOOL_STATUS.LISTED',
+  deviceUpdate: 'DEVICE.UPDATED',
   deviceUsageList: 'DEVICE_USAGE.LISTED',
   monitoringNoticeCurrentGet: 'MONITORING_NOTICE.FETCHED',
   monitoringNoticeVersionCreate: 'MONITORING_NOTICE.PUBLISHED',

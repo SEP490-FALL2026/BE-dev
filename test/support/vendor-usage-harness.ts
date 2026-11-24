@@ -76,6 +76,10 @@ export class UsageHarness extends SeatHarness {
 
   override async start(options: Parameters<SeatHarness['start']>[0] = {}): Promise<void> {
     await super.start(options);
+    await this.ctx.sql.query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [
+      this.seed.departmentId,
+      this.it1.employeeId,
+    ]);
     await this.checklists.load(this.ctx.sql, this.seed.organizationId);
   }
 
@@ -199,14 +203,26 @@ export class UsageHarness extends SeatHarness {
     this.machines += 1;
     // The machine was already in the hands of its holder before the days a test sends: it is registered on an earlier day.
     const spy = pretendBusinessToday(this.ctx.app, '2026-01-05');
+    const placed = await this.ctx.sql.query<{ id: string }>(
+      `SELECT id FROM employee_placements WHERE employee_id = $1 AND valid_to IS NULL LIMIT 1`,
+      [employeeId],
+    );
+    if (placed.rowCount === 0) {
+      await this.ctx.sql.query(
+        `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+         VALUES (gen_random_uuid(), $1, $2, $3, '2020-01-01')`,
+        [this.seed.organizationId, employeeId, this.seed.departmentId],
+      );
+    }
     const response = await request(this.server())
       .post('/api/v1/devices')
       .set(this.as(this.it1))
       .send({
-        assetCode: `UE-${this.machines}-${randomUUID().slice(0, 6)}`,
+        deviceType: 'LAP',
         hostname: `UE-${this.machines}`,
         os: 'Windows 11',
         holderEmployeeId: employeeId,
+        collectorInstalled: true,
       })
       .expect(201);
     spy.mockResolvedValue(today);

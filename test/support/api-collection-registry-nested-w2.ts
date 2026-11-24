@@ -81,4 +81,17 @@ export const NESTED_ARRAYS_W2: readonly NestedArrayEntry[] = [
     rationale: 'Acting IT Admins of the task department shown on the task detail.',
     removeWhen: 'Review when ACTING_IT_ADMINS_MAX changes.',
   },
+  {
+    key: 'deviceGet#openReturnTask.actingItAdmins',
+    classification: 'bounded',
+    findings: [],
+    owner: 'g7-device-registry-acknowledgement',
+    businessMaximum: {
+      maxItems: 2,
+      source:
+        'OPEN_RETURN_TASK_ACTING_IT_ADMINS_MAX in registry.dto.ts (at most one usable in-charge and one usable substitute)',
+    },
+    rationale: 'Acting IT Admins for an open device return task shown on device detail.',
+    removeWhen: 'Review when OPEN_RETURN_TASK_ACTING_IT_ADMINS_MAX changes.',
+  },
 ];

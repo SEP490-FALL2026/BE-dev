@@ -54,26 +54,43 @@ export class RegistryController {
   ) {}
 
   @Post()
-  @ApiOperation({ operationId: 'deviceCreate', summary: 'Register a company machine to a holder' })
+  @ApiOperation({ operationId: 'deviceCreate', summary: 'Register a company machine' })
   @ApiSuccessResponse(DeviceDetailResponseDto, {
     status: HttpStatus.CREATED,
     message: 'DEVICE.REGISTERED',
-    description: 'The machine and its registration to the holder, waiting for the holder to acknowledge the notice.',
+    description: 'The machine with a generated asset code, placed in stock or registered to the initial holder.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    IT_ADMIN_ONLY,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an IT Admin registers a machine; handing over to an initial holder requires an acting IT Admin of their department (DEVICE.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), the asset code is taken (DEVICE.ASSET_CODE_TAKEN), or the machine has a registration over those days (DEVICE.REGISTRATION_OVERLAP).',
-      examples: [EXAMPLES.HOLDER_NOT_WORKING, EXAMPLES.ASSET_CODE_TAKEN, EXAMPLES.REGISTRATION_OVERLAP],
+        'The holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), the serial number is used by another machine (DEVICE.SERIAL_TAKEN), the asset code counter is exhausted (DEVICE.ASSET_CODE_EXHAUSTED), the generated asset code collided (DEVICE.ASSET_CODE_TAKEN), or the machine has an overlapping registration (DEVICE.REGISTRATION_OVERLAP).',
+      examples: [
+        EXAMPLES.HOLDER_NOT_WORKING,
+        EXAMPLES.SERIAL_TAKEN,
+        EXAMPLES.ASSET_CODE_EXHAUSTED,
+        EXAMPLES.ASSET_CODE_TAKEN,
+        EXAMPLES.REGISTRATION_OVERLAP,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), the holder does not exist (DEVICE.HOLDER_NOT_FOUND) or the handover day is not between the hire date and today (DEVICE.HANDOVER_DATE_INVALID).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.HOLDER_NOT_FOUND, EXAMPLES.HANDOVER_DATE_INVALID],
+        'The request is invalid (VALIDATION_ERROR), handover fields were given without a holder (DEVICE.HANDOVER_WITHOUT_HOLDER), a bundled plan is invalid (DEVICE_ACTIVATION.PLAN_NOT_BUNDLED), the holder does not exist (DEVICE.HOLDER_NOT_FOUND) or the handover day is not between the hire date and today (DEVICE.HANDOVER_DATE_INVALID).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.HANDOVER_WITHOUT_HOLDER,
+        EXAMPLES.PLAN_NOT_BUNDLED,
+        EXAMPLES.HOLDER_NOT_FOUND,
+        EXAMPLES.HANDOVER_DATE_INVALID,
+      ],
     },
   )
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DeviceCreateBodyDto) {

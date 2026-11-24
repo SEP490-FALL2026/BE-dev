@@ -71,3 +71,24 @@ export class DeviceSignatureNoticeVersionNotFoundError extends Error {
     this.name = 'DeviceSignatureNoticeVersionNotFoundError';
   }
 }
+
+export class DeviceSerialTakenError extends Error {
+  constructor() {
+    super('The serial number is already used by another machine.');
+    this.name = 'DeviceSerialTakenError';
+  }
+}
+
+export class DeviceHandoverWithoutHolderError extends Error {
+  constructor() {
+    super('Handover date or collector installation requires a holder.');
+    this.name = 'DeviceHandoverWithoutHolderError';
+  }
+}
+
+export class DevicePlanNotBundledError extends Error {
+  constructor() {
+    super('Every bundled plan must be an active device-bundled K4 plan.');
+    this.name = 'DevicePlanNotBundledError';
+  }
+}

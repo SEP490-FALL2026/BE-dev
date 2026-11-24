@@ -84,4 +84,16 @@ export const W2_REGISTRY_EVENTS: readonly RegistryEvent[] = [
     date: '2026-11-23',
     reason: 'Acting IT Admins of the task department on the task detail: at most ACTING_IT_ADMINS_MAX.',
   },
+  {
+    registry: 'nested',
+    key: 'deviceGet#openReturnTask.actingItAdmins',
+    change: 'added',
+    to: 'bounded',
+    bound: 'OPEN_RETURN_TASK_ACTING_IT_ADMINS_MAX',
+    finding: 'LD-14',
+    item: 'g7-device-registry-acknowledgement',
+    date: '2026-11-24',
+    reason:
+      'Acting IT Admins for an open device return task on device detail: at most OPEN_RETURN_TASK_ACTING_IT_ADMINS_MAX.',
+  },
 ];

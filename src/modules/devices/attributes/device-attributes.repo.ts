@@ -16,6 +16,13 @@ export interface DeviceRow {
   updatedAt: Date;
 }
 
+/** Custody pointers needed to decide which acting IT Admins may update this device. */
+export interface DeviceCustodyContext {
+  hasOpenReturnTask: boolean;
+  openReturnTaskDepartmentId: string | null;
+  openRegistrationHolderId: string | null;
+}
+
 const SELECT = {
   id: true,
   assetCode: true,
@@ -39,6 +46,31 @@ export class DeviceAttributesRepo {
     if (locked.length === 0) return null;
 
     return tx.managedDevice.findUnique({ where: { id }, select: SELECT });
+  }
+
+  /** Reads whether the device currently has an open return task or open registration under the device lock. */
+  async findCustodyContext(tx: DbTx, deviceId: string): Promise<DeviceCustodyContext> {
+    const returnTask = await tx.deviceReturnTask.findFirst({
+      where: { deviceId, state: 'OPEN' },
+      select: { departmentId: true },
+    });
+    if (returnTask) {
+      return {
+        hasOpenReturnTask: true,
+        openReturnTaskDepartmentId: returnTask.departmentId,
+        openRegistrationHolderId: null,
+      };
+    }
+    const registration = await tx.deviceRegistration.findFirst({
+      where: { deviceId, endedAt: null },
+      select: { holderEmployeeId: true },
+    });
+
+    return {
+      hasOpenReturnTask: false,
+      openReturnTaskDepartmentId: null,
+      openRegistrationHolderId: registration?.holderEmployeeId ?? null,
+    };
   }
 
   /** Writes the fields that changed; the search key of the serial number moves with it. */

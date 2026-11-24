@@ -23,8 +23,9 @@ import {
 import { DeviceAttributesService } from './device-attributes.service';
 
 /**
- * The correction of what a person entered wrong on a machine (`MAY-13`): its name, system, serial number and kind. Any IT Admin may do it: it
- * touches no holding, no key and no job. The asset code never changes.
+ * The correction of what a person entered wrong on a machine: its name, system, serial number and kind.
+ * Any IT Admin may update a machine in stock; for an assigned machine or one awaiting return, only an acting IT Admin
+ * of the holder department is allowed. The asset code never changes.
  */
 @ApiTags('devices')
 @Controller({ path: 'devices', version: '1' })
@@ -47,8 +48,9 @@ export class DeviceAttributesController {
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'Only an IT Admin corrects a machine.',
-      examples: [FORBIDDEN_EXAMPLE],
+      description:
+        'Only an IT Admin corrects a machine; an assigned machine or one awaiting return requires an acting IT Admin of the holder department (DEVICE.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
     },
     {
       status: HttpStatus.NOT_FOUND,
@@ -58,8 +60,8 @@ export class DeviceAttributesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The machine changed since it was read (DEVICE.STALE, details.currentUpdatedAt), it was taken out of use or voided (DEVICE.NOT_EDITABLE, details.reason) or another machine has the serial number (DEVICE.SERIAL_NUMBER_TAKEN). Nothing is written.',
-      examples: [EXAMPLES.STALE, EXAMPLES.NOT_EDITABLE, EXAMPLES.SERIAL_NUMBER_TAKEN],
+        'The machine changed since it was read (DEVICE.STALE, details.currentUpdatedAt), it was voided (DEVICE.VOIDED) or taken out of use (DEVICE.ALREADY_RETIRED), or another machine has the serial number (DEVICE.SERIAL_TAKEN). Nothing is written.',
+      examples: [EXAMPLES.STALE, EXAMPLES.VOIDED, EXAMPLES.ALREADY_RETIRED, EXAMPLES.SERIAL_TAKEN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

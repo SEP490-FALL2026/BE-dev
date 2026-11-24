@@ -1,36 +1,49 @@
 import { Injectable } from '@nestjs/common';
+import { searchKey } from '../../../core/search-key';
 import { TransactionRunner, readSqlState, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import type { AssetDeviceType } from '../asset-code/asset-code.policy';
+import { AssetCodeService } from '../asset-code/asset-code.service';
 import { byUser, devicesEvent } from '../devices-audit-event.mapper';
+import { judgeDeviceActor } from '../devices-custody.policy';
+import { DeviceNotFoundError, DeviceNotInChargeError } from '../public/devices.errors';
 import { RegistrationEndService } from './registration-end.service';
 import {
   DeviceAlreadyRetiredError,
   DeviceAssetCodeTakenError,
   DeviceHandoverDateInvalidError,
+  DeviceHandoverWithoutHolderError,
   DeviceHolderNotFoundError,
   DeviceHolderNotWorkingError,
   DeviceHolderUnchangedError,
+  DevicePlanNotBundledError,
   DeviceRegistrationOverlapError,
+  DeviceSerialTakenError,
 } from './registry.errors';
 import { isHandoverDateValid, judgeHolder, normalizeAssetCode } from './registry.policy';
 import { RegistryRepo, type RegistrationRecord } from './registry.repo';
-import { DeviceNotFoundError } from '../public/devices.errors';
 
 export interface DeviceCreateInput {
-  assetCode: string;
+  deviceType: AssetDeviceType;
   hostname: string;
   os: string;
-  holderEmployeeId: string;
+  serialNumber?: string | undefined;
+  bundledPlanIds?: string[] | undefined;
+  holderEmployeeId?: string | undefined;
   handedOverOn?: string | undefined;
+  collectorInstalled?: boolean | undefined;
 }
 
 /**
- * The register of company machines (`US-09-01`): a machine is registered to one person, the holder changes or the machine is
- * retired by the IT Admin, and a registration ends when it does (`RegistrationEndService`). Locks, always in this order: the
- * employee (shared), the machine, the registration.
+ * The register of company machines: a machine may start in stock or be registered to one holder, and a registration
+ * ends when the holder changes or the machine is retired.
+ *
+ * Lock order on creation: asset-code counter (tier 0c), employee FOR SHARE (tier 1), then machine and registration.
+ * Lock order on holder change or retirement: employee FOR SHARE (tier 1), machine (tier 2b), then registration.
  */
 @Injectable()
 export class RegistryService {
@@ -40,48 +53,115 @@ export class RegistryService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
+    private readonly assetCodes: AssetCodeService,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /**
-   * Registers a new machine to a holder. Throws DeviceHolderNotFoundError, DeviceHolderNotWorkingError,
-   * DeviceHandoverDateInvalidError, DeviceAssetCodeTakenError and DeviceRegistrationOverlapError.
+   * Registers a new machine, in stock or handed over to a holder. Throws DeviceHandoverWithoutHolderError,
+   * DevicePlanNotBundledError, DeviceNotInChargeError, DeviceHolderNotFoundError, DeviceHolderNotWorkingError,
+   * DeviceHandoverDateInvalidError, DeviceAssetCodeTakenError, DeviceAssetCodeExhaustedError, DeviceSerialTakenError,
+   * and DeviceRegistrationOverlapError.
    */
   async create(actor: AuthenticatedPrincipal, input: DeviceCreateInput, now: Date = new Date()): Promise<string> {
+    if (!input.holderEmployeeId && (input.handedOverOn !== undefined || input.collectorInstalled !== undefined)) {
+      throw new DeviceHandoverWithoutHolderError();
+    }
+    if (input.bundledPlanIds && input.bundledPlanIds.length > 0) {
+      throw new DevicePlanNotBundledError();
+    }
     const organization = await this.requireOrganization();
 
     return this.runner.run(async (tx) => {
-      const holder = await this.lockHolder(tx, input.holderEmployeeId);
       const today = await this.organizationReads.businessToday(now, tx);
-      const validFrom = input.handedOverOn ?? today;
-      if (!isHandoverDateValid({ handedOverOn: validFrom, today, hireDate: holder.hireDate })) {
-        throw new DeviceHandoverDateInvalidError();
-      }
-      const normalizedAssetCode = normalizeAssetCode(input.assetCode);
-      if (await this.repo.deviceIdByAssetCode(tx, organization.id, normalizedAssetCode)) {
-        throw new DeviceAssetCodeTakenError();
-      }
+      const assetCode = await this.assetCodes.next(tx, input.deviceType, today);
+      const serialNumber = input.serialNumber ?? null;
+      const handover = input.holderEmployeeId
+        ? await this.prepareInitialHandover(tx, actor.employeeId, input.holderEmployeeId, {
+            handedOverOn: input.handedOverOn,
+            today,
+          })
+        : null;
       const device = await this.insertDevice(tx, {
         organizationId: organization.id,
-        assetCode: input.assetCode,
-        normalizedAssetCode,
+        assetCode,
+        normalizedAssetCode: normalizeAssetCode(assetCode),
+        assetCodeOrigin: 'GENERATED',
+        deviceType: input.deviceType,
+        serialNumber,
+        normalizedSerialNumber: serialNumber ? searchKey(serialNumber) : null,
         hostname: input.hostname,
         os: input.os,
         createdByAppUserId: actor.appUserId,
       });
-      const registration = await this.insertRegistration(tx, actor, device.id, holder.id, validFrom, organization.id);
+      const collectorInstalled = input.collectorInstalled ?? false;
+      const registration = handover
+        ? await this.insertRegistration(tx, actor, device.id, handover.holderId, handover.validFrom, {
+            organizationId: organization.id,
+            collectorInstalled,
+          })
+        : null;
       await this.audit.record(
         tx,
         devicesEvent(byUser(actor), organization.id, 'DEVICE.REGISTERED', 'ManagedDevice', device.id, null, {
           assetCode: device.assetCode,
+          deviceType: input.deviceType,
           hostname: device.hostname,
-          holderEmployeeId: holder.id,
-          registrationId: registration.id,
-          validFrom,
+          serialNumber,
+          bundledPlanIds: input.bundledPlanIds ?? [],
+          ...(handover && registration
+            ? {
+                holderEmployeeId: handover.holderId,
+                registrationId: registration.id,
+                validFrom: handover.validFrom,
+                collectorInstalled,
+              }
+            : {}),
+          ...(handover?.bySubstitute ? { bySubstitute: true } : {}),
         }),
       );
 
       return device.id;
     });
+  }
+
+  private async prepareInitialHandover(
+    tx: DbTx,
+    actorEmployeeId: string,
+    holderEmployeeId: string,
+    dates: { handedOverOn?: string | undefined; today: string },
+  ): Promise<{ holderId: string; validFrom: string; bySubstitute: boolean }> {
+    const holder = await this.lockHolder(tx, holderEmployeeId);
+    const validFrom = dates.handedOverOn ?? dates.today;
+    if (!isHandoverDateValid({ handedOverOn: validFrom, today: dates.today, hireDate: holder.hireDate })) {
+      throw new DeviceHandoverDateInvalidError();
+    }
+    const departmentId =
+      (await this.organizationReads.workDepartmentsOf([holder.id], dates.today, tx)).get(holder.id) ?? null;
+    if (!departmentId) {
+      judgeDeviceActor({
+        holderDepartmentId: null,
+        recipientDepartmentId: null,
+        actingByDepartment: new Map(),
+        actor: actorEmployeeId,
+        unplacedRequired: true,
+      });
+      throw new DeviceNotInChargeError();
+    }
+    const actingByDepartment = await this.organizationReads.itAdminsActingFor(
+      [departmentId],
+      (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+      tx,
+    );
+    const verdict = judgeDeviceActor({
+      holderDepartmentId: null,
+      recipientDepartmentId: departmentId,
+      actingByDepartment,
+      actor: actorEmployeeId,
+    });
+    if (!verdict.allowed) throw new DeviceNotInChargeError();
+
+    return { holderId: holder.id, validFrom, bySubstitute: verdict.bySubstitute };
   }
 
   /**
@@ -104,7 +184,10 @@ export class RegistryService {
       if (open?.holderEmployeeId === holder.id) throw new DeviceHolderUnchangedError();
       if (open) await this.ending.end(tx, open, { at: now, cause: 'HOLDER_CHANGED' }, byUser(actor));
       const today = await this.organizationReads.businessToday(now, tx);
-      const registration = await this.insertRegistration(tx, actor, deviceId, holder.id, today, organization.id);
+      const registration = await this.insertRegistration(tx, actor, deviceId, holder.id, today, {
+        organizationId: organization.id,
+        collectorInstalled: true,
+      });
       await this.audit.record(
         tx,
         devicesEvent(
@@ -161,6 +244,7 @@ export class RegistryService {
       return await this.repo.insertDevice(tx, input);
     } catch (error) {
       if (isUniqueViolation(error, 'normalized_asset_code')) throw new DeviceAssetCodeTakenError();
+      if (isUniqueViolation(error, 'normalized_serial_number')) throw new DeviceSerialTakenError();
       throw error;
     }
   }
@@ -172,14 +256,15 @@ export class RegistryService {
     deviceId: string,
     holderEmployeeId: string,
     validFrom: string,
-    organizationId: string,
+    options: { organizationId: string; collectorInstalled: boolean },
   ): Promise<RegistrationRecord> {
     try {
       return await this.repo.insertRegistration(tx, {
-        organizationId,
+        organizationId: options.organizationId,
         deviceId,
         holderEmployeeId,
         validFrom,
+        collectorInstalled: options.collectorInstalled,
         createdByAppUserId: actor.appUserId,
       });
     } catch (error) {
