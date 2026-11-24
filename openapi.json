@@ -40497,7 +40497,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin starts the revocation.",
+            "description": "Only an IT Admin in charge of the holder’s department or their active substitute may start the revocation (AUTHORIZATION.FORBIDDEN, PROVISIONING.NOT_IN_CHARGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40509,6 +40509,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING.NOT_IN_CHARGE": {
+                    "summary": "Only the IT Admin in charge or an appointed substitute for this department may act on this task.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING.NOT_IN_CHARGE",
+                        "message": "Only the IT Admin in charge or an appointed substitute for this department may act on this task.",
                         "requestId": "req_example"
                       }
                     }
