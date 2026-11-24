@@ -5,7 +5,7 @@
 > P9a/P9b), PR mỗi phần từ nhánh chụp `pr/redesign-w3-b<n>`, điểm gộp G1…G8 thay bằng hai cửa đẩy C1, C2 (không cửa nào bắt một làn ngồi chờ).
 
 Spec: [SPEC.md](SPEC.md) + [SPEC-B1.md](SPEC-B1.md), [SPEC-B2.md](SPEC-B2.md), [SPEC-B3.md](SPEC-B3.md). Trạng thái: Proposed bản 2.4 — chờ Owner
-duyệt; mọi câu Owner đã trả lời ([SPEC §13.2](SPEC.md#132-quyết-định-owner-owner-answersmd)) trừ OQ-D1 ([DELTA-W2-FINAL](DELTA-W2-FINAL.md#2-cần-owner)).
+duyệt; mọi câu Owner đã trả lời ([SPEC §13.2](SPEC.md#132-quyết-định-owner-owner-answersmd)) (OQ-D1 Owner chốt 25/11: có — xem OWNER-ANSWERS.md).
 Quy trình: [`docs/guides/quy-trinh-code-ai.md`](../../guides/quy-trinh-code-ai.md).
 Đường dẫn file trong PLAN tính từ gốc repo; `src/modules/` viết tắt `m/`. Mỗi file `*.ts` có logic mới kèm spec **cùng thư mục, cùng tên**
 (`<tên>.spec.ts`) — ghi `(+spec)`.
@@ -450,7 +450,7 @@ Mọi gói đổi contract: `openapi.json` + manifest (`*`); mô tả OpenAPI kh
   service của P10 (không chép). `REQUEST` kiểm người làm qua `ProvisioningTaskFrame.requireActingItAdmin`.
 - **Đợt 2 cuối:** `licenseLotKeyImport` cùng thân `licenseKeyImport` (`keys: string[]`, `maxActivations?`, `initialActivationsUsed?`) qua
   `LicenseKeyImportSettingsService` + `assertInitialActivationsAllowed` (409 `LICENSE_KEY.INITIALIZATION_CLOSED`, 422 `INITIAL_ACTIVATIONS_*` — DL-4).
-  Lô `REQUEST`: `ProvisioningTaskFrame.requireActingItAdmin` (`:134`); người thụ hưởng chưa xếp phòng ⟹ theo OQ-D1 (chưa chốt: không truyền
+  Lô `REQUEST`: `ProvisioningTaskFrame.requireActingItAdmin` (`:134`); người thụ hưởng chưa xếp phòng ⟹ theo OQ-D1 (Owner chốt Có: truyền taskId; bản cũ: không truyền
   `taskId`, 403 như SPEC).
 - **Thứ tự trong gói:** bước cổng admin (gọi service P10) làm **cuối**; P10 chưa ở `int` ⟹ làm mọi phần khác, ghi _Bàn giao_, quay lại sau C2.
 - **Xong khi:** tiêu chí 2, 4, 7, 8, 9, 10 W3-24 (http/unit); tiêu chí 3, 5, 6 ở P20.
@@ -494,7 +494,7 @@ Mọi gói đổi contract: `openapi.json` + manifest (`*`); mô tả OpenAPI kh
   `SEAT_PURCHASE_INVOICE_OVERDUE`); `test/http/licensing/seat-purchases.http-spec.ts`, `test/integration/licensing/seat-purchase-concurrency.integration-spec.ts`,
   `test/http/requests/access-request-get.http-spec.ts`.
 - **Làm:** SPEC-B3 W3-18 (route, 403 từng mục, hạn, hóa đơn gắn lần mua, nhắc hạn), W3-20. Từng mục: `ProvisioningTaskFrame.requireActingItAdmin`
-  (`:134`); người thụ hưởng chưa xếp phòng ⟹ theo OQ-D1 (chưa chốt: không truyền `taskId`, 403 `SEAT_PURCHASE.NOT_IN_CHARGE`).
+  (`:134`); người thụ hưởng chưa xếp phòng ⟹ theo OQ-D1 (Owner chốt Có: truyền taskId; bản cũ: không truyền `taskId`, 403 `SEAT_PURCHASE.NOT_IN_CHARGE`).
 - **Xong khi:** 11 ca W3-18, ca W3-20.
 
 ### P17 — biz · M
