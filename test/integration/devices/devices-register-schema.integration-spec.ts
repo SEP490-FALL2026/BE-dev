@@ -466,6 +466,22 @@ describe('the register of machines after the migrations of wave 2 (integration, 
       );
     });
 
+    it('refuses changing other columns while the job is open, while still letting due_on and overdue_noticed_on move', async () => {
+      const { id } = await job();
+
+      expect(await refusal(sql, `UPDATE device_return_tasks SET outcome_note = 'note' WHERE id = $1`, [id])).toEqual({
+        code: '55000',
+        constraint: 'device_return_tasks_open_fixed',
+      });
+      expect(
+        await refusal(
+          sql,
+          `UPDATE device_return_tasks SET due_on = '2026-03-07', overdue_noticed_on = '2026-03-08' WHERE id = $1`,
+          [id],
+        ),
+      ).toBeNull();
+    });
+
     it('closes a job the system cancelled with nobody handling it', async () => {
       const { id } = await job();
 
