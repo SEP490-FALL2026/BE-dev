@@ -231,6 +231,38 @@ describe('the key binding of a plan over HTTP (integration, real PostgreSQL)', (
       expect(reasonOf(refused)).toBe('DEVICE_ACTIVATIONS');
       expect(dataOf<PlanWire>(await getPlan(plan.id).expect(200)).keyBinding).toBe('DEVICE_BUNDLED');
     });
+
+    it('blocks a K2 plan with assignments from entering K4 DEVICE_KEY, while allowing it to enter K4 ACCOUNT', async () => {
+      const k2 = dataOf<PlanWire>(
+        await createPlan({
+          applicationId: await licensed(),
+          name: unique('K2 Assigned'),
+          provisioningType: 'K2',
+          controlLevel: 'FULL',
+        }).expect(201),
+      );
+      await ctx.sql.query(
+        `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, employee_id, account_identifier,
+           normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id)
+         SELECT gen_random_uuid(), e.organization_id, 'PERSONAL', 'REQUEST', $1, e.id, 'k2-http@acme.vn', 'k2-http@acme.vn', '2026-01-05', 'ACTUAL', $3
+           FROM employees e WHERE e.id = $2`,
+        [k2.id, it1.employeeId, randomUUID()],
+      );
+
+      const refused = await patchPlan(k2.id, { provisioningType: 'K4', keyBinding: 'DEVICE_KEY' }).expect(409);
+
+      expect(codeOf(refused)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
+      expect(reasonOf(refused)).toBe('KEY_BINDING_ASSIGNMENTS');
+      expect(dataOf<PlanWire>(await getPlan(k2.id).expect(200))).toMatchObject({
+        provisioningType: 'K2',
+        keyBinding: null,
+      });
+
+      const allowed = dataOf<PlanWire>(
+        await patchPlan(k2.id, { provisioningType: 'K4', keyBinding: 'ACCOUNT' }).expect(200),
+      );
+      expect(allowed).toMatchObject({ provisioningType: 'K4', keyBinding: 'ACCOUNT' });
+    });
   });
 
   describe('a subscription of a plan bundled with the machine', () => {

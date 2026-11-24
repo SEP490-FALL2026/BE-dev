@@ -231,6 +231,49 @@ describe('activations of a machine, the keys of a lot and the binding of a plan 
 
       expect(await refusal(sql, `UPDATE plans SET key_binding = 'DEVICE_KEY' WHERE id = $1`, [planId])).toBeNull();
     });
+
+    it('blocks entering K4 bound to a machine when assignments or perpetual purchases exist, while allowing K4 ACCOUNT', async () => {
+      const assignedK2 = await plan(null, 'K2');
+      await sql.query(
+        `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, employee_id, account_identifier,
+           normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id)
+         VALUES (gen_random_uuid(), $1, 'PERSONAL', 'REQUEST', $2, $3, 'k2-seat@x.vn', 'k2-seat@x.vn', '2026-01-05', 'ACTUAL', $4)`,
+        [org, assignedK2, employee, user],
+      );
+
+      const blockedByAssignment = await refusal(
+        sql,
+        `UPDATE plans SET provisioning_type = 'K4', pricing_model = NULL, key_binding = 'DEVICE_KEY' WHERE id = $1`,
+        [assignedK2],
+      );
+      expect(blockedByAssignment).toMatchObject({
+        code: '23514',
+        constraint: 'plans_change_keeps_key_binding_assignments',
+      });
+      expect(blockedByAssignment?.message).toContain('plan_change_blocked: KEY_BINDING_ASSIGNMENTS');
+
+      expect(
+        await refusal(
+          sql,
+          `UPDATE plans SET provisioning_type = 'K4', pricing_model = NULL, key_binding = 'ACCOUNT' WHERE id = $1`,
+          [assignedK2],
+        ),
+      ).toBeNull();
+
+      const perpetualK2 = await plan(null, 'K2');
+      await purchase(perpetualK2, 5);
+
+      const blockedByPurchase = await refusal(
+        sql,
+        `UPDATE plans SET provisioning_type = 'K4', pricing_model = NULL, key_binding = 'DEVICE_BUNDLED' WHERE id = $1`,
+        [perpetualK2],
+      );
+      expect(blockedByPurchase).toMatchObject({
+        code: '23514',
+        constraint: 'plans_change_keeps_key_binding',
+      });
+      expect(blockedByPurchase?.message).toContain('plan_change_blocked: KEY_BINDING_PURCHASES');
+    });
   });
 
   describe('the activations of a machine', () => {
