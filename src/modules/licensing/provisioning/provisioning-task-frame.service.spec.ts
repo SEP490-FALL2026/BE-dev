@@ -10,7 +10,7 @@ import { OrganizationApi } from '../../organization/public/organization.api';
 import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { unplacedWorkKey } from '../../organization/public/organization.types';
-import { ProvisioningPlanBoundToDeviceError } from '../public/licensing.errors';
+import { ProvisioningPlanBoundToDeviceError, ProvisioningTaskNotFoundError } from '../public/licensing.errors';
 import { toLicensingApiException } from '../licensing.http-errors';
 import { ProvisioningNotInChargeError } from './provisioning.errors';
 import { toProvisioningApiException } from './provisioning.http-errors';
@@ -270,7 +270,9 @@ describe('ProvisioningTaskFrame.work', () => {
       repo.lock.mockResolvedValue(null);
       const beforeLock = jest.fn();
 
-      await expect(frame.work(itAdmin('e-it1'), 'task-1', { ...action, beforeLock })).rejects.toThrow();
+      await expect(frame.work(itAdmin('e-it1'), 'task-1', { ...action, beforeLock })).rejects.toBeInstanceOf(
+        ProvisioningTaskNotFoundError,
+      );
 
       expect(beforeLock).not.toHaveBeenCalled();
     });

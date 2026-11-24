@@ -152,7 +152,7 @@ describe('BF-5 rejecting future-placed employees (integration, real PostgreSQL)'
     expect(h.codeOf(holderChangeRes)).toBe('EMPLOYEE.NOT_STARTED');
   });
 
-  it('R1-2: allows an employee with both current and future placements (201) and keeps NO_DEPARTMENT / HOLDER_UNPLACED for never-placed employees', async () => {
+  it('R1-2: allows an employee with both current and future placements (201) and keeps REQUEST_PARTY.INELIGIBLE / HOLDER_UNPLACED for never-placed employees', async () => {
     const futureDept = await h.departmentWithUnit('BF5-FIN');
     const transferringStaff = await h.staff(dept, 'BF5-TR1');
     await h.ctx.sql.query(
@@ -168,9 +168,9 @@ describe('BF-5 rejecting future-placed employees (integration, real PostgreSQL)'
     await h.submit(h.form(internalPlanId), transferringStaff.account).expect(201);
 
     const neverPlaced = await h.unplacedStaff('BF5-UNP1');
-    // R1-2: a person with no placement at all is NO_DEPARTMENT (422), not NOT_STARTED.
+    // R1-2: a person with no placement at all is refused as a party of a Request (422), before the department is looked at: not NOT_STARTED.
     const noDeptRes = await h.submit(h.form(internalPlanId), neverPlaced.account).expect(422);
-    expect(h.codeOf(noDeptRes)).toBe('ACCESS_REQUEST.NO_DEPARTMENT');
+    expect(h.codeOf(noDeptRes)).toBe('REQUEST_PARTY.INELIGIBLE');
 
     const unplacedDeviceRes = await request(server())
       .post('/api/v1/devices')
