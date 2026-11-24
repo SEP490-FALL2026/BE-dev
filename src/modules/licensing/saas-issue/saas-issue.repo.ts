@@ -302,9 +302,17 @@ export class SaasIssueRepo {
   }
 
   /** The new reports that have no IT Admin assigned yet, oldest first. */
-  async listUnassigned(limit: number): Promise<SaasIssueRecord[]> {
+  async listUnassigned(limit: number, after?: { createdAt: Date; id: string } | null): Promise<SaasIssueRecord[]> {
     const rows = await this.prisma.saasIssue.findMany({
-      where: { state: 'NEW', assignedItAdminEmployeeId: null },
+      where: {
+        state: 'NEW',
+        assignedItAdminEmployeeId: null,
+        ...(after
+          ? {
+              OR: [{ createdAt: { gt: after.createdAt } }, { createdAt: after.createdAt, id: { gt: after.id } }],
+            }
+          : {}),
+      },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take: limit,
     });

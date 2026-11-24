@@ -272,18 +272,28 @@ describe('ReplacementService', () => {
         { activationId: 'act-b', overActivationCap: false },
       ],
     });
-    const auditEvent = (
+    expect(mocks.auditRecord).toHaveBeenCalledTimes(2);
+    const auditEvents = (
       mocks.auditRecord.mock.calls as Array<
         [unknown, { action: string; resourceId: string; after: Record<string, unknown> }]
       >
-    )[0][1];
-    expect(auditEvent.action).toBe('DEVICE.REPLACED');
-    expect(auditEvent.resourceId).toBe('dev-old');
-    expect(auditEvent.after).toMatchObject({
-      oldDeviceId: 'dev-old',
-      replacementDeviceId: 'dev-rep',
-      movedCount: 2,
-      bySubstitute: true,
+    ).map((c) => c[1]);
+    expect(auditEvents[0]).toMatchObject({
+      action: 'DEVICE.REPLACED',
+      resourceId: 'dev-old',
+      after: { oldDeviceId: 'dev-old', replacementDeviceId: 'dev-rep', movedCount: 2, bySubstitute: true },
+    });
+    expect(auditEvents[1]).toMatchObject({
+      action: 'DEVICE.HOLDER_CHANGED',
+      resourceId: 'dev-rep',
+      after: {
+        holderEmployeeId: 'emp-1',
+        registrationId: 'reg-new',
+        validFrom: '2026-11-24',
+        collectorInstalled: true,
+        replacedDeviceId: 'dev-old',
+        bySubstitute: true,
+      },
     });
   });
 

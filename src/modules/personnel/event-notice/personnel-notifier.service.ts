@@ -249,7 +249,7 @@ export class PersonnelNotifier {
         input.employeeId,
       );
     if (input.accountLocked) return;
-    for (const itAdmin of await this.actingItAdminsOfDepartment(tx, input)) {
+    for (const itAdmin of await this.itAdminsOrSuperAdminOfDeparture(tx, input)) {
       await this.tell(tx, input.organizationId, itAdmin, 'DEPARTURE_ACCESS_BLOCKED', notice('IT_ADMIN'));
     }
   }

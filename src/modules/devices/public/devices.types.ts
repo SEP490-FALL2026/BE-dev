@@ -70,6 +70,7 @@ export interface CancelReturnTasksOfCaseInput {
 export interface ReturnTaskCountScope {
   organizationId: string;
   actingDepartmentIds: readonly string[];
+  includeTaskIds?: readonly string[] | undefined;
   excludeEmployeeId: string;
 }
 

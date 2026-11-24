@@ -314,23 +314,20 @@ describe('who is told of an event of the personnel context', () => {
       ]);
     });
 
-    it('never falls back to Super Admin or other IT Admins for IT_ADMIN audience when acting set is empty', async () => {
-      const { notifier, told } = notifierOf({ superAdmin: 'sa', actingByDept: {} });
+    it('falls back to usable Super Admin for IT_ADMIN audience when acting set is empty or only leaver', async () => {
+      const empty = notifierOf({ superAdmin: 'sa', actingByDept: {} });
+      await empty.notifier.departureAccessBlocked(TX, { ...facts, markLeft: false });
+      expect(audiences(empty.told)).toEqual([['sa', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN']]);
 
-      await notifier.departureAccessBlocked(TX, { ...facts, markLeft: false });
-
-      expect(audiences(told)).toEqual([]);
-    });
-
-    it('tells only Super Admin when only the leaver is named and no substitute exists', async () => {
-      const { notifier, told } = notifierOf({
+      const onlyLeaver = notifierOf({
         superAdmin: 'sa',
         actingByDept: { d1: { inCharge: 'leaver', usable: ['leaver'] } },
       });
-
-      await notifier.departureAccessBlocked(TX, facts);
-
-      expect(audiences(told)).toEqual([['sa', 'SUPER_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:SUPER_ADMIN']]);
+      await onlyLeaver.notifier.departureAccessBlocked(TX, facts);
+      expect(audiences(onlyLeaver.told)).toEqual([
+        ['sa', 'SUPER_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:SUPER_ADMIN'],
+        ['sa', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN'],
+      ]);
     });
   });
 

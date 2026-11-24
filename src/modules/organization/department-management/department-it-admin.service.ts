@@ -13,6 +13,7 @@ import { DepartmentRepo } from '../department/department.repo';
 import { EmployeeRecordService } from '../employee/employee-record.service';
 import { organizationAuditEvent } from '../organization-audit-event.mapper';
 import { EmployeeAccountsHook } from '../public/organization.extension-points';
+import type { EmployeeRecord } from '../public/organization.types';
 import { lockAndReadEmployee } from './department-facts.service';
 
 /** Whether the person named to answer for the technical work of a department can, plus substitute lifecycle and load telemetry. */
@@ -28,17 +29,33 @@ export class DepartmentItAdminService {
   ) {}
 
   /**
+   * Locks a candidate employee `FOR UPDATE` (tier 1) and reads it in the same transaction, returning `null` if missing.
+   * Callers that also lock a department (`FOR UPDATE` tier 2) call this first so the lock order matches `department-it-substitute`.
+   */
+  lockCandidate(tx: DbTx, employeeId: string): Promise<EmployeeRecord | null> {
+    return lockAndReadEmployee(this.employees, tx, employeeId, 'UPDATE');
+  }
+
+  /**
+   * Verifies an already-locked candidate employee is active, holds a usable `IT_ADMIN` account, and answers for fewer than four
+   * active departments (`QĐ-110l`). Throws DepartmentItAdminInvalidError and DepartmentItAdminLimitReachedError.
+   */
+  async assertUsableLocked(tx: DbTx, employeeId: string, employee: EmployeeRecord | null): Promise<void> {
+    if (!employee || employee.status !== 'ACTIVE') throw new DepartmentItAdminInvalidError();
+    const account = await this.employeeAccounts.get().inspectEmployeeAccount(tx, employeeId);
+    if (!account.usable || !account.roles.includes('IT_ADMIN')) throw new DepartmentItAdminInvalidError();
+    assertItAdminHasRoom(await this.departments.countActiveInChargeOf(tx, employeeId));
+  }
+
+  /**
    * An employee who works, with a usable IT_ADMIN account, who answers for fewer than four active departments (`QĐ-110l`). The employee row
    * is locked `FOR UPDATE` first (the order of the lock protocol), so two assignments of the same IT Admin wait for each other and the second
    * counts the first; then the account is read, then the departments are counted. Throws DepartmentItAdminInvalidError and
    * DepartmentItAdminLimitReachedError.
    */
   async assertUsable(tx: DbTx, employeeId: string): Promise<void> {
-    const employee = await lockAndReadEmployee(this.employees, tx, employeeId, 'UPDATE');
-    if (!employee || employee.status !== 'ACTIVE') throw new DepartmentItAdminInvalidError();
-    const account = await this.employeeAccounts.get().inspectEmployeeAccount(tx, employeeId);
-    if (!account.usable || !account.roles.includes('IT_ADMIN')) throw new DepartmentItAdminInvalidError();
-    assertItAdminHasRoom(await this.departments.countActiveInChargeOf(tx, employeeId));
+    const employee = await this.lockCandidate(tx, employeeId);
+    await this.assertUsableLocked(tx, employeeId, employee);
   }
 
   /**

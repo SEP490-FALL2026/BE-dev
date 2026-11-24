@@ -144,7 +144,7 @@ describe('DecisionReturnService', () => {
   });
 
   it('allows appointed substitute with byInCharge=false and bySubstitute=true', async () => {
-    const record = makeRecord({ departmentId: null, deciderDepartmentId: 'dept-1' });
+    const record = makeRecord({ departmentId: 'dept-holder', deciderDepartmentId: 'dept-1' });
     const { service, actingItAdminsFor, transition } = build({
       record,
       acting: { inCharge: null, substitute: 'emp-it', defaultAssignee: 'emp-it', actors: ['emp-it'] },
@@ -152,7 +152,7 @@ describe('DecisionReturnService', () => {
 
     await service.returnToHead(actor, 'rec-1', 'Cannot remove yet');
 
-    expect(actingItAdminsFor).toHaveBeenCalledWith(TX, 'dept-1', 'emp-holder', '2026-11-23');
+    expect(actingItAdminsFor).toHaveBeenCalledWith(TX, 'dept-holder', 'emp-holder', '2026-11-23');
     expect(transition).toHaveBeenCalledWith(
       TX,
       record,
@@ -162,6 +162,27 @@ describe('DecisionReturnService', () => {
       { kind: 'USER', principal: actor },
       { byInCharge: false, bySubstitute: true, taskOutcome: 'CANCELLED', referenceKind: DECISION_REFERENCE_KIND },
     );
+  });
+
+  it('passes record.departmentId (null) rather than deciderDepartmentId when record.departmentId is null', async () => {
+    const record = makeRecord({ departmentId: null, deciderDepartmentId: 'dept-decider' });
+    const denied = build({
+      record,
+      acting: { inCharge: null, substitute: null, defaultAssignee: null, actors: [] },
+    });
+
+    const error = await denied.service.returnToHead(actor, 'rec-1', 'Cannot remove yet').catch((err: unknown) => err);
+    expect(denied.actingItAdminsFor).toHaveBeenCalledWith(TX, null, 'emp-holder', '2026-11-23');
+    expect(error).toBeInstanceOf(GhostSeatDecisionNotInChargeError);
+    const apiErr = toDecisionApiException(error) as ApiException;
+    expect(apiErr.getResponse()).toMatchObject({ code: 'GHOST_SEAT.NOT_IN_CHARGE' });
+
+    const allowed = build({
+      record,
+      acting: { inCharge: null, substitute: 'emp-it', defaultAssignee: 'emp-it', actors: ['emp-it'] },
+    });
+    await allowed.service.returnToHead(actor, 'rec-1', 'Cannot remove yet');
+    expect(allowed.actingItAdminsFor).toHaveBeenCalledWith(TX, null, 'emp-holder', '2026-11-23');
   });
 
   it('preserves existing guards (NOT_FOUND, ALREADY_RETURNED, NOT_RETURNABLE, TASK_IN_PROGRESS)', async () => {

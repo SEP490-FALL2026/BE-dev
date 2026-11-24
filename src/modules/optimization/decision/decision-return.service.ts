@@ -54,12 +54,7 @@ export class DecisionReturnService {
       const record = await this.repo.lock(tx, id);
       const day = await this.followUp.dayOf(now);
       if (!record || !day || record.organizationId !== day.organizationId) throw new GhostSeatDecisionNotFoundError();
-      const acting = await this.ghostSeats.actingItAdminsFor(
-        tx,
-        record.departmentId ?? record.deciderDepartmentId,
-        record.employeeId,
-        day.today,
-      );
+      const acting = await this.ghostSeats.actingItAdminsFor(tx, record.departmentId, record.employeeId, day.today);
       if (!acting.actors.includes(actor.employeeId)) throw new GhostSeatDecisionNotInChargeError();
       const byInCharge = acting.inCharge === actor.employeeId;
       const bySubstitute = acting.substitute === actor.employeeId;

@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { isWorkingDay } from '../../../core/working-days';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { DeviceReturnTaskNotifier } from './device-return-task-notifier.service';
@@ -15,6 +16,8 @@ const BATCH = 200;
  */
 @Injectable()
 export class DeviceReturnTaskSweepService {
+  private readonly logger = new Logger(DeviceReturnTaskSweepService.name);
+
   constructor(
     private readonly runner: TransactionRunner,
     private readonly organizationReads: OrganizationReadApi,
@@ -32,31 +35,38 @@ export class DeviceReturnTaskSweepService {
 
     let told = 0;
     for (const id of await this.repo.listOverdueCandidateIds(organization.id, today, BATCH)) {
-      const notified = await this.runner.run(async (tx) => {
-        const locked = await this.repo.lockOverdueForNoticeSkipLocked(tx, id);
-        if (!locked) return false;
-        if (
-          !shouldRemindOn({
-            state: locked.state,
-            dueOn: locked.dueOn,
-            overdueNoticedOn: locked.overdueNoticedOn,
+      try {
+        const notified = await this.runner.run(async (tx) => {
+          const locked = await this.repo.lockOverdueForNoticeSkipLocked(tx, id);
+          if (!locked) return false;
+          if (
+            !shouldRemindOn({
+              state: locked.state,
+              dueOn: locked.dueOn,
+              overdueNoticedOn: locked.overdueNoticedOn,
+              today,
+              isWorkingDay: true,
+            })
+          ) {
+            return false;
+          }
+          await this.repo.markOverdueNoticed(tx, locked.id, today);
+          await this.notifier.overdue(tx, {
+            organizationId: organization.id,
+            task: locked,
+            assetCode: locked.assetCode,
             today,
-            isWorkingDay: true,
-          })
-        ) {
-          return false;
-        }
-        await this.repo.markOverdueNoticed(tx, locked.id, today);
-        await this.notifier.overdue(tx, {
-          organizationId: organization.id,
-          task: locked,
-          assetCode: locked.assetCode,
-          today,
-        });
+          });
 
-        return true;
-      });
-      if (notified) told += 1;
+          return true;
+        });
+        if (notified) told += 1;
+      } catch (error) {
+        this.logger.error(
+          `Overdue reminder for return task ${id} failed: ${describeForOperator(error)}`,
+          traceForOperator(error),
+        );
+      }
     }
 
     return { told };

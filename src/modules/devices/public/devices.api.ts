@@ -3,6 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CredentialSessionService } from '../credential/session/credential-session.service';
 import { InitialRecordQueryService } from '../initial-record/initial-record-query.service';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RegistrationEndService } from '../registry/registration-end.service';
 import { RegistryQueryRepo } from '../registry/registry-query.repo';
 import { RegistryRepo } from '../registry/registry.repo';
@@ -38,6 +39,7 @@ export class DevicesApi {
     private readonly returnTasks: DeviceReturnTaskService,
     private readonly returnTaskRepo: DeviceReturnTaskRepo,
     private readonly initialRecordQueries: InitialRecordQueryService,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   initialRecordProgress(tx?: DbTx): Promise<DeviceInitialRecordProgress> {
@@ -60,8 +62,16 @@ export class DevicesApi {
     return this.returnTasks.cancelOfCase(tx, input);
   }
 
-  countReturnTasks(scope: ReturnTaskCountScope, today: BusinessDate, tx?: DbTx): Promise<ReturnTaskCounts> {
-    return this.returnTaskRepo.countForScope(scope, today, tx);
+  async countReturnTasks(scope: ReturnTaskCountScope, today: BusinessDate, tx?: DbTx): Promise<ReturnTaskCounts> {
+    const includeTaskIds =
+      scope.includeTaskIds ??
+      (await this.organizationReads.findActiveUnplacedWorkIdsForDesignee(
+        scope.excludeEmployeeId,
+        'DEVICE_RETURN_TASK',
+        tx,
+      ));
+
+    return this.returnTaskRepo.countForScope({ ...scope, includeTaskIds }, today, tx);
   }
 
   /**

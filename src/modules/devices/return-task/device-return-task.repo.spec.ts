@@ -223,4 +223,41 @@ describe('DeviceReturnTaskRepo', () => {
     });
     expect(existing).toEqual(new Set(['reg-open']));
   });
+
+  it('countForScope includes designated unplaced open tasks even when actingDepartmentIds is empty', async () => {
+    const $queryRaw = jest.fn().mockResolvedValue([{ open_count: 2n, overdue_count: 1n }]);
+    const prisma = { $queryRaw } as unknown as PrismaService;
+    const repo = new DeviceReturnTaskRepo(prisma);
+
+    const unplacedOnly = await repo.countForScope(
+      {
+        organizationId: 'org-1',
+        actingDepartmentIds: [],
+        includeTaskIds: ['task-u1'],
+        excludeEmployeeId: 'it-1',
+      },
+      '2026-11-25',
+    );
+    expect(unplacedOnly).toEqual({ open: 2, overdue: 1 });
+    expect($queryRaw).toHaveBeenCalledTimes(1);
+    const rawCalls = $queryRaw.mock.calls as Array<
+      [TemplateStringsArray, unknown, unknown, { strings: readonly string[] }]
+    >;
+    expect(rawCalls[0][3].strings.join('?')).toContain('department_id IS NULL AND id = ANY');
+
+    const combined = await repo.countForScope(
+      {
+        organizationId: 'org-1',
+        actingDepartmentIds: ['dep-1'],
+        includeTaskIds: ['task-u1'],
+        excludeEmployeeId: 'it-1',
+      },
+      '2026-11-25',
+    );
+    expect(combined).toEqual({ open: 2, overdue: 1 });
+    expect($queryRaw).toHaveBeenCalledTimes(2);
+    const sqlText2 = rawCalls[1][3].strings.join('?');
+    expect(sqlText2).toContain('department_id = ANY');
+    expect(sqlText2).toContain('department_id IS NULL AND id = ANY');
+  });
 });

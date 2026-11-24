@@ -200,12 +200,18 @@ export class UnplacedWorkDesignationRepo {
     input: {
       workKind: UnplacedWorkKind;
       workId: string;
+      employeeId?: string;
       endedByAppUserId?: string | null;
       endedAt?: Date;
     },
   ): Promise<number> {
     const result = await tx.unplacedWorkItDesignation.updateMany({
-      where: { workKind: input.workKind, workId: input.workId, endedAt: null },
+      where: {
+        workKind: input.workKind,
+        workId: input.workId,
+        ...(input.employeeId !== undefined ? { employeeId: input.employeeId } : {}),
+        endedAt: null,
+      },
       data: {
         endedAt: input.endedAt ?? new Date(),
         endedByAppUserId: input.endedByAppUserId ?? null,

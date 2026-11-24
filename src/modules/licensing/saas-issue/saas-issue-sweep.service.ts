@@ -33,15 +33,21 @@ export class SaasIssueSweepService {
   /** Runs all three passes as of `now`; returns how many reports were assigned, closed, and reminded. */
   async run(now: Date = new Date()): Promise<{ assigned: number; closed: number; told: number }> {
     const today = await this.organizationReads.businessToday(now);
-    const unassigned = await this.issues.listUnassigned(BATCH);
     let assigned = 0;
-    for (const issue of unassigned) if (await this.assign(issue, now)) assigned += 1;
+    let after: { createdAt: Date; id: string } | null = null;
+    for (;;) {
+      const page = await this.issues.listUnassigned(BATCH, after);
+      for (const issue of page) if (await this.assign(issue, now)) assigned += 1;
+      if (page.length < BATCH) break;
+      const last = page[page.length - 1];
+      after = { createdAt: last.createdAt, id: last.id };
+    }
     const lapsed = await this.issues.listLapsed(today, BATCH);
     let closed = 0;
     for (const issue of lapsed) if (await this.close(issue, now)) closed += 1;
     const late = await this.issues.listOverdueUnnoticed(today, BATCH);
     let told = 0;
-    for (const issue of late) if (await this.tell(issue)) told += 1;
+    for (const issue of late) if (await this.tell(issue, now)) told += 1;
 
     return { assigned, closed, told };
   }
@@ -119,13 +125,12 @@ export class SaasIssueSweepService {
     });
   }
 
-  private tell(candidate: SaasIssueRecord): Promise<boolean> {
+  private tell(candidate: SaasIssueRecord, now: Date): Promise<boolean> {
     return this.runner.run(async (tx) => {
       const issue = await this.issues.lock(tx, candidate.id);
       if (!issue || issue.state !== 'NEW' || issue.responseOverdueNoticedAt !== null) return false;
-      const recipientEmployeeId =
-        issue.assignedItAdminEmployeeId ?? (await this.identity.findUsableSuperAdminEmployeeId(tx));
-      if (recipientEmployeeId === null) return false;
+      const recipients = await this.resolveOverdueRecipients(tx, issue.reporterEmployeeId, now);
+      if (recipients.length === 0) return false;
       if (!(await this.issues.markOverdueNoticed(tx, issue.id))) return false;
       await this.audit.record(tx, {
         organizationId: issue.organizationId,
@@ -136,15 +141,41 @@ export class SaasIssueSweepService {
         before: null,
         after: {
           code: issue.code,
-          notifyEmployeeId: recipientEmployeeId,
+          notifyEmployeeId: recipients[0],
+          ...(recipients.length > 1 ? { notifyEmployeeIds: recipients } : {}),
           responseDueOn: issue.responseDueOn,
           state: issue.state,
         },
         correlationId: issue.id,
       });
-      await this.notifier.responseOverdue(tx, issue, recipientEmployeeId);
+      for (const recipientEmployeeId of recipients) {
+        await this.notifier.responseOverdue(tx, issue, recipientEmployeeId);
+      }
 
       return true;
     });
+  }
+
+  private async resolveOverdueRecipients(
+    tx: Parameters<SaasIssueRepo['lock']>[0],
+    reporterEmployeeId: string,
+    now: Date,
+  ): Promise<string[]> {
+    const today = await this.organizationReads.businessToday(now, tx);
+    const departmentId =
+      (await this.organizationReads.workDepartmentsOf([reporterEmployeeId], today, tx)).get(reporterEmployeeId) ?? null;
+    if (departmentId !== null) {
+      const acting = (
+        await this.organizationReads.itAdminsActingFor(
+          [departmentId],
+          (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+          tx,
+        )
+      ).get(departmentId);
+      if (acting && acting.actors.length > 0) return acting.actors;
+    }
+    const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+
+    return superAdmin !== null ? [superAdmin] : [];
   }
 }

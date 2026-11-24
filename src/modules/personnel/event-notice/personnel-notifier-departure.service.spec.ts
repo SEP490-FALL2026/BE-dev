@@ -109,6 +109,10 @@ describe('departure, transfer, and handover notifications', () => {
 
     expect(recipients(open.told, 'DEPARTURE_ACCESS_BLOCKED')).toEqual(['it1:IT_ADMIN', 'sa:SUPER_ADMIN']);
     expect(recipients(locked.told, 'DEPARTURE_ACCESS_BLOCKED')).toEqual(['sa:SUPER_ADMIN']);
+
+    const unplaced = notifierOf({ superAdmin: 'sa', actingByDept: {} });
+    await unplaced.notifier.departureAccessBlocked(TX, { ...blocked, departmentId: null, accountLocked: false });
+    expect(recipients(unplaced.told, 'DEPARTURE_ACCESS_BLOCKED')).toEqual(['sa:IT_ADMIN', 'sa:SUPER_ADMIN']);
   });
 
   it('does not tell the person who left when they are the Super Admin', async () => {

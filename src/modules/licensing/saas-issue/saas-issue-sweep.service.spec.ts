@@ -170,17 +170,123 @@ describe('SaasIssueSweepService', () => {
     expect(h.responseOverdue).toHaveBeenCalledWith(h.tx, overdueUnassigned, 'sa-1');
   });
 
-  it('notifies assigned IT Admin when an assigned NEW issue is overdue', async () => {
+  it('notifies acting IT Admins of the reporter department when an assigned NEW issue is overdue', async () => {
     const h = createHarness();
     const overdueAssigned = baseIssue({ assignedItAdminEmployeeId: 'it-1', responseDueOn: '2026-11-03' });
     h.listOverdueUnnoticed.mockResolvedValue([overdueAssigned]);
     h.lock.mockResolvedValue(overdueAssigned);
+    h.itAdminsActingFor.mockResolvedValue(
+      new Map([['dept-1', { inCharge: 'it-1', substitute: null, defaultAssignee: 'it-1', actors: ['it-1'] }]]),
+    );
 
     const result = await h.service.run();
 
     expect(result).toEqual({ assigned: 0, closed: 0, told: 1 });
     expect(h.findUsableSuperAdminEmployeeId).not.toHaveBeenCalled();
     expect(h.responseOverdue).toHaveBeenCalledWith(h.tx, overdueAssigned, 'it-1');
+  });
+
+  it('notifies the appointed substitute instead of an unusable assignee, and falls back to Super Admin when acting set is empty', async () => {
+    const sub = createHarness();
+    const overdueWithLockedInCharge = baseIssue({
+      assignedItAdminEmployeeId: 'it-locked',
+      responseDueOn: '2026-11-03',
+    });
+    sub.listOverdueUnnoticed.mockResolvedValue([overdueWithLockedInCharge]);
+    sub.lock.mockResolvedValue(overdueWithLockedInCharge);
+    sub.itAdminsActingFor.mockResolvedValue(
+      new Map([['dept-1', { inCharge: null, substitute: 'it-sub', defaultAssignee: 'it-sub', actors: ['it-sub'] }]]),
+    );
+
+    expect(await sub.service.run()).toEqual({ assigned: 0, closed: 0, told: 1 });
+    expect(sub.findUsableSuperAdminEmployeeId).not.toHaveBeenCalled();
+    expect(sub.responseOverdue).toHaveBeenCalledTimes(1);
+    expect(sub.responseOverdue).toHaveBeenCalledWith(sub.tx, overdueWithLockedInCharge, 'it-sub');
+
+    const fallback = createHarness();
+    fallback.listOverdueUnnoticed.mockResolvedValue([overdueWithLockedInCharge]);
+    fallback.lock.mockResolvedValue(overdueWithLockedInCharge);
+    fallback.itAdminsActingFor.mockResolvedValue(
+      new Map([['dept-1', { inCharge: null, substitute: null, defaultAssignee: null, actors: [] }]]),
+    );
+
+    expect(await fallback.service.run()).toEqual({ assigned: 0, closed: 0, told: 1 });
+    expect(fallback.findUsableSuperAdminEmployeeId).toHaveBeenCalledWith(fallback.tx);
+    expect(fallback.responseOverdue).toHaveBeenCalledWith(fallback.tx, overdueWithLockedInCharge, 'sa-1');
+  });
+
+  it('notifies both usable in-charge and substitute IT Admins once per overdue issue', async () => {
+    const h = createHarness();
+    const overdue = baseIssue({ assignedItAdminEmployeeId: 'it-sub', responseDueOn: '2026-11-03' });
+    h.listOverdueUnnoticed.mockResolvedValue([overdue]);
+    h.lock.mockResolvedValue(overdue);
+    h.itAdminsActingFor.mockResolvedValue(
+      new Map([
+        ['dept-1', { inCharge: 'it-1', substitute: 'it-sub', defaultAssignee: 'it-sub', actors: ['it-1', 'it-sub'] }],
+      ]),
+    );
+
+    expect(await h.service.run()).toEqual({ assigned: 0, closed: 0, told: 1 });
+    expect(h.record).toHaveBeenCalledTimes(1);
+    expect(h.responseOverdue).toHaveBeenCalledTimes(2);
+    expect(h.responseOverdue).toHaveBeenNthCalledWith(1, h.tx, overdue, 'it-1');
+    expect(h.responseOverdue).toHaveBeenNthCalledWith(2, h.tx, overdue, 'it-sub');
+  });
+
+  it('paginates unassigned NEW issues with cursor so a full first batch without acting IT Admins does not starve later batches', async () => {
+    const h = createHarness();
+    const firstBatch = Array.from({ length: 200 }, (_, index) =>
+      baseIssue({
+        id: `unassigned-${String(index + 1).padStart(3, '0')}`,
+        reporterEmployeeId: 'emp-empty-dept',
+        createdAt: new Date(Date.UTC(2026, 10, 1, 0, index)),
+      }),
+    );
+    const assignable = baseIssue({
+      id: 'unassigned-201',
+      reporterEmployeeId: 'emp-1',
+      createdAt: new Date('2026-11-02T08:00:00Z'),
+    });
+    const assigned = baseIssue({
+      id: 'unassigned-201',
+      reporterEmployeeId: 'emp-1',
+      assignedItAdminEmployeeId: 'it-1',
+      assignedByFallback: false,
+    });
+    h.listUnassigned.mockResolvedValueOnce(firstBatch).mockResolvedValueOnce([assignable]);
+    h.lock.mockImplementation((_tx: unknown, id: string) =>
+      Promise.resolve(id === 'unassigned-201' ? assignable : (firstBatch.find((item) => item.id === id) ?? null)),
+    );
+    (
+      h.service as unknown as {
+        organizationReads: { workDepartmentsOf: jest.Mock };
+      }
+    ).organizationReads.workDepartmentsOf.mockImplementation((ids: string[]) =>
+      Promise.resolve(new Map([[ids[0], ids[0] === 'emp-1' ? 'dept-1' : 'dept-empty']])),
+    );
+    h.itAdminsActingFor.mockImplementation((deptIds: string[]) =>
+      Promise.resolve(
+        deptIds[0] === 'dept-1'
+          ? new Map([['dept-1', { inCharge: 'it-1', substitute: null, defaultAssignee: 'it-1', actors: ['it-1'] }]])
+          : new Map([['dept-empty', { inCharge: null, substitute: null, defaultAssignee: null, actors: [] }]]),
+      ),
+    );
+    h.assignUnassigned.mockResolvedValue(assigned);
+
+    const result = await h.service.run(new Date('2026-11-05T10:00:00Z'));
+
+    expect(result).toEqual({ assigned: 1, closed: 0, told: 0 });
+    expect(h.listUnassigned).toHaveBeenCalledTimes(2);
+    expect(h.listUnassigned).toHaveBeenNthCalledWith(1, 200, null);
+    expect(h.listUnassigned).toHaveBeenNthCalledWith(2, 200, {
+      createdAt: firstBatch[199].createdAt,
+      id: firstBatch[199].id,
+    });
+    expect(h.assignUnassigned).toHaveBeenCalledTimes(1);
+    expect(h.assignUnassigned).toHaveBeenCalledWith(h.tx, 'unassigned-201', {
+      employeeId: 'it-1',
+      byFallback: false,
+    });
   });
 
   it('closes lapsed RESOLVED issues and notifies reporter', async () => {

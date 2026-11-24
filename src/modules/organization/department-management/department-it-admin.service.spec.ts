@@ -94,6 +94,20 @@ describe('DepartmentItAdminService', () => {
     await expect(service().assertUsable(tx, 'emp-it')).rejects.toBeInstanceOf(DepartmentItAdminLimitReachedError);
   });
 
+  it('locks candidate and validates pre-locked employee identically via lockCandidate + assertUsableLocked', async () => {
+    const locked = await service().lockCandidate(tx, 'emp-it');
+    expect(locked).toEqual({ id: 'emp-it', status: 'ACTIVE' });
+    await expect(service().assertUsableLocked(tx, 'emp-it', locked)).resolves.toBeUndefined();
+
+    await expect(service().assertUsableLocked(tx, 'emp-it', null)).rejects.toBeInstanceOf(
+      DepartmentItAdminInvalidError,
+    );
+    departments.countActiveInChargeOf.mockResolvedValueOnce(4);
+    await expect(service().assertUsableLocked(tx, 'emp-it', locked)).rejects.toBeInstanceOf(
+      DepartmentItAdminLimitReachedError,
+    );
+  });
+
   it('closes active substitute on non-null in-charge naming and computes overLimit, while leaving null untouched', async () => {
     substitutes.endActiveForDepartment.mockResolvedValueOnce({
       id: 'sub-1',

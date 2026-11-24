@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
@@ -106,5 +107,48 @@ describe('DeviceReturnTaskSweepService', () => {
     skipLocked.lockOverdueForNoticeSkipLocked.mockResolvedValueOnce(null);
     expect(await skipLocked.service.run()).toEqual({ told: 0 });
     expect(skipLocked.overdue).not.toHaveBeenCalled();
+  });
+
+  it('logs per-task errors via describeForOperator and continues reminding remaining tasks in the batch', async () => {
+    const loggerSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    try {
+      const { service, listOverdueCandidateIds, lockOverdueForNoticeSkipLocked, markOverdueNoticed, overdue } =
+        setupSweep('2026-11-25');
+      listOverdueCandidateIds.mockResolvedValueOnce(['task-fail', 'task-ok']);
+      lockOverdueForNoticeSkipLocked
+        .mockRejectedValueOnce(new Error('postgresql://user:secret@localhost/db failure'))
+        .mockResolvedValueOnce({
+          id: 'task-ok',
+          organizationId: 'org-1',
+          deviceId: 'dev-2',
+          registrationId: 'reg-2',
+          employeeId: 'emp-2',
+          offboardingCaseId: 'case-2',
+          departmentId: 'dep-1',
+          dueOn: '2026-11-20',
+          state: 'OPEN',
+          conditionOnReceipt: null,
+          softwareRemoval: null,
+          softwareRemovalNote: null,
+          outcomeNote: null,
+          handledByAppUserId: null,
+          handledAt: null,
+          overdueNoticedOn: null,
+          createdAt: new Date('2026-11-15T00:00:00.000Z'),
+          assetCode: 'LAP-26-0002',
+        });
+
+      const result = await service.run();
+
+      expect(result).toEqual({ told: 1 });
+      expect(loggerSpy).toHaveBeenCalledTimes(1);
+      const loggedMessage = String(loggerSpy.mock.calls[0]?.[0] ?? '');
+      expect(loggedMessage).toContain('task-fail');
+      expect(loggedMessage).not.toContain('secret');
+      expect(markOverdueNoticed).toHaveBeenCalledTimes(1);
+      expect(overdue).toHaveBeenCalledTimes(1);
+    } finally {
+      loggerSpy.mockRestore();
+    }
   });
 });

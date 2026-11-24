@@ -274,15 +274,22 @@ export class DeviceReturnTaskRepo {
   }
 
   async countForScope(scope: ReturnTaskCountScope, today: BusinessDate, tx?: DbTx): Promise<ReturnTaskCounts> {
-    if (scope.actingDepartmentIds.length === 0) return { open: 0, overdue: 0 };
     const departmentIds = [...new Set(scope.actingDepartmentIds)];
+    const includeTaskIds = [...new Set(scope.includeTaskIds ?? [])];
+    if (departmentIds.length === 0 && includeTaskIds.length === 0) return { open: 0, overdue: 0 };
+    const scopeClause =
+      departmentIds.length > 0 && includeTaskIds.length > 0
+        ? Prisma.sql`(department_id = ANY(${departmentIds}::uuid[]) OR (department_id IS NULL AND id = ANY(${includeTaskIds}::uuid[])))`
+        : departmentIds.length > 0
+          ? Prisma.sql`department_id = ANY(${departmentIds}::uuid[])`
+          : Prisma.sql`(department_id IS NULL AND id = ANY(${includeTaskIds}::uuid[]))`;
     const todayDate = toDateColumn(today);
     const rows = await (tx ?? this.prisma).$queryRaw<{ open_count: bigint; overdue_count: bigint }[]>`
       SELECT count(*) FILTER (WHERE state = 'OPEN'::"DeviceReturnTaskState") AS open_count,
              count(*) FILTER (WHERE state = 'OPEN'::"DeviceReturnTaskState" AND due_on < ${todayDate}::date) AS overdue_count
         FROM device_return_tasks
        WHERE organization_id = ${scope.organizationId}::uuid
-         AND department_id = ANY(${departmentIds}::uuid[])
+         AND ${scopeClause}
          AND employee_id <> ${scope.excludeEmployeeId}::uuid
          AND state = 'OPEN'::"DeviceReturnTaskState"`;
 

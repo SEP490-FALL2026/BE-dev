@@ -104,41 +104,62 @@ export class ReplacementService {
       );
       const toMove = await this.validateAndSortMovableActivations(tx, oldDeviceId, input.activations ?? []);
 
-      await this.receipts.receive(tx, {
-        organizationId: organization.id,
-        actor,
-        deviceId: oldDeviceId,
-        openRegistration: state.oldOpen,
-        condition: input.condition,
-        conditionNote: input.conditionNote ?? null,
-        softwareRemoval: state.removal,
-        now,
-        bySubstitute,
-        recordAudit: false,
-      });
-      await this.insertReplacementRegistration(
-        tx,
-        actor,
-        organization.id,
-        state.oldOpen.holderEmployeeId,
+      const movedActivations = await this.executeReplacement(tx, actor, organization.id, oldDeviceId, state, toMove, {
+        input,
         today,
-        input,
-      );
-      const movedActivations = await this.moveSelectedActivations(tx, actor, toMove, {
-        targetDeviceId: input.replacementDeviceId,
-        on: today,
-        at: now,
-        bySubstitute,
-      });
-      await this.recordAudit(tx, actor, organization.id, oldDeviceId, state.oldOpen.holderEmployeeId, {
-        input,
-        removal: state.removal,
-        movedCount: movedActivations.length,
+        now,
         bySubstitute,
       });
 
       return { returnedDeviceId: oldDeviceId, replacementDeviceId: input.replacementDeviceId, movedActivations };
     });
+  }
+
+  private async executeReplacement(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    organizationId: string,
+    oldDeviceId: string,
+    state: { oldOpen: RegistrationRecord; removal: NormalizedSoftwareRemoval },
+    toMove: readonly ActivationRecord[],
+    context: { input: DeviceReplacementInput; today: string; now: Date; bySubstitute: boolean },
+  ): Promise<Array<{ activationId: string; overActivationCap: boolean }>> {
+    await this.receipts.receive(tx, {
+      organizationId,
+      actor,
+      deviceId: oldDeviceId,
+      openRegistration: state.oldOpen,
+      condition: context.input.condition,
+      conditionNote: context.input.conditionNote ?? null,
+      softwareRemoval: state.removal,
+      now: context.now,
+      bySubstitute: context.bySubstitute,
+      recordAudit: false,
+    });
+    const replacementRegistration = await this.insertReplacementRegistration(
+      tx,
+      actor,
+      organizationId,
+      state.oldOpen.holderEmployeeId,
+      context.today,
+      context.input,
+    );
+    const movedActivations = await this.moveSelectedActivations(tx, actor, toMove, {
+      targetDeviceId: context.input.replacementDeviceId,
+      on: context.today,
+      at: context.now,
+      bySubstitute: context.bySubstitute,
+    });
+    await this.recordAudit(tx, actor, organizationId, oldDeviceId, state.oldOpen.holderEmployeeId, {
+      input: context.input,
+      removal: state.removal,
+      movedCount: movedActivations.length,
+      bySubstitute: context.bySubstitute,
+      replacementRegistrationId: replacementRegistration.id,
+      validFrom: context.today,
+    });
+
+    return movedActivations;
   }
 
   private async lockAndValidate(
@@ -263,9 +284,9 @@ export class ReplacementService {
     holderEmployeeId: string,
     validFrom: string,
     input: DeviceReplacementInput,
-  ): Promise<void> {
+  ): Promise<RegistrationRecord> {
     try {
-      await this.repo.insertRegistration(tx, {
+      return await this.repo.insertRegistration(tx, {
         organizationId,
         deviceId: input.replacementDeviceId,
         holderEmployeeId,
@@ -319,6 +340,8 @@ export class ReplacementService {
       removal: NormalizedSoftwareRemoval;
       movedCount: number;
       bySubstitute: boolean;
+      replacementRegistrationId: string;
+      validFrom: string;
     },
   ): Promise<void> {
     await this.audit.record(
@@ -334,6 +357,25 @@ export class ReplacementService {
         movedCount: details.movedCount,
         ...(details.bySubstitute ? { bySubstitute: true } : {}),
       }),
+    );
+    await this.audit.record(
+      tx,
+      devicesEvent(
+        byUser(actor),
+        organizationId,
+        'DEVICE.HOLDER_CHANGED',
+        'ManagedDevice',
+        details.input.replacementDeviceId,
+        null,
+        {
+          holderEmployeeId,
+          registrationId: details.replacementRegistrationId,
+          validFrom: details.validFrom,
+          collectorInstalled: details.input.collectorInstalled,
+          replacedDeviceId: oldDeviceId,
+          ...(details.bySubstitute ? { bySubstitute: true } : {}),
+        },
+      ),
     );
   }
 

@@ -105,6 +105,7 @@ export class OrganizationApi {
     input: {
       workKind: UnplacedWorkKind;
       workId: string;
+      employeeId?: string;
       endedByAppUserId?: string | null;
       endedAt?: Date;
     },

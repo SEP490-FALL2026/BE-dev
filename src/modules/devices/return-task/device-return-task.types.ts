@@ -59,6 +59,7 @@ export interface ReturnTaskListFilter {
 export interface ReturnTaskCountScope {
   organizationId: string;
   actingDepartmentIds: readonly string[];
+  includeTaskIds?: readonly string[] | undefined;
   excludeEmployeeId: string;
 }
 

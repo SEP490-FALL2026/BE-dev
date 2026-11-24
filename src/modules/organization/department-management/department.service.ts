@@ -131,6 +131,11 @@ export class DepartmentService {
     const organization = await requireOrganization(this.context);
 
     return this.runner.run(async (tx) => {
+      // Lock order (S2-9): tier 1 employee FOR UPDATE before tier 2 department FOR UPDATE, matching department-it-substitute.
+      const lockedCandidate =
+        input.itAdminEmployeeId !== undefined && input.itAdminEmployeeId !== null
+          ? await this.itAdmins.lockCandidate(tx, input.itAdminEmployeeId)
+          : null;
       const current = await this.repo.lock(tx, id, 'UPDATE');
       if (!current) throw new DepartmentNotFoundError();
       if (current.status !== 'ACTIVE') throw new DepartmentInactiveError();
@@ -149,31 +154,45 @@ export class DepartmentService {
         after.function = functionDescription;
       }
       if (input.itAdminEmployeeId !== undefined && input.itAdminEmployeeId !== (current.itAdmin?.employeeId ?? null)) {
-        if (input.itAdminEmployeeId !== null) await this.itAdmins.assertUsable(tx, input.itAdminEmployeeId);
+        if (input.itAdminEmployeeId !== null) {
+          await this.itAdmins.assertUsableLocked(tx, input.itAdminEmployeeId, lockedCandidate);
+        }
         changes.itAdminEmployeeId = input.itAdminEmployeeId;
         before.itAdminEmployeeId = current.itAdmin?.employeeId ?? null;
         after.itAdminEmployeeId = input.itAdminEmployeeId;
       }
       if (Object.keys(changes).length === 0) return null;
 
-      const now = new Date();
-      await this.repo.update(tx, id, changes, now);
-      const itAdminLoad = await this.itAdmins.onInChargeNamed(
-        tx,
-        actor,
-        organization.id,
-        id,
-        changes.itAdminEmployeeId,
-        after,
-        now,
-      );
-      await this.audit.record(
-        tx,
-        organizationAuditEvent(actor, organization.id, 'DEPARTMENT.UPDATED', 'Department', id, before, after),
-      );
-
-      return itAdminLoad;
+      return this.persistUpdate(tx, actor, organization.id, id, changes, before, after);
     });
+  }
+
+  private async persistUpdate(
+    tx: Parameters<DepartmentRepo['lock']>[0],
+    actor: AuthenticatedPrincipal,
+    organizationId: string,
+    id: string,
+    changes: { name?: string; functionDescription?: string | null; itAdminEmployeeId?: string | null },
+    before: Record<string, string | null>,
+    after: Record<string, AuditValue>,
+  ): Promise<ItAdminLoad | null> {
+    const now = new Date();
+    await this.repo.update(tx, id, changes, now);
+    const itAdminLoad = await this.itAdmins.onInChargeNamed(
+      tx,
+      actor,
+      organizationId,
+      id,
+      changes.itAdminEmployeeId,
+      after,
+      now,
+    );
+    await this.audit.record(
+      tx,
+      organizationAuditEvent(actor, organizationId, 'DEPARTMENT.UPDATED', 'Department', id, before, after),
+    );
+
+    return itAdminLoad;
   }
 
   /**

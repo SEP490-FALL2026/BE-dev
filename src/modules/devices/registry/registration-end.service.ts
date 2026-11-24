@@ -46,6 +46,7 @@ export class RegistrationEndService {
     await this.organization.endUnplacedWorkDesignations(tx, {
       workKind: 'DEVICE',
       workId: registration.deviceId,
+      employeeId: registration.holderEmployeeId,
       endedByAppUserId: by.kind === 'USER' ? by.principal.appUserId : null,
       endedAt: input.at,
     });

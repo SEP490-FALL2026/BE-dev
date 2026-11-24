@@ -4,6 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import type { ReturnTaskRecord } from './device-return-task.types';
 
 const SUBJECT_TYPE = 'DEVICE_RETURN_TASK';
@@ -25,7 +26,7 @@ export class DeviceReturnTaskNotifier {
     tx: DbTx,
     input: { organizationId: string; task: ReturnTaskRecord; assetCode: string },
   ): Promise<boolean> {
-    const actors = await this.resolveActors(tx, input.task.departmentId, input.task.employeeId);
+    const actors = await this.resolveActors(tx, input.task);
     if (actors.length > 0) return false;
     const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
     if (!superAdmin) return false;
@@ -53,7 +54,7 @@ export class DeviceReturnTaskNotifier {
     tx: DbTx,
     input: { organizationId: string; task: ReturnTaskRecord; assetCode: string; today: BusinessDate },
   ): Promise<void> {
-    const actors = await this.resolveActors(tx, input.task.departmentId, input.task.employeeId);
+    const actors = await this.resolveActors(tx, input.task);
     const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
     const recipients = [...new Set([...actors, ...(superAdmin ? [superAdmin] : [])])];
 
@@ -75,14 +76,23 @@ export class DeviceReturnTaskNotifier {
     }
   }
 
-  private async resolveActors(tx: DbTx, departmentId: string | null, taskEmployeeId: string): Promise<string[]> {
-    if (departmentId === null) return [];
+  private async resolveActors(tx: DbTx, task: ReturnTaskRecord): Promise<string[]> {
+    if (task.departmentId === null) {
+      const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
+        [{ workKind: 'DEVICE_RETURN_TASK', workId: task.id, employeeId: task.employeeId }],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      );
+      const designee = resolved.get(unplacedWorkKey('DEVICE_RETURN_TASK', task.id)) ?? null;
+
+      return designee !== null && designee !== task.employeeId ? [designee] : [];
+    }
     const actingByDept = await this.organizationReads.itAdminsActingFor(
-      [departmentId],
+      [task.departmentId],
       (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
       tx,
     );
 
-    return (actingByDept.get(departmentId)?.actors ?? []).filter((id) => id !== taskEmployeeId);
+    return (actingByDept.get(task.departmentId)?.actors ?? []).filter((id) => id !== task.employeeId);
   }
 }
