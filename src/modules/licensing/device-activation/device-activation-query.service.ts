@@ -12,6 +12,10 @@ export class DeviceActivationQueryService {
     return this.repo.findById(activationId, tx);
   }
 
+  keySubscriptionIds(licenseKeyIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    return this.repo.keySubscriptionIds(licenseKeyIds, tx);
+  }
+
   openOfDevice(deviceId: string, tx?: DbTx): Promise<ActivationRecord[]> {
     return this.repo.openOfDevice(deviceId, tx);
   }

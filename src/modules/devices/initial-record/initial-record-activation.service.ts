@@ -18,9 +18,12 @@ export interface OpenInitialActivationsInput {
   bySubstitute: boolean;
 }
 
+const compareText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
+
 /**
  * Opens initial (`origin: 'INITIAL'`) bundled and keyed activations for an initial device record.
- * Bundled plans are validated first so non-bundled plans fail with `DEVICE_ACTIVATION.PLAN_NOT_BUNDLED`.
+ * Bundled plans are validated first so non-bundled plans fail with `DEVICE_ACTIVATION.PLAN_NOT_BUNDLED`;
+ * keyed activations are ordered by `(subscriptionId ASC, licenseKeyId ASC)` so tier-6 subscription locks match `SPEC` §6.
  */
 @Injectable()
 export class InitialRecordActivationService {
@@ -48,21 +51,50 @@ export class InitialRecordActivationService {
       await this.openBundled(tx, organizationId, deviceId, input.bundledPlanIds, { on: input.on, at: input.at, by });
     }
 
+    return this.openKeyed(tx, organizationId, deviceId, input.licenseKeyIds, { on: input.on, at: input.at, by });
+  }
+
+  private async openKeyed(
+    tx: DbTx,
+    organizationId: string,
+    deviceId: string,
+    licenseKeyIds: readonly string[],
+    context: {
+      on: BusinessDate;
+      at: Date;
+      by: { kind: 'USER'; appUserId: string; employeeId: string; sessionId: string | null; bySubstitute: boolean };
+    },
+  ): Promise<string[]> {
+    const uniqueKeyIds = [...new Set(licenseKeyIds)];
+    if (uniqueKeyIds.length === 0) return [];
+    const orderedKeyIds = await this.sortKeyIdsBySubscription(tx, uniqueKeyIds);
+
     const keyActivationIds: string[] = [];
-    for (const licenseKeyId of input.licenseKeyIds) {
+    for (const licenseKeyId of orderedKeyIds) {
       const opened = await this.deviceActivations.openByKey(tx, {
         organizationId,
         deviceId,
         licenseKeyId,
         origin: 'INITIAL',
-        on: input.on,
-        at: input.at,
-        by,
+        on: context.on,
+        at: context.at,
+        by: context.by,
       });
       keyActivationIds.push(opened.activation.id);
     }
 
     return keyActivationIds;
+  }
+
+  private async sortKeyIdsBySubscription(tx: DbTx, licenseKeyIds: readonly string[]): Promise<string[]> {
+    if (licenseKeyIds.length <= 1) return [...licenseKeyIds];
+    const subscriptionByKeyId = await this.deviceActivations.keySubscriptionIds(licenseKeyIds, tx);
+
+    return [...licenseKeyIds].sort(
+      (left, right) =>
+        compareText(subscriptionByKeyId.get(left) ?? '', subscriptionByKeyId.get(right) ?? '') ||
+        compareText(left, right),
+    );
   }
 
   private async openBundled(

@@ -115,6 +115,21 @@ export class DeviceActivationRepo {
     await tx.$queryRaw`SELECT id FROM license_keys WHERE id = ${licenseKeyId}::uuid FOR SHARE`;
   }
 
+  /** Reads `subscriptionId` keyed by `licenseKeyId` without locking; missing keys are omitted. */
+  async keySubscriptionIds(licenseKeyIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    const result = new Map<string, string>();
+    if (licenseKeyIds.length === 0) return result;
+    const rows = await (tx ?? this.prisma).licenseKey.findMany({
+      where: { id: { in: [...licenseKeyIds] } },
+      select: { id: true, subscriptionId: true },
+    });
+    for (const row of rows) {
+      result.set(row.id, row.subscriptionId);
+    }
+
+    return result;
+  }
+
   countOperationActivationsOfKey(tx: DbTx, licenseKeyId: string): Promise<number> {
     return tx.deviceActivation.count({ where: { licenseKeyId, origin: 'OPERATION' } });
   }

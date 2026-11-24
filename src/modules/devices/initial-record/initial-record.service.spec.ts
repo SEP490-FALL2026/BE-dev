@@ -63,6 +63,7 @@ describe('InitialRecordService (W2-13)', () => {
       substitute?: string | null;
       insertDeviceError?: Error;
       bundledTargets?: SeatTarget[];
+      keySubscriptions?: Record<string, string>;
     } = {},
   ) {
     const order: string[] = [];
@@ -155,7 +156,13 @@ describe('InitialRecordService (W2-13)', () => {
     const catalog = {
       findPlanSeatTargets: jest.fn().mockResolvedValue(options.bundledTargets ?? []),
     } as unknown as CatalogApi;
+    const subByKey = new Map(Object.entries(options.keySubscriptions ?? { 'key-a': 'sub-1', 'key-b': 'sub-1' }));
     const deviceActivations = {
+      keySubscriptionIds: jest
+        .fn()
+        .mockImplementation((ids: readonly string[]) =>
+          Promise.resolve(new Map(ids.flatMap((id) => (subByKey.has(id) ? [[id, subByKey.get(id)!]] : [])))),
+        ),
       open: jest.fn().mockImplementation(() => {
         order.push('openBundled');
         return Promise.resolve({
@@ -360,5 +367,27 @@ describe('InitialRecordService (W2-13)', () => {
       .catch((e: unknown) => e);
     expect(unplaced).toBeInstanceOf(DeviceHolderUnplacedError);
     expectHttpError(unplaced, HttpStatus.CONFLICT, 'DEVICE.HOLDER_UNPLACED');
+  });
+
+  it('opens multiple key activations in (subscriptionId ASC, licenseKeyId ASC) order', async () => {
+    const { service, order } = setup({
+      keySubscriptions: { 'key-a': 'sub-2', 'key-b': 'sub-1', 'key-c': 'sub-2' },
+    });
+
+    await service.create(actor(), {
+      deviceType: 'LAP',
+      hostname: 'OLD-MULTI',
+      os: 'Windows 11',
+      keyActivations: [{ licenseKeyId: 'key-c' }, { licenseKeyId: 'key-a' }, { licenseKeyId: 'key-b' }],
+    });
+
+    expect(order).toEqual([
+      'holdInitializationOpen',
+      'assetCodeNext',
+      'insertDevice',
+      'openByKey:key-b',
+      'openByKey:key-a',
+      'openByKey:key-c',
+    ]);
   });
 });

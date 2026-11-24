@@ -51,6 +51,11 @@ export class LicensingDeviceActivationApi {
     return this.queries.find(activationId, tx);
   }
 
+  /** Resolves `subscriptionId` keyed by `licenseKeyId` without locking; missing keys are omitted. */
+  keySubscriptionIds(licenseKeyIds: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    return this.queries.keySubscriptionIds(licenseKeyIds, tx);
+  }
+
   openOfDevice(deviceId: string, tx?: DbTx): Promise<ActivationRecord[]> {
     return this.queries.openOfDevice(deviceId, tx);
   }
