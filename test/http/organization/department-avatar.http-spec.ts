@@ -29,6 +29,8 @@ const profile = {
   costCenter: null,
   itAdmin: null,
   itAdminUsable: false,
+  itSubstitute: null,
+  itCoverage: 'NONE',
   head: null,
   memberCount: 0,
   warnings: [],

@@ -287,11 +287,15 @@ describe('the activations of the license keys (integration, real PostgreSQL)', (
       }).expect(409);
       expect(codeOf(stale)).toBe('LICENSE_KEY.STALE');
       expect(detailsOf(stale).currentUpdatedAt).toBe(raised.updatedAt);
-      await patchKey(
-        read.id,
-        { maxActivations: 50, note: 'Not mine', expectedUpdatedAt: raised.updatedAt },
-        employee,
-      ).expect(403);
+      expect(
+        codeOf(
+          await patchKey(
+            read.id,
+            { maxActivations: 50, note: 'Not mine', expectedUpdatedAt: raised.updatedAt },
+            employee,
+          ).expect(403),
+        ),
+      ).toBe('AUTHORIZATION.FORBIDDEN');
       expect(
         codeOf(
           await patchKey(randomUUID(), { maxActivations: 50, note: 'Gone', expectedUpdatedAt: read.updatedAt }).expect(
