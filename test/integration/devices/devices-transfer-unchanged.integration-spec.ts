@@ -65,10 +65,19 @@ describe('department transfer keeps device registrations and activations intact 
     );
 
     const transfer = await h.moveToday(mover, { ...fin, unitId: '' });
-    await h.ctx.sql.query(`UPDATE department_transfers SET grace_ends_on = $2::date WHERE id = $1`, [
-      transfer.id,
-      addDays(h.today(), -1),
-    ]);
+    await h.ctx.sql.query('BEGIN');
+    try {
+      await h.ctx.sql.query('ALTER TABLE department_transfers DISABLE TRIGGER USER');
+      await h.ctx.sql.query(
+        `UPDATE department_transfers SET effective_on = $2::date, grace_ends_on = $3::date, grace_reminder_on = $4::date WHERE id = $1`,
+        [transfer.id, addDays(h.today(), -10), addDays(h.today(), -1), addDays(h.today(), -3)],
+      );
+      await h.ctx.sql.query('ALTER TABLE department_transfers ENABLE TRIGGER USER');
+      await h.ctx.sql.query('COMMIT');
+    } catch (error) {
+      await h.ctx.sql.query('ROLLBACK');
+      throw error;
+    }
     const sweeper = h.ctx.app.get(TransferGraceSweeper, { strict: false });
     await (sweeper as unknown as { sweep: () => Promise<void> }).sweep();
 

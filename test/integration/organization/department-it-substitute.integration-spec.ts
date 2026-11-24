@@ -282,7 +282,7 @@ describe('department IT substitutes, acting scope, work departments and load war
     });
     const observer = await h.staff(dept, code('E-OBS'), 'IT_ADMIN');
     await h.ctx.sql.query(
-      `UPDATE employee_placements SET valid_to = $2::date WHERE employee_id = $1 AND valid_to IS NULL`,
+      `UPDATE employee_placements SET valid_from = ($2::date - 10), valid_to = $2::date WHERE employee_id = $1 AND valid_to IS NULL`,
       [leaver.employeeId, h.today()],
     );
 

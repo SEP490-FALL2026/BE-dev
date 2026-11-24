@@ -66,18 +66,22 @@ describe('device initial records & onboarding checklist step 6 (W2-13, integrati
         })
         .expect(201),
     ).id;
-    const keyId = h.dataOf<{ keys: Array<{ id: string }> }>(
-      await request(server())
-        .post('/api/v1/license-keys/imports')
-        .set(as(h.it1))
-        .send({
-          subscriptionId,
-          keys: [`ACAD-${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`],
-          maxActivations: 10,
-          initialActivationsUsed,
-        })
-        .expect(201),
-    ).keys[0].id;
+    await request(server())
+      .post('/api/v1/license-keys/imports')
+      .set(as(h.it1))
+      .send({
+        subscriptionId,
+        keys: [`ACAD-${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`],
+        maxActivations: 10,
+        initialActivationsUsed,
+      })
+      .expect(201);
+    const keyId = (
+      await h.ctx.sql.query<{ id: string }>(
+        `SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
+        [subscriptionId],
+      )
+    ).rows[0].id;
 
     return { planId, subscriptionId, keyId };
   };

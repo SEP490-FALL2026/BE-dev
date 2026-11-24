@@ -61,18 +61,22 @@ describe('device activations licensing facade & S-6 lot occupancy (integration, 
     ).id;
 
   const importKey = async (subscriptionId: string, maxActivations: number): Promise<string> => {
-    const body = dataOf<{ keys: Array<{ id: string }> }>(
-      await request(server())
-        .post('/api/v1/license-keys/imports')
-        .set(as(it1))
-        .send({
-          subscriptionId,
-          keys: [`KEY-${randomUUID().replace(/-/g, '').slice(0, 20).toUpperCase()}`],
-          maxActivations,
-        })
-        .expect(201),
-    );
-    return body.keys[0].id;
+    await request(server())
+      .post('/api/v1/license-keys/imports')
+      .set(as(it1))
+      .send({
+        subscriptionId,
+        keys: [`KEY-${randomUUID().replace(/-/g, '').slice(0, 20).toUpperCase()}`],
+        maxActivations,
+      })
+      .expect(201);
+
+    return (
+      await ctx.sql.query<{ id: string }>(
+        `SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
+        [subscriptionId],
+      )
+    ).rows[0].id;
   };
 
   const createDevice = async (type: 'LAP' | 'PC'): Promise<string> =>

@@ -62,7 +62,7 @@ describe('department software list and proposals acting IT Admin rules (integrat
 
   const auditAfterOf = async (action: string, resourceId: string): Promise<Record<string, unknown> | null> => {
     const { rows } = await h.ctx.sql.query<{ after: Record<string, unknown> | null }>(
-      'SELECT after FROM audit_events WHERE action = $1 AND resource_id = $2 ORDER BY created_at DESC LIMIT 1',
+      'SELECT after FROM audit_events WHERE action = $1 AND resource_id = $2 ORDER BY occurred_at DESC LIMIT 1',
       [action, resourceId],
     );
 

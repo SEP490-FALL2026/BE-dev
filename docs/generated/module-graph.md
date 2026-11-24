@@ -82,7 +82,7 @@ flowchart BT
   devices -->|18| licensing
   devices -->|3| notifications
   devices -->|3| operating_parameters
-  devices -->|60| organization
+  devices -->|61| organization
   finance -->|3| audit
   finance -->|3| organization
   identity_access -->|20| audit

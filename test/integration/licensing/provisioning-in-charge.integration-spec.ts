@@ -141,7 +141,7 @@ describe('provisioning in-charge, substitute, self-execution, and scope rules (i
     const subK2 = await h.subscription(5, 'K2');
     const planK2 = await h.planOf(subK2);
     const failedTask = await h.granted(an, planK2, { subscriptionId: subK2, account: ha, departmentId: desDept.id });
-    await h.makeConnector(failedTask.id);
+    await h.makeConnector(failedTask.id, ha);
     await h.recordFailure(failedTask.id, 'PERMANENT');
 
     expect(h.codeOf(await h.retry(failedTask.id, itB).expect(403))).toBe('PROVISIONING.NOT_IN_CHARGE');
@@ -250,7 +250,7 @@ describe('provisioning in-charge, substitute, self-execution, and scope rules (i
 
       // Leaver no longer has placement on today (closed before today)
       await h.ctx.sql.query(
-        `UPDATE employee_placements SET valid_to = '2026-10-05'::date WHERE employee_id = $1 AND valid_to IS NULL`,
+        `UPDATE employee_placements SET valid_from = '2026-10-01'::date, valid_to = '2026-10-05'::date WHERE employee_id = $1 AND valid_to IS NULL`,
         [leaverAn],
       );
       await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [leaverAn]);

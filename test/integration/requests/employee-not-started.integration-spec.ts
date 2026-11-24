@@ -28,8 +28,8 @@ describe('BF-5 rejecting future-placed employees (integration, real PostgreSQL)'
 
     futureStaff = await h.unplacedStaff('BF5-FUT1');
     await h.ctx.sql.query(
-      `INSERT INTO employee_placements (organization_id, employee_id, department_id, valid_from)
-       VALUES ($1, $2, $3, ($4::date + 7))`,
+      `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+       VALUES (gen_random_uuid(), $1, $2, $3, ($4::date + 7))`,
       [h.seed.organizationId, futureStaff.employeeId, dept.id, h.today()],
     );
 
@@ -125,5 +125,58 @@ describe('BF-5 rejecting future-placed employees (integration, real PostgreSQL)'
       })
       .expect(409);
     expect(h.codeOf(deviceRes)).toBe('EMPLOYEE.NOT_STARTED');
+
+    const stockDeviceId = h.dataOf<{ id: string }>(
+      await request(server())
+        .post('/api/v1/devices')
+        .set(h.as(h.it1))
+        .send({
+          deviceType: 'LAP',
+          hostname: 'BF5-STOCK-01',
+          os: 'Windows 11',
+        })
+        .expect(201),
+    ).id;
+    const holderChangeRes = await request(server())
+      .post(`/api/v1/devices/${stockDeviceId}/holder-changes`)
+      .set(h.as(h.it1))
+      .send({
+        holderEmployeeId: futureStaff.employeeId,
+        collectorInstalled: false,
+      })
+      .expect(409);
+    expect(h.codeOf(holderChangeRes)).toBe('EMPLOYEE.NOT_STARTED');
+  });
+
+  it('R1-2: allows an employee with both current and future placements (201) and keeps NO_DEPARTMENT / HOLDER_UNPLACED for never-placed employees', async () => {
+    const futureDept = await h.departmentWithUnit('BF5-FIN');
+    const transferringStaff = await h.staff(dept, 'BF5-TR1');
+    await h.ctx.sql.query(
+      `UPDATE employee_placements SET valid_to = ($2::date + 7) WHERE employee_id = $1 AND valid_to IS NULL`,
+      [transferringStaff.employeeId, h.today()],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO employee_placements (id, organization_id, employee_id, department_id, valid_from)
+       VALUES (gen_random_uuid(), $1, $2, $3, ($4::date + 7))`,
+      [h.seed.organizationId, transferringStaff.employeeId, futureDept.id, h.today()],
+    );
+
+    await h.submit(h.form(internalPlanId), transferringStaff.account).expect(201);
+
+    const neverPlaced = await h.unplacedStaff('BF5-UNP1');
+    const noDeptRes = await h.submit(h.form(internalPlanId), neverPlaced.account).expect(409);
+    expect(h.codeOf(noDeptRes)).toBe('ACCESS_REQUEST.NO_DEPARTMENT');
+
+    const unplacedDeviceRes = await request(server())
+      .post('/api/v1/devices')
+      .set(h.as(h.it1))
+      .send({
+        deviceType: 'LAP',
+        hostname: 'BF5-UNP-LAP',
+        os: 'Windows 11',
+        holderEmployeeId: neverPlaced.employeeId,
+      })
+      .expect(409);
+    expect(h.codeOf(unplacedDeviceRes)).toBe('DEVICE.HOLDER_UNPLACED');
   });
 });

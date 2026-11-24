@@ -98,12 +98,16 @@ describe('device return task list, completion, device detail, and dashboard (int
     const recordedRes = await h
       .recordCase({
         employeeId: leaverItEmp.id,
-        lastWorkingDay: addDays(h.today(), -1),
+        lastWorkingDay: h.day(3),
         accessBlockMode: 'WITH_LAST_DAY',
         groundsNote: h.groundsNote,
       })
       .expect(201);
     const wire = h.dataOf<{ id: string }>(recordedRes);
+    await h.ctx.sql.query(`UPDATE device_return_tasks SET due_on = $2::date WHERE offboarding_case_id = $1`, [
+      wire.id,
+      addDays(h.today(), -1),
+    ]);
 
     // Other IT Admin cannot see in MINE nor complete while unassigned; Super Admin sees waiting=true.
     const mineBefore = h.dataOf<{ items: ReturnTaskWire[] }>(await listTasks('?scope=MINE', subAcc).expect(200));
@@ -210,13 +214,17 @@ describe('device return task list, completion, device detail, and dashboard (int
         })
         .expect(201),
     ).id;
-    const keyId = h.dataOf<{ keys: Array<{ id: string }> }>(
-      await request(h.server())
-        .post('/api/v1/license-keys/imports')
-        .set(h.as(h.it1))
-        .send({ subscriptionId: subId, keys: [`RTK-${randomUUID().slice(0, 12).toUpperCase()}`], maxActivations: 5 })
-        .expect(201),
-    ).keys[0].id;
+    await request(h.server())
+      .post('/api/v1/license-keys/imports')
+      .set(h.as(h.it1))
+      .send({ subscriptionId: subId, keys: [`RTK-${randomUUID().slice(0, 12).toUpperCase()}`], maxActivations: 5 })
+      .expect(201);
+    const keyId = (
+      await h.ctx.sql.query<{ id: string }>(
+        `SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
+        [subId],
+      )
+    ).rows[0].id;
     const actId = h.dataOf<{ activation: { id: string } }>(
       await request(h.server())
         .post(`/api/v1/devices/${d1.id}/activations`)

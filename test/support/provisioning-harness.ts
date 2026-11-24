@@ -290,8 +290,8 @@ export class ProvisioningHarness extends SeatHarness {
   }
 
   /** A task of the connector: no connector exists, so a task by hand (back in the queue, as no person works a task of the connector) is moved to that channel the way G7 will make it. */
-  async makeConnector(taskId: string): Promise<void> {
-    await this.unclaimed(taskId);
+  async makeConnector(taskId: string, account: ApiAccount = this.it1): Promise<void> {
+    await this.unclaimed(taskId, account);
     await this.ctx.sql.query(`UPDATE provisioning_tasks SET channel = 'CONNECTOR' WHERE id = $1`, [taskId]);
   }
 

@@ -101,18 +101,24 @@ describe('device holder software & my device software views (integration, real P
         .expect(201),
     ).id;
 
-  const importKey = async (subscriptionId: string, maxActivations = 5): Promise<string> =>
-    h.dataOf<{ keys: Array<{ id: string }> }>(
-      await request(server())
-        .post('/api/v1/license-keys/imports')
-        .set(as(h.it1))
-        .send({
-          subscriptionId,
-          keys: [`KEY-${randomUUID().replace(/-/g, '').slice(0, 20).toUpperCase()}`],
-          maxActivations,
-        })
-        .expect(201),
-    ).keys[0].id;
+  const importKey = async (subscriptionId: string, maxActivations = 5): Promise<string> => {
+    await request(server())
+      .post('/api/v1/license-keys/imports')
+      .set(as(h.it1))
+      .send({
+        subscriptionId,
+        keys: [`KEY-${randomUUID().replace(/-/g, '').slice(0, 20).toUpperCase()}`],
+        maxActivations,
+      })
+      .expect(201);
+
+    return (
+      await h.ctx.sql.query<{ id: string }>(
+        `SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
+        [subscriptionId],
+      )
+    ).rows[0].id;
+  };
 
   const grantPersonalSeat = async (employeeId: string, planId: string, accountEmail: string): Promise<string> => {
     const assignmentId = randomUUID();

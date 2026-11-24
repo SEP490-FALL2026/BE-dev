@@ -138,7 +138,6 @@ describe('MF-1 blocking device-bound K4 plans and S-4 provisioning guard (integr
     const proposal = await h.proposed(designer, {
       softwareName: 'Custom OS Proposal',
       homepageUrl: 'https://custom-os.example.com',
-      plannedPlanName: 'OEM Edition',
     });
     await h.decide(proposal.id, { decision: 'APPROVE' }, head.account).expect(200);
     await h.saveAssessment(proposal.id, h.assessmentBody({ provisioningType: 'K4' }), h.it1).expect(200);
@@ -157,6 +156,7 @@ describe('MF-1 blocking device-bound K4 plans and S-4 provisioning guard (integr
   it('(e, S-4) refuses granting an older Request after its K4 plan moved from ACCOUNT to DEVICE_KEY (409 PROVISIONING.PLAN_BOUND_TO_DEVICE)', async () => {
     const req = await h.sent(designer2, convertibleAccountPlanId);
     await h.decide(req.id, { decision: 'APPROVE' }, head.account).expect(200);
+    await h.ctx.sql.query(`UPDATE access_requests SET state = 'APPROVED' WHERE id = $1`, [req.id]);
 
     await request(server())
       .patch(`/api/v1/plans/${convertibleAccountPlanId}`)

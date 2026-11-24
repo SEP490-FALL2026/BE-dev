@@ -271,8 +271,9 @@ describe('departure device return tasks and cancellation lock ordering (integrat
   it('cancels past-block departure concurrently with closing a keyed activation without deadlocks for 20 rounds', async () => {
     const subAccount = await h.subscription(30, 'K2');
     for (let round = 0; round < 20; round += 1) {
-      const worker: Person = await h.worker(des, `E-DR-K-${round}-${(seq += 1)}`);
-      await h.seatOf(worker, { subscriptionId: subAccount }, `K-${round}`);
+      const workerCode = `E-DR-K-${round}-${(seq += 1)}`;
+      const worker: Person = await h.worker(des, workerCode);
+      await h.seatOf(worker, { subscriptionId: subAccount }, workerCode);
       const dev = await registerDevice(worker.employeeId);
       const activationId = await setupKeyActivation(dev.id);
       const wire = await h.recordedCase(worker, { lastWorkingDay: h.day(4) });

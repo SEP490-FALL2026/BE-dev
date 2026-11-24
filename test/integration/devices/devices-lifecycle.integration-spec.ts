@@ -195,7 +195,7 @@ describe('device lifecycle: handover, holder change, and return to stock (integr
 
     const audits = (
       await sql().query<{ after: { bySubstitute?: boolean } }>(
-        `SELECT after FROM audit_events WHERE target_id = $1 AND action = 'DEVICE.HOLDER_CHANGED' ORDER BY occurred_at DESC LIMIT 1`,
+        `SELECT after FROM audit_events WHERE resource_id = $1 AND action = 'DEVICE.HOLDER_CHANGED' ORDER BY occurred_at DESC LIMIT 1`,
         [machine.id],
       )
     ).rows;
