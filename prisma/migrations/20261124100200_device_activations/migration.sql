@@ -76,11 +76,11 @@ ALTER TABLE "plans" ADD CONSTRAINT "plans_key_binding_k4"
 ALTER TABLE "plans" ADD CONSTRAINT "plans_device_bundled_shape"
   CHECK ("key_binding" IS DISTINCT FROM 'DEVICE_BUNDLED' OR ("reference_price_minor" IS NULL AND "has_admin_console" = false));
 
--- The guard of a plan (migration 20261113004300) with three cases more, judged when a plan goes from one binding to another: a plan
--- that has a perpetual purchase, an assignment of a person or an activation of a machine keeps its binding. Each case has its own reason
--- (the word after `plan_change_blocked:` is the one the application answers with); none reuses `PERPETUAL_SUBSCRIPTIONS`, which means
--- another thing in `plans_change_keeps_perpetual`. A change from or to no binding is the change of the provisioning type and is judged
--- by the cases that were already there. Every old case stays.
+-- The guard of a plan (migration 20261113004300) with three cases more. A plan that has a perpetual purchase or an assignment of a person
+-- keeps its binding when it goes from one binding to another; a plan that has an activation of a machine keeps it whichever way it goes,
+-- to another binding or to none (the plan leaves K4), because the activations of a machine only make sense under a binding. Each case has its
+-- own reason (the word after `plan_change_blocked:` is the one the application answers with); none reuses `PERPETUAL_SUBSCRIPTIONS`, which
+-- means another thing in `plans_change_keeps_perpetual`. Every old case stays.
 CREATE OR REPLACE FUNCTION "plans_keep_children_valid"() RETURNS trigger AS $$
 BEGIN
     -- An active subscription of a per-seat plan has its quantity (subscriptions_fit_plan).
@@ -141,14 +141,16 @@ BEGIN
     END IF;
 
     -- The binding of a K4 plan cannot move while something rests on it: a perpetual purchase, an assignment of a person, an activation of a machine.
-    IF NEW."key_binding" IS NOT NULL AND OLD."key_binding" IS NOT NULL AND NEW."key_binding" IS DISTINCT FROM OLD."key_binding" THEN
-        IF EXISTS (SELECT 1 FROM "subscriptions" s WHERE s."plan_id" = NEW."id" AND s."kind" = 'PERPETUAL') THEN
-            RAISE EXCEPTION 'plan_change_blocked: KEY_BINDING_PURCHASES'
-                USING ERRCODE = '23514', CONSTRAINT = 'plans_change_keeps_key_binding';
-        END IF;
-        IF EXISTS (SELECT 1 FROM "license_assignments" a WHERE a."plan_id" = NEW."id") THEN
-            RAISE EXCEPTION 'plan_change_blocked: KEY_BINDING_ASSIGNMENTS'
-                USING ERRCODE = '23514', CONSTRAINT = 'plans_change_keeps_key_binding_assignments';
+    IF NEW."key_binding" IS DISTINCT FROM OLD."key_binding" THEN
+        IF NEW."key_binding" IS NOT NULL AND OLD."key_binding" IS NOT NULL THEN
+            IF EXISTS (SELECT 1 FROM "subscriptions" s WHERE s."plan_id" = NEW."id" AND s."kind" = 'PERPETUAL') THEN
+                RAISE EXCEPTION 'plan_change_blocked: KEY_BINDING_PURCHASES'
+                    USING ERRCODE = '23514', CONSTRAINT = 'plans_change_keeps_key_binding';
+            END IF;
+            IF EXISTS (SELECT 1 FROM "license_assignments" a WHERE a."plan_id" = NEW."id") THEN
+                RAISE EXCEPTION 'plan_change_blocked: KEY_BINDING_ASSIGNMENTS'
+                    USING ERRCODE = '23514', CONSTRAINT = 'plans_change_keeps_key_binding_assignments';
+            END IF;
         END IF;
         IF EXISTS (SELECT 1 FROM "device_activations" d WHERE d."plan_id" = NEW."id") THEN
             RAISE EXCEPTION 'plan_change_blocked: DEVICE_ACTIVATIONS'
@@ -240,7 +242,8 @@ $$ LANGUAGE plpgsql;
 ALTER TABLE "device_activations" ADD CONSTRAINT "device_activations_closed_complete" CHECK (
   ("deactivated_at" IS NULL) = ("deactivated_on" IS NULL)
   AND ("deactivated_at" IS NULL) = ("end_cause" IS NULL)
-  AND ("deactivated_on" IS NULL OR "deactivated_on" >= "activated_on"));
+  AND ("deactivated_on" IS NULL OR "deactivated_on" >= "activated_on")
+  AND ("closed_by_app_user_id" IS NULL OR "deactivated_at" IS NOT NULL));
 ALTER TABLE "device_activations" ADD CONSTRAINT "device_activations_release" CHECK (
   (("license_released" IS NOT NULL) = ("deactivated_at" IS NOT NULL AND "license_key_id" IS NOT NULL))
   AND ("end_cause" IS DISTINCT FROM 'MOVED' OR "license_released" = true));

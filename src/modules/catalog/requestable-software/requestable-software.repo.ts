@@ -21,6 +21,12 @@ const OFFERED_APPLICATION: Prisma.ApplicationWhereInput = {
   kind: { in: [...REQUESTABLE_KINDS] },
 };
 
+/**
+ * A plan a person may ask for: bound to an account, or of a kind that has no binding. A plan bound to a machine (by a key, or bundled with it)
+ * is not asked for: the IT Admin gives the machine its software, and the key goes on the machine, never to a person.
+ */
+const REQUESTABLE_PLAN: Prisma.PlanWhereInput = { OR: [{ keyBinding: null }, { keyBinding: 'ACCOUNT' }] };
+
 const APPLICATION_ROW = {
   id: true,
   name: true,
@@ -28,7 +34,7 @@ const APPLICATION_ROW = {
   logoUrl: true,
   vendor: { select: { name: true } },
   functionalGroup: { select: { id: true, name: true } },
-  _count: { select: { plans: true } },
+  _count: { select: { plans: { where: REQUESTABLE_PLAN } } },
 } as const;
 type ApplicationRow = Prisma.ApplicationGetPayload<{ select: typeof APPLICATION_ROW }>;
 
@@ -73,7 +79,7 @@ export class RequestableSoftwareRepo {
     const where: Prisma.ApplicationWhereInput = {
       AND: [
         OFFERED_APPLICATION,
-        { plans: { some: {} } },
+        { plans: { some: REQUESTABLE_PLAN } },
         ...(filter.kind ? [{ kind: filter.kind }] : []),
         ...(filter.functionalGroupId ? [{ functionalGroupId: filter.functionalGroupId }] : []),
         ...(key
@@ -101,7 +107,7 @@ export class RequestableSoftwareRepo {
   /** The offered application with this id, or null when it does not exist or is not offered. */
   async findApplication(id: string): Promise<RequestableApplicationDetailRecord | null> {
     const row = await this.prisma.application.findFirst({
-      where: { id, AND: [OFFERED_APPLICATION, { plans: { some: {} } }] },
+      where: { id, AND: [OFFERED_APPLICATION, { plans: { some: REQUESTABLE_PLAN } }] },
       select: { ...APPLICATION_ROW, dataSensitivity: true },
     });
 
@@ -113,6 +119,7 @@ export class RequestableSoftwareRepo {
     const key = filter.search ? searchKey(filter.search) : '';
     const where: Prisma.PlanWhereInput = {
       AND: [
+        REQUESTABLE_PLAN,
         { application: { is: OFFERED_APPLICATION } },
         ...(filter.kind ? [{ application: { is: { kind: filter.kind } } }] : []),
         ...(filter.applicationId ? [{ applicationId: filter.applicationId }] : []),
@@ -148,7 +155,7 @@ export class RequestableSoftwareRepo {
   /** The plan with this id when its application is offered, or null. */
   async findPlan(id: string): Promise<RequestablePlanDetailRecord | null> {
     const row = await this.prisma.plan.findFirst({
-      where: { id, application: { is: OFFERED_APPLICATION } },
+      where: { id, AND: [REQUESTABLE_PLAN], application: { is: OFFERED_APPLICATION } },
       select: {
         ...PLAN_ROW,
         sharingPolicy: true,

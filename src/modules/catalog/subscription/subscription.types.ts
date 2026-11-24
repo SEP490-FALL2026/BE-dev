@@ -14,6 +14,8 @@ export type SubscriptionWarning = 'NO_ALERT_ANCHOR' | 'RESPONSIBLE_MISSING' | 'B
 export type PlanPricingModel = 'PER_SEAT' | 'FLAT_RATE' | 'CONCURRENT' | 'CONSUMPTION' | 'PER_HOST';
 export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
 export type ProvisioningType = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+/** How a K4 plan is bound once bought (a copy of the plan capability's type, which this one does not import). */
+export type PlanKeyBinding = 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED';
 
 /** The conversion snapshot of the unit price, frozen when the price was recorded (ADR-0007). */
 export interface PriceSnapshotRecord {

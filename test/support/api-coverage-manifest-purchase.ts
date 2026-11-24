@@ -3,6 +3,10 @@
  * `API_COVERAGE_MANIFEST` kept in a file of its own so the manifest stays under the size of a support file. Add entries and HTTP tests together.
  */
 export const API_COVERAGE_PURCHASE: readonly string[] = [
+  // Redesign wave 2 (W2-27 H16): the Super Admin names the IT Admin who answers for a subscription.
+  'POST /api/v1/subscriptions/{id}/responsible-it-admin',
+  // Redesign wave 2 (W2-21): the IT Admin raises the cap of activations of a license key.
+  'PATCH /api/v1/license-keys/{id}',
   'POST /api/v1/purchase-invoices/preview',
   'POST /api/v1/purchase-invoices',
   'POST /api/v1/purchase-invoices/{id}/resubmission',

@@ -123,7 +123,8 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
   },
   licenseKeyImport: {
     '404': ['SUBSCRIPTION.NOT_FOUND'],
-    '422': ['LICENSE_KEY.APPLICATION_RETIRED', 'LICENSE_KEY.PLAN_NOT_K4'],
+    '409': ['LICENSE_KEY.INITIALIZATION_CLOSED'],
+    '422': ['LICENSE_KEY.APPLICATION_RETIRED', 'LICENSE_KEY.PLAN_HAS_NO_KEYS', 'LICENSE_KEY.PLAN_NOT_K4'],
   },
   licenseKeyList: {
     '404': ['SUBSCRIPTION.NOT_FOUND'],
@@ -131,6 +132,11 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
   licenseKeyReveal: {
     '404': ['LICENSE_KEY.NOT_FOUND'],
     '409': ['LICENSE_KEY.WITHDRAWN'],
+  },
+  licenseKeyUpdate: {
+    '404': ['LICENSE_KEY.NOT_FOUND'],
+    '409': ['LICENSE_KEY.STALE'],
+    '422': ['LICENSE_KEY.MAX_ACTIVATIONS_NOT_RAISED'],
   },
   licenseKeyWithdraw: {
     '404': ['LICENSE_KEY.NOT_FOUND'],

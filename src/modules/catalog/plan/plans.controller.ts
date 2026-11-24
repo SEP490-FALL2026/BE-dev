@@ -40,7 +40,7 @@ const READERS = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const INVALID_DESCRIPTION =
-  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone), REFERENCE_PRICE_NOT_VND (the reference price is in dong), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.';
+  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone, and not to one bundled with the machine), REFERENCE_PRICE_NOT_VND (the reference price is in dong), KEY_BINDING_NOT_APPLICABLE (only a K4 plan has a keyBinding), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one, and a K4 plan bundled with the machine has none), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.';
 /** The rule refusals of the shape of a plan, met by a declaration and by a change alike. */
 const SHAPE_EXAMPLES = [
   EXAMPLES.NAME_INVALID,
@@ -53,6 +53,7 @@ const SHAPE_EXAMPLES = [
   EXAMPLES.CONTROL_LEVEL_REQUIRED,
   EXAMPLES.DATA_LOSS_NOTE_REQUIRED,
   EXAMPLES.ADMIN_CONSOLE_NOT_APPLICABLE,
+  EXAMPLES.KEY_BINDING_NOT_APPLICABLE,
   EXAMPLES.REFERENCE_PRICE_NOT_VND,
   EXAMPLES.REFERENCE_PRICE_NOT_APPLICABLE,
   EXAMPLES.REFERENCE_PRICE_NOT_POSITIVE,
@@ -68,7 +69,7 @@ const UPDATE_INVALID = {
   examples: [VALIDATION_EXAMPLE, ...SHAPE_EXAMPLES, EXAMPLES.UPDATE_EMPTY],
 } as const;
 const CONFLICT_DESCRIPTION =
-  'The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has) or SUBSCRIPTIONS).';
+  'The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has), KEY_BINDING_PURCHASES (a perpetual purchase hangs on the plan, so its keyBinding cannot change), KEY_BINDING_ASSIGNMENTS (a person holds a seat of the plan), DEVICE_ACTIVATIONS (a machine holds an activation of the plan) or SUBSCRIPTIONS).';
 const DECLARE_CONFLICT = {
   status: HttpStatus.CONFLICT,
   description: CONFLICT_DESCRIPTION,
@@ -113,7 +114,7 @@ export class PlansController {
   @ApiSuccessResponse(PlanPageResponseDto, {
     message: 'PLAN.LISTED',
     description:
-      'A page of plans by application then plan name, optionally for one application, one kind of provisioning, the functional group or the catalog status of the application, or a search over the plan and application names.',
+      'A page of plans by application then plan name, optionally for one application, one kind of provisioning, one key binding of a K4 plan, the functional group or the catalog status of the application, or a search over the plan and application names.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

@@ -15,6 +15,10 @@ const provisioningType = z.enum(['K1', 'K2', 'K3', 'K4', 'K5']);
 const pricingModel = z.enum(['PER_SEAT', 'FLAT_RATE', 'CONCURRENT', 'CONSUMPTION', 'PER_HOST']);
 const controlLevel = z.enum(['FULL', 'PARTIAL', 'UNCONTROLLABLE']);
 const sharingPolicy = z.enum(['ALLOWED', 'NOT_ALLOWED']);
+const keyBinding = z.enum(['ACCOUNT', 'DEVICE_KEY', 'DEVICE_BUNDLED']).meta({
+  description:
+    'How a K4 plan is bound once bought: ACCOUNT (a seat of a person, the default of a K4 plan), DEVICE_KEY (a key that goes on a machine) or DEVICE_BUNDLED (comes with the machine: no key, no price, no console). A plan of another kind has none.',
+});
 const workspaceRole = z.enum(['OWNER', 'ADMIN']);
 /** The reference price of a plan (`QĐ-113a`): money as text (ADR-0007), in dong; another currency is refused (PLAN.REFERENCE_PRICE_NOT_VND). */
 const referencePrice = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) }).meta({
@@ -26,6 +30,7 @@ export const declarePlanBodySchema = z.strictObject({
   applicationId: z.uuid(),
   name: text,
   provisioningType,
+  keyBinding: keyBinding.optional(),
   pricingModel: pricingModel.optional(),
   controlLevel: controlLevel.optional(),
   revocationNote: note.nullable().optional(),
@@ -39,6 +44,7 @@ export const declarePlanBodySchema = z.strictObject({
 export const updatePlanBodySchema = z.strictObject({
   name: text.optional(),
   provisioningType: provisioningType.optional(),
+  keyBinding: keyBinding.optional(),
   pricingModel: pricingModel.nullable().optional(),
   controlLevel: controlLevel.nullable().optional(),
   revocationNote: note.nullable().optional(),
@@ -76,6 +82,7 @@ export const workspaceProfileBodySchema = z.strictObject({
 export const listPlansQuerySchema = z.strictObject({
   applicationId: z.uuid().optional(),
   provisioningType: provisioningType.optional(),
+  keyBinding: keyBinding.optional().meta({ description: 'Only the plans bound this way (K4 plans).' }),
   functionalGroupId: z
     .uuid()
     .optional()
@@ -124,6 +131,7 @@ const planSummarySchema = z.strictObject({
   }),
   name: z.string(),
   provisioningType,
+  keyBinding: keyBinding.nullable(),
   pricingModel: pricingModel.nullable(),
   controlLevel: controlLevel.nullable(),
   dataLossOnRemoval: z.boolean(),

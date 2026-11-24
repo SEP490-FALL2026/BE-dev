@@ -14,7 +14,8 @@ export interface KeyCounts {
 }
 
 /** What a plan needs of the catalog to be counted: the kind it gives out and the subscriptions it is counted over. */
-export type StockPlanFacts = Pick<StockPlan, 'provisioningType' | 'subscriptions'>;
+export type StockPlanFacts = Pick<StockPlan, 'provisioningType' | 'subscriptions'> &
+  Partial<Pick<StockPlan, 'keyBinding'>>;
 
 /**
  * What a plan holds, by what it gives out (`QĐ-111n`): seats of a K2 plan (`purchased` and `free` are null when a subscription has no quantity),
@@ -23,6 +24,7 @@ export type StockPlanFacts = Pick<StockPlan, 'provisioningType' | 'subscriptions
 export type StockBlock =
   | { kind: 'SEATS'; purchased: number | null; assigned: number; free: number | null; revoking: number }
   | { kind: 'KEYS'; inStore: number; assigned: number; withdrawn: number }
+  | { kind: 'LICENSES'; purchased: number | null; occupied: number; free: number | null }
   | { kind: 'HOLDERS'; holders: number };
 
 /** One plan of the summary: the plan with its application and what it holds. */

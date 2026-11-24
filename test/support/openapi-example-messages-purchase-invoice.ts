@@ -3,6 +3,9 @@
  * of the invoices that differ from what was approved or bought (`RC-1`, `QĐ-111y`).
  */
 export const SUCCESS_MESSAGES_PURCHASE_INVOICE: Readonly<Record<string, string>> = {
+  // Redesign wave 2: a key's cap of activations (W2-21) and who answers for a subscription (W2-27 H16) sit here because the manifest is at its size.
+  licenseKeyUpdate: 'LICENSE_KEY.UPDATED',
+  subscriptionResponsibleItAdminChange: 'SUBSCRIPTION.RESPONSIBLE_CHANGED',
   invoiceDiscrepancyClose: 'INVOICE_DISCREPANCY.CLOSED',
   invoiceDiscrepancyGet: 'INVOICE_DISCREPANCY.READ',
   invoiceDiscrepancyList: 'INVOICE_DISCREPANCY.LISTED',

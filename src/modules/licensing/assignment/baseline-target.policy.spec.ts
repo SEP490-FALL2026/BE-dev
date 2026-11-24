@@ -18,6 +18,7 @@ const subscription = (over: Partial<SeatTarget> = {}): SeatTarget => ({
   applicationName: 'Figma',
   applicationKind: 'SAAS',
   provisioningType: 'K2',
+  keyBinding: null,
   applicationStatus: 'APPROVED',
   status: 'ACTIVE',
   missing: [],

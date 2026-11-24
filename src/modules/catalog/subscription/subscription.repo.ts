@@ -284,6 +284,15 @@ export class SubscriptionRepo {
     return rows.map((row) => row.id).sort();
   }
 
+  /**
+   * Names `employeeId` as the IT Admin who answers for the subscription (`QĐ-118f`). The caller holds the row `FOR UPDATE` and has judged the
+   * person; this only writes.
+   */
+  async setResponsible(tx: DbTx, id: string, employeeId: string): Promise<void> {
+    await tx.$executeRaw`
+      UPDATE subscriptions SET responsible_it_admin_employee_id = ${employeeId}::uuid, updated_at = now() WHERE id = ${id}::uuid`;
+  }
+
   /** How many subscriptions name each of these IT Admins responsible (`QĐ-111g`); one who answers for none is absent. */
   async countResponsibleOf(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
     if (employeeIds.length === 0) return new Map();

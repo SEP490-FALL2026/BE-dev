@@ -125,6 +125,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'PLAN.APPLICATION_RETIRED',
         'PLAN.CONTROL_LEVEL_REQUIRED',
         'PLAN.DATA_LOSS_NOTE_REQUIRED',
+        'PLAN.KEY_BINDING_NOT_APPLICABLE',
         'PLAN.NAME_INVALID',
         'PLAN.NOTE_INVALID',
         'PLAN.PRICING_MODEL_NOT_APPLICABLE',
@@ -165,6 +166,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'PLAN.ADMIN_CONSOLE_NOT_APPLICABLE',
         'PLAN.CONTROL_LEVEL_REQUIRED',
         'PLAN.DATA_LOSS_NOTE_REQUIRED',
+        'PLAN.KEY_BINDING_NOT_APPLICABLE',
         'PLAN.NAME_INVALID',
         'PLAN.NOTE_INVALID',
         'PLAN.PRICING_MODEL_NOT_APPLICABLE',
@@ -243,6 +245,10 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
     },
     subscriptionGet: {
       '404': ['SUBSCRIPTION.NOT_FOUND'],
+    },
+    subscriptionResponsibleItAdminChange: {
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
+      '422': ['SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN'],
     },
     subscriptionUpdate: {
       '404': ['SUBSCRIPTION.NOT_FOUND'],

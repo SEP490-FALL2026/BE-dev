@@ -61,6 +61,7 @@ import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-
 import { LicenseKeyRepo } from './license-key/license-key.repo';
 import { LicenseKeyAssignmentService } from './license-key/license-key-assignment.service';
 import { LicenseKeyRevealQuotaRepo } from './license-key/license-key-reveal-quota.repo';
+import { LicenseKeyImportSettingsService } from './license-key/license-key-import-settings.service';
 import { LicenseKeyService } from './license-key/license-key.service';
 import { LicenseKeysController } from './license-key/license-keys.controller';
 import { MySoftwareController } from './my-software/my-software.controller';
@@ -303,6 +304,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicenseKeyRepo,
     LicenseKeyRevealQuotaRepo,
     LicenseKeyService,
+    LicenseKeyImportSettingsService,
     LicenseKeyAssignmentService,
     {
       provide: LicenseKeyCipher,

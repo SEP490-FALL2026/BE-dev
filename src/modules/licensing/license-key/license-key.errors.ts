@@ -27,3 +27,35 @@ export class LicenseKeyStateError extends Error {
     this.name = 'LicenseKeyStateError';
   }
 }
+
+/** The activations a key had when it was entered are told only while the installation phase is open (`QĐ-116n`): after it they come from the machines. */
+export class LicenseKeyInitializationClosedError extends Error {
+  constructor() {
+    super('The activations already used can be told only while the installation phase is open.');
+    this.name = 'LicenseKeyInitializationClosedError';
+  }
+}
+
+/** A plan bundled with the machine has no key to keep: the software comes with the machine. */
+export class LicenseKeyPlanHasNoKeysError extends Error {
+  constructor() {
+    super('A plan bundled with the machine has no license keys.');
+    this.name = 'LicenseKeyPlanHasNoKeysError';
+  }
+}
+
+/** The cap of activations of a key only goes up (trigger `license_key_guard`). */
+export class LicenseKeyMaxActivationsNotRaisedError extends Error {
+  constructor(readonly current: number) {
+    super('The cap of activations of a key can only be raised.');
+    this.name = 'LicenseKeyMaxActivationsNotRaisedError';
+  }
+}
+
+/** The key changed since the caller read it (`expectedUpdatedAt` no longer matches). */
+export class LicenseKeyStaleError extends Error {
+  constructor(readonly currentUpdatedAt: Date) {
+    super('The license key was changed by someone else since it was read.');
+    this.name = 'LicenseKeyStaleError';
+  }
+}

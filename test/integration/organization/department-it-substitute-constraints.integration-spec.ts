@@ -162,6 +162,9 @@ describe('the appointments of IT Admins in place of a department (integration, P
       expect((await appoint(dept, 'x'.repeat(501))).failure?.constraint).toBe(
         'department_it_substitutes_reason_length',
       );
+      expect((await appoint(dept, ' ' + 'x'.repeat(500))).failure?.constraint).toBe(
+        'department_it_substitutes_reason_length',
+      );
       expect((await appoint(dept, 'x'.repeat(500))).failure).toBeNull();
     });
   });

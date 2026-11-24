@@ -267,8 +267,9 @@ describe('what an update of a subscription makes of its state, and when it is a 
     isPrimaryForPlan: false,
   };
 
-  it('keeps what the update does not give', () => {
+  it('keeps what the update does not give, and who answers for the subscription whatever it says', () => {
     expect(nextStateOf(current, {})).toEqual(current);
+    expect(nextStateOf(current, { responsibleItAdminEmployeeId: 'it-2' } as never)).toEqual(current);
   });
 
   it('takes what the update gives, and clears the four dates and the notice period when it says null', () => {
@@ -284,7 +285,6 @@ describe('what an update of a subscription makes of its state, and when it is a 
         autoRenew: true,
         allowsMidTermReduction: false,
         commitmentTermMonths: 1,
-        responsibleItAdminEmployeeId: 'it-2',
         vendorMinimumSeats: null,
         isPrimaryForPlan: true,
       }),
@@ -299,7 +299,7 @@ describe('what an update of a subscription makes of its state, and when it is a 
       autoRenew: true,
       allowsMidTermReduction: false,
       commitmentTermMonths: 1,
-      responsibleItAdminEmployeeId: 'it-2',
+      responsibleItAdminEmployeeId: 'it-1',
       vendorMinimumSeats: null,
       isPrimaryForPlan: true,
     });

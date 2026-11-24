@@ -68,6 +68,7 @@ describe('SubscriptionPoolService.assertVendorAdmins and assertActivation', () =
     applicationKind: 'SAAS',
     applicationStatus: 'APPROVED',
     provisioningType: 'K2',
+    keyBinding: null,
     pricingModel: 'PER_SEAT',
     sharingPolicy: null,
     hasAdminConsole: false,

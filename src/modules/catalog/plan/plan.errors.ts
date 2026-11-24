@@ -180,6 +180,9 @@ export type PlanChangeBlock =
   | 'PERPETUAL_SUBSCRIPTIONS'
   | 'TERM_SUBSCRIPTIONS'
   | 'CONTRACT_LINKS'
+  | 'KEY_BINDING_PURCHASES'
+  | 'KEY_BINDING_ASSIGNMENTS'
+  | 'DEVICE_ACTIVATIONS'
   | 'SUBSCRIPTIONS';
 
 export class PlanInUseBlocksChangeError extends Error {
@@ -210,5 +213,13 @@ export class PlanReferencePriceNotPositiveError extends Error {
   constructor() {
     super('The reference price of a plan must be above zero.');
     this.name = 'PlanReferencePriceNotPositiveError';
+  }
+}
+
+/** Only a K4 plan has a key binding (`plans_key_binding_k4`): a plan of another kind that names one is refused. */
+export class PlanKeyBindingNotApplicableError extends Error {
+  constructor() {
+    super('Only a K4 plan, bought once, is bound to an account or to a machine.');
+    this.name = 'PlanKeyBindingNotApplicableError';
   }
 }

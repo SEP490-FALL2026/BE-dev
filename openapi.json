@@ -22497,6 +22497,13 @@
             "schema": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] }
           },
           {
+            "name": "keyBinding",
+            "required": false,
+            "in": "query",
+            "description": "Only the plans bound this way (K4 plans).",
+            "schema": { "type": "string", "enum": ["ACCOUNT", "DEVICE_KEY", "DEVICE_BUNDLED"] }
+          },
+          {
             "name": "functionalGroupId",
             "required": false,
             "in": "query",
@@ -22538,7 +22545,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of plans by application then plan name, optionally for one application, one kind of provisioning, the functional group or the catalog status of the application, or a search over the plan and application names.",
+            "description": "A page of plans by application then plan name, optionally for one application, one kind of provisioning, one key binding of a K4 plan, the functional group or the catalog status of the application, or a search over the plan and application names.",
             "content": {
               "application/json": {
                 "schema": {
@@ -22779,7 +22786,7 @@
             }
           },
           "409": {
-            "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has) or SUBSCRIPTIONS).",
+            "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has), KEY_BINDING_PURCHASES (a perpetual purchase hangs on the plan, so its keyBinding cannot change), KEY_BINDING_ASSIGNMENTS (a person holds a seat of the plan), DEVICE_ACTIVATIONS (a machine holds an activation of the plan) or SUBSCRIPTIONS).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -22843,7 +22850,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone), REFERENCE_PRICE_NOT_VND (the reference price is in dong), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone, and not to one bundled with the machine), REFERENCE_PRICE_NOT_VND (the reference price is in dong), KEY_BINDING_NOT_APPLICABLE (only a K4 plan has a keyBinding), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one, and a K4 plan bundled with the machine has none), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -22989,6 +22996,17 @@
                       "error": {
                         "code": "PLAN.ADMIN_CONSOLE_NOT_APPLICABLE",
                         "message": "Only a K4 plan says whether it has an admin console.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.KEY_BINDING_NOT_APPLICABLE": {
+                    "summary": "Only a K4 plan, bought once, is bound to an account or to a machine.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.KEY_BINDING_NOT_APPLICABLE",
+                        "message": "Only a K4 plan, bought once, is bound to an account or to a machine.",
                         "requestId": "req_example"
                       }
                     }
@@ -23383,7 +23401,7 @@
             }
           },
           "409": {
-            "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has) or SUBSCRIPTIONS).",
+            "description": "The application already has a plan of this name (PLAN.NAME_TAKEN) or the plan still has a workspace profile or a numeric install limit the new kind cannot keep (PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE, PLAN.TERMS_BLOCK_TYPE_CHANGE), or a subscription or license key of the plan would no longer fit the new pricing model or kind (PLAN.IN_USE_BLOCKS_CHANGE, `details.reason`: ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY, LICENSE_KEYS, PERPETUAL_SUBSCRIPTIONS (a perpetual purchase of an application that is not licensed hangs on the K4 plan), TERM_SUBSCRIPTIONS (a subscription over a term hangs on a plan that would become K4, which is bought once), CONTRACT_LINKS (a subscription of the plan rests on a contract, which only a plan of a shared stock, K2 or K4, has), KEY_BINDING_PURCHASES (a perpetual purchase hangs on the plan, so its keyBinding cannot change), KEY_BINDING_ASSIGNMENTS (a person holds a seat of the plan), DEVICE_ACTIVATIONS (a machine holds an activation of the plan) or SUBSCRIPTIONS).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -23481,7 +23499,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone), REFERENCE_PRICE_NOT_VND (the reference price is in dong), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, PRICING_MODEL_NOT_DERIVED (the pricing model follows the kind of provisioning: leave it out or send the implied one; details.expected), CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone, and not to one bundled with the machine), REFERENCE_PRICE_NOT_VND (the reference price is in dong), KEY_BINDING_NOT_APPLICABLE (only a K4 plan has a keyBinding), REFERENCE_PRICE_NOT_APPLICABLE (only a K1, K2 or K4 plan has one, and a K4 plan bundled with the machine has none), REFERENCE_PRICE_NOT_POSITIVE (zero or less is no price), MONEY_SCALE_EXCEEDED or MONEY_OUT_OF_RANGE (a too large amount) or UPDATE_EMPTY.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -23605,6 +23623,17 @@
                       "error": {
                         "code": "PLAN.ADMIN_CONSOLE_NOT_APPLICABLE",
                         "message": "Only a K4 plan says whether it has an admin console.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.KEY_BINDING_NOT_APPLICABLE": {
+                    "summary": "Only a K4 plan, bought once, is bound to an account or to a machine.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.KEY_BINDING_NOT_APPLICABLE",
+                        "message": "Only a K4 plan, bought once, is bound to an account or to a machine.",
                         "requestId": "req_example"
                       }
                     }
@@ -27363,6 +27392,259 @@
         "tags": ["subscriptions"]
       }
     },
+    "/api/v1/subscriptions/{id}/responsible-it-admin": {
+      "post": {
+        "operationId": "subscriptionResponsibleItAdminChange",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangeResponsibleBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The subscription as it is after the change; changed is false when the IT Admin named already answered for it and nothing was written. The audit trail names who changed it, from whom to whom and the reason.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SubscriptionResponsibleChangeResponseDto" },
+                    { "properties": { "message": { "example": "SUBSCRIPTION.RESPONSIBLE_CHANGED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin names who answers for a subscription.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The subscription does not exist (SUBSCRIPTION.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "SUBSCRIPTION.NOT_FOUND": {
+                    "summary": "The subscription does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.NOT_FOUND",
+                        "message": "The subscription does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), or the person named is not an IT Admin who works now (SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN): nothing changes.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN": {
+                    "summary": "The person who answers for the subscription must be an IT Admin who works and can sign in.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN",
+                        "message": "The person who answers for the subscription must be an IT Admin who works and can sign in.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Name the IT Admin who answers for a subscription",
+        "tags": ["subscriptions"]
+      }
+    },
     "/api/v1/applications/{id}/retirement": {
       "get": {
         "operationId": "applicationRetirementGet",
@@ -27848,7 +28130,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin or the Super Admin hands an application over, and an IT Admin only while they are the one responsible, or while the application needs a responsible IT Admin and they take it for themselves (APPLICATION.RESPONSIBILITY_NOT_YOURS). The one who loses the race to take an application that needs one meets this too.",
+            "description": "Only the Super Admin changes who is responsible for an application: an IT Admin, even the one responsible, is refused (APPLICATION.RESPONSIBILITY_NOT_YOURS).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -37856,7 +38138,7 @@
         },
         "responses": {
           "201": {
-            "description": "Every valid key is kept, sealed. A line that is not kept is reported by its number with INVALID_FORMAT, DUPLICATE_IN_BATCH or ALREADY_IN_STORE, never with the key. The summary is the capacity of the purchase: the smaller of the seats bought and the keys still usable.",
+            "description": "Every valid key is kept, sealed. A line that is not kept is reported by its number with INVALID_FORMAT, DUPLICATE_IN_BATCH or ALREADY_IN_STORE, never with the key. The summary is the capacity of the purchase: for a plan bound to an account, the smaller of the seats bought and the keys still usable; for a key that goes on a machine (DEVICE_KEY), the licenses bought, with what is occupied and what is free. One maxActivations and one initialActivationsUsed apply to the whole batch: keys with another number are imported in another batch.",
             "content": {
               "application/json": {
                 "schema": {
@@ -37963,6 +38245,27 @@
               }
             }
           },
+          "409": {
+            "description": "The batch tells initialActivationsUsed but the installation phase is closed (LICENSE_KEY.INITIALIZATION_CLOSED): after it the activations come from the machines. Nothing is kept.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "LICENSE_KEY.INITIALIZATION_CLOSED": {
+                    "summary": "The activations already used can be told only while the installation phase is open.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.INITIALIZATION_CLOSED",
+                        "message": "The activations already used can be told only while the installation phase is open.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "413": {
             "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
             "content": {
@@ -38006,7 +38309,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4) or its application is retired (LICENSE_KEY.APPLICATION_RETIRED).",
+            "description": "The request is invalid (VALIDATION_ERROR), the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4), it is bundled with the machine and has no keys (LICENSE_KEY.PLAN_HAS_NO_KEYS) or its application is retired (LICENSE_KEY.APPLICATION_RETIRED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -38031,6 +38334,17 @@
                         "code": "LICENSE_KEY.PLAN_NOT_K4",
                         "message": "Only a purchase of a K4 plan keeps license keys; this plan is K1.",
                         "details": { "provisioningType": "K1" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_KEY.PLAN_HAS_NO_KEYS": {
+                    "summary": "A plan bundled with the machine has no license keys.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.PLAN_HAS_NO_KEYS",
+                        "message": "A plan bundled with the machine has no license keys.",
                         "requestId": "req_example"
                       }
                     }
@@ -38786,6 +39100,282 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Withdraw a free license key from the store, with a reason",
+        "tags": ["license-keys"]
+      }
+    },
+    "/api/v1/license-keys/{id}": {
+      "patch": {
+        "operationId": "licenseKeyUpdate",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateKeyBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The key with its new maxActivations. The cap only goes up and the caller names the updatedAt it read (expectedUpdatedAt). One event of the audit trail (LICENSE_KEY.MAX_ACTIVATIONS_RAISED) says the old and the new cap and the note, in the same transaction.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/KeyResponseDto" },
+                    { "properties": { "message": { "example": "LICENSE_KEY.UPDATED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin works the vault of license keys.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The key does not exist (LICENSE_KEY.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "LICENSE_KEY.NOT_FOUND": {
+                    "summary": "The license key does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.NOT_FOUND",
+                        "message": "The license key does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The key changed since it was read (LICENSE_KEY.STALE, details.currentUpdatedAt): read it again. Nothing is written.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "LICENSE_KEY.STALE": {
+                    "summary": "The license key was changed by someone else since it was read.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.STALE",
+                        "message": "The license key was changed by someone else since it was read.",
+                        "details": { "currentUpdatedAt": "2026-01-01T00:00:00.000Z" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR: a note of 1 to 500 characters, a cap of 1 to 100000 and expectedUpdatedAt are required) or the cap is not above the current one (LICENSE_KEY.MAX_ACTIVATIONS_NOT_RAISED, details.current).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_KEY.MAX_ACTIVATIONS_NOT_RAISED": {
+                    "summary": "The cap of activations of a key can only be raised.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_KEY.MAX_ACTIVATIONS_NOT_RAISED",
+                        "message": "The cap of activations of a key can only be raised.",
+                        "details": { "current": 30 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Raise the cap of activations of a license key",
         "tags": ["license-keys"]
       }
     },
@@ -107965,6 +108555,11 @@
             "properties": {
               "name": { "type": "string", "maxLength": 1000 },
               "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+              "keyBinding": {
+                "type": "string",
+                "enum": ["ACCOUNT", "DEVICE_KEY", "DEVICE_BUNDLED"],
+                "description": "How a K4 plan is bound once bought: ACCOUNT (a seat of a person, the default of a K4 plan), DEVICE_KEY (a key that goes on a machine) or DEVICE_BUNDLED (comes with the machine: no key, no price, no console). A plan of another kind has none."
+              },
               "controlLevel": { "type": "string", "enum": ["FULL", "PARTIAL", "UNCONTROLLABLE"] },
               "revocationNote": { "type": "string", "maxLength": 5000, "nullable": true },
               "dataLossOnRemoval": { "type": "boolean" },
@@ -108058,6 +108653,12 @@
                   },
                   "name": { "type": "string" },
                   "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+                  "keyBinding": {
+                    "type": "string",
+                    "enum": ["ACCOUNT", "DEVICE_KEY", "DEVICE_BUNDLED", null],
+                    "description": "How a K4 plan is bound once bought: ACCOUNT (a seat of a person, the default of a K4 plan), DEVICE_KEY (a key that goes on a machine) or DEVICE_BUNDLED (comes with the machine: no key, no price, no console). A plan of another kind has none.",
+                    "nullable": true
+                  },
                   "pricingModel": {
                     "type": "string",
                     "enum": ["PER_SEAT", "FLAT_RATE", "CONCURRENT", "CONSUMPTION", "PER_HOST", null],
@@ -108091,6 +108692,7 @@
                   "applicationLogoUrl",
                   "name",
                   "provisioningType",
+                  "keyBinding",
                   "pricingModel",
                   "controlLevel",
                   "dataLossOnRemoval",
@@ -108251,6 +108853,12 @@
                     },
                     "name": { "type": "string" },
                     "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+                    "keyBinding": {
+                      "type": "string",
+                      "enum": ["ACCOUNT", "DEVICE_KEY", "DEVICE_BUNDLED", null],
+                      "description": "How a K4 plan is bound once bought: ACCOUNT (a seat of a person, the default of a K4 plan), DEVICE_KEY (a key that goes on a machine) or DEVICE_BUNDLED (comes with the machine: no key, no price, no console). A plan of another kind has none.",
+                      "nullable": true
+                    },
                     "pricingModel": {
                       "type": "string",
                       "enum": ["PER_SEAT", "FLAT_RATE", "CONCURRENT", "CONSUMPTION", "PER_HOST", null],
@@ -108283,6 +108891,7 @@
                     "applicationLogoUrl",
                     "name",
                     "provisioningType",
+                    "keyBinding",
                     "pricingModel",
                     "controlLevel",
                     "dataLossOnRemoval",
@@ -108327,6 +108936,11 @@
           "applicationId": { "type": "string", "format": "uuid" },
           "name": { "type": "string", "maxLength": 1000 },
           "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+          "keyBinding": {
+            "type": "string",
+            "enum": ["ACCOUNT", "DEVICE_KEY", "DEVICE_BUNDLED"],
+            "description": "How a K4 plan is bound once bought: ACCOUNT (a seat of a person, the default of a K4 plan), DEVICE_KEY (a key that goes on a machine) or DEVICE_BUNDLED (comes with the machine: no key, no price, no console). A plan of another kind has none."
+          },
           "pricingModel": {
             "type": "string",
             "enum": ["PER_SEAT", "FLAT_RATE", "CONCURRENT", "CONSUMPTION", "PER_HOST"]
@@ -108368,6 +108982,12 @@
               },
               "name": { "type": "string" },
               "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+              "keyBinding": {
+                "type": "string",
+                "enum": ["ACCOUNT", "DEVICE_KEY", "DEVICE_BUNDLED", null],
+                "description": "How a K4 plan is bound once bought: ACCOUNT (a seat of a person, the default of a K4 plan), DEVICE_KEY (a key that goes on a machine) or DEVICE_BUNDLED (comes with the machine: no key, no price, no console). A plan of another kind has none.",
+                "nullable": true
+              },
               "pricingModel": {
                 "type": "string",
                 "enum": ["PER_SEAT", "FLAT_RATE", "CONCURRENT", "CONSUMPTION", "PER_HOST", null],
@@ -108401,6 +109021,7 @@
               "applicationLogoUrl",
               "name",
               "provisioningType",
+              "keyBinding",
               "pricingModel",
               "controlLevel",
               "dataLossOnRemoval",
@@ -108437,6 +109058,12 @@
               },
               "name": { "type": "string" },
               "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+              "keyBinding": {
+                "type": "string",
+                "enum": ["ACCOUNT", "DEVICE_KEY", "DEVICE_BUNDLED", null],
+                "description": "How a K4 plan is bound once bought: ACCOUNT (a seat of a person, the default of a K4 plan), DEVICE_KEY (a key that goes on a machine) or DEVICE_BUNDLED (comes with the machine: no key, no price, no console). A plan of another kind has none.",
+                "nullable": true
+              },
               "pricingModel": {
                 "type": "string",
                 "enum": ["PER_SEAT", "FLAT_RATE", "CONCURRENT", "CONSUMPTION", "PER_HOST", null],
@@ -108549,6 +109176,7 @@
               "applicationLogoUrl",
               "name",
               "provisioningType",
+              "keyBinding",
               "pricingModel",
               "controlLevel",
               "dataLossOnRemoval",
@@ -108573,6 +109201,11 @@
         "properties": {
           "name": { "type": "string", "maxLength": 1000 },
           "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+          "keyBinding": {
+            "type": "string",
+            "enum": ["ACCOUNT", "DEVICE_KEY", "DEVICE_BUNDLED"],
+            "description": "How a K4 plan is bound once bought: ACCOUNT (a seat of a person, the default of a K4 plan), DEVICE_KEY (a key that goes on a machine) or DEVICE_BUNDLED (comes with the machine: no key, no price, no console). A plan of another kind has none."
+          },
           "pricingModel": {
             "type": "string",
             "enum": ["PER_SEAT", "FLAT_RATE", "CONCURRENT", "CONSUMPTION", "PER_HOST", null],
@@ -109984,7 +110617,6 @@
           "noticePeriodDays": { "type": "integer", "minimum": 0, "maximum": 3650, "nullable": true },
           "autoRenew": { "type": "boolean" },
           "allowsMidTermReduction": { "type": "boolean" },
-          "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid" },
           "vendorMinimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000000, "nullable": true },
           "isPrimaryForPlan": { "type": "boolean" },
           "quantityChangeReason": {
@@ -109999,6 +110631,296 @@
             "format": "date-time"
           }
         },
+        "additionalProperties": false
+      },
+      "ChangeResponsibleBodyDto": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The IT Admin who is to answer for the subscription; one who works now."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Why the IT Admin in charge changes (1 to 500 characters)."
+          }
+        },
+        "required": ["employeeId", "reason"],
+        "additionalProperties": false
+      },
+      "SubscriptionResponsibleChangeResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "planId": { "type": "string", "format": "uuid" },
+              "planName": { "type": "string" },
+              "applicationId": { "type": "string", "format": "uuid" },
+              "applicationName": { "type": "string" },
+              "logoUrl": {
+                "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                "type": "string",
+                "nullable": true
+              },
+              "vendor": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              },
+              "kind": { "type": "string", "enum": ["TERM", "PERPETUAL"] },
+              "status": { "type": "string", "enum": ["DRAFT", "ACTIVE"] },
+              "missingFinancialData": { "type": "boolean" },
+              "missing": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["QUANTITY", "START_DATE", "BILLING_CYCLE", "UNIT_PRICE"] }
+              },
+              "purchasedQuantity": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "unitPrice": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "originalPrice": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "billingCycle": {
+                "type": "string",
+                "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
+                "nullable": true
+              },
+              "commitmentTermMonths": {
+                "anyOf": [
+                  { "type": "number", "enum": [1] },
+                  { "type": "number", "enum": [12] }
+                ],
+                "nullable": true
+              },
+              "startDate": { "type": "string", "nullable": true },
+              "endDate": { "type": "string", "nullable": true },
+              "renewalDate": { "type": "string", "nullable": true },
+              "noticePeriodDays": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "autoRenew": { "type": "boolean" },
+              "allowsMidTermReduction": { "type": "boolean" },
+              "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
+              "responsibleItAdmin": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName"],
+                "additionalProperties": false,
+                "description": "The IT Admin who answers for the subscription, by name; null when none is named.",
+                "nullable": true
+              },
+              "vendorMinimumSeats": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "isPrimaryForPlan": { "type": "boolean" },
+              "expiry": {
+                "type": "string",
+                "enum": ["SOON", "EXPIRED", null],
+                "description": "SOON from the point of adjustment to the last day of the period (a plan by the year stays SOON past its deadline to cancel); EXPIRED the day after the last day of the period (the renewal day, else the end day; for a plan by the month that does not renew itself, its end day) while seats are still held; null before the point, for a purchase made once and when no date is known to count from.",
+                "nullable": true
+              },
+              "daysLeft": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "The days from today to the deadline the point counts to; negative once it is past while the period still runs (a plan by the year after its deadline to cancel); once EXPIRED it counts from the last day of the period instead, and deadlineKind says which; null when there is no point.",
+                "nullable": true
+              },
+              "deadlineKind": {
+                "type": "string",
+                "enum": ["PAYMENT_DATE", "NOTICE_DEADLINE", "RENEWAL_DATE", "END_DATE", null],
+                "description": "What daysLeft counts to: the next payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day; once EXPIRED, the last day of the period it counts from (the renewal day or the end day; the payment day of a plan by the month that ends; the deadline itself when no later day is known).",
+                "nullable": true
+              },
+              "seats": {
+                "type": "object",
+                "properties": {
+                  "purchased": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "nullable": true
+                  },
+                  "assigned": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "free": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "nullable": true },
+                  "inRevocation": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["purchased", "assigned", "free", "inRevocation"],
+                "additionalProperties": false,
+                "description": "The seats of the shared pool of a K2 plan: bought, taken by an assignment from today on, free to grant, and held by a right being taken back. Null for any other kind of plan.",
+                "nullable": true
+              },
+              "noticeDeadline": {
+                "type": "object",
+                "properties": {
+                  "value": { "type": "string", "nullable": true },
+                  "source": {
+                    "type": "string",
+                    "enum": ["DECLARED", "INFERRED_UNCONFIRMED", "BY_END_DATE", "MISSING", "NOT_APPLICABLE"]
+                  }
+                },
+                "required": ["value", "source"],
+                "additionalProperties": false
+              },
+              "alerts": {
+                "type": "object",
+                "properties": {
+                  "baseDate": { "type": "string", "nullable": true },
+                  "dates": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["baseDate", "dates"],
+                "additionalProperties": false
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["NO_ALERT_ANCHOR", "RESPONSIBLE_MISSING", "BILLING_CYCLE_LEGACY", "SHOULD_MERGE"]
+                }
+              },
+              "mergeCandidateIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+              "vendorAdmins": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "employeeId": { "type": "string", "format": "uuid" },
+                    "employeeCode": { "type": "string" },
+                    "fullName": { "type": "string" },
+                    "role": { "type": "string", "enum": ["OWNER", "ADMIN"] },
+                    "working": { "type": "boolean" }
+                  },
+                  "required": ["employeeId", "employeeCode", "fullName", "role", "working"],
+                  "additionalProperties": false
+                }
+              },
+              "ownerAccountEmail": { "type": "string", "nullable": true },
+              "adminNote": { "type": "string", "nullable": true },
+              "vendorAdminsBelowMinimum": { "type": "boolean" },
+              "ownerAccountEmailMissing": { "type": "boolean" },
+              "taxProfile": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string", "enum": ["DECLARED", "MISSING"] },
+                  "group": { "type": "string", "enum": ["T1", "T2", "T3", null], "nullable": true }
+                },
+                "required": ["status", "group"],
+                "additionalProperties": false
+              },
+              "taxEstimate": {
+                "type": "object",
+                "properties": {
+                  "basis": { "type": "string", "enum": ["PROFILE", "DEFAULT_NO_PROFILE"] },
+                  "label": { "type": "string", "enum": ["ESTIMATE", "ESTIMATE_NO_PROFILE"] },
+                  "group": { "type": "string", "enum": ["T1", "T2", "T3"] },
+                  "taxAmount": { "type": "string" },
+                  "deductibleTaxAmount": { "type": "string" },
+                  "nonDeductibleTaxAmount": { "type": "string" },
+                  "estimatedCost": { "type": "string" }
+                },
+                "required": [
+                  "basis",
+                  "label",
+                  "group",
+                  "taxAmount",
+                  "deductibleTaxAmount",
+                  "nonDeductibleTaxAmount",
+                  "estimatedCost"
+                ],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "changed": {
+                "type": "boolean",
+                "description": "False when the IT Admin named already answered for the subscription and nothing was written."
+              }
+            },
+            "required": [
+              "id",
+              "planId",
+              "planName",
+              "applicationId",
+              "applicationName",
+              "logoUrl",
+              "vendor",
+              "kind",
+              "status",
+              "missingFinancialData",
+              "missing",
+              "purchasedQuantity",
+              "unitPrice",
+              "originalPrice",
+              "billingCycle",
+              "commitmentTermMonths",
+              "startDate",
+              "endDate",
+              "renewalDate",
+              "noticePeriodDays",
+              "autoRenew",
+              "allowsMidTermReduction",
+              "responsibleItAdminEmployeeId",
+              "responsibleItAdmin",
+              "vendorMinimumSeats",
+              "isPrimaryForPlan",
+              "expiry",
+              "daysLeft",
+              "deadlineKind",
+              "seats",
+              "noticeDeadline",
+              "alerts",
+              "warnings",
+              "mergeCandidateIds",
+              "vendorAdmins",
+              "ownerAccountEmail",
+              "adminNote",
+              "vendorAdminsBelowMinimum",
+              "ownerAccountEmailMissing",
+              "taxProfile",
+              "taxEstimate",
+              "createdAt",
+              "updatedAt",
+              "changed"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "RetirementResponseDto": {
@@ -113111,7 +114033,19 @@
         "type": "object",
         "properties": {
           "subscriptionId": { "type": "string", "format": "uuid" },
-          "keys": { "minItems": 1, "maxItems": 1000, "type": "array", "items": { "type": "string", "maxLength": 512 } }
+          "keys": { "minItems": 1, "maxItems": 1000, "type": "array", "items": { "type": "string", "maxLength": 512 } },
+          "maxActivations": {
+            "description": "How many machines each key of this batch may be on at once. One value for the whole batch: keys with another cap are imported in another batch. When it is not sent, the install limit in the terms of the plan, else 1.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "initialActivationsUsed": {
+            "description": "How many activations each key of this batch already had when it was entered. One value for the whole batch. Allowed only while the installation phase is open (409 LICENSE_KEY.INITIALIZATION_CLOSED after it); 0 or not sent is allowed whenever.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          }
         },
         "required": ["subscriptionId", "keys"],
         "additionalProperties": false
@@ -113147,9 +114081,27 @@
                     "type": "string",
                     "enum": ["KEY_COUNT_DIFFERS", "QUANTITY_UNKNOWN", null],
                     "nullable": true
+                  },
+                  "keyBinding": {
+                    "type": "string",
+                    "enum": ["ACCOUNT", "DEVICE_KEY", "DEVICE_BUNDLED", null],
+                    "description": "How the plan of the purchase is bound; null for a plan that has no binding, read as bound to an account.",
+                    "nullable": true
+                  },
+                  "occupied": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "What is taken of the capacity: the licenses held on machines for a key on a machine, the keys given to a seat otherwise."
+                  },
+                  "free": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "What is left of the capacity."
                   }
                 },
-                "required": ["purchased", "usableKeys", "capacity", "warning"],
+                "required": ["purchased", "usableKeys", "capacity", "warning", "keyBinding", "occupied", "free"],
                 "additionalProperties": false
               }
             },
@@ -113181,7 +114133,34 @@
                     "importedAt": { "type": "string", "format": "date-time" },
                     "assignmentId": { "type": "string", "format": "uuid", "nullable": true },
                     "withdrawnAt": { "type": "string", "format": "date-time", "nullable": true },
-                    "withdrawalReason": { "type": "string", "nullable": true }
+                    "withdrawalReason": { "type": "string", "nullable": true },
+                    "maxActivations": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991,
+                      "description": "How many machines the key may be on at once; it only goes up."
+                    },
+                    "activationsUsed": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "The activations the key has used: those it had when it was entered and every operation on it since, closed or not. It never goes down."
+                    },
+                    "openActivations": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "The activations open now."
+                    },
+                    "capReached": {
+                      "type": "boolean",
+                      "description": "True once activationsUsed has reached maxActivations."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "The version of the key: a raise of the cap names it as expectedUpdatedAt."
+                    }
                   },
                   "required": [
                     "id",
@@ -113191,7 +114170,12 @@
                     "importedAt",
                     "assignmentId",
                     "withdrawnAt",
-                    "withdrawalReason"
+                    "withdrawalReason",
+                    "maxActivations",
+                    "activationsUsed",
+                    "openActivations",
+                    "capReached",
+                    "updatedAt"
                   ],
                   "additionalProperties": false
                 }
@@ -113222,9 +114206,27 @@
                     "type": "string",
                     "enum": ["KEY_COUNT_DIFFERS", "QUANTITY_UNKNOWN", null],
                     "nullable": true
+                  },
+                  "keyBinding": {
+                    "type": "string",
+                    "enum": ["ACCOUNT", "DEVICE_KEY", "DEVICE_BUNDLED", null],
+                    "description": "How the plan of the purchase is bound; null for a plan that has no binding, read as bound to an account.",
+                    "nullable": true
+                  },
+                  "occupied": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "What is taken of the capacity: the licenses held on machines for a key on a machine, the keys given to a seat otherwise."
+                  },
+                  "free": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "What is left of the capacity."
                   }
                 },
-                "required": ["purchased", "usableKeys", "capacity", "warning"],
+                "required": ["purchased", "usableKeys", "capacity", "warning", "keyBinding", "occupied", "free"],
                 "additionalProperties": false
               }
             },
@@ -113276,7 +114278,34 @@
                   "importedAt": { "type": "string", "format": "date-time" },
                   "assignmentId": { "type": "string", "format": "uuid", "nullable": true },
                   "withdrawnAt": { "type": "string", "format": "date-time", "nullable": true },
-                  "withdrawalReason": { "type": "string", "nullable": true }
+                  "withdrawalReason": { "type": "string", "nullable": true },
+                  "maxActivations": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991,
+                    "description": "How many machines the key may be on at once; it only goes up."
+                  },
+                  "activationsUsed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The activations the key has used: those it had when it was entered and every operation on it since, closed or not. It never goes down."
+                  },
+                  "openActivations": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The activations open now."
+                  },
+                  "capReached": {
+                    "type": "boolean",
+                    "description": "True once activationsUsed has reached maxActivations."
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "The version of the key: a raise of the cap names it as expectedUpdatedAt."
+                  }
                 },
                 "required": [
                   "id",
@@ -113286,7 +114315,12 @@
                   "importedAt",
                   "assignmentId",
                   "withdrawnAt",
-                  "withdrawalReason"
+                  "withdrawalReason",
+                  "maxActivations",
+                  "activationsUsed",
+                  "openActivations",
+                  "capReached",
+                  "updatedAt"
                 ],
                 "additionalProperties": false
               }
@@ -113297,6 +114331,20 @@
           }
         },
         "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "UpdateKeyBodyDto": {
+        "type": "object",
+        "properties": {
+          "maxActivations": { "type": "integer", "minimum": 1, "maximum": 100000 },
+          "note": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "expectedUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The updatedAt of the key as the caller read it."
+          }
+        },
+        "required": ["maxActivations", "note", "expectedUpdatedAt"],
         "additionalProperties": false
       },
       "ExpiryQueuePageResponseDto": {
@@ -115145,6 +116193,34 @@
                             }
                           },
                           "required": ["kind", "inStore", "assigned", "withdrawn"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["LICENSES"] },
+                            "purchased": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "The licenses bought of a K4 plan whose key goes on a machine; null while a purchase of the plan has no quantity. One key can be on many machines, so the keys are not counted.",
+                              "nullable": true
+                            },
+                            "occupied": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "The licenses held on machines: the open activations and the closed ones whose license was lost with the machine."
+                            },
+                            "free": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "The licenses a machine can still take, what each purchase bought less what it holds; null when the licenses bought are not known.",
+                              "nullable": true
+                            }
+                          },
+                          "required": ["kind", "purchased", "occupied", "free"],
                           "additionalProperties": false
                         },
                         {
