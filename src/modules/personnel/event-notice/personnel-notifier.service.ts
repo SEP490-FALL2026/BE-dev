@@ -240,16 +240,18 @@ export class PersonnelNotifier {
       },
       eventKey: `DEPARTURE_ACCESS_BLOCKED:${input.caseId}:${audience}`,
     });
-    if (input.markLeft)
-      await this.toSuperAdmin(
-        tx,
-        input.organizationId,
-        'DEPARTURE_ACCESS_BLOCKED',
-        notice('SUPER_ADMIN'),
-        input.employeeId,
-      );
+    const notifiedSuperAdmin = input.markLeft
+      ? await this.toSuperAdmin(
+          tx,
+          input.organizationId,
+          'DEPARTURE_ACCESS_BLOCKED',
+          notice('SUPER_ADMIN'),
+          input.employeeId,
+        )
+      : null;
     if (input.accountLocked) return;
     for (const itAdmin of await this.itAdminsOrSuperAdminOfDeparture(tx, input)) {
+      if (itAdmin === notifiedSuperAdmin) continue;
       await this.tell(tx, input.organizationId, itAdmin, 'DEPARTURE_ACCESS_BLOCKED', notice('IT_ADMIN'));
     }
   }
@@ -499,10 +501,12 @@ export class PersonnelNotifier {
     code: InAppNotificationCode,
     notice: NoticeParts,
     exceptEmployeeId?: string,
-  ): Promise<void> {
+  ): Promise<string | null> {
     const holder = await this.identity.getSuperAdminHolder(tx);
-    if (holder && holder.employeeId !== exceptEmployeeId)
-      await this.tell(tx, organizationId, holder.employeeId, code, notice);
+    if (!holder || holder.employeeId === exceptEmployeeId) return null;
+    await this.tell(tx, organizationId, holder.employeeId, code, notice);
+
+    return holder.employeeId;
   }
 
   /** True when the notice was written, false when the recipient already has one for this event key. */
