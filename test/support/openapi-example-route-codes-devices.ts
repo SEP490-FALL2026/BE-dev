@@ -78,14 +78,24 @@ export const ROUTE_ERROR_CODES_DEVICES: Readonly<Record<string, Partial<Record<R
       '404': ['DEVICE.NOT_FOUND'],
     },
     deviceHolderChange: {
+      '403': ['DEVICE.NOT_IN_CHARGE'],
       '404': ['DEVICE.NOT_FOUND'],
       '409': [
         'DEVICE.ALREADY_RETIRED',
+        'DEVICE.AWAITING_RETURN',
         'DEVICE.HOLDER_NOT_WORKING',
         'DEVICE.HOLDER_UNCHANGED',
+        'DEVICE.NOT_USABLE',
         'DEVICE.REGISTRATION_OVERLAP',
+        'DEVICE.VOIDED',
       ],
-      '422': ['DEVICE.HOLDER_NOT_FOUND'],
+      '422': ['DEVICE.HOLDER_NOT_FOUND', 'DEVICE.SOFTWARE_REMOVAL_NOTE_REQUIRED', 'DEVICE.SOFTWARE_REMOVAL_REQUIRED'],
+    },
+    deviceReturn: {
+      '403': ['DEVICE.NOT_IN_CHARGE', 'DEVICE_RETURN_TASK.NOT_IN_CHARGE'],
+      '404': ['DEVICE.NOT_FOUND'],
+      '409': ['DEVICE.ALREADY_RETIRED', 'DEVICE.NOT_HELD', 'DEVICE.VOIDED'],
+      '422': ['DEVICE.SOFTWARE_REMOVAL_NOTE_REQUIRED'],
     },
     deviceRetire: {
       '404': ['DEVICE.NOT_FOUND'],

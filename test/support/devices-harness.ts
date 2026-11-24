@@ -142,11 +142,15 @@ export class DevicesHarness extends DocumentHarness {
     request(this.server()).get(`/api/v1/devices${query}`).set(this.as(account));
   getDevice = (id: string, account: ApiAccount = this.it1) =>
     request(this.server()).get(`/api/v1/devices/${id}`).set(this.as(account));
-  changeHolder = (id: string, holderEmployeeId: string, account: ApiAccount = this.it1) =>
+  changeHolder = (id: string, holderEmployeeId: string, over: object = {}, account: ApiAccount = this.it1) =>
     request(this.server())
       .post(`/api/v1/devices/${id}/holder-changes`)
       .set(this.as(account))
-      .send({ holderEmployeeId });
+      .send({ holderEmployeeId, collectorInstalled: true, softwareRemoval: { outcome: 'REMOVED' }, ...over });
+  changeHolderRaw = (id: string, body: object, account: ApiAccount = this.it1) =>
+    request(this.server()).post(`/api/v1/devices/${id}/holder-changes`).set(this.as(account)).send(body);
+  returnDevice = (id: string, body: object, account: ApiAccount = this.it1) =>
+    request(this.server()).post(`/api/v1/devices/${id}/returns`).set(this.as(account)).send(body);
   retire = (id: string, reason = 'The disk failed.', account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/devices/${id}/retirements`).set(this.as(account)).send({ reason });
   recordSignature = (registrationId: string, body: object, account: ApiAccount = this.it1) =>

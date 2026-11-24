@@ -93,11 +93,12 @@ export class DeviceAttributesService {
     const context = await this.repo.findCustodyContext(tx, deviceId);
     if (!context.hasOpenReturnTask && !context.openRegistrationHolderId) return false;
     const today = await this.organizationReads.businessToday(now, tx);
+    const holderId = context.openRegistrationHolderId;
     const holderDepartmentId = context.hasOpenReturnTask
       ? context.openReturnTaskDepartmentId
-      : ((await this.organizationReads.workDepartmentsOf([context.openRegistrationHolderId!], today, tx)).get(
-          context.openRegistrationHolderId!,
-        ) ?? null);
+      : holderId
+        ? ((await this.organizationReads.workDepartmentsOf([holderId], today, tx)).get(holderId) ?? null)
+        : null;
     if (!holderDepartmentId) {
       const verdict = judgeDeviceActor({
         holderDepartmentId: null,

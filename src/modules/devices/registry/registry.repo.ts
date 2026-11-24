@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { DeviceCondition } from '../devices-custody.policy';
 import type { DeviceRegistrationEndCause } from '../public/devices.types';
 
 export interface DeviceRecord {
@@ -10,8 +11,12 @@ export interface DeviceRecord {
   assetCode: string;
   hostname: string;
   os: string;
+  condition: DeviceCondition;
+  conditionNote: string | null;
   retiredAt: Date | null;
   retirementReason: string | null;
+  retirementKind: 'DISPOSED' | 'LOST' | null;
+  voidedAt: Date | null;
 }
 
 export interface RegistrationRecord {
@@ -41,8 +46,12 @@ const DEVICE_SELECT = {
   assetCode: true,
   hostname: true,
   os: true,
+  condition: true,
+  conditionNote: true,
   retiredAt: true,
   retirementReason: true,
+  retirementKind: true,
+  voidedAt: true,
 } as const;
 
 interface RegistrationRow extends Omit<RegistrationRecord, 'validFrom' | 'validUntil'> {
@@ -120,6 +129,29 @@ export class RegistryRepo {
     });
   }
 
+  async hasOpenReturnTask(tx: DbTx, deviceId: string): Promise<boolean> {
+    return (await tx.deviceReturnTask.count({ where: { deviceId, state: 'OPEN' }, take: 1 })) > 0;
+  }
+
+  async findOpenReturnTaskDepartmentId(
+    tx: DbTx,
+    deviceId: string,
+  ): Promise<{ found: boolean; departmentId: string | null }> {
+    const task = await tx.deviceReturnTask.findFirst({
+      where: { deviceId, state: 'OPEN' },
+      select: { departmentId: true },
+    });
+
+    return { found: task !== null, departmentId: task?.departmentId ?? null };
+  }
+
+  async updateCondition(tx: DbTx, id: string, condition: DeviceCondition, conditionNote: string | null): Promise<void> {
+    await tx.managedDevice.update({
+      where: { id },
+      data: { condition, conditionNote },
+    });
+  }
+
   async findRegistration(id: string, tx?: DbTx): Promise<RegistrationRecord | null> {
     const row = await (tx ?? this.prisma).deviceRegistration.findUnique({ where: { id } });
 
@@ -187,11 +219,23 @@ export class RegistryRepo {
   async endRegistration(
     tx: DbTx,
     id: string,
-    end: { endedAt: Date; validUntil: BusinessDate; cause: DeviceRegistrationEndCause },
+    end: {
+      endedAt: Date;
+      validUntil: BusinessDate;
+      cause: DeviceRegistrationEndCause;
+      softwareRemoval?: { outcome: 'REMOVED' | 'NOT_REMOVABLE'; note: string | null };
+    },
   ): Promise<void> {
     await tx.deviceRegistration.update({
       where: { id },
-      data: { endedAt: end.endedAt, validUntil: toDateColumn(end.validUntil), endCause: end.cause },
+      data: {
+        endedAt: end.endedAt,
+        validUntil: toDateColumn(end.validUntil),
+        endCause: end.cause,
+        ...(end.softwareRemoval
+          ? { softwareRemoval: end.softwareRemoval.outcome, softwareRemovalNote: end.softwareRemoval.note }
+          : {}),
+      },
     });
   }
 

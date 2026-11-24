@@ -1277,8 +1277,10 @@ WORK_CLOSED` (cạnh xuống tầng, hợp lệ). Nhờ vậy `ItCoverageSweeper
   phạm vi đọc mà không phải người làm ⟹ 403 `DEPARTMENT_TRANSFER.NOT_IN_CHARGE` (S2-2). Người gọi là người được
   chỉ định ⟹ audit `DEPARTMENT_TRANSFER.REVOCATION_OPENED` thêm `bySubstitute: true` (cờ _làm thay theo chỉ định_; bản trả lời RC-9
   gọi là _làm thay ngoài phạm vi_). Mô tả 404 của route sửa thành "không tồn tại hoặc không thuộc phòng bạn phụ trách/làm thay".
-- **Tiêu chí:** I: điều chuyển Chi DES → FIN (IT FIN là Lan): IT Hà (DES) mở lại ⟹ 404; Lan ⟹ 200; Lan bị khóa, chưa chỉ định ⟹
-  mọi IT 404; chỉ định Minh cho FIN ⟹ Minh 200, audit `bySubstitute = true`.
+- **Tiêu chí:** I: điều chuyển Chi DES → FIN (IT FIN là Lan): IT Hà (DES, thuộc phạm vi đọc qua `fromDepartmentId`) mở lại ⟹ 403
+  `DEPARTMENT_TRANSFER.NOT_IN_CHARGE`; IT ngoài phạm vi đọc ⟹ 404 `DEPARTMENT_TRANSFER.NOT_FOUND`; Lan ⟹ 200; Lan bị khóa, chưa
+  chỉ định ⟹ FIN vào phạm vi đọc chung nên mọi IT ⟹ 403 `DEPARTMENT_TRANSFER.NOT_IN_CHARGE`; chỉ định Minh cho FIN ⟹ Minh 200,
+  audit `bySubstitute = true`.
 - **Kiểm:** U `transfer-revocation.service.spec.ts` (sửa, có sẵn); I `test/integration/personnel/transfer-revocation-reopen.integration-spec.ts`
   (mới hoặc thêm ca vào spec điều chuyển có sẵn).
 - **API:** `departmentTransferRevocationReopen` **đổi quyền** (404 mới cho IT ngoài phạm vi).

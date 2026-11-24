@@ -19,7 +19,6 @@ import {
   DeviceHandoverWithoutHolderError,
   DeviceHolderNotFoundError,
   DeviceHolderNotWorkingError,
-  DeviceHolderUnchangedError,
   DevicePlanNotBundledError,
   DeviceRegistrationOverlapError,
   DeviceSerialTakenError,
@@ -162,49 +161,6 @@ export class RegistryService {
     if (!verdict.allowed) throw new DeviceNotInChargeError();
 
     return { holderId: holder.id, validFrom, bySubstitute: verdict.bySubstitute };
-  }
-
-  /**
-   * Gives a machine to another person from today: the open registration ends and a new one begins. A machine nobody holds is
-   * registered again. Throws DeviceNotFoundError, DeviceAlreadyRetiredError, DeviceHolderUnchangedError and the holder errors.
-   */
-  async changeHolder(
-    actor: AuthenticatedPrincipal,
-    deviceId: string,
-    holderEmployeeId: string,
-    now: Date = new Date(),
-  ): Promise<void> {
-    const organization = await this.requireOrganization();
-    await this.runner.run(async (tx) => {
-      const holder = await this.lockHolder(tx, holderEmployeeId);
-      const device = await this.repo.lockDevice(tx, deviceId);
-      if (!device) throw new DeviceNotFoundError();
-      if (device.retiredAt) throw new DeviceAlreadyRetiredError();
-      const open = await this.repo.lockOpenRegistration(tx, deviceId);
-      if (open?.holderEmployeeId === holder.id) throw new DeviceHolderUnchangedError();
-      if (open) await this.ending.end(tx, open, { at: now, cause: 'HOLDER_CHANGED' }, byUser(actor));
-      const today = await this.organizationReads.businessToday(now, tx);
-      const registration = await this.insertRegistration(tx, actor, deviceId, holder.id, today, {
-        organizationId: organization.id,
-        collectorInstalled: true,
-      });
-      await this.audit.record(
-        tx,
-        devicesEvent(
-          byUser(actor),
-          organization.id,
-          'DEVICE.HOLDER_CHANGED',
-          'ManagedDevice',
-          deviceId,
-          open ? { holderEmployeeId: open.holderEmployeeId } : null,
-          {
-            holderEmployeeId: holder.id,
-            registrationId: registration.id,
-            validFrom: today,
-          },
-        ),
-      );
-    });
   }
 
   /** Takes a machine out of use: its open registration ends and it is registered to nobody again. Throws DeviceNotFoundError and DeviceAlreadyRetiredError. */

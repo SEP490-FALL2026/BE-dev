@@ -75353,313 +75353,6 @@
         "tags": ["devices"]
       }
     },
-    "/api/v1/devices/{id}/holder-changes": {
-      "post": {
-        "operationId": "deviceHolderChange",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HolderChangeBodyDto" } } }
-        },
-        "responses": {
-          "201": {
-            "description": "The open registration ends today and a new one begins for the new holder, who has to acknowledge the notice. A machine nobody holds is registered again.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/DeviceDetailResponseDto" },
-                    { "properties": { "message": { "example": "DEVICE.HOLDER_CHANGED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an IT Admin keeps the register of machines.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The machine is not in the register (DEVICE.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "DEVICE.NOT_FOUND": {
-                    "summary": "The device does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "DEVICE.NOT_FOUND",
-                        "message": "The device does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The machine is retired (DEVICE.ALREADY_RETIRED), the person already holds it (DEVICE.HOLDER_UNCHANGED), the new holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), or a registration over those days exists (DEVICE.REGISTRATION_OVERLAP).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "DEVICE.ALREADY_RETIRED": {
-                    "summary": "The machine is retired.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "DEVICE.ALREADY_RETIRED",
-                        "message": "The machine is retired.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "DEVICE.HOLDER_UNCHANGED": {
-                    "summary": "That person already holds the machine.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "DEVICE.HOLDER_UNCHANGED",
-                        "message": "That person already holds the machine.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "DEVICE.HOLDER_NOT_WORKING": {
-                    "summary": "A machine is registered to a person who works here.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "DEVICE.HOLDER_NOT_WORKING",
-                        "message": "A machine is registered to a person who works here.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "DEVICE.REGISTRATION_OVERLAP": {
-                    "summary": "The machine already has a registration over those days.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "DEVICE.REGISTRATION_OVERLAP",
-                        "message": "The machine already has a registration over those days.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or the new holder does not exist (DEVICE.HOLDER_NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "DEVICE.HOLDER_NOT_FOUND": {
-                    "summary": "The holder does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "DEVICE.HOLDER_NOT_FOUND",
-                        "message": "The holder does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Give a company machine to another holder",
-        "tags": ["devices"]
-      }
-    },
     "/api/v1/devices/{id}/retirements": {
       "post": {
         "operationId": "deviceRetire",
@@ -75920,6 +75613,697 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Take a company machine out of use",
+        "tags": ["devices"]
+      }
+    },
+    "/api/v1/devices/{id}/holder-changes": {
+      "post": {
+        "operationId": "deviceHolderChange",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HolderChangeBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The open registration ends with software removal confirmation and a new registration opens for the new holder; an in-stock usable machine is assigned without removal confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DeviceDetailResponseDto" },
+                    { "properties": { "message": { "example": "DEVICE.HOLDER_CHANGED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an acting IT Admin covering the holder and recipient departments may assign or transfer the machine (DEVICE.NOT_IN_CHARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the holder department may change this device.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the holder department may change this device.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The machine is not in the register (DEVICE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE.NOT_FOUND": {
+                    "summary": "The device does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_FOUND",
+                        "message": "The device does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), awaiting return (DEVICE.AWAITING_RETURN), not usable (DEVICE.NOT_USABLE), held by the same person (DEVICE.HOLDER_UNCHANGED), the holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), or an overlapping registration exists (DEVICE.REGISTRATION_OVERLAP).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE.VOIDED": {
+                    "summary": "The machine record has been voided.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.VOIDED",
+                        "message": "The machine record has been voided.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.ALREADY_RETIRED": {
+                    "summary": "The machine is retired.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.ALREADY_RETIRED",
+                        "message": "The machine is retired.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.AWAITING_RETURN": {
+                    "summary": "The machine has an open return task from an offboarding case.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.AWAITING_RETURN",
+                        "message": "The machine has an open return task from an offboarding case.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.NOT_USABLE": {
+                    "summary": "Only a usable machine can be assigned or receive new activations.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_USABLE",
+                        "message": "Only a usable machine can be assigned or receive new activations.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.HOLDER_UNCHANGED": {
+                    "summary": "That person already holds the machine.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.HOLDER_UNCHANGED",
+                        "message": "That person already holds the machine.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.HOLDER_NOT_WORKING": {
+                    "summary": "A machine is registered to a person who works here.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.HOLDER_NOT_WORKING",
+                        "message": "A machine is registered to a person who works here.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.REGISTRATION_OVERLAP": {
+                    "summary": "The machine already has a registration over those days.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.REGISTRATION_OVERLAP",
+                        "message": "The machine already has a registration over those days.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), software removal confirmation is required (DEVICE.SOFTWARE_REMOVAL_REQUIRED), a removal note is required (DEVICE.SOFTWARE_REMOVAL_NOTE_REQUIRED), or the holder does not exist (DEVICE.HOLDER_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.SOFTWARE_REMOVAL_REQUIRED": {
+                    "summary": "Software removal confirmation is required when taking a machine back from a holder.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.SOFTWARE_REMOVAL_REQUIRED",
+                        "message": "Software removal confirmation is required when taking a machine back from a holder.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.SOFTWARE_REMOVAL_NOTE_REQUIRED": {
+                    "summary": "A note explaining why software is not removable is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.SOFTWARE_REMOVAL_NOTE_REQUIRED",
+                        "message": "A note explaining why software is not removable is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.HOLDER_NOT_FOUND": {
+                    "summary": "The holder does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.HOLDER_NOT_FOUND",
+                        "message": "The holder does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Give a company machine to another holder",
+        "tags": ["devices"]
+      }
+    },
+    "/api/v1/devices/{id}/returns": {
+      "post": {
+        "operationId": "deviceReturn",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeviceReturnBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Ends the active holding as returned, updates the machine condition, and places the machine in stock.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DeviceDetailResponseDto" },
+                    { "properties": { "message": { "example": "DEVICE.RETURNED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an acting IT Admin of the holder or return-task department may return the machine to stock (DEVICE.NOT_IN_CHARGE, DEVICE_RETURN_TASK.NOT_IN_CHARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the holder department may change this device.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the holder department may change this device.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_RETURN_TASK.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the return task department may complete or return this machine.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_RETURN_TASK.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the return task department may complete or return this machine.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The machine is not in the register (DEVICE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE.NOT_FOUND": {
+                    "summary": "The device does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_FOUND",
+                        "message": "The device does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), or already in stock (DEVICE.NOT_HELD).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE.VOIDED": {
+                    "summary": "The machine record has been voided.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.VOIDED",
+                        "message": "The machine record has been voided.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.ALREADY_RETIRED": {
+                    "summary": "The machine is retired.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.ALREADY_RETIRED",
+                        "message": "The machine is retired.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.NOT_HELD": {
+                    "summary": "The machine is already in stock without an open holding or return task.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_HELD",
+                        "message": "The machine is already in stock without an open holding or return task.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or a note explaining non-removable software is required (DEVICE.SOFTWARE_REMOVAL_NOTE_REQUIRED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.SOFTWARE_REMOVAL_NOTE_REQUIRED": {
+                    "summary": "A note explaining why software is not removable is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.SOFTWARE_REMOVAL_NOTE_REQUIRED",
+                        "message": "A note explaining why software is not removable is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Return a company machine to stock",
         "tags": ["devices"]
       }
     },
@@ -131794,16 +132178,46 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
-      "HolderChangeBodyDto": {
-        "type": "object",
-        "properties": { "holderEmployeeId": { "type": "string", "format": "uuid" } },
-        "required": ["holderEmployeeId"],
-        "additionalProperties": false
-      },
       "RetirementBodyDto": {
         "type": "object",
         "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 1000 } },
         "required": ["reason"],
+        "additionalProperties": false
+      },
+      "HolderChangeBodyDto": {
+        "type": "object",
+        "properties": {
+          "holderEmployeeId": { "type": "string", "format": "uuid" },
+          "collectorInstalled": { "type": "boolean" },
+          "softwareRemoval": {
+            "type": "object",
+            "properties": {
+              "outcome": { "type": "string", "enum": ["REMOVED", "NOT_REMOVABLE"] },
+              "note": { "type": "string", "maxLength": 1000 }
+            },
+            "required": ["outcome"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["holderEmployeeId", "collectorInstalled"],
+        "additionalProperties": false
+      },
+      "DeviceReturnBodyDto": {
+        "type": "object",
+        "properties": {
+          "condition": { "type": "string", "enum": ["USABLE", "IN_REPAIR", "BROKEN"] },
+          "conditionNote": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "softwareRemoval": {
+            "type": "object",
+            "properties": {
+              "outcome": { "type": "string", "enum": ["REMOVED", "NOT_REMOVABLE"] },
+              "note": { "type": "string", "maxLength": 1000 }
+            },
+            "required": ["outcome"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["condition", "softwareRemoval"],
         "additionalProperties": false
       },
       "DeviceAttributesBodyDto": {

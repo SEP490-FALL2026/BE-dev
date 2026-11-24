@@ -19,7 +19,6 @@ import {
   DevicePageResponseDto,
   DeviceRegistrationListQueryDto,
   DeviceRegistrationPageResponseDto,
-  HolderChangeBodyDto,
   RetirementBodyDto,
 } from './registry.dto';
 import { REGISTRY_ERROR_EXAMPLES as EXAMPLES, toRegistryApiException } from './registry.http-errors';
@@ -155,50 +154,6 @@ export class RegistryController {
   })
   async get(@Param() params: DeviceIdParamDto) {
     try {
-      return await this.queries.get(params.id);
-    } catch (error) {
-      throw toRegistryApiException(error);
-    }
-  }
-
-  @Post(':id/holder-changes')
-  @ApiOperation({ operationId: 'deviceHolderChange', summary: 'Give a company machine to another holder' })
-  @ApiSuccessResponse(DeviceDetailResponseDto, {
-    status: HttpStatus.CREATED,
-    message: 'DEVICE.HOLDER_CHANGED',
-    description:
-      'The open registration ends today and a new one begins for the new holder, who has to acknowledge the notice. A machine nobody holds is registered again.',
-  })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    IT_ADMIN_ONLY,
-    DEVICE_NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The machine is retired (DEVICE.ALREADY_RETIRED), the person already holds it (DEVICE.HOLDER_UNCHANGED), the new holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), or a registration over those days exists (DEVICE.REGISTRATION_OVERLAP).',
-      examples: [
-        EXAMPLES.ALREADY_RETIRED,
-        EXAMPLES.HOLDER_UNCHANGED,
-        EXAMPLES.HOLDER_NOT_WORKING,
-        EXAMPLES.REGISTRATION_OVERLAP,
-      ],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The request is invalid (VALIDATION_ERROR) or the new holder does not exist (DEVICE.HOLDER_NOT_FOUND).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.HOLDER_NOT_FOUND],
-    },
-  )
-  async changeHolder(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: DeviceIdParamDto,
-    @Body() body: HolderChangeBodyDto,
-  ) {
-    try {
-      await this.registry.changeHolder(actor, params.id, body.holderEmployeeId);
-
       return await this.queries.get(params.id);
     } catch (error) {
       throw toRegistryApiException(error);

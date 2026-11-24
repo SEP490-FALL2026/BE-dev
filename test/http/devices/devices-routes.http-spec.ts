@@ -43,7 +43,8 @@ describe('company machine routes (http contract, no database)', () => {
     ['get', `${DEVICES}/${ID}`, undefined],
     ['patch', `${DEVICES}/${ID}`, { expectedUpdatedAt: '2026-11-24T00:00:00.000Z', hostname: 'h2' }],
     ['get', `${DEVICES}/${ID}/registrations`, undefined],
-    ['post', `${DEVICES}/${ID}/holder-changes`, { holderEmployeeId: ID }],
+    ['post', `${DEVICES}/${ID}/holder-changes`, { holderEmployeeId: ID, collectorInstalled: true }],
+    ['post', `${DEVICES}/${ID}/returns`, { condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } }],
     ['post', `${DEVICES}/${ID}/retirements`, { reason: 'broken' }],
     ['post', `${REGISTRATIONS}/${ID}/signature-records`, { documentId: ID, noticeVersionId: ID }],
     ['post', NOTICES, NOTICE],
@@ -80,7 +81,16 @@ describe('company machine routes (http contract, no database)', () => {
           .send({ expectedUpdatedAt: '2026-11-24T00:00:00.000Z', hostname: 'h2' }),
       ),
       await as(request(server).get(`${DEVICES}/${ID}/registrations`)),
-      await as(request(server).post(`${DEVICES}/${ID}/holder-changes`).send({ holderEmployeeId: ID })),
+      await as(
+        request(server)
+          .post(`${DEVICES}/${ID}/holder-changes`)
+          .send({ holderEmployeeId: ID, collectorInstalled: true }),
+      ),
+      await as(
+        request(server)
+          .post(`${DEVICES}/${ID}/returns`)
+          .send({ condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } }),
+      ),
       await as(request(server).post(`${DEVICES}/${ID}/retirements`).send({ reason: 'x' })),
       await as(
         request(server).post(`${REGISTRATIONS}/${ID}/signature-records`).send({ documentId: ID, noticeVersionId: ID }),
@@ -223,7 +233,20 @@ describe('company machine routes (http contract, no database)', () => {
       'a holder change that names the registration',
       'post',
       `${DEVICES}/${ID}/holder-changes`,
-      { holderEmployeeId: ID, registrationId: ID },
+      { holderEmployeeId: ID, collectorInstalled: true, registrationId: ID },
+    ],
+    ['a holder change missing collectorInstalled', 'post', `${DEVICES}/${ID}/holder-changes`, { holderEmployeeId: ID }],
+    [
+      'a device return with an invalid condition',
+      'post',
+      `${DEVICES}/${ID}/returns`,
+      { condition: 'DAMAGED', softwareRemoval: { outcome: 'REMOVED' } },
+    ],
+    [
+      'a device return with an unknown field',
+      'post',
+      `${DEVICES}/${ID}/returns`,
+      { condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' }, extra: 1 },
     ],
     ['a retirement with no reason', 'post', `${DEVICES}/${ID}/retirements`, {}],
     ['a signed record with no version', 'post', `${REGISTRATIONS}/${ID}/signature-records`, { documentId: ID }],
@@ -303,7 +326,12 @@ describe('company machine routes (http contract, no database)', () => {
         ['expectedUpdatedAt', 'hostname', 'os', 'serialNumber', 'deviceType'],
         ['expectedUpdatedAt'],
       ],
-      ['HolderChangeBodyDto', ['holderEmployeeId'], ['holderEmployeeId']],
+      [
+        'HolderChangeBodyDto',
+        ['holderEmployeeId', 'collectorInstalled', 'softwareRemoval'],
+        ['holderEmployeeId', 'collectorInstalled'],
+      ],
+      ['DeviceReturnBodyDto', ['condition', 'conditionNote', 'softwareRemoval'], ['condition', 'softwareRemoval']],
       ['RetirementBodyDto', ['reason'], ['reason']],
       ['SignatureRecordBodyDto', ['documentId', 'noticeVersionId'], ['documentId', 'noticeVersionId']],
       [

@@ -28,7 +28,6 @@ export const deviceCreateBodySchema = z.strictObject({
   ).optional(),
   collectorInstalled: z.boolean().optional(),
 });
-export const holderChangeBodySchema = z.strictObject({ holderEmployeeId: z.uuid() });
 export const retirementBodySchema = z.strictObject({ reason: text(1000) });
 export const signatureRecordBodySchema = z.strictObject({ documentId: z.uuid(), noticeVersionId: z.uuid() });
 export const deviceIdParamSchema = z.strictObject({ id: z.uuid() });
@@ -164,7 +163,6 @@ export const signatureRecordSchema = z.strictObject({
 });
 
 export class DeviceCreateBodyDto extends createZodDto(deviceCreateBodySchema) {}
-export class HolderChangeBodyDto extends createZodDto(holderChangeBodySchema) {}
 export class RetirementBodyDto extends createZodDto(retirementBodySchema) {}
 export class SignatureRecordBodyDto extends createZodDto(signatureRecordBodySchema) {}
 export class DeviceIdParamDto extends createZodDto(deviceIdParamSchema) {}
