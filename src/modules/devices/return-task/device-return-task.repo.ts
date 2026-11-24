@@ -118,7 +118,7 @@ export class DeviceReturnTaskRepo {
   async findExistingRegistrationIds(tx: DbTx, registrationIds: readonly string[]): Promise<Set<string>> {
     if (registrationIds.length === 0) return new Set();
     const rows = await tx.deviceReturnTask.findMany({
-      where: { registrationId: { in: [...registrationIds] } },
+      where: { registrationId: { in: [...registrationIds] }, state: 'OPEN' },
       select: { registrationId: true },
     });
 

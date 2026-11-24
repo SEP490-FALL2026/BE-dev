@@ -188,4 +188,39 @@ describe('DeviceReturnTaskRepo', () => {
     expect(emptyCounts).toEqual({ open: 0, overdue: 0 });
     expect(counts).toEqual({ open: 3, overdue: 1 });
   });
+
+  it('findExistingRegistrationIds filters by state OPEN and ignores CANCELLED or RECEIVED tasks', async () => {
+    const stored = [
+      { registrationId: 'reg-open', state: 'OPEN' },
+      { registrationId: 'reg-cancelled', state: 'CANCELLED' },
+      { registrationId: 'reg-received', state: 'RECEIVED' },
+    ];
+    const findMany = jest
+      .fn()
+      .mockImplementation(({ where }: { where: { registrationId: { in: string[] }; state?: string } }) =>
+        Promise.resolve(
+          stored
+            .filter(
+              (row) =>
+                where.registrationId.in.includes(row.registrationId) && (!where.state || row.state === where.state),
+            )
+            .map(({ registrationId }) => ({ registrationId })),
+        ),
+      );
+    const tx = { deviceReturnTask: { findMany } } as unknown as DbTx;
+    const repo = new DeviceReturnTaskRepo({} as PrismaService);
+
+    const existing = await repo.findExistingRegistrationIds(tx, [
+      'reg-open',
+      'reg-cancelled',
+      'reg-received',
+      'reg-none',
+    ]);
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { registrationId: { in: ['reg-open', 'reg-cancelled', 'reg-received', 'reg-none'] }, state: 'OPEN' },
+      select: { registrationId: true },
+    });
+    expect(existing).toEqual(new Set(['reg-open']));
+  });
 });

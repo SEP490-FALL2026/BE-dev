@@ -71,9 +71,9 @@ Trạng thái: `chưa` · `đang làm` · `xong` · `dừng hỏi` · `bị ch�
 
 | Gói | Mục | Trạng thái | sha | Lệnh kiểm + kết quả | FIX-TEST thêm | D-n | Ghi chú / chưa kiểm được |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| BF-1 | `department-tools` ghi dùng `getItAdminActingScope` + `bySubstitute` | xong | (commit này) | `tsc` (0), `eslint` 12 file (0), `depcruise` (0), `arch:capabilities --module licensing` (0), `rules:check` (0), `test:gates` (17/17, 335 pass), unit `department-tools` (5/5, 82 pass), H platform OpenAPI (5/5, 50 pass), `openapi:export` (+30/-8) | 2 dòng (`department-software-list-http`, `department-software-proposals-http`) | — | I mới `department-software-in-charge.integration-spec.ts` chờ CI |
-| TF-2 | C-1: migration bỏ unique `device_return_tasks.registration_id`, `findExistingRegistrationIds` chỉ `OPEN` | đang làm | | | | | |
-| TF-1 | A-1: migration `plans_keep_children_valid` chặn vào K4 gắn máy | chưa | | | | | |
+| BF-1 | `department-tools` ghi dùng `getItAdminActingScope` + `bySubstitute` | xong | abd09760 | `tsc` (0), `eslint` 12 file (0), `depcruise` (0), `arch:capabilities --module licensing` (0), `rules:check` (0), `test:gates` (17/17, 335 pass), unit `department-tools` (5/5, 82 pass), H platform OpenAPI (5/5, 50 pass), `openapi:export` (+30/-8) | 2 dòng (`department-software-list-http`, `department-software-proposals-http`) | — | I mới `department-software-in-charge.integration-spec.ts` chờ CI |
+| TF-2 | C-1: migration bỏ unique `device_return_tasks.registration_id`, `findExistingRegistrationIds` chỉ `OPEN` | xong | (commit này) | `prisma:validate`/`generate` ok, `tsc` (0), `eslint` 3 file (0), `depcruise` (0), `arch:capabilities --module devices` (0), `rules:check` (0), `test:gates` (17/17, 335 pass), unit `devices/return-task` (6/6, 43 pass) | — | — | Migration `20261124133000_device_return_tasks_allow_reopen`; I `departure-device-return` chờ CI |
+| TF-1 | A-1: migration `plans_keep_children_valid` chặn vào K4 gắn máy | đang làm | | | | | |
 | BF-5 | B-3: `EMPLOYEE.NOT_STARTED` (409) cho nhân viên chỉ có placement tương lai | chưa | | | | | |
 | BF-2 + BF-4 | C-2/C-9 (`requireDepartmentActor` loại người nghỉ) + C-D2 (`409 DEVICE.HOLDER_UNPLACED`) | chưa | | | | | |
 | BF-3 | C-3: `initial-record` khóa khoản mua theo `subscriptionId` (`TF-4` dời sau T7 của Bảo) | chưa | | | | | |

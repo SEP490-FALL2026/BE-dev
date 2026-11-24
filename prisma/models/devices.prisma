@@ -135,7 +135,7 @@ model DeviceRegistration {
   stopRequests     DeviceStopRequest[]
   enrollmentCodes  DeviceEnrollmentCode[]
   credentials      DeviceCredential[]
-  returnTask       DeviceReturnTask?
+  returnTasks      DeviceReturnTask[]
 
   @@index([holderEmployeeId])
   @@index([deviceId])
@@ -159,7 +159,7 @@ model DeviceReturnTask {
   id                  String                 @id @default(uuid(7)) @db.Uuid
   organizationId      String                 @map("organization_id") @db.Uuid
   deviceId            String                 @map("device_id") @db.Uuid
-  registrationId      String                 @unique @map("registration_id") @db.Uuid
+  registrationId      String                 @map("registration_id") @db.Uuid
   employeeId          String                 @map("employee_id") @db.Uuid
   // Values, not foreign keys: the offboarding case belongs to a higher module and the department can be left later.
   offboardingCaseId   String                 @map("offboarding_case_id") @db.Uuid
@@ -180,6 +180,7 @@ model DeviceReturnTask {
   registration DeviceRegistration @relation(fields: [registrationId], references: [id], onDelete: Restrict)
   employee     Employee           @relation("DeviceReturnTaskEmployee", fields: [employeeId], references: [id], onDelete: Restrict)
 
+  @@index([registrationId])
   @@index([state, dueOn])
   @@index([departmentId, state])
   @@index([offboardingCaseId])

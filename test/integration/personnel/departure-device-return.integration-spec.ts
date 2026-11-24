@@ -9,6 +9,7 @@ interface ReturnTaskRow {
   id: string;
   device_id: string;
   registration_id: string;
+  offboarding_case_id: string;
   department_id: string | null;
   due_on: string;
   state: string;
@@ -54,7 +55,7 @@ describe('departure device return tasks and cancellation lock ordering (integrat
   const tasksOfCase = async (caseId: string): Promise<ReturnTaskRow[]> =>
     (
       await h.ctx.sql.query<ReturnTaskRow>(
-        `SELECT id::text, device_id::text, registration_id::text, department_id::text,
+        `SELECT id::text, device_id::text, registration_id::text, offboarding_case_id::text, department_id::text,
                 to_char(due_on, 'YYYY-MM-DD') AS due_on, state::text AS state,
                 handled_at, handled_by_app_user_id::text,
                 to_char(overdue_noticed_on, 'YYYY-MM-DD') AS overdue_noticed_on
@@ -62,6 +63,20 @@ describe('departure device return tasks and cancellation lock ordering (integrat
           WHERE offboarding_case_id = $1
           ORDER BY created_at, id`,
         [caseId],
+      )
+    ).rows;
+
+  const tasksOfRegistration = async (registrationId: string): Promise<ReturnTaskRow[]> =>
+    (
+      await h.ctx.sql.query<ReturnTaskRow>(
+        `SELECT id::text, device_id::text, registration_id::text, offboarding_case_id::text, department_id::text,
+                to_char(due_on, 'YYYY-MM-DD') AS due_on, state::text AS state,
+                handled_at, handled_by_app_user_id::text,
+                to_char(overdue_noticed_on, 'YYYY-MM-DD') AS overdue_noticed_on
+           FROM device_return_tasks
+          WHERE registration_id = $1
+          ORDER BY created_at, id`,
+        [registrationId],
       )
     ).rows;
 
@@ -216,6 +231,41 @@ describe('departure device return tasks and cancellation lock ordering (integrat
     });
     const stillOpen = await tasksOfCase(blockWire.id);
     expect(stillOpen[0]).toMatchObject({ state: 'OPEN', handled_at: null });
+  });
+
+  it('creates a new OPEN return task for the same registration when re-recording offboarding after pre-block cancellation', async () => {
+    const user = await h.worker(des, `E-DR-REOPEN-${(seq += 1)}`);
+    const dev = await registerDevice(user.employeeId);
+
+    const firstWire = await h.recordedCase(user, { lastWorkingDay: h.day(4) });
+    const firstTasks = await tasksOfCase(firstWire.id);
+    expect(firstTasks).toHaveLength(1);
+    expect(firstTasks[0]).toMatchObject({
+      device_id: dev.id,
+      registration_id: dev.registrationId,
+      state: 'OPEN',
+    });
+
+    await h.cancelCase(firstWire.id, { reason: 'Tạm hoãn nghỉ việc' }).expect(200);
+    expect(await tasksOfCase(firstWire.id)).toMatchObject([{ id: firstTasks[0].id, state: 'CANCELLED' }]);
+    expect(await registrationEnded(dev.registrationId)).toEqual({ ended: false, end_cause: null });
+
+    const secondWire = await h.recordedCase(user, { lastWorkingDay: h.day(6) });
+    const secondTasks = await tasksOfCase(secondWire.id);
+    expect(secondTasks).toHaveLength(1);
+    expect(secondTasks[0]).toMatchObject({
+      device_id: dev.id,
+      registration_id: dev.registrationId,
+      state: 'OPEN',
+    });
+    expect(secondTasks[0].id).not.toBe(firstTasks[0].id);
+
+    const history = await tasksOfRegistration(dev.registrationId);
+    expect(history).toHaveLength(2);
+    expect(history).toMatchObject([
+      { id: firstTasks[0].id, offboarding_case_id: firstWire.id, state: 'CANCELLED' },
+      { id: secondTasks[0].id, offboarding_case_id: secondWire.id, state: 'OPEN' },
+    ]);
   });
 
   it('cancels past-block departure concurrently with closing a keyed activation without deadlocks for 20 rounds', async () => {
