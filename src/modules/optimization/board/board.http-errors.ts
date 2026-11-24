@@ -8,6 +8,7 @@ import {
   RevocationRefusedError,
   SeatTargetNotFoundError,
 } from '../../licensing/public/licensing.errors';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import {
   GhostSeatNotDeciderError,
   GhostSeatNotFoundError,
@@ -64,6 +65,9 @@ export function toGhostSeatApiException(error: unknown): unknown {
   }
   if (error instanceof GhostSeatPeriodInvalidError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'GHOST_SEAT.PERIOD_INVALID', error.message);
+  }
+  if (error instanceof EmployeeNotStartedError) {
+    return refuse(HttpStatus.CONFLICT, 'EMPLOYEE.NOT_STARTED', error.message);
   }
 
   return toUnavailableApiException(error) ?? error;

@@ -4,6 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../organization/public/organization.types';
 import type { StopRequestRecord } from './stop-request.repo';
 
 /** The organization a request belongs to and the time zone its day is read in. */
@@ -37,10 +38,11 @@ export class StopRequestNotifier {
   }
 
   /**
-   * Acting IT Admins of the holder's work department, excluding the holder. Falls back to the usable Super Admin
-   * (unless they are the holder) when no acting IT Admin exists or the holder has no work department.
+   * Acting IT Admins of the holder's work department, excluding the holder. When the holder has no work department,
+   * checks the designated IT Admin for the unplaced `DEVICE` work before falling back to the usable Super Admin
+   * (unless they are the holder).
    */
-  private async recipients(tx: DbTx, holderEmployeeId: string): Promise<string[]> {
+  private async recipients(tx: DbTx, deviceId: string, holderEmployeeId: string): Promise<string[]> {
     const today = await this.organizationReads.businessToday(new Date(), tx);
     const deptId =
       (await this.organizationReads.workDepartmentsOf([holderEmployeeId], today, tx)).get(holderEmployeeId) ?? null;
@@ -54,6 +56,14 @@ export class StopRequestNotifier {
       ).get(deptId);
       const actors = (acting?.actors ?? []).filter((id) => id !== holderEmployeeId);
       if (actors.length > 0) return actors;
+    } else {
+      const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
+        [{ workKind: 'DEVICE', workId: deviceId, employeeId: holderEmployeeId }],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      );
+      const designee = resolved.get(unplacedWorkKey('DEVICE', deviceId)) ?? null;
+      if (designee !== null && designee !== holderEmployeeId) return [designee];
     }
 
     const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
@@ -75,7 +85,7 @@ export class StopRequestNotifier {
       dueAt: request.dueAt.toISOString(),
       dueOn: businessDateAt(request.dueAt, context.timeZone),
     };
-    for (const recipientEmployeeId of await this.recipients(tx, request.holderEmployeeId)) {
+    for (const recipientEmployeeId of await this.recipients(tx, request.deviceId, request.holderEmployeeId)) {
       await this.notifications.notifyInApp(tx, {
         organizationId: context.organizationId,
         recipientEmployeeId,

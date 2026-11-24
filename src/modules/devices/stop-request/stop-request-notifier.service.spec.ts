@@ -1,5 +1,5 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { UsableItAdmins } from '../../organization/public/organization.types';
+import { unplacedWorkKey, type UsableItAdmins } from '../../organization/public/organization.types';
 import { StopRequestNotifier, type StopRequestNoticeContext } from './stop-request-notifier.service';
 import type { StopRequestRecord } from './stop-request.repo';
 
@@ -35,6 +35,7 @@ const makeRequest = (overrides: Partial<StopRequestRecord> = {}): StopRequestRec
 function harness(options: {
   departmentId?: string | null;
   acting?: { actors: string[]; substitute: string | null } | undefined;
+  unplacedDesignee?: string | null;
   superAdminId?: string | null;
   holderEmployeeId?: string;
 }) {
@@ -47,6 +48,9 @@ function harness(options: {
       : new Map([[holderEmployeeId, options.departmentId]]);
   const actingMap =
     options.departmentId && options.acting ? new Map([[options.departmentId, options.acting]]) : new Map();
+  const unplacedMap = new Map<string, string | null>([
+    [unplacedWorkKey('DEVICE', 'dev-1'), options.unplacedDesignee ?? null],
+  ]);
 
   const organizationReads = {
     businessToday: jest.fn().mockResolvedValue('2026-10-21'),
@@ -55,6 +59,7 @@ function harness(options: {
       await usableAmong(['emp-incharge']);
       return actingMap;
     }),
+    itAdminsActingForUnplacedWork: jest.fn().mockResolvedValue(unplacedMap),
   };
   const identity = {
     findUsableItAdminEmployeeIds: jest.fn().mockResolvedValue(new Set(['emp-incharge'])),
@@ -158,7 +163,12 @@ describe('StopRequestNotifier', () => {
     expect(notifyInApp.mock.calls.map((c) => c[1].recipientEmployeeId)).toEqual(['emp-sa']);
   });
 
-  it('notifies Super Admin when holder is unplaced (deptId === null), unless Super Admin is holder', async () => {
+  it('notifies designated IT Admin for unplaced holder when a DEVICE designation exists, otherwise Super Admin', async () => {
+    const designated = harness({ departmentId: null, unplacedDesignee: 'emp-designee', superAdminId: 'emp-sa' });
+    await designated.notifier.requested(designated.tx, CONTEXT, makeRequest());
+    expect(designated.identity.findUsableSuperAdminEmployeeId).not.toHaveBeenCalled();
+    expect(designated.notifyInApp.mock.calls.map((c) => c[1].recipientEmployeeId)).toEqual(['emp-designee']);
+
     const first = harness({ departmentId: null, superAdminId: 'emp-sa' });
     await first.notifier.requested(first.tx, CONTEXT, makeRequest());
     expect(first.notifyInApp.mock.calls.map((c) => c[1].recipientEmployeeId)).toEqual(['emp-sa']);

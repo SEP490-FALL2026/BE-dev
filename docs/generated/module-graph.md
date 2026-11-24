@@ -82,7 +82,7 @@ flowchart BT
   devices -->|18| licensing
   devices -->|3| notifications
   devices -->|3| operating_parameters
-  devices -->|59| organization
+  devices -->|60| organization
   finance -->|3| audit
   finance -->|3| organization
   identity_access -->|20| audit
@@ -117,7 +117,7 @@ flowchart BT
   optimization -->|25| licensing
   optimization -->|7| notifications
   optimization -->|6| operating_parameters
-  optimization -->|23| organization
+  optimization -->|25| organization
   optimization -->|7| personnel
   optimization -->|9| policies
   optimization -->|9| usage

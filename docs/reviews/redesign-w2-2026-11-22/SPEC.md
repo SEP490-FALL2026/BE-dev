@@ -1114,7 +1114,7 @@ scope=ALL`, `provisioningTaskGet`, `deviceReturnTaskList scope=ALL`. Không rout
       (_chờ người tiếp nhận_; migration 4), thông báo `SAAS_ISSUE_AWAITING_ASSIGNEE` cho Super Admin (một lần mỗi phiếu) — **không
       còn** 409 `SAAS_ISSUE.NO_IT_ADMIN` ở `saasIssueSubmit`. `SaasIssueSweeper` sẵn có (`saas-issue/saas-issue.job.ts:15`) thêm một
       lượt mỗi giờ: phiếu `NEW` chưa người nhận ⟹ bộ giải theo phòng của người báo; có người làm ⟹ giao (một `UPDATE` từ `NULL`,
-      audit `SAAS_ISSUE.ASSIGNED`, báo người nhận như lúc gửi). Nhắc quá hạn phản hồi của phiếu chưa người nhận ⟹ Super Admin.
+      audit `SAAS_ISSUE.ASSIGNED`, báo người nhận như lúc gửi). Nhắc quá hạn phản hồi gửi người làm của phòng người báo (tối đa 2), không có ai dùng được ⟹ Super Admin.
       Response `saasIssueSubmit`/`Get`/`List`: `assignedItAdminEmployeeId` thành **nullable** (phá contract response).
     - H7: đẩy sớm chỉ người làm của phòng người giữ seat; ngoài ⟹ `SKIPPED/NOT_IN_CHARGE` (enum có sẵn); bỏ hai nhánh "phòng
       không IT" và "IT không dùng được".

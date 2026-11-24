@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import {
   GhostSeatAlreadyReturnedError,
   GhostSeatDecisionNotFoundError,
@@ -61,6 +62,9 @@ export function toDecisionApiException(error: unknown): unknown {
   }
   if (error instanceof GhostSeatTaskInProgressError) {
     return refuse(HttpStatus.CONFLICT, 'GHOST_SEAT.TASK_IN_PROGRESS', error.message);
+  }
+  if (error instanceof EmployeeNotStartedError) {
+    return refuse(HttpStatus.CONFLICT, 'EMPLOYEE.NOT_STARTED', error.message);
   }
 
   return toUnavailableApiException(error) ?? error;
