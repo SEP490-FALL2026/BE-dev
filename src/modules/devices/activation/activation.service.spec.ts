@@ -5,12 +5,18 @@ import type { SeatTarget } from '../../catalog/public/catalog.types';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { LicensingDeviceActivationApi } from '../../licensing/public/licensing-device-activation.api';
 import {
+  DeviceActivationNotFoundError,
   DeviceActivationPlanNotDeviceBoundError,
   DeviceActivationPlanNotFoundError,
 } from '../../licensing/public/licensing-device-activation.errors';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { DeviceCondition } from '../devices-custody.policy';
-import { DeviceAwaitingReturnError, DeviceNotUsableError, DeviceVoidedError } from '../lifecycle/lifecycle.errors';
+import {
+  DeviceAwaitingReturnError,
+  DeviceNotUsableError,
+  DeviceSameDeviceError,
+  DeviceVoidedError,
+} from '../lifecycle/lifecycle.errors';
 import { DeviceNotFoundError, DeviceNotInChargeError } from '../public/devices.errors';
 import { DeviceAlreadyRetiredError } from '../registry/registry.errors';
 import type { DeviceRecord, RegistrationRecord, RegistryRepo } from '../registry/registry.repo';
@@ -18,8 +24,18 @@ import { DeviceActivationCommandService } from './activation.service';
 
 interface SetupOptions {
   device?: Partial<DeviceRecord> | null;
+  targetDevice?: Partial<DeviceRecord> | null;
   open?: Partial<RegistrationRecord> | null;
+  targetOpen?: Partial<RegistrationRecord> | null;
   returnTask?: { found: boolean; departmentId: string | null };
+  targetReturnTask?: { found: boolean; departmentId: string | null };
+  foundActivation?: {
+    id: string;
+    deviceId: string;
+    planId: string;
+    licenseKeyId: string | null;
+    subscriptionId: string | null;
+  } | null;
   planTarget?: Partial<SeatTarget> | null;
   inCharge?: string | null;
   substitute?: string | null;
@@ -99,16 +115,52 @@ describe('DeviceActivationCommandService (W2-19, H17)', () => {
             ...options.planTarget,
           };
 
+    const targetDevice: DeviceRecord | null =
+      options.targetDevice === null
+        ? null
+        : {
+            id: 'dev-2',
+            organizationId: 'org-1',
+            assetCode: 'LAP-26-0002',
+            hostname: 'H2',
+            os: 'Windows 11',
+            condition: 'USABLE' as DeviceCondition,
+            conditionNote: null,
+            retiredAt: null,
+            retirementReason: null,
+            retirementKind: null,
+            voidedAt: null,
+            ...options.targetDevice,
+          };
+
     const repo = {
-      lockDevice: jest.fn().mockImplementation(() => {
+      lockDevice: jest.fn().mockImplementation((_t: unknown, id: string) => {
         order.push('lockDevice');
-        return Promise.resolve(device);
+        return Promise.resolve(id === 'dev-2' ? targetDevice : device);
       }),
-      lockOpenRegistration: jest.fn().mockImplementation(() => {
+      lockDevices: jest.fn().mockImplementation((_t: unknown, ids: string[]) => {
+        order.push(`lockDevices:${[...ids].sort().join(',')}`);
+        const list: DeviceRecord[] = [];
+        if (device && ids.includes(device.id)) list.push(device);
+        if (targetDevice && ids.includes(targetDevice.id)) list.push(targetDevice);
+        return Promise.resolve(list);
+      }),
+      lockOpenRegistration: jest.fn().mockImplementation((_t: unknown, id: string) => {
         order.push('lockOpenRegistration');
+        if (id === 'dev-2') {
+          return Promise.resolve(
+            options.targetOpen ? { ...open, id: 'reg-2', deviceId: 'dev-2', ...options.targetOpen } : null,
+          );
+        }
         return Promise.resolve(open);
       }),
-      findOpenReturnTaskDepartmentId: jest.fn().mockResolvedValue(returnTask),
+      findOpenReturnTaskDepartmentId: jest
+        .fn()
+        .mockImplementation((_t: unknown, id: string) =>
+          Promise.resolve(
+            id === 'dev-2' ? (options.targetReturnTask ?? { found: false, departmentId: null }) : returnTask,
+          ),
+        ),
     } as unknown as RegistryRepo;
 
     const deptId = options.departmentId === undefined ? 'dept-1' : options.departmentId;
@@ -171,9 +223,25 @@ describe('DeviceActivationCommandService (W2-19, H17)', () => {
       overActivationCap: false,
     };
 
+    const foundActivation =
+      options.foundActivation === undefined
+        ? openedResult.activation
+        : options.foundActivation
+          ? { ...openedResult.activation, ...options.foundActivation }
+          : null;
+
     const deviceActivations = {
       open: jest.fn().mockImplementation(() => {
         order.push('deviceActivations.open');
+        return Promise.resolve(openedResult);
+      }),
+      find: jest.fn().mockResolvedValue(foundActivation),
+      close: jest.fn().mockImplementation(() => {
+        order.push('deviceActivations.close');
+        return Promise.resolve(foundActivation);
+      }),
+      move: jest.fn().mockImplementation(() => {
+        order.push('deviceActivations.move');
         return Promise.resolve(openedResult);
       }),
     } as unknown as LicensingDeviceActivationApi;
@@ -268,5 +336,62 @@ describe('DeviceActivationCommandService (W2-19, H17)', () => {
     await expect(
       setup({ planTarget: { keyBinding: 'ACCOUNT' } }).service.open(actor(), 'dev-1', { planId: 'plan-1' }, now),
     ).rejects.toBeInstanceOf(DeviceActivationPlanNotDeviceBoundError);
+  });
+
+  it('deactivates activations with H17 enforcement on assigned devices and 404 when missing', async () => {
+    await expect(
+      setup({ foundActivation: null }).service.deactivate(actor(), 'missing', {}, now),
+    ).rejects.toBeInstanceOf(DeviceActivationNotFoundError);
+
+    const assigned = setup({ open: {}, inCharge: 'it-1' });
+    await expect(assigned.service.deactivate(actor('it-other'), 'act-1', {}, now)).rejects.toBeInstanceOf(
+      DeviceNotInChargeError,
+    );
+
+    assigned.order.length = 0;
+    const closed = await assigned.service.deactivate(
+      actor('it-1'),
+      'act-1',
+      { licenseRelease: 'LOST_WITH_DEVICE' },
+      now,
+    );
+    expect(closed).toBeDefined();
+    expect(assigned.order).toEqual(['lockDevice', 'lockOpenRegistration', 'deviceActivations.close']);
+  });
+
+  it('moves activation after locking both devices in one sorted call, checking H17 and target readiness', async () => {
+    await expect(
+      setup({
+        foundActivation: {
+          id: 'act-1',
+          deviceId: 'dev-1',
+          planId: 'plan-1',
+          licenseKeyId: 'key-1',
+          subscriptionId: 'sub-1',
+        },
+      }).service.move(actor(), 'act-1', { targetDeviceId: 'dev-1' }, now),
+    ).rejects.toBeInstanceOf(DeviceSameDeviceError);
+
+    const { service, order } = setup();
+    await service.move(actor('it-any'), 'act-1', { targetDeviceId: 'dev-2' }, now);
+    expect(order[0]).toBe('lockDevices:dev-1,dev-2');
+    expect(order[order.length - 1]).toBe('deviceActivations.move');
+
+    await expect(
+      setup({ open: {}, inCharge: 'it-1' }).service.move(actor('it-other'), 'act-1', { targetDeviceId: 'dev-2' }, now),
+    ).rejects.toBeInstanceOf(DeviceNotInChargeError);
+
+    await expect(
+      setup({ targetDevice: { condition: 'BROKEN' } }).service.move(actor(), 'act-1', { targetDeviceId: 'dev-2' }, now),
+    ).rejects.toBeInstanceOf(DeviceNotUsableError);
+
+    await expect(
+      setup({ targetReturnTask: { found: true, departmentId: 'dept-1' } }).service.move(
+        actor('it-1'),
+        'act-1',
+        { targetDeviceId: 'dev-2' },
+        now,
+      ),
+    ).rejects.toBeInstanceOf(DeviceAwaitingReturnError);
   });
 });

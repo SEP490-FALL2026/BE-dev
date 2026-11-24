@@ -97,6 +97,16 @@ export class RegistryRepo {
     return locked.length === 0 ? null : this.findDevice(id, tx);
   }
 
+  /** Locks multiple machines in one ascending `id` statement `FOR UPDATE`. */
+  async lockDevices(tx: DbTx, ids: readonly string[]): Promise<DeviceRecord[]> {
+    const uniqueIds = [...new Set(ids)].sort();
+    if (uniqueIds.length === 0) return [];
+    await tx.$queryRaw`
+      SELECT id FROM managed_devices WHERE id = ANY(${uniqueIds}::uuid[]) ORDER BY id ASC FOR UPDATE`;
+
+    return tx.managedDevice.findMany({ where: { id: { in: uniqueIds } }, select: DEVICE_SELECT });
+  }
+
   async deviceIdByAssetCode(tx: DbTx, organizationId: string, normalizedAssetCode: string): Promise<string | null> {
     const row = await tx.managedDevice.findUnique({
       where: { organizationId_normalizedAssetCode: { organizationId, normalizedAssetCode } },

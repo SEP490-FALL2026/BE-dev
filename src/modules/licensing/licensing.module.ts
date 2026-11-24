@@ -87,6 +87,7 @@ import { AssignmentSeatMonthRepo } from './assignment/assignment-seat-month.repo
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
 import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
 import { LicensingDeviceActivationApi } from './public/licensing-device-activation.api';
+import { DeviceActivationCloseService } from './device-activation/device-activation-close.service';
 import { DeviceActivationQueryService } from './device-activation/device-activation-query.service';
 import { DeviceActivationRepo } from './device-activation/device-activation.repo';
 import { DeviceActivationService } from './device-activation/device-activation.service';
@@ -345,6 +346,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicensingSeatBaselineApi,
     DeviceActivationRepo,
     DeviceActivationService,
+    DeviceActivationCloseService,
     DeviceActivationQueryService,
     LicensingDeviceActivationApi,
   ],

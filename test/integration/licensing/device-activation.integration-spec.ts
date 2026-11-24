@@ -204,4 +204,60 @@ describe('device activations licensing facade & S-6 lot occupancy (integration, 
     expect(rejected).toHaveLength(1);
     expect(rejected[0].reason).toBeInstanceOf(DeviceActivationLotFullError);
   });
+
+  it('W2-20 (b), (e) & S-12: moves on a full lot by closing before inserting, and keeps LOST_WITH_DEVICE occupying lot capacity', async () => {
+    const planId = await planOf('DEVICE_KEY');
+    const subId = await purchaseOf(planId, 2);
+    const keyId = await importKey(subId, 5);
+    const [d1, d2, d3] = await Promise.all([createDevice('LAP'), createDevice('PC'), createDevice('LAP')]);
+
+    const a1 = await runner.run((tx) =>
+      activations.open(tx, {
+        organizationId: seed.organizationId,
+        deviceId: d1,
+        planId,
+        licenseKeyId: keyId,
+        origin: 'OPERATION',
+        on: '2026-11-24',
+        by: actor(),
+      }),
+    );
+    await runner.run((tx) =>
+      activations.open(tx, {
+        organizationId: seed.organizationId,
+        deviceId: d2,
+        planId,
+        licenseKeyId: keyId,
+        origin: 'OPERATION',
+        on: '2026-11-24',
+        by: actor(),
+      }),
+    );
+
+    const moved = await runner.run((tx) =>
+      activations.move(tx, {
+        activationId: a1.activation.id,
+        targetDeviceId: d3,
+        on: '2026-11-24',
+        by: actor(),
+      }),
+    );
+    expect(moved.activation).toMatchObject({ deviceId: d3, movedFromActivationId: a1.activation.id });
+    expect(moved.activationsUsed).toBe(3);
+
+    await runner.run((tx) =>
+      activations.close(tx, {
+        activationId: moved.activation.id,
+        cause: 'DEACTIVATED',
+        licenseRelease: 'LOST_WITH_DEVICE',
+        on: '2026-11-24',
+        by: actor(),
+      }),
+    );
+
+    const sub = dataOf<{ seats: { occupied: number } }>(
+      await request(server()).get(`/api/v1/subscriptions/${subId}`).set(as(it1)).expect(200),
+    );
+    expect(sub.seats.occupied).toBe(2);
+  });
 });

@@ -77051,6 +77051,860 @@
         "tags": ["devices"]
       }
     },
+    "/api/v1/device-activations": {
+      "get": {
+        "operationId": "deviceActivationList",
+        "parameters": [
+          { "name": "deviceId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
+          { "name": "planId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "licenseKeyId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "OPEN", "type": "string", "enum": ["OPEN", "CLOSED", "ALL"] }
+          },
+          {
+            "name": "idleDevice",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "needsKeyReplacement",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 9007199254740991, "default": 1, "type": "integer" }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 100, "default": 20, "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lists device software activations with custody, condition, key status, and replacement flags.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DeviceActivationPageResponseDto" },
+                    { "properties": { "message": { "example": "DEVICE_ACTIVATION.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query parameters are invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List machine software activations across the register",
+        "tags": ["devices"]
+      }
+    },
+    "/api/v1/device-activations/{id}/deactivation": {
+      "post": {
+        "operationId": "deviceActivationDeactivate",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/DeactivateDeviceActivationBodyDto" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Closes an open software activation and returns its keyed license to the lot unless LOST_WITH_DEVICE is chosen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DeviceActivationResponseDto" },
+                    { "properties": { "message": { "example": "DEVICE_ACTIVATION.CLOSED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an acting IT Admin covering the holder or return-task department may deactivate software on an assigned or awaiting-return machine (DEVICE.NOT_IN_CHARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the holder department may change this device.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the holder department may change this device.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The device activation does not exist (DEVICE_ACTIVATION.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE_ACTIVATION.NOT_FOUND": {
+                    "summary": "The device activation does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_ACTIVATION.NOT_FOUND",
+                        "message": "The device activation does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The device activation is already closed (DEVICE_ACTIVATION.ALREADY_CLOSED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE_ACTIVATION.ALREADY_CLOSED": {
+                    "summary": "The device activation is already closed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_ACTIVATION.ALREADY_CLOSED",
+                        "message": "The device activation is already closed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid or license release decisions were supplied for a bundled activation (VALIDATION_ERROR, DEVICE_ACTIVATION.RELEASE_NOT_APPLICABLE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_ACTIVATION.RELEASE_NOT_APPLICABLE": {
+                    "summary": "License release decisions apply only to keyed device activations.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_ACTIVATION.RELEASE_NOT_APPLICABLE",
+                        "message": "License release decisions apply only to keyed device activations.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Deactivate an open software activation on a machine",
+        "tags": ["devices"]
+      }
+    },
+    "/api/v1/device-activations/{id}/moves": {
+      "post": {
+        "operationId": "deviceActivationMove",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/MoveDeviceActivationBodyDto" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Closes the source activation and opens a replacement activation for the same key on the target machine in one transaction.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/OpenedDeviceActivationResponseDto" },
+                    { "properties": { "message": { "example": "DEVICE_ACTIVATION.MOVED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an acting IT Admin covering both source and target assigned/awaiting-return departments may move an activation (DEVICE.NOT_IN_CHARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the holder department may change this device.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the holder department may change this device.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The activation or target machine does not exist (DEVICE_ACTIVATION.NOT_FOUND, DEVICE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE_ACTIVATION.NOT_FOUND": {
+                    "summary": "The device activation does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_ACTIVATION.NOT_FOUND",
+                        "message": "The device activation does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.NOT_FOUND": {
+                    "summary": "The device does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_FOUND",
+                        "message": "The device does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The target machine or key state refuses moving the activation (DEVICE.VOIDED, DEVICE.ALREADY_RETIRED, DEVICE.AWAITING_RETURN, DEVICE.NOT_USABLE, DEVICE_ACTIVATION.ALREADY_CLOSED, DEVICE_ACTIVATION.KEY_WITHDRAWN, DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE, DEVICE_ACTIVATION.LOT_FULL, DEVICE_ACTIVATION.ALREADY_ON_DEVICE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE.VOIDED": {
+                    "summary": "The machine record has been voided.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.VOIDED",
+                        "message": "The machine record has been voided.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.ALREADY_RETIRED": {
+                    "summary": "The machine is retired.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.ALREADY_RETIRED",
+                        "message": "The machine is retired.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.AWAITING_RETURN": {
+                    "summary": "The machine has an open return task from an offboarding case.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.AWAITING_RETURN",
+                        "message": "The machine has an open return task from an offboarding case.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.NOT_USABLE": {
+                    "summary": "Only a usable machine can be assigned or receive new activations.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_USABLE",
+                        "message": "Only a usable machine can be assigned or receive new activations.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_ACTIVATION.ALREADY_CLOSED": {
+                    "summary": "The device activation is already closed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_ACTIVATION.ALREADY_CLOSED",
+                        "message": "The device activation is already closed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_ACTIVATION.KEY_WITHDRAWN": {
+                    "summary": "The license key has been withdrawn from the store.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_ACTIVATION.KEY_WITHDRAWN",
+                        "message": "The license key has been withdrawn from the store.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE": {
+                    "summary": "The perpetual purchase for this key is not active.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE",
+                        "message": "The perpetual purchase for this key is not active.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_ACTIVATION.LOT_FULL": {
+                    "summary": "All licenses purchased in this lot are currently occupied.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_ACTIVATION.LOT_FULL",
+                        "message": "All licenses purchased in this lot are currently occupied.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_ACTIVATION.ALREADY_ON_DEVICE": {
+                    "summary": "The machine already has an open activation for this plan.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_ACTIVATION.ALREADY_ON_DEVICE",
+                        "message": "The machine already has an open activation for this plan.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid, the activation is bundled, or source and target match (VALIDATION_ERROR, DEVICE_ACTIVATION.NOT_MOVABLE, DEVICE.SAME_DEVICE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE_ACTIVATION.NOT_MOVABLE": {
+                    "summary": "Bundled device activations cannot be moved to another machine.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE_ACTIVATION.NOT_MOVABLE",
+                        "message": "Bundled device activations cannot be moved to another machine.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.SAME_DEVICE": {
+                    "summary": "The target machine must differ from the source machine.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.SAME_DEVICE",
+                        "message": "The target machine must differ from the source machine.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Move a keyed software activation to another machine",
+        "tags": ["devices"]
+      }
+    },
     "/api/v1/device-registrations/{id}/signature-records": {
       "post": {
         "operationId": "deviceSignatureRecordCreate",
@@ -133326,6 +134180,196 @@
           }
         },
         "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "DeviceActivationPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "device": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "assetCode": { "type": "string" },
+                        "custody": {
+                          "type": "string",
+                          "enum": ["VOIDED", "RETIRED", "AWAITING_RETURN", "ASSIGNED", "IN_STOCK"]
+                        },
+                        "condition": { "type": "string", "enum": ["USABLE", "IN_REPAIR", "BROKEN"] }
+                      },
+                      "required": ["id", "assetCode", "custody", "condition"],
+                      "additionalProperties": false
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "name": { "type": "string" },
+                        "keyBinding": { "type": "string", "enum": ["DEVICE_KEY", "DEVICE_BUNDLED"] }
+                      },
+                      "required": ["id", "name", "keyBinding"],
+                      "additionalProperties": false
+                    },
+                    "application": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "licenseKey": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "masked": { "type": "string" },
+                        "withdrawn": { "type": "boolean" }
+                      },
+                      "required": ["id", "masked", "withdrawn"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "lotId": { "type": "string", "format": "uuid", "nullable": true },
+                    "origin": { "type": "string", "enum": ["OPERATION", "INITIAL"] },
+                    "activatedOn": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD."
+                    },
+                    "deactivatedOn": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD.",
+                      "nullable": true
+                    },
+                    "endCause": {
+                      "type": "string",
+                      "enum": ["DEACTIVATED", "MOVED", "DEVICE_DISPOSED", "DEVICE_LOST", "DEVICE_VOIDED", null],
+                      "nullable": true
+                    },
+                    "licenseReleased": { "type": "boolean", "nullable": true },
+                    "overActivationCap": { "type": "boolean" },
+                    "needsKeyReplacement": { "type": "boolean" }
+                  },
+                  "required": [
+                    "id",
+                    "device",
+                    "plan",
+                    "application",
+                    "licenseKey",
+                    "lotId",
+                    "origin",
+                    "activatedOn",
+                    "deactivatedOn",
+                    "endCause",
+                    "licenseReleased",
+                    "overActivationCap",
+                    "needsKeyReplacement"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "DeactivateDeviceActivationBodyDto": {
+        "type": "object",
+        "properties": { "licenseRelease": { "type": "string", "enum": ["RETURN_TO_LOT", "LOST_WITH_DEVICE"] } },
+        "additionalProperties": false
+      },
+      "DeviceActivationResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "deviceId": { "type": "string", "format": "uuid" },
+              "planId": { "type": "string", "format": "uuid" },
+              "licenseKeyId": { "type": "string", "format": "uuid", "nullable": true },
+              "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
+              "keyMasked": { "type": "string", "nullable": true },
+              "keyWithdrawn": { "type": "boolean" },
+              "origin": { "type": "string", "enum": ["OPERATION", "INITIAL"] },
+              "movedFromActivationId": { "type": "string", "format": "uuid", "nullable": true },
+              "activatedOn": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+              "activatedAt": { "type": "string", "format": "date-time" },
+              "overActivationCap": { "type": "boolean" },
+              "deactivatedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD.",
+                "nullable": true
+              },
+              "deactivatedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "endCause": {
+                "type": "string",
+                "enum": ["DEACTIVATED", "MOVED", "DEVICE_DISPOSED", "DEVICE_LOST", "DEVICE_VOIDED", null],
+                "nullable": true
+              },
+              "licenseReleased": { "type": "boolean", "nullable": true }
+            },
+            "required": [
+              "id",
+              "deviceId",
+              "planId",
+              "licenseKeyId",
+              "subscriptionId",
+              "keyMasked",
+              "keyWithdrawn",
+              "origin",
+              "movedFromActivationId",
+              "activatedOn",
+              "activatedAt",
+              "overActivationCap",
+              "deactivatedOn",
+              "deactivatedAt",
+              "endCause",
+              "licenseReleased"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "MoveDeviceActivationBodyDto": {
+        "type": "object",
+        "properties": { "targetDeviceId": { "type": "string", "format": "uuid" } },
+        "required": ["targetDeviceId"],
         "additionalProperties": false
       },
       "DeviceAttributesBodyDto": {

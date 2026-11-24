@@ -11,8 +11,10 @@ import { DEVICE_CREDENTIAL_VERIFIER } from '../../infrastructure/security/tokens
 import { AcknowledgementController } from './acknowledgement/acknowledgement.controller';
 import { AcknowledgementRepo } from './acknowledgement/acknowledgement.repo';
 import { AcknowledgementService } from './acknowledgement/acknowledgement.service';
+import { ActivationQueryService } from './activation/activation-query.service';
 import { DeviceActivationController } from './activation/activation.controller';
 import { DeviceActivationCommandService } from './activation/activation.service';
+import { DeviceActivationsController } from './activation/device-activations.controller';
 import { AssetCodeRepo } from './asset-code/asset-code.repo';
 import { AssetCodeService } from './asset-code/asset-code.service';
 import { DeviceAttributesController } from './attributes/device-attributes.controller';
@@ -79,6 +81,7 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     RegistryController,
     LifecycleController,
     DeviceActivationController,
+    DeviceActivationsController,
     DeviceAttributesController,
     SignatureRecordController,
     AcknowledgementController,
@@ -100,6 +103,7 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     ConditionService,
     RetirementService,
     DeviceActivationCommandService,
+    ActivationQueryService,
     AssetCodeRepo,
     AssetCodeService,
     DeviceAttributesRepo,

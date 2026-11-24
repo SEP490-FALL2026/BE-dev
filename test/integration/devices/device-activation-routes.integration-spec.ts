@@ -27,6 +27,13 @@ describe('device activation routes & bundled intake (integration, real PostgreSQ
   const unique = (prefix: string): string => `${prefix} ${(seq += 1)}`;
   const server = () => h.ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
+  const deactivateActivation = (
+    id: string,
+    body: { licenseRelease?: 'RETURN_TO_LOT' | 'LOST_WITH_DEVICE' } = {},
+    account: ApiAccount = h.it1,
+  ) => request(server()).post(`/api/v1/device-activations/${id}/deactivation`).set(as(account)).send(body);
+  const moveActivation = (id: string, targetDeviceId: string, account: ApiAccount = h.it1) =>
+    request(server()).post(`/api/v1/device-activations/${id}/moves`).set(as(account)).send({ targetDeviceId });
 
   const planOf = async (binding: 'DEVICE_KEY' | 'DEVICE_BUNDLED'): Promise<string> => {
     const application = await declareApplication(h.ctx, h.it1.accessToken, {
@@ -213,5 +220,89 @@ describe('device activation routes & bundled intake (integration, real PostgreSQ
     ]);
 
     expect(results.map((res) => res.status).sort()).toEqual([201, 409]);
+  });
+
+  it('W2-20 (a)-(e): moves keyed activations on a full lot, rejects bundled moves & closed deactivations, and keeps LOST_WITH_DEVICE occupied', async () => {
+    const keyPlanId = await planOf('DEVICE_KEY');
+    const subId = await purchaseOf(keyPlanId, 2);
+    const keyId = await importKey(subId, 5);
+    const bundledPlanId = await planOf('DEVICE_BUNDLED');
+
+    const d1 = h.dataOf<DeviceWire>(
+      await h.createDevice({ deviceType: 'LAP', hostname: 'LAP-MV-1', os: 'Windows 11' }).expect(201),
+    );
+    const d2 = h.dataOf<DeviceWire>(
+      await h.createDevice({ deviceType: 'LAP', hostname: 'LAP-MV-2', os: 'Windows 11' }).expect(201),
+    );
+    const d3 = h.dataOf<DeviceWire>(
+      await h.createDevice({ deviceType: 'LAP', hostname: 'LAP-MV-3', os: 'Windows 11' }).expect(201),
+    );
+
+    const a1 = h.dataOf<OpenedActivationWire>(
+      await h.activateDevice(d1.id, { planId: keyPlanId, licenseKeyId: keyId }).expect(201),
+    );
+    const a2 = h.dataOf<OpenedActivationWire>(
+      await h.activateDevice(d2.id, { planId: keyPlanId, licenseKeyId: keyId }).expect(201),
+    );
+
+    // (e) Move on a full 2/2 lot succeeds (closes old MOVED first, inserts new on d3).
+    const moved = h.dataOf<OpenedActivationWire>(await moveActivation(a1.activation.id, d3.id).expect(201));
+    expect(moved.activation.deviceId).toBe(d3.id);
+    expect(moved.activationsUsed).toBe(2);
+
+    // (b) Deactivate with LOST_WITH_DEVICE keeps lot occupied.
+    await deactivateActivation(moved.activation.id, { licenseRelease: 'LOST_WITH_DEVICE' }).expect(201);
+    const sub = h.dataOf<{ seats: { occupied: number } }>(
+      await request(server()).get(`/api/v1/subscriptions/${subId}`).set(as(h.it1)).expect(200),
+    );
+    expect(sub.seats.occupied).toBe(2);
+
+    // (d) Deactivating an already closed activation fails with 409.
+    const alreadyClosed = await deactivateActivation(a1.activation.id).expect(409);
+    expect(h.codeOf(alreadyClosed)).toBe('DEVICE_ACTIVATION.ALREADY_CLOSED');
+
+    // (c) Moving a DEVICE_BUNDLED activation fails with 422 NOT_MOVABLE.
+    const bundled = h.dataOf<OpenedActivationWire>(
+      await h.activateDevice(d1.id, { planId: bundledPlanId }).expect(201),
+    );
+    const notMovable = await moveActivation(bundled.activation.id, d2.id).expect(422);
+    expect(h.codeOf(notMovable)).toBe('DEVICE_ACTIVATION.NOT_MOVABLE');
+
+    // Clean deactivate with RETURN_TO_LOT restores lot free slot.
+    await deactivateActivation(a2.activation.id).expect(201);
+  });
+
+  it('W2-20 (f): opposite-direction moves between two machines repeat 20 times without deadlocks', async () => {
+    const planId = await planOf('DEVICE_KEY');
+    const subId = await purchaseOf(planId, 2);
+    const key1 = await importKey(subId, 50);
+    const plan2Id = await planOf('DEVICE_KEY');
+    const sub2Id = await purchaseOf(plan2Id, 2);
+    const key2 = await importKey(sub2Id, 50);
+
+    let dLeft = h.dataOf<DeviceWire>(
+      await h.createDevice({ deviceType: 'LAP', hostname: 'LAP-DEAD-1', os: 'Windows 11' }).expect(201),
+    ).id;
+    let dRight = h.dataOf<DeviceWire>(
+      await h.createDevice({ deviceType: 'LAP', hostname: 'LAP-DEAD-2', os: 'Windows 11' }).expect(201),
+    ).id;
+
+    let actLeft = h.dataOf<OpenedActivationWire>(
+      await h.activateDevice(dLeft, { planId, licenseKeyId: key1 }).expect(201),
+    ).activation.id;
+    let actRight = h.dataOf<OpenedActivationWire>(
+      await h.activateDevice(dRight, { planId: plan2Id, licenseKeyId: key2 }).expect(201),
+    ).activation.id;
+
+    for (let i = 0; i < 20; i += 1) {
+      const [m1, m2] = await Promise.all([moveActivation(actLeft, dRight), moveActivation(actRight, dLeft)]);
+      expect(m1.status).toBe(201);
+      expect(m2.status).toBe(201);
+      actLeft = h.dataOf<OpenedActivationWire>(m1).activation.id;
+      actRight = h.dataOf<OpenedActivationWire>(m2).activation.id;
+      const tmp = dLeft;
+      dLeft = dRight;
+      dRight = tmp;
+    }
   });
 });

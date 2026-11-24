@@ -48,6 +48,37 @@ export interface OpenActivationInput {
   by: ActivationActor;
 }
 
+export interface CloseActivationInput {
+  activationId: string;
+  cause: 'DEACTIVATED';
+  licenseRelease?: DeviceLicenseRelease | undefined;
+  on: BusinessDate;
+  at?: Date;
+  by: ActivationActor;
+}
+
+export interface MoveActivationInput {
+  activationId: string;
+  targetDeviceId: string;
+  on: BusinessDate;
+  at?: Date;
+  by: ActivationActor;
+}
+
+export interface DeviceActivationDecisionInput {
+  activationId: string;
+  licenseRelease?: DeviceLicenseRelease | undefined;
+}
+
+export interface CloseAllDeviceActivationsInput {
+  deviceId: string;
+  cause: 'DEVICE_DISPOSED' | 'DEVICE_LOST' | 'DEVICE_VOIDED';
+  decisions?: readonly DeviceActivationDecisionInput[] | undefined;
+  on: BusinessDate;
+  at?: Date;
+  by: ActivationActor;
+}
+
 export interface ActivationPageFilter {
   organizationId: string;
   deviceIds?: readonly string[] | undefined;

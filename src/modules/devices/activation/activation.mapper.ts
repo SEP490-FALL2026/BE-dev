@@ -1,4 +1,6 @@
+import type { SeatTarget } from '../../catalog/public/catalog.types';
 import type { LicensingDeviceActivationApi } from '../../licensing/public/licensing-device-activation.api';
+import type { DeviceActivationDeviceSummary } from '../registry/registry-query.repo';
 
 type OpenedActivation = Awaited<ReturnType<LicensingDeviceActivationApi['open']>>;
 type ActivationRecord = OpenedActivation['activation'];
@@ -25,12 +27,50 @@ export function toDeviceActivationDto(record: ActivationRecord) {
   };
 }
 
-/** Formats the result of opening a device activation for HTTP 201 responses. */
+/** Formats the result of opening or moving a device activation for HTTP 201 responses. */
 export function toOpenedDeviceActivationDto(opened: OpenedActivation) {
   return {
     activation: toDeviceActivationDto(opened.activation),
     activationsUsed: opened.activationsUsed,
     maxActivations: opened.maxActivations,
     overActivationCap: opened.overActivationCap,
+  };
+}
+
+/** Formats one enriched machine activation item for `GET /device-activations`. */
+export function toDeviceActivationListItemDto(
+  record: ActivationRecord,
+  device: DeviceActivationDeviceSummary,
+  plan: SeatTarget,
+) {
+  return {
+    id: record.id,
+    device: {
+      id: device.id,
+      assetCode: device.assetCode,
+      custody: device.custody,
+      condition: device.condition,
+    },
+    plan: {
+      id: plan.planId,
+      name: plan.planName,
+      keyBinding: plan.keyBinding as 'DEVICE_KEY' | 'DEVICE_BUNDLED',
+    },
+    application: {
+      id: plan.applicationId,
+      name: plan.applicationName,
+    },
+    licenseKey:
+      record.licenseKeyId && record.keyMasked !== null
+        ? { id: record.licenseKeyId, masked: record.keyMasked, withdrawn: record.keyWithdrawn }
+        : null,
+    lotId: record.subscriptionId,
+    origin: record.origin,
+    activatedOn: record.activatedOn,
+    deactivatedOn: record.deactivatedOn,
+    endCause: record.endCause,
+    licenseReleased: record.licenseReleased,
+    overActivationCap: record.overActivationCap,
+    needsKeyReplacement: record.deactivatedAt === null && record.keyWithdrawn,
   };
 }

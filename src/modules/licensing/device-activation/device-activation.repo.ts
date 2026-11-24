@@ -7,6 +7,7 @@ import type {
   ActivationPageFilter,
   ActivationPageResult,
   ActivationRecord,
+  DeviceActivationEndCause,
   DeviceActivationOrigin,
 } from './device-activation.types';
 
@@ -180,6 +181,56 @@ export class DeviceActivationRepo {
     return row ? toActivationRecord(row) : null;
   }
 
+  /** Locks one activation row `FOR UPDATE` (tier 8) after any subscription/key locks are held. */
+  async lockById(tx: DbTx, id: string): Promise<ActivationRecord | null> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM device_activations WHERE id = ${id}::uuid FOR UPDATE`;
+
+    return locked.length === 0 ? null : this.findById(id, tx);
+  }
+
+  /** Locks all open activations of a device in ascending `id` order `FOR UPDATE`. */
+  async lockOpenOfDevice(tx: DbTx, deviceId: string): Promise<ActivationRecord[]> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM device_activations
+       WHERE device_id = ${deviceId}::uuid AND deactivated_at IS NULL
+       ORDER BY id ASC FOR UPDATE`;
+    if (locked.length === 0) return [];
+    const rows = await tx.deviceActivation.findMany({
+      where: { deviceId, deactivatedAt: null },
+      orderBy: [{ activatedAt: 'asc' }, { id: 'asc' }],
+      select: ACTIVATION_SELECT,
+    });
+
+    return rows.map(toActivationRecord);
+  }
+
+  async close(
+    tx: DbTx,
+    id: string,
+    data: {
+      deactivatedOn: BusinessDate;
+      deactivatedAt: Date;
+      endCause: DeviceActivationEndCause;
+      licenseReleased: boolean | null;
+      closedByAppUserId: string;
+    },
+  ): Promise<ActivationRecord> {
+    const row = await tx.deviceActivation.update({
+      where: { id },
+      data: {
+        deactivatedOn: toDateColumn(data.deactivatedOn),
+        deactivatedAt: data.deactivatedAt,
+        endCause: data.endCause,
+        licenseReleased: data.licenseReleased,
+        closedByAppUserId: data.closedByAppUserId,
+      },
+      select: ACTIVATION_SELECT,
+    });
+
+    return toActivationRecord(row);
+  }
+
   async openOfDevice(deviceId: string, tx?: DbTx): Promise<ActivationRecord[]> {
     const rows = await (tx ?? this.prisma).deviceActivation.findMany({
       where: { deviceId, deactivatedAt: null },
@@ -212,7 +263,12 @@ export class DeviceActivationRepo {
       ...(filter.licenseKeyId ? { licenseKeyId: filter.licenseKeyId } : {}),
       ...(filter.state === 'OPEN' ? { deactivatedAt: null } : {}),
       ...(filter.state === 'CLOSED' ? { deactivatedAt: { not: null } } : {}),
-      ...(filter.needsKeyReplacement ? { deactivatedAt: null, licenseKey: { withdrawnAt: { not: null } } } : {}),
+      ...(filter.needsKeyReplacement === true
+        ? { deactivatedAt: null, licenseKey: { withdrawnAt: { not: null } } }
+        : {}),
+      ...(filter.needsKeyReplacement === false
+        ? { OR: [{ deactivatedAt: { not: null } }, { licenseKeyId: null }, { licenseKey: { withdrawnAt: null } }] }
+        : {}),
     };
     const run = async (client: DbTx | PrismaService) => {
       const rows = await client.deviceActivation.findMany({

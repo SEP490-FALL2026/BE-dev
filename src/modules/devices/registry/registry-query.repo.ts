@@ -5,8 +5,15 @@ import { escapeLikePattern, searchKey } from '../../../core/search-key';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { AssetDeviceType } from '../asset-code/asset-code.policy';
 import type { CollectionState } from '../devices-collection-state.policy';
-import type { DeviceCondition } from '../devices-custody.policy';
+import type { DeviceCondition, DeviceCustody } from '../devices-custody.policy';
 import type { DeviceRegistrationEndCause } from '../public/devices.types';
+
+export interface DeviceActivationDeviceSummary {
+  id: string;
+  assetCode: string;
+  custody: DeviceCustody;
+  condition: DeviceCondition;
+}
 
 /** One machine as the register lists it: the machine and the registration open on it, if any. */
 export interface DeviceSummaryRow {
@@ -270,6 +277,36 @@ export class RegistryQueryRepo {
       conditionNote: device?.conditionNote ?? null,
       voidReason: device?.voidReason ?? null,
     };
+  }
+
+  /** Returns matching machine IDs filtered by idle status (`IN_STOCK` excluding `AWAITING_RETURN`, or `IN_REPAIR`/`BROKEN`). */
+  async findDeviceIdsByIdle(organizationId: string, idle: boolean, deviceId?: string): Promise<string[]> {
+    const deviceClause = deviceId ? Prisma.sql`AND d.id = ${deviceId}::uuid` : Prisma.empty;
+    const idleExpr = Prisma.sql`(d.voided_at IS NULL AND d.retired_at IS NULL AND ((r.id IS NULL AND NOT ${OPEN_RETURN_TASK_SQL}) OR d.condition IN ('IN_REPAIR'::"DeviceCondition", 'BROKEN'::"DeviceCondition")))`;
+    const matchExpr = idle ? idleExpr : Prisma.sql`NOT ${idleExpr}`;
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT d.id
+        FROM managed_devices d
+        LEFT JOIN device_registrations r ON r.device_id = d.id AND r.ended_at IS NULL
+       WHERE d.organization_id = ${organizationId}::uuid
+         ${deviceClause}
+         AND ${matchExpr}`;
+
+    return rows.map((row) => row.id);
+  }
+
+  /** Reads custody and condition summaries for a batch of machine IDs in one query. */
+  async findDeviceSummariesByIds(ids: readonly string[]): Promise<Map<string, DeviceActivationDeviceSummary>> {
+    const map = new Map<string, DeviceActivationDeviceSummary>();
+    if (ids.length === 0) return map;
+    const rows = await this.prisma.$queryRaw<DeviceActivationDeviceSummary[]>`
+      SELECT d.id, d.asset_code AS "assetCode", d.condition, ${CUSTODY_SQL} AS custody
+        FROM managed_devices d
+        LEFT JOIN device_registrations r ON r.device_id = d.id AND r.ended_at IS NULL
+       WHERE d.id = ANY(${[...new Set(ids)]}::uuid[])`;
+    for (const row of rows) map.set(row.id, row);
+
+    return map;
   }
 }
 

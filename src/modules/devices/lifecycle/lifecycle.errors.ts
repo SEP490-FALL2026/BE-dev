@@ -53,3 +53,10 @@ export class DeviceConditionUnchangedError extends Error {
     this.name = 'DeviceConditionUnchangedError';
   }
 }
+
+export class DeviceSameDeviceError extends Error {
+  constructor() {
+    super('The target machine must differ from the source machine.');
+    this.name = 'DeviceSameDeviceError';
+  }
+}
