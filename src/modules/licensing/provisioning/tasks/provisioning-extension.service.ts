@@ -6,6 +6,7 @@ import { IdentityAccessApi } from '../../../identity-access/public/identity-acce
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
 import { OperatingParametersApi } from '../../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../../organization/public/organization.errors';
 import { licensingAuditEvent } from '../../licensing-audit-event.mapper';
 import { maxAttempts as maxAttemptsFor } from '../failure.policy';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
@@ -36,6 +37,13 @@ export class ProvisioningExtensionService {
     const deptId = (await this.organizationReads.workDepartmentsOf([input.holderEmployeeId], today, tx)).get(
       input.holderEmployeeId,
     );
+    if (deptId === undefined) {
+      if (
+        (await this.organizationReads.notStartedAmong([input.holderEmployeeId], today, tx)).has(input.holderEmployeeId)
+      ) {
+        throw new EmployeeNotStartedError(input.holderEmployeeId);
+      }
+    }
     const defaultResponsibleEmployeeId = deptId
       ? ((
           await this.organizationReads.itAdminsActingFor(

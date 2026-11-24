@@ -1,5 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import {
   AccessRequestPlanBoundToDeviceError,
   AccessRequestTermRefusedError,
@@ -51,5 +52,12 @@ describe('ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE details', () => {
 
     expect(mapped.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
     expect(mapped.body.code).toBe('ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE');
+  });
+
+  it('maps EmployeeNotStartedError to 409 EMPLOYEE.NOT_STARTED', () => {
+    const mapped = answerOf(new EmployeeNotStartedError('e-1'));
+
+    expect(mapped.status).toBe(HttpStatus.CONFLICT);
+    expect(mapped.body.code).toBe('EMPLOYEE.NOT_STARTED');
   });
 });

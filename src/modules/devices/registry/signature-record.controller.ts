@@ -109,8 +109,13 @@ export class SignatureRecordController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The registration has ended (DEVICE_REGISTRATION.ENDED), collector installation is already enabled (DEVICE_REGISTRATION.COLLECTOR_ALREADY_INSTALLED), or the holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING).',
-      examples: [EXAMPLES.REGISTRATION_ENDED, EXAMPLES.COLLECTOR_ALREADY_INSTALLED, EXAMPLES.HOLDER_NOT_WORKING],
+        'The registration has ended (DEVICE_REGISTRATION.ENDED), collector installation is already enabled (DEVICE_REGISTRATION.COLLECTOR_ALREADY_INSTALLED), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING).',
+      examples: [
+        EXAMPLES.REGISTRATION_ENDED,
+        EXAMPLES.COLLECTOR_ALREADY_INSTALLED,
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
+        EXAMPLES.HOLDER_NOT_WORKING,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

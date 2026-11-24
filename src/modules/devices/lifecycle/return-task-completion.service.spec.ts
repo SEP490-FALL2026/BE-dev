@@ -1,7 +1,10 @@
+import { HttpStatus } from '@nestjs/common';
 import type { TransactionRunner, DbTx } from '../../../infrastructure/database/transaction-runner';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { unplacedWorkKey } from '../../organization/public/organization.types';
 import type { RegistryRepo } from '../registry/registry.repo';
@@ -11,6 +14,7 @@ import {
   DeviceReturnTaskOutcomeFieldsInvalidError,
   DeviceReturnTaskSoftwareRemovalNoteRequiredError,
 } from '../return-task/device-return-task.errors';
+import { toDeviceReturnTaskApiException } from '../return-task/device-return-task.http-errors';
 import type { DeviceReturnTaskRepo } from '../return-task/device-return-task.repo';
 import type { ReturnTaskRecord } from '../return-task/device-return-task.types';
 import type { DeviceReceiptService } from './device-receipt.service';
@@ -49,7 +53,12 @@ const actor = (employeeId = 'it-1'): AuthenticatedPrincipal =>
 
 function setup(
   task: ReturnTaskRecord | null = taskRow(),
-  options: { inCharge?: string | null; substitute?: string | null; unplacedDesignee?: string | null } = {},
+  options: {
+    inCharge?: string | null;
+    substitute?: string | null;
+    unplacedDesignee?: string | null;
+    notStartedIds?: string[];
+  } = {},
 ) {
   const tx = {} as DbTx;
   const markReceived = jest.fn().mockResolvedValue(undefined);
@@ -74,6 +83,7 @@ function setup(
   const actors = [inCharge, substitute].filter((id): id is string => id !== null);
   const organizationReads = {
     businessToday: jest.fn().mockResolvedValue('2026-11-25'),
+    notStartedAmong: jest.fn().mockResolvedValue(new Set(options.notStartedIds ?? [])),
     itAdminsActingFor: jest.fn().mockResolvedValue(new Map([['dept-1', { inCharge, substitute, actors }]])),
     itAdminsActingForUnplacedWork: jest
       .fn()
@@ -246,5 +256,24 @@ describe('ReturnTaskCompletionService', () => {
         now,
       ),
     ).rejects.toBeInstanceOf(DeviceReturnTaskNotInChargeError);
+  });
+
+  it('rejects completing a return task for a future-placed employee with EmployeeNotStartedError (409 EMPLOYEE.NOT_STARTED)', async () => {
+    const now = new Date('2026-11-25T10:00:00.000Z');
+    const unplaced = taskRow({ departmentId: null, employeeId: 'emp-future' });
+    const future = setup(unplaced, { notStartedIds: ['emp-future'] });
+    const err = await future.service
+      .complete(
+        actor('it-1'),
+        'task-1',
+        { outcome: 'RECEIVED', condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } },
+        now,
+      )
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(EmployeeNotStartedError);
+    const mapped = toDeviceReturnTaskApiException(err) as ApiException;
+    expect(mapped.getStatus()).toBe(HttpStatus.CONFLICT);
+    expect(mapped.getResponse()).toMatchObject({ code: 'EMPLOYEE.NOT_STARTED' });
   });
 });

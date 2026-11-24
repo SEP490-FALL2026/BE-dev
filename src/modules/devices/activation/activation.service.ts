@@ -205,6 +205,7 @@ export class DeviceActivationCommandService {
         {
           actorEmployeeId: actor.employeeId,
           departmentId: state.returnTask.departmentId,
+          today,
           returnTaskId: state.returnTask.id,
           returnTaskEmployeeId: state.returnTask.employeeId,
         },

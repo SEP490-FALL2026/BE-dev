@@ -6,7 +6,7 @@ import {
   RequestPartyIneligibleError,
   requestPartyRefusalBody,
 } from '../../identity-access/public/request-party.errors';
-import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
+import { EmployeeNotFoundError, EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import {
   AssignmentConflictError,
   GrantRequestRefusedError,
@@ -81,6 +81,7 @@ export function toProvisioningApiException(error: unknown): unknown {
     return refuse(CONFLICT, code, error.message);
   }
   if (error instanceof EmployeeNotFoundError) return refuse(HttpStatus.NOT_FOUND, 'EMPLOYEE.NOT_FOUND', error.message);
+  if (error instanceof EmployeeNotStartedError) return refuse(CONFLICT, 'EMPLOYEE.NOT_STARTED', error.message);
   if (error instanceof ProvisioningTypeNotSupportedError) {
     return refuse(CONFLICT, 'PROVISIONING.TYPE_NOT_SUPPORTED', error.message, {
       provisioningType: error.provisioningType,
@@ -277,6 +278,7 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   KEY_WITHDRAWN: example(new LicenseKeyStateError('WITHDRAWN')),
   KEY_SUBSCRIPTION_MISMATCH: example(new LicenseKeyStateError('SUBSCRIPTION_MISMATCH')),
   PLAN_BOUND_TO_DEVICE: example(new ProvisioningPlanBoundToDeviceError()),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
 } as const;
 
 /** The refusals of the grant of a seat, by status, after the request gate of G5 (`US-07-01`). */
@@ -300,6 +302,7 @@ export const PROVISIONING_GRANT_EXAMPLES = {
     example(new AssignmentConflictError('SEAT_CAPACITY', 0, 2)),
     example(new PurchaseNotAllowedError(2, ['<subscription-id>'])),
     example(new ProvisioningPlanBoundToDeviceError()),
+    example(new EmployeeNotStartedError()),
   ],
   UNPROCESSABLE: [
     example(new GrantRequestRefusedError('BENEFICIARY_REQUIRED')),

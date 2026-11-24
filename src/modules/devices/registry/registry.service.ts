@@ -13,6 +13,7 @@ import {
   DeviceActivationPlanNotFoundError,
 } from '../../licensing/public/licensing-device-activation.errors';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import type { AssetDeviceType } from '../asset-code/asset-code.policy';
 import { AssetCodeService } from '../asset-code/asset-code.service';
 import { byUser, devicesEvent } from '../devices-audit-event.mapper';
@@ -214,6 +215,9 @@ export class RegistryService {
     const departmentId =
       (await this.organizationReads.workDepartmentsOf([holder.id], dates.today, tx)).get(holder.id) ?? null;
     if (!departmentId) {
+      if ((await this.organizationReads.notStartedAmong([holder.id], dates.today, tx)).has(holder.id)) {
+        throw new EmployeeNotStartedError(holder.id);
+      }
       const verdict = judgeDeviceActor({
         holderDepartmentId: null,
         recipientDepartmentId: null,

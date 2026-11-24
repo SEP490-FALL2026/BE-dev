@@ -31,9 +31,10 @@ const INITIAL_RECORD_ERRORS = [
   {
     status: HttpStatus.CONFLICT,
     description:
-      'The initialization phase is closed (DEVICE.INITIALIZATION_CLOSED), a conflict occurred on the holder, serial number, asset code, registration, or an initial activation could not be opened on the lot or key.',
+      'The initialization phase is closed (DEVICE.INITIALIZATION_CLOSED), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), a conflict occurred on the holder, serial number, asset code, registration, or an initial activation could not be opened on the lot or key.',
     examples: [
       INITIAL_RECORD_ERROR_EXAMPLES.INITIALIZATION_CLOSED,
+      REGISTRY_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
       REGISTRY_ERROR_EXAMPLES.ASSET_CODE_EXHAUSTED,
       REGISTRY_ERROR_EXAMPLES.ASSET_CODE_TAKEN,
       REGISTRY_ERROR_EXAMPLES.HOLDER_NOT_WORKING,

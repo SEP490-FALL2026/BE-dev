@@ -93,11 +93,12 @@ export class ExpiryController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The right was ended already (ASSIGNMENT_EXPIRY.NOT_OPEN), its end day has not passed (ASSIGNMENT_EXPIRY.NOT_EXPIRED), a renewal sent in time waits for its decision (ASSIGNMENT_EXPIRY.RENEWAL_PENDING), or the revocation gate refuses the kind of grant (REVOCATION.TYPE_NOT_SUPPORTED). Nothing is written.',
+        'The right was ended already (ASSIGNMENT_EXPIRY.NOT_OPEN), its end day has not passed (ASSIGNMENT_EXPIRY.NOT_EXPIRED), a renewal sent in time waits for its decision (ASSIGNMENT_EXPIRY.RENEWAL_PENDING), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the revocation gate refuses the kind of grant (REVOCATION.TYPE_NOT_SUPPORTED). Nothing is written.',
       examples: [
         EXAMPLES.NOT_OPEN,
         EXAMPLES.NOT_EXPIRED,
         EXAMPLES.RENEWAL_PENDING,
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
         EXAMPLES.REVOCATION_TYPE_NOT_SUPPORTED,
       ],
     },

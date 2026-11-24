@@ -63,6 +63,7 @@ describe('ProvisioningExtensionService (defaultAssignee & unplaced notice)', () 
         businessToday: jest.fn().mockResolvedValue('2026-11-23'),
         workDepartmentsOf: jest.fn().mockResolvedValue(new Map()),
         itAdminsActingFor: jest.fn(),
+        notStartedAmong: jest.fn().mockResolvedValue(new Set()),
         unplacedAmong: jest.fn().mockResolvedValue(new Set(['emp-unplaced'])),
       } as unknown as OrganizationReadApi,
       {
@@ -89,5 +90,41 @@ describe('ProvisioningExtensionService (defaultAssignee & unplaced notice)', () 
       params: { workKind: 'PROVISIONING_TASK', workId: 'task-ext-unplaced', employeeId: 'emp-unplaced' },
       eventKey: 'unplacedWork:PROVISIONING_TASK:task-ext-unplaced',
     });
+  });
+
+  it('rejects opening an extension task with EmployeeNotStartedError when holder only has a future placement', async () => {
+    const { EmployeeNotStartedError } = await import('../../../organization/public/organization.errors');
+    const tx = { name: 'tx' } as unknown as DbTx;
+    const insert = jest.fn();
+    const notifyInApp = jest.fn();
+    const service = new ProvisioningExtensionService(
+      { insert } as unknown as ProvisioningTaskRepo,
+      {
+        getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }),
+        businessToday: jest.fn().mockResolvedValue('2026-11-23'),
+        workDepartmentsOf: jest.fn().mockResolvedValue(new Map()),
+        itAdminsActingFor: jest.fn(),
+        notStartedAmong: jest.fn().mockResolvedValue(new Set(['emp-future'])),
+        unplacedAmong: jest.fn(),
+      } as unknown as OrganizationReadApi,
+      {
+        findUsableItAdminEmployeeIds: jest.fn(),
+        findUsableSuperAdminEmployeeId: jest.fn(),
+      } as unknown as IdentityAccessApi,
+      { getValue: jest.fn().mockResolvedValue('3') } as unknown as OperatingParametersApi,
+      { record: jest.fn() } as unknown as AuditApi,
+      { notifyInApp } as unknown as NotificationsApi,
+    );
+
+    await expect(
+      service.open(tx, { appUserId: 'app-1' } as AuthenticatedPrincipal, {
+        assignmentId: 'asg-1',
+        holderEmployeeId: 'emp-future',
+        requestId: 'req-1',
+        now: new Date('2026-11-23T00:00:00Z'),
+      }),
+    ).rejects.toBeInstanceOf(EmployeeNotStartedError);
+    expect(insert).not.toHaveBeenCalled();
+    expect(notifyInApp).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,10 @@
+import { HttpStatus } from '@nestjs/common';
 import type { TransactionRunner, DbTx } from '../../../infrastructure/database/transaction-runner';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { DeviceNotFoundError, DeviceNotInChargeError } from '../public/devices.errors';
 import type { RegistrationEndService } from '../registry/registration-end.service';
@@ -13,6 +16,7 @@ import {
 } from '../registry/registry.errors';
 import type { DeviceRecord, RegistrationRecord, RegistryRepo } from '../registry/registry.repo';
 import { HolderChangeService } from './holder-change.service';
+import { toLifecycleApiException } from './lifecycle.http-errors';
 import {
   DeviceAwaitingReturnError,
   DeviceNotUsableError,
@@ -32,6 +36,7 @@ interface SetupOptions {
     hireDate: string;
   } | null;
   workDepartments?: Map<string, string | null>;
+  notStartedIds?: string[];
   actingByDepartment?: Map<string, { inCharge: string | null; substitute: string | null; actors: string[] }>;
 }
 
@@ -107,6 +112,7 @@ describe('HolderChangeService', () => {
       lockEmployeeForShare: jest.fn().mockResolvedValue(undefined),
       businessToday: jest.fn().mockResolvedValue('2026-11-24'),
       workDepartmentsOf: jest.fn().mockResolvedValue(options.workDepartments ?? new Map([['emp-new', 'dept-new']])),
+      notStartedAmong: jest.fn().mockResolvedValue(new Set(options.notStartedIds ?? [])),
       itAdminsActingFor: jest
         .fn()
         .mockResolvedValue(
@@ -342,5 +348,21 @@ describe('HolderChangeService', () => {
       now,
     );
     expect(firstAuditAfter(bothCovered.audit)).toMatchObject({ bySubstitute: true });
+  });
+
+  it('rejects assigning a device to a future-placed recipient with EmployeeNotStartedError (409 EMPLOYEE.NOT_STARTED)', async () => {
+    const future = setup({
+      workDepartments: new Map([['emp-new', null]]),
+      notStartedIds: ['emp-new'],
+      actingByDepartment: new Map(),
+    });
+    const err = await future.service
+      .changeHolder(actor('it-1'), 'dev-1', { holderEmployeeId: 'emp-new', collectorInstalled: true }, now)
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(EmployeeNotStartedError);
+    const mapped = toLifecycleApiException(err) as ApiException;
+    expect(mapped.getStatus()).toBe(HttpStatus.CONFLICT);
+    expect(mapped.getResponse()).toMatchObject({ code: 'EMPLOYEE.NOT_STARTED' });
   });
 });

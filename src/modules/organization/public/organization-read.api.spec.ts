@@ -7,6 +7,7 @@ import type { OrganizationContextService } from '../organization-context.service
 import type { OrganizationRepo } from '../organization.repo';
 import type { UnplacedWorkDesignationRepo } from '../unplaced-work-designation/unplaced-work-designation.repo';
 import { OrganizationReadApi } from './organization-read.api';
+import { EmployeeNotStartedError } from './organization.errors';
 import { unplacedWorkKey } from './organization.types';
 
 describe('OrganizationReadApi tx forwarding', () => {
@@ -47,6 +48,7 @@ describe('OrganizationReadApi tx forwarding', () => {
     const employees = {
       workDepartmentsOf: jest.fn().mockResolvedValue(new Map([['emp-1', 'dept-1']])),
       employeeIdsOfWorkDepartments: jest.fn().mockResolvedValue(['emp-1']),
+      notStartedAmong: jest.fn().mockResolvedValue(new Set()),
     };
     const context = {
       businessToday: jest.fn().mockResolvedValue('2026-11-23'),
@@ -224,5 +226,26 @@ describe('OrganizationReadApi tx forwarding', () => {
       },
     ]);
     expect(unplacedWorkDesignations.listActiveForUnplacedEmployees).toHaveBeenCalledWith(tx);
+  });
+
+  it('forwards notStartedAmong with explicit or default businessToday and asserts in assertStartedInDepartment', async () => {
+    const { api, employees, context } = makeApi();
+    employees.notStartedAmong.mockResolvedValueOnce(new Set(['emp-future']));
+
+    expect(await api.notStartedAmong([], undefined, tx)).toEqual(new Set());
+    expect(context.businessToday).not.toHaveBeenCalled();
+
+    expect(await api.notStartedAmong(['emp-future'], undefined, tx)).toEqual(new Set(['emp-future']));
+    expect(context.businessToday).toHaveBeenCalledWith(expect.any(Date), tx);
+    expect(employees.notStartedAmong).toHaveBeenCalledWith(['emp-future'], '2026-11-23', tx);
+
+    employees.notStartedAmong.mockResolvedValueOnce(new Set(['emp-2']));
+    await expect(api.assertStartedInDepartment(['emp-1', 'emp-2'], '2026-11-24', tx)).rejects.toThrow(
+      EmployeeNotStartedError,
+    );
+    expect(employees.notStartedAmong).toHaveBeenLastCalledWith(['emp-1', 'emp-2'], '2026-11-24', tx);
+
+    employees.notStartedAmong.mockResolvedValueOnce(new Set());
+    await expect(api.assertStartedInDepartment(['emp-1'], '2026-11-24', tx)).resolves.toBeUndefined();
   });
 });

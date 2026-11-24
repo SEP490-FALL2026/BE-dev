@@ -78,6 +78,7 @@ export class ReturnTaskCompletionService {
     if (!task) throw new DeviceReturnTaskNotFoundError();
     if (task.state !== 'OPEN') throw new DeviceReturnTaskAlreadyClosedError();
 
+    const today = await this.organizationReads.businessToday(now, tx);
     const bySubstitute = await requireReturnTaskActor(
       tx,
       { organizationReads: this.organizationReads, identity: this.identity },
@@ -86,9 +87,9 @@ export class ReturnTaskCompletionService {
         departmentId: task.departmentId,
         taskEmployeeId: task.employeeId,
         taskId: task.id,
+        today,
       },
     );
-    const today = await this.organizationReads.businessToday(now, tx);
 
     if (input.outcome === 'RECEIVED') {
       await this.completeReceived(tx, actor, task, open, input, now, bySubstitute);

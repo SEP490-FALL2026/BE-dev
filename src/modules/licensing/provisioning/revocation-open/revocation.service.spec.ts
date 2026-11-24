@@ -124,6 +124,7 @@ describe('RevocationTaskFactory (unplaced work waiting notice)', () => {
         businessToday: jest.fn().mockResolvedValue('2026-11-23'),
         workDepartmentsOf: jest.fn().mockResolvedValue(new Map()),
         itAdminsActingFor: jest.fn(),
+        notStartedAmong: jest.fn().mockResolvedValue(new Set()),
         unplacedAmong: jest.fn().mockResolvedValue(new Set(['emp-unplaced'])),
       } as unknown as OrganizationReadApi,
       {
@@ -177,6 +178,39 @@ describe('RevocationTaskFactory (unplaced work waiting notice)', () => {
       now: new Date('2026-11-23T00:00:00Z'),
     });
 
+    expect(notifyInApp).not.toHaveBeenCalled();
+  });
+
+  it('rejects creating a revocation task with EmployeeNotStartedError when the employee only has a future placement', async () => {
+    const { EmployeeNotStartedError } = await import('../../../organization/public/organization.errors');
+    const insertRevocation = jest.fn();
+    const notifyInApp = jest.fn();
+    const factory = new RevocationTaskFactory(
+      { insertRevocation } as unknown as ProvisioningTaskRepo,
+      {
+        businessToday: jest.fn().mockResolvedValue('2026-11-23'),
+        workDepartmentsOf: jest.fn().mockResolvedValue(new Map()),
+        itAdminsActingFor: jest.fn(),
+        notStartedAmong: jest.fn().mockResolvedValue(new Set(['emp-future'])),
+        unplacedAmong: jest.fn(),
+      } as unknown as OrganizationReadApi,
+      {
+        findUsableItAdminEmployeeIds: jest.fn(),
+        findUsableSuperAdminEmployeeId: jest.fn(),
+      } as unknown as IdentityAccessApi,
+      { getValue: jest.fn().mockResolvedValue('3') } as unknown as OperatingParametersApi,
+      { notifyInApp } as unknown as NotificationsApi,
+    );
+
+    await expect(
+      factory.create(tx, actor, {
+        organizationId: 'org-1',
+        assignment: { id: 'asg-1', employeeId: 'emp-future' },
+        source: 'DEPARTURE',
+        now: new Date('2026-11-23T00:00:00Z'),
+      }),
+    ).rejects.toBeInstanceOf(EmployeeNotStartedError);
+    expect(insertRevocation).not.toHaveBeenCalled();
     expect(notifyInApp).not.toHaveBeenCalled();
   });
 });

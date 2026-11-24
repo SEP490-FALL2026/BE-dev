@@ -74,9 +74,10 @@ export class AccessRequestsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE) or the sender already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS, with the seat in details). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01e).',
+        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender has not started working in a department yet (EMPLOYEE.NOT_STARTED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE) or the sender already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS, with the seat in details). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01e).',
       examples: [
         EXAMPLES.APPLICATION_RETIRED,
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
         EXAMPLES.NO_DEPARTMENT,
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
         EXAMPLES.ALREADY_HOLDS_ACCESS,
@@ -120,8 +121,13 @@ export class AccessRequestsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
-      examples: [EXAMPLES.APPLICATION_RETIRED, EXAMPLES.NO_DEPARTMENT, EXAMPLES.FINANCE_SETUP_INCOMPLETE],
+        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the caller has not started working in a department yet (EMPLOYEE.NOT_STARTED), the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
+      examples: [
+        EXAMPLES.APPLICATION_RETIRED,
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
+        EXAMPLES.NO_DEPARTMENT,
+        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

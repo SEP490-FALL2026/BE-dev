@@ -4,6 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { byUser, devicesEvent } from '../devices-audit-event.mapper';
 import { RegistryRepo } from '../registry/registry.repo';
@@ -104,6 +105,9 @@ export class StopRequestCompletionService {
     const departmentId =
       (await this.organizationReads.workDepartmentsOf([holderEmployeeId], today, tx)).get(holderEmployeeId) ?? null;
     if (!departmentId) {
+      if ((await this.organizationReads.notStartedAmong([holderEmployeeId], today, tx)).has(holderEmployeeId)) {
+        throw new EmployeeNotStartedError(holderEmployeeId);
+      }
       const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
         [{ workKind: 'DEVICE', workId: deviceId, employeeId: holderEmployeeId }],
         (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),

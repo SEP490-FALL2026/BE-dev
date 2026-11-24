@@ -15,4 +15,8 @@ export class EmployeeWorkDepartmentService {
   employeeIdsOfWorkDepartments(departmentIds: readonly string[], today: BusinessDate, tx?: DbTx): Promise<string[]> {
     return this.repo.employeeIdsOfWorkDepartments(departmentIds, today, tx);
   }
+
+  notStartedAmong(employeeIds: readonly string[], today: BusinessDate, tx?: DbTx): Promise<Set<string>> {
+    return this.repo.notStartedAmong(employeeIds, today, tx);
+  }
 }

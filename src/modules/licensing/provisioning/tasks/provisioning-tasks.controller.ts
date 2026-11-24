@@ -93,7 +93,7 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED (the request was refused, withdrawn, cancelled or closed as failed; a request that was granted answers with its task instead, 201), REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED and RESPONSIBLE_NOT_IN_DEPARTMENT (only for a request for a service account kept from the earlier releases: its boundary was not accepted, or the person who answers for it left its department or the company), TYPE_NOT_SUPPORTED (K3), PLAN_BOUND_TO_DEVICE (the K4 plan moved from ACCOUNT to a device-bound mode after the Request was submitted), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).',
+        'PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED (the request was refused, withdrawn, cancelled or closed as failed; a request that was granted answers with its task instead, 201), REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED and RESPONSIBLE_NOT_IN_DEPARTMENT (only for a request for a service account kept from the earlier releases: its boundary was not accepted, or the person who answers for it left its department or the company), TYPE_NOT_SUPPORTED (K3), PLAN_BOUND_TO_DEVICE (the K4 plan moved from ACCOUNT to a device-bound mode after the Request was submitted), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), EMPLOYEE.NOT_STARTED (the beneficiary has not started working in a department yet), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).',
       examples: PROVISIONING_GRANT_EXAMPLES.CONFLICT,
     },
     {
@@ -172,12 +172,13 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken) or PROVISIONING.BENEFICIARY_DEPARTED (the person has left or is blocked by a departure, details.cause says which: close the request as cancelled; a task already being worked is not refused).',
+        'PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken), EMPLOYEE.NOT_STARTED (the beneficiary has not started working in a department yet), or PROVISIONING.BENEFICIARY_DEPARTED (the person has left or is blocked by a departure, details.cause says which: close the request as cancelled; a task already being worked is not refused).',
       examples: [
         PROVISIONING_ERROR_EXAMPLES.NOT_MANUAL,
         PROVISIONING_ERROR_EXAMPLES.NOT_CLAIMABLE,
         PROVISIONING_ERROR_EXAMPLES.NOT_BEFORE,
         PROVISIONING_ERROR_EXAMPLES.BENEFICIARY_DEPARTED,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
       ],
     },
     {
@@ -214,12 +215,13 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, IS_REVOCATION (a revocation is completed by its own route), or PROVISIONING.PLAN_BOUND_TO_DEVICE (the K4 plan moved from ACCOUNT to a device-bound mode); the key named is not free in the store (LICENSE_KEY.NOT_IN_STORE: another grant took it), was withdrawn from it (LICENSE_KEY.WITHDRAWN) or belongs to another purchase than the seat (LICENSE_KEY.SUBSCRIPTION_MISMATCH). Nothing is written.',
+        'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, IS_REVOCATION (a revocation is completed by its own route), PROVISIONING.PLAN_BOUND_TO_DEVICE (the K4 plan moved from ACCOUNT to a device-bound mode), or EMPLOYEE.NOT_STARTED (the beneficiary has not started working in a department yet); the key named is not free in the store (LICENSE_KEY.NOT_IN_STORE: another grant took it), was withdrawn from it (LICENSE_KEY.WITHDRAWN) or belongs to another purchase than the seat (LICENSE_KEY.SUBSCRIPTION_MISMATCH). Nothing is written.',
       examples: [
         PROVISIONING_ERROR_EXAMPLES.NOT_MANUAL,
         PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS,
         PROVISIONING_ERROR_EXAMPLES.IS_REVOCATION,
         PROVISIONING_ERROR_EXAMPLES.PLAN_BOUND_TO_DEVICE,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
         PROVISIONING_ERROR_EXAMPLES.KEY_NOT_IN_STORE,
         PROVISIONING_ERROR_EXAMPLES.KEY_WITHDRAWN,
         PROVISIONING_ERROR_EXAMPLES.KEY_SUBSCRIPTION_MISMATCH,
@@ -266,8 +268,12 @@ export class ProvisioningTasksController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: 'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_MANUAL, PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS],
+      description: 'PROVISIONING_TASK.NOT_MANUAL, NOT_IN_PROGRESS, or EMPLOYEE.NOT_STARTED.',
+      examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_MANUAL,
+        PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -302,8 +308,12 @@ export class ProvisioningTasksController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: 'The task is not failed (PROVISIONING_TASK.NOT_FAILED).',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.WITHDRAWAL_PENDING],
+      description: 'The task is not failed (PROVISIONING_TASK.NOT_FAILED), or EMPLOYEE.NOT_STARTED.',
+      examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_FAILED,
+        PROVISIONING_ERROR_EXAMPLES.WITHDRAWAL_PENDING,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -333,8 +343,13 @@ export class ProvisioningTasksController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: 'The task is not failed (NOT_FAILED) or is by hand already (PROVISIONING_TASK.ALREADY_MANUAL).',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.ALREADY_MANUAL],
+      description:
+        'The task is not failed (NOT_FAILED), is by hand already (PROVISIONING_TASK.ALREADY_MANUAL), or EMPLOYEE.NOT_STARTED.',
+      examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_FAILED,
+        PROVISIONING_ERROR_EXAMPLES.ALREADY_MANUAL,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -370,8 +385,13 @@ export class ProvisioningTasksController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: 'The task is not failed (PROVISIONING_TASK.NOT_FAILED), or its assignment is no longer open.',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.WITHDRAWAL_PENDING],
+      description:
+        'The task is not failed (PROVISIONING_TASK.NOT_FAILED), its assignment is no longer open, or EMPLOYEE.NOT_STARTED.',
+      examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_FAILED,
+        PROVISIONING_ERROR_EXAMPLES.WITHDRAWAL_PENDING,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -410,8 +430,12 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The task is not failed (PROVISIONING_TASK.NOT_FAILED; a revocation: not in progress or failed), or nothing was withdrawn (PROVISIONING_TASK.NO_WITHDRAWAL: its request was not withdrawn, or a reason still asks for the revocation): nothing changes.',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.NO_WITHDRAWAL],
+        'The task is not failed (PROVISIONING_TASK.NOT_FAILED; a revocation: not in progress or failed), nothing was withdrawn (PROVISIONING_TASK.NO_WITHDRAWAL: its request was not withdrawn, or a reason still asks for the revocation), or EMPLOYEE.NOT_STARTED: nothing changes.',
+      examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_FAILED,
+        PROVISIONING_ERROR_EXAMPLES.NO_WITHDRAWAL,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

@@ -81,3 +81,14 @@ export class PlacementDepartmentInactiveError extends Error {
     this.name = 'PlacementDepartmentInactiveError';
   }
 }
+
+/**
+ * Thrown when an employee only has future department placement(s) (`valid_from > today`) and has not started working
+ * in any department yet; callers map it to 409 `EMPLOYEE.NOT_STARTED`.
+ */
+export class EmployeeNotStartedError extends Error {
+  constructor(readonly employeeId?: string) {
+    super('The employee has not started working in a department yet.');
+    this.name = 'EmployeeNotStartedError';
+  }
+}

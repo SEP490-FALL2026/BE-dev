@@ -149,6 +149,10 @@ export class EmployeeRecordService {
     return this.workDepartments.employeeIdsOfWorkDepartments(departmentIds, today, tx);
   }
 
+  notStartedAmong(employeeIds: readonly string[], today: BusinessDate, tx?: DbTx): Promise<Set<string>> {
+    return this.workDepartments.notStartedAmong(employeeIds, today, tx);
+  }
+
   findManyByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {
     return this.repo.findEmployeesByCodes(employeeCodes, tx);
   }

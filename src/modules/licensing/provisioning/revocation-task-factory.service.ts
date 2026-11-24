@@ -5,6 +5,7 @@ import { IdentityAccessApi } from '../../identity-access/public/identity-access.
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { isSystemActor, type RevocationSource, type SystemActor } from '../public/licensing.types';
 import { maxAttempts as maxAttemptsFor } from './failure.policy';
 import type { ProvisioningTaskRecord } from './provisioning-task.types';
@@ -35,6 +36,15 @@ export class RevocationTaskFactory {
     const deptId = (await this.organizationReads.workDepartmentsOf([input.assignment.employeeId], today, tx)).get(
       input.assignment.employeeId,
     );
+    if (deptId === undefined) {
+      if (
+        (await this.organizationReads.notStartedAmong([input.assignment.employeeId], today, tx)).has(
+          input.assignment.employeeId,
+        )
+      ) {
+        throw new EmployeeNotStartedError(input.assignment.employeeId);
+      }
+    }
     const defaultResponsibleEmployeeId = deptId
       ? ((
           await this.organizationReads.itAdminsActingFor(

@@ -9,6 +9,7 @@ import type { SeatTarget } from '../../catalog/public/catalog.types';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { LicensingDeviceActivationApi } from '../../licensing/public/licensing-device-activation.api';
 import type { LicensingSeatBaselineApi } from '../../licensing/public/licensing-seat-baseline.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AssetCodeService } from '../asset-code/asset-code.service';
 import { DeviceNotInChargeError } from '../public/devices.errors';
@@ -55,6 +56,8 @@ describe('InitialRecordService (W2-13)', () => {
       initOpen?: boolean;
       today?: string;
       hireDate?: string;
+      departmentId?: string | null;
+      notStartedIds?: string[];
       inCharge?: string | null;
       substitute?: string | null;
       insertDeviceError?: Error;
@@ -110,7 +113,12 @@ describe('InitialRecordService (W2-13)', () => {
         order.push('lockEmployeeForShare');
         return Promise.resolve();
       }),
-      workDepartmentsOf: jest.fn().mockResolvedValue(new Map([['emp-1', 'dept-1']])),
+      workDepartmentsOf: jest
+        .fn()
+        .mockResolvedValue(
+          options.departmentId === null ? new Map() : new Map([['emp-1', options.departmentId ?? 'dept-1']]),
+        ),
+      notStartedAmong: jest.fn().mockResolvedValue(new Set(options.notStartedIds ?? [])),
       itAdminsActingFor: jest.fn().mockResolvedValue(
         new Map([
           [
@@ -329,5 +337,16 @@ describe('InitialRecordService (W2-13)', () => {
       .catch((e: unknown) => e);
     expect(nonBundled).toBeInstanceOf(DevicePlanNotBundledError);
     expectHttpError(nonBundled, HttpStatus.UNPROCESSABLE_ENTITY, 'DEVICE_ACTIVATION.PLAN_NOT_BUNDLED');
+
+    const future = await setup({ departmentId: null, notStartedIds: ['emp-1'] })
+      .service.create(actor(), {
+        deviceType: 'LAP',
+        hostname: 'H',
+        os: 'Win',
+        holderEmployeeId: 'emp-1',
+      })
+      .catch((e: unknown) => e);
+    expect(future).toBeInstanceOf(EmployeeNotStartedError);
+    expectHttpError(future, HttpStatus.CONFLICT, 'EMPLOYEE.NOT_STARTED');
   });
 });

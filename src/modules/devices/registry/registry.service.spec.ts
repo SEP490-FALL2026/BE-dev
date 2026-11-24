@@ -1,15 +1,19 @@
+import { HttpStatus } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import type { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { SeatTarget } from '../../catalog/public/catalog.types';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { LicensingDeviceActivationApi } from '../../licensing/public/licensing-device-activation.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AssetCodeService } from '../asset-code/asset-code.service';
 import { DeviceNotInChargeError } from '../public/devices.errors';
 import { DeviceHandoverWithoutHolderError, DevicePlanNotBundledError, DeviceSerialTakenError } from './registry.errors';
+import { toRegistryApiException } from './registry.http-errors';
 import type { RegistryRepo } from './registry.repo';
 import { RegistryService } from './registry.service';
 
@@ -31,6 +35,7 @@ describe('RegistryService device intake (W2-03, H17, org-timezone year)', () => 
     options: {
       today?: string;
       departmentId?: string | null;
+      notStartedIds?: string[];
       inCharge?: string | null;
       substitute?: string | null;
       insertDeviceError?: Error;
@@ -82,6 +87,7 @@ describe('RegistryService device intake (W2-03, H17, org-timezone year)', () => 
       }),
       lockEmployeeForShare: jest.fn().mockResolvedValue(undefined),
       workDepartmentsOf: jest.fn().mockResolvedValue(deptId ? new Map([['emp-1', deptId]]) : new Map()),
+      notStartedAmong: jest.fn().mockResolvedValue(new Set(options.notStartedIds ?? [])),
       itAdminsActingFor: jest.fn().mockResolvedValue(
         deptId
           ? new Map([
@@ -289,5 +295,22 @@ describe('RegistryService device intake (W2-03, H17, org-timezone year)', () => 
       collectorInstalled: true,
       bySubstitute: true,
     });
+  });
+
+  it('rejects assigning a device to a future-placed employee with EmployeeNotStartedError (409 EMPLOYEE.NOT_STARTED)', async () => {
+    const future = setup({ departmentId: null, notStartedIds: ['emp-1'] });
+    const err = await future.service
+      .create(actor('it-1'), {
+        deviceType: 'LAP',
+        hostname: 'H',
+        os: 'OS',
+        holderEmployeeId: 'emp-1',
+      })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(EmployeeNotStartedError);
+    const mapped = toRegistryApiException(err) as ApiException;
+    expect(mapped.getStatus()).toBe(HttpStatus.CONFLICT);
+    expect(mapped.getResponse()).toMatchObject({ code: 'EMPLOYEE.NOT_STARTED' });
   });
 });

@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { successorRequiredException, toPersonnelAccessApiException } from '../personnel-access.http-errors';
 import { OffboardingRefusedError } from './offboarding.errors';
 
@@ -85,6 +86,12 @@ const MESSAGES: Readonly<Record<string, string>> = {
  */
 export function toOffboardingApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  if (error instanceof EmployeeNotStartedError) {
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'EMPLOYEE.NOT_STARTED',
+      message: error.message,
+    });
+  }
   const refused = toPersonnelAccessApiException(error);
   if (refused) return refused;
   if (!(error instanceof OffboardingRefusedError)) return toUnavailableApiException(error) ?? error;
@@ -163,4 +170,5 @@ export const OFFBOARDING_ERROR_EXAMPLES = {
     new OffboardingRefusedError('PLACEMENT_OVERLAP', { reason: 'FIRST_PLACEMENT_PENDING', validFrom: '2026-01-01' }),
   ),
   CONCURRENT_CHANGE: example(new OffboardingRefusedError('CONCURRENT_CHANGE')),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
 } as const;

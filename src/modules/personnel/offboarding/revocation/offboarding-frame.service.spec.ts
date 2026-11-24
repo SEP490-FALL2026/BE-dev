@@ -1,4 +1,7 @@
+import { HttpStatus } from '@nestjs/common';
+import { ApiException } from '../../../../infrastructure/http/errors/api.exception';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
+import { EmployeeNotStartedError } from '../../../organization/public/organization.errors';
 import { unplacedWorkKey } from '../../../organization/public/organization.types';
 import { DepartureClosureService } from '../../departure-closure/departure-closure.service';
 import { OffboardingCancelWriter } from '../change/offboarding-cancel-writer.service';
@@ -6,6 +9,7 @@ import type { OffboardingAuditService } from '../offboarding-audit.service';
 import { OffboardingFrame } from '../offboarding-frame.service';
 import { OffboardingLeftService } from '../offboarding-left.service';
 import { OffboardingRefusedError } from '../offboarding.errors';
+import { toOffboardingApiException } from '../offboarding.http-errors';
 import type { OffboardingRepo } from '../offboarding.repo';
 import type { OffboardingRecord } from '../offboarding.types';
 
@@ -64,6 +68,7 @@ function frameHarness(options: {
   readScope?: string[];
   acting?: { actors: string[]; substitute: string | null } | undefined;
   unplacedDesignee?: string | null;
+  notStartedIds?: string[];
 }) {
   const held = options.held ?? CASE;
   const tx = { tag: 'tx' };
@@ -73,6 +78,7 @@ function frameHarness(options: {
     businessToday: jest.fn().mockResolvedValue('2026-10-21'),
     getOrganization: jest.fn().mockResolvedValue({ timeZone: 'UTC' }),
     lockEmployeeForShare: jest.fn(),
+    notStartedAmong: jest.fn().mockResolvedValue(new Set(options.notStartedIds ?? [])),
     getItAdminScope: jest.fn().mockResolvedValue(options.readScope ?? ['dep-1']),
     itAdminsActingFor: jest
       .fn()
@@ -181,6 +187,23 @@ describe('OffboardingFrame.runTechnical (acting IT Admin & read scope)', () => {
 
     await expect(frame.runTechnical(actorOf('emp-sub'), 'case-1', {}, apply)).resolves.toBe('ok');
     expect(apply).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ bySubstitute: true }));
+  });
+
+  it('rejects technical actions on a future-placed leaver with EmployeeNotStartedError (409 EMPLOYEE.NOT_STARTED)', async () => {
+    const { frame } = frameHarness({
+      held: { ...CASE, departmentId: null, employeeId: 'emp-future' },
+      readScope: [],
+      notStartedIds: ['emp-future'],
+    });
+    const apply = jest.fn();
+
+    const err = await frame.runTechnical(actorOf('emp-it'), 'case-1', {}, apply).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(EmployeeNotStartedError);
+    expect(apply).not.toHaveBeenCalled();
+    const mapped = toOffboardingApiException(err) as ApiException;
+    expect(mapped.getStatus()).toBe(HttpStatus.CONFLICT);
+    expect(mapped.getResponse()).toMatchObject({ code: 'EMPLOYEE.NOT_STARTED' });
   });
 
   it('passes locked held record to runEvent afterLocks', async () => {

@@ -59,8 +59,9 @@ export class MailboxLockController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account (1a) is not recorded (ACCOUNT_LOCK_FIRST), the person still holds a K1 seat whose revocation is not completed (MAILBOX_LOCK_BEFORE_K1, with the count in the details), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).',
+        'The person has not started working in a department yet (EMPLOYEE.NOT_STARTED), is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account (1a) is not recorded (ACCOUNT_LOCK_FIRST), the person still holds a K1 seat whose revocation is not completed (MAILBOX_LOCK_BEFORE_K1, with the count in the details), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).',
       examples: [
+        E.EMPLOYEE_NOT_STARTED,
         E.CASE_NOT_BLOCKED,
         E.CASE_CLOSED,
         E.ACCOUNT_LOCK_FIRST,

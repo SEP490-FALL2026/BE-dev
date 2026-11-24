@@ -25,6 +25,7 @@ import {
   DeviceVoidedError,
 } from '../lifecycle/lifecycle.errors';
 import { DeviceNotFoundError, DeviceNotInChargeError } from '../public/devices.errors';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { DeviceAlreadyRetiredError } from '../registry/registry.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string): ApiException =>
@@ -62,6 +63,9 @@ const ERROR_MAPPINGS: ReadonlyArray<readonly [new () => Error, HttpStatus, strin
 /** Maps machine activation domain errors to HTTP exceptions; database unavailability becomes 503. */
 export function toActivationApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  if (error instanceof EmployeeNotStartedError) {
+    return refuse(CONFLICT, 'EMPLOYEE.NOT_STARTED', error.message);
+  }
   for (const [ErrorType, status, code] of ERROR_MAPPINGS) {
     if (error instanceof ErrorType) return refuse(status, code, error.message);
   }
@@ -93,4 +97,5 @@ export const ACTIVATION_ERROR_EXAMPLES = {
   RELEASE_NOT_APPLICABLE: example(new DeviceActivationReleaseNotApplicableError()),
   NOT_MOVABLE: example(new DeviceActivationNotMovableError()),
   SAME_DEVICE: example(new DeviceSameDeviceError()),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
 } as const;

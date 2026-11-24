@@ -5,7 +5,7 @@ import { isCheckViolation } from '../../../infrastructure/database/unique-violat
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationHistoryApi } from '../../organization/public/organization-history.api';
-import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
+import { EmployeeNotFoundError, EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { unplacedWorkKey } from '../../organization/public/organization.types';
@@ -85,7 +85,7 @@ export class OffboardingFrame {
           const refused = technicalStepRefusal(actor);
           if (refused) throw new PersonnelAccessRefusedError(refused);
         },
-        afterLocks: async (tx, held) => {
+        afterLocks: async (tx, held, today) => {
           const readScope = await this.organizationReads.getItAdminScope(
             actor.employeeId,
             (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
@@ -98,6 +98,9 @@ export class OffboardingFrame {
             throw new OffboardingRefusedError('NOT_IN_CHARGE');
           }
           if (held.departmentId === null) {
+            if ((await this.organizationReads.notStartedAmong([held.employeeId], today, tx)).has(held.employeeId)) {
+              throw new EmployeeNotStartedError(held.employeeId);
+            }
             const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
               [{ workKind: 'OFFBOARDING_CASE', workId: held.id, employeeId: held.employeeId }],
               (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
@@ -134,7 +137,7 @@ export class OffboardingFrame {
     options: FrameOptions & { outer?: DbTx | undefined },
     rules: {
       beforeLocks: (seen: OffboardingRecord) => void;
-      afterLocks?: (tx: DbTx, held: OffboardingRecord) => Promise<void>;
+      afterLocks?: (tx: DbTx, held: OffboardingRecord, today: BusinessDate) => Promise<void>;
     },
     apply: (tx: DbTx, context: OffboardingCommandContext) => Promise<T>,
   ): Promise<T> {
@@ -158,7 +161,7 @@ export class OffboardingFrame {
       if (!held) throw new OffboardingRefusedError('NOT_FOUND');
       const earlier = held.headHandover?.successorEmployeeId ?? null;
       if (options.lockDepartment && earlier && earlier !== chosen) await this.lockShared(tx, earlier);
-      await rules.afterLocks?.(tx, held);
+      await rules.afterLocks?.(tx, held, today);
       const zone = (await this.organizationReads.getOrganization(tx))?.timeZone ?? 'UTC';
 
       return apply(tx, { held, today, recordedOn: businessDateAt(held.recordedAt, zone) });

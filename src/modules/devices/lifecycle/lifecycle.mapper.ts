@@ -1,6 +1,7 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { judgeDeviceActor } from '../devices-custody.policy';
 import { DeviceNotInChargeError } from '../public/devices.errors';
@@ -57,6 +58,11 @@ export async function requireLifecycleActor(
   const recipientDepartmentId = input.recipientEmployeeId ? (workDepts.get(input.recipientEmployeeId) ?? null) : null;
 
   const unplacedEmployeeIds = [...new Set(employeeIds.filter((id) => !workDepts.get(id)))];
+  if (unplacedEmployeeIds.length > 0) {
+    const notStarted = await deps.organizationReads.notStartedAmong(unplacedEmployeeIds, input.today, tx);
+    const firstNotStarted = unplacedEmployeeIds.find((id) => notStarted.has(id));
+    if (firstNotStarted) throw new EmployeeNotStartedError(firstNotStarted);
+  }
   const unplacedRequired = unplacedEmployeeIds.length > 0;
   const unplacedDesignee = unplacedRequired
     ? await resolveUnplacedDeviceDesignee(tx, deps, { deviceId: input.deviceId, employeeIds: unplacedEmployeeIds })
@@ -95,11 +101,18 @@ export async function requireDepartmentActor(
   input: {
     actorEmployeeId: string;
     departmentId: string | null;
+    today?: string | undefined;
     returnTaskId?: string | null | undefined;
     returnTaskEmployeeId?: string | null | undefined;
   },
 ): Promise<boolean> {
   if (!input.departmentId) {
+    if (input.returnTaskEmployeeId) {
+      const notStarted = await deps.organizationReads.notStartedAmong([input.returnTaskEmployeeId], input.today, tx);
+      if (notStarted.has(input.returnTaskEmployeeId)) {
+        throw new EmployeeNotStartedError(input.returnTaskEmployeeId);
+      }
+    }
     let unplacedDesignee: string | null = null;
     if (input.returnTaskId && input.returnTaskEmployeeId && input.actorEmployeeId !== input.returnTaskEmployeeId) {
       const resolved = await deps.organizationReads.itAdminsActingForUnplacedWork(
@@ -145,12 +158,22 @@ export async function requireDepartmentActor(
 export async function requireReturnTaskActor(
   tx: DbTx,
   deps: { organizationReads: OrganizationReadApi; identity: IdentityAccessApi },
-  input: { actorEmployeeId: string; departmentId: string | null; taskEmployeeId: string; taskId?: string | undefined },
+  input: {
+    actorEmployeeId: string;
+    departmentId: string | null;
+    taskEmployeeId: string;
+    taskId?: string | undefined;
+    today?: string | undefined;
+  },
 ): Promise<boolean> {
   if (input.actorEmployeeId === input.taskEmployeeId) {
     throw new DeviceReturnTaskNotInChargeError();
   }
   if (!input.departmentId) {
+    const notStarted = await deps.organizationReads.notStartedAmong([input.taskEmployeeId], input.today, tx);
+    if (notStarted.has(input.taskEmployeeId)) {
+      throw new EmployeeNotStartedError(input.taskEmployeeId);
+    }
     if (!input.taskId) throw new DeviceReturnTaskNotInChargeError();
     const resolved = await deps.organizationReads.itAdminsActingForUnplacedWork(
       [{ workKind: 'DEVICE_RETURN_TASK', workId: input.taskId, employeeId: input.taskEmployeeId }],

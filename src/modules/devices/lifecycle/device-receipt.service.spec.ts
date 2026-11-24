@@ -111,6 +111,7 @@ describe('DeviceReceiptService', () => {
     const organizationReads = {
       getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }),
       businessToday: jest.fn().mockResolvedValue('2026-11-24'),
+      notStartedAmong: jest.fn().mockResolvedValue(new Set()),
       workDepartmentsOf: jest.fn().mockResolvedValue(deptId ? new Map([['emp-1', deptId]]) : new Map()),
       itAdminsActingFor: jest.fn().mockResolvedValue(
         deptId

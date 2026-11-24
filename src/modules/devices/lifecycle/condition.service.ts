@@ -84,12 +84,15 @@ export class ConditionService {
     now: Date,
   ): Promise<boolean> {
     if (returnTask.found) {
+      const today = await this.organizationReads.businessToday(now, tx);
+
       return requireDepartmentActor(
         tx,
         { organizationReads: this.organizationReads, identity: this.identity },
         {
           actorEmployeeId: actor.employeeId,
           departmentId: returnTask.departmentId,
+          today,
           returnTaskId: returnTask.id,
           returnTaskEmployeeId: returnTask.employeeId,
         },

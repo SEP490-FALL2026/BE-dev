@@ -60,9 +60,10 @@ export class GroupRequestsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
+        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the caller or a person named has not started working in a department yet (EMPLOYEE.NOT_STARTED), the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
       examples: [
         GROUP_REQUEST_ERROR_EXAMPLES.APPLICATION_RETIRED,
+        GROUP_REQUEST_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
         GROUP_REQUEST_ERROR_EXAMPLES.NO_DEPARTMENT,
         GROUP_REQUEST_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
       ],
@@ -125,9 +126,10 @@ export class GroupRequestsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
+        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender or a person named has not started working in a department yet (EMPLOYEE.NOT_STARTED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
       examples: [
         GROUP_REQUEST_ERROR_EXAMPLES.APPLICATION_RETIRED,
+        GROUP_REQUEST_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
         GROUP_REQUEST_ERROR_EXAMPLES.NO_DEPARTMENT,
         GROUP_REQUEST_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE,
       ],
@@ -173,8 +175,9 @@ export class GroupRequestsController {
     ...AUTH_ERRORS,
     {
       status: HttpStatus.CONFLICT,
-      description: 'The caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).',
-      examples: [GROUP_REQUEST_ERROR_EXAMPLES.NO_DEPARTMENT],
+      description:
+        'The caller has not started working in a department yet (EMPLOYEE.NOT_STARTED) or belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).',
+      examples: [GROUP_REQUEST_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED, GROUP_REQUEST_ERROR_EXAMPLES.NO_DEPARTMENT],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

@@ -14501,11 +14501,22 @@
             }
           },
           "409": {
-            "description": "The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED: the last working day has not passed and they have not left) or the lock was recorded already (ALREADY_RECORDED).",
+            "description": "The person has not started working in a department yet (EMPLOYEE.NOT_STARTED), is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED: the last working day has not passed and they have not left), or the lock was recorded already (ALREADY_RECORDED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "OFFBOARDING_CASE.CASE_NOT_BLOCKED": {
                     "summary": "The employee is not blocked yet: the last working day has not passed and they have not left.",
                     "value": {
@@ -14786,11 +14797,22 @@
             }
           },
           "409": {
-            "description": "The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED, with details.problem SOURCE_REQUIRED, ASSIGNMENT_IS_SERVICE_ACCOUNT or TYPE_NOT_SUPPORTED, and details.provisioningType when it is the kind of the seat), there is nothing left to take away or all selected seats already carry the reason of this departure (NOTHING_TO_REVOKE), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
+            "description": "The person has not started working in a department yet (EMPLOYEE.NOT_STARTED), is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account is not recorded (ACCOUNT_LOCK_NOT_RECORDED) or was recorded already (ALREADY_RECORDED), a seat named has no revocation (REVOCATION_NOT_SUPPORTED, with details.problem SOURCE_REQUIRED, ASSIGNMENT_IS_SERVICE_ACCOUNT or TYPE_NOT_SUPPORTED, and details.provisioningType when it is the kind of the seat), there is nothing left to take away or all selected seats already carry the reason of this departure (NOTHING_TO_REVOKE), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "OFFBOARDING_CASE.CASE_NOT_BLOCKED": {
                     "summary": "The employee is not blocked yet: the last working day has not passed and they have not left.",
                     "value": {
@@ -15121,11 +15143,22 @@
             }
           },
           "409": {
-            "description": "The person is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account (1a) is not recorded (ACCOUNT_LOCK_FIRST), the person still holds a K1 seat whose revocation is not completed (MAILBOX_LOCK_BEFORE_K1, with the count in the details), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
+            "description": "The person has not started working in a department yet (EMPLOYEE.NOT_STARTED), is not blocked yet (OFFBOARDING_CASE.CASE_NOT_BLOCKED) or the case is closed (CASE_CLOSED), the lock of the company account (1a) is not recorded (ACCOUNT_LOCK_FIRST), the person still holds a K1 seat whose revocation is not completed (MAILBOX_LOCK_BEFORE_K1, with the count in the details), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "OFFBOARDING_CASE.CASE_NOT_BLOCKED": {
                     "summary": "The employee is not blocked yet: the last working day has not passed and they have not left.",
                     "value": {
@@ -35274,7 +35307,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED (the request was refused, withdrawn, cancelled or closed as failed; a request that was granted answers with its task instead, 201), REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED and RESPONSIBLE_NOT_IN_DEPARTMENT (only for a request for a service account kept from the earlier releases: its boundary was not accepted, or the person who answers for it left its department or the company), TYPE_NOT_SUPPORTED (K3), PLAN_BOUND_TO_DEVICE (the K4 plan moved from ACCOUNT to a device-bound mode after the Request was submitted), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
+            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED (the request was refused, withdrawn, cancelled or closed as failed; a request that was granted answers with its task instead, 201), REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED and RESPONSIBLE_NOT_IN_DEPARTMENT (only for a request for a service account kept from the earlier releases: its boundary was not accepted, or the person who answers for it left its department or the company), TYPE_NOT_SUPPORTED (K3), PLAN_BOUND_TO_DEVICE (the K4 plan moved from ACCOUNT to a device-bound mode after the Request was submitted), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), EMPLOYEE.NOT_STARTED (the beneficiary has not started working in a department yet), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -35424,6 +35457,17 @@
                       "error": {
                         "code": "PROVISIONING.PLAN_BOUND_TO_DEVICE",
                         "message": "This plan is bound to a device, not a user account, and cannot be granted through a seat provisioning task.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -36226,7 +36270,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken) or PROVISIONING.BENEFICIARY_DEPARTED (the person has left or is blocked by a departure, details.cause says which: close the request as cancelled; a task already being worked is not refused).",
+            "description": "PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken), EMPLOYEE.NOT_STARTED (the beneficiary has not started working in a department yet), or PROVISIONING.BENEFICIARY_DEPARTED (the person has left or is blocked by a departure, details.cause says which: close the request as cancelled; a task already being worked is not refused).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -36273,6 +36317,17 @@
                         "code": "PROVISIONING.BENEFICIARY_DEPARTED",
                         "message": "The beneficiary has left the company.",
                         "details": { "requestId": "<request-id>", "cause": "LEFT", "nextStep": "CANCEL_REQUEST" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -36504,7 +36559,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, IS_REVOCATION (a revocation is completed by its own route), or PROVISIONING.PLAN_BOUND_TO_DEVICE (the K4 plan moved from ACCOUNT to a device-bound mode); the key named is not free in the store (LICENSE_KEY.NOT_IN_STORE: another grant took it), was withdrawn from it (LICENSE_KEY.WITHDRAWN) or belongs to another purchase than the seat (LICENSE_KEY.SUBSCRIPTION_MISMATCH). Nothing is written.",
+            "description": "PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, IS_REVOCATION (a revocation is completed by its own route), PROVISIONING.PLAN_BOUND_TO_DEVICE (the K4 plan moved from ACCOUNT to a device-bound mode), or EMPLOYEE.NOT_STARTED (the beneficiary has not started working in a department yet); the key named is not free in the store (LICENSE_KEY.NOT_IN_STORE: another grant took it), was withdrawn from it (LICENSE_KEY.WITHDRAWN) or belongs to another purchase than the seat (LICENSE_KEY.SUBSCRIPTION_MISMATCH). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -36549,6 +36604,17 @@
                       "error": {
                         "code": "PROVISIONING.PLAN_BOUND_TO_DEVICE",
                         "message": "This plan is bound to a device, not a user account, and cannot be granted through a seat provisioning task.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -36918,7 +36984,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.",
+            "description": "PROVISIONING_TASK.NOT_MANUAL, NOT_IN_PROGRESS, or EMPLOYEE.NOT_STARTED.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -36941,6 +37007,17 @@
                       "error": {
                         "code": "PROVISIONING_TASK.NOT_IN_PROGRESS",
                         "message": "The task is not in a state that allows this: NOT_IN_PROGRESS.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -37189,7 +37266,7 @@
             }
           },
           "409": {
-            "description": "The task is not failed (PROVISIONING_TASK.NOT_FAILED).",
+            "description": "The task is not failed (PROVISIONING_TASK.NOT_FAILED), or EMPLOYEE.NOT_STARTED.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -37212,6 +37289,17 @@
                       "error": {
                         "code": "PROVISIONING_TASK.WITHDRAWAL_PENDING",
                         "message": "The task is not in a state that allows this: WITHDRAWAL_PENDING.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -37432,7 +37520,7 @@
             }
           },
           "409": {
-            "description": "The task is not failed (NOT_FAILED) or is by hand already (PROVISIONING_TASK.ALREADY_MANUAL).",
+            "description": "The task is not failed (NOT_FAILED), is by hand already (PROVISIONING_TASK.ALREADY_MANUAL), or EMPLOYEE.NOT_STARTED.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -37455,6 +37543,17 @@
                       "error": {
                         "code": "PROVISIONING_TASK.ALREADY_MANUAL",
                         "message": "The task is already done by hand.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -37717,7 +37816,7 @@
             }
           },
           "409": {
-            "description": "The task is not failed (PROVISIONING_TASK.NOT_FAILED), or its assignment is no longer open.",
+            "description": "The task is not failed (PROVISIONING_TASK.NOT_FAILED), its assignment is no longer open, or EMPLOYEE.NOT_STARTED.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -37740,6 +37839,17 @@
                       "error": {
                         "code": "PROVISIONING_TASK.WITHDRAWAL_PENDING",
                         "message": "The task is not in a state that allows this: WITHDRAWAL_PENDING.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -37988,7 +38098,7 @@
             }
           },
           "409": {
-            "description": "The task is not failed (PROVISIONING_TASK.NOT_FAILED; a revocation: not in progress or failed), or nothing was withdrawn (PROVISIONING_TASK.NO_WITHDRAWAL: its request was not withdrawn, or a reason still asks for the revocation): nothing changes.",
+            "description": "The task is not failed (PROVISIONING_TASK.NOT_FAILED; a revocation: not in progress or failed), nothing was withdrawn (PROVISIONING_TASK.NO_WITHDRAWAL: its request was not withdrawn, or a reason still asks for the revocation), or EMPLOYEE.NOT_STARTED: nothing changes.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -38011,6 +38121,17 @@
                       "error": {
                         "code": "PROVISIONING_TASK.NO_WITHDRAWAL",
                         "message": "The task is not in a state that allows this: NO_WITHDRAWAL.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -38233,7 +38354,7 @@
             }
           },
           "409": {
-            "description": "The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), is not in progress or is completed already (NOT_IN_PROGRESS), is not for a person (NOT_MANUAL), is still in its grace (NOT_BEFORE, details.notBefore: the first day it can be completed), or the assignment is no longer open (LICENSE_ASSIGNMENT.NOT_OPEN): nothing changes.",
+            "description": "The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), is not in progress or is completed already (NOT_IN_PROGRESS), is not for a person (NOT_MANUAL), is still in its grace (NOT_BEFORE, details.notBefore: the first day it can be completed), the beneficiary has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the assignment is no longer open (LICENSE_ASSIGNMENT.NOT_OPEN): nothing changes.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -38268,6 +38389,17 @@
                         "code": "PROVISIONING_TASK.NOT_BEFORE",
                         "message": "The revocation cannot be done before 2026-11-08.",
                         "details": { "notBefore": "2026-11-08" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -38662,7 +38794,7 @@
             }
           },
           "409": {
-            "description": "The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION) or its access is not running on to the end of the paid period, or was cut already (NOT_TERMINATING): nothing changes.",
+            "description": "The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), its access is not running on to the end of the paid period, or was cut already (NOT_TERMINATING), or the beneficiary has not started working in a department yet (EMPLOYEE.NOT_STARTED): nothing changes.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -38685,6 +38817,17 @@
                       "error": {
                         "code": "PROVISIONING_TASK.NOT_TERMINATING",
                         "message": "The task is not in a state that allows this: NOT_TERMINATING.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -40396,7 +40539,7 @@
             }
           },
           "409": {
-            "description": "The right was ended already (ASSIGNMENT_EXPIRY.NOT_OPEN), its end day has not passed (ASSIGNMENT_EXPIRY.NOT_EXPIRED), a renewal sent in time waits for its decision (ASSIGNMENT_EXPIRY.RENEWAL_PENDING), or the revocation gate refuses the kind of grant (REVOCATION.TYPE_NOT_SUPPORTED). Nothing is written.",
+            "description": "The right was ended already (ASSIGNMENT_EXPIRY.NOT_OPEN), its end day has not passed (ASSIGNMENT_EXPIRY.NOT_EXPIRED), a renewal sent in time waits for its decision (ASSIGNMENT_EXPIRY.RENEWAL_PENDING), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the revocation gate refuses the kind of grant (REVOCATION.TYPE_NOT_SUPPORTED). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40430,6 +40573,17 @@
                       "error": {
                         "code": "ASSIGNMENT_EXPIRY.RENEWAL_PENDING",
                         "message": "A renewal sent before the end day waits for its decision: the right stays as it is.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -45008,11 +45162,22 @@
             }
           },
           "409": {
-            "description": "The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).",
+            "description": "The sender or a person named in a group draft has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "ACCESS_REQUEST.NO_DEPARTMENT": {
                     "summary": "The person sending the request belongs to no department.",
                     "value": {
@@ -45472,7 +45637,7 @@
             }
           },
           "409": {
-            "description": "The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01). The refusals particular to a group are those of its own operation.",
+            "description": "The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender or a group line has not started working in a department yet (EMPLOYEE.NOT_STARTED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01). The refusals particular to a group are those of its own operation.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45507,6 +45672,17 @@
                       "error": {
                         "code": "ACCESS_REQUEST.APPLICATION_RETIRED",
                         "message": "The application of the plan is retired: no access is asked for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -46101,7 +46277,7 @@
             }
           },
           "409": {
-            "description": "The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE) or the sender already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS, with the seat in details). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01e).",
+            "description": "The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender has not started working in a department yet (EMPLOYEE.NOT_STARTED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE) or the sender already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS, with the seat in details). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01e).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46113,6 +46289,17 @@
                       "error": {
                         "code": "ACCESS_REQUEST.APPLICATION_RETIRED",
                         "message": "The application of the plan is retired: no access is asked for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -46714,7 +46901,7 @@
             }
           },
           "409": {
-            "description": "The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).",
+            "description": "The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the caller has not started working in a department yet (EMPLOYEE.NOT_STARTED), the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46726,6 +46913,17 @@
                       "error": {
                         "code": "ACCESS_REQUEST.APPLICATION_RETIRED",
                         "message": "The application of the plan is retired: no access is asked for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -48529,11 +48727,22 @@
             }
           },
           "409": {
-            "description": "The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the catalog has this software already by its name or by the domain of its page, or has the plan asked for of the application named (ACCESS_REQUEST.SOFTWARE_IN_CATALOG: details.existing is the application with at most twenty of its plans and details.matchedBy says why; ask for it from the catalog instead), or the application named has left the catalog (ACCESS_REQUEST.APPLICATION_RETIRED). Nothing is written.",
+            "description": "The sender has not started working in a department yet (EMPLOYEE.NOT_STARTED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the catalog has this software already by its name or by the domain of its page, or has the plan asked for of the application named (ACCESS_REQUEST.SOFTWARE_IN_CATALOG: details.existing is the application with at most twenty of its plans and details.matchedBy says why; ask for it from the catalog instead), or the application named has left the catalog (ACCESS_REQUEST.APPLICATION_RETIRED). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "ACCESS_REQUEST.NO_DEPARTMENT": {
                     "summary": "The person sending the request belongs to no department.",
                     "value": {
@@ -55089,7 +55298,7 @@
             }
           },
           "409": {
-            "description": "The seat cannot be returned (RETURN_REQUEST.ASSIGNMENT_NOT_RETURNABLE, with the reason in details: it has ended, it is a service account, its plan is not supported, or its grant is not done), it already has a return waiting (RETURN_REQUEST.ALREADY_REQUESTED), a renewal of it waits for its decision (RETURN_REQUEST.RENEWAL_PENDING) or the holder belongs to no department (RETURN_REQUEST.NO_DEPARTMENT). Nothing is written.",
+            "description": "The seat cannot be returned (RETURN_REQUEST.ASSIGNMENT_NOT_RETURNABLE, with the reason in details: it has ended, it is a service account, its plan is not supported, or its grant is not done), it already has a return waiting (RETURN_REQUEST.ALREADY_REQUESTED), a renewal of it waits for its decision (RETURN_REQUEST.RENEWAL_PENDING), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED) or the holder belongs to no department (RETURN_REQUEST.NO_DEPARTMENT). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -55126,6 +55335,17 @@
                         "code": "RETURN_REQUEST.RENEWAL_PENDING",
                         "message": "The return of the seat is refused: RENEWAL_PENDING.",
                         "details": { "requestId": "<request-id>" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -55733,7 +55953,7 @@
             }
           },
           "409": {
-            "description": "The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). After the end the ask is a request for new access, so GH-1 judges it too (ACCESS_REQUEST.OPEN_REQUEST_EXISTS). Nothing is written.",
+            "description": "The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). After the end the ask is a request for new access, so GH-1 judges it too (ACCESS_REQUEST.OPEN_REQUEST_EXISTS). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -55787,6 +56007,17 @@
                             "validUntil": null
                           }
                         },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -59970,7 +60201,7 @@
             }
           },
           "409": {
-            "description": "The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).",
+            "description": "The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the caller or a person named has not started working in a department yet (EMPLOYEE.NOT_STARTED), the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -59982,6 +60213,17 @@
                       "error": {
                         "code": "ACCESS_REQUEST.APPLICATION_RETIRED",
                         "message": "The application of the plan is retired: no access is asked for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -60281,7 +60523,7 @@
             }
           },
           "409": {
-            "description": "The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).",
+            "description": "The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender or a person named has not started working in a department yet (EMPLOYEE.NOT_STARTED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -60293,6 +60535,17 @@
                       "error": {
                         "code": "ACCESS_REQUEST.APPLICATION_RETIRED",
                         "message": "The application of the plan is retired: no access is asked for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -60644,11 +60897,22 @@
             }
           },
           "409": {
-            "description": "The caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).",
+            "description": "The caller has not started working in a department yet (EMPLOYEE.NOT_STARTED) or belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "ACCESS_REQUEST.NO_DEPARTMENT": {
                     "summary": "The person sending the request belongs to no department.",
                     "value": {
@@ -75033,11 +75297,22 @@
             }
           },
           "409": {
-            "description": "The holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), the serial number is used by another machine (DEVICE.SERIAL_TAKEN), the asset code counter is exhausted (DEVICE.ASSET_CODE_EXHAUSTED), the generated asset code collided (DEVICE.ASSET_CODE_TAKEN), or the machine has an overlapping registration (DEVICE.REGISTRATION_OVERLAP).",
+            "description": "The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), has left or is handing over (DEVICE.HOLDER_NOT_WORKING), the serial number is used by another machine (DEVICE.SERIAL_TAKEN), the asset code counter is exhausted (DEVICE.ASSET_CODE_EXHAUSTED), the generated asset code collided (DEVICE.ASSET_CODE_TAKEN), or the machine has an overlapping registration (DEVICE.REGISTRATION_OVERLAP).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "DEVICE.HOLDER_NOT_WORKING": {
                     "summary": "A machine is registered to a person who works here.",
                     "value": {
@@ -76267,7 +76542,7 @@
             }
           },
           "409": {
-            "description": "The initialization phase is closed (DEVICE.INITIALIZATION_CLOSED), a conflict occurred on the holder, serial number, asset code, registration, or an initial activation could not be opened on the lot or key.",
+            "description": "The initialization phase is closed (DEVICE.INITIALIZATION_CLOSED), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), a conflict occurred on the holder, serial number, asset code, registration, or an initial activation could not be opened on the lot or key.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -76279,6 +76554,17 @@
                       "error": {
                         "code": "DEVICE.INITIALIZATION_CLOSED",
                         "message": "The installation phase is closed; machines can no longer be entered with initial records.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -76728,11 +77014,22 @@
             }
           },
           "409": {
-            "description": "The machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), awaiting return (DEVICE.AWAITING_RETURN), not usable (DEVICE.NOT_USABLE), held by the same person (DEVICE.HOLDER_UNCHANGED), the holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), or an overlapping registration exists (DEVICE.REGISTRATION_OVERLAP).",
+            "description": "The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), the machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), awaiting return (DEVICE.AWAITING_RETURN), not usable (DEVICE.NOT_USABLE), held by the same person (DEVICE.HOLDER_UNCHANGED), the holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), or an overlapping registration exists (DEVICE.REGISTRATION_OVERLAP).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "DEVICE.VOIDED": {
                     "summary": "The machine record has been voided.",
                     "value": {
@@ -77101,11 +77398,22 @@
             }
           },
           "409": {
-            "description": "The source or replacement machine, holder, or keyed license state refuses replacement (DEVICE.VOIDED, DEVICE.ALREADY_RETIRED, DEVICE.AWAITING_RETURN, DEVICE.NOT_HELD, DEVICE.REPLACEMENT_NOT_IN_STOCK, DEVICE.NOT_USABLE, DEVICE.HOLDER_NOT_WORKING, DEVICE.REGISTRATION_OVERLAP, DEVICE_ACTIVATION.ALREADY_ON_DEVICE, DEVICE_ACTIVATION.KEY_WITHDRAWN, DEVICE_ACTIVATION.LOT_FULL, DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE).",
+            "description": "The source or replacement machine, holder, or keyed license state refuses replacement (EMPLOYEE.NOT_STARTED, DEVICE.VOIDED, DEVICE.ALREADY_RETIRED, DEVICE.AWAITING_RETURN, DEVICE.NOT_HELD, DEVICE.REPLACEMENT_NOT_IN_STOCK, DEVICE.NOT_USABLE, DEVICE.HOLDER_NOT_WORKING, DEVICE.REGISTRATION_OVERLAP, DEVICE_ACTIVATION.ALREADY_ON_DEVICE, DEVICE_ACTIVATION.KEY_WITHDRAWN, DEVICE_ACTIVATION.LOT_FULL, DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "DEVICE.VOIDED": {
                     "summary": "The machine record has been voided.",
                     "value": {
@@ -77562,11 +77870,22 @@
             }
           },
           "409": {
-            "description": "The machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), or already in stock (DEVICE.NOT_HELD).",
+            "description": "The employee has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), or already in stock (DEVICE.NOT_HELD).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "DEVICE.VOIDED": {
                     "summary": "The machine record has been voided.",
                     "value": {
@@ -77869,11 +78188,22 @@
             }
           },
           "409": {
-            "description": "The machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), or already has that condition (DEVICE.CONDITION_UNCHANGED).",
+            "description": "The employee has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), or already has that condition (DEVICE.CONDITION_UNCHANGED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "DEVICE.VOIDED": {
                     "summary": "The machine record has been voided.",
                     "value": {
@@ -78165,11 +78495,22 @@
             }
           },
           "409": {
-            "description": "The machine is voided (DEVICE.VOIDED), already retired (DEVICE.ALREADY_RETIRED), or awaiting return (DEVICE.AWAITING_RETURN).",
+            "description": "The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the machine is voided (DEVICE.VOIDED), already retired (DEVICE.ALREADY_RETIRED), or awaiting return (DEVICE.AWAITING_RETURN).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "DEVICE.VOIDED": {
                     "summary": "The machine record has been voided.",
                     "value": {
@@ -78967,7 +79308,7 @@
             }
           },
           "409": {
-            "description": "The task is already closed or the machine state prevents completion (DEVICE_RETURN_TASK.ALREADY_CLOSED, DEVICE.VOIDED, DEVICE.ALREADY_RETIRED).",
+            "description": "The task is already closed, the employee has not started working in a department yet, or the machine state prevents completion (DEVICE_RETURN_TASK.ALREADY_CLOSED, EMPLOYEE.NOT_STARTED, DEVICE.VOIDED, DEVICE.ALREADY_RETIRED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -78979,6 +79320,17 @@
                       "error": {
                         "code": "DEVICE_RETURN_TASK.ALREADY_CLOSED",
                         "message": "The device return task is already closed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -79496,11 +79848,22 @@
             }
           },
           "409": {
-            "description": "The machine or license key state refuses the activation (DEVICE.VOIDED, DEVICE.ALREADY_RETIRED, DEVICE.AWAITING_RETURN, DEVICE.NOT_USABLE, DEVICE_ACTIVATION.LOT_FULL, DEVICE_ACTIVATION.KEY_WITHDRAWN, DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE, DEVICE_ACTIVATION.ALREADY_ON_DEVICE).",
+            "description": "The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the machine or license key state refuses the activation (DEVICE.VOIDED, DEVICE.ALREADY_RETIRED, DEVICE.AWAITING_RETURN, DEVICE.NOT_USABLE, DEVICE_ACTIVATION.LOT_FULL, DEVICE_ACTIVATION.KEY_WITHDRAWN, DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE, DEVICE_ACTIVATION.ALREADY_ON_DEVICE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "DEVICE.VOIDED": {
                     "summary": "The machine record has been voided.",
                     "value": {
@@ -80085,11 +80448,22 @@
             }
           },
           "409": {
-            "description": "The device activation is already closed (DEVICE_ACTIVATION.ALREADY_CLOSED).",
+            "description": "The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED) or the device activation is already closed (DEVICE_ACTIVATION.ALREADY_CLOSED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "DEVICE_ACTIVATION.ALREADY_CLOSED": {
                     "summary": "The device activation is already closed.",
                     "value": {
@@ -80383,11 +80757,22 @@
             }
           },
           "409": {
-            "description": "The target machine or key state refuses moving the activation (DEVICE.VOIDED, DEVICE.ALREADY_RETIRED, DEVICE.AWAITING_RETURN, DEVICE.NOT_USABLE, DEVICE_ACTIVATION.ALREADY_CLOSED, DEVICE_ACTIVATION.KEY_WITHDRAWN, DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE, DEVICE_ACTIVATION.LOT_FULL, DEVICE_ACTIVATION.ALREADY_ON_DEVICE).",
+            "description": "The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the target machine or key state refuses moving the activation (DEVICE.VOIDED, DEVICE.ALREADY_RETIRED, DEVICE.AWAITING_RETURN, DEVICE.NOT_USABLE, DEVICE_ACTIVATION.ALREADY_CLOSED, DEVICE_ACTIVATION.KEY_WITHDRAWN, DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE, DEVICE_ACTIVATION.LOT_FULL, DEVICE_ACTIVATION.ALREADY_ON_DEVICE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "DEVICE.VOIDED": {
                     "summary": "The machine record has been voided.",
                     "value": {
@@ -81204,7 +81589,7 @@
             }
           },
           "409": {
-            "description": "The registration has ended (DEVICE_REGISTRATION.ENDED), collector installation is already enabled (DEVICE_REGISTRATION.COLLECTOR_ALREADY_INSTALLED), or the holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING).",
+            "description": "The registration has ended (DEVICE_REGISTRATION.ENDED), collector installation is already enabled (DEVICE_REGISTRATION.COLLECTOR_ALREADY_INSTALLED), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -81227,6 +81612,17 @@
                       "error": {
                         "code": "DEVICE_REGISTRATION.COLLECTOR_ALREADY_INSTALLED",
                         "message": "Collector installation is already enabled on this registration.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
                         "requestId": "req_example"
                       }
                     }
@@ -83530,11 +83926,22 @@
             }
           },
           "409": {
-            "description": "The request is not open (DEVICE_STOP_REQUEST.NOT_OPEN, details.state): completed already, or closed as invalid, among them because the registration ended.",
+            "description": "The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the request is not open (DEVICE_STOP_REQUEST.NOT_OPEN, details.state): completed already, or closed as invalid, among them because the registration ended.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "EMPLOYEE.NOT_STARTED": {
+                    "summary": "The employee has not started working in a department yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_STARTED",
+                        "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "DEVICE_STOP_REQUEST.NOT_OPEN": {
                     "summary": "The request to stop collection is not open.",
                     "value": {

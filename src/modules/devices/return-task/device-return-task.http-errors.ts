@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import {
   DeviceReturnTaskAlreadyClosedError,
   DeviceReturnTaskNotFoundError,
@@ -30,6 +31,9 @@ const ERROR_MAPPINGS: ReadonlyArray<readonly [new () => Error, HttpStatus, strin
 /** Maps device return-task errors to HTTP exceptions; falls back to `null` for non-task errors. */
 export function mapDeviceReturnTaskError(error: unknown): ApiException | null {
   if (error instanceof ApiException) return error;
+  if (error instanceof EmployeeNotStartedError) {
+    return refuse(HttpStatus.CONFLICT, 'EMPLOYEE.NOT_STARTED', error.message);
+  }
   for (const [ErrorType, status, code] of ERROR_MAPPINGS) {
     if (error instanceof ErrorType) return refuse(status, code, error.message);
   }

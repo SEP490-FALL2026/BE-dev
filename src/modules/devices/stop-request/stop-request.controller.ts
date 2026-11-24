@@ -128,8 +128,8 @@ export class StopRequestController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request is not open (DEVICE_STOP_REQUEST.NOT_OPEN, details.state): completed already, or closed as invalid, among them because the registration ended.',
-      examples: [EXAMPLES.STOP_REQUEST_NOT_OPEN],
+        'The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the request is not open (DEVICE_STOP_REQUEST.NOT_OPEN, details.state): completed already, or closed as invalid, among them because the registration ended.',
+      examples: [EXAMPLES.EMPLOYEE_NOT_STARTED, EXAMPLES.STOP_REQUEST_NOT_OPEN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

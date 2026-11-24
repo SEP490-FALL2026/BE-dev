@@ -60,4 +60,26 @@ export class EmployeeWorkDepartmentRepo {
 
     return rows.map((row) => row.employee_id);
   }
+
+  /**
+   * Subset of `employeeIds` who have at least one placement with `valid_from > today` and zero placements with
+   * `valid_from <= today` (never started working in any department yet).
+   */
+  async notStartedAmong(employeeIds: readonly string[], today: BusinessDate, tx?: DbTx): Promise<Set<string>> {
+    if (employeeIds.length === 0) return new Set();
+    const uniqueIds = [...new Set(employeeIds)];
+    const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string }[]>`
+      SELECT DISTINCT p.employee_id
+        FROM employee_placements p
+       WHERE p.employee_id = ANY(${uniqueIds}::uuid[])
+         AND p.valid_from > ${today}::date
+         AND NOT EXISTS (
+           SELECT 1
+             FROM employee_placements past
+            WHERE past.employee_id = p.employee_id
+              AND past.valid_from <= ${today}::date
+         )`;
+
+    return new Set(rows.map((row) => row.employee_id));
+  }
 }

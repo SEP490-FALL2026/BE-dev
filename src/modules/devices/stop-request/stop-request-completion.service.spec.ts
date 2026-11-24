@@ -1,7 +1,11 @@
+import { HttpStatus } from '@nestjs/common';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { StopRequestCompletionService } from './stop-request-completion.service';
 import * as errors from './stop-request.errors';
+import { toStopRequestApiException } from './stop-request.http-errors';
 
 const actorOf = (employeeId: string): AuthenticatedPrincipal => ({
   subject: `app-${employeeId}`,
@@ -31,6 +35,7 @@ function harness(options: {
   acting?: { actors: string[]; substitute: string | null } | undefined;
   holderEmployeeId?: string;
   unplacedDesignee?: string | null;
+  notStartedIds?: string[];
 }) {
   const holderEmployeeId = options.holderEmployeeId ?? 'emp-holder';
   const request = { ...REQUEST, holderEmployeeId };
@@ -61,6 +66,7 @@ function harness(options: {
     getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }),
     businessToday: jest.fn().mockResolvedValue('2026-10-21'),
     workDepartmentsOf: jest.fn().mockResolvedValue(deptMap),
+    notStartedAmong: jest.fn().mockResolvedValue(new Set(options.notStartedIds ?? [])),
     itAdminsActingFor: jest.fn().mockResolvedValue(actingMap),
     itAdminsActingForUnplacedWork: jest
       .fn()
@@ -160,5 +166,15 @@ describe('StopRequestCompletionService (acting IT Admin)', () => {
       selfHandled: false,
       bySubstitute: true,
     });
+  });
+
+  it('rejects completing a stop request for a future-placed holder with EmployeeNotStartedError (409 EMPLOYEE.NOT_STARTED)', async () => {
+    const { service } = harness({ departmentId: null, notStartedIds: ['emp-holder'] });
+    const err = await service.complete(actorOf('emp-it'), 'req-1').catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(EmployeeNotStartedError);
+    const mapped = toStopRequestApiException(err) as ApiException;
+    expect(mapped.getStatus()).toBe(HttpStatus.CONFLICT);
+    expect(mapped.getResponse()).toMatchObject({ code: 'EMPLOYEE.NOT_STARTED' });
   });
 });

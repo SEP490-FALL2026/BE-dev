@@ -33,4 +33,25 @@ describe('EmployeeWorkDepartmentRepo', () => {
     expect(ids).toEqual(['emp-1']);
     expect(used).toEqual(['$queryRaw', '$queryRaw']);
   });
+
+  it('reads notStartedAmong through the caller transaction, deduplicates ids, and short-circuits empty lists', async () => {
+    const queryRaw = jest.fn().mockResolvedValue([{ employee_id: 'emp-future' }]);
+    const tx = { $queryRaw: queryRaw } as unknown as DbTx;
+    const repo = new EmployeeWorkDepartmentRepo(untouched);
+
+    expect(await repo.notStartedAmong([], '2026-11-23', tx)).toEqual(new Set());
+    expect(queryRaw).not.toHaveBeenCalled();
+
+    const result = await repo.notStartedAmong(['emp-future', 'emp-future', 'emp-active'], '2026-11-23', tx);
+
+    expect(result).toEqual(new Set(['emp-future']));
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    const [template, uniqueIds, today] = queryRaw.mock.calls[0] as [TemplateStringsArray, string[], string];
+    const sql = template.join(' ');
+    expect(sql).toContain('valid_from >');
+    expect(sql).toContain('valid_from <=');
+    expect(sql).toContain('NOT EXISTS');
+    expect(uniqueIds).toEqual(['emp-future', 'emp-active']);
+    expect(today).toBe('2026-11-23');
+  });
 });

@@ -12,6 +12,7 @@ import { OrganizationContextService } from '../organization-context.service';
 import { OrganizationRepo } from '../organization.repo';
 import { resolveUnplacedWorkDesignee } from '../unplaced-work-designation/unplaced-work-designation.policy';
 import { UnplacedWorkDesignationRepo } from '../unplaced-work-designation/unplaced-work-designation.repo';
+import { EmployeeNotStartedError } from './organization.errors';
 import {
   ActiveUnplacedWorkDesignation,
   CostCenterBrief,
@@ -57,6 +58,23 @@ export class OrganizationReadApi {
 
   unplacedAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
     return this.employees.unplacedAmong(employeeIds, tx);
+  }
+
+  /**
+   * Subset of `employeeIds` who only have future placement(s) (`valid_from > onDate`) and zero placements on or
+   * before `onDate` (default today in the organization's calendar).
+   */
+  async notStartedAmong(employeeIds: readonly string[], onDate?: BusinessDate, tx?: DbTx): Promise<Set<string>> {
+    if (employeeIds.length === 0) return new Set();
+
+    return this.employees.notStartedAmong(employeeIds, onDate ?? (await this.businessToday(new Date(), tx)), tx);
+  }
+
+  /** Throws `EmployeeNotStartedError` when any of `employeeIds` only has future placement(s) after `onDate`. */
+  async assertStartedInDepartment(employeeIds: readonly string[], onDate?: BusinessDate, tx?: DbTx): Promise<void> {
+    const notStarted = await this.notStartedAmong(employeeIds, onDate, tx);
+    const firstId = employeeIds.find((id) => notStarted.has(id));
+    if (firstId !== undefined) throw new EmployeeNotStartedError(firstId);
   }
 
   async getScheduledFirstPlacement(

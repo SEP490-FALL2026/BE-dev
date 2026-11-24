@@ -15,7 +15,7 @@ import {
   AccessRequestPlanNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
 } from '../access-request/access-request.errors';
-import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { EmployeeNotStartedError, FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import {
   DepartmentSoftwareNoteInvalidError,
   DepartmentSoftwareNotInCatalogError,
@@ -143,6 +143,7 @@ const quote = (reason: ConstructorParameters<typeof AssessmentQuoteRefusedError>
 export const ASSESSMENT_ERROR_EXAMPLES = {
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({
       reason: 'SPENDING_APPROVER',

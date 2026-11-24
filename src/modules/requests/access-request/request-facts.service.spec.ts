@@ -3,7 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { EmployeeNotStartedError, FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestPlanBoundToDeviceError, AccessRequestPlanNotFoundError } from './access-request.errors';
 import { RequestFactsService, type AssessmentInput } from './request-facts.service';
@@ -23,6 +23,7 @@ describe('RequestFactsService.assess', () => {
   const organization = {
     businessToday: jest.fn(),
     getOwningUnits: jest.fn(),
+    notStartedAmong: jest.fn().mockResolvedValue(new Set()),
     requireUnitCostCenter: jest.fn(),
     lockDepartmentShared: jest.fn(),
     getEmployee: jest.fn(),
@@ -55,6 +56,7 @@ describe('RequestFactsService.assess', () => {
   beforeEach(async () => {
     jest.resetAllMocks();
     organization.businessToday.mockResolvedValue(TODAY);
+    organization.notStartedAmong.mockResolvedValue(new Set());
     organization.lockDepartmentShared.mockResolvedValue(undefined);
     // The real rule: the unit with its Cost Center, or the error of a department that has none.
     organization.requireUnitCostCenter.mockImplementation((unit: { departmentId: string; costCenter: unknown }) => {
@@ -384,5 +386,14 @@ describe('RequestFactsService.assess', () => {
         expect(organization.lockDepartmentShared).not.toHaveBeenCalled();
       },
     );
+  });
+
+  it('rejects future-placed employee, requester, and proposal with EmployeeNotStartedError', async () => {
+    given(COST_CENTER, 'INTERNAL');
+    organization.notStartedAmong.mockResolvedValue(new Set(['e-1', 'e-req']));
+    await expect(service.assess(tx, input({ requesterEmployeeId: 'e-req' }))).rejects.toThrow(EmployeeNotStartedError);
+    organization.getOwningUnits.mockResolvedValue(new Map());
+    await expect(service.assess(tx, input())).rejects.toThrow(EmployeeNotStartedError);
+    await expect(service.assessProposal(tx, input())).rejects.toThrow(EmployeeNotStartedError);
   });
 });

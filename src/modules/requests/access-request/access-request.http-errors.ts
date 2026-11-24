@@ -5,7 +5,7 @@ import {
   RequestPartyIneligibleError,
   requestPartyRefusalBody,
 } from '../../identity-access/public/request-party.errors';
-import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { EmployeeNotStartedError, FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import { termRuleOf } from '../../../core/term-limit';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
@@ -66,6 +66,9 @@ export function toAccessRequestApiException(error: unknown): unknown {
   }
   if (error instanceof AccessRequestNoDepartmentError) {
     return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.NO_DEPARTMENT', error.message);
+  }
+  if (error instanceof EmployeeNotStartedError) {
+    return refuse(HttpStatus.CONFLICT, 'EMPLOYEE.NOT_STARTED', error.message);
   }
   // The department has no Cost Center in use yet (`QĐ-87d(1)`): Finance creates it first. Nothing was written.
   if (error instanceof FinanceSetupIncompleteError) {
@@ -194,6 +197,7 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   TERM_LONG_TERM_NOT_ALLOWED: example(new AccessRequestTermRefusedError('TERM_LONG_TERM_NOT_ALLOWED')),
   TERM_CONTRACT_ENDED: example(new AccessRequestTermRefusedError('TERM_CONTRACT_ENDED', '2026-10-31')),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({
       reason: 'SPENDING_APPROVER',

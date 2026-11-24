@@ -3,6 +3,7 @@ import { ApiException } from '../../../infrastructure/http/errors/api.exception'
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { DocumentAttachRefusedError } from '../../catalog/public/catalog.errors';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { DeviceAssetCodeExhaustedError } from '../asset-code/asset-code.errors';
 import { DeviceNotFoundError, DeviceNotInChargeError } from '../public/devices.errors';
 import {
@@ -64,6 +65,9 @@ export function toRegistryApiException(error: unknown): unknown {
   if (error instanceof DeviceCollectorAlreadyInstalledError) {
     return refuse(CONFLICT, 'DEVICE_REGISTRATION.COLLECTOR_ALREADY_INSTALLED', error.message);
   }
+  if (error instanceof EmployeeNotStartedError) {
+    return refuse(CONFLICT, 'EMPLOYEE.NOT_STARTED', error.message);
+  }
 
   if (error instanceof DocumentAttachRefusedError) return toDocumentRefusal(error);
 
@@ -110,4 +114,5 @@ export const REGISTRY_ERROR_EXAMPLES = {
   DOCUMENT_ALREADY_ATTACHED: example(new DocumentAttachRefusedError('ALREADY_ATTACHED')),
   DOCUMENT_NOT_READY: example(new DocumentAttachRefusedError('NOT_READY_TO_ATTACH')),
   DOCUMENT_PURPOSE_MISMATCH: example(new DocumentAttachRefusedError('PURPOSE_MISMATCH')),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
 } as const;

@@ -8,6 +8,7 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import {
   AccessRequestApplicationRetiredError,
   AccessRequestNoDepartmentError,
@@ -129,6 +130,28 @@ export class RequestFactsService {
     };
   }
 
+  private async requireStartedOwningUnit(
+    tx: DbTx,
+    employeeId: string,
+    today: BusinessDate,
+    requesterEmployeeId?: string,
+  ) {
+    const found = (await this.organizationReads.getOwningUnits([employeeId], today, tx)).get(employeeId);
+    if (!found) {
+      if ((await this.organizationReads.notStartedAmong([employeeId], today, tx)).has(employeeId)) {
+        throw new EmployeeNotStartedError(employeeId);
+      }
+      throw new AccessRequestNoDepartmentError();
+    }
+    if (requesterEmployeeId && requesterEmployeeId !== employeeId) {
+      if ((await this.organizationReads.notStartedAmong([requesterEmployeeId], today, tx)).has(requesterEmployeeId)) {
+        throw new EmployeeNotStartedError(requesterEmployeeId);
+      }
+    }
+
+    return found;
+  }
+
   /**
    * Throws AccessRequestNoDepartmentError, AccessRequestPlanNotFoundError, AccessRequestApplicationRetiredError,
    * FinanceSetupIncompleteError (a request that costs money, or ends in a service seat, and the department has no Cost Center yet:
@@ -136,8 +159,7 @@ export class RequestFactsService {
    */
   async assess(tx: DbTx, input: AssessmentInput): Promise<Assessment> {
     const today = await this.organizationReads.businessToday(input.now, tx);
-    const found = (await this.organizationReads.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
-    if (!found) throw new AccessRequestNoDepartmentError();
+    const found = await this.requireStartedOwningUnit(tx, input.employeeId, today, input.requesterEmployeeId);
 
     const [target] = await this.catalog.findPlanSeatTargets([input.planId], tx);
     if (!target) throw new AccessRequestPlanNotFoundError();
@@ -206,8 +228,7 @@ export class RequestFactsService {
     input: Pick<AssessmentInput, 'employeeId' | 'termMonths' | 'now' | 'settings' | 'lockDepartment'>,
   ): Promise<ProposalAssessment> {
     const today = await this.organizationReads.businessToday(input.now, tx);
-    const found = (await this.organizationReads.getOwningUnits([input.employeeId], today, tx)).get(input.employeeId);
-    if (!found) throw new AccessRequestNoDepartmentError();
+    const found = await this.requireStartedOwningUnit(tx, input.employeeId, today);
     const unit = this.organizationReads.requireUnitCostCenter(found);
     if (input.lockDepartment) await this.organizationReads.lockDepartmentShared(tx, unit.departmentId);
 

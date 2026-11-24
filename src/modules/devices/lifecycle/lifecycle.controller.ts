@@ -49,8 +49,9 @@ const REPLACE_ERRORS = [
   {
     status: HttpStatus.CONFLICT,
     description:
-      'The source or replacement machine, holder, or keyed license state refuses replacement (DEVICE.VOIDED, DEVICE.ALREADY_RETIRED, DEVICE.AWAITING_RETURN, DEVICE.NOT_HELD, DEVICE.REPLACEMENT_NOT_IN_STOCK, DEVICE.NOT_USABLE, DEVICE.HOLDER_NOT_WORKING, DEVICE.REGISTRATION_OVERLAP, DEVICE_ACTIVATION.ALREADY_ON_DEVICE, DEVICE_ACTIVATION.KEY_WITHDRAWN, DEVICE_ACTIVATION.LOT_FULL, DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE).',
+      'The source or replacement machine, holder, or keyed license state refuses replacement (EMPLOYEE.NOT_STARTED, DEVICE.VOIDED, DEVICE.ALREADY_RETIRED, DEVICE.AWAITING_RETURN, DEVICE.NOT_HELD, DEVICE.REPLACEMENT_NOT_IN_STOCK, DEVICE.NOT_USABLE, DEVICE.HOLDER_NOT_WORKING, DEVICE.REGISTRATION_OVERLAP, DEVICE_ACTIVATION.ALREADY_ON_DEVICE, DEVICE_ACTIVATION.KEY_WITHDRAWN, DEVICE_ACTIVATION.LOT_FULL, DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE).',
     examples: [
+      EXAMPLES.EMPLOYEE_NOT_STARTED,
       EXAMPLES.VOIDED,
       EXAMPLES.ALREADY_RETIRED,
       EXAMPLES.AWAITING_RETURN,
@@ -115,8 +116,9 @@ export class LifecycleController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), awaiting return (DEVICE.AWAITING_RETURN), not usable (DEVICE.NOT_USABLE), held by the same person (DEVICE.HOLDER_UNCHANGED), the holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), or an overlapping registration exists (DEVICE.REGISTRATION_OVERLAP).',
+        'The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), the machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), awaiting return (DEVICE.AWAITING_RETURN), not usable (DEVICE.NOT_USABLE), held by the same person (DEVICE.HOLDER_UNCHANGED), the holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), or an overlapping registration exists (DEVICE.REGISTRATION_OVERLAP).',
       examples: [
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
         EXAMPLES.VOIDED,
         EXAMPLES.ALREADY_RETIRED,
         EXAMPLES.AWAITING_RETURN,
@@ -201,8 +203,8 @@ export class LifecycleController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), or already in stock (DEVICE.NOT_HELD).',
-      examples: [EXAMPLES.VOIDED, EXAMPLES.ALREADY_RETIRED, EXAMPLES.NOT_HELD],
+        'The employee has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), or already in stock (DEVICE.NOT_HELD).',
+      examples: [EXAMPLES.EMPLOYEE_NOT_STARTED, EXAMPLES.VOIDED, EXAMPLES.ALREADY_RETIRED, EXAMPLES.NOT_HELD],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -244,8 +246,13 @@ export class LifecycleController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), or already has that condition (DEVICE.CONDITION_UNCHANGED).',
-      examples: [EXAMPLES.VOIDED, EXAMPLES.ALREADY_RETIRED, EXAMPLES.CONDITION_UNCHANGED],
+        'The employee has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), or already has that condition (DEVICE.CONDITION_UNCHANGED).',
+      examples: [
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
+        EXAMPLES.VOIDED,
+        EXAMPLES.ALREADY_RETIRED,
+        EXAMPLES.CONDITION_UNCHANGED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -287,8 +294,8 @@ export class LifecycleController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The machine is voided (DEVICE.VOIDED), already retired (DEVICE.ALREADY_RETIRED), or awaiting return (DEVICE.AWAITING_RETURN).',
-      examples: [EXAMPLES.VOIDED, EXAMPLES.ALREADY_RETIRED, EXAMPLES.AWAITING_RETURN],
+        'The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the machine is voided (DEVICE.VOIDED), already retired (DEVICE.ALREADY_RETIRED), or awaiting return (DEVICE.AWAITING_RETURN).',
+      examples: [EXAMPLES.EMPLOYEE_NOT_STARTED, EXAMPLES.VOIDED, EXAMPLES.ALREADY_RETIRED, EXAMPLES.AWAITING_RETURN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

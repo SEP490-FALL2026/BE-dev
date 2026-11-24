@@ -8,6 +8,7 @@ import type { AuditValue } from '../../audit/public/audit.types';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingSeatBaselineApi } from '../../licensing/public/licensing-seat-baseline.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { type AssetDeviceType, isLegacyCodeAcceptable } from '../asset-code/asset-code.policy';
 import { AssetCodeService } from '../asset-code/asset-code.service';
 import { byUser, devicesEvent } from '../devices-audit-event.mapper';
@@ -165,6 +166,9 @@ export class InitialRecordService {
     const departmentId =
       (await this.organizationReads.workDepartmentsOf([holder.id], dates.today, tx)).get(holder.id) ?? null;
     if (!departmentId) {
+      if ((await this.organizationReads.notStartedAmong([holder.id], dates.today, tx)).has(holder.id)) {
+        throw new EmployeeNotStartedError(holder.id);
+      }
       const verdict = judgeDeviceActor({
         holderDepartmentId: null,
         recipientDepartmentId: null,

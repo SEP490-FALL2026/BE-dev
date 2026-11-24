@@ -160,6 +160,7 @@ export class DeviceReceiptService {
           departmentId: returnTask.departmentId,
           taskEmployeeId: returnTask.employeeId,
           taskId: returnTask.id,
+          today,
         },
       );
     }

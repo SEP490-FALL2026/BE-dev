@@ -1,7 +1,10 @@
+import { HttpStatus } from '@nestjs/common';
 import type { TransactionRunner, DbTx } from '../../../infrastructure/database/transaction-runner';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../audit/public/audit.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { DeviceNotInChargeError } from '../public/devices.errors';
@@ -12,12 +15,14 @@ import {
   DeviceRegistrationEndedError,
   DeviceRegistrationNotFoundError,
 } from './registry.errors';
+import { toRegistryApiException } from './registry.http-errors';
 import type { RegistrationRecord, RegistryRepo } from './registry.repo';
 
 interface SetupOptions {
   registration?: Partial<RegistrationRecord> | null;
   holder?: { id: string; status: string; workState: string; hireDate: string } | null;
   workDepartmentId?: string | null;
+  notStartedIds?: string[];
   inCharge?: string | null;
   substitute?: string | null;
   unplacedDesignee?: string | null;
@@ -69,6 +74,7 @@ describe('CollectorInstallationService', () => {
       lockEmployeeForShare: jest.fn().mockResolvedValue(undefined),
       businessToday: jest.fn().mockResolvedValue('2026-11-24'),
       workDepartmentsOf: jest.fn().mockResolvedValue(deptId ? new Map([['emp-1', deptId]]) : new Map()),
+      notStartedAmong: jest.fn().mockResolvedValue(new Set(options.notStartedIds ?? [])),
       itAdminsActingFor: jest.fn().mockResolvedValue(
         deptId
           ? new Map([
@@ -159,5 +165,16 @@ describe('CollectorInstallationService', () => {
       collectorInstalled: true,
       bySubstitute: true,
     });
+  });
+
+  it('rejects enabling collector for a future-placed holder with EmployeeNotStartedError (409 EMPLOYEE.NOT_STARTED)', async () => {
+    const err = await setup({ workDepartmentId: null, notStartedIds: ['emp-1'] })
+      .service.enable(actor(), 'reg-1', now)
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(EmployeeNotStartedError);
+    const mapped = toRegistryApiException(err) as ApiException;
+    expect(mapped.getStatus()).toBe(HttpStatus.CONFLICT);
+    expect(mapped.getResponse()).toMatchObject({ code: 'EMPLOYEE.NOT_STARTED' });
   });
 });

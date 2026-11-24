@@ -26,6 +26,45 @@ import { ReturnTaskCompletionService } from './return-task-completion.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 
+const COMPLETE_ERRORS = [
+  ...AUTH_ERRORS,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'Only an acting IT Admin covering the task department (excluding the departing employee) may complete the task (DEVICE_RETURN_TASK.NOT_IN_CHARGE).',
+    examples: [FORBIDDEN_EXAMPLE, LIFECYCLE_EXAMPLES.RETURN_TASK_NOT_IN_CHARGE],
+  },
+  {
+    status: HttpStatus.NOT_FOUND,
+    description:
+      'The return task or referenced machine does not exist (DEVICE_RETURN_TASK.NOT_FOUND, DEVICE.NOT_FOUND).',
+    examples: [TASK_EXAMPLES.NOT_FOUND, LIFECYCLE_EXAMPLES.DEVICE_NOT_FOUND],
+  },
+  {
+    status: HttpStatus.CONFLICT,
+    description:
+      'The task is already closed, the employee has not started working in a department yet, or the machine state prevents completion (DEVICE_RETURN_TASK.ALREADY_CLOSED, EMPLOYEE.NOT_STARTED, DEVICE.VOIDED, DEVICE.ALREADY_RETIRED).',
+    examples: [
+      TASK_EXAMPLES.ALREADY_CLOSED,
+      LIFECYCLE_EXAMPLES.EMPLOYEE_NOT_STARTED,
+      LIFECYCLE_EXAMPLES.VOIDED,
+      LIFECYCLE_EXAMPLES.ALREADY_RETIRED,
+    ],
+  },
+  {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'The completion fields are invalid or activation decisions are invalid (VALIDATION_ERROR, DEVICE_RETURN_TASK.OUTCOME_FIELDS_INVALID, DEVICE_RETURN_TASK.SOFTWARE_REMOVAL_NOTE_REQUIRED, DEVICE_ACTIVATION.NOT_ON_DEVICE, DEVICE_ACTIVATION.RELEASE_NOT_APPLICABLE).',
+    examples: [
+      VALIDATION_EXAMPLE,
+      TASK_EXAMPLES.OUTCOME_FIELDS_INVALID,
+      TASK_EXAMPLES.SOFTWARE_REMOVAL_NOTE_REQUIRED,
+      LIFECYCLE_EXAMPLES.ACTIVATION_NOT_ON_DEVICE,
+      LIFECYCLE_EXAMPLES.ACTIVATION_RELEASE_NOT_APPLICABLE,
+    ],
+  },
+] as const;
+
 /** Completes open offboarding device return tasks (received back to stock or retired as lost). */
 @ApiTags('device-return-tasks')
 @Controller({ path: 'device-return-tasks', version: '1' })
@@ -47,39 +86,7 @@ export class ReturnTaskCompletionController {
     description:
       'Completes an open return task either as received (returning the machine to stock) or not recovered (retiring the machine as lost).',
   })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    {
-      status: HttpStatus.FORBIDDEN,
-      description:
-        'Only an acting IT Admin covering the task department (excluding the departing employee) may complete the task (DEVICE_RETURN_TASK.NOT_IN_CHARGE).',
-      examples: [FORBIDDEN_EXAMPLE, LIFECYCLE_EXAMPLES.RETURN_TASK_NOT_IN_CHARGE],
-    },
-    {
-      status: HttpStatus.NOT_FOUND,
-      description:
-        'The return task or referenced machine does not exist (DEVICE_RETURN_TASK.NOT_FOUND, DEVICE.NOT_FOUND).',
-      examples: [TASK_EXAMPLES.NOT_FOUND, LIFECYCLE_EXAMPLES.DEVICE_NOT_FOUND],
-    },
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The task is already closed or the machine state prevents completion (DEVICE_RETURN_TASK.ALREADY_CLOSED, DEVICE.VOIDED, DEVICE.ALREADY_RETIRED).',
-      examples: [TASK_EXAMPLES.ALREADY_CLOSED, LIFECYCLE_EXAMPLES.VOIDED, LIFECYCLE_EXAMPLES.ALREADY_RETIRED],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The completion fields are invalid or activation decisions are invalid (VALIDATION_ERROR, DEVICE_RETURN_TASK.OUTCOME_FIELDS_INVALID, DEVICE_RETURN_TASK.SOFTWARE_REMOVAL_NOTE_REQUIRED, DEVICE_ACTIVATION.NOT_ON_DEVICE, DEVICE_ACTIVATION.RELEASE_NOT_APPLICABLE).',
-      examples: [
-        VALIDATION_EXAMPLE,
-        TASK_EXAMPLES.OUTCOME_FIELDS_INVALID,
-        TASK_EXAMPLES.SOFTWARE_REMOVAL_NOTE_REQUIRED,
-        LIFECYCLE_EXAMPLES.ACTIVATION_NOT_ON_DEVICE,
-        LIFECYCLE_EXAMPLES.ACTIVATION_RELEASE_NOT_APPLICABLE,
-      ],
-    },
-  )
+  @ApiErrorResponses(...COMPLETE_ERRORS)
   async complete(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: DeviceReturnTaskIdParamDto,

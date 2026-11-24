@@ -5,6 +5,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestNoDepartmentError,
@@ -55,6 +56,12 @@ export class RequestDraftService {
       );
       const today = await this.organizationReads.businessToday(new Date(), tx);
       const unit = (await this.organizationReads.getOwningUnits([actor.employeeId], today, tx)).get(actor.employeeId);
+      const partyIds = [actor.employeeId, ...(body.kind === 'GROUP' ? body.lines.map((line) => line.employeeId) : [])];
+      if (!unit || body.kind === 'GROUP') {
+        const notStarted = await this.organizationReads.notStartedAmong(partyIds, today, tx);
+        const firstNotStarted = partyIds.find((id) => notStarted.has(id));
+        if (firstNotStarted) throw new EmployeeNotStartedError(firstNotStarted);
+      }
       if (!unit) throw new AccessRequestNoDepartmentError();
       const [target] = await this.catalog.findPlanSeatTargets([body.planId], tx);
       if (!target) throw new AccessRequestPlanNotFoundError();

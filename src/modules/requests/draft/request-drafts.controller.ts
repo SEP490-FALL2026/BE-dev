@@ -97,8 +97,9 @@ export class RequestDraftsController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description: 'The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).',
-      examples: [EXAMPLES.NO_DEPARTMENT],
+      description:
+        'The sender or a person named in a group draft has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT).',
+      examples: [EXAMPLES.EMPLOYEE_NOT_STARTED, EXAMPLES.NO_DEPARTMENT],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -157,11 +158,12 @@ export class RequestDraftsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01). The refusals particular to a group are those of its own operation.',
+        'The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender or a group line has not started working in a department yet (EMPLOYEE.NOT_STARTED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01). The refusals particular to a group are those of its own operation.',
       examples: [
         EXAMPLES.NOT_DRAFT,
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
         EXAMPLES.APPLICATION_RETIRED,
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
         EXAMPLES.NO_DEPARTMENT,
         EXAMPLES.ALREADY_HOLDS_ACCESS,
         ...GH_CONFLICT_EXAMPLES,

@@ -42,8 +42,9 @@ const DEACTIVATE_ERRORS = [
   },
   {
     status: HttpStatus.CONFLICT,
-    description: 'The device activation is already closed (DEVICE_ACTIVATION.ALREADY_CLOSED).',
-    examples: [EXAMPLES.ALREADY_CLOSED],
+    description:
+      'The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED) or the device activation is already closed (DEVICE_ACTIVATION.ALREADY_CLOSED).',
+    examples: [EXAMPLES.EMPLOYEE_NOT_STARTED, EXAMPLES.ALREADY_CLOSED],
   },
   {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -69,8 +70,9 @@ const MOVE_ERRORS = [
   {
     status: HttpStatus.CONFLICT,
     description:
-      'The target machine or key state refuses moving the activation (DEVICE.VOIDED, DEVICE.ALREADY_RETIRED, DEVICE.AWAITING_RETURN, DEVICE.NOT_USABLE, DEVICE_ACTIVATION.ALREADY_CLOSED, DEVICE_ACTIVATION.KEY_WITHDRAWN, DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE, DEVICE_ACTIVATION.LOT_FULL, DEVICE_ACTIVATION.ALREADY_ON_DEVICE).',
+      'The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the target machine or key state refuses moving the activation (DEVICE.VOIDED, DEVICE.ALREADY_RETIRED, DEVICE.AWAITING_RETURN, DEVICE.NOT_USABLE, DEVICE_ACTIVATION.ALREADY_CLOSED, DEVICE_ACTIVATION.KEY_WITHDRAWN, DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE, DEVICE_ACTIVATION.LOT_FULL, DEVICE_ACTIVATION.ALREADY_ON_DEVICE).',
     examples: [
+      EXAMPLES.EMPLOYEE_NOT_STARTED,
       EXAMPLES.VOIDED,
       EXAMPLES.ALREADY_RETIRED,
       EXAMPLES.AWAITING_RETURN,

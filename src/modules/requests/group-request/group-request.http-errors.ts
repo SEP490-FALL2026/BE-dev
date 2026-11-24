@@ -2,7 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
-import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { EmployeeNotStartedError, FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import {
   AccessRequestApplicationRetiredError,
   AccessRequestCancellationRefusedError,
@@ -114,6 +114,7 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   PLAN_BOUND_TO_DEVICE: example(new AccessRequestPlanBoundToDeviceError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({ reason: 'SPENDING_APPROVER', party: 'REQUESTER', employeeIds: [PERSON] }),

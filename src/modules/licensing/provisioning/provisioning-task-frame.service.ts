@@ -6,6 +6,7 @@ import { IdentityAccessApi } from '../../identity-access/public/identity-access.
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { ProvisioningTaskNotFoundError } from '../public/licensing.errors';
 import type { SelfExecutionMode } from '../public/licensing.types';
@@ -136,13 +137,21 @@ export class ProvisioningTaskFrame {
     target: { beneficiaryEmployeeId: string; departmentId?: string; taskId?: string; now?: Date },
   ): Promise<{ bySubstitute: boolean }> {
     let deptId = target.departmentId;
+    const today =
+      deptId === undefined ? await this.organizationReads.businessToday(target.now ?? new Date(), tx) : undefined;
     if (deptId === undefined) {
-      const today = await this.organizationReads.businessToday(target.now ?? new Date(), tx);
-      deptId = (await this.organizationReads.workDepartmentsOf([target.beneficiaryEmployeeId], today, tx)).get(
+      deptId = (await this.organizationReads.workDepartmentsOf([target.beneficiaryEmployeeId], today!, tx)).get(
         target.beneficiaryEmployeeId,
       );
     }
     if (deptId === undefined) {
+      if (
+        (await this.organizationReads.notStartedAmong([target.beneficiaryEmployeeId], today, tx)).has(
+          target.beneficiaryEmployeeId,
+        )
+      ) {
+        throw new EmployeeNotStartedError(target.beneficiaryEmployeeId);
+      }
       if (!target.taskId) throw new ProvisioningNotInChargeError();
       const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
         [{ workKind: 'PROVISIONING_TASK', workId: target.taskId, employeeId: target.beneficiaryEmployeeId }],

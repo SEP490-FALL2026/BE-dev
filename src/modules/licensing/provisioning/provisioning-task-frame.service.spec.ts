@@ -7,9 +7,11 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { ProvisioningPlanBoundToDeviceError } from '../public/licensing.errors';
+import { toLicensingApiException } from '../licensing.http-errors';
 import { ProvisioningNotInChargeError } from './provisioning.errors';
 import { toProvisioningApiException } from './provisioning.http-errors';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
@@ -33,6 +35,7 @@ describe('ProvisioningTaskFrame.work', () => {
     getOrganization: jest.fn(),
     businessToday: jest.fn(),
     workDepartmentsOf: jest.fn(),
+    notStartedAmong: jest.fn().mockResolvedValue(new Set()),
     itAdminsActingFor: jest.fn(),
     itAdminsActingForUnplacedWork: jest.fn(),
   };
@@ -62,6 +65,7 @@ describe('ProvisioningTaskFrame.work', () => {
     runner.run.mockImplementation((fn: (client: DbTx) => Promise<unknown>) => fn(tx));
     organization.getOrganization.mockResolvedValue(ORGANIZATION);
     organization.businessToday.mockResolvedValue('2026-11-23');
+    organization.notStartedAmong.mockResolvedValue(new Set());
     organization.workDepartmentsOf.mockResolvedValue(
       new Map([
         ['e-employee', 'dept-1'],
@@ -277,6 +281,27 @@ describe('ProvisioningTaskFrame.work', () => {
       expect(mapped).toBeInstanceOf(ApiException);
       expect(mapped.getStatus()).toBe(HttpStatus.CONFLICT);
       expect(mapped.getResponse()).toMatchObject({ code: 'PROVISIONING.PLAN_BOUND_TO_DEVICE' });
+    });
+
+    it('rejects a beneficiary with only a future placement with EmployeeNotStartedError before checking IT Admin charge', async () => {
+      repo.lock.mockResolvedValue(task('e-future'));
+      repo.find.mockResolvedValue(task('e-future'));
+      organization.workDepartmentsOf.mockResolvedValue(new Map());
+      organization.notStartedAmong.mockResolvedValue(new Set(['e-future']));
+
+      await expect(frame.work(itAdmin('e-it1'), 'task-1', action)).rejects.toBeInstanceOf(EmployeeNotStartedError);
+      expect(organization.notStartedAmong).toHaveBeenCalledWith(['e-future'], '2026-11-23', tx);
+      expect(write).not.toHaveBeenCalled();
+    });
+
+    it('maps EmployeeNotStartedError to 409 EMPLOYEE.NOT_STARTED in provisioning and licensing mappers', () => {
+      for (const mapper of [toProvisioningApiException, toLicensingApiException]) {
+        const mapped = mapper(new EmployeeNotStartedError('e-future')) as ApiException;
+
+        expect(mapped).toBeInstanceOf(ApiException);
+        expect(mapped.getStatus()).toBe(HttpStatus.CONFLICT);
+        expect(mapped.getResponse()).toMatchObject({ code: 'EMPLOYEE.NOT_STARTED' });
+      }
     });
   });
 });
