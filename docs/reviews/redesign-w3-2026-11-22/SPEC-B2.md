@@ -2,7 +2,7 @@
 
 Phần của [SPEC.md](SPEC.md). **Phụ thuộc:** B1 đã ở nhánh gộp (W3-02 cho giá). **Tự đứng được:** mỗi kỳ thuê bao vẫn một gói; B2
 thêm thực thể Workspace, gắn thuê bao vào workspace, dời cổng ≥ 2 admin, chặn trùng (workspace, gói). Migration: M4. `file:line` tính từ
-`src/modules/`, đọc trên `int/redesign-w2` `8a4c8b70`.
+`src/modules/`, đọc trên `int/redesign-w2` `8a4c8b70`, đối chiếu lại `origin/dev` `70543271` ở [DELTA-W2-FINAL.md](DELTA-W2-FINAL.md).
 
 **Quyền (QĐ-118d/f/l, áp cho mọi route B2):** người tạo workspace là **người phụ trách ban đầu**; **chỉ Super Admin** đổi người phụ trách
 (route riêng, mẫu `subscriptionResponsibleItAdminChange` của đợt 2 —
@@ -30,7 +30,7 @@ theo phòng).
   (`catalog/plan/vendor-admin-roles.service.ts:29`); `CatalogApi.workspaceDutiesOf` (`catalog/public/catalog.api.ts:94`);
   `CatalogResponsibilityApi.vendorAdminRolesOf` (`catalog/public/catalog-responsibility.api.ts:40`) với kiểu `VendorAdminRole { planId, … }`
   (`catalog/public/catalog-responsibility.types.ts:11-18`), dùng ở `personnel/departure-deadline/departure-impact.service.ts:52`,
-  `personnel/transfer-grace/transfer-impact.service.ts:65`, `personnel/it-handover/it-handover-milestone.service.ts:41-43`. Chuyển phụ trách:
+  `personnel/transfer-grace/transfer-impact.service.ts:65`, `personnel/it-handover/it-handover-milestone.service.ts:42-44`. Chuyển phụ trách:
   `catalog/application-responsibility/responsibility-handover.service.ts:66-67` (ứng dụng + thuê bao).
 - **Mô hình (M4):**
 
@@ -84,7 +84,7 @@ id`; đếm + trang cùng snapshot (`API-LIST-DETAIL.1`).
   - Audit: `WORKSPACE.CREATED`, `WORKSPACE.UPDATED`, `WORKSPACE.ADMINS_SET`, `WORKSPACE.RESPONSIBLE_CHANGED` (actor, from, to, reason),
     `WORKSPACE.RESPONSIBLE_TRANSFERRED` (SBF-16).
 
-- **Nơi đọc hồ sơ cũ chuyển sang workspace (B2-R5)** — cùng gói P9, giữ chữ ký facade:
+- **Nơi đọc hồ sơ cũ chuyển sang workspace (B2-R5)** — cùng gói P9a, giữ chữ ký facade:
   - `PlanRepo.findProfile`/`findProfilesOf` ⟹ đọc workspace của **hãng của gói** (một workspace ⟹ nó; nhiều ⟹ workspace có thuê bao sống
     của gói, không có ⟹ workspace tạo sớm nhất); `findIdsNeedingVendorAdminsInUse` giữ nghĩa (gói cần admin có thuê bao đang dùng);
     `findWorkspaceDuties` ⟹ `workspace_admins`.
@@ -153,7 +153,7 @@ id`; đếm + trang cùng snapshot (`API-LIST-DETAIL.1`).
      `MEMBERS` cam kết 12 ⟹ 422; `MEMBERS` không `renewalDate` ⟹ 422 `SUBSCRIPTION.MEMBERS_PAYMENT_DAY_REQUIRED`.
   4. Thuê bao cũ sau M4 có `workspace` của hãng; `seatCounting = FIXED`; `invoicedLater = false`.
 - **Test:** unit `subscription-pool.policy.spec.ts` (C4, payment day), `subscription-obligation.policy.spec.ts` (`hasAdjustmentPoint`);
-  http `test/http/catalog/subscriptions.http-spec.ts` (trường, mặc định workspace — P9) và `test/http/catalog/subscription-workspace.http-spec.ts`
+  http `test/http/catalog/subscriptions.http-spec.ts` (trường, mặc định workspace — P9b) và `test/http/catalog/subscription-workspace.http-spec.ts`
   (luật C4, payment day — P10).
 
 ---
@@ -168,8 +168,8 @@ id`; đếm + trang cùng snapshot (`API-LIST-DETAIL.1`).
   dùng được ⟹ Super Admin).
 - **Hiện trạng:** cổng trên gói, đếm IT Admin còn làm việc (`catalog/subscription/pool/subscription-pool.service.ts:135-160`
   `assertVendorAdmins` → `PlanFactsService.workingAdminsAmong`, `catalog/plan/plan-facts.service.ts:87`); nghỉ việc báo
-  `VENDOR_ADMINS_BELOW_MINIMUM` theo gói cho IT phụ trách thuê bao (`personnel/event-notice/personnel-notifier.service.ts:401-428`
-  `vendorAdminsGone`, gọi từ `personnel/it-handover/it-handover-milestone.service.ts:41-43`); đổi vai/khóa không báo.
+  `VENDOR_ADMINS_BELOW_MINIMUM` theo gói cho IT phụ trách thuê bao (`personnel/event-notice/personnel-notifier.service.ts:387-414`
+  `vendorAdminsGone`, gọi từ `personnel/it-handover/it-handover-milestone.service.ts:42-44`); đổi vai/khóa không báo.
 - **Hành vi đúng:**
 
   ```text
@@ -241,7 +241,7 @@ id`; đếm + trang cùng snapshot (`API-LIST-DETAIL.1`).
   `SUBSCRIPTION.DUPLICATE_PLAN` (**nghĩa đổi**: theo workspace) **cả khi pha khởi tạo đang mở** (bỏ `SHOULD_MERGE`). Hai workspace khác nhau
   cùng gói ⟹ được. Ràng buộc DB ở B3 (unique dòng — W3-15). **Khóa (B2-R6):** khai/hoàn tất/đổi `workspaceId` khóa workspace **FU** (tầng
   5b; đổi `workspaceId` khóa cả hai workspace trong một câu `ORDER BY id`) **trước** gói FU/FS (7) — hai lần khai cùng workspace xếp hàng.
-  Phần khóa do làn `tech` thêm ở P9 (`subscription.service.ts`, `subscription-change.service.ts`), luật trùng ở P10.
+  Phần khóa do làn `tech` thêm ở P9b (`subscription.service.ts`, `subscription-change.service.ts`), luật trùng ở P10.
   **Quy trình khi luồng đã biết kỳ (N5)** — `subscriptionUpdate` (`changeIn` hôm nay khóa kỳ trước), hoàn tất bản nháp, `subscriptionLineAdd`:
   (1) đọc `workspace_id` của kỳ **không khóa**; (2) khóa workspace (cùng workspace mới nếu đổi) FU trong một câu `ORDER BY id`; (3) khóa kỳ FU (6);
   (4) đọc lại `workspace_id` dưới khóa — khác bước 1 ⟹ rollback và thử lại (tối đa 3 lần, rồi 409 `SUBSCRIPTION.STALE`). Không luồng nào khóa
