@@ -32917,7 +32917,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The seats bought, the assignments occupying today in the organization calendar and the seats free; purchased and free are null while the subscription has no quantity.",
+            "description": "The seats bought, those taken today in the organization calendar (the assignments occupying and, for a lot of keys on machines, the open activations on machines) and the seats free; purchased and free are null while the subscription has no quantity.",
             "content": {
               "application/json": {
                 "schema": {

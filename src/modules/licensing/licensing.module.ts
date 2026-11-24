@@ -26,6 +26,7 @@ import { AssignmentSeatOccupancy } from './assignment/occupancy/assignment-seat-
 import { AssignmentServiceAccountReader } from './assignment/assignment-service-account.listener';
 import { AssignmentListService } from './assignment/assignment-list.service';
 import { AssignmentService } from './assignment/assignment.service';
+import { SubscriptionSeatUsageService } from './assignment/occupancy/seat-usage-occupancy.service';
 import { AssignmentsController } from './assignment/assignments.controller';
 import { DashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
 import { DashboardFactsService } from './dashboard-facts/dashboard-facts.service';
@@ -211,6 +212,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     DepartmentOpenWorkReader,
     ProvisioningDepartmentUseRepo,
     AssignmentService,
+    SubscriptionSeatUsageService,
     AssignmentEndService,
     AssignmentCarryRepo,
     AssignmentFactsRepo,

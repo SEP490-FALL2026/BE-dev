@@ -14,7 +14,6 @@ import {
   AssignmentNotFoundError,
   AssignmentNotOpenError,
   ProvisioningSubscriptionError,
-  SeatTargetNotFoundError,
 } from '../public/licensing.errors';
 import type {
   AssignmentHolder,
@@ -22,7 +21,6 @@ import type {
   ExistingAssignment,
   NewBaselineAssignment,
   SeatHolder,
-  SeatUsage,
   WaitingRegrant,
 } from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
@@ -544,22 +542,5 @@ export class AssignmentService {
     await this.repo.markGranted(tx, assignmentId, { grantedOn, expectedEndDate });
 
     return { effectiveFrom: current.effectiveFrom, expectedEndDate };
-  }
-
-  /** The seats bought, taken and free on today in the organization calendar. Throws SeatTargetNotFoundError. */
-  async seatUsage(subscriptionId: string): Promise<SeatUsage> {
-    const target = await this.catalog.findSeatTarget({ subscriptionId });
-    if (!target) throw new SeatTargetNotFoundError('SUBSCRIPTION');
-    const asOf = await this.organizationReads.businessToday();
-    const occupied = await this.repo.countOccupying(subscriptionId, asOf);
-    const purchased = target.purchasedQuantity;
-
-    return {
-      subscriptionId,
-      purchased,
-      occupied,
-      free: purchased === null ? null : Math.max(0, purchased - occupied),
-      asOf,
-    };
   }
 }
