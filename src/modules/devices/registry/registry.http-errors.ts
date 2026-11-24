@@ -13,6 +13,7 @@ import {
   DeviceHandoverWithoutHolderError,
   DeviceHolderNotFoundError,
   DeviceHolderNotWorkingError,
+  DeviceHolderUnplacedError,
   DevicePlanNotBundledError,
   DeviceRegistrationEndedError,
   DeviceRegistrationNotFoundError,
@@ -52,6 +53,7 @@ export function toRegistryApiException(error: unknown): unknown {
     return refuse(UNPROCESSABLE, 'DEVICE_SIGNATURE_RECORD.NOTICE_VERSION_NOT_FOUND', error.message);
   }
   if (error instanceof DeviceHolderNotWorkingError) return refuse(CONFLICT, 'DEVICE.HOLDER_NOT_WORKING', error.message);
+  if (error instanceof DeviceHolderUnplacedError) return refuse(CONFLICT, 'DEVICE.HOLDER_UNPLACED', error.message);
   if (error instanceof DeviceAssetCodeTakenError) return refuse(CONFLICT, 'DEVICE.ASSET_CODE_TAKEN', error.message);
   if (error instanceof DeviceAssetCodeExhaustedError) {
     return refuse(CONFLICT, 'DEVICE.ASSET_CODE_EXHAUSTED', error.message);
@@ -104,6 +106,7 @@ export const REGISTRY_ERROR_EXAMPLES = {
   PLAN_NOT_BUNDLED: example(new DevicePlanNotBundledError()),
   NOTICE_VERSION_NOT_FOUND: example(new DeviceSignatureNoticeVersionNotFoundError()),
   HOLDER_NOT_WORKING: example(new DeviceHolderNotWorkingError()),
+  HOLDER_UNPLACED: example(new DeviceHolderUnplacedError()),
   ASSET_CODE_TAKEN: example(new DeviceAssetCodeTakenError()),
   ASSET_CODE_EXHAUSTED: example(new DeviceAssetCodeExhaustedError()),
   SERIAL_TAKEN: example(new DeviceSerialTakenError()),

@@ -3,7 +3,7 @@ import type { IdentityAccessApi } from '../../identity-access/public/identity-ac
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { unplacedWorkKey } from '../../organization/public/organization.types';
-import { judgeDeviceActor } from '../devices-custody.policy';
+import { excludeDepartmentActor, judgeDeviceActor } from '../devices-custody.policy';
 import { DeviceNotInChargeError } from '../public/devices.errors';
 import { DeviceReturnTaskNotInChargeError } from './lifecycle.errors';
 import type { SoftwareRemovalInput } from './lifecycle.policy';
@@ -106,6 +106,9 @@ export async function requireDepartmentActor(
     returnTaskEmployeeId?: string | null | undefined;
   },
 ): Promise<boolean> {
+  if (input.returnTaskEmployeeId && input.actorEmployeeId === input.returnTaskEmployeeId) {
+    throw new DeviceNotInChargeError();
+  }
   if (!input.departmentId) {
     if (input.returnTaskEmployeeId) {
       const notStarted = await deps.organizationReads.notStartedAmong([input.returnTaskEmployeeId], input.today, tx);
@@ -114,7 +117,7 @@ export async function requireDepartmentActor(
       }
     }
     let unplacedDesignee: string | null = null;
-    if (input.returnTaskId && input.returnTaskEmployeeId && input.actorEmployeeId !== input.returnTaskEmployeeId) {
+    if (input.returnTaskId && input.returnTaskEmployeeId) {
       const resolved = await deps.organizationReads.itAdminsActingForUnplacedWork(
         [{ workKind: 'DEVICE_RETURN_TASK', workId: input.returnTaskId, employeeId: input.returnTaskEmployeeId }],
         (ids) => deps.identity.findUsableItAdminEmployeeIds(ids, tx),
@@ -143,7 +146,7 @@ export async function requireDepartmentActor(
   const verdict = judgeDeviceActor({
     holderDepartmentId: input.departmentId,
     recipientDepartmentId: null,
-    actingByDepartment,
+    actingByDepartment: excludeDepartmentActor(actingByDepartment, input.departmentId, input.returnTaskEmployeeId),
     actor: input.actorEmployeeId,
   });
   if (!verdict.allowed) throw new DeviceNotInChargeError();

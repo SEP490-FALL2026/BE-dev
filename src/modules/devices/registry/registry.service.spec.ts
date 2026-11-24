@@ -12,7 +12,12 @@ import { EmployeeNotStartedError } from '../../organization/public/organization.
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AssetCodeService } from '../asset-code/asset-code.service';
 import { DeviceNotInChargeError } from '../public/devices.errors';
-import { DeviceHandoverWithoutHolderError, DevicePlanNotBundledError, DeviceSerialTakenError } from './registry.errors';
+import {
+  DeviceHandoverWithoutHolderError,
+  DeviceHolderUnplacedError,
+  DevicePlanNotBundledError,
+  DeviceSerialTakenError,
+} from './registry.errors';
 import { toRegistryApiException } from './registry.http-errors';
 import type { RegistryRepo } from './registry.repo';
 import { RegistryService } from './registry.service';
@@ -273,14 +278,18 @@ describe('RegistryService device intake (W2-03, H17, org-timezone year)', () => 
     ).rejects.toBeInstanceOf(DeviceNotInChargeError);
 
     const unplaced = setup({ departmentId: null });
-    await expect(
-      unplaced.service.create(actor('it-1'), {
+    const unplacedErr = await unplaced.service
+      .create(actor('it-1'), {
         deviceType: 'LAP',
         hostname: 'H',
         os: 'OS',
         holderEmployeeId: 'emp-1',
-      }),
-    ).rejects.toBeInstanceOf(DeviceNotInChargeError);
+      })
+      .catch((e: unknown) => e);
+    expect(unplacedErr).toBeInstanceOf(DeviceHolderUnplacedError);
+    const mappedUnplaced = toRegistryApiException(unplacedErr) as ApiException;
+    expect(mappedUnplaced.getStatus()).toBe(HttpStatus.CONFLICT);
+    expect(mappedUnplaced.getResponse()).toMatchObject({ code: 'DEVICE.HOLDER_UNPLACED' });
 
     const bySub = setup({ inCharge: 'it-1', substitute: 'it-sub' });
     await bySub.service.create(actor('it-sub'), {

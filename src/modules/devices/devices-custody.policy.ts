@@ -92,3 +92,24 @@ export function judgeDeviceActor(facts: {
     bySubstitute: Boolean(facts.unplacedRequired) || holderCheck.bySubstitute || recipientCheck.bySubstitute,
   };
 }
+
+/** Returns a department acting map with `excludedEmployeeId` removed from in-charge and substitute slots. */
+export function excludeDepartmentActor(
+  actingByDepartment: ReadonlyMap<string, DepartmentActingActors>,
+  departmentId: string,
+  excludedEmployeeId: string | null | undefined,
+): ReadonlyMap<string, DepartmentActingActors> {
+  if (!excludedEmployeeId) return actingByDepartment;
+  const entry = actingByDepartment.get(departmentId);
+  if (!entry) return actingByDepartment;
+
+  return new Map([
+    [
+      departmentId,
+      {
+        inCharge: entry.inCharge === excludedEmployeeId ? null : entry.inCharge,
+        substitute: entry.substitute === excludedEmployeeId ? null : entry.substitute,
+      },
+    ],
+  ]);
+}

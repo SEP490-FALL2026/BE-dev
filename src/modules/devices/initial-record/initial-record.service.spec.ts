@@ -17,6 +17,7 @@ import {
   DeviceAssetCodeTakenError,
   DeviceHandoverDateInvalidError,
   DeviceHandoverWithoutHolderError,
+  DeviceHolderUnplacedError,
   DevicePlanNotBundledError,
 } from '../registry/registry.errors';
 import type { RegistryRepo } from '../registry/registry.repo';
@@ -348,5 +349,16 @@ describe('InitialRecordService (W2-13)', () => {
       .catch((e: unknown) => e);
     expect(future).toBeInstanceOf(EmployeeNotStartedError);
     expectHttpError(future, HttpStatus.CONFLICT, 'EMPLOYEE.NOT_STARTED');
+
+    const unplaced = await setup({ departmentId: null })
+      .service.create(actor(), {
+        deviceType: 'LAP',
+        hostname: 'H',
+        os: 'Win',
+        holderEmployeeId: 'emp-1',
+      })
+      .catch((e: unknown) => e);
+    expect(unplaced).toBeInstanceOf(DeviceHolderUnplacedError);
+    expectHttpError(unplaced, HttpStatus.CONFLICT, 'DEVICE.HOLDER_UNPLACED');
   });
 });

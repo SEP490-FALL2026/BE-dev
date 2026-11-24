@@ -21,11 +21,13 @@ import type { RegistrationRecord, RegistryRepo } from './registry.repo';
 interface SetupOptions {
   registration?: Partial<RegistrationRecord> | null;
   holder?: { id: string; status: string; workState: string; hireDate: string } | null;
+  openReturnTask?: { found: boolean; id?: string | null; departmentId: string | null; employeeId?: string | null };
   workDepartmentId?: string | null;
   notStartedIds?: string[];
   inCharge?: string | null;
   substitute?: string | null;
-  unplacedDesignee?: string | null;
+  unplacedDesignee?:
+    { kind?: 'DEVICE' | 'DEVICE_RETURN_TASK'; workId?: string; employeeId: string | null } | string | null;
 }
 
 describe('CollectorInstallationService', () => {
@@ -56,6 +58,9 @@ describe('CollectorInstallationService', () => {
     const repo = {
       findRegistration: jest.fn().mockResolvedValue(registration),
       lockRegistrationChain: jest.fn().mockResolvedValue(registration),
+      findOpenReturnTaskDepartmentId: jest
+        .fn()
+        .mockResolvedValue(options.openReturnTask ?? { found: false, id: null, departmentId: null, employeeId: null }),
       enableCollector: jest.fn().mockResolvedValue(undefined),
     } as unknown as RegistryRepo;
 
@@ -63,10 +68,28 @@ describe('CollectorInstallationService', () => {
       options.holder === undefined
         ? { id: 'emp-1', status: 'ACTIVE', workState: 'WORKING', hireDate: '2025-01-01' }
         : options.holder;
-    const deptId = options.workDepartmentId === undefined ? 'dept-1' : options.workDepartmentId;
+    const deptId = options.openReturnTask?.found
+      ? options.openReturnTask.departmentId
+      : options.workDepartmentId === undefined
+        ? 'dept-1'
+        : options.workDepartmentId;
     const actors = [options.inCharge === undefined ? 'it-1' : options.inCharge, options.substitute ?? null].filter(
       (id): id is string => id !== null,
     );
+    const unplacedEntry =
+      options.unplacedDesignee === undefined
+        ? null
+        : typeof options.unplacedDesignee === 'string' || options.unplacedDesignee === null
+          ? {
+              kind: 'DEVICE' as const,
+              workId: registration?.deviceId ?? 'dev-1',
+              employeeId: options.unplacedDesignee,
+            }
+          : {
+              kind: options.unplacedDesignee.kind ?? ('DEVICE' as const),
+              workId: options.unplacedDesignee.workId ?? registration?.deviceId ?? 'dev-1',
+              employeeId: options.unplacedDesignee.employeeId,
+            };
 
     const organizationReads = {
       getOrganization: jest.fn().mockResolvedValue({ id: 'org-1' }),
@@ -92,8 +115,8 @@ describe('CollectorInstallationService', () => {
       itAdminsActingForUnplacedWork: jest
         .fn()
         .mockResolvedValue(
-          options.unplacedDesignee !== undefined
-            ? new Map([[unplacedWorkKey('DEVICE', registration?.deviceId ?? 'dev-1'), options.unplacedDesignee]])
+          unplacedEntry
+            ? new Map([[unplacedWorkKey(unplacedEntry.kind, unplacedEntry.workId), unplacedEntry.employeeId]])
             : new Map(),
         ),
     } as unknown as OrganizationReadApi;
@@ -176,5 +199,46 @@ describe('CollectorInstallationService', () => {
     const mapped = toRegistryApiException(err) as ApiException;
     expect(mapped.getStatus()).toBe(HttpStatus.CONFLICT);
     expect(mapped.getResponse()).toMatchObject({ code: 'EMPLOYEE.NOT_STARTED' });
+  });
+
+  it('authorizes by open return task on AWAITING_RETURN, excluding departing IT Admin while allowing substitute or return-task designee', async () => {
+    const deptTask = { found: true, id: 'task-1', departmentId: 'dept-ret', employeeId: 'it-ret' };
+    const departingErr = await setup({ openReturnTask: deptTask, inCharge: 'it-ret', substitute: 'it-sub' })
+      .service.enable(actor('it-ret'), 'reg-1', now)
+      .catch((e: unknown) => e);
+    expect(departingErr).toBeInstanceOf(DeviceNotInChargeError);
+    expect((toRegistryApiException(departingErr) as ApiException).getStatus()).toBe(HttpStatus.FORBIDDEN);
+    expect((toRegistryApiException(departingErr) as ApiException).getResponse()).toMatchObject({
+      code: 'DEVICE.NOT_IN_CHARGE',
+    });
+
+    const subOk = setup({ openReturnTask: deptTask, inCharge: 'it-ret', substitute: 'it-sub' });
+    await expect(subOk.service.enable(actor('it-sub'), 'reg-1', now)).resolves.toBe('dev-1');
+    expect(firstAuditAfter(subOk.audit)).toEqual({
+      deviceId: 'dev-1',
+      collectorInstalled: true,
+      bySubstitute: true,
+    });
+
+    const unplacedTask = { found: true, id: 'task-2', departmentId: null, employeeId: 'emp-unplaced' };
+    const notStartedErr = await setup({ openReturnTask: unplacedTask, notStartedIds: ['emp-unplaced'] })
+      .service.enable(actor('it-des'), 'reg-1', now)
+      .catch((e: unknown) => e);
+    expect(notStartedErr).toBeInstanceOf(EmployeeNotStartedError);
+    expect((toRegistryApiException(notStartedErr) as ApiException).getStatus()).toBe(HttpStatus.CONFLICT);
+    expect((toRegistryApiException(notStartedErr) as ApiException).getResponse()).toMatchObject({
+      code: 'EMPLOYEE.NOT_STARTED',
+    });
+
+    const unplacedOk = setup({
+      openReturnTask: unplacedTask,
+      unplacedDesignee: { kind: 'DEVICE_RETURN_TASK', workId: 'task-2', employeeId: 'it-des' },
+    });
+    await expect(unplacedOk.service.enable(actor('it-des'), 'reg-1', now)).resolves.toBe('dev-1');
+    expect(firstAuditAfter(unplacedOk.audit)).toEqual({
+      deviceId: 'dev-1',
+      collectorInstalled: true,
+      bySubstitute: true,
+    });
   });
 });

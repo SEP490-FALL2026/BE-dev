@@ -20,6 +20,7 @@ import {
   DeviceHandoverWithoutHolderError,
   DeviceHolderNotFoundError,
   DeviceHolderNotWorkingError,
+  DeviceHolderUnplacedError,
   DeviceRegistrationOverlapError,
   DeviceSerialTakenError,
 } from '../registry/registry.errors';
@@ -169,17 +170,7 @@ export class InitialRecordService {
       if ((await this.organizationReads.notStartedAmong([holder.id], dates.today, tx)).has(holder.id)) {
         throw new EmployeeNotStartedError(holder.id);
       }
-      const verdict = judgeDeviceActor({
-        holderDepartmentId: null,
-        recipientDepartmentId: null,
-        actingByDepartment: new Map(),
-        actor: actorEmployeeId,
-        unplacedRequired: true,
-        unplacedDesignee: null,
-      });
-      if (!verdict.allowed) throw new DeviceNotInChargeError();
-
-      return { holderId: holder.id, validFrom, bySubstitute: verdict.bySubstitute };
+      throw new DeviceHolderUnplacedError();
     }
     const actingByDepartment = await this.organizationReads.itAdminsActingFor(
       [departmentId],

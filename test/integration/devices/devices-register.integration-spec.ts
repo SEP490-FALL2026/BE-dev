@@ -159,6 +159,11 @@ describe('the register of company machines (integration, real PostgreSQL)', () =
     expect(h.codeOf(await h.createDevice(body({ holderEmployeeId: handing })).expect(409))).toBe(
       'DEVICE.HOLDER_NOT_WORKING',
     );
+    const unplaced = await holder();
+    await sql().query(`DELETE FROM employee_placements WHERE employee_id = $1`, [unplaced]);
+    expect(h.codeOf(await h.createDevice(body({ holderEmployeeId: unplaced })).expect(409))).toBe(
+      'DEVICE.HOLDER_UNPLACED',
+    );
     expect(h.codeOf(await h.createDevice(body({ handedOverOn: tomorrow })).expect(422))).toBe(
       'DEVICE.HANDOVER_DATE_INVALID',
     );

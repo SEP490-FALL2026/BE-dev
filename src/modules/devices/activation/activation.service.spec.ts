@@ -27,8 +27,8 @@ interface SetupOptions {
   targetDevice?: Partial<DeviceRecord> | null;
   open?: Partial<RegistrationRecord> | null;
   targetOpen?: Partial<RegistrationRecord> | null;
-  returnTask?: { found: boolean; departmentId: string | null };
-  targetReturnTask?: { found: boolean; departmentId: string | null };
+  returnTask?: { found: boolean; id?: string | null; departmentId: string | null; employeeId?: string | null };
+  targetReturnTask?: { found: boolean; id?: string | null; departmentId: string | null; employeeId?: string | null };
   foundActivation?: {
     id: string;
     deviceId: string;
@@ -299,34 +299,37 @@ describe('DeviceActivationCommandService (W2-19, H17)', () => {
     expect(openCalls[0][1].by).toMatchObject({ employeeId: 'it-sub', bySubstitute: true });
   });
 
-  it('rejects VOIDED, RETIRED, NOT_USABLE (even for DEVICE_BUNDLED), and AWAITING_RETURN (for DEVICE_KEY)', async () => {
+  it('rejects missing, voided, retired, NOT_USABLE, and AWAITING_RETURN (and departing IT Admin self-action)', async () => {
+    const bundled = { keyBinding: 'DEVICE_BUNDLED' } as const;
+    const open = (opts: SetupOptions, emp = 'it-1', licenseKeyId?: string) =>
+      setup(opts).service.open(
+        actor(emp),
+        'dev-1',
+        licenseKeyId ? { planId: 'plan-1', licenseKeyId } : { planId: 'plan-1' },
+        now,
+      );
+    await expect(open({ device: null })).rejects.toBeInstanceOf(DeviceNotFoundError);
+    await expect(open({ device: { voidedAt: now } })).rejects.toBeInstanceOf(DeviceVoidedError);
+    await expect(open({ device: { retiredAt: now } })).rejects.toBeInstanceOf(DeviceAlreadyRetiredError);
+    for (const condition of ['BROKEN', 'IN_REPAIR'] as const) {
+      await expect(open({ device: { condition }, planTarget: bundled })).rejects.toBeInstanceOf(DeviceNotUsableError);
+    }
+    const awaiting: SetupOptions = {
+      returnTask: { found: true, id: 'task-1', departmentId: 'dept-1', employeeId: 'it-1' },
+      inCharge: 'it-1',
+      substitute: 'it-sub',
+    };
     await expect(
-      setup({ device: null }).service.open(actor(), 'dev-1', { planId: 'plan-1' }, now),
-    ).rejects.toBeInstanceOf(DeviceNotFoundError);
-    await expect(
-      setup({ device: { voidedAt: now } }).service.open(actor(), 'dev-1', { planId: 'plan-1' }, now),
-    ).rejects.toBeInstanceOf(DeviceVoidedError);
-    await expect(
-      setup({ device: { retiredAt: now } }).service.open(actor(), 'dev-1', { planId: 'plan-1' }, now),
-    ).rejects.toBeInstanceOf(DeviceAlreadyRetiredError);
-    await expect(
-      setup({
-        device: { condition: 'BROKEN' },
-        planTarget: { keyBinding: 'DEVICE_BUNDLED', subscriptionId: null, status: null, purchasedQuantity: null },
-      }).service.open(actor(), 'dev-1', { planId: 'plan-1' }, now),
-    ).rejects.toBeInstanceOf(DeviceNotUsableError);
-    await expect(
-      setup({
-        device: { condition: 'IN_REPAIR' },
-        planTarget: { keyBinding: 'DEVICE_BUNDLED', subscriptionId: null, status: null, purchasedQuantity: null },
-      }).service.open(actor(), 'dev-1', { planId: 'plan-1' }, now),
-    ).rejects.toBeInstanceOf(DeviceNotUsableError);
-    await expect(
-      setup({
-        returnTask: { found: true, departmentId: 'dept-1' },
-        planTarget: { keyBinding: 'DEVICE_KEY' },
-      }).service.open(actor('it-1'), 'dev-1', { planId: 'plan-1', licenseKeyId: 'key-1' }, now),
+      open({ ...awaiting, planTarget: { keyBinding: 'DEVICE_KEY' } }, 'it-sub', 'key-1'),
     ).rejects.toBeInstanceOf(DeviceAwaitingReturnError);
+    await expect(open({ ...awaiting, planTarget: bundled })).rejects.toBeInstanceOf(DeviceNotInChargeError);
+    await expect(setup(awaiting).service.deactivate(actor('it-1'), 'act-1', {}, now)).rejects.toBeInstanceOf(
+      DeviceNotInChargeError,
+    );
+    await expect(
+      setup(awaiting).service.move(actor('it-1'), 'act-1', { targetDeviceId: 'dev-2' }, now),
+    ).rejects.toBeInstanceOf(DeviceNotInChargeError);
+    await expect(setup(awaiting).service.deactivate(actor('it-sub'), 'act-1', {}, now)).resolves.toBeDefined();
   });
 
   it('rejects unknown or non-device-bound plans before opening activation', async () => {
@@ -360,16 +363,9 @@ describe('DeviceActivationCommandService (W2-19, H17)', () => {
   });
 
   it('moves activation after locking both devices in one sorted call, checking H17 and target readiness', async () => {
+    const same = { id: 'act-1', deviceId: 'dev-1', planId: 'plan-1', licenseKeyId: 'key-1', subscriptionId: 'sub-1' };
     await expect(
-      setup({
-        foundActivation: {
-          id: 'act-1',
-          deviceId: 'dev-1',
-          planId: 'plan-1',
-          licenseKeyId: 'key-1',
-          subscriptionId: 'sub-1',
-        },
-      }).service.move(actor(), 'act-1', { targetDeviceId: 'dev-1' }, now),
+      setup({ foundActivation: same }).service.move(actor(), 'act-1', { targetDeviceId: 'dev-1' }, now),
     ).rejects.toBeInstanceOf(DeviceSameDeviceError);
 
     const { service, order } = setup();

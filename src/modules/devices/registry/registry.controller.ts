@@ -64,9 +64,10 @@ export class RegistryController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), has left or is handing over (DEVICE.HOLDER_NOT_WORKING), the serial number is used by another machine (DEVICE.SERIAL_TAKEN), the asset code counter is exhausted (DEVICE.ASSET_CODE_EXHAUSTED), the generated asset code collided (DEVICE.ASSET_CODE_TAKEN), or the machine has an overlapping registration (DEVICE.REGISTRATION_OVERLAP).',
+        'The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), has not been placed in a department yet (DEVICE.HOLDER_UNPLACED), has left or is handing over (DEVICE.HOLDER_NOT_WORKING), the serial number is used by another machine (DEVICE.SERIAL_TAKEN), the asset code counter is exhausted (DEVICE.ASSET_CODE_EXHAUSTED), the generated asset code collided (DEVICE.ASSET_CODE_TAKEN), or the machine has an overlapping registration (DEVICE.REGISTRATION_OVERLAP).',
       examples: [
         EXAMPLES.EMPLOYEE_NOT_STARTED,
+        EXAMPLES.HOLDER_UNPLACED,
         EXAMPLES.HOLDER_NOT_WORKING,
         EXAMPLES.SERIAL_TAKEN,
         EXAMPLES.ASSET_CODE_EXHAUSTED,

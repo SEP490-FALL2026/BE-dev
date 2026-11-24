@@ -7,7 +7,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { unplacedWorkKey } from '../../organization/public/organization.types';
 import { byUser, devicesEvent } from '../devices-audit-event.mapper';
-import { judgeDeviceActor } from '../devices-custody.policy';
+import { excludeDepartmentActor, judgeDeviceActor } from '../devices-custody.policy';
 import { DeviceNotInChargeError } from '../public/devices.errors';
 import {
   DeviceCollectorAlreadyInstalledError,
@@ -88,31 +88,106 @@ export class CollectorInstallationService {
     actorEmployeeId: string,
     today: string,
   ): Promise<boolean> {
+    const returnTask = await this.repo.findOpenReturnTaskDepartmentId(tx, deviceId);
+    if (returnTask.found) {
+      return this.requireReturnTaskActingItAdmin(tx, {
+        actorEmployeeId,
+        departmentId: returnTask.departmentId,
+        returnTaskId: returnTask.id ?? null,
+        returnTaskEmployeeId: returnTask.employeeId ?? null,
+        today,
+      });
+    }
+
     const departmentId =
       (await this.organizationReads.workDepartmentsOf([holderEmployeeId], today, tx)).get(holderEmployeeId) ?? null;
     if (!departmentId) {
-      if ((await this.organizationReads.notStartedAmong([holderEmployeeId], today, tx)).has(holderEmployeeId)) {
-        throw new EmployeeNotStartedError(holderEmployeeId);
+      return this.requireUnplacedActingItAdmin(tx, {
+        workKind: 'DEVICE',
+        workId: deviceId,
+        employeeId: holderEmployeeId,
+        actorEmployeeId,
+        today,
+      });
+    }
+
+    return this.requireDepartmentActingItAdmin(tx, departmentId, actorEmployeeId);
+  }
+
+  private async requireReturnTaskActingItAdmin(
+    tx: Parameters<RegistryRepo['lockRegistrationChain']>[0],
+    input: {
+      actorEmployeeId: string;
+      departmentId: string | null;
+      returnTaskId: string | null;
+      returnTaskEmployeeId: string | null;
+      today: string;
+    },
+  ): Promise<boolean> {
+    if (input.returnTaskEmployeeId && input.actorEmployeeId === input.returnTaskEmployeeId) {
+      throw new DeviceNotInChargeError();
+    }
+    if (!input.departmentId) {
+      return this.requireUnplacedActingItAdmin(tx, {
+        workKind: 'DEVICE_RETURN_TASK',
+        workId: input.returnTaskId,
+        employeeId: input.returnTaskEmployeeId,
+        actorEmployeeId: input.actorEmployeeId,
+        today: input.today,
+      });
+    }
+
+    return this.requireDepartmentActingItAdmin(
+      tx,
+      input.departmentId,
+      input.actorEmployeeId,
+      input.returnTaskEmployeeId,
+    );
+  }
+
+  private async requireUnplacedActingItAdmin(
+    tx: Parameters<RegistryRepo['lockRegistrationChain']>[0],
+    input: {
+      workKind: 'DEVICE' | 'DEVICE_RETURN_TASK';
+      workId: string | null;
+      employeeId: string | null;
+      actorEmployeeId: string;
+      today: string;
+    },
+  ): Promise<boolean> {
+    if (input.employeeId) {
+      if ((await this.organizationReads.notStartedAmong([input.employeeId], input.today, tx)).has(input.employeeId)) {
+        throw new EmployeeNotStartedError(input.employeeId);
       }
+    }
+    let unplacedDesignee: string | null = null;
+    if (input.workId && input.employeeId) {
       const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
-        [{ workKind: 'DEVICE', workId: deviceId, employeeId: holderEmployeeId }],
+        [{ workKind: input.workKind, workId: input.workId, employeeId: input.employeeId }],
         (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
         tx,
       );
-      const unplacedDesignee = resolved.get(unplacedWorkKey('DEVICE', deviceId)) ?? null;
-      const verdict = judgeDeviceActor({
-        holderDepartmentId: null,
-        recipientDepartmentId: null,
-        actingByDepartment: new Map(),
-        actor: actorEmployeeId,
-        unplacedRequired: true,
-        unplacedDesignee,
-      });
-      if (!verdict.allowed) throw new DeviceNotInChargeError();
-
-      return verdict.bySubstitute;
+      unplacedDesignee = resolved.get(unplacedWorkKey(input.workKind, input.workId)) ?? null;
     }
+    const verdict = judgeDeviceActor({
+      holderDepartmentId: null,
+      recipientDepartmentId: null,
+      actingByDepartment: new Map(),
+      actor: input.actorEmployeeId,
+      unplacedRequired: true,
+      unplacedDesignee,
+    });
+    if (!verdict.allowed) throw new DeviceNotInChargeError();
 
+    return verdict.bySubstitute;
+  }
+
+  private async requireDepartmentActingItAdmin(
+    tx: Parameters<RegistryRepo['lockRegistrationChain']>[0],
+    departmentId: string,
+    actorEmployeeId: string,
+    excludedEmployeeId?: string | null,
+  ): Promise<boolean> {
     const actingByDepartment = await this.organizationReads.itAdminsActingFor(
       [departmentId],
       (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
@@ -121,7 +196,7 @@ export class CollectorInstallationService {
     const verdict = judgeDeviceActor({
       holderDepartmentId: departmentId,
       recipientDepartmentId: null,
-      actingByDepartment,
+      actingByDepartment: excludeDepartmentActor(actingByDepartment, departmentId, excludedEmployeeId),
       actor: actorEmployeeId,
     });
     if (!verdict.allowed) throw new DeviceNotInChargeError();

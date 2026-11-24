@@ -206,6 +206,26 @@ describe('device initial records & onboarding checklist step 6 (W2-13, integrati
     });
   });
 
+  it('rejects initial recording to an unplaced holder with 409 DEVICE.HOLDER_UNPLACED', async () => {
+    const unplaced = (
+      await insertEmployeeFixture(h.ctx.app, h.seed, {
+        code: 'E-UNPLACED-INIT',
+        email: 'unplaced-init@acme.vn',
+      })
+    ).employeeId;
+    await h.ctx.sql.query(`DELETE FROM employee_placements WHERE employee_id = $1`, [unplaced]);
+
+    const res = await postInitial({
+      deviceType: 'LAP',
+      hostname: 'UNPLACED-LT',
+      os: 'Windows 11',
+      assetCode: 'IT-UNPLACED-01',
+      holderEmployeeId: unplaced,
+    }).expect(409);
+
+    expect(h.codeOf(res)).toBe('DEVICE.HOLDER_UNPLACED');
+  });
+
   it('W2-13 (c, d, e): handles concurrent initial record vs seat-baseline close without deadlock, does not block baseline close, and rejects after close', async () => {
     // Record an unsigned initial machine so step 6 returns to INCOMPLETE before closing baseline
     const unsigned = h.dataOf<DeviceWire>(

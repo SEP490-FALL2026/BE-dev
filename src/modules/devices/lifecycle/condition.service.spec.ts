@@ -12,7 +12,7 @@ import { DeviceConditionUnchangedError, DeviceVoidedError } from './lifecycle.er
 interface SetupOptions {
   device?: Partial<DeviceRecord> | null;
   openRegistration?: Partial<RegistrationRecord> | null;
-  openReturnTask?: { found: boolean; departmentId: string | null };
+  openReturnTask?: { found: boolean; id?: string | null; departmentId: string | null; employeeId?: string | null };
   workDepartmentId?: string | null;
   inCharge?: string | null;
   substitute?: string | null;
@@ -164,13 +164,17 @@ describe('ConditionService', () => {
       awaitingDenied.service.changeCondition(actor('it-other'), 'dev-1', { condition: 'BROKEN' }, now),
     ).rejects.toBeInstanceOf(DeviceNotInChargeError);
 
-    const awaitingOk = setup({
-      openReturnTask: { found: true, departmentId: 'dept-ret' },
+    const awaitingDeparting = setup({
+      openReturnTask: { found: true, id: 'task-1', departmentId: 'dept-ret', employeeId: 'it-ret' },
       inCharge: 'it-ret',
       substitute: 'it-sub',
     });
-    await awaitingOk.service.changeCondition(actor('it-sub'), 'dev-1', { condition: 'BROKEN' }, now);
-    expect(firstAudit(awaitingOk.audit).after).toEqual({
+    await expect(
+      awaitingDeparting.service.changeCondition(actor('it-ret'), 'dev-1', { condition: 'BROKEN' }, now),
+    ).rejects.toBeInstanceOf(DeviceNotInChargeError);
+
+    await awaitingDeparting.service.changeCondition(actor('it-sub'), 'dev-1', { condition: 'BROKEN' }, now);
+    expect(firstAudit(awaitingDeparting.audit).after).toEqual({
       condition: 'BROKEN',
       conditionNote: null,
       bySubstitute: true,

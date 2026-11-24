@@ -75297,7 +75297,7 @@
             }
           },
           "409": {
-            "description": "The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), has left or is handing over (DEVICE.HOLDER_NOT_WORKING), the serial number is used by another machine (DEVICE.SERIAL_TAKEN), the asset code counter is exhausted (DEVICE.ASSET_CODE_EXHAUSTED), the generated asset code collided (DEVICE.ASSET_CODE_TAKEN), or the machine has an overlapping registration (DEVICE.REGISTRATION_OVERLAP).",
+            "description": "The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), has not been placed in a department yet (DEVICE.HOLDER_UNPLACED), has left or is handing over (DEVICE.HOLDER_NOT_WORKING), the serial number is used by another machine (DEVICE.SERIAL_TAKEN), the asset code counter is exhausted (DEVICE.ASSET_CODE_EXHAUSTED), the generated asset code collided (DEVICE.ASSET_CODE_TAKEN), or the machine has an overlapping registration (DEVICE.REGISTRATION_OVERLAP).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -75309,6 +75309,17 @@
                       "error": {
                         "code": "EMPLOYEE.NOT_STARTED",
                         "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.HOLDER_UNPLACED": {
+                    "summary": "The holder has no department yet. Register the machine in stock, ask a Super Admin to designate an acting IT Admin for it, and then hand it over.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.HOLDER_UNPLACED",
+                        "message": "The holder has no department yet. Register the machine in stock, ask a Super Admin to designate an acting IT Admin for it, and then hand it over.",
                         "requestId": "req_example"
                       }
                     }
@@ -76542,7 +76553,7 @@
             }
           },
           "409": {
-            "description": "The initialization phase is closed (DEVICE.INITIALIZATION_CLOSED), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), a conflict occurred on the holder, serial number, asset code, registration, or an initial activation could not be opened on the lot or key.",
+            "description": "The initialization phase is closed (DEVICE.INITIALIZATION_CLOSED), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), has not been placed in a department yet (DEVICE.HOLDER_UNPLACED), a conflict occurred on the holder, serial number, asset code, registration, or an initial activation could not be opened on the lot or key.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -76565,6 +76576,17 @@
                       "error": {
                         "code": "EMPLOYEE.NOT_STARTED",
                         "message": "The employee has not started working in a department yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.HOLDER_UNPLACED": {
+                    "summary": "The holder has no department yet. Register the machine in stock, ask a Super Admin to designate an acting IT Admin for it, and then hand it over.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.HOLDER_UNPLACED",
+                        "message": "The holder has no department yet. Register the machine in stock, ask a Super Admin to designate an acting IT Admin for it, and then hand it over.",
                         "requestId": "req_example"
                       }
                     }

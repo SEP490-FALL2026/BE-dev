@@ -99,3 +99,13 @@ export class DeviceCollectorAlreadyInstalledError extends Error {
     this.name = 'DeviceCollectorAlreadyInstalledError';
   }
 }
+
+/** The employee who is to receive a machine has never been placed in any department yet. */
+export class DeviceHolderUnplacedError extends Error {
+  constructor() {
+    super(
+      'The holder has no department yet. Register the machine in stock, ask a Super Admin to designate an acting IT Admin for it, and then hand it over.',
+    );
+    this.name = 'DeviceHolderUnplacedError';
+  }
+}
