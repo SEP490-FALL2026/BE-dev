@@ -16,11 +16,19 @@ export class DepartmentSoftwareEntryNotFoundError extends Error {
   }
 }
 
-/** The proposal does not exist, or the IT Admin who asks is not in charge of its department: they cannot tell it from one that is not there. */
+/** The proposal does not exist, or its department is outside the IT Admin's read scope: they cannot tell it from one that is not there. */
 export class DepartmentSoftwareProposalNotFoundError extends Error {
   constructor() {
     super('The proposal does not exist.');
     this.name = 'DepartmentSoftwareProposalNotFoundError';
+  }
+}
+
+/** The proposal is in the IT Admin's read scope, but they are not an acting IT Admin (in charge or appointed substitute) of its department. */
+export class DepartmentSoftwareNotInChargeError extends Error {
+  constructor() {
+    super('Only an acting IT Admin of the department may decide its software proposals.');
+    this.name = 'DepartmentSoftwareNotInChargeError';
   }
 }
 

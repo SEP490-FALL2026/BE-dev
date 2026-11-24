@@ -1,11 +1,14 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
   DepartmentSoftwareNoteInvalidError,
   DepartmentSoftwareNotInCatalogError,
   ToolsDepartmentNotFoundError,
+  ToolsDepartmentOutOfScopeError,
 } from '../public/licensing.errors';
 import { DepartmentSoftwareChangesService } from './department-software-changes.service';
+import { toDepartmentSoftwareApiException } from './department-software.http-errors';
 import type { SoftwareEntry } from './department-software.types';
 
 const TX = {} as DbTx;
@@ -204,7 +207,7 @@ describe('DepartmentSoftwareChangesService.change: the catalog is read in the tr
       findEntries: jest.fn().mockResolvedValue([]),
       deleteEntries: jest.fn().mockResolvedValue(0),
     };
-    const access = { assertMayChange: jest.fn().mockResolvedValue(undefined) };
+    const access = { assertMayChange: jest.fn().mockResolvedValue({ bySubstitute: false }) };
     const view = {
       assertInCatalog: jest.fn((): Promise<void> => {
         inTransaction.push(inside);
@@ -227,18 +230,22 @@ describe('DepartmentSoftwareChangesService.change: the catalog is read in the tr
       audit as never,
     );
 
-    return { service, repo, view, inTransaction, organizationReads };
+    return { service, repo, view, inTransaction, organizationReads, access, audit };
   }
   const add = [{ applicationId: APPLICATION, planId: PLAN, note: null }];
 
-  it('judges the places to add inside the transaction, with the transaction, after the department is held', async () => {
-    const { service, view, inTransaction, organizationReads } = buildChange();
+  it('judges acting scope and places to add inside the transaction, with the transaction, after the department is held', async () => {
+    const { service, view, inTransaction, organizationReads, access } = buildChange();
 
     await service.change(IT_ADMIN, DEPARTMENT, { add, remove: [] });
 
+    expect(access.assertMayChange).toHaveBeenCalledWith(IT_ADMIN, DEPARTMENT, TX);
     expect(view.assertInCatalog).toHaveBeenCalledWith(add, TX);
     expect(inTransaction).toEqual([true]);
     expect(organizationReads.lockDepartmentShared.mock.invocationCallOrder[0]).toBeLessThan(
+      access.assertMayChange.mock.invocationCallOrder[0],
+    );
+    expect(access.assertMayChange.mock.invocationCallOrder[0]).toBeLessThan(
       view.assertInCatalog.mock.invocationCallOrder[0],
     );
   });
@@ -255,5 +262,95 @@ describe('DepartmentSoftwareChangesService.change: the catalog is read in the tr
 
     expect(repo.insertEntries).not.toHaveBeenCalled();
     expect(repo.deleteEntries).not.toHaveBeenCalled();
+  });
+
+  it('refuses a non-acting IT Admin with 403 DEPARTMENT.OUT_OF_SCOPE and writes and audits nothing', async () => {
+    const { service, access, repo, view, audit } = buildChange();
+    access.assertMayChange.mockRejectedValue(new ToolsDepartmentOutOfScopeError());
+
+    const caught = await service.change(IT_ADMIN, DEPARTMENT, { add, remove: [] }).catch((error: unknown) => error);
+
+    expect(caught).toBeInstanceOf(ToolsDepartmentOutOfScopeError);
+    const apiEx = toDepartmentSoftwareApiException(caught) as ApiException;
+    expect(apiEx.getStatus()).toBe(403);
+    expect(apiEx.getResponse()).toMatchObject({ code: 'DEPARTMENT.OUT_OF_SCOPE' });
+    expect(view.assertInCatalog).not.toHaveBeenCalled();
+    expect(repo.insertEntries).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('records bySubstitute: true in ENTRY_ADDED and ENTRY_REMOVED audit after when an appointed substitute acts', async () => {
+    const { service, access, repo, audit } = buildChange();
+    access.assertMayChange.mockResolvedValue({ bySubstitute: true });
+    repo.findEntries.mockResolvedValue([entry('entry-old')]);
+    repo.deleteEntries.mockResolvedValue(1);
+
+    await service.change(IT_ADMIN, DEPARTMENT, { add, remove: ['entry-old'] });
+
+    expect(audit.record).toHaveBeenNthCalledWith(
+      1,
+      TX,
+      expect.objectContaining({
+        action: 'DEPARTMENT_SOFTWARE.ENTRY_REMOVED',
+        resourceId: 'entry-old',
+        after: { bySubstitute: true },
+      }),
+    );
+    expect(audit.record).toHaveBeenNthCalledWith(
+      2,
+      TX,
+      expect.objectContaining({
+        action: 'DEPARTMENT_SOFTWARE.ENTRY_ADDED',
+        resourceId: 'entry-1',
+        after: { departmentId: DEPARTMENT, applicationId: APPLICATION, planId: PLAN, bySubstitute: true },
+      }),
+    );
+  });
+
+  it('omits bySubstitute from audit after when the in-charge IT Admin acts', async () => {
+    const { service, repo, audit } = buildChange();
+    repo.findEntries.mockResolvedValue([entry('entry-old')]);
+    repo.deleteEntries.mockResolvedValue(1);
+
+    await service.change(IT_ADMIN, DEPARTMENT, { add, remove: ['entry-old'] });
+
+    expect(audit.record).toHaveBeenNthCalledWith(
+      1,
+      TX,
+      expect.objectContaining({
+        action: 'DEPARTMENT_SOFTWARE.ENTRY_REMOVED',
+        after: null,
+      }),
+    );
+    const calls = audit.record.mock.calls as [unknown, { after: Record<string, unknown> }][];
+    const addedAudit = calls[1][1];
+    expect(addedAudit.after).toEqual({ departmentId: DEPARTMENT, applicationId: APPLICATION, planId: PLAN });
+    expect(addedAudit.after).not.toHaveProperty('bySubstitute');
+  });
+
+  it('records bySubstitute: true on ensureEntry when requested', async () => {
+    const { service, repo, audit } = build();
+    repo.insertEntries.mockResolvedValue([entry('entry-sub')]);
+
+    await service.ensureEntry(
+      TX,
+      IT_ADMIN,
+      ORGANIZATION,
+      DEPARTMENT,
+      { applicationId: APPLICATION, planId: PLAN },
+      null,
+      {
+        bySubstitute: true,
+      },
+    );
+
+    expect(audit.record).toHaveBeenCalledWith(
+      TX,
+      expect.objectContaining({
+        action: 'DEPARTMENT_SOFTWARE.ENTRY_ADDED',
+        resourceId: 'entry-sub',
+        after: { departmentId: DEPARTMENT, applicationId: APPLICATION, planId: PLAN, bySubstitute: true },
+      }),
+    );
   });
 });

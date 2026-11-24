@@ -33462,7 +33462,7 @@
         },
         "responses": {
           "200": {
-            "description": "Only an IT Admin in charge of the department changes its list. The entries to take out are removed first, then the places to add are written (up to 50 of each), in one transaction: a place that is not in the catalog (422), one that is already listed (409) or an entry that is not in this department (404) refuses the whole call and writes nothing. The answer lists the entries written, with their ids, and the ids taken out. The Audit Trail records each place added or taken out.",
+            "description": "Only an acting IT Admin (in charge or appointed substitute) of the department changes its list. The entries to take out are removed first, then the places to add are written (up to 50 of each), in one transaction: a place that is not in the catalog (422), one that is already listed (409) or an entry that is not in this department (404) refuses the whole call and writes nothing. The answer lists the entries written, with their ids, and the ids taken out. The Audit Trail records each place added or taken out.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33528,7 +33528,7 @@
             }
           },
           "403": {
-            "description": "Not an IT Admin (AUTHORIZATION.FORBIDDEN), or an IT Admin who is not in charge of this department (DEPARTMENT.OUT_OF_SCOPE).",
+            "description": "Not an IT Admin (AUTHORIZATION.FORBIDDEN), or not an acting IT Admin (in charge or appointed substitute) of this department (DEPARTMENT.OUT_OF_SCOPE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -34354,7 +34354,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Only an IT Admin in charge of the proposal’s department accepts. The place is added to the list at once and the head who proposed is told; entryId is the entry in the list (the one that was already there when an IT Admin had added the place meanwhile). The person who made the proposal does not accept it. A proposal is decided once.",
+            "description": "Only an acting IT Admin (in charge or appointed substitute) of the proposal’s department accepts. The place is added to the list at once and the head who proposed is told; entryId is the entry in the list (the one that was already there when an IT Admin had added the place meanwhile). The person who made the proposal does not accept it. A proposal is decided once.",
             "content": {
               "application/json": {
                 "schema": {
@@ -34399,7 +34399,7 @@
             }
           },
           "403": {
-            "description": "Not an IT Admin (AUTHORIZATION.FORBIDDEN), or the IT Admin made the proposal themselves, as the head of the department before (DEPARTMENT_SOFTWARE.OWN_PROPOSAL): another IT Admin in charge decides it.",
+            "description": "Not an IT Admin (AUTHORIZATION.FORBIDDEN), not an acting IT Admin (in charge or appointed substitute) of the department (DEPARTMENT_SOFTWARE.NOT_IN_CHARGE), or the IT Admin made the proposal themselves, as the head of the department before (DEPARTMENT_SOFTWARE.OWN_PROPOSAL): another acting IT Admin decides it.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -34411,6 +34411,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_SOFTWARE.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the department may decide its software proposals.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_SOFTWARE.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the department may decide its software proposals.",
                         "requestId": "req_example"
                       }
                     }
@@ -34431,7 +34442,7 @@
             }
           },
           "404": {
-            "description": "The proposal does not exist, or its department is not one the IT Admin is in charge of (DEPARTMENT_SOFTWARE.PROPOSAL_NOT_FOUND).",
+            "description": "The proposal does not exist, or its department is outside the IT Admin’s read scope (DEPARTMENT_SOFTWARE.PROPOSAL_NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -34579,7 +34590,7 @@
         },
         "responses": {
           "200": {
-            "description": "Only an IT Admin in charge of the proposal’s department rejects, and the reason is required: the head who proposed reads it in their notice. Nothing is added to the list. The person who made the proposal does not reject it. A proposal is decided once, and the place can be proposed again.",
+            "description": "Only an acting IT Admin (in charge or appointed substitute) of the proposal’s department rejects, and the reason is required: the head who proposed reads it in their notice. Nothing is added to the list. The person who made the proposal does not reject it. A proposal is decided once, and the place can be proposed again.",
             "content": {
               "application/json": {
                 "schema": {
@@ -34645,7 +34656,7 @@
             }
           },
           "403": {
-            "description": "Not an IT Admin (AUTHORIZATION.FORBIDDEN), or the IT Admin made the proposal themselves, as the head of the department before (DEPARTMENT_SOFTWARE.OWN_PROPOSAL): another IT Admin in charge decides it.",
+            "description": "Not an IT Admin (AUTHORIZATION.FORBIDDEN), not an acting IT Admin (in charge or appointed substitute) of the department (DEPARTMENT_SOFTWARE.NOT_IN_CHARGE), or the IT Admin made the proposal themselves, as the head of the department before (DEPARTMENT_SOFTWARE.OWN_PROPOSAL): another acting IT Admin decides it.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -34657,6 +34668,17 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_SOFTWARE.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the department may decide its software proposals.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_SOFTWARE.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the department may decide its software proposals.",
                         "requestId": "req_example"
                       }
                     }
@@ -34677,7 +34699,7 @@
             }
           },
           "404": {
-            "description": "The proposal does not exist, or its department is not one the IT Admin is in charge of (DEPARTMENT_SOFTWARE.PROPOSAL_NOT_FOUND).",
+            "description": "The proposal does not exist, or its department is outside the IT Admin’s read scope (DEPARTMENT_SOFTWARE.PROPOSAL_NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },

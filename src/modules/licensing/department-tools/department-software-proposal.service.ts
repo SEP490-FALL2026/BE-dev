@@ -20,7 +20,6 @@ import {
 import {
   decidedByRefusal,
   decisionRefusal,
-  mayChangeList,
   proposerDepartment,
   type DepartmentSoftwareItem,
 } from './department-software.policy';
@@ -103,7 +102,8 @@ export class DepartmentSoftwareProposalService {
   /**
    * Accepts the proposal: the place goes in the list (nothing to write when an IT Admin put it there meanwhile) and the head is told. A place
    * the catalog no longer offers is refused: the IT Admin rejects it. Throws DepartmentSoftwareProposalNotFoundError,
-   * DepartmentSoftwareOwnProposalError, DepartmentSoftwareNotInCatalogError and DepartmentSoftwareProposalDecidedError.
+   * DepartmentSoftwareNotInChargeError, DepartmentSoftwareOwnProposalError, DepartmentSoftwareNotInCatalogError and
+   * DepartmentSoftwareProposalDecidedError.
    */
   async accept(
     actor: AuthenticatedPrincipal,
@@ -115,11 +115,14 @@ export class DepartmentSoftwareProposalService {
 
     const done = await this.runner.run(async (tx) => {
       await this.lockDepartment(tx, proposal.departmentId);
+      const { bySubstitute } = await this.access.assertMayDecideProposal(actor, proposal.departmentId, tx);
       // What the catalog offers is read in the transaction that decides, so a place that stops being offered leaves the proposal open (DS-R3).
       await this.view.assertInCatalog([item], tx);
       const decided = await this.decide(tx, actor, proposal, { state: 'ACCEPTED', reason: null });
-      const { entry } = await this.changes.ensureEntry(tx, actor, organization, proposal.departmentId, item, null);
-      await this.recordDecision(tx, actor, organization, proposal, 'ACCEPTED');
+      const { entry } = await this.changes.ensureEntry(tx, actor, organization, proposal.departmentId, item, null, {
+        bySubstitute,
+      });
+      await this.recordDecision(tx, actor, organization, proposal, 'ACCEPTED', bySubstitute);
       await this.notice.decided(tx, decided, { state: 'ACCEPTED', reason: null });
 
       return { decided, entryId: entry.id };
@@ -128,15 +131,19 @@ export class DepartmentSoftwareProposalService {
     return { proposal: (await this.view.proposals([done.decided]))[0], entryId: done.entryId };
   }
 
-  /** Rejects the proposal with the reason the head reads (`QĐ-110t`). Throws DepartmentSoftwareProposalNotFoundError, DepartmentSoftwareOwnProposalError and DepartmentSoftwareProposalDecidedError. */
+  /**
+   * Rejects the proposal with the reason the head reads (`QĐ-110t`). Throws DepartmentSoftwareProposalNotFoundError,
+   * DepartmentSoftwareNotInChargeError, DepartmentSoftwareOwnProposalError and DepartmentSoftwareProposalDecidedError.
+   */
   async reject(actor: AuthenticatedPrincipal, proposalId: string, reason: string): Promise<SoftwareProposalWire> {
     const proposal = await this.inCharge(actor, proposalId);
     const organization = await this.requireOrganization();
 
     const decided = await this.runner.run(async (tx) => {
       await this.lockDepartment(tx, proposal.departmentId);
+      const { bySubstitute } = await this.access.assertMayDecideProposal(actor, proposal.departmentId, tx);
       const rejected = await this.decide(tx, actor, proposal, { state: 'REJECTED', reason });
-      await this.recordDecision(tx, actor, organization, proposal, 'REJECTED');
+      await this.recordDecision(tx, actor, organization, proposal, 'REJECTED', bySubstitute);
       await this.notice.decided(tx, rejected, { state: 'REJECTED', reason });
 
       return rejected;
@@ -146,14 +153,14 @@ export class DepartmentSoftwareProposalService {
   }
 
   /**
-   * The proposal, for an IT Admin in charge of its department: one of another department is not found, as one that is not there. The person
-   * who made it does not decide it (`SoD-4`): that is asked of the one who can see it, after the scope, and before anything is written.
+   * The proposal, for an acting IT Admin of its department: one outside read scope is not found (404), one in read scope but
+   * outside acting scope is forbidden (403). The person who made it does not decide it (`SoD-4`): that is asked after the scope
+   * and before anything is written.
    */
   private async inCharge(actor: AuthenticatedPrincipal, proposalId: string): Promise<SoftwareProposal> {
     const proposal = await this.repo.findProposal(proposalId);
     if (!proposal) throw new DepartmentSoftwareProposalNotFoundError();
-    const inItAdminScope = (await this.access.itAdminScope(actor)).has(proposal.departmentId);
-    if (!mayChangeList({ roles: actor.roles, inItAdminScope })) throw new DepartmentSoftwareProposalNotFoundError();
+    await this.access.assertMayDecideProposal(actor, proposal.departmentId);
     if (decidedByRefusal({ employeeId: actor.employeeId }, proposal) !== null)
       throw new DepartmentSoftwareOwnProposalError();
 
@@ -182,6 +189,7 @@ export class DepartmentSoftwareProposalService {
     organizationId: string,
     proposal: SoftwareProposal,
     state: 'ACCEPTED' | 'REJECTED',
+    bySubstitute: boolean,
   ): Promise<void> {
     await this.audit.record(
       tx,
@@ -192,7 +200,12 @@ export class DepartmentSoftwareProposalService {
         'DepartmentSoftwareProposal',
         proposal.id,
         { state: 'PENDING' },
-        { state, departmentId: proposal.departmentId, ...place(proposal) },
+        {
+          state,
+          departmentId: proposal.departmentId,
+          ...place(proposal),
+          ...(bySubstitute ? { bySubstitute: true } : {}),
+        },
       ),
     );
   }

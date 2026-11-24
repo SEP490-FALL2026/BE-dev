@@ -6,6 +6,7 @@ import { DepartmentSoftwareNoteInvalidError, DepartmentSoftwareNotInCatalogError
 import {
   DepartmentSoftwareAlreadyListedError,
   DepartmentSoftwareEntryNotFoundError,
+  DepartmentSoftwareNotInChargeError,
   DepartmentSoftwareOwnProposalError,
   DepartmentSoftwareProposalDecidedError,
   DepartmentSoftwareProposalNotFoundError,
@@ -53,6 +54,12 @@ export function toDepartmentSoftwareApiException(error: unknown): unknown {
       message: error.message,
     });
   }
+  if (error instanceof DepartmentSoftwareNotInChargeError) {
+    return new ApiException(HttpStatus.FORBIDDEN, {
+      code: 'DEPARTMENT_SOFTWARE.NOT_IN_CHARGE',
+      message: error.message,
+    });
+  }
   if (error instanceof DepartmentSoftwareOwnProposalError) {
     return new ApiException(HttpStatus.FORBIDDEN, {
       code: 'DEPARTMENT_SOFTWARE.OWN_PROPOSAL',
@@ -85,6 +92,7 @@ export const DEPARTMENT_SOFTWARE_ERROR_EXAMPLES = {
   ALREADY_LISTED: example(new DepartmentSoftwareAlreadyListedError([PLACE])),
   ENTRY_NOT_FOUND: example(new DepartmentSoftwareEntryNotFoundError(['entry-id'])),
   PROPOSAL_NOT_FOUND: example(new DepartmentSoftwareProposalNotFoundError()),
+  NOT_IN_CHARGE: example(new DepartmentSoftwareNotInChargeError()),
   OWN_PROPOSAL: example(new DepartmentSoftwareOwnProposalError()),
   PROPOSAL_ALREADY_OPEN: example(new DepartmentSoftwareProposalOpenError()),
   PROPOSAL_NOT_PENDING: example(new DepartmentSoftwareProposalDecidedError()),

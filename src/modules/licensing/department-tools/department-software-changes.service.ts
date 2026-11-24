@@ -50,13 +50,13 @@ export class DepartmentSoftwareChangesService {
     departmentId: string,
     change: SoftwareListChange,
   ): Promise<{ added: SoftwareEntryWire[]; removed: string[] }> {
-    await this.access.assertMayChange(actor, departmentId);
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The list of software of a department was changed before installation');
 
     const result = await this.runner.run(async (tx) => {
       if (!(await this.organizationReads.lockDepartmentShared(tx, departmentId)))
         throw new ToolsDepartmentNotFoundError();
+      const { bySubstitute } = await this.access.assertMayChange(actor, departmentId, tx);
       // What the catalog offers is read in the transaction that writes, once the department is held (DS-R3).
       await this.view.assertInCatalog(change.add, tx);
       const removed = await this.takeOut(tx, departmentId, change.remove);
@@ -74,7 +74,7 @@ export class DepartmentSoftwareChangesService {
               departmentId,
               ...place(entry),
             },
-            null,
+            bySubstitute ? { bySubstitute: true } : null,
           ),
         );
       }
@@ -91,6 +91,7 @@ export class DepartmentSoftwareChangesService {
             {
               departmentId,
               ...place(entry),
+              ...(bySubstitute ? { bySubstitute: true } : {}),
             },
           ),
         );
@@ -139,6 +140,7 @@ export class DepartmentSoftwareChangesService {
     departmentId: string,
     item: DepartmentSoftwareItem,
     note: string | null,
+    options?: { bySubstitute?: boolean },
   ): Promise<{ entry: SoftwareEntry; created: boolean }> {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const [written] = await this.repo.insertEntries(tx, {
@@ -160,6 +162,7 @@ export class DepartmentSoftwareChangesService {
             {
               departmentId,
               ...place(item),
+              ...(options?.bySubstitute ? { bySubstitute: true } : {}),
             },
           ),
         );

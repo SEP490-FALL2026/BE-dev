@@ -67,6 +67,21 @@ Trạng thái: `chưa` · `đang làm` · `xong` · `dừng hỏi` · `bị ch�
 | Lần | Commit | Link run | Kết quả từng job |
 | --- | ------ | -------- | ---------------- |
 
+## Sửa cuối đợt 2 (`FIX-PLAN-W2.md`)
+
+| Gói | Mục | Trạng thái | sha | Lệnh kiểm + kết quả | FIX-TEST thêm | D-n | Ghi chú / chưa kiểm được |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| BF-1 | `department-tools` ghi dùng `getItAdminActingScope` + `bySubstitute` | xong | (commit này) | `tsc` (0), `eslint` 12 file (0), `depcruise` (0), `arch:capabilities --module licensing` (0), `rules:check` (0), `test:gates` (17/17, 335 pass), unit `department-tools` (5/5, 82 pass), H platform OpenAPI (5/5, 50 pass), `openapi:export` (+30/-8) | 2 dòng (`department-software-list-http`, `department-software-proposals-http`) | — | I mới `department-software-in-charge.integration-spec.ts` chờ CI |
+| TF-2 | C-1: migration bỏ unique `device_return_tasks.registration_id`, `findExistingRegistrationIds` chỉ `OPEN` | đang làm | | | | | |
+| TF-1 | A-1: migration `plans_keep_children_valid` chặn vào K4 gắn máy | chưa | | | | | |
+| BF-5 | B-3: `EMPLOYEE.NOT_STARTED` (409) cho nhân viên chỉ có placement tương lai | chưa | | | | | |
+| BF-2 + BF-4 | C-2/C-9 (`requireDepartmentActor` loại người nghỉ) + C-D2 (`409 DEVICE.HOLDER_UNPLACED`) | chưa | | | | | |
+| BF-3 | C-3: `initial-record` khóa khoản mua theo `subscriptionId` (`TF-4` dời sau T7 của Bảo) | chưa | | | | | |
+| TF-5 | A-5: migration `device_return_tasks_guard` chặn đổi cột khác khi `OPEN` | chưa | | | | | |
+| TF-6 + BF-8 + BF-6 | A-7/A-8 unit/403 + mock `department-avatar.http-spec` + sửa chữ SPEC | chưa | | | | | |
+| BF-7 | Low SPEC: B-5, B-6, B-7, B-8, C-5..C-8, C-10 | chưa | | | | | |
+| TF-7 + TF-8 e2e | Sửa fixture 17 I mới + 3 e2e (`paid-request-to-seat`, `offboarding-revocation`, `free-request`) | chưa | | | | | |
+
 ## Dừng ở đâu
 
 Đã hoàn tất toàn bộ làn **`biz`** của đợt 2 (`B0 → B10a → B10b → B10c → B10d → B10e → B10f → B10g → B11 → B1 → B2a-1 → B2a-2 → B2b → B3a-1 → B3a-2 → B3b → B4 → B5a → B5b → B5c → B6 → B7 → B8 → B10h → B9`), đã kiểm tra xanh (gates/unit/HTTP contract không DB/arch/rules) và push lên `origin/int/redesign-w2`.
