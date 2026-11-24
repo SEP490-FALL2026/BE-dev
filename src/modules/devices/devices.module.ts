@@ -35,6 +35,8 @@ import { HolderChangeService } from './lifecycle/holder-change.service';
 import { LifecycleController } from './lifecycle/lifecycle.controller';
 import { ReplacementService } from './lifecycle/replacement.service';
 import { RetirementService } from './lifecycle/retirement.service';
+import { ReturnTaskCompletionController } from './lifecycle/return-task-completion.controller';
+import { ReturnTaskCompletionService } from './lifecycle/return-task-completion.service';
 import { VoidService } from './lifecycle/void.service';
 import { MyDevicesController } from './my-devices/my-devices.controller';
 import { MyDevicesRepo } from './my-devices/my-devices.repo';
@@ -51,6 +53,8 @@ import { RegistryQueryRepo } from './registry/registry-query.repo';
 import { RegistryQueryService } from './registry/registry-query.service';
 import { RegistryRepo } from './registry/registry.repo';
 import { RegistryService } from './registry/registry.service';
+import { DeviceReturnTaskController } from './return-task/device-return-task.controller';
+import { DeviceReturnTaskQueryService } from './return-task/device-return-task-query.service';
 import { DeviceReturnTaskRepo } from './return-task/device-return-task.repo';
 import { DeviceReturnTaskService } from './return-task/device-return-task.service';
 import { SignatureRecordController } from './registry/signature-record.controller';
@@ -84,6 +88,8 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     NoticeController,
     RegistryController,
     LifecycleController,
+    DeviceReturnTaskController,
+    ReturnTaskCompletionController,
     DeviceActivationController,
     DeviceActivationsController,
     DeviceAttributesController,
@@ -107,6 +113,7 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     ConditionService,
     RetirementService,
     ReplacementService,
+    ReturnTaskCompletionService,
     VoidService,
     DeviceActivationCommandService,
     ActivationQueryService,
@@ -116,6 +123,7 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     DeviceAttributesService,
     RegistrationEndService,
     DeviceReturnTaskRepo,
+    DeviceReturnTaskQueryService,
     DeviceReturnTaskService,
     SignatureRecordService,
     CollectorInstallationService,

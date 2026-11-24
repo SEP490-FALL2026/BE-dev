@@ -79,6 +79,12 @@ export interface DeviceExtras {
   retirementReason: string | null;
   conditionNote: string | null;
   voidReason: string | null;
+  openReturnTask: {
+    id: string;
+    dueOn: BusinessDate;
+    departmentId: string | null;
+    employeeId: string;
+  } | null;
 }
 
 /** The same decision as `collectionStateOf`, in SQL: a list filtered by state reads exactly what the detail shows. */
@@ -226,7 +232,7 @@ export class RegistryQueryRepo {
 
   /** What only the detail of a machine shows: its latest acknowledgement and signed record, how the last registration ended. */
   async extras(deviceId: string, registrationId: string | null): Promise<DeviceExtras> {
-    const [acknowledgement, signature, lastEnd, device] = await Promise.all([
+    const [acknowledgement, signature, lastEnd, device, openReturnTask] = await Promise.all([
       registrationId
         ? this.prisma.deviceAcknowledgement.findFirst({
             where: { registrationId },
@@ -255,6 +261,7 @@ export class RegistryQueryRepo {
         where: { id: deviceId },
         select: { retirementReason: true, conditionNote: true, voidReason: true },
       }),
+      this.openReturnTaskOf(deviceId),
     ]);
 
     return {
@@ -276,7 +283,19 @@ export class RegistryQueryRepo {
       retirementReason: device?.retirementReason ?? null,
       conditionNote: device?.conditionNote ?? null,
       voidReason: device?.voidReason ?? null,
+      openReturnTask,
     };
+  }
+
+  private async openReturnTaskOf(deviceId: string): Promise<DeviceExtras['openReturnTask']> {
+    const row = await this.prisma.deviceReturnTask.findFirst({
+      where: { deviceId, state: 'OPEN' },
+      select: { id: true, dueOn: true, departmentId: true, employeeId: true },
+    });
+
+    return row
+      ? { id: row.id, dueOn: fromDateColumn(row.dueOn), departmentId: row.departmentId, employeeId: row.employeeId }
+      : null;
   }
 
   /** Returns matching machine IDs filtered by idle status (`IN_STOCK` excluding `AWAITING_RETURN`, or `IN_REPAIR`/`BROKEN`). */

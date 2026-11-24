@@ -1,16 +1,19 @@
 import { Injectable } from '@nestjs/common';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AssetDeviceType } from '../asset-code/asset-code.policy';
 import type { CollectionState } from '../devices-collection-state.policy';
 import type { DeviceCondition } from '../devices-custody.policy';
 import { DeviceNotFoundError } from '../public/devices.errors';
-import { RegistryQueryRepo } from './registry-query.repo';
+import { OPEN_RETURN_TASK_ACTING_IT_ADMINS_MAX } from './registry.dto';
+import { RegistryQueryRepo, type DeviceExtras } from './registry-query.repo';
 import {
   toDeviceDetail,
   toDeviceRegistration,
   toDeviceSummary,
   type DepartmentBriefView,
   type HolderBrief,
+  type OpenReturnTaskDetailView,
 } from './registry.mapper';
 
 export interface DeviceListInput {
@@ -31,6 +34,7 @@ export class RegistryQueryService {
   constructor(
     private readonly queries: RegistryQueryRepo,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   async list(input: DeviceListInput, now: Date = new Date()) {
@@ -93,10 +97,40 @@ export class RegistryQueryService {
     const row = await this.queries.one(organization.id, id);
     if (!row) throw new DeviceNotFoundError();
     const extras = await this.queries.extras(id, row.registrationId);
-    const holders = await this.holdersOf([row.holderEmployeeId, extras.lastEnd?.holderEmployeeId ?? null]);
+    const actingIds = await this.resolveOpenTaskActorIds(extras.openReturnTask);
+    const holders = await this.holdersOf([
+      row.holderEmployeeId,
+      extras.lastEnd?.holderEmployeeId ?? null,
+      ...actingIds,
+    ]);
     const departments = await this.departmentsOf([row.holderEmployeeId], now);
+    const openReturnTask: OpenReturnTaskDetailView | null = extras.openReturnTask
+      ? {
+          id: extras.openReturnTask.id,
+          dueOn: extras.openReturnTask.dueOn,
+          departmentId: extras.openReturnTask.departmentId,
+          actingItAdmins: actingIds.map((actorId) => ({
+            id: actorId,
+            fullName: holders.get(actorId)?.fullName ?? '',
+          })),
+          waiting: actingIds.length === 0,
+        }
+      : null;
 
-    return toDeviceDetail(row, extras, holders, departments);
+    return toDeviceDetail(row, extras, holders, departments, openReturnTask);
+  }
+
+  private async resolveOpenTaskActorIds(openTask: DeviceExtras['openReturnTask']): Promise<string[]> {
+    if (!openTask?.departmentId) return [];
+    const map = await this.organizationReads.itAdminsActingFor([openTask.departmentId], (ids) =>
+      this.identity.findUsableItAdminEmployeeIds(ids),
+    );
+    const acting = map.get(openTask.departmentId);
+    if (!acting) return [];
+
+    return acting.actors
+      .filter((actorId) => actorId !== openTask.employeeId)
+      .slice(0, OPEN_RETURN_TASK_ACTING_IT_ADMINS_MAX);
   }
 
   /** Resolves the current owning department of each holder in two batch queries. */

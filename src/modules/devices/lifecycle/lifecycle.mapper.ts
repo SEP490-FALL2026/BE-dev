@@ -3,6 +3,7 @@ import type { IdentityAccessApi } from '../../identity-access/public/identity-ac
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { judgeDeviceActor } from '../devices-custody.policy';
 import { DeviceNotInChargeError } from '../public/devices.errors';
+import { DeviceReturnTaskNotInChargeError } from './lifecycle.errors';
 import type { SoftwareRemovalInput } from './lifecycle.policy';
 
 export type NormalizedSoftwareRemoval = {
@@ -106,4 +107,31 @@ export async function requireDepartmentActor(
   if (!verdict.allowed) throw new DeviceNotInChargeError();
 
   return verdict.bySubstitute;
+}
+
+/**
+ * Verifies that an IT Admin is currently acting for the return task's department (excluding the departing employee)
+ * and returns whether the authorization came through an active substitute appointment.
+ */
+export async function requireReturnTaskActor(
+  tx: DbTx,
+  deps: { organizationReads: OrganizationReadApi; identity: IdentityAccessApi },
+  input: { actorEmployeeId: string; departmentId: string | null; taskEmployeeId: string },
+): Promise<boolean> {
+  if (input.actorEmployeeId === input.taskEmployeeId || !input.departmentId) {
+    throw new DeviceReturnTaskNotInChargeError();
+  }
+
+  const actingByDept = await deps.organizationReads.itAdminsActingFor(
+    [input.departmentId],
+    (ids) => deps.identity.findUsableItAdminEmployeeIds(ids, tx),
+    tx,
+  );
+  const acting = actingByDept.get(input.departmentId);
+  const eligible = (acting?.actors ?? []).filter((id) => id !== input.taskEmployeeId);
+  if (!acting || !eligible.includes(input.actorEmployeeId)) {
+    throw new DeviceReturnTaskNotInChargeError();
+  }
+
+  return acting.substitute === input.actorEmployeeId && acting.inCharge !== input.actorEmployeeId;
 }

@@ -40,3 +40,28 @@ export interface CancelReturnTasksInput {
   caseId: string;
   at: Date;
 }
+
+export interface ReturnTaskListRow extends ReturnTaskRecord {
+  deviceAssetCode: string;
+  deviceHostname: string;
+}
+
+export interface ReturnTaskListFilter {
+  organizationId: string;
+  departmentIds?: readonly string[] | undefined;
+  excludeEmployeeId?: string | undefined;
+  state: 'OPEN' | 'CLOSED' | 'ALL';
+  overdue?: boolean | undefined;
+  today: BusinessDate;
+}
+
+export interface ReturnTaskCountScope {
+  organizationId: string;
+  actingDepartmentIds: readonly string[];
+  excludeEmployeeId: string;
+}
+
+export interface ReturnTaskCounts {
+  open: number;
+  overdue: number;
+}

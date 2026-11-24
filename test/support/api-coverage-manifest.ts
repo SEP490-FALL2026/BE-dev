@@ -344,6 +344,8 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/devices/{id}/condition-changes',
   'POST /api/v1/devices/{id}/retirements',
   'POST /api/v1/devices/{id}/voids',
+  'GET /api/v1/device-return-tasks',
+  'POST /api/v1/device-return-tasks/{id}/completion',
   'POST /api/v1/devices/{id}/activations',
   'GET /api/v1/device-activations',
   'POST /api/v1/device-activations/{id}/deactivation',

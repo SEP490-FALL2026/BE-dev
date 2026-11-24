@@ -442,6 +442,11 @@ describe('company machine routes (http contract, no database)', () => {
         ['replacementDeviceId', 'condition', 'softwareRemoval', 'collectorInstalled'],
       ],
       ['DeviceVoidBodyDto', ['reason'], ['reason']],
+      [
+        'DeviceReturnTaskCompleteBodyDto',
+        ['outcome', 'condition', 'conditionNote', 'softwareRemoval', 'reason', 'activationDecisions'],
+        ['outcome'],
+      ],
       ['OpenDeviceActivationBodyDto', ['planId', 'licenseKeyId'], ['planId']],
       ['DeactivateDeviceActivationBodyDto', ['licenseRelease'], []],
       ['MoveDeviceActivationBodyDto', ['targetDeviceId'], ['targetDeviceId']],
@@ -496,6 +501,35 @@ describe('company machine routes (http contract, no database)', () => {
 
       expect(registrations?.operationId).toBe('deviceRegistrationList');
       expect(parameters.sort()).toEqual(['id', 'page', 'pageSize']);
+    });
+  });
+
+  describe('device return task routes', () => {
+    it('enforces authentication and role guards for list and completion endpoints', async () => {
+      const server = app.getHttpServer();
+      await request(server).get('/api/v1/device-return-tasks').expect(401);
+      await request(server).post(`/api/v1/device-return-tasks/${ID}/completion`).send({}).expect(401);
+
+      for (const roles of [['EMPLOYEE'], ['MANAGER'], ['FINANCE']]) {
+        const res = await request(server)
+          .get('/api/v1/device-return-tasks')
+          .set('Authorization', bearer(principal(roles)))
+          .expect(403);
+        expect(bodyOf(res).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+      }
+
+      const saComplete = await request(server)
+        .post(`/api/v1/device-return-tasks/${ID}/completion`)
+        .set('Authorization', bearer(principal(['SUPER_ADMIN'])))
+        .send({ outcome: 'NOT_RECOVERED', reason: 'Lost' })
+        .expect(403);
+      expect(bodyOf(saComplete).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+
+      const badQuery = await request(server)
+        .get('/api/v1/device-return-tasks?scope=GENERAL')
+        .set('Authorization', bearer(principal(['IT_ADMIN'])))
+        .expect(422);
+      expect(bodyOf(badQuery).error.code).toBe('VALIDATION_ERROR');
     });
   });
 });

@@ -66,3 +66,14 @@ export interface CancelReturnTasksOfCaseInput {
   caseId: string;
   at: Date;
 }
+
+export interface ReturnTaskCountScope {
+  organizationId: string;
+  actingDepartmentIds: readonly string[];
+  excludeEmployeeId: string;
+}
+
+export interface ReturnTaskCounts {
+  open: number;
+  overdue: number;
+}

@@ -6,6 +6,7 @@ import { RegistrationEndService } from '../registry/registration-end.service';
 import { RegistryQueryRepo } from '../registry/registry-query.repo';
 import { RegistryRepo } from '../registry/registry.repo';
 import { returnDueOn as computeReturnDueOn } from '../return-task/device-return-task.policy';
+import { DeviceReturnTaskRepo } from '../return-task/device-return-task.repo';
 import { DeviceReturnTaskService } from '../return-task/device-return-task.service';
 import type {
   CancelReturnTasksOfCaseInput,
@@ -16,6 +17,8 @@ import type {
   MoveReturnTaskDueInput,
   OpenReturnTasksForDepartureInput,
   ReturnDueFacts,
+  ReturnTaskCounts,
+  ReturnTaskCountScope,
 } from './devices.types';
 
 /**
@@ -31,6 +34,7 @@ export class DevicesApi {
     private readonly sessions: CredentialSessionService,
     private readonly queries: RegistryQueryRepo,
     private readonly returnTasks: DeviceReturnTaskService,
+    private readonly returnTaskRepo: DeviceReturnTaskRepo,
   ) {}
 
   returnDueOn(facts: ReturnDueFacts): BusinessDate {
@@ -47,6 +51,10 @@ export class DevicesApi {
 
   cancelReturnTasksOfCase(tx: DbTx, input: CancelReturnTasksOfCaseInput): Promise<{ cancelledIds: string[] }> {
     return this.returnTasks.cancelOfCase(tx, input);
+  }
+
+  countReturnTasks(scope: ReturnTaskCountScope, today: BusinessDate, tx?: DbTx): Promise<ReturnTaskCounts> {
+    return this.returnTaskRepo.countForScope(scope, today, tx);
   }
 
   /**

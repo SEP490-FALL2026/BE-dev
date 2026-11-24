@@ -10,13 +10,14 @@ import { DeviceNotFoundError } from '../public/devices.errors';
 import { RegistrationEndService } from '../registry/registration-end.service';
 import { DeviceAlreadyRetiredError } from '../registry/registry.errors';
 import { RegistryRepo, type RegistrationRecord } from '../registry/registry.repo';
+import { DeviceReturnTaskRepo } from '../return-task/device-return-task.repo';
+import { DeviceNotHeldError, DeviceSoftwareRemovalNoteRequiredError, DeviceVoidedError } from './lifecycle.errors';
 import {
-  DeviceNotHeldError,
-  DeviceReturnTaskNotInChargeError,
-  DeviceSoftwareRemovalNoteRequiredError,
-  DeviceVoidedError,
-} from './lifecycle.errors';
-import { normalizeSoftwareRemoval, requireLifecycleActor, type NormalizedSoftwareRemoval } from './lifecycle.mapper';
+  normalizeSoftwareRemoval,
+  requireLifecycleActor,
+  requireReturnTaskActor,
+  type NormalizedSoftwareRemoval,
+} from './lifecycle.mapper';
 import { judgeReturn, judgeSoftwareRemoval, type SoftwareRemovalInput } from './lifecycle.policy';
 
 export interface DeviceReturnInput {
@@ -26,15 +27,17 @@ export interface DeviceReturnInput {
 }
 
 /**
- * Receives a held or awaiting-return machine back into stock, ending any open registration and recording its condition.
+ * Receives a held or awaiting-return machine back into stock, ending any open registration, completing any open
+ * return task, and recording its condition.
  *
- * Lock order: machine FOR UPDATE (tier 2b), then open registration FOR UPDATE.
+ * Lock order: machine FOR UPDATE (tier 2b), open registration FOR UPDATE, then open return task FOR UPDATE.
  */
 @Injectable()
 export class DeviceReceiptService {
   constructor(
     private readonly repo: RegistryRepo,
     private readonly ending: RegistrationEndService,
+    private readonly returnTasks: DeviceReturnTaskRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly audit: AuditApi,
@@ -50,52 +53,124 @@ export class DeviceReceiptService {
   ): Promise<void> {
     const organization = await this.requireOrganization();
 
-    await this.runner.run(async (tx) => {
-      const device = await this.repo.lockDevice(tx, deviceId);
-      if (!device) throw new DeviceNotFoundError();
-      const open = await this.repo.lockOpenRegistration(tx, deviceId);
-      const hasOpenReturnTask = await this.repo.hasOpenReturnTask(tx, deviceId);
-      const custody = custodyOf({
+    await this.runner.run((tx) => this.returnInTx(tx, organization.id, actor, deviceId, input, now));
+  }
+
+  private async returnInTx(
+    tx: DbTx,
+    organizationId: string,
+    actor: AuthenticatedPrincipal,
+    deviceId: string,
+    input: DeviceReturnInput,
+    now: Date,
+  ): Promise<void> {
+    const device = await this.repo.lockDevice(tx, deviceId);
+    if (!device) throw new DeviceNotFoundError();
+    const open = await this.repo.lockOpenRegistration(tx, deviceId);
+    const returnTask = await this.returnTasks.lockOpenByDeviceId(tx, deviceId);
+    this.assertMayReturn(
+      custodyOf({
         voidedAt: device.voidedAt,
         retiredAt: device.retiredAt,
-        hasOpenReturnTask,
+        hasOpenReturnTask: returnTask !== null,
         hasOpenRegistration: open !== null,
+      }),
+    );
+
+    const removal = this.assertRemovalValid(input.softwareRemoval);
+    const today = await this.organizationReads.businessToday(now, tx);
+    const bySubstitute = await this.authorizeReturn(tx, actor, today, open, returnTask);
+    if (returnTask) {
+      await this.returnTasks.markReceived(tx, returnTask.id, {
+        conditionOnReceipt: input.condition,
+        softwareRemoval: removal.outcome,
+        softwareRemovalNote: removal.note,
+        handledByAppUserId: actor.appUserId,
+        handledAt: now,
       });
-      this.assertMayReturn(custody);
+    }
 
-      const removal = this.assertRemovalValid(input.softwareRemoval);
-      if (hasOpenReturnTask) {
-        // Open return task handling is connected in the return-task module later; reject until task completion is wired.
-        throw new DeviceReturnTaskNotInChargeError();
-      }
-
-      const today = await this.organizationReads.businessToday(now, tx);
-      const bySubstitute = open
-        ? await requireLifecycleActor(
-            tx,
-            { organizationReads: this.organizationReads, identity: this.identity },
-            {
-              actorEmployeeId: actor.employeeId,
-              today,
-              oldHolderEmployeeId: open.holderEmployeeId,
-              recipientEmployeeId: null,
-            },
-          )
-        : false;
-
-      await this.receive(tx, {
-        organizationId: organization.id,
-        actor,
-        deviceId,
-        openRegistration: open,
-        condition: input.condition,
-        conditionNote: input.conditionNote ?? null,
-        softwareRemoval: removal,
-        now,
-        bySubstitute,
-        recordAudit: true,
-      });
+    await this.receive(tx, {
+      organizationId,
+      actor,
+      deviceId,
+      openRegistration: open,
+      condition: input.condition,
+      conditionNote: input.conditionNote ?? null,
+      softwareRemoval: removal,
+      now,
+      bySubstitute,
+      returnTaskId: returnTask?.id ?? null,
+      recordAudit: true,
     });
+
+    if (returnTask) {
+      await this.auditTaskCompleted(
+        tx,
+        organizationId,
+        actor,
+        returnTask.id,
+        deviceId,
+        input.condition,
+        removal,
+        bySubstitute,
+      );
+    }
+  }
+
+  private async auditTaskCompleted(
+    tx: DbTx,
+    organizationId: string,
+    actor: AuthenticatedPrincipal,
+    taskId: string,
+    deviceId: string,
+    condition: DeviceCondition,
+    softwareRemoval: NormalizedSoftwareRemoval,
+    bySubstitute: boolean,
+  ): Promise<void> {
+    await this.audit.record(
+      tx,
+      devicesEvent(byUser(actor), organizationId, 'DEVICE_RETURN_TASK.COMPLETED', 'DeviceReturnTask', taskId, null, {
+        outcome: 'RECEIVED',
+        deviceId,
+        condition,
+        softwareRemoval,
+        viaDeviceReturn: true,
+        ...(bySubstitute ? { bySubstitute: true } : {}),
+      }),
+    );
+  }
+
+  private authorizeReturn(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    today: string,
+    open: RegistrationRecord | null,
+    returnTask: { departmentId: string | null; employeeId: string } | null,
+  ): Promise<boolean> {
+    if (returnTask) {
+      return requireReturnTaskActor(
+        tx,
+        { organizationReads: this.organizationReads, identity: this.identity },
+        {
+          actorEmployeeId: actor.employeeId,
+          departmentId: returnTask.departmentId,
+          taskEmployeeId: returnTask.employeeId,
+        },
+      );
+    }
+    if (!open) return Promise.resolve(false);
+
+    return requireLifecycleActor(
+      tx,
+      { organizationReads: this.organizationReads, identity: this.identity },
+      {
+        actorEmployeeId: actor.employeeId,
+        today,
+        oldHolderEmployeeId: open.holderEmployeeId,
+        recipientEmployeeId: null,
+      },
+    );
   }
 
   /** Shared transaction step for return-to-stock, device replacement, and return-task receipt. */

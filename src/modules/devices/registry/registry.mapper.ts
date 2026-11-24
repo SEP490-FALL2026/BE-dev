@@ -59,11 +59,20 @@ export function toDeviceSummary(
   };
 }
 
+export interface OpenReturnTaskDetailView {
+  id: string;
+  dueOn: string;
+  departmentId: string | null;
+  actingItAdmins: Array<{ id: string; fullName: string }>;
+  waiting: boolean;
+}
+
 export function toDeviceDetail(
   row: DeviceSummaryRow,
   extras: DeviceExtras,
   holders: ReadonlyMap<string, HolderBrief>,
   departments: ReadonlyMap<string, DepartmentBriefView>,
+  openReturnTask: OpenReturnTaskDetailView | null = null,
 ) {
   const lastHolder = extras.lastEnd ? holders.get(extras.lastEnd.holderEmployeeId) : undefined;
 
@@ -99,7 +108,7 @@ export function toDeviceDetail(
     voidReason: extras.voidReason,
     updatedAt: row.updatedAt.toISOString(),
     collectorInstalled: row.registrationId ? row.collectorInstalled : null,
-    openReturnTask: null,
+    openReturnTask,
   };
 }
 

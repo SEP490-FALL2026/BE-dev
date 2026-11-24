@@ -7,6 +7,8 @@ import { DeviceNotFoundError, DeviceNotInChargeError } from '../public/devices.e
 import type { RegistrationEndService } from '../registry/registration-end.service';
 import { DeviceAlreadyRetiredError } from '../registry/registry.errors';
 import type { DeviceRecord, RegistrationRecord, RegistryRepo } from '../registry/registry.repo';
+import type { DeviceReturnTaskRepo } from '../return-task/device-return-task.repo';
+import type { ReturnTaskRecord } from '../return-task/device-return-task.types';
 import { DeviceReceiptService } from './device-receipt.service';
 import {
   DeviceNotHeldError,
@@ -18,7 +20,7 @@ import {
 interface SetupOptions {
   device?: Partial<DeviceRecord> | null;
   openRegistration?: Partial<RegistrationRecord> | null;
-  hasOpenReturnTask?: boolean;
+  openReturnTask?: Partial<ReturnTaskRecord> | null;
   workDepartmentId?: string | null;
   inCharge?: string | null;
   substitute?: string | null;
@@ -70,9 +72,34 @@ describe('DeviceReceiptService', () => {
     const repo = {
       lockDevice: jest.fn().mockResolvedValue(device),
       lockOpenRegistration: jest.fn().mockResolvedValue(open),
-      hasOpenReturnTask: jest.fn().mockResolvedValue(options.hasOpenReturnTask ?? false),
       updateCondition: jest.fn().mockResolvedValue(undefined),
     } as unknown as RegistryRepo;
+    const taskRecord: ReturnTaskRecord | null = options.openReturnTask
+      ? {
+          id: 'task-1',
+          organizationId: 'org-1',
+          deviceId: 'dev-1',
+          registrationId: 'reg-1',
+          employeeId: 'emp-1',
+          offboardingCaseId: 'case-1',
+          departmentId: 'dept-1',
+          dueOn: '2026-11-30',
+          state: 'OPEN',
+          conditionOnReceipt: null,
+          softwareRemoval: null,
+          softwareRemovalNote: null,
+          outcomeNote: null,
+          handledByAppUserId: null,
+          handledAt: null,
+          overdueNoticedOn: null,
+          createdAt: new Date('2026-11-20T00:00:00.000Z'),
+          ...options.openReturnTask,
+        }
+      : null;
+    const returnTasks = {
+      lockOpenByDeviceId: jest.fn().mockResolvedValue(taskRecord),
+      markReceived: jest.fn().mockResolvedValue(undefined),
+    } as unknown as DeviceReturnTaskRepo;
     const ending = { end: jest.fn().mockResolvedValue(undefined) } as unknown as RegistrationEndService;
     const deptId = options.workDepartmentId === undefined ? 'dept-1' : options.workDepartmentId;
     const actors = [options.inCharge === undefined ? 'it-1' : options.inCharge, options.substitute ?? null].filter(
@@ -105,9 +132,9 @@ describe('DeviceReceiptService', () => {
       run: jest.fn().mockImplementation((work: (tx: DbTx) => Promise<unknown>) => work(tx)),
     } as unknown as TransactionRunner;
 
-    const service = new DeviceReceiptService(repo, ending, organizationReads, identity, audit, runner);
+    const service = new DeviceReceiptService(repo, ending, returnTasks, organizationReads, identity, audit, runner);
 
-    return { service, repo, ending, audit };
+    return { service, repo, ending, returnTasks, audit };
   }
 
   const firstAuditAfter = (audit: AuditApi): Record<string, unknown> => {
@@ -200,12 +227,50 @@ describe('DeviceReceiptService', () => {
       ),
     ).rejects.toBeInstanceOf(DeviceNotInChargeError);
     await expect(
-      setup({ openRegistration: null, hasOpenReturnTask: true }).service.returnToStock(
-        actor(),
+      setup({
+        openRegistration: null,
+        openReturnTask: { departmentId: 'dept-1' },
+        inCharge: 'it-1',
+      }).service.returnToStock(
+        actor('it-other'),
         'dev-1',
         { condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } },
         now,
       ),
     ).rejects.toBeInstanceOf(DeviceReturnTaskNotInChargeError);
+  });
+
+  it('completes an open return task as RECEIVED when an acting IT Admin returns an awaiting-return machine', async () => {
+    const { service, returnTasks, audit } = setup({
+      openRegistration: null,
+      openReturnTask: { departmentId: 'dept-1', employeeId: 'emp-1' },
+      inCharge: 'it-1',
+      substitute: 'it-sub',
+    });
+
+    await service.returnToStock(
+      actor('it-sub'),
+      'dev-1',
+      { condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } },
+      now,
+    );
+
+    expect((returnTasks as unknown as { markReceived: jest.Mock }).markReceived).toHaveBeenCalledWith(tx, 'task-1', {
+      conditionOnReceipt: 'USABLE',
+      softwareRemoval: 'REMOVED',
+      softwareRemovalNote: null,
+      handledByAppUserId: 'user-it-sub',
+      handledAt: now,
+    });
+    const calls = (audit.record as jest.Mock).mock.calls as Array<
+      [unknown, { action: string; resourceId: string; after: Record<string, unknown> }]
+    >;
+    expect(calls[1]?.[1]).toMatchObject({
+      action: 'DEVICE_RETURN_TASK.COMPLETED',
+      resourceId: 'task-1',
+    });
+    expect(calls[1]?.[1].after).toEqual(
+      expect.objectContaining({ outcome: 'RECEIVED', viaDeviceReturn: true, bySubstitute: true }),
+    );
   });
 });

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -62,8 +63,10 @@ export class RetirementService {
     deviceId: string,
     input: RetireDeviceInput,
     now: Date = new Date(),
+    options?: { preAuthorized?: { open: RegistrationRecord | null; today: BusinessDate; bySubstitute: boolean } },
   ): Promise<void> {
-    const { open, today, bySubstitute } = await this.lockAndAuthorize(tx, actor, deviceId, now);
+    const { open, today, bySubstitute } =
+      options?.preAuthorized ?? (await this.lockAndAuthorize(tx, actor, deviceId, now));
 
     if (open) await this.ending.end(tx, open, { at: now, cause: 'DEVICE_RETIRED' }, byUser(actor));
     const kind = input.retirementKind ?? 'DISPOSED';

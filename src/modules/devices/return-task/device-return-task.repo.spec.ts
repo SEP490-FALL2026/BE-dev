@@ -123,4 +123,69 @@ describe('DeviceReturnTaskRepo', () => {
       data: { state: 'CANCELLED', handledAt: cancelledAt },
     });
   });
+
+  it('marks RECEIVED / NOT_RECOVERED, skips empty acting scope on countForScope, and pages deterministically', async () => {
+    const update = jest.fn().mockResolvedValue(undefined);
+    const findMany = jest.fn().mockResolvedValue([]);
+    const count = jest.fn().mockResolvedValue(0);
+    const tx = {
+      deviceReturnTask: { update, findMany, count },
+    } as unknown as DbTx;
+    const prisma = {
+      $transaction: jest.fn((work: (t: DbTx) => Promise<unknown>) => work(tx)),
+      $queryRaw: jest.fn().mockResolvedValue([{ open_count: 3n, overdue_count: 1n }]),
+    } as unknown as PrismaService;
+    const repo = new DeviceReturnTaskRepo(prisma);
+    const handledAt = new Date('2026-11-25T10:00:00.000Z');
+
+    await repo.markReceived(tx, 'task-1', {
+      conditionOnReceipt: 'IN_REPAIR',
+      softwareRemoval: 'NOT_REMOVABLE',
+      softwareRemovalNote: 'Firmware bound',
+      handledByAppUserId: 'user-1',
+      handledAt,
+    });
+    await repo.markNotRecovered(tx, 'task-2', {
+      outcomeNote: 'Not returned',
+      handledByAppUserId: 'user-1',
+      handledAt,
+    });
+    const emptyPage = await repo.page(
+      { organizationId: 'org-1', departmentIds: [], state: 'OPEN', today: '2026-11-25' },
+      0,
+      20,
+    );
+    const emptyCounts = await repo.countForScope(
+      { organizationId: 'org-1', actingDepartmentIds: [], excludeEmployeeId: 'it-1' },
+      '2026-11-25',
+    );
+    const counts = await repo.countForScope(
+      { organizationId: 'org-1', actingDepartmentIds: ['dep-1'], excludeEmployeeId: 'it-1' },
+      '2026-11-25',
+    );
+
+    expect(update).toHaveBeenNthCalledWith(1, {
+      where: { id: 'task-1' },
+      data: {
+        state: 'RECEIVED',
+        conditionOnReceipt: 'IN_REPAIR',
+        softwareRemoval: 'NOT_REMOVABLE',
+        softwareRemovalNote: 'Firmware bound',
+        handledByAppUserId: 'user-1',
+        handledAt,
+      },
+    });
+    expect(update).toHaveBeenNthCalledWith(2, {
+      where: { id: 'task-2' },
+      data: {
+        state: 'NOT_RECOVERED',
+        outcomeNote: 'Not returned',
+        handledByAppUserId: 'user-1',
+        handledAt,
+      },
+    });
+    expect(emptyPage).toEqual({ rows: [], total: 0 });
+    expect(emptyCounts).toEqual({ open: 0, overdue: 0 });
+    expect(counts).toEqual({ open: 3, overdue: 1 });
+  });
 });
