@@ -71,7 +71,6 @@ export interface UpdateSubscriptionInput {
   noticePeriodDays?: number | null;
   autoRenew?: boolean;
   allowsMidTermReduction?: boolean;
-  responsibleItAdminEmployeeId?: string;
   vendorMinimumSeats?: number | null;
   isPrimaryForPlan?: boolean;
   quantityChangeReason?: string;

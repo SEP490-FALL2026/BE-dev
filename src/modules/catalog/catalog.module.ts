@@ -78,6 +78,8 @@ import { SubscriptionPricingService } from './subscription/subscription-pricing.
 import { SubscriptionViewService } from './subscription/subscription-view.service';
 import { SubscriptionWindowsService } from './subscription/subscription-windows.service';
 import { SubscriptionsController } from './subscription/subscriptions.controller';
+import { SubscriptionResponsibleController } from './subscription/responsible/subscription-responsible.controller';
+import { SubscriptionResponsibleService } from './subscription/responsible/subscription-responsible.service';
 import { VendorDictionaryController } from './vendor-dictionary/vendor-dictionary.controller';
 import { VendorDictionaryFactsService } from './vendor-dictionary/vendor-dictionary-facts.service';
 import { VendorDictionaryRepo } from './vendor-dictionary/vendor-dictionary.repo';
@@ -121,6 +123,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     PlanTermsController,
     VendorsController,
     SubscriptionsController,
+    SubscriptionResponsibleController,
     ApplicationRetirementController,
     ApplicationResponsibilityController,
     ContractsController,
@@ -169,6 +172,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     { provide: ApplicationPlans, useExisting: PlanFactsService },
     SubscriptionChangeGuard,
     SubscriptionChangeService,
+    SubscriptionResponsibleService,
     SubscriptionService,
     SubscriptionPoolService,
     SubscriptionSeatIncreaseService,

@@ -67,7 +67,6 @@ export const updateSubscriptionBodySchema = z.strictObject({
   noticePeriodDays: noticeDays.nullable().optional(),
   autoRenew: z.boolean().optional(),
   allowsMidTermReduction: z.boolean().optional(),
-  responsibleItAdminEmployeeId: z.uuid().optional(),
   vendorMinimumSeats: vendorMinimumSeats.nullable().optional(),
   // Makes this the subscription that prices its plan (Q-04); the flag of the other subscriptions of the plan is taken off.
   isPrimaryForPlan: z.boolean().optional(),
@@ -226,6 +225,15 @@ export class SubscriptionPageResponseDto extends createZodDto(
           }),
         })
         .nullable(),
+    }),
+  ),
+) {}
+export class SubscriptionResponsibleChangeResponseDto extends createZodDto(
+  successEnvelopeSchema(
+    subscriptionSchema.extend({
+      changed: z.boolean().meta({
+        description: 'False when the IT Admin named already answered for the subscription and nothing was written.',
+      }),
     }),
   ),
 ) {}

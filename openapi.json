@@ -26704,6 +26704,259 @@
         "tags": ["subscriptions"]
       }
     },
+    "/api/v1/subscriptions/{id}/responsible-it-admin": {
+      "post": {
+        "operationId": "subscriptionResponsibleItAdminChange",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangeResponsibleBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The subscription as it is after the change; changed is false when the IT Admin named already answered for it and nothing was written. The audit trail names who changed it, from whom to whom and the reason.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SubscriptionResponsibleChangeResponseDto" },
+                    { "properties": { "message": { "example": "SUBSCRIPTION.RESPONSIBLE_CHANGED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin names who answers for a subscription.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The subscription does not exist (SUBSCRIPTION.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "SUBSCRIPTION.NOT_FOUND": {
+                    "summary": "The subscription does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.NOT_FOUND",
+                        "message": "The subscription does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), or the person named is not an IT Admin who works now (SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN): nothing changes.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN": {
+                    "summary": "The person who answers for the subscription must be an IT Admin who works and can sign in.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN",
+                        "message": "The person who answers for the subscription must be an IT Admin who works and can sign in.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Name the IT Admin who answers for a subscription",
+        "tags": ["subscriptions"]
+      }
+    },
     "/api/v1/applications/{id}/retirement": {
       "get": {
         "operationId": "applicationRetirementGet",
@@ -27189,7 +27442,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin or the Super Admin hands an application over, and an IT Admin only while they are the one responsible, or while the application needs a responsible IT Admin and they take it for themselves (APPLICATION.RESPONSIBILITY_NOT_YOURS). The one who loses the race to take an application that needs one meets this too.",
+            "description": "Only the Super Admin changes who is responsible for an application: an IT Admin, even the one responsible, is refused (APPLICATION.RESPONSIBILITY_NOT_YOURS).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -108872,7 +109125,6 @@
           "noticePeriodDays": { "type": "integer", "minimum": 0, "maximum": 3650, "nullable": true },
           "autoRenew": { "type": "boolean" },
           "allowsMidTermReduction": { "type": "boolean" },
-          "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid" },
           "vendorMinimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000000, "nullable": true },
           "isPrimaryForPlan": { "type": "boolean" },
           "quantityChangeReason": {
@@ -108887,6 +109139,296 @@
             "format": "date-time"
           }
         },
+        "additionalProperties": false
+      },
+      "ChangeResponsibleBodyDto": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The IT Admin who is to answer for the subscription; one who works now."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Why the IT Admin in charge changes (1 to 500 characters)."
+          }
+        },
+        "required": ["employeeId", "reason"],
+        "additionalProperties": false
+      },
+      "SubscriptionResponsibleChangeResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "planId": { "type": "string", "format": "uuid" },
+              "planName": { "type": "string" },
+              "applicationId": { "type": "string", "format": "uuid" },
+              "applicationName": { "type": "string" },
+              "logoUrl": {
+                "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                "type": "string",
+                "nullable": true
+              },
+              "vendor": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              },
+              "kind": { "type": "string", "enum": ["TERM", "PERPETUAL"] },
+              "status": { "type": "string", "enum": ["DRAFT", "ACTIVE"] },
+              "missingFinancialData": { "type": "boolean" },
+              "missing": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["QUANTITY", "START_DATE", "BILLING_CYCLE", "UNIT_PRICE"] }
+              },
+              "purchasedQuantity": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "unitPrice": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "originalPrice": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "billingCycle": {
+                "type": "string",
+                "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
+                "nullable": true
+              },
+              "commitmentTermMonths": {
+                "anyOf": [
+                  { "type": "number", "enum": [1] },
+                  { "type": "number", "enum": [12] }
+                ],
+                "nullable": true
+              },
+              "startDate": { "type": "string", "nullable": true },
+              "endDate": { "type": "string", "nullable": true },
+              "renewalDate": { "type": "string", "nullable": true },
+              "noticePeriodDays": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "autoRenew": { "type": "boolean" },
+              "allowsMidTermReduction": { "type": "boolean" },
+              "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
+              "responsibleItAdmin": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName"],
+                "additionalProperties": false,
+                "description": "The IT Admin who answers for the subscription, by name; null when none is named.",
+                "nullable": true
+              },
+              "vendorMinimumSeats": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "nullable": true
+              },
+              "isPrimaryForPlan": { "type": "boolean" },
+              "expiry": {
+                "type": "string",
+                "enum": ["SOON", "EXPIRED", null],
+                "description": "SOON from the point of adjustment to the last day of the period (a plan by the year stays SOON past its deadline to cancel); EXPIRED the day after the last day of the period (the renewal day, else the end day; for a plan by the month that does not renew itself, its end day) while seats are still held; null before the point, for a purchase made once and when no date is known to count from.",
+                "nullable": true
+              },
+              "daysLeft": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "The days from today to the deadline the point counts to; negative once it is past while the period still runs (a plan by the year after its deadline to cancel); once EXPIRED it counts from the last day of the period instead, and deadlineKind says which; null when there is no point.",
+                "nullable": true
+              },
+              "deadlineKind": {
+                "type": "string",
+                "enum": ["PAYMENT_DATE", "NOTICE_DEADLINE", "RENEWAL_DATE", "END_DATE", null],
+                "description": "What daysLeft counts to: the next payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day; once EXPIRED, the last day of the period it counts from (the renewal day or the end day; the payment day of a plan by the month that ends; the deadline itself when no later day is known).",
+                "nullable": true
+              },
+              "seats": {
+                "type": "object",
+                "properties": {
+                  "purchased": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "nullable": true
+                  },
+                  "assigned": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "free": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "nullable": true },
+                  "inRevocation": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["purchased", "assigned", "free", "inRevocation"],
+                "additionalProperties": false,
+                "description": "The seats of the shared pool of a K2 plan: bought, taken by an assignment from today on, free to grant, and held by a right being taken back. Null for any other kind of plan.",
+                "nullable": true
+              },
+              "noticeDeadline": {
+                "type": "object",
+                "properties": {
+                  "value": { "type": "string", "nullable": true },
+                  "source": {
+                    "type": "string",
+                    "enum": ["DECLARED", "INFERRED_UNCONFIRMED", "BY_END_DATE", "MISSING", "NOT_APPLICABLE"]
+                  }
+                },
+                "required": ["value", "source"],
+                "additionalProperties": false
+              },
+              "alerts": {
+                "type": "object",
+                "properties": {
+                  "baseDate": { "type": "string", "nullable": true },
+                  "dates": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["baseDate", "dates"],
+                "additionalProperties": false
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["NO_ALERT_ANCHOR", "RESPONSIBLE_MISSING", "BILLING_CYCLE_LEGACY", "SHOULD_MERGE"]
+                }
+              },
+              "mergeCandidateIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+              "vendorAdmins": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "employeeId": { "type": "string", "format": "uuid" },
+                    "employeeCode": { "type": "string" },
+                    "fullName": { "type": "string" },
+                    "role": { "type": "string", "enum": ["OWNER", "ADMIN"] },
+                    "working": { "type": "boolean" }
+                  },
+                  "required": ["employeeId", "employeeCode", "fullName", "role", "working"],
+                  "additionalProperties": false
+                }
+              },
+              "ownerAccountEmail": { "type": "string", "nullable": true },
+              "adminNote": { "type": "string", "nullable": true },
+              "vendorAdminsBelowMinimum": { "type": "boolean" },
+              "ownerAccountEmailMissing": { "type": "boolean" },
+              "taxProfile": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string", "enum": ["DECLARED", "MISSING"] },
+                  "group": { "type": "string", "enum": ["T1", "T2", "T3", null], "nullable": true }
+                },
+                "required": ["status", "group"],
+                "additionalProperties": false
+              },
+              "taxEstimate": {
+                "type": "object",
+                "properties": {
+                  "basis": { "type": "string", "enum": ["PROFILE", "DEFAULT_NO_PROFILE"] },
+                  "label": { "type": "string", "enum": ["ESTIMATE", "ESTIMATE_NO_PROFILE"] },
+                  "group": { "type": "string", "enum": ["T1", "T2", "T3"] },
+                  "taxAmount": { "type": "string" },
+                  "deductibleTaxAmount": { "type": "string" },
+                  "nonDeductibleTaxAmount": { "type": "string" },
+                  "estimatedCost": { "type": "string" }
+                },
+                "required": [
+                  "basis",
+                  "label",
+                  "group",
+                  "taxAmount",
+                  "deductibleTaxAmount",
+                  "nonDeductibleTaxAmount",
+                  "estimatedCost"
+                ],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "changed": {
+                "type": "boolean",
+                "description": "False when the IT Admin named already answered for the subscription and nothing was written."
+              }
+            },
+            "required": [
+              "id",
+              "planId",
+              "planName",
+              "applicationId",
+              "applicationName",
+              "logoUrl",
+              "vendor",
+              "kind",
+              "status",
+              "missingFinancialData",
+              "missing",
+              "purchasedQuantity",
+              "unitPrice",
+              "originalPrice",
+              "billingCycle",
+              "commitmentTermMonths",
+              "startDate",
+              "endDate",
+              "renewalDate",
+              "noticePeriodDays",
+              "autoRenew",
+              "allowsMidTermReduction",
+              "responsibleItAdminEmployeeId",
+              "responsibleItAdmin",
+              "vendorMinimumSeats",
+              "isPrimaryForPlan",
+              "expiry",
+              "daysLeft",
+              "deadlineKind",
+              "seats",
+              "noticeDeadline",
+              "alerts",
+              "warnings",
+              "mergeCandidateIds",
+              "vendorAdmins",
+              "ownerAccountEmail",
+              "adminNote",
+              "vendorAdminsBelowMinimum",
+              "ownerAccountEmailMissing",
+              "taxProfile",
+              "taxEstimate",
+              "createdAt",
+              "updatedAt",
+              "changed"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "RetirementResponseDto": {

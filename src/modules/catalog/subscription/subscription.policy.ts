@@ -199,7 +199,6 @@ export function nextStateOf<B extends string, C extends number>(
     noticePeriodDays?: number | null;
     autoRenew?: boolean;
     allowsMidTermReduction?: boolean;
-    responsibleItAdminEmployeeId?: string;
     vendorMinimumSeats?: number | null;
     isPrimaryForPlan?: boolean;
   },
@@ -215,10 +214,8 @@ export function nextStateOf<B extends string, C extends number>(
     noticePeriodDays: given(input.noticePeriodDays, current.noticePeriodDays),
     autoRenew: given(input.autoRenew, current.autoRenew),
     allowsMidTermReduction: given(input.allowsMidTermReduction, current.allowsMidTermReduction),
-    responsibleItAdminEmployeeId: given<string | null>(
-      input.responsibleItAdminEmployeeId,
-      current.responsibleItAdminEmployeeId,
-    ),
+    // Who answers for the subscription never changes with an update: only the Super Admin names them, through their own route (`QĐ-118f`).
+    responsibleItAdminEmployeeId: current.responsibleItAdminEmployeeId,
     vendorMinimumSeats: given(input.vendorMinimumSeats, current.vendorMinimumSeats),
     isPrimaryForPlan: given(input.isPrimaryForPlan, current.isPrimaryForPlan),
   };

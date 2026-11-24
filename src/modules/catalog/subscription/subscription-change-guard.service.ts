@@ -23,11 +23,6 @@ export class SubscriptionChangeGuard {
     return organization.id;
   }
 
-  /** The person named to answer for the subscription works, holds the IT Admin role and can sign in (an unlocked read, before the transaction). */
-  async requireResponsible(employeeId: string | undefined): Promise<void> {
-    if (employeeId !== undefined) await this.poolRules.requireItAdmin(employeeId);
-  }
-
   /** What a change tells the others: a rise of the seats of a K2 or K4 pool goes to the IT Admin who answers for it (`QĐ-110v`, SPEC P24). */
   tellSeatIncrease(tx: DbTx, rise: SeatIncrease): Promise<number> {
     return this.seatIncrease.told(tx, rise);

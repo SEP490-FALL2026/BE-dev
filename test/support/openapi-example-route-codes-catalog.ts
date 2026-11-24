@@ -246,6 +246,10 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
     subscriptionGet: {
       '404': ['SUBSCRIPTION.NOT_FOUND'],
     },
+    subscriptionResponsibleItAdminChange: {
+      '404': ['SUBSCRIPTION.NOT_FOUND'],
+      '422': ['SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN'],
+    },
     subscriptionUpdate: {
       '404': ['SUBSCRIPTION.NOT_FOUND'],
       '409': ['SUBSCRIPTION.MID_TERM_REDUCTION_NOT_ALLOWED', 'SUBSCRIPTION.PRIMARY_CONFLICT', 'SUBSCRIPTION.STALE'],
