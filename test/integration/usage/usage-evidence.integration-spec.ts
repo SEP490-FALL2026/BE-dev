@@ -123,6 +123,26 @@ describe('the evidence of the usage of an application, vendors and collector thr
         detectableGroups: ['G1', 'G2', 'G3', 'G4'],
       });
     });
+
+    it('a person named with the date of the last activity left empty never appeared in a vendor that tells the last activity: no evidence of them at all', async () => {
+      const { applicationId } = await h.usageApp();
+      const empty = await h.person('EMPTY1');
+      const seen = await h.person('SEEN1');
+      const source = await h.source(applicationId, { evidenceDirection: 'POSITIVE_AND_NEGATIVE' });
+      await h.confirmed(
+        source.id,
+        aggregate([
+          ['empty1@acme.vn', ''],
+          ['seen1@acme.vn', '2026-08-20'],
+        ]),
+        { coverageFrom: '2026-06-01', coverageTo: '2026-08-31' },
+      );
+
+      const [vendor] = vendorOf(await evidenceFor(applicationId, [empty, seen], TODAY));
+
+      expect(vendor.canConcludeAbsence).toBe(true);
+      expect(vendor.employees.map((employee) => employee.employeeId)).toEqual([seen]);
+    });
   });
 
   describe('INV-12, FR-4.11: only what is tied to a person is theirs', () => {
