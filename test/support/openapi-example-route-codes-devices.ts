@@ -112,6 +112,9 @@ export const ROUTE_ERROR_CODES_DEVICES: Readonly<Record<string, Partial<Record<R
     deviceGet: {
       '404': ['DEVICE.NOT_FOUND'],
     },
+    deviceHolderSoftwareList: {
+      '404': ['DEVICE.NOT_FOUND'],
+    },
     deviceRegistrationList: {
       '404': ['DEVICE.NOT_FOUND'],
     },

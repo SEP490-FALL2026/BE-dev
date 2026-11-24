@@ -15,6 +15,7 @@ import { ActivationQueryService } from './activation/activation-query.service';
 import { DeviceActivationController } from './activation/activation.controller';
 import { DeviceActivationCommandService } from './activation/activation.service';
 import { DeviceActivationsController } from './activation/device-activations.controller';
+import { MeDeviceSoftwareController } from './activation/me-device-software.controller';
 import { AssetCodeRepo } from './asset-code/asset-code.repo';
 import { AssetCodeService } from './asset-code/asset-code.service';
 import { DeviceAttributesController } from './attributes/device-attributes.controller';
@@ -100,6 +101,7 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     ReturnTaskCompletionController,
     DeviceActivationController,
     DeviceActivationsController,
+    MeDeviceSoftwareController,
     DeviceAttributesController,
     SignatureRecordController,
     AcknowledgementController,

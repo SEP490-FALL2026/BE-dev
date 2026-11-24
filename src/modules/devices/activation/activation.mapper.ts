@@ -1,6 +1,7 @@
 import type { SeatTarget } from '../../catalog/public/catalog.types';
 import type { LicensingDeviceActivationApi } from '../../licensing/public/licensing-device-activation.api';
-import type { DeviceActivationDeviceSummary } from '../registry/registry-query.repo';
+import type { HeldSoftware } from '../../licensing/public/licensing.types';
+import type { DeviceActivationDeviceSummary, HeldDeviceSummary } from '../registry/registry-query.repo';
 
 type OpenedActivation = Awaited<ReturnType<LicensingDeviceActivationApi['open']>>;
 type ActivationRecord = OpenedActivation['activation'];
@@ -72,5 +73,38 @@ export function toDeviceActivationListItemDto(
     licenseReleased: record.licenseReleased,
     overActivationCap: record.overActivationCap,
     needsKeyReplacement: record.deactivatedAt === null && record.keyWithdrawn,
+  };
+}
+
+/** Formats one personal account-bound software item for `GET /devices/:id/holder-software`. */
+export function toDeviceHolderSoftwareItemDto(item: HeldSoftware) {
+  return {
+    assignmentId: item.assignmentId,
+    applicationName: item.applicationName,
+    planName: item.planName,
+    grantedOn: item.grantedOn,
+    endsOn: item.endsOn,
+  };
+}
+
+/** Formats one open machine-bound software activation for `GET /me/device-software`. */
+export function toMeDeviceSoftwareItemDto(record: ActivationRecord, device: HeldDeviceSummary, plan: SeatTarget) {
+  return {
+    activationId: record.id,
+    device: {
+      id: device.id,
+      assetCode: device.assetCode,
+      hostname: device.hostname,
+    },
+    plan: {
+      id: plan.planId,
+      name: plan.planName,
+      keyBinding: plan.keyBinding as 'DEVICE_KEY' | 'DEVICE_BUNDLED',
+    },
+    application: {
+      id: plan.applicationId,
+      name: plan.applicationName,
+    },
+    activatedOn: record.activatedOn,
   };
 }

@@ -109,15 +109,72 @@ export const deviceActivationListItemSchema = z.strictObject({
   needsKeyReplacement: z.boolean(),
 });
 
+export const deviceHolderSoftwareQuerySchema = z.strictObject({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export const meDeviceSoftwareQuerySchema = z.strictObject({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export const deviceHolderSummarySchema = z.strictObject({
+  id: z.uuid(),
+  employeeCode: z.string(),
+  fullName: z.string(),
+});
+
+export const deviceHolderSoftwareItemSchema = z.strictObject({
+  assignmentId: z.uuid(),
+  applicationName: z.string(),
+  planName: z.string(),
+  grantedOn: responseBusinessDate,
+  endsOn: responseBusinessDate.nullable(),
+});
+
+export const meDeviceSoftwareItemSchema = z.strictObject({
+  activationId: z.uuid(),
+  device: z.strictObject({
+    id: z.uuid(),
+    assetCode: z.string(),
+    hostname: z.string(),
+  }),
+  plan: z.strictObject({
+    id: z.uuid(),
+    name: z.string(),
+    keyBinding: z.enum(['DEVICE_KEY', 'DEVICE_BUNDLED']),
+  }),
+  application: z.strictObject({
+    id: z.uuid(),
+    name: z.string(),
+  }),
+  activatedOn: responseBusinessDate,
+});
+
 export class ActivationIdParamDto extends createZodDto(activationIdParamSchema) {}
 export class OpenDeviceActivationBodyDto extends createZodDto(openDeviceActivationBodySchema) {}
 export class DeactivateDeviceActivationBodyDto extends createZodDto(deactivateDeviceActivationBodySchema) {}
 export class MoveDeviceActivationBodyDto extends createZodDto(moveDeviceActivationBodySchema) {}
 export class DeviceActivationListQueryDto extends createZodDto(deviceActivationListQuerySchema) {}
+export class DeviceHolderSoftwareQueryDto extends createZodDto(deviceHolderSoftwareQuerySchema) {}
+export class MeDeviceSoftwareQueryDto extends createZodDto(meDeviceSoftwareQuerySchema) {}
 export class DeviceActivationResponseDto extends createZodDto(successEnvelopeSchema(deviceActivationSchema)) {}
 export class OpenedDeviceActivationResponseDto extends createZodDto(
   successEnvelopeSchema(openedDeviceActivationSchema),
 ) {}
 export class DeviceActivationPageResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ items: z.array(deviceActivationListItemSchema), pagination })),
+) {}
+export class DeviceHolderSoftwarePageResponseDto extends createZodDto(
+  successEnvelopeSchema(
+    z.strictObject({
+      holder: deviceHolderSummarySchema.nullable(),
+      items: z.array(deviceHolderSoftwareItemSchema),
+      pagination,
+    }),
+  ),
+) {}
+export class MeDeviceSoftwarePageResponseDto extends createZodDto(
+  successEnvelopeSchema(z.strictObject({ items: z.array(meDeviceSoftwareItemSchema), pagination })),
 ) {}

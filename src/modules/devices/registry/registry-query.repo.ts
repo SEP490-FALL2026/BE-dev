@@ -16,6 +16,12 @@ export interface DeviceActivationDeviceSummary {
   condition: DeviceCondition;
 }
 
+export interface HeldDeviceSummary {
+  id: string;
+  assetCode: string;
+  hostname: string;
+}
+
 /** One machine as the register lists it: the machine and the registration open on it, if any. */
 export interface DeviceSummaryRow {
   id: string;
@@ -343,6 +349,20 @@ export class RegistryQueryRepo {
     for (const row of rows) map.set(row.id, row);
 
     return map;
+  }
+
+  /** Reads machines currently held by an employee (open registration, non-voided, non-retired) in one query. */
+  async findHeldDevicesByHolder(organizationId: string, holderEmployeeId: string): Promise<HeldDeviceSummary[]> {
+    return this.prisma.$queryRaw<HeldDeviceSummary[]>`
+      SELECT d.id, d.asset_code AS "assetCode", d.hostname
+        FROM device_registrations r
+        JOIN managed_devices d ON d.id = r.device_id
+       WHERE d.organization_id = ${organizationId}::uuid
+         AND d.voided_at IS NULL
+         AND d.retired_at IS NULL
+         AND r.ended_at IS NULL
+         AND r.holder_employee_id = ${holderEmployeeId}::uuid
+       ORDER BY d.id ASC`;
   }
 }
 

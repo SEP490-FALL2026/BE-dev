@@ -61,6 +61,7 @@ describe('company machine routes (http contract, no database)', () => {
     ['post', `${DEVICES}/${ID}/retirements`, { reason: 'broken' }],
     ['post', `${DEVICES}/${ID}/voids`, { reason: 'entered twice' }],
     ['post', `${DEVICES}/${ID}/activations`, { planId: ID }],
+    ['get', `${DEVICES}/${ID}/holder-software`, undefined],
     ['get', '/api/v1/device-activations', undefined],
     ['post', `/api/v1/device-activations/${ID}/deactivation`, {}],
     ['post', `/api/v1/device-activations/${ID}/moves`, { targetDeviceId: ID }],
@@ -69,6 +70,7 @@ describe('company machine routes (http contract, no database)', () => {
     ['post', NOTICES, NOTICE],
     ['get', '/api/v1/monitoring-notices/current', undefined],
     ['get', `${ME}/devices`, undefined],
+    ['get', `${ME}/device-software`, undefined],
     ['post', `${ME}/device-registrations/${ID}/acknowledgements`, { noticeVersionId: ID }],
     ['post', `${REGISTRATIONS}/${ID}/enrollment-codes`, { collectorKind: 'AI_COLLECTOR' }],
     ['get', `${REGISTRATIONS}/${ID}/credentials`, undefined],
@@ -125,6 +127,7 @@ describe('company machine routes (http contract, no database)', () => {
       await as(request(server).post(`${DEVICES}/${ID}/retirements`).send({ reason: 'x' })),
       await as(request(server).post(`${DEVICES}/${ID}/voids`).send({ reason: 'x' })),
       await as(request(server).post(`${DEVICES}/${ID}/activations`).send({ planId: ID })),
+      await as(request(server).get(`${DEVICES}/${ID}/holder-software`)),
       await as(request(server).get('/api/v1/device-activations')),
       await as(request(server).post(`/api/v1/device-activations/${ID}/deactivation`).send({})),
       await as(request(server).post(`/api/v1/device-activations/${ID}/moves`).send({ targetDeviceId: ID })),
@@ -359,6 +362,9 @@ describe('company machine routes (http contract, no database)', () => {
     ],
     ['an activation list with invalid state', 'get', '/api/v1/device-activations?state=BAD', undefined],
     ['an activation list with pageSize over 100', 'get', '/api/v1/device-activations?pageSize=101', undefined],
+    ['holder software for non-UUID device id', 'get', `${DEVICES}/not-a-uuid/holder-software`, undefined],
+    ['holder software with pageSize over 50', 'get', `${DEVICES}/${ID}/holder-software?pageSize=51`, undefined],
+    ['holder software with an unknown query param', 'get', `${DEVICES}/${ID}/holder-software?extra=1`, undefined],
     [
       'a deactivation with invalid licenseRelease',
       'post',
@@ -415,6 +421,19 @@ describe('company machine routes (http contract, no database)', () => {
       .get(`${ME}/devices?pageSize=51`)
       .set('Authorization', bearer(principal(['EMPLOYEE'])))
       .expect(422);
+  });
+
+  it.each([
+    ['pageSize over 50', `${ME}/device-software?pageSize=51`],
+    ['page 0', `${ME}/device-software?page=0`],
+    ['an unknown query param', `${ME}/device-software?extra=1`],
+  ])('refuses /me/device-software with %s with 422', async (_name, path) => {
+    const response = await request(app.getHttpServer())
+      .get(path)
+      .set('Authorization', bearer(principal(['EMPLOYEE'])))
+      .expect(422);
+
+    expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
   });
 
   /** The wire promises: the fields a request takes and a response shows are exactly these (a field added without the spec fails here). */
@@ -524,6 +543,8 @@ describe('company machine routes (http contract, no database)', () => {
         bodyOf_('DeviceDetailResponseDto'),
         bodyOf_('MyDevicePageResponseDto'),
         bodyOf_('DeviceRegistrationPageResponseDto'),
+        bodyOf_('DeviceHolderSoftwarePageResponseDto'),
+        bodyOf_('MeDeviceSoftwarePageResponseDto'),
       ]);
 
       expect(text).not.toMatch(/"(?:ip|address|ipAddress|token|credential|url|link)[A-Za-z]*"/i);

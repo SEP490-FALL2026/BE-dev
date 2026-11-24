@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -12,10 +12,36 @@ import { RequireRoles } from '../../../infrastructure/security/decorators/access
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { DeviceIdParamDto } from '../registry/registry.dto';
-import { OpenDeviceActivationBodyDto, OpenedDeviceActivationResponseDto } from './activation.dto';
+import { ActivationQueryService } from './activation-query.service';
+import {
+  DeviceHolderSoftwarePageResponseDto,
+  DeviceHolderSoftwareQueryDto,
+  OpenDeviceActivationBodyDto,
+  OpenedDeviceActivationResponseDto,
+} from './activation.dto';
 import { ACTIVATION_ERROR_EXAMPLES as EXAMPLES, toActivationApiException } from './activation.http-errors';
 import { toOpenedDeviceActivationDto } from './activation.mapper';
 import { DeviceActivationCommandService } from './activation.service';
+
+const HOLDER_SOFTWARE_ERRORS = [
+  UNAUTHENTICATED_RESPONSE,
+  GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description: 'Only an IT Admin may read the holder software list of a company machine.',
+    examples: [FORBIDDEN_EXAMPLE],
+  },
+  {
+    status: HttpStatus.NOT_FOUND,
+    description: 'The machine is not in the register (DEVICE.NOT_FOUND).',
+    examples: [EXAMPLES.DEVICE_NOT_FOUND],
+  },
+  {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description: 'The machine id or query parameters are invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
+  },
+] as const;
 
 const ACTIVATION_OPEN_ERRORS = [
   UNAUTHENTICATED_RESPONSE,
@@ -67,7 +93,30 @@ const ACTIVATION_OPEN_ERRORS = [
 @Controller({ path: 'devices', version: '1' })
 @RequireRoles('IT_ADMIN')
 export class DeviceActivationController {
-  constructor(private readonly commands: DeviceActivationCommandService) {}
+  constructor(
+    private readonly commands: DeviceActivationCommandService,
+    private readonly queries: ActivationQueryService,
+  ) {}
+
+  @Get(':id/holder-software')
+  @ApiOperation({
+    operationId: 'deviceHolderSoftwareList',
+    summary: 'List personal software held by the current holder of a company machine',
+  })
+  @ApiSuccessResponse(DeviceHolderSoftwarePageResponseDto, {
+    status: HttpStatus.OK,
+    message: 'DEVICE.HOLDER_SOFTWARE_LISTED',
+    description:
+      'Lists personal account-bound software currently held by the open holder of the machine, or returns a null holder and an empty list when the machine has no open registration.',
+  })
+  @ApiErrorResponses(...HOLDER_SOFTWARE_ERRORS)
+  async holderSoftware(@Param() params: DeviceIdParamDto, @Query() query: DeviceHolderSoftwareQueryDto) {
+    try {
+      return await this.queries.holderSoftware(params.id, query);
+    } catch (error) {
+      throw toActivationApiException(error);
+    }
+  }
 
   @Post(':id/activations')
   @HttpCode(HttpStatus.CREATED)
