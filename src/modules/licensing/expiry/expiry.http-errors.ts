@@ -3,6 +3,7 @@ import { ApiException } from '../../../infrastructure/http/errors/api.exception'
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { RevocationRefusedError } from '../public/licensing.errors';
+import { ProvisioningNotInChargeError } from '../provisioning/provisioning.errors';
 import { toProvisioningApiException } from '../provisioning/provisioning.http-errors';
 import { ExpiryError, type ExpiryProblem } from './expiry.errors';
 
@@ -43,6 +44,7 @@ export const EXPIRY_ERROR_EXAMPLES = {
   NOT_EXPIRED: example(new ExpiryError('NOT_EXPIRED')),
   RENEWAL_PENDING: example(new ExpiryError('RENEWAL_PENDING')),
   SCOPE_FORBIDDEN: example(new ExpiryError('SCOPE_FORBIDDEN')),
+  NOT_IN_CHARGE: example(new ProvisioningNotInChargeError()),
   REVOCATION_TYPE_NOT_SUPPORTED: example(new RevocationRefusedError('TYPE_NOT_SUPPORTED', 'K3')),
   EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
 } as const;
