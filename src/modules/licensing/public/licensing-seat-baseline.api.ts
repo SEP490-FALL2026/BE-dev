@@ -48,6 +48,15 @@ export class LicensingSeatBaselineApi {
     return this.assignments.openHolders();
   }
 
+  /**
+   * Whether the installation phase is still open, holding the state `FOR SHARE` until the caller's transaction ends so the closing of the
+   * baseline waits for it: what a write that is allowed only during the installation (the activations a key had when it was entered, a
+   * machine entered with its history) asks first. The row is made when there is none.
+   */
+  holdInitializationOpen(tx: DbTx): Promise<boolean> {
+    return this.baseline.holdInitializationOpen(tx);
+  }
+
   /** Whether the baseline is closed and how many assignments it has produced, for the onboarding checklist. */
   async getBaselineProgress(): Promise<BaselineProgress> {
     const state = await this.baseline.state();

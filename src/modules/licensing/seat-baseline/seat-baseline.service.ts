@@ -76,6 +76,17 @@ export class SeatBaselineService {
     if (state.closedAt) throw new SeatBaselineClosedError();
   }
 
+  /**
+   * Holds the state `FOR SHARE` until the transaction ends, so a closing waits for it, and says whether the installation phase is still open
+   * (`QĐ-116n`). The row is made when there is none. Unlike `lockOpen` it does not refuse: the caller decides what a closed phase means.
+   */
+  async holdInitializationOpen(tx: DbTx): Promise<boolean> {
+    const organization = await this.requireOrganization(tx);
+    const state = await this.repo.lock(tx, organization.id, 'SHARE');
+
+    return state.closedAt === null;
+  }
+
   private async requireOrganization(tx?: DbTx) {
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('The seat baseline was read before installation');

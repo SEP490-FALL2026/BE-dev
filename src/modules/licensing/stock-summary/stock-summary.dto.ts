@@ -19,7 +19,7 @@ export const stockSummaryQuerySchema = z.strictObject({
 
 /**
  * What a plan holds, by what it gives out and never by the records of its subscriptions (`QĐ-111n`): the seats of a K2 plan, the keys of a K4
- * plan, the rights of a K1 plan. Counted over the subscriptions a seat can be taken from today.
+ * plan (or its licenses, when its key goes on a machine), the rights of a K1 plan. Counted over the subscriptions a seat can be taken from today.
  */
 const stockSchema = z.discriminatedUnion('kind', [
   z.strictObject({
@@ -53,6 +53,21 @@ const stockSchema = z.discriminatedUnion('kind', [
       .int()
       .nonnegative()
       .meta({ description: 'The keys taken out of the store and never given out again.' }),
+  }),
+  z.strictObject({
+    kind: z.literal('LICENSES'),
+    purchased: z.number().int().nonnegative().nullable().meta({
+      description:
+        'The licenses bought of a K4 plan whose key goes on a machine; null while a purchase of the plan has no quantity. One key can be on many machines, so the keys are not counted.',
+    }),
+    occupied: z.number().int().nonnegative().meta({
+      description:
+        'The licenses held on machines: the open activations and the closed ones whose license was lost with the machine.',
+    }),
+    free: z.number().int().nonnegative().nullable().meta({
+      description:
+        'The licenses a machine can still take, what each purchase bought less what it holds; null when the licenses bought are not known.',
+    }),
   }),
   z.strictObject({
     kind: z.literal('HOLDERS'),

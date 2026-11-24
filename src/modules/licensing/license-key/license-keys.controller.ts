@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -20,9 +20,10 @@ import {
   KeyResponseDto,
   ListKeysQueryDto,
   RevealResponseDto,
+  UpdateKeyBodyDto,
   WithdrawalBodyDto,
 } from './license-key.dto';
-import type { LicenseKeyListed } from './license-key.repo';
+import type { LicenseKeyView } from './license-key.service';
 import { REVEAL_LIMITS } from './license-key-reveal-quota.repo';
 import { LICENSE_KEY_ERROR_EXAMPLES, toLicenseKeyApiException } from './license-key.http-errors';
 import { LicenseKeyService } from './license-key.service';
@@ -35,10 +36,20 @@ const IT_ONLY = {
 } as const;
 
 /** A key as the routes answer it: dates as ISO text. */
-const wireOf = (key: LicenseKeyListed) => ({
-  ...key,
+const wireOf = (key: LicenseKeyView) => ({
+  id: key.id,
+  subscriptionId: key.subscriptionId,
+  masked: key.masked,
+  status: key.status,
   importedAt: key.importedAt.toISOString(),
+  assignmentId: key.assignmentId,
   withdrawnAt: key.withdrawnAt?.toISOString() ?? null,
+  withdrawalReason: key.withdrawalReason,
+  maxActivations: key.maxActivations,
+  activationsUsed: key.activationsUsed,
+  openActivations: key.openActivations,
+  capReached: key.capReached,
+  updatedAt: key.updatedAt.toISOString(),
 });
 
 /**
@@ -61,7 +72,7 @@ export class LicenseKeysController {
     status: HttpStatus.CREATED,
     message: 'LICENSE_KEY.IMPORTED',
     description:
-      'Every valid key is kept, sealed. A line that is not kept is reported by its number with INVALID_FORMAT, DUPLICATE_IN_BATCH or ALREADY_IN_STORE, never with the key. The summary is the capacity of the purchase: the smaller of the seats bought and the keys still usable.',
+      'Every valid key is kept, sealed. A line that is not kept is reported by its number with INVALID_FORMAT, DUPLICATE_IN_BATCH or ALREADY_IN_STORE, never with the key. The summary is the capacity of the purchase: for a plan bound to an account, the smaller of the seats bought and the keys still usable; for a key that goes on a machine (DEVICE_KEY), the licenses bought, with what is occupied and what is free. One maxActivations and one initialActivationsUsed apply to the whole batch: keys with another number are imported in another batch.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -72,12 +83,19 @@ export class LicenseKeysController {
       examples: [LICENSE_KEY_ERROR_EXAMPLES.SUBSCRIPTION_NOT_FOUND],
     },
     {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The batch tells initialActivationsUsed but the installation phase is closed (LICENSE_KEY.INITIALIZATION_CLOSED): after it the activations come from the machines. Nothing is kept.',
+      examples: [LICENSE_KEY_ERROR_EXAMPLES.INITIALIZATION_CLOSED],
+    },
+    {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4) or its application is retired (LICENSE_KEY.APPLICATION_RETIRED).',
+        'The request is invalid (VALIDATION_ERROR), the plan is not K4 (LICENSE_KEY.PLAN_NOT_K4), it is bundled with the machine and has no keys (LICENSE_KEY.PLAN_HAS_NO_KEYS) or its application is retired (LICENSE_KEY.APPLICATION_RETIRED).',
       examples: [
         VALIDATION_EXAMPLE,
         LICENSE_KEY_ERROR_EXAMPLES.PLAN_NOT_K4,
+        LICENSE_KEY_ERROR_EXAMPLES.PLAN_HAS_NO_KEYS,
         LICENSE_KEY_ERROR_EXAMPLES.APPLICATION_RETIRED,
       ],
     },
@@ -210,6 +228,53 @@ export class LicenseKeysController {
   ) {
     try {
       return { key: wireOf(await this.keys.withdraw(actor, params.id, body)) };
+    } catch (error) {
+      throw toLicenseKeyApiException(error);
+    }
+  }
+
+  @Patch(':id')
+  @RequireRoles('IT_ADMIN')
+  @ApiOperation({ operationId: 'licenseKeyUpdate', summary: 'Raise the cap of activations of a license key' })
+  @ApiSuccessResponse(KeyResponseDto, {
+    message: 'LICENSE_KEY.UPDATED',
+    description:
+      'The key with its new maxActivations. The cap only goes up and the caller names the updatedAt it read (expectedUpdatedAt). One event of the audit trail (LICENSE_KEY.MAX_ACTIVATIONS_RAISED) says the old and the new cap and the note, in the same transaction.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    IT_ONLY,
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The key does not exist (LICENSE_KEY.NOT_FOUND).',
+      examples: [LICENSE_KEY_ERROR_EXAMPLES.NOT_FOUND],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The key changed since it was read (LICENSE_KEY.STALE, details.currentUpdatedAt): read it again. Nothing is written.',
+      examples: [LICENSE_KEY_ERROR_EXAMPLES.STALE],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'The request is invalid (VALIDATION_ERROR: a note of 1 to 500 characters, a cap of 1 to 100000 and expectedUpdatedAt are required) or the cap is not above the current one (LICENSE_KEY.MAX_ACTIVATIONS_NOT_RAISED, details.current).',
+      examples: [VALIDATION_EXAMPLE, LICENSE_KEY_ERROR_EXAMPLES.MAX_ACTIVATIONS_NOT_RAISED],
+    },
+  )
+  async update(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: KeyIdParamDto,
+    @Body() body: UpdateKeyBodyDto,
+  ) {
+    try {
+      const key = await this.keys.raiseMaxActivations(actor, params.id, {
+        maxActivations: body.maxActivations,
+        note: body.note,
+        expectedUpdatedAt: new Date(body.expectedUpdatedAt),
+      });
+
+      return { key: wireOf(key) };
     } catch (error) {
       throw toLicenseKeyApiException(error);
     }

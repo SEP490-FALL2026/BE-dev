@@ -281,7 +281,8 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       // 429 with QĐ-113c/e (the picture of a department: put and delete; the first placement of an employee).
       // 430 with the IT Admin route to reopen a closed-failed transfer revocation.
       // 431 with the Super Admin route that names the IT Admin who answers for a subscription (redesign wave 2).
-      expect(operations).toHaveLength(431);
+      // 432 with the IT Admin route that raises the cap of activations of a license key (redesign wave 2).
+      expect(operations).toHaveLength(432);
       expect(missing).toEqual([]);
     });
 

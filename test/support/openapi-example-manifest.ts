@@ -349,7 +349,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   subscriptionRenewalPropose: 'SUBSCRIPTION_RENEWAL.OUTCOME_RECORDED',
   subscriptionRenewalRecordOutcome: 'SUBSCRIPTION_RENEWAL.OUTCOME_RECORDED',
   subscriptionRenewalSeatRanking: 'SUBSCRIPTION_RENEWAL.SEATS_RANKED',
-  subscriptionResponsibleItAdminChange: 'SUBSCRIPTION.RESPONSIBLE_CHANGED',
   subscriptionSeatUsage: 'SUBSCRIPTION_SEAT_USAGE.FETCHED',
   subscriptionUpdate: 'SUBSCRIPTION.UPDATED',
   superAdminDashboardGet: 'DASHBOARD.SUPER_ADMIN_RETRIEVED',

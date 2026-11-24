@@ -58,6 +58,8 @@ export interface StockPlan {
   planId: string;
   planName: string;
   provisioningType: 'K1' | 'K2' | 'K4';
+  /** How a K4 plan is bound once bought; null for a plan of another kind. A key that goes on a machine is counted by licenses, not by keys. */
+  keyBinding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
   applicationId: string;
   applicationName: string;
   /** The https link the IT Admin pasted for the logo of the application, never checked, or null. */

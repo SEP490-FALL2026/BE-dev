@@ -122,6 +122,7 @@ export class SubscriptionGrantingRepo {
             id: true,
             name: true,
             provisioningType: true,
+            keyBinding: true,
             application: { select: { id: true, name: true, logoUrl: true } },
             subscriptions: {
               where: grantable,
@@ -140,6 +141,7 @@ export class SubscriptionGrantingRepo {
             planName: row.name,
             // The filter keeps K1, K2 and K4 plans only.
             provisioningType: row.provisioningType as 'K1' | 'K2' | 'K4',
+            keyBinding: row.keyBinding,
             applicationId: row.application.id,
             applicationName: row.application.name,
             applicationLogoUrl: row.application.logoUrl,

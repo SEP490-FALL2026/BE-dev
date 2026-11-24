@@ -4,6 +4,7 @@ const counts = (parts: Partial<StockCounts> = {}): StockCounts => ({
   seats: new Map(),
   keys: new Map(),
   holders: new Map(),
+  deviceOccupied: new Map(),
   ...parts,
 });
 
@@ -131,5 +132,51 @@ describe('stockOfPlan (QĐ-111n: the stock counted by what the plan gives out, n
 
       expect(stock).toEqual({ kind: 'HOLDERS', holders: 2 });
     });
+  });
+});
+
+describe('stockOfPlan for a K4 plan whose key goes on a machine (W2-21)', () => {
+  const plan = (quantities: (number | null)[]) => ({
+    provisioningType: 'K4' as const,
+    keyBinding: 'DEVICE_KEY' as const,
+    subscriptions: quantities.map((purchasedQuantity, index) => ({ subscriptionId: `s${index}`, purchasedQuantity })),
+  });
+
+  it('counts the licenses bought and the licenses held on machines, and what each purchase has left', () => {
+    const stock = stockOfPlan(
+      plan([25, 10]),
+      counts({
+        deviceOccupied: new Map([
+          ['s0', 10],
+          ['s1', 12],
+        ]),
+      }),
+    );
+
+    // The second purchase holds more than it bought and lends nothing to the first: 15 free + 0 free.
+    expect(stock).toEqual({ kind: 'LICENSES', purchased: 35, occupied: 22, free: 15 });
+  });
+
+  it('counts a purchase that holds nothing as having all its licenses free', () => {
+    expect(stockOfPlan(plan([25]), counts())).toEqual({ kind: 'LICENSES', purchased: 25, occupied: 0, free: 25 });
+  });
+
+  it('does not know the licenses bought or free when a purchase has no quantity, and still counts what is held', () => {
+    const stock = stockOfPlan(plan([25, null]), counts({ deviceOccupied: new Map([['s0', 3]]) }));
+
+    expect(stock).toEqual({ kind: 'LICENSES', purchased: null, occupied: 3, free: null });
+  });
+
+  it('keeps counting keys for a K4 plan whose key is given to an account', () => {
+    const stock = stockOfPlan(
+      {
+        provisioningType: 'K4',
+        keyBinding: 'ACCOUNT',
+        subscriptions: [{ subscriptionId: 'a', purchasedQuantity: 10 }],
+      },
+      counts({ keys: new Map([['a', { inStore: 4, assigned: 5, withdrawn: 1 }]]) }),
+    );
+
+    expect(stock).toEqual({ kind: 'KEYS', inStore: 4, assigned: 5, withdrawn: 1 });
   });
 });
