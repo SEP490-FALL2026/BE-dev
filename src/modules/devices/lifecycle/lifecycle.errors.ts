@@ -60,3 +60,20 @@ export class DeviceSameDeviceError extends Error {
     this.name = 'DeviceSameDeviceError';
   }
 }
+
+export class DeviceReplacementNotInStockError extends Error {
+  constructor() {
+    super('The replacement machine is not in stock.');
+    this.name = 'DeviceReplacementNotInStockError';
+  }
+}
+
+export type DeviceVoidRefusalReason =
+  'AWAITING_RETURN' | 'HELD' | 'SIGNATURE_RECORDED' | 'CREDENTIAL_ISSUED' | 'KEY_ACTIVATION';
+
+export class DeviceVoidRefusedError extends Error {
+  constructor(readonly reason: DeviceVoidRefusalReason) {
+    super('Only an untouched machine without custody, signature, credential, or key activation history may be voided.');
+    this.name = 'DeviceVoidRefusedError';
+  }
+}

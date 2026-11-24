@@ -134,11 +134,41 @@ export class RegistryRepo {
     return tx.managedDevice.create({ data: input, select: DEVICE_SELECT });
   }
 
-  async retireDevice(tx: DbTx, id: string, retiredAt: Date, reason: string): Promise<void> {
+  async retireDevice(
+    tx: DbTx,
+    id: string,
+    retiredAt: Date,
+    reason: string,
+    kind: 'DISPOSED' | 'LOST' = 'DISPOSED',
+  ): Promise<void> {
     await tx.managedDevice.update({
       where: { id },
-      data: { retiredAt, retirementReason: reason, retirementKind: 'DISPOSED' },
+      data: { retiredAt, retirementReason: reason, retirementKind: kind },
     });
+  }
+
+  /** Updates void metadata when an untouched machine record is voided. */
+  async voidDevice(
+    tx: DbTx,
+    id: string,
+    input: { voidedAt: Date; voidReason: string; voidedByAppUserId: string },
+  ): Promise<void> {
+    await tx.managedDevice.update({
+      where: { id },
+      data: {
+        voidedAt: input.voidedAt,
+        voidReason: input.voidReason,
+        voidedByAppUserId: input.voidedByAppUserId,
+      },
+    });
+  }
+
+  /** Checks whether a machine has any signature record or issued credential preventing voiding. */
+  async readVoidHistory(tx: DbTx, deviceId: string): Promise<{ hasSignatureRecord: boolean; hasCredential: boolean }> {
+    const sigCount = await tx.deviceSignatureRecord.count({ where: { registration: { deviceId } }, take: 1 });
+    const credCount = await tx.deviceCredential.count({ where: { deviceId }, take: 1 });
+
+    return { hasSignatureRecord: sigCount > 0, hasCredential: credCount > 0 };
   }
 
   async hasOpenReturnTask(tx: DbTx, deviceId: string): Promise<boolean> {
@@ -166,6 +196,13 @@ export class RegistryRepo {
 
   async findRegistration(id: string, tx?: DbTx): Promise<RegistrationRecord | null> {
     const row = await (tx ?? this.prisma).deviceRegistration.findUnique({ where: { id } });
+
+    return row ? toRegistrationRecord(row) : null;
+  }
+
+  /** Unlocked lookup of the open registration of a machine so Tier 1 holder locks can precede Tier 2b device locks. */
+  async findOpenRegistration(deviceId: string, tx?: DbTx): Promise<RegistrationRecord | null> {
+    const row = await (tx ?? this.prisma).deviceRegistration.findFirst({ where: { deviceId, endedAt: null } });
 
     return row ? toRegistrationRecord(row) : null;
   }

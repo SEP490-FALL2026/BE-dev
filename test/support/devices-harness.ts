@@ -155,6 +155,12 @@ export class DevicesHarness extends DocumentHarness {
     request(this.server()).post(`/api/v1/devices/${id}/condition-changes`).set(this.as(account)).send(body);
   retire = (id: string, reason = 'The disk failed.', account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/devices/${id}/retirements`).set(this.as(account)).send({ reason });
+  retireDevice = (id: string, body: object, account: ApiAccount = this.it1) =>
+    request(this.server()).post(`/api/v1/devices/${id}/retirements`).set(this.as(account)).send(body);
+  replaceDevice = (id: string, body: object, account: ApiAccount = this.it1) =>
+    request(this.server()).post(`/api/v1/devices/${id}/replacements`).set(this.as(account)).send(body);
+  voidDevice = (id: string, reason = 'Duplicate entry', account: ApiAccount = this.it1) =>
+    request(this.server()).post(`/api/v1/devices/${id}/voids`).set(this.as(account)).send({ reason });
   activateDevice = (
     deviceId: string,
     body: { planId: string; licenseKeyId?: string },

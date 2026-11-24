@@ -16,9 +16,19 @@ import { RegistryQueryService } from '../registry/registry-query.service';
 import { ConditionService } from './condition.service';
 import { DeviceReceiptService } from './device-receipt.service';
 import { HolderChangeService } from './holder-change.service';
-import { ConditionChangeBodyDto, DeviceReturnBodyDto, HolderChangeBodyDto, RetirementBodyDto } from './lifecycle.dto';
+import {
+  ConditionChangeBodyDto,
+  DeviceReplacementBodyDto,
+  DeviceReplacementResponseDto,
+  DeviceReturnBodyDto,
+  DeviceVoidBodyDto,
+  HolderChangeBodyDto,
+  RetirementBodyDto,
+} from './lifecycle.dto';
 import { LIFECYCLE_ERROR_EXAMPLES as EXAMPLES, toLifecycleApiException } from './lifecycle.http-errors';
+import { ReplacementService } from './replacement.service';
 import { RetirementService } from './retirement.service';
+import { VoidService } from './void.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const DEVICE_NOT_FOUND = {
@@ -27,7 +37,50 @@ const DEVICE_NOT_FOUND = {
   examples: [EXAMPLES.DEVICE_NOT_FOUND],
 } as const;
 
-/** Lifecycle transitions of a registered company machine: handover, holder change, return to stock, and condition/retirement flows. */
+const REPLACE_ERRORS = [
+  ...AUTH_ERRORS,
+  {
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'Only an acting IT Admin covering the holder department may replace the machine (DEVICE.NOT_IN_CHARGE).',
+    examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
+  },
+  DEVICE_NOT_FOUND,
+  {
+    status: HttpStatus.CONFLICT,
+    description:
+      'The source or replacement machine, holder, or keyed license state refuses replacement (DEVICE.VOIDED, DEVICE.ALREADY_RETIRED, DEVICE.AWAITING_RETURN, DEVICE.NOT_HELD, DEVICE.REPLACEMENT_NOT_IN_STOCK, DEVICE.NOT_USABLE, DEVICE.HOLDER_NOT_WORKING, DEVICE.REGISTRATION_OVERLAP, DEVICE_ACTIVATION.ALREADY_ON_DEVICE, DEVICE_ACTIVATION.KEY_WITHDRAWN, DEVICE_ACTIVATION.LOT_FULL, DEVICE_ACTIVATION.PURCHASE_NOT_ACTIVE).',
+    examples: [
+      EXAMPLES.VOIDED,
+      EXAMPLES.ALREADY_RETIRED,
+      EXAMPLES.AWAITING_RETURN,
+      EXAMPLES.NOT_HELD,
+      EXAMPLES.REPLACEMENT_NOT_IN_STOCK,
+      EXAMPLES.NOT_USABLE,
+      EXAMPLES.HOLDER_NOT_WORKING,
+      EXAMPLES.REGISTRATION_OVERLAP,
+      EXAMPLES.ACTIVATION_ALREADY_ON_DEVICE,
+      EXAMPLES.ACTIVATION_KEY_WITHDRAWN,
+      EXAMPLES.ACTIVATION_LOT_FULL,
+      EXAMPLES.ACTIVATION_PURCHASE_NOT_ACTIVE,
+    ],
+  },
+  {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'The request is invalid, source and replacement match, removal note is missing, or a listed activation cannot move (VALIDATION_ERROR, DEVICE.SAME_DEVICE, DEVICE.HOLDER_NOT_FOUND, DEVICE.SOFTWARE_REMOVAL_NOTE_REQUIRED, DEVICE_ACTIVATION.NOT_ON_DEVICE, DEVICE_ACTIVATION.NOT_MOVABLE).',
+    examples: [
+      VALIDATION_EXAMPLE,
+      EXAMPLES.SAME_DEVICE,
+      EXAMPLES.HOLDER_NOT_FOUND,
+      EXAMPLES.SOFTWARE_REMOVAL_NOTE_REQUIRED,
+      EXAMPLES.ACTIVATION_NOT_ON_DEVICE,
+      EXAMPLES.ACTIVATION_NOT_MOVABLE,
+    ],
+  },
+] as const;
+
+/** Lifecycle transitions of a registered company machine: handover, replacement, return, condition, retirement, and void. */
 @ApiTags('devices')
 @Controller({ path: 'devices', version: '1' })
 @RequireRoles('IT_ADMIN')
@@ -37,6 +90,8 @@ export class LifecycleController {
     private readonly receipts: DeviceReceiptService,
     private readonly conditions: ConditionService,
     private readonly retirements: RetirementService,
+    private readonly replacements: ReplacementService,
+    private readonly voids: VoidService,
     private readonly queries: RegistryQueryService,
   ) {}
 
@@ -92,6 +147,36 @@ export class LifecycleController {
       await this.holderChanges.changeHolder(actor, params.id, body);
 
       return await this.queries.get(params.id);
+    } catch (error) {
+      throw toLifecycleApiException(error);
+    }
+  }
+
+  @Post(':id/replacements')
+  @ApiOperation({
+    operationId: 'deviceReplace',
+    summary: 'Replace an assigned company machine with an in-stock usable machine',
+  })
+  @ApiSuccessResponse(DeviceReplacementResponseDto, {
+    status: HttpStatus.CREATED,
+    message: 'DEVICE.REPLACED',
+    description:
+      'Returns the assigned machine to stock, hands over the replacement machine to the same holder, and moves selected keyed activations atomically.',
+  })
+  @ApiErrorResponses(...REPLACE_ERRORS)
+  async replace(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: DeviceIdParamDto,
+    @Body() body: DeviceReplacementBodyDto,
+  ) {
+    try {
+      const result = await this.replacements.replace(actor, params.id, body);
+
+      return {
+        returnedDeviceId: result.returnedDeviceId,
+        replacementDevice: await this.queries.get(result.replacementDeviceId),
+        movedActivations: result.movedActivations,
+      };
     } catch (error) {
       throw toLifecycleApiException(error);
     }
@@ -187,7 +272,8 @@ export class LifecycleController {
   @ApiSuccessResponse(DeviceDetailResponseDto, {
     status: HttpStatus.CREATED,
     message: 'DEVICE.RETIRED',
-    description: 'The open registration ends and the machine stays in the register as retired, with the reason.',
+    description:
+      'Ends any open registration and closes open software activations, keeping the machine in the register as retired.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -200,13 +286,15 @@ export class LifecycleController {
     DEVICE_NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: 'The machine is voided (DEVICE.VOIDED) or already retired (DEVICE.ALREADY_RETIRED).',
-      examples: [EXAMPLES.VOIDED, EXAMPLES.ALREADY_RETIRED],
+      description:
+        'The machine is voided (DEVICE.VOIDED), already retired (DEVICE.ALREADY_RETIRED), or awaiting return (DEVICE.AWAITING_RETURN).',
+      examples: [EXAMPLES.VOIDED, EXAMPLES.ALREADY_RETIRED, EXAMPLES.AWAITING_RETURN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The request is invalid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
+      description:
+        'The request is invalid or activation release decisions do not match open keyed activations on the machine (VALIDATION_ERROR, DEVICE_ACTIVATION.NOT_ON_DEVICE, DEVICE_ACTIVATION.RELEASE_NOT_APPLICABLE).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.ACTIVATION_NOT_ON_DEVICE, EXAMPLES.ACTIVATION_RELEASE_NOT_APPLICABLE],
     },
   )
   async retire(
@@ -215,7 +303,52 @@ export class LifecycleController {
     @Body() body: RetirementBodyDto,
   ) {
     try {
-      await this.retirements.retire(actor, params.id, body.reason);
+      await this.retirements.retire(actor, params.id, {
+        retirementKind: body.retirementKind,
+        reason: body.reason,
+        activationDecisions: body.activationDecisions,
+      });
+
+      return await this.queries.get(params.id);
+    } catch (error) {
+      throw toLifecycleApiException(error);
+    }
+  }
+
+  @Post(':id/voids')
+  @ApiOperation({ operationId: 'deviceVoid', summary: 'Void a mistakenly entered company machine record' })
+  @ApiSuccessResponse(DeviceDetailResponseDto, {
+    status: HttpStatus.CREATED,
+    message: 'DEVICE.VOIDED',
+    description: 'Marks an untouched machine record as voided and closes any initial bundled activations.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only an IT Admin may void a machine record.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    DEVICE_NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The machine is already voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), or has custody, signature, credential, or key activation history (DEVICE.VOID_REFUSED).',
+      examples: [EXAMPLES.VOIDED, EXAMPLES.ALREADY_RETIRED, EXAMPLES.VOID_REFUSED],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The request is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
+  )
+  async voidDevice(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: DeviceIdParamDto,
+    @Body() body: DeviceVoidBodyDto,
+  ) {
+    try {
+      await this.voids.voidDevice(actor, params.id, body.reason);
 
       return await this.queries.get(params.id);
     } catch (error) {

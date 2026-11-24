@@ -33,7 +33,9 @@ import { ConditionService } from './lifecycle/condition.service';
 import { DeviceReceiptService } from './lifecycle/device-receipt.service';
 import { HolderChangeService } from './lifecycle/holder-change.service';
 import { LifecycleController } from './lifecycle/lifecycle.controller';
+import { ReplacementService } from './lifecycle/replacement.service';
 import { RetirementService } from './lifecycle/retirement.service';
+import { VoidService } from './lifecycle/void.service';
 import { MyDevicesController } from './my-devices/my-devices.controller';
 import { MyDevicesRepo } from './my-devices/my-devices.repo';
 import { MyDevicesService } from './my-devices/my-devices.service';
@@ -102,6 +104,8 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     DeviceReceiptService,
     ConditionService,
     RetirementService,
+    ReplacementService,
+    VoidService,
     DeviceActivationCommandService,
     ActivationQueryService,
     AssetCodeRepo,

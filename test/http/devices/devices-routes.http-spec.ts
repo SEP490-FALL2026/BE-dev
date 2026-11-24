@@ -44,9 +44,20 @@ describe('company machine routes (http contract, no database)', () => {
     ['patch', `${DEVICES}/${ID}`, { expectedUpdatedAt: '2026-11-24T00:00:00.000Z', hostname: 'h2' }],
     ['get', `${DEVICES}/${ID}/registrations`, undefined],
     ['post', `${DEVICES}/${ID}/holder-changes`, { holderEmployeeId: ID, collectorInstalled: true }],
+    [
+      'post',
+      `${DEVICES}/${ID}/replacements`,
+      {
+        replacementDeviceId: ID,
+        condition: 'USABLE',
+        softwareRemoval: { outcome: 'REMOVED' },
+        collectorInstalled: true,
+      },
+    ],
     ['post', `${DEVICES}/${ID}/returns`, { condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } }],
     ['post', `${DEVICES}/${ID}/condition-changes`, { condition: 'IN_REPAIR' }],
     ['post', `${DEVICES}/${ID}/retirements`, { reason: 'broken' }],
+    ['post', `${DEVICES}/${ID}/voids`, { reason: 'entered twice' }],
     ['post', `${DEVICES}/${ID}/activations`, { planId: ID }],
     ['get', '/api/v1/device-activations', undefined],
     ['post', `/api/v1/device-activations/${ID}/deactivation`, {}],
@@ -94,11 +105,22 @@ describe('company machine routes (http contract, no database)', () => {
       ),
       await as(
         request(server)
+          .post(`${DEVICES}/${ID}/replacements`)
+          .send({
+            replacementDeviceId: ID,
+            condition: 'USABLE',
+            softwareRemoval: { outcome: 'REMOVED' },
+            collectorInstalled: true,
+          }),
+      ),
+      await as(
+        request(server)
           .post(`${DEVICES}/${ID}/returns`)
           .send({ condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } }),
       ),
       await as(request(server).post(`${DEVICES}/${ID}/condition-changes`).send({ condition: 'IN_REPAIR' })),
       await as(request(server).post(`${DEVICES}/${ID}/retirements`).send({ reason: 'x' })),
+      await as(request(server).post(`${DEVICES}/${ID}/voids`).send({ reason: 'x' })),
       await as(request(server).post(`${DEVICES}/${ID}/activations`).send({ planId: ID })),
       await as(request(server).get('/api/v1/device-activations')),
       await as(request(server).post(`/api/v1/device-activations/${ID}/deactivation`).send({})),
@@ -267,6 +289,46 @@ describe('company machine routes (http contract, no database)', () => {
       { condition: 'LOST' },
     ],
     ['a retirement with no reason', 'post', `${DEVICES}/${ID}/retirements`, {}],
+    [
+      'a retirement with invalid retirementKind',
+      'post',
+      `${DEVICES}/${ID}/retirements`,
+      { reason: 'broken', retirementKind: 'SOLD' },
+    ],
+    [
+      'a retirement with duplicate activationIds',
+      'post',
+      `${DEVICES}/${ID}/retirements`,
+      {
+        reason: 'broken',
+        activationDecisions: [
+          { activationId: ID, licenseRelease: 'RETURN_TO_LOT' },
+          { activationId: ID, licenseRelease: 'LOST_WITH_DEVICE' },
+        ],
+      },
+    ],
+    [
+      'a replacement missing collectorInstalled',
+      'post',
+      `${DEVICES}/${ID}/replacements`,
+      { replacementDeviceId: ID, condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } },
+    ],
+    [
+      'a replacement with duplicate activationIds',
+      'post',
+      `${DEVICES}/${ID}/replacements`,
+      {
+        replacementDeviceId: ID,
+        condition: 'USABLE',
+        softwareRemoval: { outcome: 'REMOVED' },
+        collectorInstalled: true,
+        activations: [
+          { activationId: ID, action: 'MOVE' },
+          { activationId: ID, action: 'STAY' },
+        ],
+      },
+    ],
+    ['a void with blank reason', 'post', `${DEVICES}/${ID}/voids`, { reason: '   ' }],
     ['an activation with no planId', 'post', `${DEVICES}/${ID}/activations`, {}],
     [
       'an activation with non-UUID licenseKeyId',
@@ -373,7 +435,13 @@ describe('company machine routes (http contract, no database)', () => {
       ],
       ['DeviceReturnBodyDto', ['condition', 'conditionNote', 'softwareRemoval'], ['condition', 'softwareRemoval']],
       ['ConditionChangeBodyDto', ['condition', 'note'], ['condition']],
-      ['RetirementBodyDto', ['reason'], ['reason']],
+      ['RetirementBodyDto', ['retirementKind', 'reason', 'activationDecisions'], ['reason']],
+      [
+        'DeviceReplacementBodyDto',
+        ['replacementDeviceId', 'condition', 'conditionNote', 'softwareRemoval', 'collectorInstalled', 'activations'],
+        ['replacementDeviceId', 'condition', 'softwareRemoval', 'collectorInstalled'],
+      ],
+      ['DeviceVoidBodyDto', ['reason'], ['reason']],
       ['OpenDeviceActivationBodyDto', ['planId', 'licenseKeyId'], ['planId']],
       ['DeactivateDeviceActivationBodyDto', ['licenseRelease'], []],
       ['MoveDeviceActivationBodyDto', ['targetDeviceId'], ['targetDeviceId']],
