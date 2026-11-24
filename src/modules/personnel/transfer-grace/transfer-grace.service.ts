@@ -73,7 +73,7 @@ export class TransferGraceService {
       graceEndsOn: grace.endsOn,
       today,
     });
-    // A moved IT Admin who still answers for something in the catalog: every IT Admin is told, the transfer is not held back (`R-26`).
+    // A moved IT Admin who still answers for something in the catalog: the Super Admin is told, the transfer is not held back (`R-26`).
     await this.handovers.reached(tx, {
       organizationId: transfer.organizationId,
       source: { kind: 'DEPARTMENT_TRANSFER', id: transfer.id },

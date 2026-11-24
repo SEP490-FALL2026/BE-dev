@@ -20,8 +20,11 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
       `getCompanyEmailDomains`, `countUnmarkedChangesAsOf` (cho `ops:inspect`).
     - Phòng ban: `getDepartmentBrief(s)`, `getActiveDepartmentIds`, `lockDepartmentShared`, `lockDepartmentForEntry`, `getDepartmentMemberIds`,
       `getMemberIdsOfDepartments` (thành viên của nhiều phòng trong một câu lệnh),
-      `getDepartmentHeads`, `getHeadedDepartment(…, tx?)`, `isDepartmentHead(…, tx?)`, `departmentsWithoutHead`; IT Admin phụ trách:
-      `getItAdminInCharge`, `getItAdminInChargeOfDepartment`, `getItAdminScope`, `getDepartmentIdsInChargeOf`.
+      `getDepartmentHeads`, `getHeadedDepartment(…, tx?)`, `isDepartmentHead(…, tx?)`, `departmentsWithoutHead`; IT Admin phụ trách và
+      phạm vi làm việc: `getItAdminInCharge`, `getItAdminInChargeOfDepartment`, `getItAdminScope` (phạm vi đọc),
+      `getItAdminActingScope` (phạm vi hành động, không có hàng chung), `getDepartmentIdsInChargeOf`, `itAdminsActingFor`,
+      `itAdminsActingForUnplacedWork`, `findActiveUnplacedWorkIdsForDesignee`, `listActiveUnplacedWorkDesignations`,
+      `getActiveDepartmentsForItCoverage`, `workDepartmentsOf`, `getEmployeeIdsOfWorkDepartments`.
     - Nhân viên: `getEmployee`, `getEmployeeByCode`, `getEmployeesByCodes`, `getEmployeesByWorkEmails` (theo email công việc đã chuẩn hóa, gồm
       người đã nghỉ; chỉ mã NV + email, không họ tên — usage nhà cung cấp khớp danh tính), `getEmployees`, `getEmployeePlacement`,
       `getEmployeeProfile`, `searchActiveEmployees`, `lockEmployeeForShare`, `isWorkEmailTaken`, `lookupForEmployeeImport`,
@@ -30,7 +33,8 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
       `requireUnitCostCenter` (kiểm thuần, không chạm CSDL).
   - `OrganizationApi` ([public/organization.api.ts](public/organization.api.ts)), 9 phương thức ghi, khóa ghi và bộ đọc "đang dùng":
     - Ghi: `createOrganization`, `createDepartment`, `createUnitCostCenter`,
-      `createEmployeeWithPlacement` (cách duy nhất tạo nhân viên), `updateEmployeeOfficialFields`, `emitChange` (báo thay đổi).
+      `createEmployeeWithPlacement` (cách duy nhất tạo nhân viên), `updateEmployeeOfficialFields`, `emitChange` (báo thay đổi),
+      `endUnplacedWorkDesignations` (đóng chỉ định việc chưa xếp phòng khi việc gốc kết thúc, `WORK_CLOSED`).
     - Khóa ghi: `lockEmployeeForUpdate` (`FOR UPDATE`).
     - Đang dùng: `getDepartmentUse`, `getCostCenterUse` (hỏi các extension point bên dưới).
 - `OrganizationHistoryApi` ([public/organization-history.api.ts](public/organization-history.api.ts)): ghi lịch sử cho
@@ -46,8 +50,8 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
 
 ## Bảng sở hữu
 
-- `organizations`, `departments`, `department_head_periods`, `employees`, `employee_placements`, `cost_centers`,
-  `cost_center_department_links`, `cost_center_direction_activations`,
+- `organizations`, `departments`, `department_head_periods`, `department_it_substitutes`, `unplaced_work_it_designations`,
+  `employees`, `employee_placements`, `cost_centers`, `cost_center_department_links`, `cost_center_direction_activations`,
   `organization_change_announcements` ([prisma/models/organization.prisma](../../../prisma/models/organization.prisma)).
 
 ## Extension point
@@ -94,8 +98,18 @@ Từ vựng trạng thái nhân viên (`EmployeeStatus`, `EmployeeWorkState`, `E
 - `department/` — phần nền: `department-record.service.ts` (thư mục, kỳ trưởng phòng), `department-use.service.ts`,
   `department.repo.ts`, `department-head.repo.ts`, `department.policy.ts`, `department.errors.ts`, `held-notice-handover.listener.ts`.
 - `department-management/` — use case của phòng ban và trưởng phòng: `departments.controller.ts` (`/departments*`,
-  `/department-warnings`) → `department.service.ts`, `department-query.service.ts`; `department-heads.controller.ts` (trưởng, khuyết,
+  `/department-warnings`; đọc trả thêm `itCoverage`, `itSubstitute`) → `department.service.ts`, `department-query.service.ts`; `department-heads.controller.ts` (trưởng, khuyết,
   kế nhiệm) → `department-head.service.ts`; `department.dto.ts`, `department.mapper.ts`, `department.http-errors.ts`.
+- `department-it-substitute/` — Super Admin chỉ định/kết thúc người làm thay IT Admin tạm thời cho phòng ban
+  (`POST /departments/{id}/it-substitutes`, `GET /department-it-substitutes`, `POST /department-it-substitutes/{id}/end`):
+  `department-it-substitute.controller.ts`, `DepartmentItSubstituteService`, `department-it-substitute.policy.ts` (`actingItAdmins`,
+  `itAdminLoadOf` cảnh báo mềm theo `IT_ADMIN_DEPARTMENT_LIMIT = 4`, không chặn chỉ định), thông báo
+  `DEPARTMENT_IT_SUBSTITUTE_APPOINTED` / `ENDED`. Khóa: nhân viên (tầng 1) → phòng ban (tầng 2).
+- `unplaced-work-designation/` — Super Admin chỉ định IT Admin xử lý việc của nhân viên chưa từng xếp phòng
+  (`PROVISIONING_TASK`, `OFFBOARDING_CASE`, `DEVICE_RETURN_TASK`, `DEVICE`; `POST/GET /unplaced-work-designations`,
+  `POST /unplaced-work-designations/{id}/end`): `unplaced-work-designation.controller.ts`, `UnplacedWorkDesignationService`, thông
+  báo `UNPLACED_WORK_DESIGNATED`. Khóa: hai nhân viên (người lao động và người được chỉ định) trong một câu theo `id` tăng dần ở
+  tầng 1.
 - `cost-center/` — `cost-centers.controller.ts` (`/cost-centers*`) → `cost-center.service.ts`, `cost-center.policy.ts`,
   `cost-center.http-errors.ts`.
 - `change-announcement/` — `organization-change.service.ts` (phát thay đổi), `organization-change.job.ts` (sweeper mỗi

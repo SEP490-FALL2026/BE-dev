@@ -15,16 +15,18 @@ export interface RenewalPeople {
 export type RenewalReadScope = { kind: 'ALL'; itAdmin: boolean };
 
 /**
- * Who a renewal concerns (`US-11-01`, `US-11-05`, `QĐ-103e`, `QĐ-104l`): the IT Admin who answers for the subscription (else any usable IT Admin), Finance, who is told of every result, and the person who decides spending, who
- * hears of an incident only (`QĐ-99h`). Nobody confirms a renewal and no department takes part (`QĐ-113g`).
+ * Who a renewal concerns (`US-11-01`, `US-11-05`, `QĐ-103e`, `QĐ-104l`): the IT Admin responsible for the subscription
+ * (with no temporary substitute per subscription; alerts fall back to the usable Super Admin), Finance, who is told of
+ * every result, and the person who decides spending, who hears of an incident only (`QĐ-99h`). Nobody confirms a renewal
+ * and no department takes part (`QĐ-113g`).
  */
 @Injectable()
 export class RenewalPartiesService {
   constructor(private readonly identity: IdentityAccessApi) {}
 
   /**
-   * The IT Admin notified for the period: the one responsible for the subscription while they are a usable IT Admin, else the
-   * usable Super Admin; null when there is none. No department takes part: a subscription has no owning department.
+   * The recipient notified for the period: the IT Admin responsible for the subscription while they are a usable IT Admin,
+   * else the usable Super Admin fallback; null when there is none. No department takes part: a subscription has no owning department.
    */
   async itAdminOf(period: { responsibleItAdminEmployeeId: string | null }, tx?: DbTx): Promise<string | null> {
     const responsible = period.responsibleItAdminEmployeeId;
@@ -39,19 +41,18 @@ export class RenewalPartiesService {
   }
 
   /**
-   * Returns the usable responsible IT Admin for the subscription (`substitute` is always false since temporary substitutes are not
-   * supported per subscription). `responsibleItAdminEmployeeId` is that person while they are usable, else null.
+   * Returns the subscription's responsible IT Admin while they are a usable IT Admin, else null.
+   * Subscriptions do not have temporary substitutes: only the named responsible IT Admin may record renewals.
    */
-  async substituteOf(
-    _actor: Pick<AuthenticatedPrincipal, 'employeeId'>,
+  async usableResponsibleItAdminOf(
     period: { responsibleItAdminEmployeeId: string | null },
     tx?: DbTx,
-  ): Promise<{ substitute: boolean; responsibleItAdminEmployeeId: string | null }> {
+  ): Promise<string | null> {
     const responsible = period.responsibleItAdminEmployeeId;
-    if (responsible === null) return { substitute: false, responsibleItAdminEmployeeId: null };
+    if (responsible === null) return null;
     const usable = (await this.identity.findUsableItAdminEmployeeIds([responsible], tx)).has(responsible);
 
-    return { substitute: false, responsibleItAdminEmployeeId: usable ? responsible : null };
+    return usable ? responsible : null;
   }
 
   /**

@@ -11,7 +11,6 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
     '403': ['ASSIGNMENT_EXPIRY.SCOPE_FORBIDDEN'],
   },
   assignmentExpiryStartRevocation: {
-    '403': ['PROVISIONING.ANOTHER_IT_ADMIN_NEEDED'],
     '404': ['ASSIGNMENT_EXPIRY.NOT_FOUND'],
     '409': [
       'ASSIGNMENT_EXPIRY.NOT_EXPIRED',

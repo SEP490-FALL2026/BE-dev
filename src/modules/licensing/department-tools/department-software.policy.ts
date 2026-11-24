@@ -56,9 +56,8 @@ export function mayReadList(who: { roles: readonly string[]; isMember: boolean; 
 }
 
 /**
- * Who changes the list and decides on proposals: only an IT Admin in charge of the department (`QĐ-110s`; the scope is the one of
- * `US-01-11`, so a department no IT Admin who can act is in charge of falls to every IT Admin). The Super Admin and the head read and
- * propose, they do not write the list (`QĐ-87`).
+ * Who changes the list and decides on proposals: only an acting IT Admin of the department (the usable IT Admin in charge or
+ * an appointed substitute — no common queue for acting). The Super Admin and the head read and propose, they do not write the list (`QĐ-87`).
  */
 export function mayChangeList(who: { roles: readonly string[]; inItAdminScope: boolean }): boolean {
   return who.roles.includes('IT_ADMIN') && who.inItAdminScope;

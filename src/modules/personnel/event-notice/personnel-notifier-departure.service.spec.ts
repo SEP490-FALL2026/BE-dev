@@ -21,7 +21,6 @@ function notifierOf(world: {
   heads?: Record<string, string>;
   workDepartments?: Record<string, string>;
   unplaced?: string[];
-  readScopeByActor?: Record<string, string[]>;
 }) {
   const told: InAppNotificationInput[] = [];
   const notifications = {
@@ -44,7 +43,6 @@ function notifierOf(world: {
     unplacedAmong: jest.fn((ids: readonly string[]) =>
       Promise.resolve(new Set(ids.filter((id) => (world.unplaced ?? []).includes(id)))),
     ),
-    getItAdminScope: jest.fn((actorId: string) => Promise.resolve(world.readScopeByActor?.[actorId] ?? [])),
     itAdminsActingFor: jest.fn(
       async (deptIds: readonly string[], usableAmong: (ids: string[]) => Promise<Set<string>>) =>
         new Map(
@@ -232,62 +230,6 @@ describe('departure, transfer, and handover notifications', () => {
     expect(named.findAllUsableItAdminEmployeeIds).not.toHaveBeenCalled();
     expect(countFallback).toBe(1);
     expect(recipients(fallback.told, 'VENDOR_ADMINS_BELOW_MINIMUM')).toEqual(['sa:-']);
-  });
-
-  describe('resolveTransferReopenAccess', () => {
-    const transfer = { fromDepartmentId: 'from-dept', toDepartmentId: 'to-dept' };
-
-    it('returns inReadScope: false when actor read scope covers neither department', async () => {
-      const { notifier } = notifierOf({
-        readScopeByActor: { 'it-other': ['other-dept'] },
-        actingByDept: { 'to-dept': { inCharge: 'it-to', usable: ['it-to'] } },
-      });
-
-      await expect(notifier.resolveTransferReopenAccess(TX, 'it-other', transfer)).resolves.toEqual({
-        inReadScope: false,
-        isActing: false,
-        bySubstitute: false,
-      });
-    });
-
-    it('returns inReadScope: true and isActing: false when actor only sees fromDepartmentId', async () => {
-      const { notifier } = notifierOf({
-        readScopeByActor: { 'it-from': ['from-dept'] },
-        actingByDept: { 'to-dept': { inCharge: 'it-to', usable: ['it-to'] } },
-      });
-
-      await expect(notifier.resolveTransferReopenAccess(TX, 'it-from', transfer)).resolves.toEqual({
-        inReadScope: true,
-        isActing: false,
-        bySubstitute: false,
-      });
-    });
-
-    it('returns isActing: true and bySubstitute: false for usable in-charge of toDepartmentId', async () => {
-      const { notifier } = notifierOf({
-        readScopeByActor: { 'it-to': ['to-dept'] },
-        actingByDept: { 'to-dept': { inCharge: 'it-to', usable: ['it-to'] } },
-      });
-
-      await expect(notifier.resolveTransferReopenAccess(TX, 'it-to', transfer)).resolves.toEqual({
-        inReadScope: true,
-        isActing: true,
-        bySubstitute: false,
-      });
-    });
-
-    it('returns isActing: true and bySubstitute: true for active substitute of toDepartmentId', async () => {
-      const { notifier } = notifierOf({
-        readScopeByActor: { 'it-sub': ['to-dept'] },
-        actingByDept: { 'to-dept': { inCharge: 'it-locked', substitute: 'it-sub', usable: ['it-sub'] } },
-      });
-
-      await expect(notifier.resolveTransferReopenAccess(TX, 'it-sub', transfer)).resolves.toEqual({
-        inReadScope: true,
-        isActing: true,
-        bySubstitute: true,
-      });
-    });
   });
 
   it('notifies usable Super Admin with UNPLACED_WORK_WAITING for a never-placed offboarding case only', async () => {

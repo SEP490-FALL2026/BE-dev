@@ -192,24 +192,6 @@ export class PersonnelNotifier {
     return superAdmin !== null && superAdmin !== input.employeeId ? [superAdmin] : [];
   }
 
-  /** Resolves whether an IT Admin may see or reopen revocations for a department transfer, and whether they act as a substitute. */
-  async resolveTransferReopenAccess(
-    tx: DbTx,
-    actorEmployeeId: string,
-    transfer: { fromDepartmentId: string; toDepartmentId: string },
-  ): Promise<{ inReadScope: boolean; isActing: boolean; bySubstitute: boolean }> {
-    const usableAmong = (ids: readonly string[]) => this.identity.findUsableItAdminEmployeeIds(ids, tx);
-    const readScope = await this.organizationReads.getItAdminScope(actorEmployeeId, usableAmong, tx);
-    const inReadScope = readScope.includes(transfer.fromDepartmentId) || readScope.includes(transfer.toDepartmentId);
-    if (!inReadScope) return { inReadScope: false, isActing: false, bySubstitute: false };
-    const acting = (await this.organizationReads.itAdminsActingFor([transfer.toDepartmentId], usableAmong, tx)).get(
-      transfer.toDepartmentId,
-    );
-    const isActing = Boolean(acting?.actors.includes(actorEmployeeId));
-
-    return { inReadScope: true, isActing, bySubstitute: isActing && acting?.substitute === actorEmployeeId };
-  }
-
   /**
    * The rights of a departure are still not taken away past the day (`QĐ-110c`): the IT Admin in charge and the Super Admin are told, once
    * for the case and the day (`offboarding:<case>:<day>`), so a pass that runs again, or on another instance, writes nothing. Returns whether

@@ -1,9 +1,9 @@
 # onboarding
 
-Mục đích: checklist khởi tạo tổ chức (5 bước) cho Super Admin và IT Admin, tính từ dữ liệu đang có ở các module khác.
+Mục đích: checklist khởi tạo tổ chức (6 bước) cho Super Admin và IT Admin, tính từ dữ liệu đang có ở các module khác.
 Chỉ đọc, không ghi gì. Story chính: US-02-04.
 
-Tầng: T6 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: catalog, data-import, identity-access, licensing,
+Tầng: T6 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: catalog, data-import, devices, identity-access, licensing,
 organization ([module-graph](../../../docs/generated/module-graph.md)). Được dùng bởi: không module nào; chỉ
 `app/app.module.ts` mount `OnboardingModule`.
 
@@ -27,7 +27,8 @@ Module nhỏ, chưa chia capability; mọi file ở gốc module.
 
 - `onboarding.controller.ts` — `GET /onboarding-checklist` (`SUPER_ADMIN`, `IT_ADMIN`) → `onboarding.service.ts`.
 - `onboarding.service.ts` — đọc `OrganizationReadApi.getOnboardingFacts`, `DataImportApi.latestEmployeeImport`,
-  `CatalogApi.getOnboardingFacts`, `LicensingSeatBaselineApi.getBaselineProgress`, `IdentityAccessApi.findUsableItAdminEmployeeIds`.
+  `CatalogApi.getOnboardingFacts`, `LicensingSeatBaselineApi.getBaselineProgress`, `DevicesApi.initialRecordProgress`,
+  `IdentityAccessApi.findUsableItAdminEmployeeIds`.
 - `onboarding.policy.ts` — ai được đọc; `onboarding.errors.ts` — `OnboardingForbiddenError`.
 - Nest: `onboarding.module.ts` (controller + service, chỉ API mount).
 
@@ -39,7 +40,8 @@ Module nhỏ, chưa chia capability; mọi file ở gốc module.
 - Bước 1 xong khi có phòng ban, có nhân viên và file nhân sự mới nhất không có dòng lỗi; thiếu trưởng phòng, IT Admin
   hoặc Cost Center chỉ là cảnh báo, không chặn (US-02-04 AC-6, `QĐ-87f(2)`).
 - Bước 2 xong khi catalog có ứng dụng, bước 3 khi có subscription; bước 4 (seat baseline) bị chặn tới khi bước 1 và 3
-  xong (`BR-01.1`), xong khi IT Admin đóng nó; bước 5 (usage) luôn `NOT_AVAILABLE`.
+  xong (`BR-01.1`), xong khi IT Admin đóng nó; bước 5 (usage) luôn `NOT_AVAILABLE`; bước 6 (`DEVICE_INITIAL_RECORDS`) xong khi đã có
+  máy nhập hiện trạng và không còn máy thiếu bản ký `BM-06` (`NO_INITIAL_DEVICE`, `SIGNATURES_MISSING`).
 
 ## Test
 

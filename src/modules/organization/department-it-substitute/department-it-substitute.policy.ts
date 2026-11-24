@@ -1,3 +1,4 @@
+import { IT_ADMIN_DEPARTMENT_LIMIT } from '../department/department.policy';
 import { DepartmentItSubstituteForbiddenError } from './department-it-substitute.errors';
 
 export interface ActingItAdminsResult {
@@ -73,7 +74,7 @@ export function itAdminLoadOf(facts: {
   substituteCount: number;
   limit?: number;
 }): ItAdminLoad {
-  const limit = facts.limit ?? 4;
+  const limit = facts.limit ?? IT_ADMIN_DEPARTMENT_LIMIT;
 
   return {
     employeeId: facts.employeeId,

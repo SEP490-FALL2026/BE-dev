@@ -74,7 +74,7 @@ export class ProvisioningTaskFrame {
         now,
       });
       action.check(task);
-      const mode = await this.selfExecutionMode(actor, task.assignment.employeeId, tx);
+      const mode = await this.selfExecutionMode(actor, task.assignment.employeeId);
       const done = await action.write({ tx, task, organizationId: organization.id, now });
       if (done === false) return task;
       await this.finalizeWork(tx, actor, organization.id, task, done, { mode, bySubstitute, now });
@@ -169,12 +169,7 @@ export class ProvisioningTaskFrame {
    * Self-execution mode when the IT Admin works for a person who is themselves: allowed for any acting
    * IT Admin and marked as self-executed.
    */
-  selfExecutionMode(
-    actor: AuthenticatedPrincipal,
-    beneficiaryEmployeeId: string,
-    _tx?: DbTx,
-  ): Promise<SelfExecutionMode> {
-    void _tx;
+  selfExecutionMode(actor: AuthenticatedPrincipal, beneficiaryEmployeeId: string): Promise<SelfExecutionMode> {
     return Promise.resolve(
       selfExecution({
         actorEmployeeId: actor.employeeId,

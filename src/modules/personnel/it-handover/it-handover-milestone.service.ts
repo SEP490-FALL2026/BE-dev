@@ -8,9 +8,10 @@ import type { HandoverSource } from './it-handover.types';
 
 /**
  * The milestone of a departure (the block of the access) or of a transfer (the day it takes effect) is here, in the transaction that opens it
- * (`QĐ-110j`, `R-26`, `QĐ-110k`): a departure that takes the last admin of a plan at the vendor away tells every IT Admin; when the IT Admin who leaves still answers for a subscription or an application, every IT Admin who works is told, once
- * each for the file, so the work lands in the common queue and is not left to a person who is leaving. The file is never held back: a hand-over
- * not made changes nothing about its closing (`QĐ-110e`). The same milestone seen twice (a pass that runs again, another instance) tells nobody twice.
+ * (`QĐ-110j`, `R-26`, `QĐ-110k`): a departure that takes away the last working vendor admin of a plan tells the active subscription IT Admins
+ * of that plan (or the usable Super Admin fallback); when the departing or transferred IT Admin still answers for a subscription or an
+ * application, the usable Super Admin is told once for the file to hand them over. The file is never held back: a hand-over not made changes
+ * nothing about its closing (`QĐ-110e`). The same milestone seen twice (a pass that runs again, another instance) tells nobody twice.
  */
 @Injectable()
 export class ItHandoverMilestoneService {

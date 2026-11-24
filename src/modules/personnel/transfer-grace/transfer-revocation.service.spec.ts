@@ -1,15 +1,15 @@
 import type { TransactionRunner, DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { AuditApi } from '../../audit/public/audit.api';
+import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { LicensingApi } from '../../licensing/public/licensing.api';
 import type { OrganizationApi } from '../../organization/public/organization.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import type { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import type { TransferClosureService } from './transfer-closure.service';
 import type { TransferGraceRepo } from './transfer-grace.repo';
 import type { HeldTransfer } from './transfer-grace.types';
 import { TransferRevocationRefusedError } from './transfer-revocation.errors';
 import { TransferRevocationService } from './transfer-revocation.service';
+import type { TransferTellingService } from './transfer-telling.service';
 
 describe('TransferRevocationService', () => {
   const actor: AuthenticatedPrincipal = {
@@ -55,7 +55,8 @@ describe('TransferRevocationService', () => {
   function makeSut(options?: {
     foundEmployeeId?: string | null;
     locked?: HeldTransfer | null;
-    reopenAccess?: { inReadScope: boolean; isActing: boolean; bySubstitute: boolean };
+    readScope?: string[];
+    toDeptActing?: { inCharge?: string | null; substitute?: string | null; usable?: string[] };
     openRevocationResult?: {
       taskId: string;
       created: boolean;
@@ -70,7 +71,9 @@ describe('TransferRevocationService', () => {
       .mockResolvedValue(
         options?.openRevocationResult ?? { taskId: 'task-1', created: true, reasonAdded: false, status: 'QUEUED' },
       );
-    const auditRecord = jest.fn().mockResolvedValue(undefined);
+    const revocationOpened = jest.fn().mockResolvedValue(undefined);
+    const actingSpec = options?.toDeptActing ?? { inCharge: actor.employeeId, usable: [actor.employeeId] };
+    const usableIds = new Set(actingSpec.usable ?? []);
 
     const runner = {
       run: jest.fn(async (fn: (t: DbTx) => Promise<unknown>) => fn(tx)),
@@ -88,7 +91,28 @@ describe('TransferRevocationService', () => {
     } as unknown as OrganizationApi;
     const organizationReads = {
       businessToday: jest.fn().mockResolvedValue('2026-11-21'),
+      getItAdminScope: jest.fn().mockResolvedValue(options?.readScope ?? ['dept-2']),
+      itAdminsActingFor: jest.fn(
+        async (deptIds: readonly string[], usableAmong: (ids: string[]) => Promise<Set<string>>) => {
+          const candidates = [actingSpec.inCharge, actingSpec.substitute].filter((id): id is string => Boolean(id));
+          const usable = candidates.length === 0 ? new Set<string>() : await usableAmong(candidates);
+          const inCharge = actingSpec.inCharge && usable.has(actingSpec.inCharge) ? actingSpec.inCharge : null;
+          const substitute = actingSpec.substitute && usable.has(actingSpec.substitute) ? actingSpec.substitute : null;
+          const actors = [inCharge, substitute].filter((id): id is string => id !== null);
+          return new Map(
+            deptIds.map((deptId) => [
+              deptId,
+              { inCharge, substitute, defaultAssignee: substitute ?? inCharge, actors },
+            ]),
+          );
+        },
+      ),
     } as unknown as OrganizationReadApi;
+    const identity = {
+      findUsableItAdminEmployeeIds: jest.fn((ids: readonly string[]) =>
+        Promise.resolve(new Set(ids.filter((id) => usableIds.has(id)))),
+      ),
+    } as unknown as IdentityAccessApi;
     const licensing = {
       listPersonalSeatsOf: jest.fn().mockResolvedValue([
         {
@@ -101,14 +125,7 @@ describe('TransferRevocationService', () => {
       ]),
       openRevocation,
     } as unknown as LicensingApi;
-    const audit = { record: auditRecord } as unknown as AuditApi;
-    const resolveTransferReopenAccess = jest
-      .fn()
-      .mockResolvedValue(options?.reopenAccess ?? { inReadScope: true, isActing: true, bySubstitute: false });
-    const notifier = {
-      transferRightsRevoking: jest.fn().mockResolvedValue(undefined),
-      resolveTransferReopenAccess,
-    } as unknown as PersonnelNotifier;
+    const telling = { revocationOpened } as unknown as TransferTellingService;
     const closing = { closeIfDue: jest.fn().mockResolvedValue(false) } as unknown as TransferClosureService;
 
     const service = new TransferRevocationService(
@@ -116,13 +133,13 @@ describe('TransferRevocationService', () => {
       graces,
       organization,
       organizationReads,
+      identity,
       licensing,
-      audit,
-      notifier,
+      telling,
       closing,
     );
 
-    return { service, pageGraceOver, openRevocation, auditRecord };
+    return { service, tx, pageGraceOver, openRevocation, revocationOpened };
   }
 
   describe('sweep', () => {
@@ -160,9 +177,7 @@ describe('TransferRevocationService', () => {
     });
 
     it('throws NOT_FOUND when actor is outside read scope', async () => {
-      const { service, openRevocation } = makeSut({
-        reopenAccess: { inReadScope: false, isActing: false, bySubstitute: false },
-      });
+      const { service, openRevocation } = makeSut({ readScope: ['other-dept'] });
 
       await expect(service.reopen(actor, 'tr-1')).rejects.toMatchObject({
         constructor: TransferRevocationRefusedError,
@@ -173,7 +188,8 @@ describe('TransferRevocationService', () => {
 
     it('throws NOT_IN_CHARGE when actor is in read scope but not acting for destination department', async () => {
       const { service, openRevocation } = makeSut({
-        reopenAccess: { inReadScope: true, isActing: false, bySubstitute: false },
+        readScope: ['dept-1'],
+        toDeptActing: { inCharge: 'it-other', usable: ['it-other'] },
       });
 
       await expect(service.reopen(actor, 'tr-1')).rejects.toMatchObject({
@@ -204,7 +220,7 @@ describe('TransferRevocationService', () => {
     });
 
     it('reopens with noReopenAfterFailure: false and actor, returning created and reasonAdded counts', async () => {
-      const { service, openRevocation, auditRecord } = makeSut();
+      const { service, openRevocation, revocationOpened } = makeSut();
 
       const result = await service.reopen(actor, 'tr-1', new Date('2026-11-21T10:00:00Z'));
 
@@ -214,30 +230,84 @@ describe('TransferRevocationService', () => {
         actor,
         expect.objectContaining({ assignmentId: 'asg-1', source: 'TRANSFER', noReopenAfterFailure: false }),
       );
-      expect(auditRecord).toHaveBeenCalledWith(
+      expect(revocationOpened).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ action: 'DEPARTMENT_TRANSFER.REVOCATION_OPENED', actorKind: 'USER' }),
+        expect.objectContaining({ id: 'tr-1' }),
+        { created: 1, reasonAdded: 0 },
+        actor,
+        false,
       );
-      const recordedEvent = (auditRecord.mock.calls[0] as [unknown, { after: Record<string, unknown> }])[1];
-      expect(recordedEvent.after).not.toHaveProperty('bySubstitute');
     });
 
-    it('records bySubstitute: true in audit after when reopened by an active substitute', async () => {
-      const { service, auditRecord } = makeSut({
-        reopenAccess: { inReadScope: true, isActing: true, bySubstitute: true },
+    it('passes bySubstitute: true when reopened by an active substitute', async () => {
+      const { service, revocationOpened } = makeSut({
+        readScope: ['dept-2'],
+        toDeptActing: { inCharge: 'it-locked', substitute: actor.employeeId, usable: [actor.employeeId] },
       });
 
       const result = await service.reopen(actor, 'tr-1', new Date('2026-11-21T10:00:00Z'));
 
       expect(result).toEqual({ created: 1, reasonAdded: 0 });
-      expect(auditRecord).toHaveBeenCalledWith(
+      expect(revocationOpened).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({
-          action: 'DEPARTMENT_TRANSFER.REVOCATION_OPENED',
-          actorKind: 'USER',
-          after: { employeeId: 'emp-1', tasksCreated: 1, reasonsAdded: 0, bySubstitute: true },
-        }),
+        expect.objectContaining({ id: 'tr-1' }),
+        { created: 1, reasonAdded: 0 },
+        actor,
+        true,
       );
+    });
+  });
+
+  describe('resolveReopenAccess', () => {
+    const transfer = { fromDepartmentId: 'dept-1', toDepartmentId: 'dept-2' };
+
+    it('returns inReadScope: false when actor read scope covers neither department', async () => {
+      const { service, tx } = makeSut({ readScope: ['other-dept'] });
+
+      await expect(service.resolveReopenAccess(tx, actor.employeeId, transfer)).resolves.toEqual({
+        inReadScope: false,
+        isActing: false,
+        bySubstitute: false,
+      });
+    });
+
+    it('returns inReadScope: true and isActing: false when actor only sees fromDepartmentId', async () => {
+      const { service, tx } = makeSut({
+        readScope: ['dept-1'],
+        toDeptActing: { inCharge: 'it-to', usable: ['it-to'] },
+      });
+
+      await expect(service.resolveReopenAccess(tx, actor.employeeId, transfer)).resolves.toEqual({
+        inReadScope: true,
+        isActing: false,
+        bySubstitute: false,
+      });
+    });
+
+    it('returns isActing: true and bySubstitute: false for usable in-charge of toDepartmentId', async () => {
+      const { service, tx } = makeSut({
+        readScope: ['dept-2'],
+        toDeptActing: { inCharge: actor.employeeId, usable: [actor.employeeId] },
+      });
+
+      await expect(service.resolveReopenAccess(tx, actor.employeeId, transfer)).resolves.toEqual({
+        inReadScope: true,
+        isActing: true,
+        bySubstitute: false,
+      });
+    });
+
+    it('returns isActing: true and bySubstitute: true for active substitute of toDepartmentId', async () => {
+      const { service, tx } = makeSut({
+        readScope: ['dept-2'],
+        toDeptActing: { inCharge: 'it-locked', substitute: actor.employeeId, usable: [actor.employeeId] },
+      });
+
+      await expect(service.resolveReopenAccess(tx, actor.employeeId, transfer)).resolves.toEqual({
+        inReadScope: true,
+        isActing: true,
+        bySubstitute: true,
+      });
     });
   });
 });

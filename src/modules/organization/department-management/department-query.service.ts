@@ -244,8 +244,8 @@ export class DepartmentQueryService {
   }
 
   /**
-   * The departments an IT Admin may read: those they are named in charge of (retired ones too), and the active ones nobody usable is
-   * in charge of, whose technical work falls to every IT Admin.
+   * The departments an IT Admin may read: those they are named in charge of (retired ones too), departments where they hold
+   * an active substitute appointment, and active departments without usable IT coverage (read scope only; acting scope excludes uncovered departments).
    */
   private async scopeOf(principal: AuthenticatedPrincipal): Promise<ReadonlySet<string>> {
     return new Set(

@@ -63,25 +63,13 @@ describe('the IT Admin of a renewal period (H5, H15, Owner Q7)', () => {
     expect(w.findUsableSuperAdminEmployeeId).toHaveBeenCalledWith(tx);
   });
 
-  describe('substituteOf (no temporary substitute per subscription)', () => {
-    it('always returns substitute=false, naming the responsible IT Admin only while usable', async () => {
-      expect(await world(['it-sub']).service.substituteOf({ employeeId: 'it-other' }, pool)).toEqual({
-        substitute: false,
-        responsibleItAdminEmployeeId: 'it-sub',
-      });
-      expect(await world(['it-sub']).service.substituteOf({ employeeId: 'it-sub' }, pool)).toEqual({
-        substitute: false,
-        responsibleItAdminEmployeeId: 'it-sub',
-      });
-      expect(await world([]).service.substituteOf({ employeeId: 'it-other' }, pool)).toEqual({
-        substitute: false,
-        responsibleItAdminEmployeeId: null,
-      });
+  describe('usableResponsibleItAdminOf (no temporary substitute per subscription)', () => {
+    it('returns the responsible IT Admin only while they are usable, else null', async () => {
+      expect(await world(['it-sub']).service.usableResponsibleItAdminOf(pool)).toBe('it-sub');
+      expect(await world([]).service.usableResponsibleItAdminOf(pool)).toBeNull();
 
       const none = world([]);
-      expect(
-        await none.service.substituteOf({ employeeId: 'it-other' }, { responsibleItAdminEmployeeId: null }),
-      ).toEqual({ substitute: false, responsibleItAdminEmployeeId: null });
+      expect(await none.service.usableResponsibleItAdminOf({ responsibleItAdminEmployeeId: null })).toBeNull();
       expect(none.findUsableItAdminEmployeeIds).not.toHaveBeenCalled();
     });
 
@@ -89,7 +77,7 @@ describe('the IT Admin of a renewal period (H5, H15, Owner Q7)', () => {
       const tx = {} as unknown as DbTx;
       const w = world(['it-sub']);
 
-      await w.service.substituteOf({ employeeId: 'it-other' }, pool, tx);
+      await w.service.usableResponsibleItAdminOf(pool, tx);
 
       expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub'], tx);
     });

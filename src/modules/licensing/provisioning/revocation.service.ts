@@ -43,8 +43,7 @@ export class RevocationService {
 
   /**
    * Opens the revocation of a personal seat, or adds the reason to the one it has. Throws RevocationRefusedError,
-   * AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError and ProvisioningAnotherItAdminNeededError (an IT
-   * Admin who asks for their own seat while another IT Admin can).
+   * AssignmentNotFoundError, AssignmentNotOpenError, and SeatTargetNotFoundError.
    */
   async open(
     tx: DbTx,
@@ -74,7 +73,7 @@ export class RevocationService {
       open: isOpenAssignment(assignment),
       provisioningType: plan.provisioningType,
     });
-    const selfExecuted = await this.selfExecuted(tx, actor, assignment.employeeId);
+    const selfExecuted = await this.selfExecuted(actor, assignment.employeeId);
     const organizationId = await this.frame.requireOrganizationId(tx);
 
     const task = live ?? (await this.factory.create(tx, actor, { organizationId, assignment, source, now }));
@@ -94,14 +93,10 @@ export class RevocationService {
     return { taskId: task.id, created: live === null, reasonAdded: live !== null, status: task.status };
   }
 
-  /** The rule of the IT Admin who is the one revoked (`QĐ-77m`); a person who is not an IT Admin is never restricted by it. */
-  private async selfExecuted(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal | SystemActor,
-    holderEmployeeId: string,
-  ): Promise<boolean> {
+  /** Marks self-execution when an acting IT Admin opens a revocation on their own seat. */
+  private async selfExecuted(actor: AuthenticatedPrincipal | SystemActor, holderEmployeeId: string): Promise<boolean> {
     if (isSystemActor(actor) || !actor.roles.includes('IT_ADMIN')) return false;
 
-    return (await this.frame.selfExecutionMode(actor, holderEmployeeId, tx)) === 'ALLOW_SELF_EXECUTED';
+    return (await this.frame.selfExecutionMode(actor, holderEmployeeId)) === 'ALLOW_SELF_EXECUTED';
   }
 }

@@ -40309,7 +40309,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin starts the revocation, and an IT Admin who is the person revoked waits for another usable IT Admin (PROVISIONING.ANOTHER_IT_ADMIN_NEEDED); with none left they may.",
+            "description": "Only an IT Admin starts the revocation.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40321,17 +40321,6 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PROVISIONING.ANOTHER_IT_ADMIN_NEEDED": {
-                    "summary": "Another IT Admin has to do the work for the IT Admin who is its beneficiary.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PROVISIONING.ANOTHER_IT_ADMIN_NEEDED",
-                        "message": "Another IT Admin has to do the work for the IT Admin who is its beneficiary.",
                         "requestId": "req_example"
                       }
                     }
@@ -57284,7 +57273,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Each period of a right paid by the month (a request for months of use of a plan bought by the month, while a seat of it is held) or by the cycle of a subscription whose invoice has not been submitted by the fifth working day, the payment day being the first when it is a working day. The oldest due day first. An invoice that was returned does not count. Finance reads every period; the IT Admin the ones of the departments they work and of the shared pool, which every IT Admin works.",
+            "description": "Each period of a right paid by the month (a request for months of use of a plan bought by the month, while a seat of it is held) or by the cycle of a subscription whose invoice has not been submitted by the fifth working day, the payment day being the first when it is a working day. The oldest due day first. An invoice that was returned does not count. Finance reads every period; the IT Admin reads the ones of the departments in their scope and of the subscriptions they are responsible for.",
             "content": {
               "application/json": {
                 "schema": {

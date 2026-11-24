@@ -82,9 +82,8 @@ export class ExpiryController {
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description:
-        'Only an IT Admin starts the revocation, and an IT Admin who is the person revoked waits for another usable IT Admin (PROVISIONING.ANOTHER_IT_ADMIN_NEEDED); with none left they may.',
-      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.ANOTHER_IT_ADMIN_NEEDED],
+      description: 'Only an IT Admin starts the revocation.',
+      examples: [FORBIDDEN_EXAMPLE],
     },
     {
       status: HttpStatus.NOT_FOUND,

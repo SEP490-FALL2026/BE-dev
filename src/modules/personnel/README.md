@@ -70,12 +70,16 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
 - `offboarding/` — nghỉ việc: ghi, đổi ngày làm cuối, hủy, đã nghỉ, khóa tài khoản (1a), mở thu hồi (US-03-04); không còn route đóng hồ sơ (hệ thống đóng, `departure-closure/`);
   `offboarding.controller.ts`, `offboarding-steps.controller.ts`; `OffboardingService` điều phối ba bước ghi nghỉ việc:
   `OffboardingPreconditions` (đọc, khóa, kiểm lại sau khóa), `OffboardingEndings` (hủy điều chuyển đang chờ, kết thúc nghỉ dài
-  hạn, kỳ trưởng phòng và placement), `OffboardingCaseWriter` (ca, thay đổi đầu tiên, audit, hook, chặn đăng nhập, thông báo);
+  hạn, kỳ trưởng phòng và placement), `OffboardingCaseWriter` (ca, thay đổi đầu tiên, audit, hook, chặn đăng nhập, thông báo — gửi
+  `UNPLACED_WORK_WAITING` tới Super Admin khi nhân viên chưa từng xếp phòng); `OffboardingFrame` và `MailboxLockService` chỉ cho
+  acting IT Admin của phòng (hoặc người được chỉ định qua `itAdminsActingForUnplacedWork`, tự đóng chỉ định khi hồ sơ đóng/hủy).
   `OffboardingRevocationService`.
   Luồng rút gọn cho người chưa xếp phòng (`US-03-04` AC-30, `QĐ-93g`(5), `D-S14`, `D-S17`, `D-S18`, `D-S28`):
   `offboarding_cases.department_id` có thể null; không placement để kết thúc, không bàn giao trưởng phòng; một lần xếp phòng lần đầu chưa hiệu lực mà ngày làm việc cuối đứng trước `validFrom` bị hủy cùng
   hồ sơ (cột `cancelled_placement_*`, khôi phục khi hủy hồ sơ nếu phòng còn hoạt động); ngày cuối từ `validFrom` ⟹ 409
-  `PLACEMENT_OVERLAP` `FIRST_PLACEMENT_PENDING`. Hồ sơ không phòng hiện cho Super Admin và mọi IT Admin dùng được.
+  `PLACEMENT_OVERLAP` `FIRST_PLACEMENT_PENDING`. Hồ sơ không phòng hiện cho Super Admin và mọi IT Admin đọc, nhưng chỉ IT Admin được
+  chỉ định (`unplaced-work-designation`) mới thực hiện bước xử lý. Hook `offboarding/device-registration.listener.ts` gọi
+  `DevicesApi` để mở/dời/hủy tác vụ thu máy và kết thúc đăng ký máy theo mốc nghỉ việc.
   Con `open-requests/` (`open-requests.controller.ts`), `detail/` (`OffboardingDetailService` dựng chi tiết một ca cho
   controller và `OffboardingViewService`; `offboarding-detail.policy.ts`), `change/` (đổi ngày làm cuối, hủy:
   `OffboardingChangeService` điều phối `OffboardingChangeJudge` (xét), `OffboardingChangeWriter` (ghi đổi ngày) và
@@ -95,7 +99,10 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   migration m-17 cho ân hạn (không có `snapshot_before`; chụp ảnh quyền rồi mới báo, nên chỉ một lần), `remind` báo người chuyển `TRANSFER_GRACE_ENDING` từ `grace_reminder_on` (claim `reminded_at`),
   `TransferRevocationService.sweep` ngày sau `grace_ends_on` mở `LicensingApi.openRevocation` nguồn `TRANSFER` (actor `SystemActor`, `referenceKind DEPARTMENT_TRANSFER`, `referenceId` = điều chuyển, `noReopenAfterFailure: true`) theo thứ tự `(subscriptionId, assignmentId)` cho
   mọi quyền cá nhân giữ từ ngày hiệu lực trở về trước còn hiệu lực và có tác vụ thu hồi (`rightsToTakeBack` trong `transfer-sweep.policy.ts`: K3 không có thu hồi nên không tính), giao IT phụ trách
-  phòng mới. Tác vụ đã đóng `CLOSED_FAILED` không bị lượt quét tự mở lại; IT Admin mở lại thủ công qua `POST /department-transfers/{id}/revocations` (`TransferRevocationController`, `TransferRevocationService.reopen` với `noReopenAfterFailure: false`). Idempotent bằng chính cổng `openRevocation`; mỗi điều chuyển một transaction khóa nhân viên rồi điều chuyển.
+  phòng mới. Tác vụ đã đóng `CLOSED_FAILED` không bị lượt quét tự mở lại; acting IT Admin của phòng đích mở lại thủ công qua `POST
+/department-transfers/{id}/revocations` (`TransferRevocationController`, `TransferRevocationService.reopen` với
+  `noReopenAfterFailure: false`; ngoài phạm vi đọc ⟹ 404 `NOT_FOUND`, trong phạm vi đọc nhưng không phải acting IT Admin của phòng
+  đích ⟹ 403 `DEPARTMENT_TRANSFER.NOT_IN_CHARGE`; người làm thay ghi `bySubstitute: true` trong Audit Trail). Idempotent bằng chính cổng `openRevocation`; mỗi điều chuyển một transaction khóa nhân viên rồi điều chuyển.
   **Cấp lại trong ân hạn (MF3-C.3/C.4, R-49)**: `TransferGraceHoldListener` bind `TransferGraceHoldContributions` của `requests` (quyền đang giữ ∈ `snapshot_before`, `isOldRightOf`); lúc cấp trên cùng thuê bao `licensing` kết thúc quyền cũ
   (`valid_until` = ngày cấp), nên `rightsToTakeBack` không thấy nó, `oldRights[].regranted` và kết cục `REGRANTED` đọc `LicensingApi.listRegrantedAssignments`.
   **Đóng điều chuyển (MF3-C.2, `QĐ-110r`)** `TransferClosureService.closeIfDue`: hết ân hạn và không còn quyền cũ cần thu hồi (`closureDue`) ⟹ hệ thống đóng (`closed_by_system`, không tài khoản,
@@ -134,12 +141,11 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
 - `it-handover/` — bàn giao của IT Admin rời đi (X-IT.3, `QĐ-110j`, `QĐ-111g`, R-8, R-26, SPEC P5): bảng `it_admin_handovers` (mục tạo MỘT LẦN lúc ghi hồ sơ nếu người đó
   đang phụ trách thuê bao/ứng dụng: `ItHandoverRecorder` bind `PersonnelFileHookContributions.onRecorded` cho cả `OFFBOARDING` và `TRANSFER`, đếm qua `CatalogResponsibilityApi`;
   về sau ghi bàn giao mới nhất: người nhận, lúc nào, bao nhiêu). `POST /offboarding-cases/{id}/it-admin-handover` và `POST /department-transfers/{id}/it-admin-handover`
-  (`it-handover.controller.ts`, `@RequireRoles('IT_ADMIN')`): `ItHandoverService.handOver` khóa nhân viên rồi hồ sơ, `handoverRefusal` (`it-handover.policy.ts`: hồ sơ bị hủy ⟹ 409
-  `SOURCE_CANCELLED`; trước mốc chỉ chính người rời ⟹ 403 `NOT_YET_YOURS`, từ mốc IT Admin nào cũng được; không còn gì ⟹ 409 `NOTHING_TO_HAND_OVER`), rồi
+  (`it-handover.controller.ts`, chỉ `@RequireRoles('SUPER_ADMIN')` — IT Admin gọi ⟹ 403 `AUTHORIZATION.FORBIDDEN`): `ItHandoverService.handOver` khóa nhân viên rồi hồ sơ, `handoverRefusal` (`it-handover.policy.ts`: hồ sơ bị hủy ⟹ 409
+  `SOURCE_CANCELLED`; không còn gì ⟹ 409 `NOTHING_TO_HAND_OVER`), rồi
   `CatalogResponsibilityApi.transferResponsibilities` đổi MỌI thuê bao + ứng dụng (đích khác người rời và là IT Admin dùng được, không thì 422 `SAME_PERSON`/`TARGET_NOT_IT_ADMIN`);
   `ItHandoverTellingService` ghi dòng log `IT_ADMIN_HANDED_OVER` (chỉ hồ sơ nghỉ việc), Audit `OFFBOARDING_CASE|DEPARTMENT_TRANSFER.IT_ADMIN_HANDED_OVER` và báo người nhận
-  (`IT_ADMIN_HANDOVER_RECEIVED`). Mốc = ngày đầu tiên nghỉ việc từ chối người đó (chặn hoặc đã nghỉ) / ngày điều chuyển hiệu lực (`milestoneDay`). Tới mốc còn trách nhiệm ⟹ mọi IT Admin
-  đang làm việc nhận `IT_ADMIN_HANDOVER_PENDING` một lần (`ItHandoverMilestoneService.reached`, gọi trong transaction của `BlockMomentEffects` và `TransferGraceService.open`).
+  (`IT_ADMIN_HANDOVER_RECEIVED`). Mốc = ngày đầu tiên nghỉ việc từ chối người đó (chặn hoặc đã nghỉ) / ngày điều chuyển hiệu lực (`milestoneDay`). Tới mốc còn trách nhiệm ⟹ Super Admin nhận `IT_ADMIN_HANDOVER_PENDING` một lần (`ItHandoverMilestoneService.reached`, gọi trong transaction của `BlockMomentEffects` và `TransferGraceService.open`); nếu một gói mất admin cuối cùng ở nhà cung cấp thì báo `VENDOR_ADMINS_BELOW_MINIMUM` tới IT phụ trách thuê bao active của gói (fallback Super Admin).
   Phần `itHandover { state, subscriptions, applications, handedOver }` của chi tiết hồ sơ/điều chuyển đọc qua `ItHandoverViewService` (đếm còn lại tại lúc đọc). **Không bao giờ chặn
   hồ sơ** (`QĐ-110e`). Capability không import `offboarding/`, `transfer/`, `departure-deadline/` (chính chúng import nó).
 - `department-member/` — trưởng phòng đọc một người đang ở phòng mình hôm nay (`QĐ-41c`(2)); `department-member.controller.ts`

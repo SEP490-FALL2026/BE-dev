@@ -131,7 +131,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     `pricing.policy.ts` (`requestAmountOf`: giá tháng của thuê bao chính — gói chưa có thuê bao có giá thì giá tham chiếu của gói (`QĐ-113a`, `CatalogApi.getPlanPrice`, nguồn `PLAN_REFERENCE`) — × số tháng **bắt đầu** trong năm của `asOf` (tháng k bắt đầu ở ngày bắt đầu + k − 1 tháng, R-39);
     số tháng bắt đầu năm sau là `nextYearAmount` (Dùng lâu dài = 12 tháng, R-46); thời gian dùng đi bằng số tháng `termMonths` (`core/term-limit.ts`: `K1` 1–9, `K2`/`K5` 1–12 hoặc không, `K4` không hỏi), người có thời hạn bị **cắt** ở ngày hết hợp đồng (`employees.contract_end_date`), không bị từ chối; `K4` = giá mua;
     Request tiếp tục có kỳ mới năm sau ⟹ 0 + `nextYearAmount`, QĐ-109b; mốc `asOf` theo QĐ-109e: gửi = tạm tính, mỗi lần `BudgetCheckService.run`
-    tính lại và ghi `ACCESS_REQUEST.REPRICED`), `request-facts.service.ts` (đọc mọi sự kiện mà một request được xét bởi: phòng ban, kế hoạch, giá, người
+    tính lại và ghi `ACCESS_REQUEST.REPRICED`), `request-facts.service.ts` (đọc mọi sự kiện mà một request được xét bởi: phòng ban, kế hoạch — từ chối gói gắn thiết bị `DEVICE_KEY`/`DEVICE_BUNDLED` bằng 422 `ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE` cùng `request-draft.service.ts` và `catalog-link.service.ts` — giá, người
     giữ ghế, định tuyến; trước đây `request-assessment.service`), `need-decision.policy.ts`, `withdrawal.policy.ts`. Con:
     `open-request/`.
   - `outcome/` — `RequestOutcomeService`: mọi service kết thúc request phát `requests.outcome` qua đây.
@@ -175,7 +175,8 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   - `repricing/` — tính lại số tiền của Request theo ngày (QĐ-109e): `RepricingService` (giá thuê bao chính hoặc báo giá của IT Admin, tính theo `asOf`; Request giữ số tháng thì mỗi người một ngày kết thúc riêng qua `RequestTermEndsService`), `quote-pricing.policy.ts` (số tiền từ báo giá); `spend`, `spend-submission`, `group-request`, `assessment` gọi, không import capability nào ngoài lõi `access-request`.
   - `assessment/` — thẩm định phần mềm ngoài catalog, đăng ký nội bộ, nối plan (US-05-06, US-05-18, US-05-20); hoàn tất và từ chối ở cổng nhận `checklist` của bước `1.3` (`AssessmentGate.judgeChecklist`, `QĐ-111ap`); `assessment-decision/` — `AssessmentDecisionService` chọn `REJECT` hay `RETURN` của `POST /access-requests/{id}/assessment/rejection`, `AssessmentReturnService` trả đề xuất về người gửi (`AWAITING_REQUESTER_REVISION`, bước đánh giá `CLOSED`, audit `ASSESSMENT_RETURNED`, thông báo `REQUEST_RETURNED` by `IT_ASSESSMENT`; không có bản ghi phê duyệt vì IT Admin chưa có vai ở `approval_records`);
     `AssessmentQueryService` (đọc), `AssessmentService` (lưu), `AssessmentCompletionService`, `AssessmentRejectionService`, qua cổng chung
-    `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `AssessmentTermFitService` là chỗ duy nhất xét lại số tháng của đề xuất
+    `AssessmentGate` (khóa đề xuất, kiểm acting IT Admin của phòng — ngoài ⟹ 403 `ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE`, không có
+    hàng chung — người thẩm định, bước của IT Admin); `AssessmentTermFitService` là chỗ duy nhất xét lại số tháng của đề xuất
     theo kiểu cấp (QĐ-111i; K4 xóa tháng, K1 ngoài 1–9 ⟹ 422 `ASSESSMENT.TERM_NOT_FIT_KIND`): hoàn tất đánh giá dùng kiểu IT kết luận, `catalog-link/` (nối plan còn chép giá tháng của báo giá đã duyệt thành giá tham chiếu của gói `K1`/`K2` chưa có giá, `QĐ-113a`, `monthlyPriceOfQuote`)
     dùng kiểu của gói được gắn khi khác kiểu đã kết luận; `ProposalService`,
     `need-spend.service.ts`, `internal-registration.service.ts` (đăng ký nội bộ; `internalRegistrationBasis`, `registeredShapeOf`,
@@ -197,8 +198,8 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     dùng chung vị từ `canReadRequest` (`access-request.policy.ts`) qua `request-view/request-read-access.service.ts`: danh sách trả dòng nào
     thì chi tiết đọc được dòng đó; không đọc được ⟹ 404.
   - Hai hàng chờ đọc theo vai, chỉ đọc, không khóa, không ghi (L3): `need-decision-queue/` — `GET /need-decisions`, bước chờ quyết nhu cầu của người đang được giao
-    (`need-decision-queue.service.ts`, `.repo.ts`, `.mapper.ts`); `assessment-queue/` — `GET /assessment-queue` (lọc `departmentId`; phòng ngoài phạm vi ⟹ trang rỗng), việc thẩm định của IT Admin trong phạm vi phụ trách
-    (`assessment-queue.service.ts`, `.repo.ts`, `.mapper.ts`); `GET /assessment-queue/departments` đếm đơn đang chờ theo phòng (`departmentCounts`, cùng định nghĩa "đang chờ" `openAssessmentsIn`);
+    (`need-decision-queue.service.ts`, `.repo.ts`, `.mapper.ts`); `assessment-queue/` — `GET /assessment-queue` (lọc `departmentId`; phòng ngoài phạm vi hành động ⟹ trang rỗng), việc thẩm định của IT Admin theo `getItAdminActingScope` (bỏ hàng chung;
+    `assessment-queue.service.ts`, `.repo.ts`, `.mapper.ts`); `GET /assessment-queue/departments` đếm đơn đang chờ theo phòng (`departmentCounts`, cùng định nghĩa "đang chờ" `openAssessmentsIn`);
     `GET /assessment-decisions` các đơn đã hoàn tất hoặc bị từ chối ở cổng (`assessment-decisions.service.ts`, `.repo.ts`, `.mapper.ts`, `.dto.ts`); phạm vi IT Admin chung ở
     `assessment-queue-reach.service.ts`. Đơn case B rút gọn (đề xuất nêu `existingApplicationId`) mang `scope: PLAN_ONLY`: chỉ đánh giá gói. `my-requests` và `need-decision-queue` đọc cột `policy` qua `requestPolicyJson` (không ép kiểu).
 - **Request nhóm** (US-05-17)
