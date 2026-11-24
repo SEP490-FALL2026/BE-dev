@@ -36,6 +36,7 @@ organization, personnel, requests ([module-graph](../../../docs/generated/module
       dùng được (`usage/vendor-account-review/vendor-account-review-notifier.service.ts`).
     - `DEVICE_STOP_REQUESTED`, `DEVICE_STOP_REQUEST_OVERDUE` (`stopRequestId, registrationId, deviceId, holderEmployeeId, dueAt, dueOn`; subject `DEVICE_STOP_REQUEST`) — IT Admin
       phụ trách phòng của người giữ, không thì mọi IT Admin dùng được, không bao giờ chính người giữ (`devices/stop-request/stop-request-notifier.service.ts`).
+    - `UNPLACED_WORK_WAITING` (`workKind, workId, employeeId`; đích `unplacedWorkDesignationList`) — Super Admin khi có việc của người chưa từng xếp phòng chưa có IT Admin xử lý; `UNPLACED_WORK_DESIGNATED` (`designationId, workKind, workId, employeeId`; subject `UNPLACED_WORK_DESIGNATION`; đích `unplacedWorkDesignationList`) — IT Admin được chỉ định (`organization/unplaced-work-designation/unplaced-work-designation.service.ts`).
   - `STEP_ASSIGNED` (`requestId, stepKind, cause`) có thêm hai giá trị `cause`: `RESUBMITTED` (người gửi gửi lại sau _Trả về_, báo người giữ bước mở lại) và `SPEND_SENT` (bước duyệt chi
     mở khi trưởng phòng xác nhận dự phòng riêng, ngoài lô).
 - `public/notifications.errors.ts` — `InvalidInAppNotificationError`.

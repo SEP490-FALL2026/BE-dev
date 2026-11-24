@@ -235,6 +235,9 @@ export const IN_APP_NOTIFICATION_CODES = [
   // Offboarding device return task waiting for acting IT coverage and daily overdue reminders.
   'DEVICE_RETURN_OVERDUE',
   'DEVICE_RETURN_WAITING',
+  // Unplaced-work IT Admin designations: waiting for Super Admin designation and designee notification.
+  'UNPLACED_WORK_WAITING',
+  'UNPLACED_WORK_DESIGNATED',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

@@ -5,7 +5,9 @@ import type { DepartmentRecordService } from '../department/department-record.se
 import type { EmployeeRecordService } from '../employee/employee-record.service';
 import type { OrganizationContextService } from '../organization-context.service';
 import type { OrganizationRepo } from '../organization.repo';
+import type { UnplacedWorkDesignationRepo } from '../unplaced-work-designation/unplaced-work-designation.repo';
 import { OrganizationReadApi } from './organization-read.api';
+import { unplacedWorkKey } from './organization.types';
 
 describe('OrganizationReadApi tx forwarding', () => {
   const tx = { name: 'tx' } as unknown as DbTx;
@@ -49,6 +51,54 @@ describe('OrganizationReadApi tx forwarding', () => {
     const context = {
       businessToday: jest.fn().mockResolvedValue('2026-11-23'),
     };
+    const unplacedWorkDesignations = {
+      findActiveForResolution: jest.fn().mockResolvedValue([
+        {
+          workKind: 'PROVISIONING_TASK',
+          workId: 'task-1',
+          employeeId: 'emp-binh',
+          designeeEmployeeId: 'emp-it-b',
+          designeeStatus: 'ACTIVE',
+          employeeHasAnyPlacement: false,
+        },
+        {
+          workKind: 'OFFBOARDING_CASE',
+          workId: 'case-placed',
+          employeeId: 'emp-placed',
+          designeeEmployeeId: 'emp-it-b',
+          designeeStatus: 'ACTIVE',
+          employeeHasAnyPlacement: true,
+        },
+        {
+          workKind: 'DEVICE',
+          workId: 'dev-mismatch',
+          employeeId: 'emp-wrong',
+          designeeEmployeeId: 'emp-it-b',
+          designeeStatus: 'ACTIVE',
+          employeeHasAnyPlacement: false,
+        },
+        {
+          workKind: 'DEVICE_RETURN_TASK',
+          workId: 'ret-unusable',
+          employeeId: 'emp-binh',
+          designeeEmployeeId: 'emp-it-locked',
+          designeeStatus: 'ACTIVE',
+          employeeHasAnyPlacement: false,
+        },
+      ]),
+      findActiveWorkIdsForDesignee: jest.fn().mockResolvedValue(['task-1']),
+      listActiveForUnplacedEmployees: jest.fn().mockResolvedValue([
+        {
+          id: 'des-1',
+          organizationId: 'org-1',
+          workKind: 'PROVISIONING_TASK',
+          workId: 'task-1',
+          employeeId: 'emp-binh',
+          designeeEmployeeId: 'emp-it-b',
+          designeeStatus: 'ACTIVE',
+        },
+      ]),
+    };
     const api = new OrganizationReadApi(
       {} as OrganizationRepo,
       departments as unknown as DepartmentRecordService,
@@ -56,9 +106,10 @@ describe('OrganizationReadApi tx forwarding', () => {
       {} as CostCenterCatalogueService,
       {} as OrganizationChangeService,
       context as unknown as OrganizationContextService,
+      unplacedWorkDesignations as unknown as UnplacedWorkDesignationRepo,
     );
 
-    return { api, departments, employees, context };
+    return { api, departments, employees, context, unplacedWorkDesignations };
   };
 
   it('forwards tx in isDepartmentHead to businessToday and hasHeadPeriodFrom', async () => {
@@ -128,5 +179,50 @@ describe('OrganizationReadApi tx forwarding', () => {
         itAdminStatus: 'ACTIVE',
       },
     ]);
+  });
+
+  it('resolves unplaced-work acting designees in one batch and filters out placed, mismatched, or unusable rows', async () => {
+    const { api, unplacedWorkDesignations } = makeApi();
+    const usable = jest.fn().mockResolvedValue(new Set(['emp-it-b']));
+
+    const works = [
+      { workKind: 'PROVISIONING_TASK' as const, workId: 'task-1', employeeId: 'emp-binh' },
+      { workKind: 'OFFBOARDING_CASE' as const, workId: 'case-placed', employeeId: 'emp-placed' },
+      { workKind: 'DEVICE' as const, workId: 'dev-mismatch', employeeId: 'emp-binh' },
+      { workKind: 'DEVICE_RETURN_TASK' as const, workId: 'ret-unusable', employeeId: 'emp-binh' },
+      { workKind: 'PROVISIONING_TASK' as const, workId: 'task-none', employeeId: 'emp-binh' },
+    ];
+
+    const resolved = await api.itAdminsActingForUnplacedWork(works, usable, tx);
+
+    expect(unplacedWorkDesignations.findActiveForResolution).toHaveBeenCalledWith(works, tx);
+    expect(usable).toHaveBeenCalledWith(['emp-it-b', 'emp-it-locked']);
+    expect(resolved.get(unplacedWorkKey('PROVISIONING_TASK', 'task-1'))).toBe('emp-it-b');
+    expect(resolved.get(unplacedWorkKey('OFFBOARDING_CASE', 'case-placed'))).toBeNull();
+    expect(resolved.get(unplacedWorkKey('DEVICE', 'dev-mismatch'))).toBeNull();
+    expect(resolved.get(unplacedWorkKey('DEVICE_RETURN_TASK', 'ret-unusable'))).toBeNull();
+    expect(resolved.get(unplacedWorkKey('PROVISIONING_TASK', 'task-none'))).toBeNull();
+
+    expect(await api.itAdminsActingForUnplacedWork([], usable, tx)).toEqual(new Map());
+
+    expect(await api.findActiveUnplacedWorkIdsForDesignee('emp-it-b', 'PROVISIONING_TASK', tx)).toEqual(['task-1']);
+    expect(unplacedWorkDesignations.findActiveWorkIdsForDesignee).toHaveBeenCalledWith(
+      'emp-it-b',
+      'PROVISIONING_TASK',
+      tx,
+    );
+
+    expect(await api.listActiveUnplacedWorkDesignations(tx)).toEqual([
+      {
+        id: 'des-1',
+        organizationId: 'org-1',
+        workKind: 'PROVISIONING_TASK',
+        workId: 'task-1',
+        employeeId: 'emp-binh',
+        designeeEmployeeId: 'emp-it-b',
+        designeeStatus: 'ACTIVE',
+      },
+    ]);
+    expect(unplacedWorkDesignations.listActiveForUnplacedEmployees).toHaveBeenCalledWith(tx);
   });
 });

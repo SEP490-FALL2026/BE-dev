@@ -10,4 +10,7 @@ export const SUCCESS_MESSAGES_ORGANIZATION: Readonly<Record<string, string>> = {
   departmentItSubstituteList: 'DEPARTMENT_IT_SUBSTITUTE.LISTED',
   employeeFirstPlacementCorrect: 'EMPLOYEE.FIRST_PLACEMENT_CORRECTED',
   departmentUpdate: 'DEPARTMENT.UPDATED',
+  unplacedWorkDesignationAppoint: 'UNPLACED_WORK_DESIGNATION.APPOINTED',
+  unplacedWorkDesignationEnd: 'UNPLACED_WORK_DESIGNATION.ENDED',
+  unplacedWorkDesignationList: 'UNPLACED_WORK_DESIGNATION.LISTED',
 };

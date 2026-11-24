@@ -26,6 +26,7 @@ import { AnnouncementRepo } from '../../../src/modules/organization/change-annou
 import { OrganizationChangeService } from '../../../src/modules/organization/change-announcement/organization-change.service';
 import { OrganizationApi } from '../../../src/modules/organization/public/organization.api';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
+import { UnplacedWorkDesignationRepo } from '../../../src/modules/organization/unplaced-work-designation/unplaced-work-designation.repo';
 import {
   CostCenterUseContributions,
   DepartmentUseContributions,
@@ -76,6 +77,7 @@ describe('organization foundation (integration)', () => {
       new AnnouncementRepo(prisma),
       runner,
     );
+    const unplacedWorkDesignations = new UnplacedWorkDesignationRepo(prisma);
     organization = new OrganizationApi(
       organizationRepo,
       departments,
@@ -83,6 +85,7 @@ describe('organization foundation (integration)', () => {
       costCenters,
       new DepartmentUseService(new DepartmentUseContributions(), new CostCenterUseContributions()),
       changes,
+      unplacedWorkDesignations,
     );
     organizationReads = new OrganizationReadApi(
       organizationRepo,
@@ -91,6 +94,7 @@ describe('organization foundation (integration)', () => {
       costCenters,
       changes,
       new OrganizationContextService(organizationRepo),
+      unplacedWorkDesignations,
     );
     sql = new Client({ connectionString: database.url });
     await sql.connect();

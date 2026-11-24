@@ -10,7 +10,10 @@ import { EmployeeRecordService } from '../employee/employee-record.service';
 import { toBrief } from '../organization-brief.mapper';
 import { OrganizationContextService } from '../organization-context.service';
 import { OrganizationRepo } from '../organization.repo';
+import { resolveUnplacedWorkDesignee } from '../unplaced-work-designation/unplaced-work-designation.policy';
+import { UnplacedWorkDesignationRepo } from '../unplaced-work-designation/unplaced-work-designation.repo';
 import {
+  ActiveUnplacedWorkDesignation,
   CostCenterBrief,
   CostedOwningUnit,
   DepartmentBrief,
@@ -29,7 +32,10 @@ import {
   OrganizationRecord,
   ProfileNotice,
   ProfileNoticeRequest,
+  UnplacedWorkKind,
+  UnplacedWorkRef,
   UsableItAdmins,
+  unplacedWorkKey,
 } from './organization.types';
 
 /**
@@ -46,6 +52,7 @@ export class OrganizationReadApi {
     private readonly costCenters: CostCenterCatalogueService,
     private readonly changes: OrganizationChangeService,
     private readonly context: OrganizationContextService,
+    private readonly unplacedWorkDesignations: UnplacedWorkDesignationRepo,
   ) {}
 
   unplacedAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
@@ -235,6 +242,74 @@ export class OrganizationReadApi {
         ];
       }),
     );
+  }
+
+  /**
+   * Resolves the acting IT Admin designee for a batch of works belonging to employees without a department.
+   * Keyed by `unplacedWorkKey(workKind, workId)`; returns `null` unless the designation is active, matches the work's
+   * employee, the employee has never been placed in a department, and the designee is active and usable.
+   */
+  async itAdminsActingForUnplacedWork(
+    works: readonly UnplacedWorkRef[],
+    usableAmong: UsableItAdmins,
+    tx?: DbTx,
+  ): Promise<Map<string, string | null>> {
+    if (works.length === 0) return new Map();
+    const rows = await this.unplacedWorkDesignations.findActiveForResolution(works, tx);
+    const activeByKey = new Map(rows.map((row) => [unplacedWorkKey(row.workKind, row.workId), row]));
+    const candidateIds = [
+      ...new Set(
+        works.flatMap((work) => {
+          const row = activeByKey.get(unplacedWorkKey(work.workKind, work.workId));
+          if (
+            !row ||
+            row.employeeId !== work.employeeId ||
+            row.employeeHasAnyPlacement ||
+            row.designeeStatus !== 'ACTIVE'
+          ) {
+            return [];
+          }
+
+          return [row.designeeEmployeeId];
+        }),
+      ),
+    ];
+    const usable = candidateIds.length === 0 ? new Set<string>() : await usableAmong(candidateIds);
+
+    const resolved = new Map<string, string | null>();
+    for (const work of works) {
+      const key = unplacedWorkKey(work.workKind, work.workId);
+      const row = activeByKey.get(key);
+      resolved.set(
+        key,
+        row
+          ? resolveUnplacedWorkDesignee({
+              designationEmployeeId: row.employeeId,
+              workEmployeeId: work.employeeId,
+              employeeHasAnyPlacement: row.employeeHasAnyPlacement,
+              designeeEmployeeId: row.designeeEmployeeId,
+              designeeActive: row.designeeStatus === 'ACTIVE',
+              designeeUsable: usable.has(row.designeeEmployeeId),
+            })
+          : null,
+      );
+    }
+
+    return resolved;
+  }
+
+  /** Distinct work ids of active designations for this designee and work kind whose employee was never placed. */
+  findActiveUnplacedWorkIdsForDesignee(
+    designeeEmployeeId: string,
+    workKind: UnplacedWorkKind,
+    tx?: DbTx,
+  ): Promise<string[]> {
+    return this.unplacedWorkDesignations.findActiveWorkIdsForDesignee(designeeEmployeeId, workKind, tx);
+  }
+
+  /** Active unplaced-work designations whose employee still has zero placements, for coverage sweeps. */
+  listActiveUnplacedWorkDesignations(tx?: DbTx): Promise<ActiveUnplacedWorkDesignation[]> {
+    return this.unplacedWorkDesignations.listActiveForUnplacedEmployees(tx);
   }
 
   /** Active non-starting departments with their named IT Admin in charge and employee status, for coverage checks. */

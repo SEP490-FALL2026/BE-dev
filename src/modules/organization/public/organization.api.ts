@@ -8,6 +8,7 @@ import { DepartmentUseService } from '../department/department-use.service';
 import { OrganizationChangeService } from '../change-announcement/organization-change.service';
 import { EmployeeRecordService } from '../employee/employee-record.service';
 import { OrganizationRepo } from '../organization.repo';
+import { UnplacedWorkDesignationRepo } from '../unplaced-work-designation/unplaced-work-designation.repo';
 import type { CostCenterUse, DepartmentUse } from './organization-use.types';
 import {
   CreateCostCenterInput,
@@ -17,6 +18,7 @@ import {
   NewOrganizationChange,
   OfficialFieldsPatch,
   OrganizationRecord,
+  UnplacedWorkKind,
 } from './organization.types';
 
 /**
@@ -32,6 +34,7 @@ export class OrganizationApi {
     private readonly costCenters: CostCenterCatalogueService,
     private readonly use: DepartmentUseService,
     private readonly changes: OrganizationChangeService,
+    private readonly unplacedWorkDesignations: UnplacedWorkDesignationRepo,
   ) {}
 
   /** Tells the listeners of a change that has taken effect (`OrganizationChangeListeners`), in the caller's transaction; one that throws rolls it back. */
@@ -94,5 +97,18 @@ export class OrganizationApi {
   /** The same for a Cost Center: Requests with a cost not over and commitments held (`QĐ-87d(2)`), told by their modules. */
   getCostCenterUse(costCenterId: string, limit: number, tx?: DbTx): Promise<CostCenterUse> {
     return this.use.readCostCenter(costCenterId, limit, tx);
+  }
+
+  /** Closes any active unplaced-work IT Admin designation when the owning work closes. */
+  endUnplacedWorkDesignations(
+    tx: DbTx,
+    input: {
+      workKind: UnplacedWorkKind;
+      workId: string;
+      endedByAppUserId?: string | null;
+      endedAt?: Date;
+    },
+  ): Promise<number> {
+    return this.unplacedWorkDesignations.endActiveByWork(tx, input);
   }
 }

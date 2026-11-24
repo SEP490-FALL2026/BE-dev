@@ -189,4 +189,26 @@ export const OPS_TEXTS = {
         'Device return for {assetCode} from {employeeId:name}[ in {departmentId:name}] (due {dueOn:date}) has no acting IT Admin.',
     },
   },
+  UNPLACED_WORK_WAITING: {
+    vi: {
+      title: 'Việc của người chưa xếp phòng đang chờ chỉ định IT',
+      message:
+        'Công việc ({workKind:enum}) của {employeeId:name} chưa có IT Admin xử lý. Vui lòng chỉ định IT Admin cho việc này.',
+    },
+    en: {
+      title: 'Unplaced employee work awaiting IT Admin',
+      message:
+        'Work ({workKind:enum}) for {employeeId:name} has no acting IT Admin. Please designate an IT Admin for it.',
+    },
+  },
+  UNPLACED_WORK_DESIGNATED: {
+    vi: {
+      title: 'Được chỉ định xử lý việc của người chưa xếp phòng',
+      message: 'Bạn được chỉ định làm IT Admin xử lý {workKind:enum} của {employeeId:name}.',
+    },
+    en: {
+      title: 'Designated for unplaced employee work',
+      message: 'You were designated as IT Admin for the {workKind:enum} of {employeeId:name}.',
+    },
+  },
 } satisfies Partial<Record<InAppNotificationCode, NotificationTexts>>;

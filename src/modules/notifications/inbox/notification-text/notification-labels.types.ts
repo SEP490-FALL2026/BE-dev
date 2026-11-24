@@ -50,6 +50,12 @@ export const SHARED_LABELS = {
     INCREASE: { vi: 'tăng số chỗ', en: 'increase seats' },
     CANCEL: { vi: 'hủy', en: 'cancel' },
   },
+  workKind: {
+    PROVISIONING_TASK: { vi: 'tác vụ thu hồi quyền', en: 'revocation task' },
+    OFFBOARDING_CASE: { vi: 'hồ sơ nghỉ việc', en: 'offboarding case' },
+    DEVICE_RETURN_TASK: { vi: 'việc thu hồi thiết bị', en: 'device return task' },
+    DEVICE: { vi: 'thiết bị đang giao', en: 'assigned device' },
+  },
 } satisfies LabelsByKey;
 
 /** The states of a report of an error in a SaaS right (`SAAS_ISSUE_STATE_CHANGED`), the same for where it comes from and where it goes. */

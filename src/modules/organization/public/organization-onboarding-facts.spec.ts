@@ -7,6 +7,7 @@ import { OrganizationRepo } from '../organization.repo';
 import { AnnouncementRepo } from '../change-announcement/announcement.repo';
 import { OrganizationChangeService } from '../change-announcement/organization-change.service';
 import type { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { UnplacedWorkDesignationRepo } from '../unplaced-work-designation/unplaced-work-designation.repo';
 import { OrganizationReadApi } from './organization-read.api';
 import { OrganizationChangeListeners } from './organization.extension-points';
 
@@ -42,6 +43,7 @@ describe('OrganizationReadApi.getOnboardingFacts', () => {
       costCenters as unknown as CostCenterCatalogueService,
       new OrganizationChangeService(new OrganizationChangeListeners(), {} as AnnouncementRepo, {} as TransactionRunner),
       new OrganizationContextService(repo as unknown as OrganizationRepo),
+      {} as UnplacedWorkDesignationRepo,
     );
     return { service, calls };
   }

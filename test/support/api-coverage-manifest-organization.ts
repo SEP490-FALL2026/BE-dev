@@ -23,4 +23,7 @@ export const API_COVERAGE_ORGANIZATION: readonly string[] = [
   'POST /api/v1/departments/{id}/it-substitutes',
   'POST /api/v1/department-it-substitutes/{id}/end',
   'GET /api/v1/department-it-substitutes',
+  'POST /api/v1/unplaced-work-designations',
+  'POST /api/v1/unplaced-work-designations/{id}/end',
+  'GET /api/v1/unplaced-work-designations',
 ];

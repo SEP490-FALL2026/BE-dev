@@ -8,6 +8,7 @@ import { DepartmentItCoverageRepo } from './department/department-it-coverage.re
 import { DepartmentRepo } from './department/department.repo';
 import { DepartmentUseService } from './department/department-use.service';
 import { DepartmentItSubstituteRepo } from './department-it-substitute/department-it-substitute.repo';
+import { UnplacedWorkDesignationRepo } from './unplaced-work-designation/unplaced-work-designation.repo';
 import { EmployeeRecordService } from './employee/employee-record.service';
 import { FirstPlacementUseService } from './employee/first-placement-correction/first-placement-use.service';
 import { EmployeeDepartureRepo } from './employee/employee-departure.repo';
@@ -45,6 +46,7 @@ import {
     DepartmentHeadRepo,
     DepartmentItCoverageRepo,
     DepartmentItSubstituteRepo,
+    UnplacedWorkDesignationRepo,
     DepartmentRecordService,
     DepartmentUseService,
     OrganizationChangeListeners,
@@ -88,6 +90,7 @@ import {
     CostCenterRepo,
     DepartmentRepo,
     DepartmentItSubstituteRepo,
+    UnplacedWorkDesignationRepo,
     OrganizationChangeListeners,
     DepartmentUseContributions,
     CostCenterUseContributions,

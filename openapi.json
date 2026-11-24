@@ -7313,6 +7313,672 @@
         "tags": ["departments"]
       }
     },
+    "/api/v1/unplaced-work-designations": {
+      "post": {
+        "operationId": "unplacedWorkDesignationAppoint",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/AppointUnplacedWorkDesignationBodyDto" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Designates an active IT Admin to handle one or more specific works belonging to an employee who has never been placed in a department.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/AppointUnplacedWorkDesignationResponseDto" },
+                    { "properties": { "message": { "example": "UNPLACED_WORK_DESIGNATION.APPOINTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin appoints or ends unplaced-work IT Admin designations.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The employee does not exist (EMPLOYEE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "EMPLOYEE.NOT_FOUND": {
+                    "summary": "Employee not found: <employee-id>",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "EMPLOYEE.NOT_FOUND",
+                        "message": "Employee not found: <employee-id>",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The employee already has a department placement record (UNPLACED_WORK_DESIGNATION.EMPLOYEE_PLACED) or at least one work already has an active designation (UNPLACED_WORK_DESIGNATION.ALREADY_ACTIVE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "UNPLACED_WORK_DESIGNATION.EMPLOYEE_PLACED": {
+                    "summary": "Only employees who have never been placed in a department may receive an unplaced-work IT Admin designation.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "UNPLACED_WORK_DESIGNATION.EMPLOYEE_PLACED",
+                        "message": "Only employees who have never been placed in a department may receive an unplaced-work IT Admin designation.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "UNPLACED_WORK_DESIGNATION.ALREADY_ACTIVE": {
+                    "summary": "At least one of the requested works already has an active IT Admin designation.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "UNPLACED_WORK_DESIGNATION.ALREADY_ACTIVE",
+                        "message": "At least one of the requested works already has an active IT Admin designation.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or the designee is not an active employee with a usable IT Admin account (UNPLACED_WORK_DESIGNATION.NOT_USABLE_IT_ADMIN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "UNPLACED_WORK_DESIGNATION.NOT_USABLE_IT_ADMIN": {
+                    "summary": "The designee must be an active employee with a usable account holding the IT Admin role.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "UNPLACED_WORK_DESIGNATION.NOT_USABLE_IT_ADMIN",
+                        "message": "The designee must be an active employee with a usable account holding the IT Admin role.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Designate an IT Admin for specific works of a never-placed employee",
+        "tags": ["departments"]
+      },
+      "get": {
+        "operationId": "unplacedWorkDesignationList",
+        "parameters": [
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "ACTIVE", "type": "string", "enum": ["ACTIVE", "ENDED", "ALL"] }
+          },
+          {
+            "name": "workKind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["PROVISIONING_TASK", "OFFBOARDING_CASE", "DEVICE_RETURN_TASK", "DEVICE"]
+            }
+          },
+          { "name": "employeeId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of unplaced-work IT Admin designations ordered by appointedAt descending then id. IT Admins see only designations naming them as designee.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UnplacedWorkDesignationPageResponseDto" },
+                    { "properties": { "message": { "example": "UNPLACED_WORK_DESIGNATION.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin and the IT Admin may list unplaced-work IT Admin designations.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List unplaced-work IT Admin designations",
+        "tags": ["departments"]
+      }
+    },
+    "/api/v1/unplaced-work-designations/{id}/end": {
+      "post": {
+        "operationId": "unplacedWorkDesignationEnd",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "201": {
+            "description": "Ends the active unplaced-work IT Admin designation with endCause REMOVED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UnplacedWorkDesignationResponseDto" },
+                    { "properties": { "message": { "example": "UNPLACED_WORK_DESIGNATION.ENDED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin appoints or ends unplaced-work IT Admin designations.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The designation does not exist (UNPLACED_WORK_DESIGNATION.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "UNPLACED_WORK_DESIGNATION.NOT_FOUND": {
+                    "summary": "Unplaced-work IT Admin designation not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "UNPLACED_WORK_DESIGNATION.NOT_FOUND",
+                        "message": "Unplaced-work IT Admin designation not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The designation has already ended (UNPLACED_WORK_DESIGNATION.ALREADY_ENDED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "UNPLACED_WORK_DESIGNATION.ALREADY_ENDED": {
+                    "summary": "This unplaced-work IT Admin designation has already ended.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "UNPLACED_WORK_DESIGNATION.ALREADY_ENDED",
+                        "message": "This unplaced-work IT Admin designation has already ended.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "End an active unplaced-work IT Admin designation",
+        "tags": ["departments"]
+      }
+    },
     "/api/v1/department-transfers": {
       "post": {
         "operationId": "departmentTransferRecord",
@@ -109426,6 +110092,228 @@
                     "department",
                     "substitute",
                     "replaced",
+                    "reason",
+                    "appointedAt",
+                    "endedAt",
+                    "endCause"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "AppointUnplacedWorkDesignationBodyDto": {
+        "type": "object",
+        "properties": {
+          "employeeId": { "type": "string", "format": "uuid" },
+          "designeeEmployeeId": { "type": "string", "format": "uuid" },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "works": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workKind": {
+                  "type": "string",
+                  "enum": ["PROVISIONING_TASK", "OFFBOARDING_CASE", "DEVICE_RETURN_TASK", "DEVICE"]
+                },
+                "workId": { "type": "string", "format": "uuid" }
+              },
+              "required": ["workKind", "workId"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["employeeId", "designeeEmployeeId", "reason", "works"],
+        "additionalProperties": false
+      },
+      "AppointUnplacedWorkDesignationResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "workKind": {
+                      "type": "string",
+                      "enum": ["PROVISIONING_TASK", "OFFBOARDING_CASE", "DEVICE_RETURN_TASK", "DEVICE"]
+                    },
+                    "workId": { "type": "string", "format": "uuid" },
+                    "employee": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "fullName": { "type": "string" } },
+                      "required": ["id", "fullName"],
+                      "additionalProperties": false
+                    },
+                    "designee": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "fullName": { "type": "string" },
+                        "usable": { "type": "boolean" }
+                      },
+                      "required": ["id", "fullName", "usable"],
+                      "additionalProperties": false
+                    },
+                    "reason": { "type": "string" },
+                    "appointedAt": { "type": "string", "format": "date-time" },
+                    "endedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "endCause": { "type": "string", "enum": ["REMOVED", "WORK_CLOSED", null], "nullable": true }
+                  },
+                  "required": [
+                    "id",
+                    "workKind",
+                    "workId",
+                    "employee",
+                    "designee",
+                    "reason",
+                    "appointedAt",
+                    "endedAt",
+                    "endCause"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "UnplacedWorkDesignationResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "workKind": {
+                "type": "string",
+                "enum": ["PROVISIONING_TASK", "OFFBOARDING_CASE", "DEVICE_RETURN_TASK", "DEVICE"]
+              },
+              "workId": { "type": "string", "format": "uuid" },
+              "employee": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "fullName": { "type": "string" } },
+                "required": ["id", "fullName"],
+                "additionalProperties": false
+              },
+              "designee": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "fullName": { "type": "string" },
+                  "usable": { "type": "boolean" }
+                },
+                "required": ["id", "fullName", "usable"],
+                "additionalProperties": false
+              },
+              "reason": { "type": "string" },
+              "appointedAt": { "type": "string", "format": "date-time" },
+              "endedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "endCause": { "type": "string", "enum": ["REMOVED", "WORK_CLOSED", null], "nullable": true }
+            },
+            "required": [
+              "id",
+              "workKind",
+              "workId",
+              "employee",
+              "designee",
+              "reason",
+              "appointedAt",
+              "endedAt",
+              "endCause"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "UnplacedWorkDesignationPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "workKind": {
+                      "type": "string",
+                      "enum": ["PROVISIONING_TASK", "OFFBOARDING_CASE", "DEVICE_RETURN_TASK", "DEVICE"]
+                    },
+                    "workId": { "type": "string", "format": "uuid" },
+                    "employee": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "fullName": { "type": "string" } },
+                      "required": ["id", "fullName"],
+                      "additionalProperties": false
+                    },
+                    "designee": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "fullName": { "type": "string" },
+                        "usable": { "type": "boolean" }
+                      },
+                      "required": ["id", "fullName", "usable"],
+                      "additionalProperties": false
+                    },
+                    "reason": { "type": "string" },
+                    "appointedAt": { "type": "string", "format": "date-time" },
+                    "endedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "endCause": { "type": "string", "enum": ["REMOVED", "WORK_CLOSED", null], "nullable": true }
+                  },
+                  "required": [
+                    "id",
+                    "workKind",
+                    "workId",
+                    "employee",
+                    "designee",
                     "reason",
                     "appointedAt",
                     "endedAt",

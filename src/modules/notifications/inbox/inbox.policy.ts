@@ -250,6 +250,9 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   // Offboarding device return task reminders and unassigned alerts.
   DEVICE_RETURN_OVERDUE: ['taskId', 'deviceId', 'assetCode', 'employeeId', 'dueOn'],
   DEVICE_RETURN_WAITING: ['taskId', 'deviceId', 'assetCode', 'employeeId', 'departmentId', 'dueOn'],
+  // Unplaced-work IT Admin designations: waiting work for Super Admin and appointed notice for designee.
+  UNPLACED_WORK_WAITING: ['workKind', 'workId', 'employeeId'],
+  UNPLACED_WORK_DESIGNATED: ['designationId', 'workKind', 'workId', 'employeeId'],
 };
 
 /** Whether the code is one of the closed table. */

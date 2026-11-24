@@ -9,6 +9,8 @@ import { CostCenterService } from './cost-center/cost-center.service';
 import { CostCentersController } from './cost-center/cost-centers.controller';
 import { DepartmentItSubstituteController } from './department-it-substitute/department-it-substitute.controller';
 import { DepartmentItSubstituteService } from './department-it-substitute/department-it-substitute.service';
+import { UnplacedWorkDesignationController } from './unplaced-work-designation/unplaced-work-designation.controller';
+import { UnplacedWorkDesignationService } from './unplaced-work-designation/unplaced-work-designation.service';
 import { DepartmentHeadService } from './department-management/department-head.service';
 import { DepartmentHeadsController } from './department-management/department-heads.controller';
 import { DepartmentTechnicalMembersRepo } from './department-management/department-technical-members.repo';
@@ -47,6 +49,7 @@ import { OrganizationModule } from './organization.module';
     DepartmentsController,
     DepartmentHeadsController,
     DepartmentItSubstituteController,
+    UnplacedWorkDesignationController,
   ],
   providers: [
     EmployeeManualService,
@@ -60,6 +63,7 @@ import { OrganizationModule } from './organization.module';
     DepartmentItAdminService,
     DepartmentHeadService,
     DepartmentItSubstituteService,
+    UnplacedWorkDesignationService,
     // Hands the notices kept for a department with no head to the head whose period starts, added to the change listeners.
     HeldNoticeHandoverListener,
     // Name an employee, a department and a Cost Center in a notification sentence: added to the name sources of `notifications`, which only the API graph reads

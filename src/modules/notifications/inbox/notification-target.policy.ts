@@ -105,6 +105,8 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
   DEPARTMENT_IT_COVERAGE_MISSING: route('departmentGet', { id: 'departmentId' }),
   DEVICE_RETURN_OVERDUE: route('deviceReturnTaskList'),
   DEVICE_RETURN_WAITING: route('deviceReturnTaskList'),
+  UNPLACED_WORK_WAITING: route('unplacedWorkDesignationList'),
+  UNPLACED_WORK_DESIGNATED: route('unplacedWorkDesignationList'),
 };
 
 /**
@@ -144,6 +146,7 @@ export const ROUTE_READERS: Readonly<Record<string, readonly string[]>> = {
   subscriptionDeadlineEventList: ['IT_ADMIN', 'FINANCE', 'SPENDING_APPROVER', 'SUPER_ADMIN'],
   subscriptionGet: ['IT_ADMIN', 'FINANCE'],
   subscriptionRenewalGet: ['IT_ADMIN', 'FINANCE', 'MANAGER'], // service: the IT Admin, Finance and the head of the owning department
+  unplacedWorkDesignationList: ['SUPER_ADMIN', 'IT_ADMIN'],
   usageSourceList: ['IT_ADMIN'],
   vendorAccountDiscrepancyList: ['IT_ADMIN'],
 };

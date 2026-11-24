@@ -36,6 +36,7 @@ const TYPES_WITHOUT_DETAIL_ROUTE = [
   'LICENSE_ASSIGNMENT',
   'OUT_OF_PROCESS_CASE',
   'TRANSFER_REVIEW',
+  'UNPLACED_WORK_DESIGNATION',
 ] as const;
 
 /** Every `subject.type` the catalogue of notifications names (canonical form). */
@@ -71,16 +72,15 @@ const CATALOGUE_SUBJECT_TYPES = [
   'SUBSCRIPTION',
   'SUBSCRIPTION_RENEWAL',
   'TRANSFER_REVIEW',
+  'UNPLACED_WORK_DESIGNATION',
 ] as const;
 
 describe('canonicalSubjectType', () => {
-  it.each([
-    ['LicenseAssignment', 'LICENSE_ASSIGNMENT'],
-    ['ProvisioningTask', 'PROVISIONING_TASK'],
-    ['HandoverDuty', 'HANDOVER_DUTY'],
-    ['Employee', 'EMPLOYEE'],
-  ])('turns the old spelling %s into %s', (old, canonical) => {
-    expect(canonicalSubjectType(old)).toBe(canonical);
+  it('turns the old spellings into canonical UPPER_SNAKE', () => {
+    expect(canonicalSubjectType('LicenseAssignment')).toBe('LICENSE_ASSIGNMENT');
+    expect(canonicalSubjectType('ProvisioningTask')).toBe('PROVISIONING_TASK');
+    expect(canonicalSubjectType('HandoverDuty')).toBe('HANDOVER_DUTY');
+    expect(canonicalSubjectType('Employee')).toBe('EMPLOYEE');
   });
 
   it('keeps every other value as it is', () => {
@@ -248,12 +248,11 @@ describe('notificationTarget', () => {
   it('opens the substitute list for substitute notices (SUPER_ADMIN/IT_ADMIN only) and the department profile for missing IT coverage', () => {
     const dept = { type: 'DEPARTMENT', id: ID };
     for (const code of ['DEPARTMENT_IT_SUBSTITUTE_APPOINTED', 'DEPARTMENT_IT_SUBSTITUTE_ENDED']) {
-      for (const role of ['SUPER_ADMIN', 'IT_ADMIN']) {
+      for (const role of ['SUPER_ADMIN', 'IT_ADMIN'])
         expect(targetOf(code, dept, { departmentId: ID }, [role])).toEqual({
           operationId: 'departmentItSubstituteList',
           pathParams: {},
         });
-      }
       expect(targetOf(code, dept, { departmentId: ID }, ['EMPLOYEE'])).toBeNull();
     }
     expect(targetOf('DEPARTMENT_IT_COVERAGE_MISSING', dept, { departmentId: ID }, ['SUPER_ADMIN'])).toEqual({
