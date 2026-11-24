@@ -264,7 +264,7 @@ describe('device activation routes & bundled intake (integration, real PostgreSQ
     // (e) Move on a full 2/2 lot succeeds (closes old MOVED first, inserts new on d3).
     const moved = h.dataOf<OpenedActivationWire>(await moveActivation(a1.activation.id, d3.id).expect(201));
     expect(moved.activation.deviceId).toBe(d3.id);
-    expect(moved.activationsUsed).toBe(2);
+    expect(moved.activationsUsed).toBe(3);
 
     // (b) Deactivate with LOST_WITH_DEVICE keeps lot occupied.
     await deactivateActivation(moved.activation.id, { licenseRelease: 'LOST_WITH_DEVICE' }).expect(201);

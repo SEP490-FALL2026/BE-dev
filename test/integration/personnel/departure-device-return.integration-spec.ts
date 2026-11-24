@@ -124,7 +124,7 @@ describe('departure device return tasks and cancellation lock ordering (integrat
       .expect(201);
     const subscriptionId = h.dataOf<{ id: string }>(subRes).id;
 
-    const keyRes = await request(h.server())
+    await request(h.server())
       .post('/api/v1/license-keys/imports')
       .set(h.as(h.it1))
       .send({
@@ -133,7 +133,12 @@ describe('departure device return tasks and cancellation lock ordering (integrat
         maxActivations: 10,
       })
       .expect(201);
-    const licenseKeyId = h.dataOf<{ keys: Array<{ id: string }> }>(keyRes).keys[0].id;
+    const licenseKeyId = (
+      await h.ctx.sql.query<{ id: string }>(
+        `SELECT id FROM license_keys WHERE subscription_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1`,
+        [subscriptionId],
+      )
+    ).rows[0].id;
 
     const actRes = await request(h.server())
       .post(`/api/v1/devices/${deviceId}/activations`)

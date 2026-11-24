@@ -144,7 +144,6 @@ describe('device activation list, withdrawn key replacement & idleDevice filter 
       await h.createDevice({ deviceType: 'LAP', hostname: 'LAP-IDLE-1', os: 'Windows 11' }).expect(201),
     );
     const broken = await h.registered(h.employee.employeeId);
-    await h.changeCondition(broken.id, { condition: 'BROKEN', note: 'Mainboard fault' }).expect(201);
     const awaiting = await h.registered(h.employee.employeeId);
 
     const actStock = h.dataOf<{ activation: { id: string } }>(
@@ -153,6 +152,7 @@ describe('device activation list, withdrawn key replacement & idleDevice filter 
     const actBroken = h.dataOf<{ activation: { id: string } }>(
       await h.activateDevice(broken.id, { planId, licenseKeyId: keyId }).expect(201),
     ).activation.id;
+    await h.changeCondition(broken.id, { condition: 'BROKEN', note: 'Mainboard fault' }).expect(201);
     const actAwait = h.dataOf<{ activation: { id: string } }>(
       await h.activateDevice(awaiting.id, { planId, licenseKeyId: keyId }).expect(201),
     ).activation.id;

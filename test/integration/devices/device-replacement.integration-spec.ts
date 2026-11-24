@@ -123,7 +123,7 @@ describe('device replacement (integration, real PostgreSQL)', () => {
 
     const planMove = await planOf('DEVICE_KEY');
     const subMove = await purchaseOf(planMove, 1);
-    const keyMove = await importKey(subMove, 1);
+    const keyMove = await importKey(subMove, 2);
 
     const planStay = await planOf('DEVICE_KEY');
     const subStay = await purchaseOf(planStay, 2);

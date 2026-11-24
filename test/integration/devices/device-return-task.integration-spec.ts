@@ -240,7 +240,7 @@ describe('device return task list, completion, device detail, and dashboard (int
     const t2 = openTasks.find((t) => t.offboardingCaseId === case2.id)!;
 
     // Non-acting IT gets 403 NOT_IN_CHARGE even if in-charge IT is locked.
-    await h.ctx.sql.query(`UPDATE app_users SET locked_at = now() WHERE employee_id = $1`, [h.it1.employeeId]);
+    await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [h.it1.employeeId]);
     const blockedRes = await completeTask(
       t1.id,
       {
@@ -251,7 +251,7 @@ describe('device return task list, completion, device detail, and dashboard (int
       otherIt.account,
     ).expect(403);
     expect(h.codeOf(blockedRes)).toBe('DEVICE_RETURN_TASK.NOT_IN_CHARGE');
-    await h.ctx.sql.query(`UPDATE app_users SET locked_at = NULL WHERE employee_id = $1`, [h.it1.employeeId]);
+    await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE employee_id = $1`, [h.it1.employeeId]);
 
     // Complete t1 as NOT_RECOVERED -> RETIRED LOST.
     await completeTask(

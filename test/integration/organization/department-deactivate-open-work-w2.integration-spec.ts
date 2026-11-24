@@ -44,7 +44,7 @@ describe('departmentDeactivate open work checks: return tasks, SaaS issues, ghos
     const deviceId = (
       await h.ctx.sql.query<{ id: string }>(
         `INSERT INTO managed_devices (id, organization_id, asset_code, normalized_asset_code, hostname, os, device_type, asset_code_origin, created_by_app_user_id, updated_at)
-         VALUES (gen_random_uuid(), $1, $2, lower($2), 'host-f22', 'Windows 11', 'LAPTOP', 'SYSTEM', $3, now())
+         VALUES (gen_random_uuid(), $1, $2, lower($2), 'host-f22', 'Windows 11', 'LAP', 'SYSTEM', $3, now())
          RETURNING id`,
         [orgId, assetCode, actorAppUserId],
       )
@@ -102,7 +102,7 @@ describe('departmentDeactivate open work checks: return tasks, SaaS issues, ghos
         [orgId, planId, subscriptionId, reporterId, dept.id, `f22-${counter}@acme.vn`, today, actorAppUserId],
       )
     ).rows[0].id;
-    const code = `ISS-2026-99${counter}1`;
+    const code = `BM11-2026-${String(990000 + counter).padStart(6, '0')}`;
     const issueId = (
       await h.ctx.sql.query<{ id: string }>(
         `INSERT INTO saas_issues (id, code, organization_id, reporter_employee_id, assignment_id, category, impact, description, occurred_at, state, response_due_on)
@@ -151,8 +151,8 @@ describe('departmentDeactivate open work checks: return tasks, SaaS issues, ghos
     ).rows[0].id;
     const runId = (
       await h.ctx.sql.query<{ id: string }>(
-        `INSERT INTO ghost_seat_rule_runs (id, organization_id, rule_set, period_key, status)
-         VALUES (gen_random_uuid(), $1, 'G1_G2', $2, 'COMPLETED')
+        `INSERT INTO ghost_seat_rule_runs (id, organization_id, rule_set, period_key, status, finished_at)
+         VALUES (gen_random_uuid(), $1, 'G1_G2', $2, 'COMPLETED', now())
          RETURNING id`,
         [orgId, `f22-period-${counter}`],
       )

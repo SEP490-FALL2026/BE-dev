@@ -36,7 +36,6 @@ describe('BF-5 rejecting future-placed employees (integration, real PostgreSQL)'
     const appId = await declareApplication(h.ctx, h.it1.accessToken, {
       name: unique('Internal Wiki BF5'),
       kind: 'INTERNAL',
-      vendorName: unique('Internal'),
       dataSensitivity: 'LOW',
     });
     internalPlanId = await declarePlan(h.ctx, h.it1.accessToken, {
