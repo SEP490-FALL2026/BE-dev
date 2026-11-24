@@ -351,4 +351,39 @@ export class SaasIssueRepo {
 
     return rows.length > 0;
   }
+
+  /**
+   * The first `take` unclosed SaaS issue reports belonging to the department (either via the assignment's owning department or
+   * via a reporter currently placed in the department), ordered by id, and how many there are in all.
+   */
+  async openOfDepartment(
+    departmentId: string,
+    reporterEmployeeIds: readonly string[],
+    take: number,
+    tx?: DbTx,
+  ): Promise<{ items: { id: string; code: string }[]; total: number }> {
+    const db = tx ?? this.prisma;
+    const departmentMatch: Prisma.SaasIssueWhereInput =
+      reporterEmployeeIds.length > 0
+        ? {
+            OR: [
+              { assignment: { owningDepartmentId: departmentId } },
+              { reporterEmployeeId: { in: [...reporterEmployeeIds] } },
+            ],
+          }
+        : { assignment: { owningDepartmentId: departmentId } };
+    const where: Prisma.SaasIssueWhereInput = {
+      state: { notIn: ['CLOSED', 'DUPLICATE'] },
+      ...departmentMatch,
+    };
+    const rows = await db.saasIssue.findMany({
+      where,
+      select: { id: true, code: true },
+      orderBy: { id: 'asc' },
+      take: Math.max(0, take),
+    });
+    const total = await db.saasIssue.count({ where });
+
+    return { items: rows, total };
+  }
 }

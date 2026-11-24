@@ -127,6 +127,7 @@ import { RevocationWithdrawalService } from './provisioning/revocation-withdrawa
 import { ForRevocationWithdrawalService } from './provisioning/revocation-withdrawal/for-revocation-withdrawal.service';
 import { ProvisioningTaskReasonRepo } from './provisioning/provisioning-task-reason.repo';
 import { SaasIssueCalendar } from './saas-issue/saas-issue-calendar.service';
+import { SaasIssueOpenWorkReader } from './saas-issue/department-open-work.listener';
 import { SaasIssueFactsRepo } from './saas-issue/saas-issue-facts.repo';
 import { SaasIssueHandlingService } from './saas-issue/saas-issue-handling.service';
 import { SaasIssueNotifier } from './saas-issue/saas-issue-notifier.service';
@@ -280,6 +281,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     ExpiryQueueRepo,
     ExpiryQueueService,
     SaasIssueRepo,
+    SaasIssueOpenWorkReader,
     SaasIssueFactsRepo,
     SaasIssueCalendar,
     SaasIssueNotifier,

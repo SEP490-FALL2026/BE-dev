@@ -336,4 +336,26 @@ export class DeviceReturnTaskRepo {
       data: { overdueNoticedOn: toDateColumn(today) },
     });
   }
+
+  /**
+   * The first `take` open device return tasks belonging to the department, by id, and how many there are in all.
+   * Used when checking whether a department still has open work before deactivation.
+   */
+  async openOfDepartment(
+    departmentId: string,
+    take: number,
+    tx?: DbTx,
+  ): Promise<{ items: { id: string; assetCode: string }[]; total: number }> {
+    const db = tx ?? this.prisma;
+    const where: Prisma.DeviceReturnTaskWhereInput = { departmentId, state: 'OPEN' };
+    const rows = await db.deviceReturnTask.findMany({
+      where,
+      select: { id: true, device: { select: { assetCode: true } } },
+      orderBy: { id: 'asc' },
+      take: Math.max(0, take),
+    });
+    const total = await db.deviceReturnTask.count({ where });
+
+    return { items: rows.map((row) => ({ id: row.id, assetCode: row.device.assetCode })), total };
+  }
 }
