@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
+import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import { unplacedWorkKey } from '../../../organization/public/organization.types';
 import { ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
 import { RevocationListeners } from '../../public/licensing.extension-points';
 import type { ProvisioningChannel, ProvisioningTaskStatus } from '../../public/licensing.types';
 import type { K1ChecklistClaim } from '../k1-checklist/provisioning-k1-checklist.policy';
-import { cleanEvidence, cleanFailureReason, nextStatus } from '../provisioning.policy';
+import { assertItAdmin, cleanEvidence, cleanFailureReason, nextStatus } from '../provisioning.policy';
 import { assertNotBefore, assertNotRevocationTask } from '../revocation.policy';
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { toRevocationFacts } from '../provisioning-task.types';
@@ -15,7 +17,7 @@ import { ProvisioningTaskViewService, type TaskSummaryView, type TaskView } from
 import { ProvisioningGrantCompletion } from './provisioning-grant-completion.service';
 import { ProvisioningHolderService } from './provisioning-holder.service';
 
-export type TaskScope = 'ALL' | 'MINE' | 'GENERAL';
+export type TaskScope = 'ALL' | 'MINE';
 
 /**
  * The queue of the work that makes a seat real (`US-07-01`, `US-07-02`): the list, one task, and the claim, the completion and the failure
@@ -29,12 +31,13 @@ export class ProvisioningService {
     private readonly frame: ProvisioningTaskFrame,
     private readonly views: ProvisioningTaskViewService,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly identity: IdentityAccessApi,
     private readonly revocation: RevocationListeners,
     private readonly completion: ProvisioningGrantCompletion,
     private readonly holders: ProvisioningHolderService,
   ) {}
 
-  /** The queue, the oldest first: `MINE` the tasks this IT Admin is in charge of, `GENERAL` those nobody works by default. */
+  /** The queue, the oldest first: `MINE` for departments the IT Admin acts for, `ALL` for the caller's read scope. */
   async list(
     actor: AuthenticatedPrincipal,
     query: {
@@ -47,17 +50,30 @@ export class ProvisioningService {
       pageSize: number;
     },
   ): Promise<Page<TaskSummaryView>> {
+    assertItAdmin(actor);
+    const usable = (ids: readonly string[]) => this.identity.findUsableItAdminEmployeeIds(ids);
+    const [deptIds, unplacedTaskIds] = await Promise.all([
+      query.scope === 'MINE'
+        ? this.organizationReads.getItAdminActingScope(actor.employeeId, usable)
+        : this.organizationReads.getItAdminScope(actor.employeeId, usable),
+      this.organizationReads.findActiveUnplacedWorkIdsForDesignee(actor.employeeId, 'PROVISIONING_TASK'),
+    ]);
+    if (deptIds.length === 0 && unplacedTaskIds.length === 0) return pageOf([], 0, query.page, query.pageSize);
+
+    const today = await this.organizationReads.businessToday();
+    const beneficiaryEmployeeIds =
+      deptIds.length > 0 ? await this.organizationReads.getEmployeeIdsOfWorkDepartments(deptIds, today) : [];
+    if (beneficiaryEmployeeIds.length === 0 && unplacedTaskIds.length === 0) {
+      return pageOf([], 0, query.page, query.pageSize);
+    }
+
     const { items, total } = await this.repo.page({
       ...(query.channel ? { channel: query.channel } : {}),
       ...(query.status ? { status: query.status } : {}),
-      ...(query.scope === 'MINE' ? { responsibleEmployeeId: actor.employeeId } : {}),
-      ...(query.scope === 'GENERAL' ? { generalQueueOf: await this.responsibleWhoLeft() } : {}),
-      ...(query.claimableNow !== undefined
-        ? { claimableOn: { today: await this.organizationReads.businessToday(), claimable: query.claimableNow } }
-        : {}),
-      ...(query.overdue !== undefined
-        ? { overdueOn: { today: await this.organizationReads.businessToday(), overdue: query.overdue } }
-        : {}),
+      beneficiaryEmployeeIds,
+      ...(unplacedTaskIds.length > 0 ? { includeTaskIds: unplacedTaskIds } : {}),
+      ...(query.claimableNow !== undefined ? { claimableOn: { today, claimable: query.claimableNow } } : {}),
+      ...(query.overdue !== undefined ? { overdueOn: { today, overdue: query.overdue } } : {}),
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     });
@@ -65,10 +81,31 @@ export class ProvisioningService {
     return pageOf(await this.views.summaries(items), total, query.page, query.pageSize);
   }
 
-  /** One task as a card. Throws ProvisioningTaskNotFoundError. */
-  async get(id: string): Promise<TaskView> {
+  /** One task as a card, scoped to the caller's IT Admin read scope. Throws ProvisioningTaskNotFoundError. */
+  async get(actor: AuthenticatedPrincipal, id: string): Promise<TaskView> {
+    assertItAdmin(actor);
     const task = await this.repo.find(id);
     if (!task) throw new ProvisioningTaskNotFoundError();
+
+    const today = await this.organizationReads.businessToday();
+    const deptId = (await this.organizationReads.workDepartmentsOf([task.assignment.employeeId], today)).get(
+      task.assignment.employeeId,
+    );
+    if (!deptId) {
+      const resolved = await this.organizationReads.itAdminsActingForUnplacedWork(
+        [{ workKind: 'PROVISIONING_TASK', workId: task.id, employeeId: task.assignment.employeeId }],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids),
+      );
+      const designee = resolved.get(unplacedWorkKey('PROVISIONING_TASK', task.id)) ?? null;
+      if (designee !== actor.employeeId) throw new ProvisioningTaskNotFoundError();
+
+      return (await this.views.views([task]))[0];
+    }
+
+    const readScope = await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
+      this.identity.findUsableItAdminEmployeeIds(ids),
+    );
+    if (!readScope.includes(deptId)) throw new ProvisioningTaskNotFoundError();
 
     return (await this.views.views([task]))[0];
   }
@@ -169,13 +206,5 @@ export class ProvisioningService {
     });
 
     return (await this.views.views([task]))[0];
-  }
-
-  /** The persons in charge by default who no longer work: the tasks of those join the general queue. */
-  private async responsibleWhoLeft(): Promise<string[]> {
-    const ids = await this.repo.responsibleEmployeeIds();
-    const known = await this.organizationReads.getEmployees(ids);
-
-    return known.filter((employee) => employee.status !== 'ACTIVE').map((employee) => employee.id);
   }
 }

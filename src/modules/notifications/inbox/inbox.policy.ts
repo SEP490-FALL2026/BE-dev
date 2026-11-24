@@ -198,7 +198,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   USAGE_SOURCE_STALE: ['applicationId', 'source', 'coverageTo', 'freshnessDays'],
   // MF-2 (`QĐ-110b`–`QĐ-110e`): the people and the days of a departure, how many rights wait. `DEPARTURE_ACCESS_BLOCKED` is told at the block moment, once for
   // each `audience`: `SUPER_ADMIN` to mark the person as left; `IT_ADMIN` to **block** the company account (item 1a of `BM-08`: reset the password of the
-  // mailbox and sign out every session; the mailbox is not locked yet, that is item 1b) and to open the revocation by `revocationDueOn`. `blockedOn` is the
+  // mailbox and sign out every session; the mailbox is not locked yet, that is item 1b) and to open the revocation by `revocationDueOn`;
+  // `SUPER_ADMIN_AND_IT_ADMIN` is the one notice of a Super Admin who must do both (no IT Admin of the department can act). `blockedOn` is the
   // first day the person is refused. `ACCOUNT_LOCK_OVERDUE` says item 1a of a departure blocked now was still not recorded at the end of the day `blockedOn`.
   REVOCATION_OVERDUE: ['caseId', 'employeeId', 'dueOn', 'rightCount'],
   DEPARTURE_ACCESS_BLOCKED: ['caseId', 'employeeId', 'departmentId', 'blockedOn', 'revocationDueOn', 'audience'],
@@ -234,6 +235,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   SPEND_BATCH_SUBMITTED: ['batchId', 'departmentId', 'sentCount'],
   // The reports of errors in SaaS rights (`FR-2.15`): ids, the code of the report and the words of its kind and states. Never what the reporter or the IT Admin wrote, because the head of the department does not read it.
   SAAS_ISSUE_SUBMITTED: ['issueId', 'issueCode', 'category', 'impact', 'applicationId'],
+  SAAS_ISSUE_AWAITING_ASSIGNEE: ['issueId', 'issueCode', 'category', 'impact', 'applicationId', 'departmentId'],
   SAAS_ISSUE_RESPONSE_OVERDUE: ['issueId', 'issueCode', 'responseDueOn'],
   SAAS_ISSUE_STATE_CHANGED: ['issueId', 'issueCode', 'fromState', 'toState', 'trigger'],
   // A case outside the process closed as a report only, and a difference with a vendor opened (`SBF-07a`, `SBF-08`): ids and the source, never the account's identifier or what it did.
@@ -242,6 +244,16 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   // A holder asked to stop the collection of a machine (`US-09-04`, E1): ids, the deadline and its day in the time of the company; never what the machine collected.
   DEVICE_STOP_REQUESTED: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
   DEVICE_STOP_REQUEST_OVERDUE: ['stopRequestId', 'registrationId', 'deviceId', 'holderEmployeeId', 'dueAt', 'dueOn'],
+  // Temporary department IT Admin substitute appointments and daily missing coverage alerts.
+  DEPARTMENT_IT_SUBSTITUTE_APPOINTED: ['substituteId', 'departmentId', 'substituteEmployeeId', 'replacedEmployeeId'],
+  DEPARTMENT_IT_SUBSTITUTE_ENDED: ['substituteId', 'departmentId', 'substituteEmployeeId', 'endCause'],
+  DEPARTMENT_IT_COVERAGE_MISSING: ['departmentId', 'departmentName', 'inChargeEmployeeId', 'reason'],
+  // Offboarding device return task reminders and unassigned alerts.
+  DEVICE_RETURN_OVERDUE: ['taskId', 'deviceId', 'assetCode', 'employeeId', 'dueOn'],
+  DEVICE_RETURN_WAITING: ['taskId', 'deviceId', 'assetCode', 'employeeId', 'departmentId', 'dueOn'],
+  // Unplaced-work IT Admin designations: waiting work for Super Admin and appointed notice for designee.
+  UNPLACED_WORK_WAITING: ['workKind', 'workId', 'employeeId'],
+  UNPLACED_WORK_DESIGNATED: ['designationId', 'workKind', 'workId', 'employeeId'],
 };
 
 /** Whether the code is one of the closed table. */

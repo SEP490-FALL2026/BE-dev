@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RenewalUsageContributions } from '../public/licensing.extension-points';
-import type { RenewalSeatUsage } from '../public/licensing-subscription-renewal.types';
+import type { RenewalSeatUsage } from '../public/licensing-renewal.types';
 import { heldOn, rankSeats, type RankedSeat } from './subscription-renewal-ranking.policy';
 import { SubscriptionRenewalSeatRepo } from './subscription-renewal-seat.repo';
 import type { HeldSeat } from './subscription-renewal.types';

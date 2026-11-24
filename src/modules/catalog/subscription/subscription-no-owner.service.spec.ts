@@ -91,7 +91,6 @@ describe('QĐ-113g: no owning department on a subscription', () => {
     const update = jest.fn((_tx: unknown, _id: string, state: object) => Promise.resolve(stored({ ...state })));
     const guard = {
       requireOrganizationId: jest.fn(() => Promise.resolve('org-1')),
-      requireResponsible: jest.fn(),
       assertNotBelowOccupied: jest.fn(),
       judgePool: jest.fn(),
       tellSeatIncrease: jest.fn(),

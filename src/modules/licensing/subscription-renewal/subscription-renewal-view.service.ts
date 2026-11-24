@@ -119,7 +119,7 @@ export class RenewalViewService {
     });
 
     return toAdjustmentWire(period, adjustment, counts, {
-      ...(await this.parties.substituteOf(actor, period)),
+      responsibleItAdminEmployeeId: await this.parties.usableResponsibleItAdminOf(period),
       callerEmployeeId: actor.employeeId,
       recordedRenewalId: existingCaseOf(cases, adjustment.deadline)?.id ?? null,
     });

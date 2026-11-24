@@ -17,7 +17,8 @@ import { DepartureClosureService } from './departure-closure.service';
 
 /** Who wrote item (1b): an IT Admin with their words, or the system when the last K1 revocation of the person ticked the lock of the mailbox. */
 export type MailboxLockWriter =
-  { kind: 'IT_ADMIN'; principal: AuthenticatedPrincipal; note: string | null } | { kind: 'SYSTEM' };
+  | { kind: 'IT_ADMIN'; principal: AuthenticatedPrincipal; note: string | null; bySubstitute?: boolean | undefined }
+  | { kind: 'SYSTEM' };
 
 /**
  * Item (1b) of `BM-08`, the lock of the mailbox for good (`QĐ-110e`, `B-1`, SPEC P28). The IT Admin writes it after (1a) and, when the person
@@ -40,7 +41,7 @@ export class MailboxLockService {
 
   /** The IT Admin writes (1b). Throws OffboardingRefusedError and PersonnelAccessRefusedError. */
   record(actor: AuthenticatedPrincipal, id: string, input: { note?: string | undefined }): Promise<OffboardingRecord> {
-    return this.frame.runTechnical(actor, id, {}, async (tx, { held, today }) => {
+    return this.frame.runTechnical(actor, id, {}, async (tx, { held, today, bySubstitute }) => {
       // Written already (by an IT Admin or by the last K1 revocation): the answer is the case as it is, whatever it has become since.
       if (held.mailboxLockAt !== null) return held;
       const block = ownBlock(await this.identity.findDepartureBlock(held.employeeId, tx), held.id);
@@ -53,7 +54,12 @@ export class MailboxLockService {
           : 0;
       const refusal = mailboxLockRefusal({ closed, blocked, accountLocked, k1RightsOpen });
       if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
-      const written = await this.write(tx, held, { kind: 'IT_ADMIN', principal: actor, note: input.note ?? null });
+      const written = await this.write(tx, held, {
+        kind: 'IT_ADMIN',
+        principal: actor,
+        note: input.note ?? null,
+        bySubstitute,
+      });
       if (!written) throw new OffboardingRefusedError('CONCURRENT_CHANGE');
       await this.closing.closeIfDue(tx, written);
 
@@ -110,7 +116,11 @@ export class MailboxLockService {
       changedByAppUserId: appUserId,
       changedByTicketId: null,
     });
-    const after = { employeeId: held.employeeId, by: by.kind };
+    const after = {
+      employeeId: held.employeeId,
+      by: by.kind,
+      ...(by.kind === 'IT_ADMIN' && by.bySubstitute ? { bySubstitute: true } : {}),
+    };
     if (by.kind === 'IT_ADMIN')
       await this.audit.changed(
         tx,

@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { EmployeeNotFoundError } from '../public/organization.errors';
 import { OrganizationContextService } from '../organization-context.service';
 import { EmployeeRecordService } from '../employee/employee-record.service';
@@ -19,6 +20,7 @@ import {
   DepartmentOutsideBudgetPeriodError,
 } from '../department/department.errors';
 import { DepartmentRepo } from '../department/department.repo';
+import { DepartmentItSubstituteRepo } from '../department-it-substitute/department-it-substitute.repo';
 import { DepartmentItAdminService } from './department-it-admin.service';
 import { DepartmentService } from './department.service';
 
@@ -61,10 +63,16 @@ describe('DepartmentService', () => {
     members: jest.fn(),
     deactivate: jest.fn(),
     countActiveInChargeOf: jest.fn(),
+    countActiveInChargeExcludingStarting: jest.fn(),
+  };
+  const substitutes = {
+    endActiveForDepartment: jest.fn(),
+    countActiveBySubstitute: jest.fn(),
   };
   const identity = { inspectEmployeeAccount: jest.fn() };
   const creationWindow = { windowOn: jest.fn() };
   const audit = { record: jest.fn() };
+  const notifications = { notifyInApp: jest.fn().mockResolvedValue(true) };
   const runner = { run: jest.fn((work: (transaction: unknown) => Promise<unknown>) => work(tx)) };
 
   async function service(): Promise<DepartmentService> {
@@ -73,6 +81,7 @@ describe('DepartmentService', () => {
         DepartmentService,
         DepartmentItAdminService,
         { provide: DepartmentRepo, useValue: departments },
+        { provide: DepartmentItSubstituteRepo, useValue: substitutes },
         {
           provide: OrganizationContextService,
           useValue: { businessToday: organization.businessToday, findOrganization: organization.getOrganization },
@@ -100,6 +109,7 @@ describe('DepartmentService', () => {
         },
         { provide: DepartmentCreationWindowHook, useValue: { get: () => creationWindow } },
         { provide: AuditApi, useValue: audit },
+        { provide: NotificationsApi, useValue: notifications },
         { provide: TransactionRunner, useValue: runner },
       ],
     }).compile();
@@ -124,6 +134,9 @@ describe('DepartmentService', () => {
     });
     departments.insert.mockResolvedValue('dep-new');
     departments.countActiveInChargeOf.mockResolvedValue(0);
+    departments.countActiveInChargeExcludingStarting.mockResolvedValue(1);
+    substitutes.endActiveForDepartment.mockResolvedValue(null);
+    substitutes.countActiveBySubstitute.mockResolvedValue(0);
     creationWindow.windowOn.mockResolvedValue({ kind: 'NO_CYCLE_YET' });
     departments.members.mockResolvedValue(noGroup);
     identity.inspectEmployeeAccount.mockResolvedValue({ usable: true, roles: ['IT_ADMIN'] });
@@ -369,6 +382,19 @@ describe('DepartmentService', () => {
 
       expect(organization.getDepartmentUse).not.toHaveBeenCalled();
       expect(departments.deactivate).not.toHaveBeenCalled();
+    });
+
+    it('delegates IT substitute cleanup on non-null in-charge update and deactivate, keeping on null', async () => {
+      const dept = await service();
+      const endSub = substitutes.endActiveForDepartment;
+      expect((await dept.update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-it' }))?.employeeId).toBe('emp-it');
+      expect(endSub).toHaveBeenCalledWith(tx, containing({ endCause: 'IN_CHARGE_NAMED' }));
+      endSub.mockClear();
+      departments.lock.mockResolvedValueOnce({ id: 'dep-1', status: 'ACTIVE', itAdmin: { employeeId: 'emp-it' } });
+      expect(await dept.update(superAdmin, 'dep-1', { itAdminEmployeeId: null })).toBeNull();
+      expect(endSub).not.toHaveBeenCalled();
+      await dept.deactivate(superAdmin, 'dep-1');
+      expect(endSub).toHaveBeenCalledWith(tx, containing({ endCause: 'DEPARTMENT_RETIRED' }));
     });
   });
 });

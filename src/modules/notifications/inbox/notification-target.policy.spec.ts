@@ -30,11 +30,13 @@ const TYPES_WITHOUT_DETAIL_ROUTE = [
   'BUDGET_ADJUSTMENT',
   'COST_CENTER',
   'DEPARTMENT_SOFTWARE_PROPOSAL',
+  'DEVICE_RETURN_TASK',
   'DEVICE_STOP_REQUEST',
   'HANDOVER_DUTY',
   'LICENSE_ASSIGNMENT',
   'OUT_OF_PROCESS_CASE',
   'TRANSFER_REVIEW',
+  'UNPLACED_WORK_DESIGNATION',
 ] as const;
 
 /** Every `subject.type` the catalogue of notifications names (canonical form). */
@@ -50,6 +52,7 @@ const CATALOGUE_SUBJECT_TYPES = [
   'DEPARTMENT',
   'DEPARTMENT_SOFTWARE_PROPOSAL',
   'DEPARTMENT_TRANSFER',
+  'DEVICE_RETURN_TASK',
   'DEVICE_STOP_REQUEST',
   'EMPLOYEE',
   'EMPLOYEE_LEAVE',
@@ -69,16 +72,15 @@ const CATALOGUE_SUBJECT_TYPES = [
   'SUBSCRIPTION',
   'SUBSCRIPTION_RENEWAL',
   'TRANSFER_REVIEW',
+  'UNPLACED_WORK_DESIGNATION',
 ] as const;
 
 describe('canonicalSubjectType', () => {
-  it.each([
-    ['LicenseAssignment', 'LICENSE_ASSIGNMENT'],
-    ['ProvisioningTask', 'PROVISIONING_TASK'],
-    ['HandoverDuty', 'HANDOVER_DUTY'],
-    ['Employee', 'EMPLOYEE'],
-  ])('turns the old spelling %s into %s', (old, canonical) => {
-    expect(canonicalSubjectType(old)).toBe(canonical);
+  it('turns the old spellings into canonical UPPER_SNAKE', () => {
+    expect(canonicalSubjectType('LicenseAssignment')).toBe('LICENSE_ASSIGNMENT');
+    expect(canonicalSubjectType('ProvisioningTask')).toBe('PROVISIONING_TASK');
+    expect(canonicalSubjectType('HandoverDuty')).toBe('HANDOVER_DUTY');
+    expect(canonicalSubjectType('Employee')).toBe('EMPLOYEE');
   });
 
   it('keeps every other value as it is', () => {
@@ -217,13 +219,19 @@ describe('notificationTarget', () => {
     }
   });
 
-  it('opens the issue report of the three notices about one, the lists of the operations notices, and nothing for a case outside the process', () => {
+  it('opens the issue report of the three notices about one, the issue list for SAAS_ISSUE_AWAITING_ASSIGNEE, the lists of the operations notices, and nothing for a case outside the process', () => {
     for (const code of ['SAAS_ISSUE_SUBMITTED', 'SAAS_ISSUE_RESPONSE_OVERDUE', 'SAAS_ISSUE_STATE_CHANGED']) {
       expect(targetOf(code, { type: 'SAAS_ISSUE', id: ID }, { issueId: ID })).toEqual({
         operationId: 'saasIssueGet',
         pathParams: { id: ID },
       });
     }
+    expect(
+      targetOf('SAAS_ISSUE_AWAITING_ASSIGNEE', { type: 'SAAS_ISSUE', id: ID }, { issueId: ID }, ['SUPER_ADMIN']),
+    ).toEqual({
+      operationId: 'saasIssueList',
+      pathParams: {},
+    });
     expect(targetOf('VENDOR_ACCOUNT_DISCREPANCY_OPENED', null, { newCount: 2 })).toEqual({
       operationId: 'vendorAccountDiscrepancyList',
       pathParams: {},
@@ -235,6 +243,23 @@ describe('notificationTarget', () => {
       });
     }
     expect(targetOf('OUT_OF_PROCESS_CASE_REPORTED', { type: 'OUT_OF_PROCESS_CASE', id: ID }, {})).toBeNull();
+  });
+
+  it('opens the substitute list for substitute notices (SUPER_ADMIN/IT_ADMIN only) and the department profile for missing IT coverage', () => {
+    const dept = { type: 'DEPARTMENT', id: ID };
+    for (const code of ['DEPARTMENT_IT_SUBSTITUTE_APPOINTED', 'DEPARTMENT_IT_SUBSTITUTE_ENDED']) {
+      for (const role of ['SUPER_ADMIN', 'IT_ADMIN'])
+        expect(targetOf(code, dept, { departmentId: ID }, [role])).toEqual({
+          operationId: 'departmentItSubstituteList',
+          pathParams: {},
+        });
+      expect(targetOf(code, dept, { departmentId: ID }, ['EMPLOYEE'])).toBeNull();
+    }
+    expect(targetOf('DEPARTMENT_IT_COVERAGE_MISSING', dept, { departmentId: ID }, ['SUPER_ADMIN'])).toEqual({
+      operationId: 'departmentGet',
+      pathParams: { id: ID },
+    });
+    expect(targetOf('DEPARTMENT_IT_COVERAGE_MISSING', dept, { departmentId: ID }, ['EMPLOYEE'])).toBeNull();
   });
 
   it('gives a screen without a subject when the catalogue names one', () => {

@@ -10,6 +10,7 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
 import { OrganizationModule } from '../organization/organization.module';
 import { CatalogApi } from './public/catalog.api';
 import { CatalogContractApi } from './public/catalog-contract.api';
+import { CatalogPlanTermsApi } from './public/catalog-plan-terms.api';
 import { CatalogResponsibilityApi } from './public/catalog-responsibility.api';
 import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
 import { ApplicationIntakeController } from './application-intake/application-intake.controller';
@@ -77,6 +78,8 @@ import { SubscriptionPricingService } from './subscription/subscription-pricing.
 import { SubscriptionViewService } from './subscription/subscription-view.service';
 import { SubscriptionWindowsService } from './subscription/subscription-windows.service';
 import { SubscriptionsController } from './subscription/subscriptions.controller';
+import { SubscriptionResponsibleController } from './subscription/responsible/subscription-responsible.controller';
+import { SubscriptionResponsibleService } from './subscription/responsible/subscription-responsible.service';
 import { VendorDictionaryController } from './vendor-dictionary/vendor-dictionary.controller';
 import { VendorDictionaryFactsService } from './vendor-dictionary/vendor-dictionary-facts.service';
 import { VendorDictionaryRepo } from './vendor-dictionary/vendor-dictionary.repo';
@@ -120,6 +123,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     PlanTermsController,
     VendorsController,
     SubscriptionsController,
+    SubscriptionResponsibleController,
     ApplicationRetirementController,
     ApplicationResponsibilityController,
     ContractsController,
@@ -168,6 +172,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     { provide: ApplicationPlans, useExisting: PlanFactsService },
     SubscriptionChangeGuard,
     SubscriptionChangeService,
+    SubscriptionResponsibleService,
     SubscriptionService,
     SubscriptionPoolService,
     SubscriptionSeatIncreaseService,
@@ -194,6 +199,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRetirementRepo,
     ApplicationRetirementService,
     CatalogApi,
+    CatalogPlanTermsApi,
     CatalogContractApi,
     CatalogResponsibilityApi,
     SubscriptionPeriodApi,
@@ -207,6 +213,7 @@ import { VendorRepo } from './vendor/vendor.repo';
   // (`public/catalog-responsibility.api.ts`), and the facade `usage` reads the applications of a contract through (`public/catalog-contract.api.ts`); the capability services and repos stay private.
   exports: [
     CatalogApi,
+    CatalogPlanTermsApi,
     CatalogContractApi,
     CatalogResponsibilityApi,
     SubscriptionPeriodApi,

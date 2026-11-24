@@ -7,6 +7,7 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { SeatTargetNotFoundError } from '../../licensing/public/licensing.errors';
 import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestSuperAdminCannotRequestError } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
@@ -117,7 +118,12 @@ export class ReturnRequestService {
       actorHeadedDepartmentId: headed?.departmentId ?? null,
     });
     if (!sender.ok) throw new ReturnRequestRefusedError(sender.refusal);
-    if (!holderUnit) throw new ReturnRequestRefusedError('NO_DEPARTMENT');
+    if (!holderUnit) {
+      if ((await this.organizationReads.notStartedAmong([facts.employeeId], today, tx)).has(facts.employeeId)) {
+        throw new EmployeeNotStartedError(facts.employeeId);
+      }
+      throw new ReturnRequestRefusedError('NO_DEPARTMENT');
+    }
 
     const [plan] = await this.catalog.getPlanRevocationInfo([facts.planId], tx);
     if (!plan) throw new SeatTargetNotFoundError('PLAN');

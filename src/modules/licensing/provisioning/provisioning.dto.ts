@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { K1_CHECKLIST_CODES, K1_CHECKLIST_VARIANTS, REVOCATION_SOURCES } from '../public/licensing.types';
-import { EVIDENCE_MAX_LENGTH, FAILURE_REASON_MAX_LENGTH } from './provisioning.policy';
+import { ACTING_IT_ADMINS_MAX, EVIDENCE_MAX_LENGTH, FAILURE_REASON_MAX_LENGTH } from './provisioning.policy';
 import { REVOCATION_NOTE_MAX_LENGTH } from './revocation.policy';
 import { WITHDRAWAL_REASON_MAX_LENGTH } from '../license-key/license-key.policy';
 import { businessDate, responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
@@ -113,7 +113,7 @@ const pageQuery = {
 export const listTasksQuerySchema = z.strictObject({
   channel: z.enum(['MANUAL', 'CONNECTOR']).optional(),
   status: z.enum(TASK_STATUSES).optional(),
-  scope: z.enum(['ALL', 'MINE', 'GENERAL']).default('ALL'),
+  scope: z.enum(['ALL', 'MINE']).default('ALL'),
   /** `true`: only the tasks that may be taken today (a revocation in its grace is left out); `false`: only those in their grace. */
   claimableNow: z
     .enum(['true', 'false'])
@@ -224,7 +224,16 @@ const taskSummarySchema = z.strictObject({
   subscriptionId: z.uuid().nullable(),
   accountIdentifier: z.string(),
   defaultResponsibleEmployeeId: z.uuid().nullable(),
-  inGeneralQueue: z.boolean(),
+  awaitingItAdmin: z.boolean(),
+  actingItAdmins: z
+    .array(
+      z.strictObject({
+        id: z.uuid(),
+        fullName: z.string(),
+        bySubstitute: z.boolean(),
+      }),
+    )
+    .max(ACTING_IT_ADMINS_MAX),
   dueOn: responseBusinessDate.nullable(),
   notBefore: responseBusinessDate.nullable(),
   claimableNow: z.boolean(),

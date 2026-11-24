@@ -52,6 +52,8 @@ export const ORG_TEXTS = {
             '{employeeId:name} bị từ chối truy cập từ {blockedOn:date}. Vui lòng đánh dấu người này đã nghỉ việc.',
           IT_ADMIN:
             '{employeeId:name} bị từ chối truy cập từ {blockedOn:date}. Vui lòng chặn tài khoản email công ty (đặt lại mật khẩu hộp thư, đăng xuất mọi phiên) và mở thu hồi quyền phần mềm trước {revocationDueOn:date}.',
+          SUPER_ADMIN_AND_IT_ADMIN:
+            '{employeeId:name} bị từ chối truy cập từ {blockedOn:date}. Vui lòng đánh dấu người này đã nghỉ việc, chặn tài khoản email công ty (đặt lại mật khẩu hộp thư, đăng xuất mọi phiên) và mở thu hồi quyền phần mềm trước {revocationDueOn:date}.',
         },
         otherwise: '{employeeId:name} bị từ chối truy cập từ {blockedOn:date}.',
       },
@@ -64,6 +66,8 @@ export const ORG_TEXTS = {
           SUPER_ADMIN: '{employeeId:name} is refused access from {blockedOn:date}. Please mark this person as left.',
           IT_ADMIN:
             '{employeeId:name} is refused access from {blockedOn:date}. Please block the company email account (reset the mailbox password and sign out every session) and open the software revocation by {revocationDueOn:date}.',
+          SUPER_ADMIN_AND_IT_ADMIN:
+            '{employeeId:name} is refused access from {blockedOn:date}. Please mark this person as left, block the company email account (reset the mailbox password and sign out every session) and open the software revocation by {revocationDueOn:date}.',
         },
         otherwise: '{employeeId:name} is refused access from {blockedOn:date}.',
       },

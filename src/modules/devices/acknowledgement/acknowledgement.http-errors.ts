@@ -4,6 +4,7 @@ import { toUnavailableApiException } from '../../../infrastructure/http/errors/s
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { DeviceRegistrationEndedError, DeviceRegistrationNotFoundError } from '../registry/registry.errors';
 import {
+  DeviceAcknowledgementCollectorNotInstalledError,
   DeviceAcknowledgementNoticeNotCurrentError,
   DeviceAlreadyAcknowledgedError,
   DeviceSignatureRecordMissingError,
@@ -20,6 +21,9 @@ export function toAcknowledgementApiException(error: unknown): unknown {
   }
   if (error instanceof DeviceRegistrationEndedError) {
     return refuse(HttpStatus.CONFLICT, 'DEVICE_REGISTRATION.ENDED', error.message);
+  }
+  if (error instanceof DeviceAcknowledgementCollectorNotInstalledError) {
+    return refuse(HttpStatus.CONFLICT, 'DEVICE_ACKNOWLEDGEMENT.COLLECTOR_NOT_INSTALLED', error.message);
   }
   if (error instanceof DeviceSignatureRecordMissingError) {
     return refuse(HttpStatus.CONFLICT, 'DEVICE_REGISTRATION.SIGNATURE_RECORD_MISSING', error.message);
@@ -39,6 +43,7 @@ const example = (error: Error) => errorExampleOf(toAcknowledgementApiException(e
 export const ACKNOWLEDGEMENT_ERROR_EXAMPLES = {
   REGISTRATION_NOT_FOUND: example(new DeviceRegistrationNotFoundError()),
   REGISTRATION_ENDED: example(new DeviceRegistrationEndedError()),
+  COLLECTOR_NOT_INSTALLED: example(new DeviceAcknowledgementCollectorNotInstalledError()),
   SIGNATURE_RECORD_MISSING: example(new DeviceSignatureRecordMissingError()),
   NOTICE_NOT_CURRENT: example(new DeviceAcknowledgementNoticeNotCurrentError()),
   ALREADY_ACKNOWLEDGED: example(new DeviceAlreadyAcknowledgedError()),

@@ -7,7 +7,7 @@ import {
   plansLeftWithoutAdmin,
 } from './it-handover.policy';
 
-describe('it-handover.policy (QĐ-110j, QĐ-111g, R-8, R-26: one hand-over of an IT Admin who leaves, no blocker)', () => {
+describe('it-handover.policy (one hand-over of an IT Admin who leaves, no blocker)', () => {
   describe('milestoneDay and milestoneReached: the block moment of a departure, the day a transfer takes effect', () => {
     it('is the first day a departure refuses the person: the block, or the day they left, whichever came first', () => {
       expect(
@@ -35,43 +35,37 @@ describe('it-handover.policy (QĐ-110j, QĐ-111g, R-8, R-26: one hand-over of an
     });
   });
 
-  describe('handoverRefusal: the person leaving hands over before the milestone, any IT Admin from it, nothing to do refuses', () => {
+  describe('handoverRefusal: Super Admin may hand over regardless of milestone; cancelled and nothing left refuse', () => {
     const base = {
       cancelled: false,
       milestoneReached: true,
-      actorEmployeeId: 'it-other',
+      actorEmployeeId: 'super-admin',
       leavingEmployeeId: 'it-leaving',
       remaining: 3,
     };
 
-    it('lets any IT Admin hand over from the milestone', () => {
+    it('allows handover after milestone', () => {
       expect(handoverRefusal(base)).toBeNull();
     });
 
-    it('lets the person who leaves hand over before the milestone, and nobody else', () => {
-      const before = { ...base, milestoneReached: false };
-
-      expect(handoverRefusal({ ...before, actorEmployeeId: 'it-leaving' })).toBeNull();
-      expect(handoverRefusal(before)).toBe('NOT_YET_YOURS');
+    it('allows handover before milestone', () => {
+      expect(handoverRefusal({ ...base, milestoneReached: false })).toBeNull();
     });
 
-    it('refuses a file that was cancelled, whoever asks', () => {
+    it('refuses a file that was cancelled, regardless of milestone', () => {
       expect(handoverRefusal({ ...base, cancelled: true })).toBe('SOURCE_CANCELLED');
       expect(handoverRefusal({ ...base, cancelled: true, milestoneReached: false })).toBe('SOURCE_CANCELLED');
     });
 
-    it('refuses when the person answers for nothing now, even for the one who leaves', () => {
+    it('refuses when the person answers for nothing now', () => {
       expect(handoverRefusal({ ...base, remaining: 0 })).toBe('NOTHING_TO_HAND_OVER');
-      expect(handoverRefusal({ ...base, remaining: 0, milestoneReached: false, actorEmployeeId: 'it-leaving' })).toBe(
-        'NOTHING_TO_HAND_OVER',
-      );
+      expect(handoverRefusal({ ...base, remaining: 0, milestoneReached: false })).toBe('NOTHING_TO_HAND_OVER');
     });
 
-    it('judges the file, then the milestone, then what is left', () => {
+    it('judges cancelled before nothing left', () => {
       expect(handoverRefusal({ ...base, cancelled: true, remaining: 0, milestoneReached: false })).toBe(
         'SOURCE_CANCELLED',
       );
-      expect(handoverRefusal({ ...base, remaining: 0, milestoneReached: false })).toBe('NOT_YET_YOURS');
     });
   });
 

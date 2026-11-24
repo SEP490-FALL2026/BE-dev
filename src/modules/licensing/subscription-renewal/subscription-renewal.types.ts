@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { RenewalFinancialSnapshot } from '../public/licensing-subscription-renewal.types';
+import type { RenewalFinancialSnapshot } from '../public/licensing-renewal.types';
 
 export type RenewalChoice = 'RENEW' | 'REDUCE' | 'CANCEL' | 'INCREASE';
 /** `STALE`: a case closed without an outcome: one waiting for the head when the one-write renewal came, or one out of date. */

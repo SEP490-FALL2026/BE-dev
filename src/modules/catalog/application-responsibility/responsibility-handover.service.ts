@@ -40,6 +40,15 @@ export class ResponsibilityHandoverService {
     );
   }
 
+  /** Working IT Admins currently named responsible on active subscriptions of the plan. */
+  async usableSubscriptionItAdminsOfPlan(planId: string, tx?: DbTx): Promise<string[]> {
+    const ids = await this.subscriptions.findActiveResponsibleItAdminIdsOfPlan(planId, tx);
+    if (ids.length === 0) return [];
+    const usable = await this.planFacts.workingAdminsAmong(ids, tx);
+
+    return ids.filter((id) => usable.has(id));
+  }
+
   /** Throws ResponsibilityHandoverRefusedError (nothing was written). */
   async transfer(
     tx: DbTx,

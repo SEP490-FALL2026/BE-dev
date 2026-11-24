@@ -61,6 +61,12 @@ export class DepartureClosureService {
       openRights: counted.get(held.employeeId) ?? 0,
     });
     if (!due || !(await this.closure.closeBySystem(tx, held.id, now))) return false;
+    await this.organization.endUnplacedWorkDesignations(tx, {
+      workKind: 'OFFBOARDING_CASE',
+      workId: held.id,
+      endedByAppUserId: null,
+      endedAt: now,
+    });
     await this.cases.insertChange(tx, {
       caseId: held.id,
       kind: 'CLOSED_BY_SYSTEM',

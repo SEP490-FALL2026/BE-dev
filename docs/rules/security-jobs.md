@@ -124,7 +124,7 @@
   every open request of the person through `RequestsApi.cancelForBeneficiaryGone` with the scope `ALL_OPEN` (the ones whose grant is being
   carried out stay and the IT Admin is told), writes the audit event `OFFBOARDING_CASE.ACCESS_BLOCKED` (actor `SYSTEM`) and the line
   `ACCESS_BLOCKED` of the log of the case (no account and no ticket wrote it), and tells the Super Admin (only while the person is not yet
-  marked as left) and the IT Admin (`DEPARTURE_ACCESS_BLOCKED`, one key per audience). A deadline of revocation already on the case is never
+  marked as left) and the IT Admin (`DEPARTURE_ACCESS_BLOCKED`, one key per audience; a Super Admin who must also block the account is told once, with both tasks). A deadline of revocation already on the case is never
   changed; it is written only when the case has none. The same pass then tells the IT Admin and the Super Admin (`ACCOUNT_LOCK_OVERDUE`, key
   `ACCOUNT_LOCK_OVERDUE:<case>`, once for the case, with the audit event `OFFBOARDING_CASE.ACCOUNT_LOCK_OVERDUE`) when a departure blocked now
   has no lock of the company account from the day after it was recorded. It revokes nothing and opens no task. Run one by hand with
@@ -178,6 +178,19 @@
   to stop the collection of a machine that is still `OPEN` after its `due_at` it sets `overdue_noticed_at` and writes the inbox notice
   `DEVICE_STOP_REQUEST_OVERDUE` in one transaction, so a request is told once however many instances run; a failed pass only logs. The reminder
   only tells: the request stays open and collection goes on until an IT Admin completes it. Run one by hand with `StopRequestSweepService.run(now)`.
+  The API also runs `DeviceReturnOverdueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): on a working day of
+  the organization, for each open offboarding device return task past its `due_on` (`BATCH = 200`, not yet reminded today), it locks the task
+  `FOR UPDATE SKIP LOCKED` in its own transaction, stamps `overdue_noticed_on` and writes the inbox notice `DEVICE_RETURN_OVERDUE` (key
+  `deviceReturnOverdue:<task>:<recipient>:<day>`) to the acting IT Admins of the department (excluding the departing employee) and the usable Super
+  Admin, so a task is told once per working day however many instances run; a failed pass only logs. The reminder only tells: the task stays open
+  until an acting IT Admin completes it. Run one by hand with `DeviceReturnTaskSweepService.run(now)`.
+  The API also runs `ItCoverageSweeper` once an hour (the first pass five minutes after start, unreferenced timer): on weekdays in the organization's
+  time zone, it checks active non-starting departments without any usable acting IT Admin (neither a usable in-charge nor a usable appointed
+  substitute) and writes `DEPARTMENT_IT_COVERAGE_MISSING` (key `departmentItCoverage:<department>:<day>`) to the usable Super Admin, and checks
+  active unplaced-work designations whose designee is no longer an active usable IT Admin and writes `UNPLACED_WORK_WAITING` (key
+  `unplacedWork:<workKind>:<workId>:<day>`) to the usable Super Admin; each notice runs in its own transaction and is idempotent per item and day,
+  and a failed pass only logs. It only tells: it never appoints or modifies any IT coverage or designation. Run one by hand with
+  `ItCoverageSweepService.run(now)`.
   The API also runs `SubscriptionRenewalSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each active
   K2 term subscription not yet continued (the catalog gives at most 500, no order) it reads the point of adjustment of the period (`SBF-20`: a
   plan by the month opens `SUBSCRIPTION_ADJUSTMENT_DAYS_MONTHLY` days before its payment day, a plan by the year `SUBSCRIPTION_ADJUSTMENT_DAYS_ANNUAL`

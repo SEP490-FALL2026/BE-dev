@@ -20,3 +20,11 @@ export class DeviceCredentialRevokedError extends Error {
     this.name = 'DeviceCredentialRevokedError';
   }
 }
+
+/** Only an acting IT Admin of the holder department may change this device. */
+export class DeviceNotInChargeError extends Error {
+  constructor() {
+    super('Only an acting IT Admin of the holder department may change this device.');
+    this.name = 'DeviceNotInChargeError';
+  }
+}

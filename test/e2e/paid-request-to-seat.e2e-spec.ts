@@ -31,6 +31,7 @@ describe('a paid request from the employee to the seat (e2e, D-1)', () => {
     subscriptionId = await h.subscription(10);
     planId = await h.planOf(subscriptionId);
     unit = await h.departmentWithHead('P-DES');
+    await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
   }, 180000);
 
   afterAll(async () => {

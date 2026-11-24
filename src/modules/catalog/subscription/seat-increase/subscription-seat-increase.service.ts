@@ -22,10 +22,10 @@ export interface SeatIncrease {
 }
 
 /**
- * The one place a rise of the seats bought of a subscription is told (`QĐ-110v`, `S-4`, SPEC P24): whoever raises `purchased_quantity` (the seat a grant
+ * The one place a rise of the seats bought of a subscription is told: whoever raises `purchased_quantity` (the seat a grant
  * buys, a change of the quantity) calls it in the same transaction, so the notice exists exactly when the rise commits. Only the pool of a `K2` or `K4`
- * plan is told (`seatIncreaseNoticeOwed`); the notice goes to the IT Admin who answers for the subscription unless they bought, or to every other IT
- * Admin when nobody usable answers for it (`seatIncreaseRecipients`). It is a notice and never a step to approve.
+ * plan is told (`seatIncreaseNoticeOwed`); the notice goes to the IT Admin who answers for the subscription unless they bought, or to the usable
+ * Super Admin when nobody usable answers for it (`seatIncreaseRecipients`). It is a notice and never a step to approve.
  */
 @Injectable()
 export class SubscriptionSeatIncreaseService {
@@ -34,7 +34,7 @@ export class SubscriptionSeatIncreaseService {
     private readonly identity: IdentityAccessApi,
   ) {}
 
-  /** Returns how many IT Admins were told. */
+  /** Returns how many recipients were told. */
   async told(tx: DbTx, input: SeatIncrease): Promise<number> {
     if (
       !seatIncreaseNoticeOwed({
@@ -45,10 +45,14 @@ export class SubscriptionSeatIncreaseService {
       })
     )
       return 0;
-    const usable = new Set(await this.identity.findAllUsableItAdminEmployeeIds(tx));
+    const responsible = input.responsibleItAdminEmployeeId;
+    const responsibleUsable =
+      responsible !== null && (await this.identity.findUsableItAdminEmployeeIds([responsible], tx)).has(responsible);
+    const superAdmin = responsibleUsable ? null : await this.identity.findUsableSuperAdminEmployeeId(tx);
     const recipients = seatIncreaseRecipients({
-      responsible: input.responsibleItAdminEmployeeId,
-      usable,
+      responsible,
+      responsibleUsable,
+      superAdmin,
       actor: input.actor.employeeId,
     });
     // Every rise is its own event: the same two numbers can come round again after the seats were cut back.

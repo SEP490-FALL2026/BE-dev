@@ -192,6 +192,7 @@ describe('PL-2.4 (QĐ-111ap, R-24): the sender sends on again a proposal the IT 
     id: 'request',
     organizationId: 'org',
     type: 'GRANT',
+    departmentId: 'dept-1',
     requesterEmployeeId: 'requester',
     state: 'AWAITING_REQUESTER_REVISION',
     routing: { mode: 'VIA_HEAD' },
@@ -231,6 +232,7 @@ describe('PL-2.4 (QĐ-111ap, R-24): the sender sends on again a proposal the IT 
   it('opens a new step for the IT Admin in charge of today and waits for the assessment, not for the head or the spend step', async () => {
     await service.resubmit(actor, 'request');
 
+    expect(targets.assessmentTarget).toHaveBeenCalledWith(tx, 'dept-1');
     expect(repo.reopenAssessmentStep).toHaveBeenCalledWith(tx, {
       requestId: 'request',
       assignee: 'it-admin',

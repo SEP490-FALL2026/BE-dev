@@ -4,6 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { RequestPartyEligibilityApi } from '../../identity-access/public/request-party-eligibility.api';
 import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { AccessRequestNoDepartmentError } from '../access-request/access-request.errors';
 
 export interface GroupCandidate {
@@ -36,7 +37,12 @@ export class GroupCandidateService {
     if (block !== null) throw new RequestPartyIneligibleError(block);
     const today = await this.organizationReads.businessToday();
     const unit = (await this.organizationReads.getOwningUnits([actor.employeeId], today)).get(actor.employeeId);
-    if (!unit) throw new AccessRequestNoDepartmentError();
+    if (!unit) {
+      if ((await this.organizationReads.notStartedAmong([actor.employeeId], today)).has(actor.employeeId)) {
+        throw new EmployeeNotStartedError(actor.employeeId);
+      }
+      throw new AccessRequestNoDepartmentError();
+    }
 
     const ids = (await this.organizationReads.getDepartmentMemberIds(unit.departmentId, today)) ?? [];
     const head = (await this.organizationReads.getDepartmentHeads([unit.departmentId], today)).get(

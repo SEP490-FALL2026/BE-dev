@@ -108,7 +108,7 @@ export class ProvisioningHolderService {
       throw new ProvisioningContractEndedError(input.requestId, contractEnd);
     }
 
-    const mode = await this.frame.selfExecutionMode(actor, input.employeeId, tx);
+    const mode = await this.frame.selfExecutionMode(actor, input.employeeId);
 
     return {
       employeeId: input.employeeId,
@@ -129,8 +129,8 @@ export class ProvisioningHolderService {
   /**
    * `named` is the person the IT Admin chose in the place of the one the request names. Throws
    * ProvisioningResponsibleNotInDepartmentError (the one the request names is not there any more),
-   * ProvisioningResponsibleInvalidError (the one the IT Admin named is not there), RequestPartyIneligibleError (the one the IT Admin
-   * named is the spending approver, `D-S21`) and ProvisioningAnotherItAdminNeededError.
+   * ProvisioningResponsibleInvalidError (the one the IT Admin named is not there), and RequestPartyIneligibleError (the one the IT Admin
+   * named is the spending approver, `D-S21`).
    */
   async service(
     tx: DbTx,
@@ -152,7 +152,7 @@ export class ProvisioningHolderService {
         ? new ProvisioningResponsibleNotInDepartmentError()
         : new ProvisioningResponsibleInvalidError(problem);
     }
-    const mode = await this.frame.selfExecutionMode(actor, employeeId, tx);
+    const mode = await this.frame.selfExecutionMode(actor, employeeId);
 
     return {
       employeeId,

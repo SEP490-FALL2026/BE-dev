@@ -66,7 +66,7 @@ export class RequestResubmissionService {
   private async reopenAssessment(tx: DbTx, actor: AuthenticatedPrincipal, request: AccessRequestRecord, now: Date) {
     await this.requests.reopenAssessmentStep(tx, {
       requestId: request.id,
-      assignee: await this.targets.assessmentTarget(tx, request.requesterEmployeeId, now),
+      assignee: await this.targets.assessmentTarget(tx, request.departmentId),
       slaWorkingDays: request.policy.slaWorkingDays,
       now,
     });

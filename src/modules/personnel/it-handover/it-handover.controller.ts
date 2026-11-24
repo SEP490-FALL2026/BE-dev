@@ -15,15 +15,14 @@ import { ItHandoverBodyDto, ItHandoverIdParamDto, ItHandoverResultResponseDto } 
 import { IT_HANDOVER_ERROR_EXAMPLES as E, toItHandoverApiException } from './it-handover.http-errors';
 import { ItHandoverService, type ItHandoverResult } from './it-handover.service';
 
-const WHO =
-  'The IT Admin who is leaving hands over before the block of the departure or the day the transfer takes effect; from then on any IT Admin does. ';
+const WHO = 'Only the Super Admin hands responsibilities over. ';
 
 const COMMON = [
   UNAUTHENTICATED_RESPONSE,
   {
     status: HttpStatus.FORBIDDEN,
-    description: `Only an IT Admin hands responsibilities over (AUTHORIZATION.FORBIDDEN). Before the block of the departure or the day the transfer takes effect only the IT Admin who is leaving does (IT_HANDOVER.NOT_YET_YOURS).`,
-    examples: [FORBIDDEN_EXAMPLE, E.NOT_YET_YOURS],
+    description: 'Only the Super Admin hands responsibilities over (AUTHORIZATION.FORBIDDEN).',
+    examples: [FORBIDDEN_EXAMPLE],
   },
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   {
@@ -66,7 +65,7 @@ export class ItHandoverController {
   constructor(private readonly handovers: ItHandoverService) {}
 
   @Post('offboarding-cases/:id/it-admin-handover')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({
     operationId: 'offboardingCaseItAdminHandover',
     summary: 'Hand the responsibilities of a leaving IT Admin to another',
@@ -91,7 +90,7 @@ export class ItHandoverController {
   }
 
   @Post('department-transfers/:id/it-admin-handover')
-  @RequireRoles('IT_ADMIN')
+  @RequireRoles('SUPER_ADMIN')
   @ApiOperation({
     operationId: 'departmentTransferItAdminHandover',
     summary: 'Hand the responsibilities of a moving IT Admin to another',

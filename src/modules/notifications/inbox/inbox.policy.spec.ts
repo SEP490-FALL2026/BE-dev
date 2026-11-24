@@ -346,9 +346,12 @@ describe('what the table says it may carry (INF-06, FR-3.11)', () => {
     }
   });
 
-  it('names a person only by id: no key of any code is a name', () => {
+  it('names a person only by id: no key of any code is a person name or email', () => {
     for (const keys of Object.values(PARAM_KEYS_BY_CODE)) {
-      for (const key of keys) expect(key).not.toMatch(/(?:^|[a-z])(?:Name|Email)$|^fullName$/);
+      for (const key of keys) {
+        if (key === 'departmentName') continue;
+        expect(key).not.toMatch(/(?:^|[a-z])(?:Name|Email)$|^fullName$/);
+      }
     }
   });
 });

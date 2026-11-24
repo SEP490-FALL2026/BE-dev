@@ -57,4 +57,54 @@ export const NESTED_ARRAYS_W2: readonly NestedArrayEntry[] = [
       'the departments of the year, cut to the most a division of the ceiling names; departmentsTotal says how many there are',
     removeWhen: 'Review when DEPARTMENTS_LISTED_MAX changes or the answer is paged.',
   },
+  {
+    key: 'provisioningTaskList#actingItAdmins',
+    classification: 'bounded',
+    findings: [],
+    owner: 'licensing-provisioning-task-read-contracts',
+    businessMaximum: {
+      maxItems: 2,
+      source: 'ACTING_IT_ADMINS_MAX in provisioning.policy.ts (at most one usable in-charge and one usable substitute)',
+    },
+    rationale: 'Acting IT Admins of the task department shown on each summary row.',
+    removeWhen: 'Review when ACTING_IT_ADMINS_MAX changes.',
+  },
+  {
+    key: 'provisioningTaskGet#task.actingItAdmins',
+    classification: 'bounded',
+    findings: [],
+    owner: 'licensing-provisioning-task-read-contracts',
+    businessMaximum: {
+      maxItems: 2,
+      source: 'ACTING_IT_ADMINS_MAX in provisioning.policy.ts (at most one usable in-charge and one usable substitute)',
+    },
+    rationale: 'Acting IT Admins of the task department shown on the task detail.',
+    removeWhen: 'Review when ACTING_IT_ADMINS_MAX changes.',
+  },
+  {
+    key: 'deviceGet#openReturnTask.actingItAdmins',
+    classification: 'bounded',
+    findings: [],
+    owner: 'g7-device-registry-acknowledgement',
+    businessMaximum: {
+      maxItems: 2,
+      source:
+        'OPEN_RETURN_TASK_ACTING_IT_ADMINS_MAX in registry.dto.ts (at most one usable in-charge and one usable substitute)',
+    },
+    rationale: 'Acting IT Admins for an open device return task shown on device detail.',
+    removeWhen: 'Review when OPEN_RETURN_TASK_ACTING_IT_ADMINS_MAX changes.',
+  },
+  {
+    key: 'deviceReturnTaskList#actingItAdmins',
+    classification: 'bounded',
+    findings: [],
+    owner: 'g7-device-registry-acknowledgement',
+    businessMaximum: {
+      maxItems: 2,
+      source:
+        'OPEN_RETURN_TASK_ACTING_IT_ADMINS_MAX in registry.dto.ts (at most one usable in-charge and one usable substitute)',
+    },
+    rationale: 'Acting IT Admins for an open device return task shown on each return task list item.',
+    removeWhen: 'Review when OPEN_RETURN_TASK_ACTING_IT_ADMINS_MAX changes.',
+  },
 ];

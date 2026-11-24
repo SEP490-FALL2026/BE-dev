@@ -93,7 +93,7 @@ export class DepartmentSoftwareController {
   @ApiSuccessResponse(DepartmentSoftwareChangesResponseDto, {
     message: 'DEPARTMENT_SOFTWARE.CHANGED',
     description:
-      'Only an IT Admin in charge of the department changes its list. The entries to take out are removed first, then the places to add are written (up to 50 of each), in one transaction: a place that is not in the catalog (422), one that is already listed (409) or an entry that is not in this department (404) refuses the whole call and writes nothing. The answer lists the entries written, with their ids, and the ids taken out. The Audit Trail records each place added or taken out.',
+      'Only an acting IT Admin (in charge or appointed substitute) of the department changes its list. The entries to take out are removed first, then the places to add are written (up to 50 of each), in one transaction: a place that is not in the catalog (422), one that is already listed (409) or an entry that is not in this department (404) refuses the whole call and writes nothing. The answer lists the entries written, with their ids, and the ids taken out. The Audit Trail records each place added or taken out.',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,
@@ -101,7 +101,7 @@ export class DepartmentSoftwareController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'Not an IT Admin (AUTHORIZATION.FORBIDDEN), or an IT Admin who is not in charge of this department (DEPARTMENT.OUT_OF_SCOPE).',
+        'Not an IT Admin (AUTHORIZATION.FORBIDDEN), or not an acting IT Admin (in charge or appointed substitute) of this department (DEPARTMENT.OUT_OF_SCOPE).',
       examples: [FORBIDDEN_EXAMPLE, LICENSING_ERROR_EXAMPLES.DEPARTMENT_OUT_OF_SCOPE],
     },
     {

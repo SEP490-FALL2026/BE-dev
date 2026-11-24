@@ -14,11 +14,15 @@ import { returnOutcomeOf } from './decision.policy';
 import {
   GhostSeatAlreadyReturnedError,
   GhostSeatDecisionNotFoundError,
+  GhostSeatDecisionNotInChargeError,
   GhostSeatNotReturnableError,
   GhostSeatTaskInProgressError,
 } from './decision.errors';
 import { DECISION_REFERENCE_KIND } from './decision-reclaim.service';
 import type { FollowUpDay } from './decision.types';
+
+const isNonReturnableRecord = (record: GhostSeatRecord): boolean =>
+  record.group === 'G2' || record.group === 'G1' || record.state !== 'RECLAIM_DECIDED' || record.assignmentId === null;
 
 /**
  * The IT Admin cannot do what the head decided to reclaim and gives it back, once (`OI-02`, `US-10-06` AC-10): the reason of the head is
@@ -50,15 +54,12 @@ export class DecisionReturnService {
       const record = await this.repo.lock(tx, id);
       const day = await this.followUp.dayOf(now);
       if (!record || !day || record.organizationId !== day.organizationId) throw new GhostSeatDecisionNotFoundError();
+      const acting = await this.ghostSeats.actingItAdminsFor(tx, record.departmentId, record.employeeId, day.today);
+      if (!acting.actors.includes(actor.employeeId)) throw new GhostSeatDecisionNotInChargeError();
+      const byInCharge = acting.inCharge === actor.employeeId;
+      const bySubstitute = acting.substitute === actor.employeeId;
       if (record.returnCount === 1) throw new GhostSeatAlreadyReturnedError();
-      if (
-        record.group === 'G2' ||
-        record.group === 'G1' ||
-        record.state !== 'RECLAIM_DECIDED' ||
-        record.assignmentId === null
-      ) {
-        throw new GhostSeatNotReturnableError();
-      }
+      if (isNonReturnableRecord(record) || record.assignmentId === null) throw new GhostSeatNotReturnableError();
       const withdrawn = await this.licensing.withdrawRevocationReason(tx, actor, {
         assignmentId: record.assignmentId,
         source: 'GHOST_SEAT',
@@ -76,7 +77,7 @@ export class DecisionReturnService {
         taskId: withdrawn.taskId ?? record.revocationTaskId,
       });
 
-      return this.handBack(tx, actor, record, day, outcome);
+      return this.handBack(tx, actor, record, day, { outcome, byInCharge, bySubstitute });
     });
   }
 
@@ -85,15 +86,12 @@ export class DecisionReturnService {
     actor: AuthenticatedPrincipal,
     record: GhostSeatRecord,
     day: FollowUpDay,
-    outcome: 'CANCELLED' | 'CONTINUES',
+    handoff: { outcome: 'CANCELLED' | 'CONTINUES'; byInCharge: boolean; bySubstitute: boolean },
   ): Promise<GhostSeatRecord> {
     const departmentId = record.deciderDepartmentId;
     const head = departmentId
       ? (await this.organizationReads.getDepartmentHeads([departmentId], day.today, tx)).get(departmentId)
       : undefined;
-    const inCharge = departmentId
-      ? await this.organizationReads.getItAdminInChargeOfDepartment(departmentId, tx)
-      : null;
     const updated = await this.ghostSeats.transition(
       tx,
       record,
@@ -106,7 +104,12 @@ export class DecisionReturnService {
       },
       'GHOST_SEAT.RETURNED',
       { kind: 'USER', principal: actor },
-      { byInCharge: inCharge === actor.employeeId, taskOutcome: outcome, referenceKind: DECISION_REFERENCE_KIND },
+      {
+        byInCharge: handoff.byInCharge,
+        ...(handoff.bySubstitute ? { bySubstitute: true } : {}),
+        taskOutcome: handoff.outcome,
+        referenceKind: DECISION_REFERENCE_KIND,
+      },
     );
     await this.tell(tx, updated, day.organizationId, head?.employeeId ?? null);
 

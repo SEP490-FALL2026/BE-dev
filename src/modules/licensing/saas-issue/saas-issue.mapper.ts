@@ -28,7 +28,7 @@ export function toSummary(record: SaasIssueRecord, names: IssueNames): SaasIssue
     title: issueTitleOf(record.description),
     reporter: names.employee(record.reporterEmployeeId),
     department: names.department(record.reporterEmployeeId),
-    assignedItAdmin: names.employee(record.assignedItAdminEmployeeId),
+    assignedItAdmin: record.assignedItAdminEmployeeId ? names.employee(record.assignedItAdminEmployeeId) : null,
     responseDueOn: record.responseDueOn,
     overdue: isResponseOverdue({ state: record.state, responseDueOn: record.responseDueOn, today: names.today }),
     createdAt: record.createdAt.toISOString(),

@@ -48,3 +48,11 @@ export class GhostSeatRuleRunBusyError extends Error {
     this.name = 'GhostSeatRuleRunBusyError';
   }
 }
+
+/** Only an acting IT Admin of the holder’s department (usable in-charge or appointed substitute) may act on this recommendation. */
+export class GhostSeatNotInChargeError extends Error {
+  constructor() {
+    super('Only the acting IT Admin of the holder’s department may act on this recommendation.');
+    this.name = 'GhostSeatNotInChargeError';
+  }
+}

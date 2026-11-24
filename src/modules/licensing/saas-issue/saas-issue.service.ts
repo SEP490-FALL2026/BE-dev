@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -30,9 +31,10 @@ export interface SubmitIssueInput {
 
 /**
  * The report of an error in a SaaS right and what the reporter does with it afterwards (`US-07-10`): sending it for a right that is
- * theirs, adding to it, reopening it in time. The report is given to exactly one IT Admin when it is made (the one in charge of the
- * department of the reporter when they can act, else the first who can) and the day it should be taken up by is fixed then. Nothing
- * about the assignment, the grant task or a request is changed and nothing is sent to the vendor. Throws SaasIssueError.
+ * theirs, adding to it, reopening it in time. The report is given to the acting IT Admin of the reporter's work department
+ * (substitute if appointed, else the one in charge), or created unassigned awaiting an IT Admin when nobody can act for that
+ * department, and the day it should be taken up by is fixed then. Nothing about the assignment, the grant task or a request is
+ * changed and nothing is sent to the vendor. Throws SaasIssueError.
  */
 @Injectable()
 export class SaasIssueService {
@@ -63,8 +65,13 @@ export class SaasIssueService {
         today,
       });
       if (refusal || !facts) throw new SaasIssueError(refusal ?? 'ASSIGNMENT_NOT_YOURS');
-      const assignee = await this.assigneeFor(tx, actor.employeeId, today);
-      if (!assignee) throw new SaasIssueError('NO_IT_ADMIN');
+      const { departmentId, assignee } = await resolveDepartmentAssignee(
+        this.organizationReads,
+        this.identity,
+        tx,
+        actor.employeeId,
+        today,
+      );
 
       const issue = await this.issues.insert(tx, await this.issues.nextCode(tx, today.slice(0, 4)), {
         organizationId: organization.id,
@@ -75,8 +82,8 @@ export class SaasIssueService {
         impact: input.impact,
         description: input.description.trim(),
         occurredAt: input.occurredAt,
-        assignedItAdminEmployeeId: assignee.employeeId,
-        assignedByFallback: assignee.byFallback,
+        assignedItAdminEmployeeId: assignee?.employeeId ?? null,
+        assignedByFallback: assignee?.byFallback ?? false,
         responseDueOn,
       });
       // The description is free text a person may have put a secret in: the event keeps what it is about, not what was written.
@@ -96,10 +103,26 @@ export class SaasIssueService {
           responseDueOn: issue.responseDueOn,
         }),
       );
-      await this.notifier.submitted(tx, issue, facts.planId);
+      if (assignee !== null) {
+        await this.notifier.submitted(tx, issue, facts.planId);
+      } else {
+        await this.notifyAwaiting(tx, issue, facts.planId, departmentId);
+      }
 
       return issue;
     });
+  }
+
+  private async notifyAwaiting(
+    tx: DbTx,
+    issue: SaasIssueRecord,
+    planId: string,
+    departmentId: string | null,
+  ): Promise<void> {
+    const superAdminId = await this.identity.findUsableSuperAdminEmployeeId(tx);
+    if (superAdminId !== null) {
+      await this.notifier.awaitingAssignee(tx, issue, planId, departmentId, superAdminId);
+    }
   }
 
   /**
@@ -204,19 +227,32 @@ export class SaasIssueService {
       return updated;
     });
   }
+}
 
-  /** The IT Admin in charge of the department of the reporter when they can act, else the first IT Admin who can. */
-  private async assigneeFor(tx: DbTx, reporterEmployeeId: string, today: string) {
-    const inCharge =
-      (await this.organizationReads.getItAdminInCharge(reporterEmployeeId, today, tx))?.itAdminEmployeeId ?? null;
-    const usable = inCharge ? (await this.identity.findUsableItAdminEmployeeIds([inCharge], tx)).has(inCharge) : false;
+/** Resolves the reporter's work department and its acting IT Admin (substitute if appointed, else usable in-charge). */
+export async function resolveDepartmentAssignee(
+  organizationReads: OrganizationReadApi,
+  identity: IdentityAccessApi,
+  tx: DbTx,
+  reporterEmployeeId: string,
+  today: BusinessDate,
+): Promise<{ departmentId: string | null; assignee: { employeeId: string; byFallback: boolean } | null }> {
+  const departmentId =
+    (await organizationReads.workDepartmentsOf([reporterEmployeeId], today, tx)).get(reporterEmployeeId) ?? null;
+  if (departmentId === null) return { departmentId: null, assignee: null };
 
-    return assigneeOf({
-      inChargeEmployeeId: inCharge,
-      inChargeUsable: usable,
-      fallbackEmployeeId: usable ? null : await this.identity.findFirstUsableItAdminEmployeeId(tx),
-    });
-  }
+  const acting = (
+    await organizationReads.itAdminsActingFor(
+      [departmentId],
+      (ids) => identity.findUsableItAdminEmployeeIds(ids, tx),
+      tx,
+    )
+  ).get(departmentId);
+
+  return {
+    departmentId,
+    assignee: acting ? assigneeOf({ inCharge: acting.inCharge, substitute: acting.substitute }) : null,
+  };
 }
 
 /** Who speaks: the reporter on their own report, or an IT Admin; anyone else has no such report. */

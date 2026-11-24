@@ -193,57 +193,36 @@ describe('reporting an error in a SaaS right (integration, real PostgreSQL)', ()
     expect(await h.issueCount()).toBe(before);
   });
 
-  describe('who a report is given to', () => {
-    const expectedFallback = async (): Promise<string> =>
-      (
-        await h.ctx.sql.query<{ id: string }>(
-          `SELECT e.id FROM employees e
-             JOIN app_users u ON u.employee_id = e.id AND u.status = 'ACTIVE' AND u.activation_state = 'ACTIVATED'
-             JOIN role_grants g ON g.app_user_id = u.id AND g.role = 'IT_ADMIN' AND g.revoked_at IS NULL
-            ORDER BY e.employee_code LIMIT 1`,
-        )
-      ).rows[0].id;
-
-    it('gives it to the first IT Admin who can act when the department has none in charge', async () => {
-      await h.staff(await h.departmentWithUnit('P-SIX'), 'E-AAA-IT', 'IT_ADMIN');
-      const { member, assignmentId } = await reporter(null);
+  describe('who a report is given to (W2-27 H6, W2-Q10)', () => {
+    it('gives it to the appointed substitute over the IT Admin in charge, with assignedByFallback true', async () => {
+      const sub = await h.staff(await h.departmentWithUnit('P-SISUB'), 'E-SUB-IT', 'IT_ADMIN');
+      const { department, member, assignmentId } = await reporter(it1);
+      await h.ctx.sql.query(
+        `INSERT INTO department_it_substitutes (id, department_id, substitute_employee_id, reason, appointed_by_app_user_id)
+         VALUES (gen_random_uuid(), $1, $2, 'Temporary cover', $3)`,
+        [department.id, sub.employeeId, h.it1.appUserId],
+      );
 
       const issue = await h.reported(member.account, assignmentId);
 
       expect(issue.assignedByFallback).toBe(true);
-      expect(issue.assignedItAdmin.employeeId).toBe(await expectedFallback());
-      expect(issue.assignedItAdmin.employeeCode).toBe('E-AAA-IT');
+      expect(issue.assignedItAdmin?.employeeId).toBe(sub.employeeId);
       expect((await h.issueRow(issue.id)).assigned_by_fallback).toBe(true);
     });
 
-    it('gives it to the first who can act when the one in charge cannot', async () => {
+    it('creates an unassigned NEW report when nobody acts for the department (no in-charge, or unusable)', async () => {
       const retired = await h.staff(await h.departmentWithUnit('P-SIY'), 'E-ZZZ-OLD');
-      const { member, assignmentId } = await reporter(retired);
+      for (const inCharge of [null, retired]) {
+        const { member, assignmentId } = await reporter(inCharge);
 
-      const issue = await h.reported(member.account, assignmentId);
+        const issue = await h.reported(member.account, assignmentId);
 
-      expect(issue).toMatchObject({ assignedByFallback: true });
-      expect(issue.assignedItAdmin.employeeId).toBe(await expectedFallback());
-    });
-
-    it('refuses the report when no IT Admin can act, and writes nothing', async () => {
-      const { member, assignmentId } = await reporter(null);
-      const grants = (
-        await h.ctx.sql.query<{ id: string }>(
-          `UPDATE role_grants SET revoked_at = now() WHERE role = 'IT_ADMIN' AND revoked_at IS NULL RETURNING id`,
-        )
-      ).rows.map((row) => row.id);
-      const before = await h.issueCount();
-      try {
-        const response = await h.submitIssue(h.issueBody(assignmentId), member.account);
-
-        expect({ status: response.status, code: h.codeOf(response) }).toEqual({
-          status: 409,
-          code: 'SAAS_ISSUE.NO_IT_ADMIN',
+        expect(issue).toMatchObject({ state: 'NEW', assignedItAdmin: null, assignedByFallback: false });
+        expect(await h.issueRow(issue.id)).toMatchObject({
+          state: 'NEW',
+          assigned_it_admin_employee_id: null,
+          assigned_by_fallback: false,
         });
-        expect(await h.issueCount()).toBe(before);
-      } finally {
-        await h.ctx.sql.query(`UPDATE role_grants SET revoked_at = NULL WHERE id = ANY($1::uuid[])`, [grants]);
       }
     });
   });

@@ -224,7 +224,7 @@ describe('handling a report of an error in a SaaS right (integration, real Postg
 
     const taken = await moved(issue.id, { to: 'IN_PROGRESS' }, it2.account);
 
-    expect(taken.assignedItAdmin.employeeId).toBe(it1.employeeId);
+    expect(taken.assignedItAdmin?.employeeId).toBe(it1.employeeId);
     const [event] = await h.issueEvents('SAAS_ISSUE.TRANSITIONED', issue.id);
     expect(event).toMatchObject({ actor_app_user_id: it2.account.appUserId });
     expect(event.after).toMatchObject({ onBehalfOf: it1.employeeId });

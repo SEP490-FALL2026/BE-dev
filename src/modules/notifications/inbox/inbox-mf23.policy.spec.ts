@@ -1,5 +1,6 @@
 import type { InAppNotificationInput } from '../public/notifications.types';
 import { refuseInAppNotification } from './inbox.policy';
+import { notificationTarget } from './notification-target.policy';
 
 const notice = (overrides: Partial<InAppNotificationInput> = {}): InAppNotificationInput => ({
   organizationId: '22222222-2222-4222-8222-222222222222',
@@ -115,6 +116,21 @@ describe('the notices of MF-2 and MF-3 and of what goes with them (QĐ-110, QĐ-
         dueOn: '2026-11-19',
       },
     ],
+    [
+      'DEVICE_RETURN_OVERDUE',
+      { taskId: ID, deviceId: OTHER, assetCode: 'LAP-26-0001', employeeId: OTHER, dueOn: '2026-11-19' },
+    ],
+    [
+      'DEVICE_RETURN_WAITING',
+      {
+        taskId: ID,
+        deviceId: OTHER,
+        assetCode: 'LAP-26-0001',
+        employeeId: OTHER,
+        departmentId: null,
+        dueOn: '2026-11-19',
+      },
+    ],
   ];
 
   it.each(cases)('accepts %s with the keys of its code', (code, params) => {
@@ -132,5 +148,17 @@ describe('the notices of MF-2 and MF-3 and of what goes with them (QĐ-110, QĐ-
       reason: 'PARAM_KEY_NOT_ALLOWED',
       key: 'amount',
     });
+  });
+
+  it('targets deviceReturnTaskList only for IT_ADMIN and SUPER_ADMIN on return task notices', () => {
+    for (const code of ['DEVICE_RETURN_OVERDUE', 'DEVICE_RETURN_WAITING'] as const) {
+      for (const role of ['IT_ADMIN', 'SUPER_ADMIN'] as const) {
+        expect(notificationTarget(code, { type: 'DEVICE_RETURN_TASK', id: ID }, { taskId: ID }, [role])).toEqual({
+          operationId: 'deviceReturnTaskList',
+          pathParams: {},
+        });
+      }
+      expect(notificationTarget(code, { type: 'DEVICE_RETURN_TASK', id: ID }, { taskId: ID }, ['EMPLOYEE'])).toBeNull();
+    }
   });
 });

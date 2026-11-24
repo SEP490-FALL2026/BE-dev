@@ -1,7 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
-import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import { EmployeeNotStartedError, FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import {
   AccessRequestAlreadyHoldsAccessError,
   AccessRequestApplicationRetiredError,
@@ -71,6 +71,7 @@ export const RENEWAL_ERROR_EXAMPLES = {
     }),
   ),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
   OPEN_REQUEST_EXISTS: example(new AccessRequestOpenRequestExistsError('<request-id>')),
   OPEN_LIMIT_REACHED: example(new AccessRequestOpenLimitReachedError(10, '2026-11-16')),
   REQUEST_PARTY_INELIGIBLE: example(

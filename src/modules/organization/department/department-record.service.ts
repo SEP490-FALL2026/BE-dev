@@ -12,8 +12,9 @@ import {
   UsableItAdmins,
 } from '../public/organization.types';
 import { HeadAssignmentError } from './department.errors';
-import { itAdminScope } from './department.policy';
+import { type ItAdminScopeFacts, itAdminActingScope, itAdminScope } from './department.policy';
 import { DepartmentHeadRepo } from './department-head.repo';
+import { DepartmentItCoverageRepo } from './department-it-coverage.repo';
 import { DepartmentRepo } from './department.repo';
 import { DepartmentHeadRecord, DepartmentRecord, HeadPeriodChanges } from './department.types';
 import { HeadPeriodRecord } from '../organization-structure.types';
@@ -30,6 +31,7 @@ export class DepartmentRecordService {
   constructor(
     private readonly departments: DepartmentRepo,
     private readonly heads: DepartmentHeadRepo,
+    private readonly coverage: DepartmentItCoverageRepo,
   ) {}
 
   // --- departments --------------------------------------------------------------------
@@ -79,12 +81,21 @@ export class DepartmentRecordService {
     return this.departments.activeDepartmentsWithoutHead(onDate, tx);
   }
 
-  activeWithItAdmin(
-    tx?: DbTx,
-  ): Promise<
-    { id: string; code: string; name: string; itAdminEmployeeId: string | null; itAdminStatus: EmployeeStatus | null }[]
+  activeWithItAdmin(tx?: DbTx): Promise<
+    {
+      id: string;
+      code: string;
+      name: string;
+      itAdminEmployeeId: string | null;
+      itAdminStatus: EmployeeStatus | null;
+      starting: boolean;
+    }[]
   > {
     return this.departments.activeDepartmentsWithItAdmin(tx);
+  }
+
+  countActiveInChargeExcludingStarting(tx: DbTx, employeeId: string): Promise<number> {
+    return this.departments.countActiveInChargeExcludingStarting(tx, employeeId);
   }
 
   /** `FOR UPDATE` on a department the caller is about to change the head of (the lock protocol: departments in id order first). */
@@ -178,18 +189,42 @@ export class DepartmentRecordService {
   }
 
   /**
-   * The departments an IT Admin reads and handles (`US-01-11`): those that name them in charge (retired ones too) and the active
-   * ones nobody usable is in charge of, whose technical work falls to every IT Admin (`itAdminScope`). An unlocked read; `usableAmong`
-   * tells which of the IT Admins named can act.
+   * The departments an IT Admin may read: those that name them in charge (retired ones too), those where they are the
+   * active usable substitute, and the active ones nobody usable is in charge of (except the starting department).
    */
   async itAdminScopeOf(employeeId: string, usableAmong: UsableItAdmins, tx?: DbTx): Promise<string[]> {
+    const facts = await this.readScopeFacts(usableAmong, tx);
+    const standingIn = itAdminScope(employeeId, facts);
+
+    return [...new Set([...standingIn, ...(await this.idsInChargeOf(employeeId, tx))])];
+  }
+
+  /** The departments an IT Admin may act on: active departments where they are usable in-charge or usable substitute. */
+  async itAdminActingScopeOf(employeeId: string, usableAmong: UsableItAdmins, tx?: DbTx): Promise<string[]> {
+    const facts = await this.readScopeFacts(usableAmong, tx);
+
+    return [...itAdminActingScope(employeeId, facts)];
+  }
+
+  activeItSubstitutesFor(departmentIds: readonly string[], tx?: DbTx) {
+    return this.coverage.activeItSubstitutesFor(departmentIds, tx);
+  }
+
+  private async readScopeFacts(usableAmong: UsableItAdmins, tx?: DbTx): Promise<ItAdminScopeFacts[]> {
     const active = await this.departments.activeDepartmentsWithItAdmin(tx);
-    const usable = await usableAmong(
-      active.flatMap((department) => (department.itAdminEmployeeId ? [department.itAdminEmployeeId] : [])),
-    );
-    const standingIn = itAdminScope(
-      employeeId,
-      active.map((department) => ({
+    const substitutes = await this.coverage.activeItSubstitutes(tx);
+    const subByDept = new Map(substitutes.map((sub) => [sub.departmentId, sub]));
+    const candidateIds = [
+      ...new Set([
+        ...active.flatMap((department) => (department.itAdminEmployeeId ? [department.itAdminEmployeeId] : [])),
+        ...substitutes.map((sub) => sub.substituteEmployeeId),
+      ]),
+    ];
+    const usable = await usableAmong(candidateIds);
+
+    return active.map((department) => {
+      const sub = subByDept.get(department.id);
+      return {
         id: department.id,
         active: true,
         itAdminEmployeeId: department.itAdminEmployeeId,
@@ -198,10 +233,11 @@ export class DepartmentRecordService {
           department.itAdminEmployeeId !== null &&
           department.itAdminStatus === 'ACTIVE' &&
           usable.has(department.itAdminEmployeeId),
-      })),
-    );
-
-    return [...new Set([...standingIn, ...(await this.idsInChargeOf(employeeId, tx))])];
+        substituteEmployeeId: sub?.substituteEmployeeId ?? null,
+        substituteUsable:
+          sub !== undefined && sub.substituteStatus === 'ACTIVE' && usable.has(sub.substituteEmployeeId),
+      };
+    });
   }
 
   /** The active departments each of these employees is named IT Admin in charge of (one read, in code order). */

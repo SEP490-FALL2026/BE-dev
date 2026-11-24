@@ -99,6 +99,14 @@ export const TARGET_BY_CODE: Readonly<Partial<Record<InAppNotificationCode, Rout
   VENDOR_ACCOUNT_DISCREPANCY_OPENED: route('vendorAccountDiscrepancyList'),
   DEVICE_STOP_REQUESTED: route('deviceStopRequestList'),
   DEVICE_STOP_REQUEST_OVERDUE: route('deviceStopRequestList'),
+  SAAS_ISSUE_AWAITING_ASSIGNEE: route('saasIssueList'),
+  DEPARTMENT_IT_SUBSTITUTE_APPOINTED: route('departmentItSubstituteList'),
+  DEPARTMENT_IT_SUBSTITUTE_ENDED: route('departmentItSubstituteList'),
+  DEPARTMENT_IT_COVERAGE_MISSING: route('departmentGet', { id: 'departmentId' }),
+  DEVICE_RETURN_OVERDUE: route('deviceReturnTaskList'),
+  DEVICE_RETURN_WAITING: route('deviceReturnTaskList'),
+  UNPLACED_WORK_WAITING: route('unplacedWorkDesignationList'),
+  UNPLACED_WORK_DESIGNATED: route('unplacedWorkDesignationList'),
 };
 
 /**
@@ -118,9 +126,11 @@ export const ROUTE_READERS: Readonly<Record<string, readonly string[]>> = {
   budgetTable: ['FINANCE', 'SPENDING_APPROVER'],
   budgetVersionGet: ['FINANCE', 'SPENDING_APPROVER'], // service: only Finance and the spending approver read a version
   departmentGet: ['SUPER_ADMIN', 'IT_ADMIN', 'MANAGER'],
+  departmentItSubstituteList: ['SUPER_ADMIN', 'IT_ADMIN'],
   departmentSoftwareProposalList: ['IT_ADMIN', 'MANAGER'],
   departmentTransferGet: ['SUPER_ADMIN', 'IT_ADMIN'],
   departmentWarningList: ['SUPER_ADMIN', 'IT_ADMIN'],
+  deviceReturnTaskList: ['IT_ADMIN', 'SUPER_ADMIN'],
   deviceStopRequestList: ['IT_ADMIN'],
   employeeGet: ['SUPER_ADMIN'],
   ghostSeatExemptionList: ['MANAGER', 'IT_ADMIN'],
@@ -136,6 +146,7 @@ export const ROUTE_READERS: Readonly<Record<string, readonly string[]>> = {
   subscriptionDeadlineEventList: ['IT_ADMIN', 'FINANCE', 'SPENDING_APPROVER', 'SUPER_ADMIN'],
   subscriptionGet: ['IT_ADMIN', 'FINANCE'],
   subscriptionRenewalGet: ['IT_ADMIN', 'FINANCE', 'MANAGER'], // service: the IT Admin, Finance and the head of the owning department
+  unplacedWorkDesignationList: ['SUPER_ADMIN', 'IT_ADMIN'],
   usageSourceList: ['IT_ADMIN'],
   vendorAccountDiscrepancyList: ['IT_ADMIN'],
 };
@@ -159,7 +170,7 @@ export const ALTERNATIVES: Readonly<
 /**
  * By `subject.type` (canonical), tried when the code has no route of its own: one line for each type of the catalogue that has a route
  * to read one record. Not here, for want of such a route: `APPLICATION`, `BUDGET_ADJUSTMENT`, `COST_CENTER`,
- * `DEPARTMENT_SOFTWARE_PROPOSAL`, `DEVICE_STOP_REQUEST`, `HANDOVER_DUTY`, `LICENSE_ASSIGNMENT`, `OUT_OF_PROCESS_CASE`, `TRANSFER_REVIEW`.
+ * `DEPARTMENT_SOFTWARE_PROPOSAL`, `DEVICE_RETURN_TASK`, `DEVICE_STOP_REQUEST`, `HANDOVER_DUTY`, `LICENSE_ASSIGNMENT`, `OUT_OF_PROCESS_CASE`, `TRANSFER_REVIEW`.
  */
 export const TARGET_BY_SUBJECT_TYPE: Readonly<Record<string, RouteRef>> = {
   ACCESS_REQUEST: route('accessRequestGet', { id: 'subject' }),

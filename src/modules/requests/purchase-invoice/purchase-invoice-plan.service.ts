@@ -116,7 +116,7 @@ export class PurchaseInvoicePlanService {
 
   /** Throws PurchaseInvoiceRefusedError('LINK_NOT_FOUND' | 'REQUEST_NOT_PURCHASABLE' | 'NO_VENDOR'). */
   private async factsOf(actor: AuthenticatedPrincipal, form: PurchaseInvoiceFormInput, tx?: DbTx): Promise<LinkFacts> {
-    const scope = await this.organizationReads.getItAdminScope(
+    const scope = await this.organizationReads.getItAdminActingScope(
       actor.employeeId,
       (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
       tx,

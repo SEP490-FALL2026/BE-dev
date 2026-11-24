@@ -27,6 +27,8 @@ export interface ItAdminDashboard {
     ghostSeats: DashboardSection;
     missingInvoicePeriods: DashboardSection;
     outOfProcessRevocationsDue: DashboardSection;
+    deviceReturnTasksOpen: DashboardSection;
+    deviceReturnTasksOverdue: DashboardSection;
   };
 }
 
@@ -61,9 +63,11 @@ export class ItAdminDashboardService {
   async overview(actor: AuthenticatedPrincipal): Promise<ItAdminDashboard> {
     assertHoldsRole(actor.roles, 'IT_ADMIN');
     const today = await this.organizationReads.businessToday();
-    const departmentIds = await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
-      this.identity.findUsableItAdminEmployeeIds(ids),
-    );
+    const usableAmong = (ids: readonly string[]) => this.identity.findUsableItAdminEmployeeIds(ids);
+    const [departmentIds, actingDepartmentIds] = await Promise.all([
+      this.organizationReads.getItAdminScope(actor.employeeId, usableAmong),
+      this.organizationReads.getItAdminActingScope(actor.employeeId, usableAmong),
+    ]);
     const work = await this.licensing.itAdminFacts(actor.employeeId);
     const handovers = await this.personnel.handingOverCases(departmentIds);
     // The progress of the departures and the transfers of the departments in scope; the seats counted are the tasks this IT Admin is in charge of (SPEC P21).
@@ -76,6 +80,8 @@ export class ItAdminDashboardService {
       organizationId: organization?.id ?? null,
       employeeId: actor.employeeId,
       departmentIds,
+      actingDepartmentIds,
+      today,
     });
 
     return {
@@ -98,6 +104,8 @@ export class ItAdminDashboardService {
         missingInvoicePeriods: counted(counts.missingInvoicePeriods, 'purchaseInvoiceMissingPeriodList'),
         // No list answers this number alone: the cases are listed by `outOfProcessCaseList`, each saying in `revocation` whether it is due.
         outOfProcessRevocationsDue: counted(counts.outOfProcessRevocationsDue, null),
+        deviceReturnTasksOpen: counted(counts.deviceReturnTasksOpen, 'deviceReturnTaskList'),
+        deviceReturnTasksOverdue: counted(counts.deviceReturnTasksOverdue, 'deviceReturnTaskList'),
       },
     };
   }

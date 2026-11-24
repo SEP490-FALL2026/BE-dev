@@ -71,6 +71,15 @@ export class OffboardingPeriodsService {
     return false;
   }
 
+  /** Closes any active unplaced-work IT Admin designation when the offboarding case ends. */
+  endUnplacedDesignations(tx: DbTx, caseId: string, endedByAppUserId: string | null): Promise<number> {
+    return this.organization.endUnplacedWorkDesignations(tx, {
+      workKind: 'OFFBOARDING_CASE',
+      workId: caseId,
+      endedByAppUserId,
+    });
+  }
+
   /** The placement is open again and the head of the department is back where it was, as when the case was not yet written. */
   async undo(tx: DbTx, held: Pick<OffboardingRecord, 'placementClosedId' | 'headHandover'>): Promise<void> {
     try {

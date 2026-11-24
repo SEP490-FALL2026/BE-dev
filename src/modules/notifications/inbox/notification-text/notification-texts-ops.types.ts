@@ -31,6 +31,18 @@ export const OPS_TEXTS = {
         'Issue report {issueCode} for {applicationId:name} ({category:enum}, impact {impact:enum}) was sent and assigned to you.',
     },
   },
+  SAAS_ISSUE_AWAITING_ASSIGNEE: {
+    vi: {
+      title: 'Phiếu báo lỗi chờ người tiếp nhận',
+      message:
+        'Phiếu {issueCode} về ứng dụng {applicationId:name} ({category:enum}, ảnh hưởng {impact:enum})[ thuộc phòng {departmentId:name}] chưa có IT Admin nào phụ trách hoặc làm thay để tiếp nhận.',
+    },
+    en: {
+      title: 'Issue report awaiting assignee',
+      message:
+        'Issue report {issueCode} for {applicationId:name} ({category:enum}, impact {impact:enum})[ in {departmentId:name}] has no IT Admin in charge or substitute to take it.',
+    },
+  },
   SAAS_ISSUE_RESPONSE_OVERDUE: {
     vi: {
       title: 'Phiếu báo lỗi quá hạn phản hồi',
@@ -117,6 +129,86 @@ export const OPS_TEXTS = {
       title: 'Collection stop request overdue',
       message:
         'The collection stop request of {holderEmployeeId:name} passed its due date {dueOn:date} without being handled.',
+    },
+  },
+  DEPARTMENT_IT_SUBSTITUTE_APPOINTED: {
+    vi: {
+      title: 'Phân công IT Admin làm thay cho phòng',
+      message:
+        '{substituteEmployeeId:name} được chỉ định làm IT Admin thay thế cho phòng {departmentId:name}[ (thay thế cho {replacedEmployeeId:name})].',
+    },
+    en: {
+      title: 'Department IT Admin substitute appointed',
+      message:
+        '{substituteEmployeeId:name} was appointed as temporary IT Admin substitute for {departmentId:name}[ (replacing {replacedEmployeeId:name})].',
+    },
+  },
+  DEPARTMENT_IT_SUBSTITUTE_ENDED: {
+    vi: {
+      title: 'Kết thúc phân công IT Admin làm thay',
+      message:
+        'Nhiệm vụ IT Admin làm thay của {substituteEmployeeId:name} tại phòng {departmentId:name} đã kết thúc ({endCause:enum}).',
+    },
+    en: {
+      title: 'Department IT Admin substitute ended',
+      message:
+        'The temporary IT Admin substitute assignment of {substituteEmployeeId:name} for {departmentId:name} has ended ({endCause:enum}).',
+    },
+  },
+  DEPARTMENT_IT_COVERAGE_MISSING: {
+    vi: {
+      title: 'Phòng chưa có IT Admin xử lý công việc',
+      message:
+        'Phòng {departmentId:name} hiện chưa có IT Admin phụ trách hoặc làm thay có thể xử lý công việc ({reason:enum}[ — {inChargeEmployeeId:name}]). Vui lòng chỉ định IT Admin phụ trách hoặc làm thay.',
+    },
+    en: {
+      title: 'Department has no acting IT Admin',
+      message:
+        'Department {departmentId:name} has no acting IT Admin in charge or substitute right now ({reason:enum}[ — {inChargeEmployeeId:name}]). Please assign an IT Admin in charge or appoint a substitute.',
+    },
+  },
+  DEVICE_RETURN_OVERDUE: {
+    vi: {
+      title: 'Thu hồi máy quá hạn',
+      message: 'Việc thu hồi máy {assetCode} từ {employeeId:name} đã quá hạn {dueOn:date}.',
+    },
+    en: {
+      title: 'Device return overdue',
+      message: 'Device return for {assetCode} from {employeeId:name} passed its due date {dueOn:date}.',
+    },
+  },
+  DEVICE_RETURN_WAITING: {
+    vi: {
+      title: 'Việc thu hồi máy đang chờ phân công IT',
+      message:
+        'Việc thu hồi máy {assetCode} từ {employeeId:name}[ tại phòng {departmentId:name}] (hạn {dueOn:date}) chưa có IT Admin xử lý.',
+    },
+    en: {
+      title: 'Device return awaiting IT Admin',
+      message:
+        'Device return for {assetCode} from {employeeId:name}[ in {departmentId:name}] (due {dueOn:date}) has no acting IT Admin.',
+    },
+  },
+  UNPLACED_WORK_WAITING: {
+    vi: {
+      title: 'Việc của người chưa xếp phòng đang chờ chỉ định IT',
+      message:
+        'Công việc ({workKind:enum}) của {employeeId:name} chưa có IT Admin xử lý. Vui lòng chỉ định IT Admin cho việc này.',
+    },
+    en: {
+      title: 'Unplaced employee work awaiting IT Admin',
+      message:
+        'Work ({workKind:enum}) for {employeeId:name} has no acting IT Admin. Please designate an IT Admin for it.',
+    },
+  },
+  UNPLACED_WORK_DESIGNATED: {
+    vi: {
+      title: 'Được chỉ định xử lý việc của người chưa xếp phòng',
+      message: 'Bạn được chỉ định làm IT Admin xử lý {workKind:enum} của {employeeId:name}.',
+    },
+    en: {
+      title: 'Designated for unplaced employee work',
+      message: 'You were designated as IT Admin for the {workKind:enum} of {employeeId:name}.',
     },
   },
 } satisfies Partial<Record<InAppNotificationCode, NotificationTexts>>;

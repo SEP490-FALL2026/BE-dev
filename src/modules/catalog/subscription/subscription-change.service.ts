@@ -76,7 +76,6 @@ export class SubscriptionChangeService {
       ? await this.pricing.readOriginal(input.originalPrice)
       : input.originalPrice;
     const organizationId = await this.guard.requireOrganizationId();
-    await this.guard.requireResponsible(input.responsibleItAdminEmployeeId);
 
     const record = await this.runner.run((tx) =>
       this.changeIn(tx, actor, id, { input, money, originalPrice, organizationId, expectedUpdatedAt }),

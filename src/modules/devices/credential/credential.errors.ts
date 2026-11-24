@@ -35,6 +35,13 @@ export class CredentialRegistrationEndedError extends Error {
   }
 }
 
+export class CredentialCollectorNotInstalledError extends Error {
+  constructor() {
+    super('Collector installation must be enabled on this registration before creating an enrollment code.');
+    this.name = 'CredentialCollectorNotInstalledError';
+  }
+}
+
 /** The signed `BM-06` of the registration is not kept: no code is made before the holder has signed. */
 export class CredentialSignatureRecordMissingError extends Error {
   constructor() {

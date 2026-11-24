@@ -24,7 +24,7 @@ const stepStatus = z.enum(['DONE', 'INCOMPLETE', 'BLOCKED', 'NOT_AVAILABLE']);
 const checklistSchema = z.strictObject({
   steps: z.array(
     z.strictObject({
-      step: z.number().int().min(1).max(5),
+      step: z.number().int().min(1).max(6),
       key: z.string(),
       status: stepStatus,
       reasons: z.array(z.string()),
@@ -48,6 +48,10 @@ const checklistSchema = z.strictObject({
             assignments: z.number().int().nonnegative(),
             closed: z.boolean(),
             closedAt: z.iso.datetime().nullable(),
+          }),
+          z.strictObject({
+            initialRecords: z.number().int().nonnegative(),
+            signaturesMissing: z.number().int().nonnegative(),
           }),
         ])
         .optional(),
@@ -81,7 +85,7 @@ export class OnboardingController {
   @ApiSuccessResponse(OnboardingChecklistResponseDto, {
     message: 'ONBOARDING.CHECKLIST_FETCHED',
     description:
-      'The five steps and where each stands, judged from the data that exists. Step 1 says what is missing and which departments lack a head, an IT Admin in charge or a Cost Center (a warning that stops nothing: Finance creates it for a department that exists); step 2 (applications) and step 3 (subscriptions) are done when the catalog holds one; step 4 (seat baseline) is blocked until steps 1 and 3 are done, then ready, and done once closed; step 5 (usage) is not built yet and says so.',
+      'The six steps and where each stands, judged from the data that exists. Step 1 says what is missing and which departments lack a head, an IT Admin in charge or a Cost Center (a warning that stops nothing: Finance creates it for a department that exists); step 2 (applications) and step 3 (subscriptions) are done when the catalog holds one; step 4 (seat baseline) is blocked until steps 1 and 3 are done, then ready, and done once closed; step 5 (usage) is not built yet and says so; step 6 (device initial records) is done once at least one initial device is recorded and no open registration lacks a BM-06 signature (it never blocks closing the seat baseline).',
   })
   @ApiErrorResponses(
     UNAUTHENTICATED_RESPONSE,

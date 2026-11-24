@@ -53,7 +53,7 @@ export class SpendRoutingService {
     const state = request.branch === 'NEW_SOFTWARE' ? 'AWAITING_IT_ASSESSMENT' : 'AWAITING_EXECUTION';
     await this.requests.setState(tx, request.id, state);
     if (request.branch === 'NEW_SOFTWARE') {
-      const assignee = await this.targets.assessmentTarget(tx, request.requesterEmployeeId, now);
+      const assignee = await this.targets.assessmentTarget(tx, request.departmentId);
       await this.requests.addAssessmentStep(tx, request.id, assignee, request.policy.slaWorkingDays, now);
       await this.audit.record(
         tx,

@@ -293,12 +293,16 @@ export class SubscriptionPoolService {
     );
   }
 
-  /** Throws SubscriptionResponsibleNotItAdminError unless the person works, holds the IT Admin role and can sign in. */
-  async requireItAdmin(employeeId: string, tx?: DbTx): Promise<void> {
+  /** Whether the person works, holds the IT Admin role and can sign in. */
+  async isUsableItAdmin(employeeId: string, tx?: DbTx): Promise<boolean> {
     const usable = await this.identity.findUsableItAdminEmployeeIds([employeeId], tx);
     const employee = usable.has(employeeId) ? await this.organizationReads.getEmployee(employeeId, tx) : null;
-    if (employee?.status !== 'ACTIVE' || employee.workState !== 'WORKING') {
-      throw new SubscriptionResponsibleNotItAdminError();
-    }
+
+    return employee?.status === 'ACTIVE' && employee.workState === 'WORKING';
+  }
+
+  /** Throws SubscriptionResponsibleNotItAdminError unless the person works, holds the IT Admin role and can sign in. */
+  async requireItAdmin(employeeId: string, tx?: DbTx): Promise<void> {
+    if (!(await this.isUsableItAdmin(employeeId, tx))) throw new SubscriptionResponsibleNotItAdminError();
   }
 }

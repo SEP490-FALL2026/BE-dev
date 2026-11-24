@@ -8,6 +8,7 @@ import { NoticeRepo } from '../notice/notice.repo';
 import { DeviceRegistrationEndedError, DeviceRegistrationNotFoundError } from '../registry/registry.errors';
 import { RegistryRepo } from '../registry/registry.repo';
 import {
+  DeviceAcknowledgementCollectorNotInstalledError,
   DeviceAcknowledgementNoticeNotCurrentError,
   DeviceAlreadyAcknowledgedError,
   DeviceSignatureRecordMissingError,
@@ -58,6 +59,7 @@ export class AcknowledgementService {
       const current = await this.notices.current(organization.id, tx);
       const block = acknowledgementBlock({
         registrationEnded: registration.endedAt !== null,
+        collectorInstalled: registration.collectorInstalled,
         signatureRecorded: await this.registry.hasSignatureRecord(registrationId, tx),
         currentNoticeId: current?.id ?? null,
         offeredNoticeId: input.noticeVersionId,
@@ -97,6 +99,8 @@ export class AcknowledgementService {
     switch (block) {
       case 'REGISTRATION_ENDED':
         return new DeviceRegistrationEndedError();
+      case 'COLLECTOR_NOT_INSTALLED':
+        return new DeviceAcknowledgementCollectorNotInstalledError();
       case 'SIGNATURE_RECORD_MISSING':
         return new DeviceSignatureRecordMissingError();
       case 'ALREADY_ACKNOWLEDGED':

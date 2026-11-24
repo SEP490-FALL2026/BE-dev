@@ -76,11 +76,12 @@ export class ReturnRequestsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The seat cannot be returned (RETURN_REQUEST.ASSIGNMENT_NOT_RETURNABLE, with the reason in details: it has ended, it is a service account, its plan is not supported, or its grant is not done), it already has a return waiting (RETURN_REQUEST.ALREADY_REQUESTED), a renewal of it waits for its decision (RETURN_REQUEST.RENEWAL_PENDING) or the holder belongs to no department (RETURN_REQUEST.NO_DEPARTMENT). Nothing is written.',
+        'The seat cannot be returned (RETURN_REQUEST.ASSIGNMENT_NOT_RETURNABLE, with the reason in details: it has ended, it is a service account, its plan is not supported, or its grant is not done), it already has a return waiting (RETURN_REQUEST.ALREADY_REQUESTED), a renewal of it waits for its decision (RETURN_REQUEST.RENEWAL_PENDING), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED) or the holder belongs to no department (RETURN_REQUEST.NO_DEPARTMENT). Nothing is written.',
       examples: [
         RETURN_ERROR_EXAMPLES.ASSIGNMENT_NOT_RETURNABLE,
         RETURN_ERROR_EXAMPLES.ALREADY_REQUESTED,
         RETURN_ERROR_EXAMPLES.RENEWAL_PENDING,
+        RETURN_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
         RETURN_ERROR_EXAMPLES.NO_DEPARTMENT,
       ],
     },

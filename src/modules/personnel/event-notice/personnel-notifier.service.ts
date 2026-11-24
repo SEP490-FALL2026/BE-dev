@@ -66,10 +66,11 @@ export class PersonnelNotifier {
     ];
     const heads = await this.organizationReads.getDepartmentHeads(departments, today, tx);
     const recipients = new Set<string>([input.employeeId, ...[...heads.values()].map((head) => head.employeeId)]);
-    // The IT Admin who answers for the department is told a departure was recorded, moved or cancelled, since the block and the revocations follow it.
+    // The acting IT Admins of the department (or Super Admin fallback) are told when a departure is recorded, moved, or cancelled.
     if (IT_ADMIN_TOLD_OF.has(input.eventKind)) {
-      const itAdmin = await this.itAdminOfDeparture(tx, input);
-      if (itAdmin) recipients.add(itAdmin);
+      for (const itAdmin of await this.itAdminsOrSuperAdminOfDeparture(tx, input)) {
+        recipients.add(itAdmin);
+      }
     }
     const occurrence = randomUUID();
     for (const recipient of recipients) {
@@ -132,7 +133,7 @@ export class PersonnelNotifier {
     });
   }
 
-  /** A person left suddenly: the Super Admin and the IT Admin in charge of the department are told (the lock cannot wait). */
+  /** A person left suddenly: notifies the Super Admin and the acting IT Admins of the person's work department. */
   async abruptDeparture(
     tx: DbTx,
     input: Common & { caseId: string; effectiveOn: BusinessDate; lastDayInOffice: BusinessDate },
@@ -143,27 +144,52 @@ export class PersonnelNotifier {
     };
     const eventKey = `ABRUPT_DEPARTURE_RECORDED:${input.caseId}`;
     await this.toSuperAdmin(tx, input.organizationId, 'ABRUPT_DEPARTURE_RECORDED', { ...parameters, eventKey });
-    const inCharge = await this.organizationReads.getItAdminInCharge(input.employeeId, input.lastDayInOffice, tx);
-    const itAdmin = inCharge?.itAdminEmployeeId ?? (await this.identity.findFirstUsableItAdminEmployeeId(tx));
-    if (itAdmin)
+    const deptId =
+      input.departmentId ??
+      (await this.organizationReads.workDepartmentsOf([input.employeeId], input.lastDayInOffice, tx)).get(
+        input.employeeId,
+      ) ??
+      null;
+    if (deptId === null) return;
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [deptId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(deptId);
+    for (const itAdmin of (acting?.actors ?? []).filter((id) => id !== input.employeeId)) {
       await this.tell(tx, input.organizationId, itAdmin, 'ABRUPT_DEPARTURE_RECORDED', { ...parameters, eventKey });
+    }
   }
 
-  /**
-   * The IT Admin a departure is told through (`QĐ-110c`): the one named for the department the person leaves, unless that is the person
-   * themselves (their account is blocked, so the notice would reach nobody who can act), and otherwise the first IT Admin whose account can
-   * act. A case without a department goes to the first one. Null when no IT Admin can act.
-   */
-  async itAdminOfDeparture(
+  /** Usable acting IT Admins (in-charge and active substitute) for the department, excluding the employee. */
+  async actingItAdminsOfDepartment(
     tx: DbTx,
     input: { departmentId: string | null; employeeId: string },
-  ): Promise<string | null> {
-    const named = input.departmentId
-      ? await this.organizationReads.getItAdminInChargeOfDepartment(input.departmentId, tx)
-      : null;
-    if (named !== null && named !== input.employeeId) return named;
+  ): Promise<string[]> {
+    if (input.departmentId === null) return [];
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [input.departmentId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(input.departmentId);
 
-    return (await this.identity.findAllUsableItAdminEmployeeIds(tx)).find((id) => id !== input.employeeId) ?? null;
+    return (acting?.actors ?? []).filter((id) => id !== input.employeeId);
+  }
+
+  /** Acting IT Admins of the department, or the usable Super Admin fallback when none can act. */
+  async itAdminsOrSuperAdminOfDeparture(
+    tx: DbTx,
+    input: { departmentId: string | null; employeeId: string },
+  ): Promise<string[]> {
+    const actors = await this.actingItAdminsOfDepartment(tx, input);
+    if (actors.length > 0) return actors;
+    const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+
+    return superAdmin !== null && superAdmin !== input.employeeId ? [superAdmin] : [];
   }
 
   /**
@@ -188,9 +214,11 @@ export class PersonnelNotifier {
    * The access of a person who is leaving is blocked from today (`QĐ-110b`, `QĐ-110d`, R-1): the system has ended the machines and closed the
    * open requests. The Super Admin is asked to mark the person as left (only while `markLeft`, a person already marked has nothing to mark),
    * and the IT Admin to **block** the company account (item 1a of `BM-08`: reset the password of the mailbox and sign out every session; the
-   * mailbox itself is not locked yet) and to open the revocation by `revocationDueOn`. One notice for each audience, once for the case. The IT
-   * Admin is not asked to block an account they already blocked (`accountLocked`: a case that was already blocked when this release started),
-   * and the person who left is never told as the Super Admin: their account is blocked.
+   * mailbox itself is not locked yet) and to open the revocation by `revocationDueOn`. One notice for each person, once for the case: the
+   * Super Admin who is also the IT Admin who must block the account (the department has no usable IT Admin, so the Super Admin answers for it)
+   * gets one notice with both tasks (`audience` `SUPER_ADMIN_AND_IT_ADMIN`), never two. The IT Admin is not asked to block an account they
+   * already blocked (`accountLocked`: a case that was already blocked when this release started), and the person who left is never told as
+   * the Super Admin: their account is blocked.
    */
   async departureAccessBlocked(
     tx: DbTx,
@@ -202,7 +230,7 @@ export class PersonnelNotifier {
       accountLocked: boolean;
     },
   ): Promise<void> {
-    const notice = (audience: 'SUPER_ADMIN' | 'IT_ADMIN'): NoticeParts => ({
+    const notice = (audience: 'SUPER_ADMIN' | 'IT_ADMIN' | 'SUPER_ADMIN_AND_IT_ADMIN'): NoticeParts => ({
       subject: { type: 'OFFBOARDING_CASE', id: input.caseId },
       params: {
         caseId: input.caseId,
@@ -214,17 +242,20 @@ export class PersonnelNotifier {
       },
       eventKey: `DEPARTURE_ACCESS_BLOCKED:${input.caseId}:${audience}`,
     });
-    if (input.markLeft)
-      await this.toSuperAdmin(
-        tx,
-        input.organizationId,
-        'DEPARTURE_ACCESS_BLOCKED',
-        notice('SUPER_ADMIN'),
-        input.employeeId,
-      );
-    if (input.accountLocked) return;
-    const itAdmin = await this.itAdminOfDeparture(tx, input);
-    if (itAdmin) await this.tell(tx, input.organizationId, itAdmin, 'DEPARTURE_ACCESS_BLOCKED', notice('IT_ADMIN'));
+    const itAdmins = input.accountLocked ? [] : await this.itAdminsOrSuperAdminOfDeparture(tx, input);
+    const notifiedSuperAdmin = input.markLeft
+      ? await this.toSuperAdmin(
+          tx,
+          input.organizationId,
+          'DEPARTURE_ACCESS_BLOCKED',
+          (superAdmin) => notice(itAdmins.includes(superAdmin) ? 'SUPER_ADMIN_AND_IT_ADMIN' : 'SUPER_ADMIN'),
+          input.employeeId,
+        )
+      : null;
+    for (const itAdmin of itAdmins) {
+      if (itAdmin === notifiedSuperAdmin) continue;
+      await this.tell(tx, input.organizationId, itAdmin, 'DEPARTURE_ACCESS_BLOCKED', notice('IT_ADMIN'));
+    }
   }
 
   /**
@@ -249,8 +280,12 @@ export class PersonnelNotifier {
     for (const head of (await this.organizationReads.getDepartmentHeads(departments, input.today, tx)).values())
       if (!audiences.has(head.employeeId)) audiences.set(head.employeeId, 'HEAD');
     for (const departmentId of departments) {
-      const itAdmin = await this.itAdminOfDeparture(tx, { departmentId, employeeId: input.employeeId });
-      if (itAdmin !== null && !audiences.has(itAdmin)) audiences.set(itAdmin, 'IT_ADMIN');
+      for (const itAdmin of await this.itAdminsOrSuperAdminOfDeparture(tx, {
+        departmentId,
+        employeeId: input.employeeId,
+      })) {
+        if (!audiences.has(itAdmin)) audiences.set(itAdmin, 'IT_ADMIN');
+      }
     }
     for (const [recipient, audience] of audiences)
       await this.tell(tx, input.organizationId, recipient, 'TRANSFER_GRACE_STARTED', {
@@ -296,11 +331,11 @@ export class PersonnelNotifier {
       rightCount: number;
     },
   ): Promise<void> {
-    const itAdmin = await this.itAdminOfDeparture(tx, {
+    const itAdmins = await this.itAdminsOrSuperAdminOfDeparture(tx, {
       departmentId: input.toDepartmentId,
       employeeId: input.employeeId,
     });
-    const recipients = new Set<string>([input.employeeId, ...(itAdmin === null ? [] : [itAdmin])]);
+    const recipients = new Set<string>([input.employeeId, ...itAdmins]);
     for (const recipient of recipients)
       await this.tell(tx, input.organizationId, recipient, 'TRANSFER_RIGHTS_REVOKING', {
         subject: { type: 'DEPARTMENT_TRANSFER', id: input.transferId },
@@ -328,43 +363,46 @@ export class PersonnelNotifier {
     return this.toItAdminAndSuperAdmin(tx, input, 'ACCOUNT_LOCK_OVERDUE', notice);
   }
 
-  /**
-   * The milestone of a departure (the block) or of a transfer (the day it takes effect) has come and the IT Admin who leaves still answers for
-   * something in the catalog (`QĐ-110j`, `R-26`): every IT Admin who works is told, once each for the file, since the work is the common queue's.
-   * It never holds the file back. Returns how many were told.
-   */
+  /** Notifies the usable Super Admin when a leaving IT Admin still holds catalog responsibilities. */
   async itHandoverPending(
     tx: DbTx,
     input: { organizationId: string; source: { kind: string; id: string }; employeeId: string; dueOn: BusinessDate },
   ): Promise<number> {
-    let told = 0;
-    for (const recipient of await this.identity.findAllUsableItAdminEmployeeIds(tx)) {
-      const written = await this.tell(tx, input.organizationId, recipient, 'IT_ADMIN_HANDOVER_PENDING', {
-        subject: { type: input.source.kind, id: input.source.id },
-        params: {
-          sourceKind: input.source.kind,
-          sourceId: input.source.id,
-          employeeId: input.employeeId,
-          dueOn: input.dueOn,
-        },
-        eventKey: `IT_ADMIN_HANDOVER_PENDING:${input.source.kind}:${input.source.id}`,
-      });
-      if (written) told += 1;
-    }
+    const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+    if (superAdmin === null || superAdmin === input.employeeId) return 0;
+    const written = await this.tell(tx, input.organizationId, superAdmin, 'IT_ADMIN_HANDOVER_PENDING', {
+      subject: { type: input.source.kind, id: input.source.id },
+      params: {
+        sourceKind: input.source.kind,
+        sourceId: input.source.id,
+        employeeId: input.employeeId,
+        dueOn: input.dueOn,
+      },
+      eventKey: `IT_ADMIN_HANDOVER_PENDING:${input.source.kind}:${input.source.id}`,
+    });
 
-    return told;
+    return written ? 1 : 0;
   }
 
-  /**
-   * The last admin a plan had at the vendor is leaving and nobody else who works administers it (`QĐ-110k`, SPEC T-IT): every IT Admin is told, once
-   * each for the plan and the file, because the plan can no longer be reached at the vendor and the work is the common queue's. Returns how many were told.
-   */
+  /** Notifies active subscription IT Admins of the plan (or the usable Super Admin fallback) when a plan loses its last working vendor admin. */
   async vendorAdminsGone(
     tx: DbTx,
-    input: { organizationId: string; planId: string; applicationId: string; sourceId: string },
+    input: {
+      organizationId: string;
+      planId: string;
+      applicationId: string;
+      sourceId: string;
+      responsibleItAdminEmployeeIds: readonly string[];
+      leavingEmployeeId?: string;
+    },
   ): Promise<number> {
+    let recipients = [...new Set(input.responsibleItAdminEmployeeIds.filter((id) => id !== input.leavingEmployeeId))];
+    if (recipients.length === 0) {
+      const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+      recipients = superAdmin !== null && superAdmin !== input.leavingEmployeeId ? [superAdmin] : [];
+    }
     let told = 0;
-    for (const recipient of await this.identity.findAllUsableItAdminEmployeeIds(tx)) {
+    for (const recipient of recipients) {
       const written = await this.tell(tx, input.organizationId, recipient, 'VENDOR_ADMINS_BELOW_MINIMUM', {
         subject: { type: 'PLAN', id: input.planId },
         params: { planId: input.planId, applicationId: input.applicationId, adminCount: 0 },
@@ -401,6 +439,26 @@ export class PersonnelNotifier {
     });
   }
 
+  /** Notifies the usable Super Admin when an offboarding case opens for a never-placed employee. */
+  async unplacedOffboardingWaiting(
+    tx: DbTx,
+    input: { organizationId: string; caseId: string; employeeId: string },
+  ): Promise<void> {
+    const unplaced = await this.organizationReads.unplacedAmong([input.employeeId], tx);
+    if (!unplaced.has(input.employeeId)) return;
+    const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+    if (superAdmin === null || superAdmin === input.employeeId) return;
+
+    await this.notifications.notifyInApp(tx, {
+      organizationId: input.organizationId,
+      recipientEmployeeId: superAdmin,
+      code: 'UNPLACED_WORK_WAITING',
+      subject: null,
+      params: { workKind: 'OFFBOARDING_CASE', workId: input.caseId, employeeId: input.employeeId },
+      eventKey: `unplacedWork:OFFBOARDING_CASE:${input.caseId}`,
+    });
+  }
+
   /** A person who holds a role that needs someone to take over is leaving: the Super Admin is told, once for each role. */
   async roleHolderLeaving(
     tx: DbTx,
@@ -418,17 +476,17 @@ export class PersonnelNotifier {
     });
   }
 
-  /** The IT Admin of the departure and the Super Admin, a person who is both once and never the person who left; true when a notice was written. */
+  /** Acting IT Admins of the department and the Super Admin, deduplicated and excluding the employee. */
   private async toItAdminAndSuperAdmin(
     tx: DbTx,
     input: Common,
     code: InAppNotificationCode,
     notice: NoticeParts,
   ): Promise<boolean> {
-    const itAdmin = await this.itAdminOfDeparture(tx, input);
+    const itAdmins = await this.actingItAdminsOfDepartment(tx, input);
     const superAdmin = (await this.identity.getSuperAdminHolder(tx))?.employeeId ?? null;
     const recipients = new Set(
-      [itAdmin, superAdmin].filter((id): id is string => id !== null && id !== input.employeeId),
+      [...itAdmins, superAdmin].filter((id): id is string => id !== null && id !== input.employeeId),
     );
     let written = false;
     for (const recipient of recipients) {
@@ -438,17 +496,28 @@ export class PersonnelNotifier {
     return written;
   }
 
-  /** The Super Admin, unless they are `exceptEmployeeId` (the person a departure is about: their account is blocked). */
+  /**
+   * The Super Admin, unless they are `exceptEmployeeId` (the person a departure is about: their account is blocked). The notice may depend on
+   * who the Super Admin is.
+   */
   private async toSuperAdmin(
     tx: DbTx,
     organizationId: string,
     code: InAppNotificationCode,
-    notice: NoticeParts,
+    notice: NoticeParts | ((superAdminEmployeeId: string) => NoticeParts),
     exceptEmployeeId?: string,
-  ): Promise<void> {
+  ): Promise<string | null> {
     const holder = await this.identity.getSuperAdminHolder(tx);
-    if (holder && holder.employeeId !== exceptEmployeeId)
-      await this.tell(tx, organizationId, holder.employeeId, code, notice);
+    if (!holder || holder.employeeId === exceptEmployeeId) return null;
+    await this.tell(
+      tx,
+      organizationId,
+      holder.employeeId,
+      code,
+      typeof notice === 'function' ? notice(holder.employeeId) : notice,
+    );
+
+    return holder.employeeId;
   }
 
   /** True when the notice was written, false when the recipient already has one for this event key. */

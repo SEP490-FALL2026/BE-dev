@@ -3,10 +3,10 @@
 The seed builds real PDFs (contracts, invoices, signed records, receipts) with `pdf-lib`. A PDF written in Vietnamese needs an embedded
 Unicode font, so one is kept here (`SPEC` S23, section 4a, decision Q-D).
 
-| File                   | What                                                                          |
-| ---------------------- | ----------------------------------------------------------------------------- |
-| `NotoSans-Regular.ttf` | Noto Sans Regular, the **static** instance (not the variable `[wdth,wght]`)   |
-| `OFL.txt`              | SIL Open Font License 1.1, verbatim, from the Noto project                    |
+| File                   | What                                                                        |
+| ---------------------- | --------------------------------------------------------------------------- |
+| `NotoSans-Regular.ttf` | Noto Sans Regular, the **static** instance (not the variable `[wdth,wght]`) |
+| `OFL.txt`              | SIL Open Font License 1.1, verbatim, from the Noto project                  |
 
 ## Source
 

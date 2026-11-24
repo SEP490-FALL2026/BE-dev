@@ -211,7 +211,7 @@ export class SubscriptionsController {
   @ApiSuccessResponse(SubscriptionResponseDto, {
     message: 'SUBSCRIPTION.UPDATED',
     description:
-      'The subscription as it is after the change; a new unit price is in dong and nothing is converted; a change of nothing is answered the same and not audited. The plan and the kind cannot change.',
+      'The subscription as it is after the change; a new unit price is in dong and nothing is converted; a change of nothing is answered the same and not audited. The plan and the kind cannot change. The IT Admin who answers for the subscription is not changed here: the Super Admin does it with subscriptionResponsibleItAdminChange (POST /subscriptions/{id}/responsible-it-admin).',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_UPDATE, NOT_FOUND, UPDATE_CONFLICT)
   async update(

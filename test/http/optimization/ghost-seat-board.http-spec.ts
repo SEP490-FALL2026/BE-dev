@@ -7,6 +7,7 @@ import { BoardReclaimService } from '../../../src/modules/optimization/board/boa
 import { BoardSummaryService } from '../../../src/modules/optimization/board/board-summary.service';
 import {
   GhostSeatNotFoundError,
+  GhostSeatNotInChargeError,
   GhostSeatNotReclaimableError,
   GhostSeatPeriodInvalidError,
 } from '../../../src/modules/optimization/board/board.errors';
@@ -278,6 +279,7 @@ describe('ghost seat board routes (no database)', () => {
   it('US-10-05 AC-5: answers the reclaim with the recommendation and the task; the errors of the board and of the gate keep their codes', async () => {
     const url = `/api/v1/ghost-seat-recommendations/${ID}/reclaim`;
     const cases: [Error, number, string][] = [
+      [new GhostSeatNotInChargeError(), 403, 'GHOST_SEAT.NOT_IN_CHARGE'],
       [new GhostSeatNotFoundError(), 404, 'GHOST_SEAT.NOT_FOUND'],
       [new GhostSeatNotReclaimableError(), 409, 'GHOST_SEAT.NOT_RECLAIMABLE'],
       [new RevocationRefusedError('ASSIGNMENT_IS_SERVICE_ACCOUNT'), 409, 'GHOST_SEAT.SEAT_NOT_REVOCABLE'],

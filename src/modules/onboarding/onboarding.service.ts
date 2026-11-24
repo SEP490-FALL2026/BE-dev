@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../catalog/public/catalog.api';
 import { DataImportApi } from '../data-import/public/data-import.api';
+import { DevicesApi } from '../devices/public/devices.api';
 import { IdentityAccessApi } from '../identity-access/public/identity-access.api';
 import { LicensingSeatBaselineApi } from '../licensing/public/licensing-seat-baseline.api';
 import { OrganizationReadApi } from '../organization/public/organization-read.api';
@@ -51,8 +52,21 @@ export interface LaterStep {
   reasons: 'NOT_BUILT_YET'[];
 }
 
+export type DeviceInitialStepReason = 'NO_INITIAL_DEVICE' | 'SIGNATURES_MISSING';
+
+export interface DeviceInitialStep {
+  step: 6;
+  key: 'DEVICE_INITIAL_RECORDS';
+  status: 'DONE' | 'INCOMPLETE';
+  reasons: DeviceInitialStepReason[];
+  facts: {
+    initialRecords: number;
+    signaturesMissing: number;
+  };
+}
+
 export interface OnboardingChecklist {
-  steps: [OrganizationStep, DataStep, DataStep, DataStep, LaterStep];
+  steps: [OrganizationStep, DataStep, DataStep, DataStep, LaterStep, DeviceInitialStep];
 }
 
 /**
@@ -72,16 +86,18 @@ export class OnboardingService {
     private readonly imports: DataImportApi,
     private readonly catalog: CatalogApi,
     private readonly licensingBaseline: LicensingSeatBaselineApi,
+    private readonly devices: DevicesApi,
   ) {}
 
   /** The Super Admin and the IT Admin read it, and nobody else: OnboardingForbiddenError. */
   async checklist(actor: Pick<AuthenticatedPrincipal, 'roles'>): Promise<OnboardingChecklist> {
     assertMayReadChecklist(actor.roles);
-    const [facts, latest, catalog, baseline] = await Promise.all([
+    const [facts, latest, catalog, baseline, deviceProgress] = await Promise.all([
       this.organizationReads.getOnboardingFacts(),
       this.imports.latestEmployeeImport(),
       this.catalog.getOnboardingFacts(),
       this.licensingBaseline.getBaselineProgress(),
+      this.devices.initialRecordProgress(),
     ]);
     const usableItAdmins = await this.identity.findUsableItAdminEmployeeIds(
       facts.departmentsByItAdmin.flatMap((department) =>
@@ -161,6 +177,21 @@ export class OnboardingService {
       },
     };
 
+    const deviceReasons: DeviceInitialStepReason[] = [
+      ...(deviceProgress.initialRecords === 0 ? (['NO_INITIAL_DEVICE'] as const) : []),
+      ...(deviceProgress.signaturesMissing > 0 ? (['SIGNATURES_MISSING'] as const) : []),
+    ];
+    const sixth: DeviceInitialStep = {
+      step: 6,
+      key: 'DEVICE_INITIAL_RECORDS',
+      status: deviceReasons.length === 0 ? 'DONE' : 'INCOMPLETE',
+      reasons: deviceReasons,
+      facts: {
+        initialRecords: deviceProgress.initialRecords,
+        signaturesMissing: deviceProgress.signaturesMissing,
+      },
+    };
+
     return {
       steps: [
         first,
@@ -168,6 +199,7 @@ export class OnboardingService {
         third,
         fourth,
         { step: 5, key: 'USAGE', status: 'NOT_AVAILABLE', reasons: ['NOT_BUILT_YET'] },
+        sixth,
       ],
     };
   }

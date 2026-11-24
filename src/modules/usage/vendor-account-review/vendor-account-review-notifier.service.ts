@@ -34,7 +34,7 @@ export class VendorAccountReviewNotifier {
 
   /**
    * One notice for the whole occasion (the report, the invoice, the day of the collector) when it opened `newCount` differences that were not
-   * there: to the IT Admin in charge of the application when it has one who can still act, else to every IT Admin who can. An occasion with no
+   * there: to the usable IT Admin in charge of the application when assigned, else to the usable Super Admin. An occasion with no
    * new difference tells nobody.
    */
   async opened(
@@ -104,13 +104,14 @@ export class VendorAccountReviewNotifier {
     }
   }
 
-  /** The IT Admin in charge of the application while they can still act; otherwise every IT Admin who can (the same fall back as a proposal of software, `US-01-11`). */
+  /** The usable IT Admin in charge of the application; otherwise the usable Super Admin. */
   private async itAdminsOf(tx: DbTx, applicationId: string | null): Promise<string[]> {
     const inCharge = applicationId ? await this.catalog.getApplicationResponsibleItAdminId(applicationId, tx) : null;
     if (inCharge !== null && (await this.identity.findUsableItAdminEmployeeIds([inCharge], tx)).has(inCharge)) {
       return [inCharge];
     }
 
-    return this.identity.findAllUsableItAdminEmployeeIds(tx);
+    const superAdmin = await this.identity.findUsableSuperAdminEmployeeId(tx);
+    return superAdmin !== null ? [superAdmin] : [];
   }
 }

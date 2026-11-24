@@ -15,9 +15,9 @@ export class AssessmentQueueReachService {
     private readonly identity: IdentityAccessApi,
   ) {}
 
-  /** The departments in scope; narrowed to the one asked for when there is one, empty when that one is out of scope. */
+  /** The departments in acting scope; narrowed to the one asked for when there is one, empty when that one is out of scope. */
   async departmentsOf(actor: AuthenticatedPrincipal, asked?: string): Promise<string[]> {
-    const scope = await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
+    const scope = await this.organizationReads.getItAdminActingScope(actor.employeeId, (ids) =>
       this.identity.findUsableItAdminEmployeeIds(ids),
     );
 

@@ -6,7 +6,7 @@ import {
   RequestPartyIneligibleError,
   requestPartyRefusalBody,
 } from '../../identity-access/public/request-party.errors';
-import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
+import { EmployeeNotFoundError, EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import {
   AssignmentConflictError,
   GrantRequestRefusedError,
@@ -17,6 +17,7 @@ import {
   ProvisioningContractEndedError,
   ProvisioningEvidenceRequiredError,
   ProvisioningPersonalAccountError,
+  ProvisioningPlanBoundToDeviceError,
   ProvisioningReasonRequiredError,
   ProvisioningResponsibleInvalidError,
   ProvisioningResponsibleNotInDepartmentError,
@@ -48,6 +49,7 @@ import {
   ProvisioningItAdminRequiredError,
   ProvisioningK1ChecklistError,
   ProvisioningKeyError,
+  ProvisioningNotInChargeError,
 } from './provisioning.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
@@ -79,6 +81,7 @@ export function toProvisioningApiException(error: unknown): unknown {
     return refuse(CONFLICT, code, error.message);
   }
   if (error instanceof EmployeeNotFoundError) return refuse(HttpStatus.NOT_FOUND, 'EMPLOYEE.NOT_FOUND', error.message);
+  if (error instanceof EmployeeNotStartedError) return refuse(CONFLICT, 'EMPLOYEE.NOT_STARTED', error.message);
   if (error instanceof ProvisioningTypeNotSupportedError) {
     return refuse(CONFLICT, 'PROVISIONING.TYPE_NOT_SUPPORTED', error.message, {
       provisioningType: error.provisioningType,
@@ -197,6 +200,12 @@ export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof LicenseKeyStateError) return refuse(CONFLICT, `LICENSE_KEY.${error.problem}`, error.message);
   // The same answer as the role guard of the route: the policy of the work refuses what the guard would have refused.
   if (error instanceof ProvisioningItAdminRequiredError) return new ApiException(HttpStatus.FORBIDDEN, FORBIDDEN_ERROR);
+  if (error instanceof ProvisioningNotInChargeError) {
+    return refuse(HttpStatus.FORBIDDEN, 'PROVISIONING.NOT_IN_CHARGE', error.message);
+  }
+  if (error instanceof ProvisioningPlanBoundToDeviceError) {
+    return refuse(CONFLICT, 'PROVISIONING.PLAN_BOUND_TO_DEVICE', error.message);
+  }
 
   return toLicensingApiException(error);
 }
@@ -233,6 +242,7 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   EVIDENCE_REQUIRED: example(new ProvisioningEvidenceRequiredError()),
   REASON_REQUIRED: example(new ProvisioningReasonRequiredError()),
   ANOTHER_IT_ADMIN_NEEDED: example(new ProvisioningAnotherItAdminNeededError()),
+  NOT_IN_CHARGE: example(new ProvisioningNotInChargeError()),
   NOT_CLAIMABLE: example(new ProvisioningTaskStateError('NOT_CLAIMABLE')),
   NOT_IN_PROGRESS: example(new ProvisioningTaskStateError('NOT_IN_PROGRESS')),
   NOT_MANUAL: example(new ProvisioningTaskNotManualError()),
@@ -267,6 +277,8 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   KEY_NOT_IN_STORE: example(new LicenseKeyStateError('NOT_IN_STORE')),
   KEY_WITHDRAWN: example(new LicenseKeyStateError('WITHDRAWN')),
   KEY_SUBSCRIPTION_MISMATCH: example(new LicenseKeyStateError('SUBSCRIPTION_MISMATCH')),
+  PLAN_BOUND_TO_DEVICE: example(new ProvisioningPlanBoundToDeviceError()),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
 } as const;
 
 /** The refusals of the grant of a seat, by status, after the request gate of G5 (`US-07-01`). */
@@ -289,6 +301,8 @@ export const PROVISIONING_GRANT_EXAMPLES = {
     example(new SeatApplicationRetiredError()),
     example(new AssignmentConflictError('SEAT_CAPACITY', 0, 2)),
     example(new PurchaseNotAllowedError(2, ['<subscription-id>'])),
+    example(new ProvisioningPlanBoundToDeviceError()),
+    example(new EmployeeNotStartedError()),
   ],
   UNPROCESSABLE: [
     example(new GrantRequestRefusedError('BENEFICIARY_REQUIRED')),

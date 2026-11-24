@@ -49,7 +49,7 @@ export class InternalRegistrationService {
     return this.runner.run(async (tx) => {
       const request = await this.requests.lockById(tx, requestId);
       if (!request) throw new AccessRequestNotFoundError();
-      this.gate.requireAssessor(actor, request);
+      const { bySubstitute } = await this.gate.requireAssessor(tx, actor, request);
       const { assessment, proposal } = await this.gate.requireProposalFacts(tx, requestId);
       const basis = internalRegistrationBasis(assessment, body.dataSensitivity, assessmentScopeOf(proposal));
       if (basis.kind === 'NOT_INTERNAL') throw new InternalRegistrationRefusedError('NOT_INTERNAL');
@@ -83,7 +83,7 @@ export class InternalRegistrationService {
       const standsIn = await this.gate.finishStep(tx, requestId, actor, { now });
       // It was classified internal to get here: that classification stands.
       await this.assessments.complete(tx, requestId, actor.employeeId, now, null);
-      await this.auditRegistered(tx, actor, request, { registered, body, withSpend, standsIn });
+      await this.auditRegistered(tx, actor, request, { registered, body, withSpend, standsIn, bySubstitute });
       await this.startOneStep(tx, actor, requestId, request.routing?.mode === 'ONE_STEP', withSpend, now);
 
       const record = await this.requests.findById(requestId, tx);
@@ -117,6 +117,7 @@ export class InternalRegistrationService {
       body: InternalRegistrationBodyDto;
       withSpend: boolean;
       standsIn: boolean;
+      bySubstitute: boolean;
     },
   ): Promise<void> {
     await this.audit.record(
@@ -133,6 +134,7 @@ export class InternalRegistrationService {
           planId: done.registered.planId,
           withSpend: done.withSpend,
           actingForAssignee: done.standsIn,
+          ...(done.bySubstitute ? { bySubstitute: true } : {}),
         },
       ),
     );

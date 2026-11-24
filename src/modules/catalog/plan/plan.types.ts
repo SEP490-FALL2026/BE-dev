@@ -5,6 +5,8 @@ export type SharingPolicy = 'ALLOWED' | 'NOT_ALLOWED';
 export type WorkspaceRole = 'OWNER' | 'ADMIN';
 export type SeatTracking = 'APPLICABLE' | 'NOT_APPLICABLE';
 export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
+/** How a K4 plan is bound once bought: to an account, to a machine by a key, or bundled with the machine (no key). */
+export type KeyBinding = 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED';
 
 /** The reference price of a plan, in minor units of dong (`QĐ-113a`). */
 export interface ReferencePrice {
@@ -21,6 +23,8 @@ export interface PlanRecord {
   applicationKind: ApplicationKind;
   name: string;
   provisioningType: ProvisioningType;
+  /** How a K4 plan is bound once bought; null for every other kind. */
+  keyBinding: KeyBinding | null;
   pricingModel: PricingModel | null;
   controlLevel: ControlLevel | null;
   revocationNote: string | null;
@@ -88,6 +92,8 @@ export interface WorkspaceProfileView {
 export interface PlanListFilter {
   applicationId?: string;
   provisioningType?: ProvisioningType;
+  /** Only the plans bound this way (K4 plans). */
+  keyBinding?: KeyBinding;
   functionalGroupId?: string;
   /** The catalog status of the application of the plan. */
   status?: 'APPROVED' | 'RETIRED';
@@ -102,6 +108,7 @@ export interface NewPlan {
   applicationId: string;
   name: string;
   provisioningType: ProvisioningType;
+  keyBinding: KeyBinding | null;
   pricingModel: PricingModel | null;
   controlLevel: ControlLevel | null;
   revocationNote: string | null;
@@ -114,6 +121,7 @@ export interface NewPlan {
 export interface PlanChanges {
   name?: string;
   provisioningType?: ProvisioningType;
+  keyBinding?: KeyBinding | null;
   pricingModel?: PricingModel | null;
   controlLevel?: ControlLevel | null;
   revocationNote?: string | null;
@@ -128,6 +136,7 @@ export interface PlanLookup {
   id: string;
   name: string;
   provisioningType: ProvisioningType;
+  keyBinding: KeyBinding | null;
   pricingModel: PricingModel | null;
   sharingPolicy: SharingPolicy | null;
   hasAdminConsole: boolean;

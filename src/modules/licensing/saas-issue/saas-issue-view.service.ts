@@ -189,7 +189,13 @@ export class SaasIssueViewService {
     const reporterIds = [...new Set(records.map((record) => record.reporterEmployeeId))];
     const [people, plans, originals, units] = await Promise.all([
       this.organizationReads.getEmployees([
-        ...new Set(records.flatMap((record) => [record.reporterEmployeeId, record.assignedItAdminEmployeeId])),
+        ...new Set(
+          records.flatMap((record) =>
+            record.assignedItAdminEmployeeId
+              ? [record.reporterEmployeeId, record.assignedItAdminEmployeeId]
+              : [record.reporterEmployeeId],
+          ),
+        ),
       ]),
       this.catalog.getPlanSummariesWithLogo([...new Set(planIdOf.values())]),
       this.issues.findMany(originalIds),

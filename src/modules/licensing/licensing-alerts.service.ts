@@ -4,7 +4,7 @@ import type { DbTx } from '../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../notifications/public/notifications.api';
 import { OrganizationReadApi } from '../organization/public/organization-read.api';
-import { recipientsOf, usableOrNull, type LicensingAlert } from './licensing-alerts.policy';
+import { recipientsOf, type LicensingAlert } from './licensing-alerts.policy';
 
 /**
  * Puts the alerts of the rights into the inbox (`FR-5.14`, item `a03-license-inbox-alerts`), always in the transaction of the
@@ -21,18 +21,30 @@ export class LicensingAlerts {
   ) {}
 
   /** The IT Admins among these people who can act as one today, in one read. */
-  usableItAdmins(employeeIds: readonly (string | null)[]): Promise<ReadonlySet<string>> {
+  usableItAdmins(employeeIds: readonly (string | null)[], tx?: DbTx): Promise<ReadonlySet<string>> {
     const named = recipientsOf(employeeIds);
 
-    return named.length === 0 ? Promise.resolve(new Set<string>()) : this.identity.findUsableItAdminEmployeeIds(named);
+    return named.length === 0
+      ? Promise.resolve(new Set<string>())
+      : this.identity.findUsableItAdminEmployeeIds(named, tx);
   }
 
-  /** The IT Admin in charge of the department while they can act as one; null for no department or nobody usable. */
+  /**
+   * The default acting IT Admin of the department (active substitute or usable in-charge), or the usable Super Admin fallback when none
+   * can act; null when departmentId is null or nobody usable exists.
+   */
   async itAdminOfDepartment(departmentId: string | null, tx?: DbTx): Promise<string | null> {
     if (departmentId === null) return null;
-    const named = await this.organizationReads.getItAdminInChargeOfDepartment(departmentId, tx);
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [departmentId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(departmentId);
+    if (acting?.defaultAssignee) return acting.defaultAssignee;
 
-    return usableOrNull(named, await this.usableItAdmins([named]));
+    return this.identity.findUsableSuperAdminEmployeeId(tx);
   }
 
   /**

@@ -197,7 +197,7 @@ describe('the outcome of a case decided before the one-write rule (integration, 
     );
   });
 
-  it('refuses a non-responsible IT Admin with 403 NOT_RESPONSIBLE when the responsible admin is active, and allows when locked', async () => {
+  it('refuses a non-responsible IT Admin with 403 NOT_RESPONSIBLE whether the responsible admin is active or locked', async () => {
     const other = await handOthersToSecondItAdmin(h);
     const { subscriptionId, id } = await legacy('RENEW', undefined, 0);
     await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $1 WHERE id = $2`, [
@@ -216,6 +216,10 @@ describe('the outcome of a case decided before the one-write rule (integration, 
     ]);
     await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [lockedEmp]);
 
-    await h.outcome(id, { outcome: 'UNCONFIRMED' }).expect(200);
+    const deniedWhileLocked = await h.outcome(id, { outcome: 'UNCONFIRMED' });
+    expect([deniedWhileLocked.status, h.codeOf(deniedWhileLocked)]).toEqual([
+      403,
+      'SUBSCRIPTION_RENEWAL.NOT_RESPONSIBLE',
+    ]);
   });
 });

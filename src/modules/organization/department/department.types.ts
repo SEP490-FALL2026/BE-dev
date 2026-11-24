@@ -53,12 +53,24 @@ export interface HeadPeriodChanges {
   cancelledPeriodIds: string[];
 }
 
+export type ItCoverage = 'IN_CHARGE' | 'SUBSTITUTE' | 'NONE';
+
+export interface DepartmentItSubstituteBrief {
+  id: string;
+  employee: { id: string; fullName: string };
+  appointedAt: Date;
+}
+
 export interface DepartmentView extends DepartmentRecord {
   head: DepartmentHeadRecord | null;
   memberCount: number;
   warnings: DepartmentWarning[];
   /** Whether the IT Admin named still holds the role on a usable account. Meaningful only when `itAdmin` is set. */
   itAdminUsable: boolean;
+  /** Active temporary IT Admin substitute for the department, if any. */
+  itSubstitute: DepartmentItSubstituteBrief | null;
+  /** Current technical coverage state of the department. */
+  itCoverage: ItCoverage;
   /** A signed link to the picture, good for 15 minutes; null when the department has none (`QĐ-113c`). */
   avatarUrl: string | null;
 }

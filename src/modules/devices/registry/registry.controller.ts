@@ -19,19 +19,12 @@ import {
   DevicePageResponseDto,
   DeviceRegistrationListQueryDto,
   DeviceRegistrationPageResponseDto,
-  HolderChangeBodyDto,
-  RetirementBodyDto,
 } from './registry.dto';
 import { REGISTRY_ERROR_EXAMPLES as EXAMPLES, toRegistryApiException } from './registry.http-errors';
 import { RegistryQueryService } from './registry-query.service';
 import { RegistryService } from './registry.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
-const IT_ADMIN_ONLY = {
-  status: HttpStatus.FORBIDDEN,
-  description: 'Only an IT Admin keeps the register of machines.',
-  examples: [FORBIDDEN_EXAMPLE],
-} as const;
 const IT_ADMIN_READS = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin reads the register of machines.',
@@ -54,26 +47,45 @@ export class RegistryController {
   ) {}
 
   @Post()
-  @ApiOperation({ operationId: 'deviceCreate', summary: 'Register a company machine to a holder' })
+  @ApiOperation({ operationId: 'deviceCreate', summary: 'Register a company machine' })
   @ApiSuccessResponse(DeviceDetailResponseDto, {
     status: HttpStatus.CREATED,
     message: 'DEVICE.REGISTERED',
-    description: 'The machine and its registration to the holder, waiting for the holder to acknowledge the notice.',
+    description: 'The machine with a generated asset code, placed in stock or registered to the initial holder.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
-    IT_ADMIN_ONLY,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an IT Admin registers a machine; handing over to an initial holder requires an acting IT Admin of their department (DEVICE.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
+    },
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), the asset code is taken (DEVICE.ASSET_CODE_TAKEN), or the machine has a registration over those days (DEVICE.REGISTRATION_OVERLAP).',
-      examples: [EXAMPLES.HOLDER_NOT_WORKING, EXAMPLES.ASSET_CODE_TAKEN, EXAMPLES.REGISTRATION_OVERLAP],
+        'The holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), has not been placed in a department yet (DEVICE.HOLDER_UNPLACED), has left or is handing over (DEVICE.HOLDER_NOT_WORKING), the serial number is used by another machine (DEVICE.SERIAL_TAKEN), the asset code counter is exhausted (DEVICE.ASSET_CODE_EXHAUSTED), the generated asset code collided (DEVICE.ASSET_CODE_TAKEN), or the machine has an overlapping registration (DEVICE.REGISTRATION_OVERLAP).',
+      examples: [
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
+        EXAMPLES.HOLDER_UNPLACED,
+        EXAMPLES.HOLDER_NOT_WORKING,
+        EXAMPLES.SERIAL_TAKEN,
+        EXAMPLES.ASSET_CODE_EXHAUSTED,
+        EXAMPLES.ASSET_CODE_TAKEN,
+        EXAMPLES.REGISTRATION_OVERLAP,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), the holder does not exist (DEVICE.HOLDER_NOT_FOUND) or the handover day is not between the hire date and today (DEVICE.HANDOVER_DATE_INVALID).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.HOLDER_NOT_FOUND, EXAMPLES.HANDOVER_DATE_INVALID],
+        'The request is invalid (VALIDATION_ERROR), handover fields were given without a holder (DEVICE.HANDOVER_WITHOUT_HOLDER), a bundled plan is invalid (DEVICE_ACTIVATION.PLAN_NOT_BUNDLED), the holder does not exist (DEVICE.HOLDER_NOT_FOUND) or the handover day is not between the hire date and today (DEVICE.HANDOVER_DATE_INVALID).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.HANDOVER_WITHOUT_HOLDER,
+        EXAMPLES.PLAN_NOT_BUNDLED,
+        EXAMPLES.HOLDER_NOT_FOUND,
+        EXAMPLES.HANDOVER_DATE_INVALID,
+      ],
     },
   )
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DeviceCreateBodyDto) {
@@ -138,86 +150,6 @@ export class RegistryController {
   })
   async get(@Param() params: DeviceIdParamDto) {
     try {
-      return await this.queries.get(params.id);
-    } catch (error) {
-      throw toRegistryApiException(error);
-    }
-  }
-
-  @Post(':id/holder-changes')
-  @ApiOperation({ operationId: 'deviceHolderChange', summary: 'Give a company machine to another holder' })
-  @ApiSuccessResponse(DeviceDetailResponseDto, {
-    status: HttpStatus.CREATED,
-    message: 'DEVICE.HOLDER_CHANGED',
-    description:
-      'The open registration ends today and a new one begins for the new holder, who has to acknowledge the notice. A machine nobody holds is registered again.',
-  })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    IT_ADMIN_ONLY,
-    DEVICE_NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The machine is retired (DEVICE.ALREADY_RETIRED), the person already holds it (DEVICE.HOLDER_UNCHANGED), the new holder has left or is handing over (DEVICE.HOLDER_NOT_WORKING), or a registration over those days exists (DEVICE.REGISTRATION_OVERLAP).',
-      examples: [
-        EXAMPLES.ALREADY_RETIRED,
-        EXAMPLES.HOLDER_UNCHANGED,
-        EXAMPLES.HOLDER_NOT_WORKING,
-        EXAMPLES.REGISTRATION_OVERLAP,
-      ],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The request is invalid (VALIDATION_ERROR) or the new holder does not exist (DEVICE.HOLDER_NOT_FOUND).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.HOLDER_NOT_FOUND],
-    },
-  )
-  async changeHolder(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: DeviceIdParamDto,
-    @Body() body: HolderChangeBodyDto,
-  ) {
-    try {
-      await this.registry.changeHolder(actor, params.id, body.holderEmployeeId);
-
-      return await this.queries.get(params.id);
-    } catch (error) {
-      throw toRegistryApiException(error);
-    }
-  }
-
-  @Post(':id/retirements')
-  @ApiOperation({ operationId: 'deviceRetire', summary: 'Take a company machine out of use' })
-  @ApiSuccessResponse(DeviceDetailResponseDto, {
-    status: HttpStatus.CREATED,
-    message: 'DEVICE.RETIRED',
-    description: 'The open registration ends and the machine stays in the register as retired, with the reason.',
-  })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    IT_ADMIN_ONLY,
-    DEVICE_NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description: 'The machine is retired already (DEVICE.ALREADY_RETIRED).',
-      examples: [EXAMPLES.ALREADY_RETIRED],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The request is invalid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
-    },
-  )
-  async retire(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: DeviceIdParamDto,
-    @Body() body: RetirementBodyDto,
-  ) {
-    try {
-      await this.registry.retire(actor, params.id, body.reason);
-
       return await this.queries.get(params.id);
     } catch (error) {
       throw toRegistryApiException(error);

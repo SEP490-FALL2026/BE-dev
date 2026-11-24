@@ -39,12 +39,11 @@ export class RequestStatusRecipientsService {
       const heads = await this.organizationReads.getDepartmentHeads([request.departmentId], today);
       holders.departmentHeadEmployeeId = heads.get(request.departmentId)?.employeeId ?? null;
     }
-    if (request !== null && needs.includes('IT_ADMIN')) {
-      holders.itAdminEmployeeId =
-        (await this.organizationReads.getItAdminInCharge(request.requesterEmployeeId, today))?.itAdminEmployeeId ??
-        null;
+    const actingItAdmins = await this.actingItAdminsOf(needs, request);
+    if (needs.includes('IT_ADMIN')) {
+      holders.itAdminEmployeeId = actingItAdmins?.defaultAssignee ?? null;
     }
-    holders.grantItAdminEmployeeIds = await this.grantItAdminsOf(needs, request);
+    holders.grantItAdminEmployeeIds = await this.grantItAdminsOf(needs, request, actingItAdmins);
     if (needs.includes('FINANCE')) holders.financeEmployeeId = await this.identity.findUsableFinanceEmployeeId();
     if (needs.includes('SUPER_ADMIN'))
       holders.superAdminEmployeeId = await this.identity.findUsableSuperAdminEmployeeId();
@@ -52,19 +51,30 @@ export class RequestStatusRecipientsService {
     return holders;
   }
 
-  /**
-   * Who the grant of a request of this department is told to, as the queue of grants shares it: the IT Admin in charge of the
-   * department when their account can act, otherwise every IT Admin whose account can act.
-   */
-  private async grantItAdminsOf(needs: readonly FactNeed[], request: RequestFacts | null): Promise<string[]> {
-    if (request === null || !needs.includes('GRANT_IT_ADMINS')) return [];
-    const departmentId = request.departmentId;
-    const inCharge = await this.organizationReads.getItAdminInChargeOfDepartment(departmentId);
-    if (inCharge !== null && (await this.identity.findUsableItAdminEmployeeIds([inCharge])).has(inCharge)) {
-      return [inCharge];
-    }
+  private async actingItAdminsOf(needs: readonly FactNeed[], request: RequestFacts | null) {
+    if (request === null || (!needs.includes('IT_ADMIN') && !needs.includes('GRANT_IT_ADMINS'))) return undefined;
 
-    return this.identity.findAllUsableItAdminEmployeeIds();
+    return (
+      await this.organizationReads.itAdminsActingFor([request.departmentId], (ids) =>
+        this.identity.findUsableItAdminEmployeeIds(ids),
+      )
+    ).get(request.departmentId);
+  }
+
+  /**
+   * Who the grant of a request of this department is told to: the acting IT Admins of the department when at least one
+   * can act, otherwise the Super Admin when usable.
+   */
+  private async grantItAdminsOf(
+    needs: readonly FactNeed[],
+    request: RequestFacts | null,
+    actingItAdmins: { actors: readonly string[] } | undefined,
+  ): Promise<string[]> {
+    if (request === null || !needs.includes('GRANT_IT_ADMINS')) return [];
+    if (actingItAdmins && actingItAdmins.actors.length > 0) return [...actingItAdmins.actors];
+    const superAdmin = await this.identity.findUsableSuperAdminEmployeeId();
+
+    return superAdmin ? [superAdmin] : [];
   }
 
   /** Among these employees, those who still work: a person who has left is told nothing. */

@@ -387,4 +387,29 @@ export class GhostSeatRepo {
       select: { group: true, tier: true, state: true, closeReason: true },
     });
   }
+
+  /**
+   * The first `take` unclosed ghost seat recommendations owned by or routed to the department, ordered by id,
+   * and how many there are in all.
+   */
+  async openOfDepartment(
+    departmentId: string,
+    take: number,
+    tx?: DbTx,
+  ): Promise<{ items: { id: string; group: GhostSeatGroup }[]; total: number }> {
+    const db = tx ?? this.prisma;
+    const where: Prisma.GhostSeatRecommendationWhereInput = {
+      state: { not: 'CLOSED' },
+      OR: [{ departmentId }, { deciderDepartmentId: departmentId }],
+    };
+    const rows = await db.ghostSeatRecommendation.findMany({
+      where,
+      select: { id: true, group: true },
+      orderBy: { id: 'asc' },
+      take: Math.max(0, take),
+    });
+    const total = await db.ghostSeatRecommendation.count({ where });
+
+    return { items: rows, total };
+  }
 }

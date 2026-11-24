@@ -31,7 +31,7 @@ export class AssessmentService {
   async save(actor: AuthenticatedPrincipal, requestId: string, body: AssessmentPatchDto): Promise<AssessmentWire> {
     return this.runner.run(async (tx) => {
       const request = await this.gate.lockProposal(tx, requestId);
-      this.gate.requireAssessor(actor, request);
+      const { bySubstitute } = await this.gate.requireAssessor(tx, actor, request);
       const current = await this.gate.requireAssessment(requestId, tx);
       const patch = await this.patches.toPatch(body, current);
 
@@ -45,7 +45,12 @@ export class AssessmentService {
           'ACCESS_REQUEST.ASSESSMENT_SAVED',
           'ACCESS_REQUEST',
           requestId,
-          { requestId, fields: Object.keys(body).join(','), actingForAssignee: standsIn },
+          {
+            requestId,
+            fields: Object.keys(body).join(','),
+            actingForAssignee: standsIn,
+            ...(bySubstitute ? { bySubstitute: true } : {}),
+          },
         ),
       );
 

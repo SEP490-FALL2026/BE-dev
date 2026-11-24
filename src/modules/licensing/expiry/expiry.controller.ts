@@ -83,8 +83,8 @@ export class ExpiryController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'Only an IT Admin starts the revocation, and an IT Admin who is the person revoked waits for another usable IT Admin (PROVISIONING.ANOTHER_IT_ADMIN_NEEDED); with none left they may.',
-      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.ANOTHER_IT_ADMIN_NEEDED],
+        'Only an IT Admin in charge of the holder’s department or their active substitute may start the revocation (AUTHORIZATION.FORBIDDEN, PROVISIONING.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
     },
     {
       status: HttpStatus.NOT_FOUND,
@@ -94,11 +94,12 @@ export class ExpiryController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The right was ended already (ASSIGNMENT_EXPIRY.NOT_OPEN), its end day has not passed (ASSIGNMENT_EXPIRY.NOT_EXPIRED), a renewal sent in time waits for its decision (ASSIGNMENT_EXPIRY.RENEWAL_PENDING), or the revocation gate refuses the kind of grant (REVOCATION.TYPE_NOT_SUPPORTED). Nothing is written.',
+        'The right was ended already (ASSIGNMENT_EXPIRY.NOT_OPEN), its end day has not passed (ASSIGNMENT_EXPIRY.NOT_EXPIRED), a renewal sent in time waits for its decision (ASSIGNMENT_EXPIRY.RENEWAL_PENDING), the holder has not started working in a department yet (EMPLOYEE.NOT_STARTED), or the revocation gate refuses the kind of grant (REVOCATION.TYPE_NOT_SUPPORTED). Nothing is written.',
       examples: [
         EXAMPLES.NOT_OPEN,
         EXAMPLES.NOT_EXPIRED,
         EXAMPLES.RENEWAL_PENDING,
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
         EXAMPLES.REVOCATION_TYPE_NOT_SUPPORTED,
       ],
     },

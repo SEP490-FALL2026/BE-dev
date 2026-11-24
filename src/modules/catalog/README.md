@@ -47,8 +47,12 @@ unitPrice, reportingUnitPrice, billingCycle }`, thuê bao `PERPETUAL` có giá �
 - `SubscriptionPeriodApi` ([public/subscription-period.api.ts](public/subscription-period.api.ts)) — kỳ subscription cho gia hạn
   (licensing): `getPeriods` (cả thuê bao kho; kèm `adjustment` điểm điều chỉnh), `lockPeriod`, `listAdjustmentSubjects` (K2 đang chạy kỳ, chưa nối tiếp, tối đa 500), `recordNextPeriod` (kỳ mới nối chuỗi `renewed_from_id`, một
   lần), `getRenewalAlertRecipient`, `listPaymentSchedules` (PI-2: chu kỳ, ngày thanh toán và IT Admin phụ trách của mọi thuê bao đang chạy kỳ, cho cờ kỳ chưa có hóa đơn của `requests`); lỗi `public/subscription-period.errors.ts`, kiểu `public/subscription-period.types.ts`.
-- `CatalogResponsibilityApi` ([public/catalog-responsibility.api.ts](public/catalog-responsibility.api.ts)) — IT Admin phụ trách (`QĐ-111g`, R-8, R-26) cho bàn giao của IT Admin rời: `countResponsibilitiesOf` (số thuê bao + ứng dụng mỗi người phụ trách), `transferResponsibilities(tx, actor, from, to)` đổi MỌI thuê bao và ứng dụng sang IT Admin khác trong transaction của bên gọi, một Audit mỗi thứ; lỗi `public/catalog-responsibility.errors.ts` (`ResponsibilityHandoverRefusedError`: cùng một người / đích không phải IT Admin đang làm việc), kiểu `public/catalog-responsibility.types.ts`.
-- `public/catalog.types.ts` — `SeatTarget`, `SeatTargetRef`, `PlanSummary`, `PlanRevocationInfo`, `WorkspaceDuty`…
+- `CatalogPlanTermsApi` ([public/catalog-plan-terms.api.ts](public/catalog-plan-terms.api.ts)) — `installLimitOf(planId, tx?)`: giới
+  hạn số máy cài đặt tối đa theo điều khoản gói (tách khỏi `CatalogApi` để giữ ≤ 8 phụ thuộc và tránh vòng `plan → plan-terms →
+subscription → plan`; `licensing/license-key` và `licensing/device-activation` gọi).
+- `CatalogResponsibilityApi` ([public/catalog-responsibility.api.ts](public/catalog-responsibility.api.ts)) — IT Admin phụ trách (`QĐ-111g`, R-8, R-26) cho bàn giao của IT Admin rời: `countResponsibilitiesOf` (số thuê bao + ứng dụng mỗi người phụ trách), `transferResponsibilities(tx, actor, from, to)` đổi MỌI thuê bao và ứng dụng sang IT Admin khác trong transaction của bên gọi, một Audit mỗi thứ; `usableSubscriptionItAdminsOfPlan` đọc IT phụ trách thuê bao active của gói cho cảnh báo `VENDOR_ADMINS_BELOW_MINIMUM`; lỗi `public/catalog-responsibility.errors.ts` (`ResponsibilityHandoverRefusedError`: cùng một người / đích không phải IT Admin đang làm việc), kiểu `public/catalog-responsibility.types.ts`.
+- `public/catalog.types.ts` — `SeatTarget` (kèm `keyBinding`), `SeatTargetRef`, `StockPlan` (kèm `keyBinding`), `PlanSummary`,
+  `PlanRevocationInfo`, `WorkspaceDuty`…
 - `public/catalog.extension-points.ts` — `SeatOccupancyHook` và contract `SeatOccupancyReader`; `SeatBaselinePhaseHook` (`catalog.seat-baseline-phase`) và `SeatBaselinePhase`.
 
 ## Bảng sở hữu
@@ -62,7 +66,7 @@ unitPrice, reportingUnitPrice, billingCycle }`, thuê bao `PERPETUAL` có giá �
 ## Extension point
 
 - Mở: `SeatOccupancyHook` (`catalog.seat-occupancy`, Hook) — bên bind: licensing
-  `assignment/assignment-seat-occupancy.listener.ts` (`seatsOfSubscriptions`: ghế và ghế đang thu hồi của cả trang thuê bao trong một câu; dòng `GET /subscriptions` K2 có `seats`, `EXPIRED` chỉ khi còn ghế). Chưa bind thì `get()` ném lỗi, không để rule đi qua.
+  `assignment/occupancy/assignment-seat-occupancy.listener.ts` (`seatsOfSubscriptions`: ghế và ghế đang thu hồi của cả trang thuê bao trong một câu; dòng `GET /subscriptions` K2 có `seats`, `EXPIRED` chỉ khi còn ghế). Chưa bind thì `get()` ném lỗi, không để rule đi qua.
 - Mở: `SeatBaselinePhaseHook` (`catalog.seat-baseline-phase`, Hook) — bên bind: licensing `seat-baseline/seat-baseline-phase.listener.ts`; cho
   biết baseline đã đóng chưa để chặn trùng thuê bao K2/K4. Chưa bind ⟹ coi như đã đóng (chặn).
 - Không còn đăng ký vào `organization.department-use-readers`: thuê bao không có phòng đứng tên (`QĐ-113g`) nên không chặn việc ngừng phòng.
@@ -94,7 +98,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   kiểu ứng dụng suy từ kiểu cấp của gói (`application-intake.policy.ts`: K5 ⟹ `INTERNAL`, còn lại `SAAS`), mô hình giá do `PlanService` suy (B-5), nhóm chức năng không nêu ⟹ _Khác_; kiểm trùng bằng `duplicateOf` chạy dưới
   `pg_advisory_xact_lock` theo tổ chức (409 `APPLICATION.DUPLICATE` kèm mục đã có). Đứng trên `catalog-entry/` và `plan/`.
 - `application-responsibility/` — chuyển IT Admin phụ trách ứng dụng (`POST /applications/{id}/responsibility-transfer`, khóa dòng ứng dụng,
-  `QĐ-111g`, R-26); `application-responsibility.policy.ts` quyết ai chuyển cho ai.
+  chỉ `SUPER_ADMIN` — IT Admin gọi ⟹ 403 `APPLICATION.RESPONSIBILITY_NOT_YOURS`; `QĐ-111g`, R-26); `application-responsibility.policy.ts` quyết ai chuyển cho ai.
   `responsibility-handover.service.ts` (+ `.policy.ts`) chuyển MỘT LẦN mọi thuê bao và ứng dụng của một IT Admin (facade `CatalogResponsibilityApi`).
 - `application-retirement/` — retire ứng dụng (IT Admin quyết, không ai xác nhận; chặn bởi assignment/subscription); đọc ứng dụng,
   plan và subscription nên đứng trên cả ba; controller, dto, policy, repo, `ApplicationRetirementService`.
@@ -102,18 +106,25 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `catalog-entry/` và `plan/`; `InternalSoftwareRegistrationService` (facade `CatalogApi` gọi).
 - `requestable-software/` — danh mục cho người gửi Request chọn phần mềm/gói trước khi xem trước (`US-05-01` main flow,
   `a01-employee-catalog-selector`): `GET /requestable-applications[/{id}]`, `GET /requestable-plans[/{id}]`, mọi người đăng
-  nhập; projection riêng, không dùng DTO quản trị. Ẩn ứng dụng retired/không có gói/loại ngoài baseline; mỗi dòng nêu
+  nhập; projection riêng, không dùng DTO quản trị. Ẩn ứng dụng retired/không có gói/loại ngoài baseline và chỉ gồm gói
+  `keyBinding IS NULL OR ACCOUNT` (hằng `REQUESTABLE_PLAN`, loại gói `DEVICE_KEY`/`DEVICE_BUNDLED`); mỗi dòng nêu
   `canSubmit` (cổng Cost Center như preview) và trạng thái giá (`SubscriptionFactsService.pricedCyclesOfPlans`, không lộ số
   tiền); gói không có thuê bao có giá nhưng có giá tham chiếu (`QĐ-113a`) vẫn tính là "định giá được" (`referenceCycleOf`: `K1`/`K2` theo tháng, `K4` một lần). `RequestableSoftwareService`, `requestable-software.policy.ts`, repo chỉ `select` trường được phép.
 - `functional-group/` — nhóm chức năng (BR-06.9); `functional-groups.controller.ts`; `FunctionalGroupService`.
 - `plan/` — plan của ứng dụng, workspace profile K2 (US-04-02); `plans.controller.ts`; `PlanService`,
   `PlanWorkspaceService`.
+  Kiểu gắn khóa `plans.key_binding` (`ACCOUNT`/`DEVICE_KEY`/`DEVICE_BUNDLED`, gói `K4` mặc định `ACCOUNT`) ghi qua `plan.repo.ts`;
+  đổi kiểu gắn bị chặn bởi ba lý do của `PLAN.IN_USE_BLOCKS_CHANGE` (đã có thuê bao/ghế/kích hoạt thiết bị); `planList` hỗ trợ lọc
+  `keyBinding`.
   Giá tham chiếu (`QĐ-113a`): `referencePrice { amount, currency }` không bắt buộc ở `POST/PATCH /plans` và gói đầu của `POST /applications` (`null` xóa khi sửa); chỉ `K1`/`K2`/`K4`,
   chỉ VND (`PLAN.REFERENCE_PRICE_NOT_VND`, `PLAN.REFERENCE_PRICE_NOT_APPLICABLE`); CHECK ở bảng (`plans_reference_price_whole/_valid`). Đổi kiểu sang `K5` hoặc giữa
   `K1`/`K2` và `K4` ⟹ xóa giá (nhập lại; audit `PLAN.UPDATED` giữ giá cũ); `K1`↔`K2` giữ. Requestable-software không lộ số (chỉ trạng thái giá).
 - `plan-terms/` — điều khoản, cảnh báo review (US-04-11; ý kiến Business Owner đã gỡ, `QĐ-111g`); `plan-terms.controller.ts`;
   `PlanTermsService`.
-- `subscription/` — subscription và mua đứt (US-04-03, US-04-05), đích ghế, giá; `subscriptions.controller.ts`;
+- `subscription/` — subscription và mua đứt (US-04-03, US-04-05), đích ghế, giá; `subscriptions.controller.ts` (`subscriptionCreate` từ
+  chối gói `DEVICE_BUNDLED` bằng 422 `SUBSCRIPTION.PLAN_HAS_NO_SUBSCRIPTION`; `subscriptionUpdate` không còn nhận
+  `responsibleItAdminEmployeeId`); con `responsible/` (`POST /subscriptions/{id}/responsible-it-admin`,
+  `subscriptionResponsibleItAdminChange`, chỉ `SUPER_ADMIN`, audit `SUBSCRIPTION.RESPONSIBLE_CHANGED`);
   `SubscriptionService`, `SubscriptionChangeService` (đổi subscription; kiểm trước khi ghi ở `SubscriptionChangeGuard`),
   `SeatTargetService`, `seat-guard.policy.ts` (số lượng không dưới ghế đang chiếm); `nextStateOf`, `subscriptionStatusOf`,
   `sameUnitPrice`, `isStaleEdit` là hàm thuần trong `subscription.policy.ts`.

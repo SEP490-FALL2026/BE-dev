@@ -1,6 +1,6 @@
 import { seatIncreaseNoticeOwed, seatIncreaseRecipients } from './subscription-seat-increase.policy';
 
-describe('subscription-seat-increase.policy (QĐ-110v, S-4: the IT Admin of a pool is told when its seats grow)', () => {
+describe('subscription-seat-increase.policy (seat increase notice)', () => {
   describe('seatIncreaseNoticeOwed: only a K2 or K4 pool whose bought seats rise', () => {
     it.each([
       ['K2', 10, 11, true],
@@ -21,27 +21,71 @@ describe('subscription-seat-increase.policy (QĐ-110v, S-4: the IT Admin of a po
     });
   });
 
-  describe('seatIncreaseRecipients: the one who answers for the subscription, or every IT Admin when nobody usable does; never the one who bought', () => {
-    const base = { responsible: 'it-a', usable: new Set(['it-a', 'it-b', 'it-c']), actor: 'it-b' };
-
-    it('tells the IT Admin who answers for the subscription when someone else bought', () => {
-      expect(seatIncreaseRecipients(base)).toEqual(['it-a']);
+  describe('seatIncreaseRecipients: responsible IT Admin if usable, else Super Admin, never the actor', () => {
+    it('notifies the responsible IT Admin when usable and not the actor', () => {
+      expect(
+        seatIncreaseRecipients({
+          responsible: 'it-a',
+          responsibleUsable: true,
+          superAdmin: 'sa-1',
+          actor: 'it-b',
+        }),
+      ).toEqual(['it-a']);
     });
 
-    it('tells nobody when the IT Admin who answers for it is the one who bought', () => {
-      expect(seatIncreaseRecipients({ ...base, actor: 'it-a' })).toEqual([]);
+    it('notifies nobody when the usable responsible IT Admin is the actor', () => {
+      expect(
+        seatIncreaseRecipients({
+          responsible: 'it-a',
+          responsibleUsable: true,
+          superAdmin: 'sa-1',
+          actor: 'it-a',
+        }),
+      ).toEqual([]);
     });
 
-    it('tells every other IT Admin when nobody answers for the subscription', () => {
-      expect(seatIncreaseRecipients({ ...base, responsible: null })).toEqual(['it-a', 'it-c']);
+    it('falls back to Super Admin when no responsible IT Admin is assigned', () => {
+      expect(
+        seatIncreaseRecipients({
+          responsible: null,
+          responsibleUsable: false,
+          superAdmin: 'sa-1',
+          actor: 'it-b',
+        }),
+      ).toEqual(['sa-1']);
     });
 
-    it('tells every other IT Admin when the one who answers for it no longer works as one', () => {
-      expect(seatIncreaseRecipients({ ...base, responsible: 'left', actor: 'it-b' })).toEqual(['it-a', 'it-c']);
+    it('falls back to Super Admin when responsible IT Admin is unusable', () => {
+      expect(
+        seatIncreaseRecipients({
+          responsible: 'left',
+          responsibleUsable: false,
+          superAdmin: 'sa-1',
+          actor: 'it-b',
+        }),
+      ).toEqual(['sa-1']);
     });
 
-    it('tells nobody when nobody else is an IT Admin who works', () => {
-      expect(seatIncreaseRecipients({ responsible: null, usable: new Set(['it-b']), actor: 'it-b' })).toEqual([]);
+    it('notifies nobody when falling back to Super Admin and Super Admin is the actor', () => {
+      expect(
+        seatIncreaseRecipients({
+          responsible: 'left',
+          responsibleUsable: false,
+          superAdmin: 'sa-1',
+          actor: 'sa-1',
+        }),
+      ).toEqual([]);
+    });
+
+    it('notifies nobody when neither responsible IT Admin nor Super Admin is usable', () => {
+      expect(
+        seatIncreaseRecipients({
+          responsible: null,
+          responsibleUsable: false,
+          superAdmin: null,
+          actor: 'it-b',
+        }),
+      ).toEqual([]);
     });
   });
 });

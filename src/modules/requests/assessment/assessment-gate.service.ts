@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
 import type { ChecklistBody, ChecklistVerdict } from '../../policies/public/policy-checklist.types';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
@@ -26,6 +28,8 @@ export class AssessmentGate {
     private readonly steps: AssessmentStepRepo,
     private readonly catalog: CatalogApi,
     private readonly checklists: PolicyChecklistApi,
+    private readonly organizationReads: OrganizationReadApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** The request, locked; AccessRequestNotFoundError when it is not a proposal: a request has an assessment from the proposal on. */
@@ -37,15 +41,32 @@ export class AssessmentGate {
     return request;
   }
 
-  /** Throws AssessmentRefusedError for the person who asked, the person it is for, or a request that is not being assessed. */
-  requireAssessor(actor: AuthenticatedPrincipal, request: AccessRequestRecord): void {
+  /**
+   * Throws AssessmentRefusedError for the person who asked, the person it is for, a request that is not being assessed,
+   * or an IT Admin who is not acting for the requester’s department; reports whether the actor is an appointed substitute.
+   */
+  async requireAssessor(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord,
+  ): Promise<{ bySubstitute: boolean }> {
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [request.departmentId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(request.departmentId);
     const refusal = checkAssessor({
       actorEmployeeId: actor.employeeId,
       requesterEmployeeId: request.requesterEmployeeId,
       beneficiaryEmployeeIds: request.beneficiaryEmployeeIds,
       requestState: request.state,
+      actingItAdminIds: acting?.actors ?? [],
     });
     if (refusal) throw new AssessmentRefusedError(refusal);
+
+    return { bySubstitute: acting?.substitute === actor.employeeId };
   }
 
   async requireAssessment(requestId: string, tx?: DbTx): Promise<AssessmentRecord> {

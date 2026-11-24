@@ -6,6 +6,7 @@ import { RequestPartyEligibilityApi } from '../../identity-access/public/request
 import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { PricingRecord } from '../access-request/access-request.types';
 import { RequestFactsService, type Assessment, type RequestSettings } from '../access-request/request-facts.service';
@@ -135,6 +136,12 @@ export class GroupSubmissionFactsService {
 
     const people = await this.organizationReads.getEmployees(ids, tx);
     const units = await this.organizationReads.getOwningUnits(ids, today, tx);
+    const withoutUnit = ids.filter((id) => !units.has(id));
+    if (withoutUnit.length > 0) {
+      const notStarted = await this.organizationReads.notStartedAmong(withoutUnit, today, tx);
+      const firstNotStarted = withoutUnit.find((id) => notStarted.has(id));
+      if (firstNotStarted) throw new EmployeeNotStartedError(firstNotStarted);
+    }
     const open = await this.requests.openRequestHolders(tx, input.planId, ids);
     const known = new Map(people.map((person) => [person.id, person]));
     // The employees are locked first and their accounts after (employee, then account); checking locks nothing (`D-S21`).

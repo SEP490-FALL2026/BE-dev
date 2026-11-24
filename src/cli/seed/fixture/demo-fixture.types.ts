@@ -4,6 +4,9 @@
  * the business rules name (and the demo accounts through the demo account contract), so a fixture can never say "put this row in
  * that state". Every date is an offset from the business day the dataset is applied on (`ctx.today`).
  */
+import type { DemoDepartmentSubstitute, DemoDevice, DemoNewDevice } from './demo-device-fixture.types';
+
+export type { DemoDepartmentSubstitute, DemoDevice, DemoNewDevice };
 
 export type DemoRole = 'EMPLOYEE' | 'IT_ADMIN' | 'FINANCE' | 'MANAGER';
 
@@ -71,6 +74,8 @@ export interface DemoPlan {
   key: string;
   name: string;
   provisioningType: 'K1' | 'K2' | 'K4' | 'K5';
+  /** K4 only: how the plan is bound once bought (default: to an account). `DEVICE_BUNDLED` has no purchase, no price and no key. */
+  keyBinding?: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED';
   controlLevel?: 'FULL' | 'PARTIAL' | 'UNCONTROLLABLE';
   dataLossOnRemoval: boolean;
   revocationNote?: string;
@@ -329,6 +334,10 @@ export interface DemoKeys {
   subscription: string;
   /** How many keys the store holds; their values are written by the seed, never shared. */
   count: number;
+  /** The cap of activations of each key (default: the install limit in the terms of the plan, else one). */
+  maxActivations?: number;
+  /** The activations the keys already had when they were entered, told while the installation phase is open (a plan bought per machine only). */
+  initialActivationsUsed?: number;
 }
 
 /** One report file of usage the IT Admin in charge of the application imports for a source (`SBF-04a`). */
@@ -396,17 +405,6 @@ export interface DemoRenewal {
   nextPeriod: boolean;
 }
 
-export interface DemoDevice {
-  assetCode: string;
-  holder: string;
-  signature: boolean;
-  acknowledge: boolean;
-  changeTo?: string;
-  retire?: boolean;
-  tools?: ('CLAUDE_CODE' | 'CODEX')[];
-  stop?: 'OPEN' | 'COMPLETED';
-}
-
 export interface DemoMonitoringNotice {
   collected: string;
   notCollected: string;
@@ -460,6 +458,10 @@ export interface DemoFixture {
   usageSources: DemoUsageSource[];
   renewals: DemoRenewal[];
   devices: DemoDevice[];
+  /** The machines bought after the baseline, entered and handed over before the people of the fixture move. */
+  newDevices: DemoNewDevice[];
+  /** Who stands in for a department, named by the Super Admin once the people have moved. */
+  departmentSubstitutes: DemoDepartmentSubstitute[];
   monitoringNotice: DemoMonitoringNotice;
   aiSummaries: string[];
   retiredApplications: string[];

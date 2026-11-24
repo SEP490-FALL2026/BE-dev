@@ -31,7 +31,7 @@ export interface EscalationInput {
  * `escalationVerdictOf` lets through gets the tier _review_ and goes to the queue of the head of its holder's department at once (or waits for
  * one), the way the routing of the hour would have put it; the others are named with their reason and nothing is refused for them. One batch is one
  * transaction: the key is taken first (so the same key again answers the same result and never acts twice), the recommendations are locked by id,
- * then licensing and personnel are read. Any IT Admin may push; the audit says whether it was the one in charge.
+ * then licensing and personnel are read. Only an acting IT Admin of the holder's department (usable in-charge or appointed substitute) may push; the audit says whether it was the one in charge or a substitute.
  * A key that was used before answers the batch it made and judges nothing (the push was judged when it was made); a new batch has its checklist
  * of the step judged before the key is taken (`US-2-O6`): a batch refused for an answer No holds no key, the watch stays as it was, and the
  * answers are kept, at the hour of the push, for each recommendation that was pushed. Throws GhostSeatEscalationKeyReusedError and what the checklist
@@ -95,7 +95,7 @@ export class EscalationService {
   ): Promise<EscalationItemResult[]> {
     const batch = await this.facts.ofBatch(tx, day.today, [...ctx.records.values()]);
     const results: EscalationItemResult[] = [];
-    const inCharge = new Map<string, { allowed: boolean; byInCharge: boolean }>();
+    const inCharge = new Map<string, { allowed: boolean; byInCharge: boolean; bySubstitute: boolean }>();
     for (const recommendationId of ids) {
       const record = ctx.records.get(recommendationId) ?? null;
       const facts = this.facts.of(record, batch);
@@ -125,6 +125,7 @@ export class EscalationService {
           departmentId,
           hasNote: ctx.note !== null,
           byInCharge: access.byInCharge,
+          ...(access.bySubstitute ? { bySubstitute: true } : {}),
         }),
       );
     }
@@ -166,7 +167,13 @@ export class EscalationService {
     actor: AuthenticatedPrincipal,
     day: FollowUpDay,
     record: GhostSeatRecord,
-    facts: { escalationId: string; departmentId: string; hasNote: boolean; byInCharge: boolean },
+    facts: {
+      escalationId: string;
+      departmentId: string;
+      hasNote: boolean;
+      byInCharge: boolean;
+      bySubstitute?: boolean;
+    },
   ): Promise<EscalationItemResult> {
     const raised = await this.ghostSeats.raiseTierEarly(tx, record, { kind: 'USER', principal: actor }, facts);
     const queued = await this.routing.enterQueue(tx, raised, day, {

@@ -3,14 +3,12 @@ import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { AuditApi } from '../../audit/public/audit.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { AssignmentNotOpenError } from '../../licensing/public/licensing.errors';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import type { SystemActor } from '../../licensing/public/licensing.types';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
-import { personnelAuditEvent, personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { TransferClosureService } from './transfer-closure.service';
 import { TransferGraceRepo } from './transfer-grace.repo';
 import { heldOnOrBefore } from './transfer-grace.policy';
@@ -18,6 +16,7 @@ import type { HeldTransfer, SweptRef } from './transfer-grace.types';
 import { TransferRevocationRefusedError } from './transfer-revocation.errors';
 import { snapshotRightOf } from './transfer-snapshot.json';
 import { pictureIdsOf, revocationDue, rightsToTakeBack, sweptOf } from './transfer-sweep.policy';
+import { TransferTellingService } from './transfer-telling.service';
 
 /** How many transfers are read in one statement. */
 const PAGE = 200;
@@ -60,9 +59,9 @@ export class TransferRevocationService {
     private readonly graces: TransferGraceRepo,
     private readonly organization: OrganizationApi,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly identity: IdentityAccessApi,
     private readonly licensing: LicensingApi,
-    private readonly audit: AuditApi,
-    private readonly notifier: PersonnelNotifier,
+    private readonly telling: TransferTellingService,
     private readonly closing: TransferClosureService,
   ) {}
 
@@ -109,9 +108,16 @@ export class TransferRevocationService {
       await this.organization.lockEmployeeForUpdate(tx, employeeId);
       const held = await this.graces.lock(tx, transferId);
       if (!held) throw new TransferRevocationRefusedError('NOT_FOUND');
+      const access = await this.resolveReopenAccess(tx, actor.employeeId, held);
+      if (!access.inReadScope) throw new TransferRevocationRefusedError('NOT_FOUND');
+      if (!access.isActing) throw new TransferRevocationRefusedError('NOT_IN_CHARGE');
       if (!revocationDue(sweptOf(held), today)) throw new TransferRevocationRefusedError('REVOCATION_NOT_DUE');
 
-      const done = await this.takeBack(tx, held, today, now, { noReopenAfterFailure: false, actor });
+      const done = await this.takeBack(tx, held, today, now, {
+        noReopenAfterFailure: false,
+        actor,
+        bySubstitute: access.bySubstitute,
+      });
       if (done.created + done.reasonAdded === 0) throw new TransferRevocationRefusedError('NOTHING_TO_REVOKE');
 
       return done;
@@ -144,7 +150,7 @@ export class TransferRevocationService {
     held: HeldTransfer,
     today: BusinessDate,
     now: Date,
-    options: { noReopenAfterFailure: boolean; actor: AuthenticatedPrincipal | SystemActor },
+    options: { noReopenAfterFailure: boolean; actor: AuthenticatedPrincipal | SystemActor; bySubstitute?: boolean },
   ): Promise<Omit<TransfersRevoked, 'closed'>> {
     const seats = await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx);
     if (held.snapshotBefore === null) await this.keepPicture(tx, held, seats, today);
@@ -171,9 +177,29 @@ export class TransferRevocationService {
         if (!(error instanceof AssignmentNotOpenError)) throw error;
       }
     }
-    if (done.created + done.reasonAdded > 0) await this.tell(tx, held, done, options.actor);
+    if (done.created + done.reasonAdded > 0) {
+      await this.telling.revocationOpened(tx, held, done, options.actor, options.bySubstitute);
+    }
 
     return done;
+  }
+
+  /** Resolves whether an IT Admin may see or reopen revocations for a department transfer, and whether they act as a substitute. */
+  async resolveReopenAccess(
+    tx: DbTx,
+    actorEmployeeId: string,
+    transfer: { fromDepartmentId: string; toDepartmentId: string },
+  ): Promise<{ inReadScope: boolean; isActing: boolean; bySubstitute: boolean }> {
+    const usableAmong = (ids: readonly string[]) => this.identity.findUsableItAdminEmployeeIds(ids, tx);
+    const readScope = await this.organizationReads.getItAdminScope(actorEmployeeId, usableAmong, tx);
+    const inReadScope = readScope.includes(transfer.fromDepartmentId) || readScope.includes(transfer.toDepartmentId);
+    if (!inReadScope) return { inReadScope: false, isActing: false, bySubstitute: false };
+    const acting = (await this.organizationReads.itAdminsActingFor([transfer.toDepartmentId], usableAmong, tx)).get(
+      transfer.toDepartmentId,
+    );
+    const isActing = Boolean(acting?.actors.includes(actorEmployeeId));
+
+    return { inReadScope: true, isActing, bySubstitute: isActing && acting?.substitute === actorEmployeeId };
   }
 
   private async keepPicture(
@@ -188,43 +214,6 @@ export class TransferRevocationService {
       commitmentsReleased: [],
       requestsCancelled: 0,
       requestsToCheck: 0,
-    });
-  }
-
-  private async tell(
-    tx: DbTx,
-    held: HeldTransfer,
-    done: { created: number; reasonAdded: number },
-    actor: AuthenticatedPrincipal | SystemActor,
-  ): Promise<void> {
-    const after = { employeeId: held.employeeId, tasksCreated: done.created, reasonsAdded: done.reasonAdded };
-    const event =
-      'kind' in actor && actor.kind === 'SYSTEM'
-        ? personnelSystemAuditEvent(
-            held.organizationId,
-            'DEPARTMENT_TRANSFER.REVOCATION_OPENED',
-            'DepartmentTransfer',
-            held.id,
-            actor.correlationId,
-            null,
-            after,
-          )
-        : personnelAuditEvent(
-            { kind: 'USER', principal: actor as AuthenticatedPrincipal },
-            held.organizationId,
-            'DEPARTMENT_TRANSFER.REVOCATION_OPENED',
-            'DepartmentTransfer',
-            held.id,
-            null,
-            after,
-          );
-    await this.audit.record(tx, event);
-    await this.notifier.transferRightsRevoking(tx, {
-      organizationId: held.organizationId,
-      transferId: held.id,
-      employeeId: held.employeeId,
-      toDepartmentId: held.toDepartmentId,
-      rightCount: done.created + done.reasonAdded,
     });
   }
 }

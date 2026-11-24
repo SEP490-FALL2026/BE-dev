@@ -2,9 +2,11 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { EmployeeNotStartedError } from '../../organization/public/organization.errors';
 import {
   GhostSeatAlreadyReturnedError,
   GhostSeatDecisionNotFoundError,
+  GhostSeatDecisionNotInChargeError,
   GhostSeatDecisionRefusedError,
   GhostSeatNotReturnableError,
   GhostSeatTaskInProgressError,
@@ -49,6 +51,9 @@ export function toDecisionApiException(error: unknown): unknown {
   if (error instanceof GhostSeatDecisionNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'GHOST_SEAT.NOT_FOUND', error.message);
   }
+  if (error instanceof GhostSeatDecisionNotInChargeError) {
+    return refuse(HttpStatus.FORBIDDEN, 'GHOST_SEAT.NOT_IN_CHARGE', error.message);
+  }
   if (error instanceof GhostSeatNotReturnableError) {
     return refuse(HttpStatus.CONFLICT, 'GHOST_SEAT.NOT_RETURNABLE', error.message);
   }
@@ -57,6 +62,9 @@ export function toDecisionApiException(error: unknown): unknown {
   }
   if (error instanceof GhostSeatTaskInProgressError) {
     return refuse(HttpStatus.CONFLICT, 'GHOST_SEAT.TASK_IN_PROGRESS', error.message);
+  }
+  if (error instanceof EmployeeNotStartedError) {
+    return refuse(HttpStatus.CONFLICT, 'EMPLOYEE.NOT_STARTED', error.message);
   }
 
   return toUnavailableApiException(error) ?? error;
@@ -85,4 +93,6 @@ export const DECISION_ERROR_EXAMPLES = {
   NOT_RETURNABLE: example(new GhostSeatNotReturnableError()),
   ALREADY_RETURNED: example(new GhostSeatAlreadyReturnedError()),
   TASK_IN_PROGRESS: example(new GhostSeatTaskInProgressError()),
+  NOT_IN_CHARGE: example(new GhostSeatDecisionNotInChargeError()),
+  EMPLOYEE_NOT_STARTED: example(new EmployeeNotStartedError()),
 } as const;

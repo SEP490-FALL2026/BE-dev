@@ -9,6 +9,7 @@ import { toUnavailableApiException } from '../../../infrastructure/http/errors/s
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { DeviceCredentialRevokedError } from '../public/devices.errors';
 import {
+  CredentialCollectorNotInstalledError,
   CredentialRegistrationEndedError,
   CredentialRegistrationNotFoundError,
   CredentialSignatureRecordMissingError,
@@ -40,6 +41,9 @@ export function toCredentialApiException(error: unknown): unknown {
   if (error instanceof CredentialRegistrationEndedError) {
     return refuse(HttpStatus.CONFLICT, 'DEVICE_REGISTRATION.ENDED', error.message);
   }
+  if (error instanceof CredentialCollectorNotInstalledError) {
+    return refuse(HttpStatus.CONFLICT, 'DEVICE_REGISTRATION.COLLECTOR_NOT_INSTALLED', error.message);
+  }
   if (error instanceof CredentialSignatureRecordMissingError) {
     return refuse(HttpStatus.CONFLICT, 'DEVICE_REGISTRATION.SIGNATURE_RECORD_MISSING', error.message);
   }
@@ -65,6 +69,7 @@ export const CREDENTIAL_ERROR_EXAMPLES = {
   REGISTRATION_NOT_FOUND: example(new CredentialRegistrationNotFoundError()),
   ALREADY_REVOKED: example(new DeviceCredentialAlreadyRevokedError()),
   REGISTRATION_ENDED: example(new CredentialRegistrationEndedError()),
+  COLLECTOR_NOT_INSTALLED: example(new CredentialCollectorNotInstalledError()),
   SIGNATURE_RECORD_MISSING: example(new CredentialSignatureRecordMissingError()),
   CREDENTIAL_INVALID: example(new DeviceCredentialInvalidError()),
   CREDENTIAL_REVOKED: example(new DeviceCredentialRevokedError()),

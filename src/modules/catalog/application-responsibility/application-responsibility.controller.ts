@@ -24,7 +24,7 @@ import { ApplicationResponsibilityService } from './application-responsibility.s
 
 /**
  * The IT Admin who answers for an application is the one who declared it; there is no field to choose another. It changes hands here only
- * (`QĐ-111g`): the responsible IT Admin hands it over, any IT Admin takes one that needs a responsible IT Admin, the Super Admin names any.
+ * (`QĐ-111g`, `QĐ-118f`): only the Super Admin names who is responsible; an IT Admin is refused whoever they are.
  */
 @ApiTags('applications')
 @Controller({ path: 'applications', version: '1' })
@@ -49,7 +49,7 @@ export class ApplicationResponsibilityController {
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'Only an IT Admin or the Super Admin hands an application over, and an IT Admin only while they are the one responsible, or while the application needs a responsible IT Admin and they take it for themselves (APPLICATION.RESPONSIBILITY_NOT_YOURS). The one who loses the race to take an application that needs one meets this too.',
+        'Only the Super Admin changes who is responsible for an application: an IT Admin, even the one responsible, is refused (APPLICATION.RESPONSIBILITY_NOT_YOURS).',
       examples: [FORBIDDEN_EXAMPLE, EXAMPLES.RESPONSIBILITY_NOT_YOURS],
     },
     {

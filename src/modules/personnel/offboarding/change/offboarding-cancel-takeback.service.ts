@@ -89,20 +89,19 @@ export class OffboardingCancelTakeBack {
   }
 
   /**
-   * The IT Admin in charge of the department of the case, or the first one who can act, is told once for the case (`eventKey`): never the person
-   * who left, whose account is blocked and who would read nothing (`PersonnelNotifier.itAdminOfDeparture`).
+   * Notifies the acting IT Admins of the department (or the usable Super Admin fallback) once for the case, excluding the departing
+   * employee whose account is blocked.
    */
   private async tellItAdmin(tx: DbTx, held: OffboardingRecord, taskCount: number): Promise<void> {
-    const recipient = await this.notifier.itAdminOfDeparture(tx, held);
-    if (recipient === null) return;
-
-    await this.notifications.notifyInApp(tx, {
-      organizationId: held.organizationId,
-      recipientEmployeeId: recipient,
-      code: 'DEPARTURE_REVOCATION_IT_CLOSE',
-      subject: { type: 'OFFBOARDING_CASE', id: held.id },
-      params: { caseId: held.id, employeeId: held.employeeId, taskCount },
-      eventKey: `DEPARTURE_REVOCATION_IT_CLOSE:${held.id}`,
-    });
+    for (const recipientEmployeeId of await this.notifier.itAdminsOrSuperAdminOfDeparture(tx, held)) {
+      await this.notifications.notifyInApp(tx, {
+        organizationId: held.organizationId,
+        recipientEmployeeId,
+        code: 'DEPARTURE_REVOCATION_IT_CLOSE',
+        subject: { type: 'OFFBOARDING_CASE', id: held.id },
+        params: { caseId: held.id, employeeId: held.employeeId, taskCount },
+        eventKey: `DEPARTURE_REVOCATION_IT_CLOSE:${held.id}`,
+      });
+    }
   }
 }

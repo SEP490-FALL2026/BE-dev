@@ -26,6 +26,8 @@ interface Step {
     assignments?: number;
     closed?: boolean;
     closedAt?: string | null;
+    initialRecords?: number;
+    signaturesMissing?: number;
   };
   warnings?: { code: string; departmentCode: string }[];
 }
@@ -96,7 +98,7 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
     for (const headers of [as(it1), { Authorization: `Bearer ${admin}` }]) {
       const response = await request(server()).get('/api/v1/onboarding-checklist').set(headers).expect(200);
 
-      expect((response.body as { data: { steps: Step[] } }).data.steps).toHaveLength(5);
+      expect((response.body as { data: { steps: Step[] } }).data.steps).toHaveLength(6);
     }
   });
 
@@ -226,8 +228,8 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
     });
   });
 
-  it('has the applications, subscriptions and seat steps incomplete or blocked on an empty catalog, and the usage step not built (AC-2)', async () => {
-    const [first, applications, contracts, seats, usage] = await steps();
+  it('has the applications, subscriptions and seat steps incomplete or blocked on an empty catalog, the usage step not built, and device initial records incomplete (AC-2, W2-13)', async () => {
+    const [first, applications, contracts, seats, usage, initialDevices] = await steps();
 
     expect(first.status).toBe('DONE');
     expect(applications).toMatchObject({
@@ -244,6 +246,13 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
     });
     expect(seats).toMatchObject({ step: 4, status: 'BLOCKED', reasons: ['STEP_3_INCOMPLETE'] });
     expect(usage).toEqual({ step: 5, key: 'USAGE', status: 'NOT_AVAILABLE', reasons: ['NOT_BUILT_YET'] });
+    expect(initialDevices).toEqual({
+      step: 6,
+      key: 'DEVICE_INITIAL_RECORDS',
+      status: 'INCOMPLETE',
+      reasons: ['NO_INITIAL_DEVICE'],
+      facts: { initialRecords: 0, signaturesMissing: 0 },
+    });
     expect(await checklistKeys()).toEqual(['steps']);
   });
 

@@ -83,6 +83,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'CatalogModule: CatalogContractApi',
   // X-IT.2: what an IT Admin answers for in the catalog (subscriptions and applications), counted and handed over by the hand-over of personnel.
   'CatalogModule: CatalogResponsibilityApi',
+  // Redesign wave 2 (W2-21): licensing reads the install limit in the terms of a plan, the default cap of activations of a key.
+  'CatalogModule: CatalogPlanTermsApi',
   // The extension point licensing binds its reader of occupied seats to (public/catalog.extension-points.ts).
   'CatalogModule: SeatOccupancyHook',
   // The phase of the seat baseline licensing binds, so the rule against a second K2 or K4 subscription knows whether it is closed.
@@ -121,6 +123,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // P2-03: what the shared pool of a plan holds, which the queue of grants of requests shows beside each request.
   'LicensingModule: LicensingPoolStockApi',
   'LicensingModule: LicensingSeatMonthApi',
+  'LicensingModule: LicensingDeviceActivationApi',
   // The extension points requests and personnel bind or add to (public/licensing.extension-points.ts).
   'LicensingModule: GrantRequestGateHook',
   'LicensingModule: RevocationListeners',

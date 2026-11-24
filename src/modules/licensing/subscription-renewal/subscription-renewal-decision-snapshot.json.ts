@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { jsonColumn } from '../../../infrastructure/database/json-column';
-import type { RenewalFinancialSnapshot } from '../public/licensing-subscription-renewal.types';
+import type { RenewalFinancialSnapshot } from '../public/licensing-renewal.types';
 import type { DecisionSnapshot } from './subscription-renewal.types';
 
 /** The figures of the budget the decider saw: decimal strings of one currency, null where the source could not give one. */

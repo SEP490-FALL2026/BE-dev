@@ -2,7 +2,7 @@ import type { DemoFixture } from '../demo-fixture.types';
 import { CATALOG } from './catalog';
 import { RETIRED_APPLICATIONS } from './catalog-extra';
 import { FINANCE } from './finance';
-import { DEVICES, MONITORING_NOTICE } from './devices';
+import { DEPARTMENT_SUBSTITUTES, DEVICES, MONITORING_NOTICE, NEW_DEVICES } from './devices';
 import { ORGANIZATION } from './organization';
 import { REQUESTS } from './requests';
 import { REQUESTS_EXTRA, RETURNS } from './requests-extra';
@@ -24,6 +24,8 @@ export const SHARED_DEMO_V4: DemoFixture = {
   returns: RETURNS,
   renewals: RENEWALS,
   devices: DEVICES,
+  newDevices: NEW_DEVICES,
+  departmentSubstitutes: DEPARTMENT_SUBSTITUTES,
   monitoringNotice: MONITORING_NOTICE,
   aiSummaries: AI_SUMMARIES,
   retiredApplications: RETIRED_APPLICATIONS,

@@ -8,6 +8,7 @@ import { AssignmentService } from '../../assignment/assignment.service';
 import {
   AssignmentConflictError,
   GrantRequestRefusedError,
+  ProvisioningPlanBoundToDeviceError,
   ProvisioningSubscriptionError,
   SeatQuantityUnknownError,
   SeatTargetNotFoundError,
@@ -17,6 +18,7 @@ import type { GrantRequestAnswer } from '../../public/licensing.types';
 import type { PoolStock } from '../../shared-pool/shared-pool.policy';
 import { SharedPoolService } from '../../shared-pool/shared-pool.service';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
+import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import type { GrantInput, ProvisioningGrantPlanner } from './provisioning-grant-planner.service';
 import { ProvisioningGrantTaskService } from './provisioning-grant-task.service';
 import { claimMatchesAnswer } from './provisioning-grant.policy';
@@ -42,6 +44,7 @@ export class ProvisioningGrantWriter {
     private readonly gate: GrantRequestGateHook,
     private readonly sharedPool: SharedPoolService,
     private readonly replacements: ProvisioningReplacementService,
+    private readonly frame: ProvisioningTaskFrame,
   ) {}
 
   async write(
@@ -52,18 +55,15 @@ export class ProvisioningGrantWriter {
   ): Promise<ProvisioningTaskRecord> {
     const { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts } = planned;
     const { holderContractEnd, holderHasTerm } = planned;
-    if (answer.seat === 'PERSONAL') {
-      await this.holders.lockPersonalEmployee(tx, answer.employeeId);
-    }
-    const lockedRevocation =
-      answer.seat === 'PERSONAL' && answer.replacesAssignmentId
-        ? await this.replacements.lockLiveRevocation(tx, answer.replacesAssignmentId)
-        : null;
+    const { bySubstitute, lockedRevocation } = await this.lockAndAuthorize(tx, actor, answer);
     // The request is locked and moved to "being carried out" here, in the transaction of the grant: a second grant of
     // the same request finds it no longer grantable, and a request that changed since the read above is refused.
     const claimed = await this.gate.get().claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);
     if (claimed.status !== 'GRANTABLE') throw new GrantRequestRefusedError(claimed.status);
     if (!claimMatchesAnswer(claimed, answer)) throw new GrantRequestRefusedError('NOT_APPROVED');
+    if (plan.keyBinding === 'DEVICE_KEY' || plan.keyBinding === 'DEVICE_BUNDLED') {
+      throw new ProvisioningPlanBoundToDeviceError();
+    }
     const subscriptionId = await this.subscriptionOf(tx, plan, input.subscriptionId, today);
     await this.requireGrantable(tx, plan, input.subscriptionId, today);
     const target = await this.lockTarget(tx, plan, subscriptionId);
@@ -105,7 +105,24 @@ export class ProvisioningGrantWriter {
       purchase,
       carriesOn: replaced !== null,
       selfExecuted: holder.selfExecuted,
+      bySubstitute,
     });
+  }
+
+  private async lockAndAuthorize(tx: DbTx, actor: AuthenticatedPrincipal, answer: Planned['answer']) {
+    if (answer.seat === 'PERSONAL') {
+      await this.holders.lockPersonalEmployee(tx, answer.employeeId);
+    }
+    const { bySubstitute } = await this.frame.requireActingItAdmin(tx, actor, {
+      beneficiaryEmployeeId: answer.employeeId,
+      ...(answer.seat === 'SERVICE' ? { departmentId: answer.serviceAccount.departmentId } : {}),
+    });
+    const lockedRevocation =
+      answer.seat === 'PERSONAL' && answer.replacesAssignmentId
+        ? await this.replacements.lockLiveRevocation(tx, answer.replacesAssignmentId)
+        : null;
+
+    return { bySubstitute, lockedRevocation };
   }
 
   private async reserveSeat(
@@ -251,6 +268,9 @@ export class ProvisioningGrantWriter {
     const target = await this.catalog.lockSeatTarget(tx, subscriptionId ? { subscriptionId } : { planId: plan.planId });
     if (!target) throw new SeatTargetNotFoundError(subscriptionId ? 'SUBSCRIPTION' : 'PLAN');
     if (target.planId !== plan.planId) throw new ProvisioningSubscriptionError('PLAN_MISMATCH');
+    if (target.keyBinding === 'DEVICE_KEY' || target.keyBinding === 'DEVICE_BUNDLED') {
+      throw new ProvisioningPlanBoundToDeviceError();
+    }
     this.assignments.assertSeatTargetUsable(target);
     if (target.kind === 'SUBSCRIPTION' && target.purchasedQuantity === null) throw new SeatQuantityUnknownError();
 

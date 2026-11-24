@@ -46,6 +46,11 @@ function serviceWith(scope: string[]) {
 
     return scope;
   });
+  const getItAdminActingScope = jest.fn(async (_id: string, usable: (ids: readonly string[]) => Promise<unknown>) => {
+    await usable(['it-1']);
+
+    return scope;
+  });
   const findUsableItAdminEmployeeIds = jest.fn().mockResolvedValue(new Set(['it-1']));
   const itAdminFacts = jest
     .fn()
@@ -54,6 +59,7 @@ function serviceWith(scope: string[]) {
   const getSummary = jest.fn().mockResolvedValue({ counted: 3, groups: [], limitation: '' });
   const openFindingCount = jest.fn().mockResolvedValue(2);
   const countByCollectionState = jest.fn().mockResolvedValue(4);
+  const countReturnTasks = jest.fn().mockResolvedValue({ open: 6, overdue: 2 });
   const read = jest.fn().mockResolvedValue(PROGRESS);
   const missingInvoicePeriods = jest.fn().mockResolvedValue(7);
   const revocationsDue = jest.fn().mockResolvedValue(4);
@@ -62,6 +68,7 @@ function serviceWith(scope: string[]) {
       businessToday: () => Promise.resolve('2026-10-23'),
       getOrganization: () => Promise.resolve({ id: 'org-1' }),
       getItAdminScope,
+      getItAdminActingScope,
     } as unknown as OrganizationReadApi,
     { findUsableItAdminEmployeeIds } as unknown as IdentityAccessApi,
     { itAdminFacts } as unknown as LicensingDashboardApi,
@@ -70,7 +77,7 @@ function serviceWith(scope: string[]) {
     new ItAdminDashboardFactsService(
       { getSummary } as unknown as OptimizationApi,
       { openFindingCount } as unknown as UsageEvidenceApi,
-      { countByCollectionState } as unknown as DevicesApi,
+      { countByCollectionState, countReturnTasks } as unknown as DevicesApi,
       { missingInvoicePeriods } as unknown as RequestsDashboardApi,
       { revocationsDue } as unknown as UsageOutOfProcessApi,
     ),
@@ -79,11 +86,13 @@ function serviceWith(scope: string[]) {
   return {
     service,
     getItAdminScope,
+    getItAdminActingScope,
     findUsableItAdminEmployeeIds,
     itAdminFacts,
     handingOverCases,
     getSummary,
     countByCollectionState,
+    countReturnTasks,
     read,
     missingInvoicePeriods,
     revocationsDue,
@@ -96,16 +105,19 @@ describe('ItAdminDashboardService', () => {
     const {
       service,
       getItAdminScope,
+      getItAdminActingScope,
       findUsableItAdminEmployeeIds,
       itAdminFacts,
       handingOverCases,
       countByCollectionState,
+      countReturnTasks,
       missingInvoicePeriods,
     } = serviceWith(['d-des', 'd-ops']);
 
     const overview = await service.overview(actor(['IT_ADMIN']));
 
     expect(getItAdminScope).toHaveBeenCalledWith('it-1', expect.any(Function));
+    expect(getItAdminActingScope).toHaveBeenCalledWith('it-1', expect.any(Function));
     expect(findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-1']);
     expect(itAdminFacts).toHaveBeenCalledWith('it-1');
     expect(handingOverCases).toHaveBeenCalledWith(['d-des', 'd-ops']);
@@ -128,9 +140,15 @@ describe('ItAdminDashboardService', () => {
       missingInvoicePeriods: { state: 'COUNTED', count: 7, sourceOperationId: 'purchaseInvoiceMissingPeriodList' },
       // OOP-1a: the open cases on a company asset whose revocation is due; no list answers this number alone, so it names none.
       outOfProcessRevocationsDue: { state: 'COUNTED', count: 4, sourceOperationId: null },
+      deviceReturnTasksOpen: { state: 'COUNTED', count: 6, sourceOperationId: 'deviceReturnTaskList' },
+      deviceReturnTasksOverdue: { state: 'COUNTED', count: 2, sourceOperationId: 'deviceReturnTaskList' },
     });
     expect(missingInvoicePeriods).toHaveBeenCalledWith(['d-des', 'd-ops'], 'it-1');
     expect(countByCollectionState).toHaveBeenCalledWith('org-1', 'AWAITING_ACKNOWLEDGEMENT');
+    expect(countReturnTasks).toHaveBeenCalledWith(
+      { organizationId: 'org-1', actingDepartmentIds: ['d-des', 'd-ops'], excludeEmployeeId: 'it-1' },
+      '2026-10-23',
+    );
   });
 
   // SPEC P21: the departures and the transfers of the departments in scope; the seats of the pools are the tasks of this IT Admin.

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { DevicesApi } from '../../devices/public/devices.api';
 import { OptimizationApi } from '../../optimization/public/optimization.api';
 import { RequestsDashboardApi } from '../../requests/public/requests-dashboard.api';
@@ -17,6 +18,8 @@ export interface ItAdminDashboardFacts {
   missingInvoicePeriods: number;
   /** The open cases outside the process on a company asset whose revocation is due now: nobody to wait for, or the ten working days passed (`US-13-05` AC-23). */
   outOfProcessRevocationsDue: number;
+  deviceReturnTasksOpen: number;
+  deviceReturnTasksOverdue: number;
 }
 
 /**
@@ -40,6 +43,8 @@ export class ItAdminDashboardFactsService {
     organizationId: string | null;
     employeeId: string;
     departmentIds: readonly string[];
+    actingDepartmentIds: readonly string[];
+    today: BusinessDate;
   }): Promise<ItAdminDashboardFacts> {
     const wastedSeats = await this.optimization.getSummary();
     const withoutSeat = await this.usage.openFindingCount();
@@ -47,6 +52,16 @@ export class ItAdminDashboardFactsService {
     const unconfirmedDevices = input.organizationId
       ? await this.devices.countByCollectionState(input.organizationId, 'AWAITING_ACKNOWLEDGEMENT')
       : 0;
+    const returnTasks = input.organizationId
+      ? await this.devices.countReturnTasks(
+          {
+            organizationId: input.organizationId,
+            actingDepartmentIds: input.actingDepartmentIds,
+            excludeEmployeeId: input.employeeId,
+          },
+          input.today,
+        )
+      : { open: 0, overdue: 0 };
     const missingInvoicePeriods = await this.requests.missingInvoicePeriods(input.departmentIds, input.employeeId);
 
     const outOfProcessRevocationsDue = await this.outOfProcess.revocationsDue();
@@ -57,6 +72,8 @@ export class ItAdminDashboardFactsService {
       unconfirmedDevices,
       missingInvoicePeriods,
       outOfProcessRevocationsDue,
+      deviceReturnTasksOpen: returnTasks.open,
+      deviceReturnTasksOverdue: returnTasks.overdue,
     };
   }
 }

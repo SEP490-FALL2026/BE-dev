@@ -6,6 +6,7 @@ import { OBJECT_STORAGE, type ObjectStoragePort } from '../../../infrastructure/
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { EmployeeTechnicalView } from '../public/organization.types';
 import { OrganizationContextService } from '../organization-context.service';
+import { DepartmentItSubstituteRepo } from '../department-it-substitute/department-it-substitute.repo';
 import { DepartmentRecordService } from '../department/department-record.service';
 import { EmployeeAccountsHook } from '../public/organization.extension-points';
 import {
@@ -64,6 +65,7 @@ export class DepartmentQueryService {
     private readonly technical: DepartmentTechnicalMembersRepo,
     private readonly context: OrganizationContextService,
     private readonly departments: DepartmentRecordService,
+    private readonly substitutes: DepartmentItSubstituteRepo,
     private readonly employeeAccounts: EmployeeAccountsHook,
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStoragePort,
   ) {}
@@ -242,8 +244,8 @@ export class DepartmentQueryService {
   }
 
   /**
-   * The departments an IT Admin may read: those they are named in charge of (retired ones too), and the active ones nobody usable is
-   * in charge of, whose technical work falls to every IT Admin.
+   * The departments an IT Admin may read: those they are named in charge of (retired ones too), departments where they hold
+   * an active substitute appointment, and active departments without usable IT coverage (read scope only; acting scope excludes uncovered departments).
    */
   private async scopeOf(principal: AuthenticatedPrincipal): Promise<ReadonlySet<string>> {
     return new Set(
@@ -268,37 +270,89 @@ export class DepartmentQueryService {
   private async toViews(records: DepartmentRecord[]): Promise<DepartmentView[]> {
     const today = await this.context.businessToday();
     const ids = records.map((record) => record.id);
-    const [heads, counts] = await Promise.all([
+    const [heads, counts, activeSubstitutes] = await Promise.all([
       this.departments.headsOn(ids, today),
       this.repo.memberCounts(ids, today),
+      this.substitutes.activeByDepartmentIds(ids),
     ]);
-    const itAdminIds = records.flatMap((record) => (record.itAdmin ? [record.itAdmin.employeeId] : []));
-    const usable = await this.employeeAccounts.get().findUsableItAdminEmployeeIds(itAdminIds);
+    const candidateIds = [
+      ...new Set([
+        ...records.flatMap((record) => (record.itAdmin ? [record.itAdmin.employeeId] : [])),
+        ...[...activeSubstitutes.values()].map((sub) => sub.employee.id),
+      ]),
+    ];
+    const usable =
+      candidateIds.length === 0
+        ? new Set<string>()
+        : await this.employeeAccounts.get().findUsableItAdminEmployeeIds(candidateIds);
 
     const links = await Promise.all(records.map((record) => this.avatarLinkOf(record)));
 
-    return records.map((record, index) => {
-      const head = heads.get(record.id) ?? null;
-      const itAdminUsable =
-        record.itAdmin !== null && record.itAdmin.employeeStatus === 'ACTIVE' && usable.has(record.itAdmin.employeeId);
-      // A department with no Cost Center in use yet is still a department: its finance configuration is incomplete (`QĐ-87d(1)`).
-      const warnings: DepartmentWarning[] =
-        record.status === 'ACTIVE'
-          ? [
-              ...(head ? [] : (['MISSING_HEAD'] as const)),
-              ...(itAdminUsable ? [] : (['MISSING_IT_ADMIN'] as const)),
-              ...(record.costCenter ? [] : (['MISSING_COST_CENTER'] as const)),
-            ]
-          : [];
-
-      return {
-        ...record,
-        head,
+    return records.map((record, index) =>
+      this.toView(record, {
+        head: heads.get(record.id) ?? null,
         memberCount: counts.get(record.id) ?? 0,
-        warnings,
-        itAdminUsable,
+        activeSubstitute: activeSubstitutes.get(record.id) ?? null,
+        usable,
         avatarUrl: links[index] ?? null,
-      };
-    });
+      }),
+    );
+  }
+
+  private toView(
+    record: DepartmentRecord,
+    context: {
+      head: DepartmentHeadRecord | null;
+      memberCount: number;
+      activeSubstitute: {
+        id: string;
+        employee: { id: string; fullName: string };
+        employeeStatus: 'ACTIVE' | 'TERMINATED';
+        appointedAt: Date;
+      } | null;
+      usable: ReadonlySet<string>;
+      avatarUrl: string | null;
+    },
+  ): DepartmentView {
+    const itAdminUsable =
+      record.itAdmin !== null &&
+      record.itAdmin.employeeStatus === 'ACTIVE' &&
+      context.usable.has(record.itAdmin.employeeId);
+    const { activeSubstitute } = context;
+    const substituteUsable =
+      activeSubstitute !== null &&
+      activeSubstitute.employeeStatus === 'ACTIVE' &&
+      context.usable.has(activeSubstitute.employee.id);
+    const itSubstitute = activeSubstitute
+      ? { id: activeSubstitute.id, employee: activeSubstitute.employee, appointedAt: activeSubstitute.appointedAt }
+      : null;
+    const itCoverage = substituteUsable ? 'SUBSTITUTE' : itAdminUsable ? 'IN_CHARGE' : 'NONE';
+    const warnings = this.warningsFor(record, context.head, itAdminUsable);
+
+    return {
+      ...record,
+      head: context.head,
+      memberCount: context.memberCount,
+      warnings,
+      itAdminUsable,
+      itSubstitute,
+      itCoverage,
+      avatarUrl: context.avatarUrl,
+    };
+  }
+
+  private warningsFor(
+    record: DepartmentRecord,
+    head: DepartmentHeadRecord | null,
+    itAdminUsable: boolean,
+  ): DepartmentWarning[] {
+    if (record.status !== 'ACTIVE') return [];
+
+    // A department with no Cost Center in use yet is still a department: its finance configuration is incomplete.
+    return [
+      ...(head ? [] : (['MISSING_HEAD'] as const)),
+      ...(itAdminUsable ? [] : (['MISSING_IT_ADMIN'] as const)),
+      ...(record.costCenter ? [] : (['MISSING_COST_CENTER'] as const)),
+    ];
   }
 }

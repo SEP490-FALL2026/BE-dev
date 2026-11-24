@@ -221,16 +221,11 @@ export class LicensingApi {
   }
 
   /**
-   * Whether the IT Admin may work for a person who is themselves (`QĐ-77m`): not while another usable IT Admin can, and then
-   * the act is marked as self-executed. The review of a service account and its grant both ask it; with `tx` the other IT Admins
-   * are counted in the transaction of the act. Throws ProvisioningAnotherItAdminNeededError.
+   * Self-execution mode when an acting IT Admin works on a task for themselves: allowed and marked as self-executed
+   * so the audit event records it and the Super Admin is notified once for the task (`SoD-5`).
    */
-  selfExecutionMode(
-    actor: AuthenticatedPrincipal,
-    beneficiaryEmployeeId: string,
-    tx?: DbTx,
-  ): Promise<SelfExecutionMode> {
-    return this.frame.selfExecutionMode(actor, beneficiaryEmployeeId, tx);
+  selfExecutionMode(actor: AuthenticatedPrincipal, beneficiaryEmployeeId: string): Promise<SelfExecutionMode> {
+    return this.frame.selfExecutionMode(actor, beneficiaryEmployeeId);
   }
 
   /**

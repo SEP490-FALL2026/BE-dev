@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
+import type { BusinessDate } from '../../../core/business-date';
+import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { SaasIssueError } from './saas-issue.errors';
@@ -28,16 +30,19 @@ export interface TransitionInput {
 const blankToNull = (text: string | null): string | null => (text && text.trim() !== '' ? text.trim() : null);
 
 /**
- * The handling of a report by an IT Admin (`US-07-11`): the states it moves through, the result, the vendor ticket typed by hand, the
- * pointers to other work, and the marking of a duplicate. Any IT Admin may handle a report; when it is not the one it was given to, the
- * event names both. The vendor ticket is only a text kept as written: nothing is sent to the vendor, and a pointer to a retry, a
- * discrepancy, a return or a request opens none of them. Throws SaasIssueError.
+ * The handling of a report by an acting IT Admin of the reporter’s work department: the states it moves through, the result, the
+ * vendor ticket typed by hand, the pointers to other work, and the marking of a duplicate. Only an acting IT Admin for the
+ * reporter’s work department (appointed substitute if usable, otherwise the one in charge when usable) may handle an assigned
+ * report; when the actor is a substitute or differs from the assigned IT Admin, the record names who acted on whose behalf. The
+ * vendor ticket is only a text kept as written: nothing is sent to the vendor, and a pointer to a retry, a discrepancy, a return
+ * or a request opens none of them. Throws SaasIssueError.
  */
 @Injectable()
 export class SaasIssueHandlingService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly identity: IdentityAccessApi,
     private readonly calendar: SaasIssueCalendar,
     private readonly issues: SaasIssueRepo,
     private readonly facts: SaasIssueFactsRepo,
@@ -52,6 +57,7 @@ export class SaasIssueHandlingService {
     return this.runner.run(async (tx) => {
       const issue = await this.issues.lock(tx, id);
       if (!issue) throw new SaasIssueError('NOT_FOUND');
+      const { bySubstitute, onBehalfOf } = await this.assertActingItAdmin(tx, actor, issue, today);
       const message = blankToNull(input.message);
       const resolution = blankToNull(input.resolution);
       const refusal = transitionProblem({ from: issue.state, to: input.to, message, resolution });
@@ -71,7 +77,6 @@ export class SaasIssueHandlingService {
         ...(input.to === 'RESOLVED' && resolution && reopenUntil ? { resolution, resolvedAt: now, reopenUntil } : {}),
       };
       const updated = await this.issues.update(tx, id, patch);
-      const onBehalfOf = actor.employeeId === issue.assignedItAdminEmployeeId ? null : issue.assignedItAdminEmployeeId;
       const entry = await this.issues.insertEntry(tx, {
         issueId: id,
         kind: 'TRANSITION',
@@ -95,6 +100,7 @@ export class SaasIssueHandlingService {
             state: input.to,
             code: issue.code,
             onBehalfOf,
+            ...(bySubstitute ? { bySubstitute: true } : {}),
             reporterEmployeeId: issue.reporterEmployeeId,
             vendorTicketRefGiven: patch.vendorTicketRef !== undefined,
             linkedWork: patch.linkedWork ? { ...patch.linkedWork } : null,
@@ -116,6 +122,7 @@ export class SaasIssueHandlingService {
               code: issue.code,
               notifyEmployeeId: issue.reporterEmployeeId,
               onBehalfOf,
+              ...(bySubstitute ? { bySubstitute: true } : {}),
               reopenUntil: updated.reopenUntil,
             },
           ),
@@ -138,18 +145,11 @@ export class SaasIssueHandlingService {
     if (reason === '') throw new SaasIssueError('REASON_REQUIRED');
 
     return this.runner.run(async (tx) => {
-      // The two reports are locked in the order of their ids, so two that are marked duplicates of each other meet one after the other.
-      const first = id < input.ofIssueId ? id : input.ofIssueId;
-      const second = id < input.ofIssueId ? input.ofIssueId : id;
-      const locked = new Map<string, SaasIssueRecord | null>();
-      locked.set(first, await this.issues.lock(tx, first));
-      if (second !== first) locked.set(second, await this.issues.lock(tx, second));
-      const issue = locked.get(id) ?? null;
+      const { primary: issue, other: original } = await this.lockPair(tx, id, input.ofIssueId);
       if (!issue) throw new SaasIssueError('NOT_FOUND');
-      const targetRefusal = duplicateTargetProblem({
-        issueId: id,
-        original: locked.get(input.ofIssueId) ?? null,
-      });
+      const today = await this.organizationReads.businessToday(new Date(), tx);
+      const { bySubstitute, onBehalfOf } = await this.assertActingItAdmin(tx, actor, issue, today);
+      const targetRefusal = duplicateTargetProblem({ issueId: id, original });
       if (targetRefusal) throw new SaasIssueError(targetRefusal);
       if (!canMove(issue.state, 'DUPLICATE')) throw new SaasIssueError('INVALID_TRANSITION');
 
@@ -158,7 +158,6 @@ export class SaasIssueHandlingService {
         duplicateOfId: input.ofIssueId,
         duplicateReason: reason,
       });
-      const onBehalfOf = actor.employeeId === issue.assignedItAdminEmployeeId ? null : issue.assignedItAdminEmployeeId;
       const entry = await this.issues.insertEntry(tx, {
         issueId: id,
         kind: 'TRANSITION',
@@ -183,6 +182,7 @@ export class SaasIssueHandlingService {
             code: issue.code,
             ofIssueId: input.ofIssueId,
             onBehalfOf,
+            ...(bySubstitute ? { bySubstitute: true } : {}),
             reporterEmployeeId: issue.reporterEmployeeId,
           },
         ),
@@ -192,5 +192,52 @@ export class SaasIssueHandlingService {
 
       return updated;
     });
+  }
+
+  private async assertActingItAdmin(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    issue: SaasIssueRecord,
+    today: BusinessDate,
+  ): Promise<{ bySubstitute: boolean; onBehalfOf: string | null }> {
+    if (issue.assignedItAdminEmployeeId === null) throw new SaasIssueError('NOT_IN_CHARGE');
+    const departmentId =
+      (await this.organizationReads.workDepartmentsOf([issue.reporterEmployeeId], today, tx)).get(
+        issue.reporterEmployeeId,
+      ) ?? null;
+    if (departmentId === null) throw new SaasIssueError('NOT_IN_CHARGE');
+    const acting = (
+      await this.organizationReads.itAdminsActingFor(
+        [departmentId],
+        (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
+        tx,
+      )
+    ).get(departmentId);
+    if (!acting || !acting.actors.includes(actor.employeeId)) throw new SaasIssueError('NOT_IN_CHARGE');
+
+    const bySubstitute = acting.substitute === actor.employeeId;
+    const onBehalfOf = bySubstitute
+      ? (acting.inCharge ??
+        (issue.assignedItAdminEmployeeId !== actor.employeeId ? issue.assignedItAdminEmployeeId : null))
+      : actor.employeeId === issue.assignedItAdminEmployeeId
+        ? null
+        : issue.assignedItAdminEmployeeId;
+
+    return { bySubstitute, onBehalfOf };
+  }
+
+  private async lockPair(
+    tx: DbTx,
+    primaryId: string,
+    otherId: string,
+  ): Promise<{ primary: SaasIssueRecord | null; other: SaasIssueRecord | null }> {
+    // The two reports are locked in the order of their ids, so two that are marked duplicates of each other meet one after the other.
+    const first = primaryId < otherId ? primaryId : otherId;
+    const second = primaryId < otherId ? otherId : primaryId;
+    const locked = new Map<string, SaasIssueRecord | null>();
+    locked.set(first, await this.issues.lock(tx, first));
+    if (second !== first) locked.set(second, await this.issues.lock(tx, second));
+
+    return { primary: locked.get(primaryId) ?? null, other: locked.get(otherId) ?? null };
   }
 }

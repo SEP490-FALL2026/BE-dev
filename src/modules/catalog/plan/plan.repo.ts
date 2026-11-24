@@ -46,6 +46,7 @@ const toPlan = (row: PlanRow): PlanRecord => ({
   applicationKind: row.application.kind,
   name: row.name,
   provisioningType: row.provisioningType,
+  keyBinding: row.keyBinding,
   pricingModel: row.pricingModel,
   controlLevel: row.controlLevel,
   revocationNote: row.revocationNote,
@@ -91,6 +92,7 @@ export class PlanRepo {
         name: input.name,
         normalizedName: searchKey(input.name),
         provisioningType: input.provisioningType,
+        keyBinding: input.keyBinding,
         pricingModel: input.pricingModel,
         controlLevel: input.controlLevel,
         revocationNote: input.revocationNote,
@@ -160,6 +162,7 @@ export class PlanRepo {
       data: {
         ...(changes.name !== undefined ? { name: changes.name, normalizedName: searchKey(changes.name) } : {}),
         ...(changes.provisioningType !== undefined ? { provisioningType: changes.provisioningType } : {}),
+        ...(changes.keyBinding !== undefined ? { keyBinding: changes.keyBinding } : {}),
         ...(changes.pricingModel !== undefined ? { pricingModel: changes.pricingModel } : {}),
         ...(changes.controlLevel !== undefined ? { controlLevel: changes.controlLevel } : {}),
         ...(changes.revocationNote !== undefined ? { revocationNote: changes.revocationNote } : {}),
@@ -188,6 +191,7 @@ export class PlanRepo {
           id: row.id,
           name: row.name,
           provisioningType: row.provisioningType,
+          keyBinding: row.keyBinding,
           pricingModel: row.pricingModel,
           sharingPolicy: row.sharingPolicy,
           hasAdminConsole: row.hasAdminConsole,
@@ -213,6 +217,7 @@ export class PlanRepo {
       id: row.id,
       name: row.name,
       provisioningType: row.provisioningType,
+      keyBinding: row.keyBinding,
       pricingModel: row.pricingModel,
       sharingPolicy: row.sharingPolicy,
       hasAdminConsole: row.hasAdminConsole,
@@ -364,6 +369,7 @@ export class PlanRepo {
     const where: Prisma.PlanWhereInput = {
       ...(filter.applicationId ? { applicationId: filter.applicationId } : {}),
       ...(filter.provisioningType ? { provisioningType: filter.provisioningType } : {}),
+      ...(filter.keyBinding ? { keyBinding: filter.keyBinding } : {}),
       ...(Object.keys(application).length > 0 ? { application: { is: application } } : {}),
     };
 
@@ -378,6 +384,7 @@ export class PlanRepo {
             applicationId: true,
             name: true,
             provisioningType: true,
+            keyBinding: true,
             pricingModel: true,
             controlLevel: true,
             dataLossOnRemoval: true,

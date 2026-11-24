@@ -158,12 +158,14 @@ describe('assignment and license key read contracts (integration, real PostgreSQ
     const commit = statements.findIndex(
       (statement, index) => /^\s*COMMIT/i.test(statement) && index > keyReads[keyReads.length - 1].index,
     );
-    expect(keyReads).toHaveLength(3);
+    // Four reads of the keys, a fixed number whatever the rows: the page, the total, the keys still usable and the keys given to a seat (the
+    // capacity of a key on an account counts them). The activations of the page are one statement on another table.
+    expect(keyReads).toHaveLength(4);
     expect(begin).toBeGreaterThanOrEqual(0);
     expect(commit).toBeGreaterThan(keyReads[keyReads.length - 1].index);
     expect(statements.slice(begin, commit).some((statement) => /REPEATABLE\s+READ/i.test(statement))).toBe(true);
     expect(
       statements.slice(begin, commit).filter((statement) => tablesOf(statement).includes('license_keys')),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
   }, 120_000);
 });

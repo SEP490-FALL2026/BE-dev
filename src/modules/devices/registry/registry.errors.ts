@@ -71,3 +71,41 @@ export class DeviceSignatureNoticeVersionNotFoundError extends Error {
     this.name = 'DeviceSignatureNoticeVersionNotFoundError';
   }
 }
+
+export class DeviceSerialTakenError extends Error {
+  constructor() {
+    super('The serial number is already used by another machine.');
+    this.name = 'DeviceSerialTakenError';
+  }
+}
+
+export class DeviceHandoverWithoutHolderError extends Error {
+  constructor() {
+    super('Handover date or collector installation requires a holder.');
+    this.name = 'DeviceHandoverWithoutHolderError';
+  }
+}
+
+export class DevicePlanNotBundledError extends Error {
+  constructor() {
+    super('Every bundled plan must be an active device-bundled K4 plan.');
+    this.name = 'DevicePlanNotBundledError';
+  }
+}
+
+export class DeviceCollectorAlreadyInstalledError extends Error {
+  constructor() {
+    super('Collector installation is already enabled on this registration.');
+    this.name = 'DeviceCollectorAlreadyInstalledError';
+  }
+}
+
+/** The employee who is to receive a machine has never been placed in any department yet. */
+export class DeviceHolderUnplacedError extends Error {
+  constructor() {
+    super(
+      'The holder has no department yet. Register the machine in stock, ask a Super Admin to designate an acting IT Admin for it, and then hand it over.',
+    );
+    this.name = 'DeviceHolderUnplacedError';
+  }
+}

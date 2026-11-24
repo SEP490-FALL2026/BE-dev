@@ -39,15 +39,16 @@ const IT_ONLY = {
   description: 'Only an IT Admin works the queue of provisioning tasks.',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
-/** The task routes: the role guard, and the IT Admin who is the beneficiary of the task while another can work it. */
+/** The task routes: only an acting IT Admin (in charge or appointed substitute) for the task department may act. */
 const TASK_WORKER_FORBIDDEN = {
   status: HttpStatus.FORBIDDEN,
-  description: 'Not an IT Admin, or PROVISIONING.ANOTHER_IT_ADMIN_NEEDED.',
-  examples: [FORBIDDEN_EXAMPLE, PROVISIONING_ERROR_EXAMPLES.ANOTHER_IT_ADMIN_NEEDED],
+  description:
+    'Only an acting IT Admin (in charge or appointed substitute) for the task department may perform this action (PROVISIONING.NOT_IN_CHARGE).',
+  examples: [FORBIDDEN_EXAMPLE, PROVISIONING_ERROR_EXAMPLES.NOT_IN_CHARGE],
 } as const;
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
-  description: 'The task does not exist (PROVISIONING_TASK.NOT_FOUND).',
+  description: 'The task does not exist or is outside the caller read scope (PROVISIONING_TASK.NOT_FOUND).',
   examples: [PROVISIONING_ERROR_EXAMPLES.TASK_NOT_FOUND],
 } as const;
 
@@ -72,15 +73,15 @@ export class ProvisioningTasksController {
     status: HttpStatus.CREATED,
     message: 'PROVISIONING_TASK.CREATED',
     description:
-      'The seat is taken from today by an assignment of source REQUEST, and a manual task is made that the IT Admin who pressed has already taken: it is in progress (IN_PROGRESS) under their account (claimedBy), whoever is in charge of the beneficiary department by default (defaultResponsibleEmployeeId; none: the general queue, with a warning). Pressing again for the same request (for a request for a group, the same person), or another IT Admin pressing, makes nothing new: the answer is the task that exists, 201 with no warnings, still taken by whoever took it first. K5 takes no subscription and no seat. The seat is taken from the subscription of the plan, with no department filter: a subscription has no owning department. The task of a K1 grant carries k1Checklist (variant GRANT) to tick before it is completed. For the request of a service account the IT Admin enters the account identifier (not read from the request) and may name another active person of the owning department to answer for it (responsibleEmployeeId); the assignment is a service one, owned by that department and charged to its Unit Cost Center, with the purpose as its reason.',
+      'The seat is taken from today by an assignment of source REQUEST, and a manual task is made that the acting IT Admin who pressed has already taken: it is in progress (IN_PROGRESS) under their account (claimedBy), recording the acting default responsible employee (appointed substitute or in-charge IT Admin) at creation time. Pressing again for the same request (for a request for a group, the same person), or another acting IT Admin pressing, makes nothing new: the answer is the task that exists, 201 with no warnings, still taken by whoever took it first. K5 takes no subscription and no seat. The seat is taken from the subscription of the plan, with no department filter: a subscription has no owning department. The task of a K1 grant carries k1Checklist (variant GRANT) to tick before it is completed. For the request of a service account the IT Admin enters the account identifier (not read from the request) and may name another active person of the owning department to answer for it (responsibleEmployeeId); the assignment is a service one, owned by that department and charged to its Unit Cost Center, with the purpose as its reason.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
       description:
-        'Only an IT Admin works the queue of provisioning tasks, and an IT Admin who answers for the service account themselves waits for another usable IT Admin to grant it (PROVISIONING.ANOTHER_IT_ADMIN_NEEDED); with none left they may.',
-      examples: [FORBIDDEN_EXAMPLE, PROVISIONING_ERROR_EXAMPLES.ANOTHER_IT_ADMIN_NEEDED],
+        'Only an acting IT Admin (in charge or appointed substitute) for the beneficiary department may grant this request (PROVISIONING.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, PROVISIONING_ERROR_EXAMPLES.NOT_IN_CHARGE],
     },
     {
       status: HttpStatus.NOT_FOUND,
@@ -92,7 +93,7 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED (the request was refused, withdrawn, cancelled or closed as failed; a request that was granted answers with its task instead, 201), REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED and RESPONSIBLE_NOT_IN_DEPARTMENT (only for a request for a service account kept from the earlier releases: its boundary was not accepted, or the person who answers for it left its department or the company), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).',
+        'PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED (the request was refused, withdrawn, cancelled or closed as failed; a request that was granted answers with its task instead, 201), REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED and RESPONSIBLE_NOT_IN_DEPARTMENT (only for a request for a service account kept from the earlier releases: its boundary was not accepted, or the person who answers for it left its department or the company), TYPE_NOT_SUPPORTED (K3), PLAN_BOUND_TO_DEVICE (the K4 plan moved from ACCOUNT to a device-bound mode after the Request was submitted), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), EMPLOYEE.NOT_STARTED (the beneficiary has not started working in a department yet), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).',
       examples: PROVISIONING_GRANT_EXAMPLES.CONFLICT,
     },
     {
@@ -118,7 +119,7 @@ export class ProvisioningTasksController {
   @ApiSuccessResponse(TaskPageResponseDto, {
     message: 'PROVISIONING_TASK.LISTED',
     description:
-      'The tasks of both channels in one queue, the oldest first, each with the time it has taken. scope MINE is the IT Admin in charge by default, GENERAL the tasks nobody in charge works, ALL every task. A revocation says the day it may not be done before (notBefore), its due day (dueOn) and whether it may be taken today (claimableNow); claimableNow=true lists only what may be taken today, false only the revocations still in their grace. overdue=true lists only the tasks past their due day that are not over (completed, cancelled or closed as failed), the late revocations of a departure among them, false all the others.',
+      'The tasks of both channels in one queue, the oldest first, each with the time it has taken. scope MINE lists tasks whose beneficiary belongs to a department the caller acts for (in charge or appointed substitute); scope ALL lists tasks within the caller IT Admin read scope. Each row shows actingItAdmins and awaitingItAdmin. A revocation says the day it may not be done before (notBefore), its due day (dueOn) and whether it may be taken today (claimableNow); claimableNow=true lists only what may be taken today, false only the revocations still in their grace. overdue=true lists only the tasks past their due day that are not over (completed, cancelled or closed as failed), the late revocations of a departure among them, false all the others.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -148,9 +149,9 @@ export class ProvisioningTasksController {
     description: 'The id is invalid (VALIDATION_ERROR).',
     examples: [VALIDATION_EXAMPLE],
   })
-  async get(@Param() params: TaskIdParamDto) {
+  async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: TaskIdParamDto) {
     try {
-      return { task: toWire(await this.provisioning.get(params.id)) };
+      return { task: toWire(await this.provisioning.get(actor, params.id)) };
     } catch (error) {
       throw toProvisioningApiException(error);
     }
@@ -162,7 +163,7 @@ export class ProvisioningTasksController {
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.CLAIMED',
     description:
-      'The task is in progress under the name of this IT Admin; an IT Admin other than the one in charge may take it, and another may take it over. Taking it again is a no-op. A revocation is taken whoever its beneficiary is, a person who left included.',
+      'The task is in progress under the name of this acting IT Admin, and another acting IT Admin for the department may take it over. Taking it again is a no-op. A revocation is taken whoever its beneficiary is, a person who left included.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -171,12 +172,13 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken) or PROVISIONING.BENEFICIARY_DEPARTED (the person has left or is blocked by a departure, details.cause says which: close the request as cancelled; a task already being worked is not refused).',
+        'PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken), EMPLOYEE.NOT_STARTED (the beneficiary has not started working in a department yet), or PROVISIONING.BENEFICIARY_DEPARTED (the person has left or is blocked by a departure, details.cause says which: close the request as cancelled; a task already being worked is not refused).',
       examples: [
         PROVISIONING_ERROR_EXAMPLES.NOT_MANUAL,
         PROVISIONING_ERROR_EXAMPLES.NOT_CLAIMABLE,
         PROVISIONING_ERROR_EXAMPLES.NOT_BEFORE,
         PROVISIONING_ERROR_EXAMPLES.BENEFICIARY_DEPARTED,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
       ],
     },
     {
@@ -199,7 +201,7 @@ export class ProvisioningTasksController {
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.COMPLETED',
     description:
-      'The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key. A K4 grant names the free key of the store its seat is given (licenseKeyId; a key bought with the grant is imported into the store first): the key becomes ASSIGNED to the seat in the same transaction (LICENSE_KEY.ASSIGNED in the audit trail). A K2 or K4 grant taken from the pool with nothing bought records the cost it avoided; the request of a K4 grant taken from the pool gives back all of its commitment (GRANTED_FROM_POOL). A task of the kind EXTEND (the extension of a right whose renewal was approved, BR-MF1-08d) grants nothing: completing it writes the record that follows the renewed one and completes the renewal. The grant of a K1 seat is completed with k1Checklist: both steps of the card ticked (done true, each with the instant it was done, in the order of the card) and the evidence, written in k1Checklist.evidence or beside it; the steps are kept with the task and shown on its card. Another kind of grant, and an extension, take no k1Checklist.',
+      'The task is completed under the name of this acting IT Admin for the task department. The evidence is a note of what was done, never a password or a key. A K4 grant names the free key of the store its seat is given (licenseKeyId; a key bought with the grant is imported into the store first): the key becomes ASSIGNED to the seat in the same transaction (LICENSE_KEY.ASSIGNED in the audit trail). A K2 or K4 grant taken from the pool with nothing bought records the cost it avoided; the request of a K4 grant taken from the pool gives back all of its commitment (GRANTED_FROM_POOL). A task of the kind EXTEND (the extension of a right whose renewal was approved) grants nothing: completing it writes the record that follows the renewed one and completes the renewal. The grant of a K1 seat is completed with k1Checklist: both steps of the card ticked (done true, each with the instant it was done, in the order of the card) and the evidence, written in k1Checklist.evidence or beside it; the steps are kept with the task and shown on its card. Another kind of grant, and an extension, take no k1Checklist.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -213,11 +215,13 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, or IS_REVOCATION (a revocation is completed by its own route); the key named is not free in the store (LICENSE_KEY.NOT_IN_STORE: another grant took it), was withdrawn from it (LICENSE_KEY.WITHDRAWN) or belongs to another purchase than the seat (LICENSE_KEY.SUBSCRIPTION_MISMATCH). Nothing is written.',
+        'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS, IS_REVOCATION (a revocation is completed by its own route), PROVISIONING.PLAN_BOUND_TO_DEVICE (the K4 plan moved from ACCOUNT to a device-bound mode), or EMPLOYEE.NOT_STARTED (the beneficiary has not started working in a department yet); the key named is not free in the store (LICENSE_KEY.NOT_IN_STORE: another grant took it), was withdrawn from it (LICENSE_KEY.WITHDRAWN) or belongs to another purchase than the seat (LICENSE_KEY.SUBSCRIPTION_MISMATCH). Nothing is written.',
       examples: [
         PROVISIONING_ERROR_EXAMPLES.NOT_MANUAL,
         PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS,
         PROVISIONING_ERROR_EXAMPLES.IS_REVOCATION,
+        PROVISIONING_ERROR_EXAMPLES.PLAN_BOUND_TO_DEVICE,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
         PROVISIONING_ERROR_EXAMPLES.KEY_NOT_IN_STORE,
         PROVISIONING_ERROR_EXAMPLES.KEY_WITHDRAWN,
         PROVISIONING_ERROR_EXAMPLES.KEY_SUBSCRIPTION_MISMATCH,
@@ -264,8 +268,12 @@ export class ProvisioningTasksController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: 'PROVISIONING_TASK.NOT_MANUAL or NOT_IN_PROGRESS.',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_MANUAL, PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS],
+      description: 'PROVISIONING_TASK.NOT_MANUAL, NOT_IN_PROGRESS, or EMPLOYEE.NOT_STARTED.',
+      examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_MANUAL,
+        PROVISIONING_ERROR_EXAMPLES.NOT_IN_PROGRESS,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -300,8 +308,12 @@ export class ProvisioningTasksController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: 'The task is not failed (PROVISIONING_TASK.NOT_FAILED).',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.WITHDRAWAL_PENDING],
+      description: 'The task is not failed (PROVISIONING_TASK.NOT_FAILED), or EMPLOYEE.NOT_STARTED.',
+      examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_FAILED,
+        PROVISIONING_ERROR_EXAMPLES.WITHDRAWAL_PENDING,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -331,8 +343,13 @@ export class ProvisioningTasksController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: 'The task is not failed (NOT_FAILED) or is by hand already (PROVISIONING_TASK.ALREADY_MANUAL).',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.ALREADY_MANUAL],
+      description:
+        'The task is not failed (NOT_FAILED), is by hand already (PROVISIONING_TASK.ALREADY_MANUAL), or EMPLOYEE.NOT_STARTED.',
+      examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_FAILED,
+        PROVISIONING_ERROR_EXAMPLES.ALREADY_MANUAL,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -368,8 +385,13 @@ export class ProvisioningTasksController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: 'The task is not failed (PROVISIONING_TASK.NOT_FAILED), or its assignment is no longer open.',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.WITHDRAWAL_PENDING],
+      description:
+        'The task is not failed (PROVISIONING_TASK.NOT_FAILED), its assignment is no longer open, or EMPLOYEE.NOT_STARTED.',
+      examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_FAILED,
+        PROVISIONING_ERROR_EXAMPLES.WITHDRAWAL_PENDING,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -408,8 +430,12 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The task is not failed (PROVISIONING_TASK.NOT_FAILED; a revocation: not in progress or failed), or nothing was withdrawn (PROVISIONING_TASK.NO_WITHDRAWAL: its request was not withdrawn, or a reason still asks for the revocation): nothing changes.',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.NO_WITHDRAWAL],
+        'The task is not failed (PROVISIONING_TASK.NOT_FAILED; a revocation: not in progress or failed), nothing was withdrawn (PROVISIONING_TASK.NO_WITHDRAWAL: its request was not withdrawn, or a reason still asks for the revocation), or EMPLOYEE.NOT_STARTED: nothing changes.',
+      examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_FAILED,
+        PROVISIONING_ERROR_EXAMPLES.NO_WITHDRAWAL,
+        PROVISIONING_ERROR_EXAMPLES.EMPLOYEE_NOT_STARTED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

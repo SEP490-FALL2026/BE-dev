@@ -28,6 +28,11 @@ export class CatalogResponsibilityApi {
     return this.handover.countOf(employeeIds, tx);
   }
 
+  /** Working IT Admins currently named responsible on active subscriptions of the plan. */
+  usableSubscriptionItAdminsOfPlan(planId: string, tx?: DbTx): Promise<string[]> {
+    return this.handover.usableSubscriptionItAdminsOfPlan(planId, tx);
+  }
+
   /**
    * The plans this person administers at the vendor (owner or admin of the workspace profile of a plan that needs admins) and, for each, how many of
    * the other admins recorded still work as IT Admins now: what a departure or a transfer of the person puts at risk (`QĐ-110k`).

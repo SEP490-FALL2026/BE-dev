@@ -56,13 +56,14 @@ export class TransferRevocationController {
     UNAUTHENTICATED_RESPONSE,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'Only an IT Admin can reopen transfer revocations (AUTHORIZATION.FORBIDDEN).',
-      examples: [FORBIDDEN_EXAMPLE],
+      description:
+        'Only an acting IT Admin of the destination department can reopen transfer revocations (AUTHORIZATION.FORBIDDEN, DEPARTMENT_TRANSFER.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
     },
     GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
     {
       status: HttpStatus.NOT_FOUND,
-      description: 'The transfer does not exist (DEPARTMENT_TRANSFER.NOT_FOUND).',
+      description: 'The transfer does not exist or is outside your department scope (DEPARTMENT_TRANSFER.NOT_FOUND).',
       examples: [EXAMPLES.NOT_FOUND],
     },
     {

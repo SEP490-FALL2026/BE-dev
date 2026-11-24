@@ -21,67 +21,55 @@ describe('the read scope of the renewals', () => {
   });
 });
 
-describe('the IT Admin of a renewal period (QĐ-113g, BB-9)', () => {
+describe('the IT Admin of a renewal period (H5, H15, Owner Q7)', () => {
   const pool = { responsibleItAdminEmployeeId: 'it-sub' as string | null };
 
-  const world = (usable: readonly string[], firstUsable: string | null = null) => {
+  const world = (usable: readonly string[], superAdmin: string | null = 'super-admin') => {
     const findUsableItAdminEmployeeIds = jest.fn().mockResolvedValue(new Set(usable));
-    const findFirstUsableItAdminEmployeeId = jest.fn().mockResolvedValue(firstUsable);
+    const findUsableSuperAdminEmployeeId = jest.fn().mockResolvedValue(superAdmin);
     const service = new RenewalPartiesService({
       findUsableItAdminEmployeeIds,
-      findFirstUsableItAdminEmployeeId,
+      findUsableSuperAdminEmployeeId,
     } as unknown as IdentityAccessApi);
 
-    return { service, findUsableItAdminEmployeeIds, findFirstUsableItAdminEmployeeId };
+    return { service, findUsableItAdminEmployeeIds, findUsableSuperAdminEmployeeId };
   };
 
-  it('names the one responsible while they are usable and never reads the first usable one', async () => {
-    const w = world(['it-sub'], 'it-first');
+  it('names the one responsible while they are usable and never reads the Super Admin', async () => {
+    const w = world(['it-sub'], 'super-admin');
 
     expect(await w.service.itAdminOf(pool)).toBe('it-sub');
     expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub'], undefined);
-    expect(w.findFirstUsableItAdminEmployeeId).not.toHaveBeenCalled();
+    expect(w.findUsableSuperAdminEmployeeId).not.toHaveBeenCalled();
   });
 
-  it('names the first usable IT Admin when the one responsible is gone or none is named', async () => {
-    expect(await world([], 'it-first').service.itAdminOf(pool)).toBe('it-first');
-    const none = world([], 'it-first');
-    expect(await none.service.itAdminOf({ responsibleItAdminEmployeeId: null })).toBe('it-first');
+  it('falls back to the usable Super Admin when the responsible IT Admin is unusable or none is named', async () => {
+    const unusable = world([], 'super-admin');
+    expect(await unusable.service.itAdminOf(pool)).toBe('super-admin');
+    expect(unusable.findUsableSuperAdminEmployeeId).toHaveBeenCalledWith(undefined);
+
+    const none = world([], 'super-admin');
+    expect(await none.service.itAdminOf({ responsibleItAdminEmployeeId: null })).toBe('super-admin');
     expect(none.findUsableItAdminEmployeeIds).not.toHaveBeenCalled();
+    expect(none.findUsableSuperAdminEmployeeId).toHaveBeenCalledWith(undefined);
   });
 
-  it('is nobody when none is usable, and hands the transaction of the caller to every read', async () => {
+  it('returns null when no usable Super Admin exists, and hands the transaction to every read', async () => {
     const tx = {} as unknown as DbTx;
     const w = world([], null);
 
     expect(await w.service.itAdminOf(pool, tx)).toBeNull();
     expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub'], tx);
-    expect(w.findFirstUsableItAdminEmployeeId).toHaveBeenCalledWith(tx);
+    expect(w.findUsableSuperAdminEmployeeId).toHaveBeenCalledWith(tx);
   });
 
-  describe('who records on behalf of the one responsible (QĐ-58b)', () => {
-    it('is a substitute when the one responsible still works and is someone else', async () => {
-      const w = world(['it-sub']);
+  describe('usableResponsibleItAdminOf (no temporary substitute per subscription)', () => {
+    it('returns the responsible IT Admin only while they are usable, else null', async () => {
+      expect(await world(['it-sub']).service.usableResponsibleItAdminOf(pool)).toBe('it-sub');
+      expect(await world([]).service.usableResponsibleItAdminOf(pool)).toBeNull();
 
-      expect(await w.service.substituteOf({ employeeId: 'it-other' }, pool)).toEqual({
-        substitute: true,
-        responsibleItAdminEmployeeId: 'it-sub',
-      });
-    });
-
-    it('is not a substitute for the one responsible, and nobody is replaced when they are gone or none is named', async () => {
-      expect(await world(['it-sub']).service.substituteOf({ employeeId: 'it-sub' }, pool)).toEqual({
-        substitute: false,
-        responsibleItAdminEmployeeId: 'it-sub',
-      });
-      expect(await world([]).service.substituteOf({ employeeId: 'it-other' }, pool)).toEqual({
-        substitute: false,
-        responsibleItAdminEmployeeId: null,
-      });
       const none = world([]);
-      expect(
-        await none.service.substituteOf({ employeeId: 'it-other' }, { responsibleItAdminEmployeeId: null }),
-      ).toEqual({ substitute: false, responsibleItAdminEmployeeId: null });
+      expect(await none.service.usableResponsibleItAdminOf({ responsibleItAdminEmployeeId: null })).toBeNull();
       expect(none.findUsableItAdminEmployeeIds).not.toHaveBeenCalled();
     });
 
@@ -89,48 +77,57 @@ describe('the IT Admin of a renewal period (QĐ-113g, BB-9)', () => {
       const tx = {} as unknown as DbTx;
       const w = world(['it-sub']);
 
-      await w.service.substituteOf({ employeeId: 'it-other' }, pool, tx);
+      await w.service.usableResponsibleItAdminOf(pool, tx);
 
       expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub'], tx);
     });
   });
 
   describe('who may record a renewal result for the subscription period', () => {
-    it('allows the responsible IT Admin directly without substitute flag', async () => {
+    it('allows only the responsible IT Admin when they are usable, with substitute=false', async () => {
+      const tx = {} as unknown as DbTx;
       const w = world(['it-sub']);
-      await expect(w.service.recordingAccessOf({ employeeId: 'it-sub' }, pool)).resolves.toEqual({
+      await expect(w.service.recordingAccessOf({ employeeId: 'it-sub' }, pool, tx)).resolves.toEqual({
         allowed: true,
         substitute: false,
         responsibleItAdminEmployeeId: 'it-sub',
       });
+      expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub'], tx);
     });
 
-    it('allows any IT Admin when no responsible IT Admin is assigned', async () => {
-      const w = world([]);
+    it('refuses any IT Admin when no responsible IT Admin is assigned', async () => {
+      const w = world(['it-other']);
       await expect(
         w.service.recordingAccessOf({ employeeId: 'it-other' }, { responsibleItAdminEmployeeId: null }),
       ).resolves.toEqual({
-        allowed: true,
+        allowed: false,
         substitute: false,
         responsibleItAdminEmployeeId: null,
       });
     });
 
-    it('refuses another IT Admin when the responsible IT Admin is still active and usable', async () => {
-      const w = world(['it-sub']);
-      await expect(w.service.recordingAccessOf({ employeeId: 'it-other' }, pool)).resolves.toEqual({
+    it('refuses another IT Admin whether the responsible IT Admin is usable or unusable', async () => {
+      const active = world(['it-sub']);
+      await expect(active.service.recordingAccessOf({ employeeId: 'it-other' }, pool)).resolves.toEqual({
+        allowed: false,
+        substitute: false,
+        responsibleItAdminEmployeeId: 'it-sub',
+      });
+
+      const locked = world([]);
+      await expect(locked.service.recordingAccessOf({ employeeId: 'it-other' }, pool)).resolves.toEqual({
         allowed: false,
         substitute: false,
         responsibleItAdminEmployeeId: 'it-sub',
       });
     });
 
-    it('allows another IT Admin with substitute=true when the responsible IT Admin is no longer usable', async () => {
+    it('refuses the responsible IT Admin themselves if they are no longer a usable IT Admin', async () => {
       const tx = {} as unknown as DbTx;
       const w = world([]);
-      await expect(w.service.recordingAccessOf({ employeeId: 'it-other' }, pool, tx)).resolves.toEqual({
-        allowed: true,
-        substitute: true,
+      await expect(w.service.recordingAccessOf({ employeeId: 'it-sub' }, pool, tx)).resolves.toEqual({
+        allowed: false,
+        substitute: false,
         responsibleItAdminEmployeeId: 'it-sub',
       });
       expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub'], tx);

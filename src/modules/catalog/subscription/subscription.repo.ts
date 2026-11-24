@@ -219,6 +219,18 @@ export class SubscriptionRepo {
     return rows.map((row) => row.id);
   }
 
+  /** Distinct responsible IT Admin employee ids on active subscriptions of the plan, ordered by employee id. */
+  async findActiveResponsibleItAdminIdsOfPlan(planId: string, tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: { planId, status: 'ACTIVE', responsibleItAdminEmployeeId: { not: null } },
+      select: { responsibleItAdminEmployeeId: true },
+      distinct: ['responsibleItAdminEmployeeId'],
+      orderBy: { responsibleItAdminEmployeeId: 'asc' },
+    });
+
+    return rows.flatMap((row) => (row.responsibleItAdminEmployeeId !== null ? [row.responsibleItAdminEmployeeId] : []));
+  }
+
   /** The subscriptions with these ids, in one read; an id that does not exist is absent. */
   async findMany(ids: readonly string[], tx?: DbTx): Promise<SubscriptionRecord[]> {
     if (ids.length === 0) return [];
@@ -270,6 +282,15 @@ export class SubscriptionRepo {
       RETURNING s.id`;
 
     return rows.map((row) => row.id).sort();
+  }
+
+  /**
+   * Names `employeeId` as the IT Admin who answers for the subscription (`QĐ-118f`). The caller holds the row `FOR UPDATE` and has judged the
+   * person; this only writes.
+   */
+  async setResponsible(tx: DbTx, id: string, employeeId: string): Promise<void> {
+    await tx.$executeRaw`
+      UPDATE subscriptions SET responsible_it_admin_employee_id = ${employeeId}::uuid, updated_at = now() WHERE id = ${id}::uuid`;
   }
 
   /** How many subscriptions name each of these IT Admins responsible (`QĐ-111g`); one who answers for none is absent. */

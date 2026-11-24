@@ -37,11 +37,11 @@ import { ACCESS_REQUEST_ERROR_EXAMPLES as ACCESS_EXAMPLES } from '../access-requ
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const IT_ONLY_DESCRIPTION =
-  'Only an IT Admin does this, and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).';
+  'Only the acting IT Admin of the requester’s department does this (ACCESS_REQUEST.ASSESSMENT_NOT_IN_CHARGE), and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).';
 const IT_ONLY = {
   status: HttpStatus.FORBIDDEN,
   description: IT_ONLY_DESCRIPTION,
-  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.OWN_REQUEST],
+  examples: [FORBIDDEN_EXAMPLE, EXAMPLES.OWN_REQUEST, EXAMPLES.ASSESSMENT_NOT_IN_CHARGE],
 } as const;
 const NOT_FOUND_DESCRIPTION =
   'The request does not exist, is not a proposal, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND).';
@@ -99,8 +99,9 @@ export class ProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the catalog has this software already by its name or by the domain of its page, or has the plan asked for of the application named (ACCESS_REQUEST.SOFTWARE_IN_CATALOG: details.existing is the application with at most twenty of its plans and details.matchedBy says why; ask for it from the catalog instead), or the application named has left the catalog (ACCESS_REQUEST.APPLICATION_RETIRED). Nothing is written.',
+        'The sender has not started working in a department yet (EMPLOYEE.NOT_STARTED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the catalog has this software already by its name or by the domain of its page, or has the plan asked for of the application named (ACCESS_REQUEST.SOFTWARE_IN_CATALOG: details.existing is the application with at most twenty of its plans and details.matchedBy says why; ask for it from the catalog instead), or the application named has left the catalog (ACCESS_REQUEST.APPLICATION_RETIRED). Nothing is written.',
       examples: [
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
         EXAMPLES.NO_DEPARTMENT,
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
         EXAMPLES.SOFTWARE_IN_CATALOG,
@@ -350,7 +351,8 @@ export class ProposalsController {
     // The link checks no assessor, so OWN_REQUEST is not reachable; a plan that does not exist is (PLAN_NOT_FOUND).
     {
       status: HttpStatus.FORBIDDEN,
-      description: `${IT_ONLY_DESCRIPTION} With addToDepartmentList, the department of the request must be one the IT Admin is in charge of (DEPARTMENT.OUT_OF_SCOPE); nothing is written.`,
+      description:
+        'Only an IT Admin does this. With addToDepartmentList, the department of the request must be one the IT Admin is acting for (DEPARTMENT.OUT_OF_SCOPE); nothing is written.',
       examples: [FORBIDDEN_EXAMPLE, EXAMPLES.DEPARTMENT_OUT_OF_SCOPE],
     },
     {
@@ -367,9 +369,10 @@ export class ProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), or the plan is of another kind than the assessment concluded and the months of use the person gave do not fit it (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: link a plan of a kind that takes them, or reject the request for the person to propose again), or the proposal is a short one that names an application of the catalog and the plan belongs to another application (ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH, with details.expectedApplicationId: only the plan of that application was assessed; a proposal of software that is new links to any plan), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written. A plan bought once takes no months: linking it clears any the person gave.',
+        'The body is invalid (VALIDATION_ERROR), or the plan is bound to a device (ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE), or the plan is of another kind than the assessment concluded and the months of use the person gave do not fit it (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: link a plan of a kind that takes them, or reject the request for the person to propose again), or the proposal is a short one that names an application of the catalog and the plan belongs to another application (ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH, with details.expectedApplicationId: only the plan of that application was assessed; a proposal of software that is new links to any plan), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written. A plan bought once takes no months: linking it clears any the person gave.',
       examples: [
         VALIDATION_EXAMPLE,
+        EXAMPLES.PLAN_BOUND_TO_DEVICE,
         EXAMPLES.TERM_NOT_FIT_KIND,
         EXAMPLES.CATALOG_LINK_APPLICATION_MISMATCH,
         EXAMPLES.DEPARTMENT_SOFTWARE_NOT_IN_CATALOG,

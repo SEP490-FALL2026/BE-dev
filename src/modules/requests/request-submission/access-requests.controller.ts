@@ -74,9 +74,10 @@ export class AccessRequestsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE) or the sender already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS, with the seat in details). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01e).',
+        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender has not started working in a department yet (EMPLOYEE.NOT_STARTED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE) or the sender already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS, with the seat in details). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01e).',
       examples: [
         EXAMPLES.APPLICATION_RETIRED,
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
         EXAMPLES.NO_DEPARTMENT,
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
         EXAMPLES.ALREADY_HOLDS_ACCESS,
@@ -86,9 +87,10 @@ export class AccessRequestsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE, with the sender in details.employeeIds). A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). The time of use follows the kind of the plan: 1 to 9 months for a plan bought by the month (ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE, TERM_REQUIRED when none is given), 1 to 12 for the others, none for a plan bought once (ACCESS_REQUEST.TERM_NOT_ASKED); a contractor, a freelancer or an intern gives the months and never a right with no end (ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED), and one whose contract ended before today gets no access (ACCESS_REQUEST.TERM_CONTRACT_ENDED, details.contractEndDate). Nothing is written.',
+        'The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE, with the sender in details.employeeIds). A device-bound plan cannot be requested through an access request (ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE). A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). The time of use follows the kind of the plan: 1 to 9 months for a plan bought by the month (ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE, TERM_REQUIRED when none is given), 1 to 12 for the others, none for a plan bought once (ACCESS_REQUEST.TERM_NOT_ASKED); a contractor, a freelancer or an intern gives the months and never a right with no end (ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED), and one whose contract ended before today gets no access (ACCESS_REQUEST.TERM_CONTRACT_ENDED, details.contractEndDate). Nothing is written.',
       examples: [
         VALIDATION_EXAMPLE,
+        EXAMPLES.PLAN_BOUND_TO_DEVICE,
         EXAMPLES.REQUEST_PARTY_INELIGIBLE,
         EXAMPLES.OPEN_LIMIT_REACHED,
         ...TERM_ERROR_EXAMPLES,
@@ -119,14 +121,19 @@ export class AccessRequestsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
-      examples: [EXAMPLES.APPLICATION_RETIRED, EXAMPLES.NO_DEPARTMENT, EXAMPLES.FINANCE_SETUP_INCOMPLETE],
+        'The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the caller has not started working in a department yet (EMPLOYEE.NOT_STARTED), the caller belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
+      examples: [
+        EXAMPLES.APPLICATION_RETIRED,
+        EXAMPLES.EMPLOYEE_NOT_STARTED,
+        EXAMPLES.NO_DEPARTMENT,
+        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), or the caller is placed in no department (REQUEST_PARTY.INELIGIBLE, details.reason UNPLACED). A spending approver is not refused here: the answer is 200 with blockedBy and canSubmit false.',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.PREVIEW_REQUEST_PARTY_UNPLACED],
+        'The body is invalid (VALIDATION_ERROR), the plan is bound to a device (ACCESS_REQUEST.PLAN_BOUND_TO_DEVICE), or the caller is placed in no department (REQUEST_PARTY.INELIGIBLE, details.reason UNPLACED). A spending approver is not refused here: the answer is 200 with blockedBy and canSubmit false.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.PLAN_BOUND_TO_DEVICE, EXAMPLES.PREVIEW_REQUEST_PARTY_UNPLACED],
     },
   )
   async preview(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: PreviewBodyDto) {

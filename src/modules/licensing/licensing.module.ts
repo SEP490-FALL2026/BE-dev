@@ -22,10 +22,11 @@ import { UsageFactsRepo } from './assignment/usage-facts.repo';
 import { RuleSeatsFactsService } from './assignment/rule-seats-facts.service';
 import { RuleSeatsRepo } from './assignment/rule-seats.repo';
 import { SharedPoolVacancyService } from './shared-pool/shared-pool-vacancy.service';
-import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
+import { AssignmentSeatOccupancy } from './assignment/occupancy/assignment-seat-occupancy.listener';
 import { AssignmentServiceAccountReader } from './assignment/assignment-service-account.listener';
 import { AssignmentListService } from './assignment/assignment-list.service';
 import { AssignmentService } from './assignment/assignment.service';
+import { SubscriptionSeatUsageService } from './assignment/occupancy/seat-usage-occupancy.service';
 import { AssignmentsController } from './assignment/assignments.controller';
 import { DashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
 import { DashboardFactsService } from './dashboard-facts/dashboard-facts.service';
@@ -61,6 +62,7 @@ import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-
 import { LicenseKeyRepo } from './license-key/license-key.repo';
 import { LicenseKeyAssignmentService } from './license-key/license-key-assignment.service';
 import { LicenseKeyRevealQuotaRepo } from './license-key/license-key-reveal-quota.repo';
+import { LicenseKeyImportSettingsService } from './license-key/license-key-import-settings.service';
 import { LicenseKeyService } from './license-key/license-key.service';
 import { LicenseKeysController } from './license-key/license-keys.controller';
 import { MySoftwareController } from './my-software/my-software.controller';
@@ -85,6 +87,11 @@ import { LicensingSeatMonthApi } from './public/licensing-seat-month.api';
 import { AssignmentSeatMonthRepo } from './assignment/assignment-seat-month.repo';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
 import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
+import { LicensingDeviceActivationApi } from './public/licensing-device-activation.api';
+import { DeviceActivationCloseService } from './device-activation/device-activation-close.service';
+import { DeviceActivationQueryService } from './device-activation/device-activation-query.service';
+import { DeviceActivationRepo } from './device-activation/device-activation.repo';
+import { DeviceActivationService } from './device-activation/device-activation.service';
 import { ProvisioningCancellationService } from './provisioning/grant-cancellation/provisioning-cancellation.service';
 import { ProvisioningDecisionService } from './provisioning/tasks/provisioning-decision.service';
 import { ProvisioningFailureService } from './provisioning/provisioning-failure.service';
@@ -120,6 +127,7 @@ import { RevocationWithdrawalService } from './provisioning/revocation-withdrawa
 import { ForRevocationWithdrawalService } from './provisioning/revocation-withdrawal/for-revocation-withdrawal.service';
 import { ProvisioningTaskReasonRepo } from './provisioning/provisioning-task-reason.repo';
 import { SaasIssueCalendar } from './saas-issue/saas-issue-calendar.service';
+import { SaasIssueOpenWorkReader } from './saas-issue/department-open-work.listener';
 import { SaasIssueFactsRepo } from './saas-issue/saas-issue-facts.repo';
 import { SaasIssueHandlingService } from './saas-issue/saas-issue-handling.service';
 import { SaasIssueNotifier } from './saas-issue/saas-issue-notifier.service';
@@ -205,6 +213,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     DepartmentOpenWorkReader,
     ProvisioningDepartmentUseRepo,
     AssignmentService,
+    SubscriptionSeatUsageService,
     AssignmentEndService,
     AssignmentCarryRepo,
     AssignmentFactsRepo,
@@ -272,6 +281,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     ExpiryQueueRepo,
     ExpiryQueueService,
     SaasIssueRepo,
+    SaasIssueOpenWorkReader,
     SaasIssueFactsRepo,
     SaasIssueCalendar,
     SaasIssueNotifier,
@@ -303,6 +313,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicenseKeyRepo,
     LicenseKeyRevealQuotaRepo,
     LicenseKeyService,
+    LicenseKeyImportSettingsService,
     LicenseKeyAssignmentService,
     {
       provide: LicenseKeyCipher,
@@ -337,6 +348,11 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
+    DeviceActivationRepo,
+    DeviceActivationService,
+    DeviceActivationCloseService,
+    DeviceActivationQueryService,
+    LicensingDeviceActivationApi,
   ],
   // Other modules read through the facade and bind the extension points; the capability services and the repos stay private.
   exports: [
@@ -350,6 +366,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
+    LicensingDeviceActivationApi,
     GrantRequestGateHook,
     RevocationListeners,
     RenewalHoldHook,

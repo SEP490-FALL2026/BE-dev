@@ -18,17 +18,18 @@ export function seatIncreaseNoticeOwed(input: {
 }
 
 /**
- * Who is told of a rise (`QĐ-110v`, SPEC P24): the IT Admin who answers for the subscription while they still work as one, unless they are the one who
- * bought the seat; when nobody usable answers for it, every IT Admin who works but the buyer (the common queue). Only a notice, never a step to approve.
+ * Who is told of a rise: the IT Admin who answers for the subscription while they still work as one, unless they are the one who
+ * bought the seat; when nobody usable answers for it, the usable Super Admin unless they are the actor. Only a notice, never a step to approve.
  */
 export function seatIncreaseRecipients(input: {
   responsible: string | null;
-  usable: ReadonlySet<string>;
+  responsibleUsable: boolean;
+  superAdmin: string | null;
   actor: string;
 }): string[] {
-  if (input.responsible !== null && input.usable.has(input.responsible)) {
+  if (input.responsible !== null && input.responsibleUsable) {
     return input.responsible === input.actor ? [] : [input.responsible];
   }
 
-  return [...input.usable].filter((employeeId) => employeeId !== input.actor).sort();
+  return input.superAdmin !== null && input.superAdmin !== input.actor ? [input.superAdmin] : [];
 }

@@ -9,9 +9,16 @@ import { SharedPoolCapacityRepo } from '../shared-pool/shared-pool-capacity.repo
 import { stockOfPlan } from './stock-summary.policy';
 import type { StockSummaryRow } from './stock-summary.types';
 
-const subscriptionIdsOf = (plans: readonly StockPlan[], type: StockPlan['provisioningType']): string[] =>
+const subscriptionIdsOf = (
+  plans: readonly StockPlan[],
+  type: StockPlan['provisioningType'],
+  /** For a K4 plan: whether its key goes on a machine (counted by licenses) or not (counted by keys). */
+  onMachine = false,
+): string[] =>
   plans
-    .filter((plan) => plan.provisioningType === type)
+    .filter(
+      (plan) => plan.provisioningType === type && (type !== 'K4' || (plan.keyBinding === 'DEVICE_KEY') === onMachine),
+    )
     .flatMap((plan) => plan.subscriptions.map((subscription) => subscription.subscriptionId));
 
 /**
@@ -42,10 +49,11 @@ export class StockSummaryQueryService {
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     });
-    const [seats, keys, holders] = await Promise.all([
+    const [seats, keys, holders, deviceOccupied] = await Promise.all([
       this.seats.occupancyOfMany(subscriptionIdsOf(plans, 'K2'), today),
       this.keys.countsOfSubscriptions(subscriptionIdsOf(plans, 'K4')),
       this.assignments.countHoldingOfSubscriptions(subscriptionIdsOf(plans, 'K1'), today),
+      this.keys.deviceOccupiedOfMany(subscriptionIdsOf(plans, 'K4', true)),
     ]);
 
     return pageOf(
@@ -58,7 +66,7 @@ export class StockSummaryQueryService {
           applicationName: plan.applicationName,
           logoUrl: plan.applicationLogoUrl,
         },
-        stock: stockOfPlan(plan, { seats, keys, holders }),
+        stock: stockOfPlan(plan, { seats, keys, holders, deviceOccupied }),
       })),
       total,
       query.page,

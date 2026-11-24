@@ -101,6 +101,8 @@ const ROUTES: Route[] = [
         ghostSeats: COUNTED,
         missingInvoicePeriods: COUNTED,
         outOfProcessRevocationsDue: COUNTED,
+        deviceReturnTasksOpen: COUNTED,
+        deviceReturnTasksOverdue: COUNTED,
       },
     },
   },

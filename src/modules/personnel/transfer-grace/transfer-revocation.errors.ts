@@ -1,4 +1,4 @@
-export type TransferRevocationErrorCode = 'NOT_FOUND' | 'REVOCATION_NOT_DUE' | 'NOTHING_TO_REVOKE';
+export type TransferRevocationErrorCode = 'NOT_FOUND' | 'NOT_IN_CHARGE' | 'REVOCATION_NOT_DUE' | 'NOTHING_TO_REVOKE';
 
 /**
  * Refusal when reopening failed revocations of a department transfer. `NOT_FOUND` answers with the same code as the not found of the `transfer` capability
