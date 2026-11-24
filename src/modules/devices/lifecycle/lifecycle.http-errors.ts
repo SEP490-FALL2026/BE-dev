@@ -12,6 +12,7 @@ import {
 } from '../registry/registry.errors';
 import {
   DeviceAwaitingReturnError,
+  DeviceConditionUnchangedError,
   DeviceNotHeldError,
   DeviceNotUsableError,
   DeviceReturnTaskNotInChargeError,
@@ -40,6 +41,7 @@ const ERROR_MAPPINGS: ReadonlyArray<readonly [new () => Error, HttpStatus, strin
   [DeviceHolderUnchangedError, CONFLICT, 'DEVICE.HOLDER_UNCHANGED'],
   [DeviceHolderNotWorkingError, CONFLICT, 'DEVICE.HOLDER_NOT_WORKING'],
   [DeviceRegistrationOverlapError, CONFLICT, 'DEVICE.REGISTRATION_OVERLAP'],
+  [DeviceConditionUnchangedError, CONFLICT, 'DEVICE.CONDITION_UNCHANGED'],
   [DeviceHolderNotFoundError, UNPROCESSABLE, 'DEVICE.HOLDER_NOT_FOUND'],
   [DeviceSoftwareRemovalRequiredError, UNPROCESSABLE, 'DEVICE.SOFTWARE_REMOVAL_REQUIRED'],
   [DeviceSoftwareRemovalNoteRequiredError, UNPROCESSABLE, 'DEVICE.SOFTWARE_REMOVAL_NOTE_REQUIRED'],
@@ -69,6 +71,7 @@ export const LIFECYCLE_ERROR_EXAMPLES = {
   HOLDER_UNCHANGED: example(new DeviceHolderUnchangedError()),
   HOLDER_NOT_WORKING: example(new DeviceHolderNotWorkingError()),
   REGISTRATION_OVERLAP: example(new DeviceRegistrationOverlapError()),
+  CONDITION_UNCHANGED: example(new DeviceConditionUnchangedError()),
   HOLDER_NOT_FOUND: example(new DeviceHolderNotFoundError()),
   SOFTWARE_REMOVAL_REQUIRED: example(new DeviceSoftwareRemovalRequiredError()),
   SOFTWARE_REMOVAL_NOTE_REQUIRED: example(new DeviceSoftwareRemovalNoteRequiredError()),

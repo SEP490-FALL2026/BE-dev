@@ -6,7 +6,6 @@ import type { IdentityAccessApi } from '../../identity-access/public/identity-ac
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AssetCodeService } from '../asset-code/asset-code.service';
 import { DeviceNotInChargeError } from '../public/devices.errors';
-import type { RegistrationEndService } from './registration-end.service';
 import { DeviceHandoverWithoutHolderError, DevicePlanNotBundledError, DeviceSerialTakenError } from './registry.errors';
 import type { RegistryRepo } from './registry.repo';
 import { RegistryService } from './registry.service';
@@ -62,7 +61,6 @@ describe('RegistryService device intake (W2-03, H17, org-timezone year)', () => 
       }),
     } as unknown as RegistryRepo;
 
-    const ending = {} as unknown as RegistrationEndService;
     const deptId = options.departmentId === undefined ? 'dept-1' : options.departmentId;
     const actingActors = [options.inCharge ?? 'it-1', options.substitute ?? null].filter(
       (id): id is string => id !== null,
@@ -107,7 +105,7 @@ describe('RegistryService device intake (W2-03, H17, org-timezone year)', () => 
     } as unknown as AssetCodeService;
     const audit = { record: jest.fn().mockResolvedValue(undefined) } as unknown as AuditApi;
 
-    const service = new RegistryService(repo, ending, organizationReads, audit, runner, assetCodes, identity);
+    const service = new RegistryService(repo, organizationReads, audit, runner, assetCodes, identity);
 
     return { service, repo, organizationReads, assetCodes, audit };
   }

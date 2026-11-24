@@ -6,7 +6,6 @@ import { DocumentAttachRefusedError } from '../../catalog/public/catalog.errors'
 import { DeviceAssetCodeExhaustedError } from '../asset-code/asset-code.errors';
 import { DeviceNotFoundError, DeviceNotInChargeError } from '../public/devices.errors';
 import {
-  DeviceAlreadyRetiredError,
   DeviceAssetCodeTakenError,
   DeviceHandoverDateInvalidError,
   DeviceHandoverWithoutHolderError,
@@ -59,7 +58,6 @@ export function toRegistryApiException(error: unknown): unknown {
   if (error instanceof DeviceRegistrationOverlapError) {
     return refuse(CONFLICT, 'DEVICE.REGISTRATION_OVERLAP', error.message);
   }
-  if (error instanceof DeviceAlreadyRetiredError) return refuse(CONFLICT, 'DEVICE.ALREADY_RETIRED', error.message);
   if (error instanceof DeviceRegistrationEndedError)
     return refuse(CONFLICT, 'DEVICE_REGISTRATION.ENDED', error.message);
 
@@ -102,7 +100,6 @@ export const REGISTRY_ERROR_EXAMPLES = {
   ASSET_CODE_EXHAUSTED: example(new DeviceAssetCodeExhaustedError()),
   SERIAL_TAKEN: example(new DeviceSerialTakenError()),
   REGISTRATION_OVERLAP: example(new DeviceRegistrationOverlapError()),
-  ALREADY_RETIRED: example(new DeviceAlreadyRetiredError()),
   REGISTRATION_ENDED: example(new DeviceRegistrationEndedError()),
   DOCUMENT_NOT_FOUND: example(new DocumentAttachRefusedError('NOT_FOUND')),
   DOCUMENT_ALREADY_ATTACHED: example(new DocumentAttachRefusedError('ALREADY_ATTACHED')),

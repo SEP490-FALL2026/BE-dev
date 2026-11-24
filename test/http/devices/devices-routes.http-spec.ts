@@ -45,6 +45,7 @@ describe('company machine routes (http contract, no database)', () => {
     ['get', `${DEVICES}/${ID}/registrations`, undefined],
     ['post', `${DEVICES}/${ID}/holder-changes`, { holderEmployeeId: ID, collectorInstalled: true }],
     ['post', `${DEVICES}/${ID}/returns`, { condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } }],
+    ['post', `${DEVICES}/${ID}/condition-changes`, { condition: 'IN_REPAIR' }],
     ['post', `${DEVICES}/${ID}/retirements`, { reason: 'broken' }],
     ['post', `${REGISTRATIONS}/${ID}/signature-records`, { documentId: ID, noticeVersionId: ID }],
     ['post', NOTICES, NOTICE],
@@ -91,6 +92,7 @@ describe('company machine routes (http contract, no database)', () => {
           .post(`${DEVICES}/${ID}/returns`)
           .send({ condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' } }),
       ),
+      await as(request(server).post(`${DEVICES}/${ID}/condition-changes`).send({ condition: 'IN_REPAIR' })),
       await as(request(server).post(`${DEVICES}/${ID}/retirements`).send({ reason: 'x' })),
       await as(
         request(server).post(`${REGISTRATIONS}/${ID}/signature-records`).send({ documentId: ID, noticeVersionId: ID }),
@@ -248,6 +250,12 @@ describe('company machine routes (http contract, no database)', () => {
       `${DEVICES}/${ID}/returns`,
       { condition: 'USABLE', softwareRemoval: { outcome: 'REMOVED' }, extra: 1 },
     ],
+    [
+      'a condition change with an invalid condition',
+      'post',
+      `${DEVICES}/${ID}/condition-changes`,
+      { condition: 'LOST' },
+    ],
     ['a retirement with no reason', 'post', `${DEVICES}/${ID}/retirements`, {}],
     ['a signed record with no version', 'post', `${REGISTRATIONS}/${ID}/signature-records`, { documentId: ID }],
   ] as const)('refuses %s with 422', async (_name, method, path, body) => {
@@ -332,6 +340,7 @@ describe('company machine routes (http contract, no database)', () => {
         ['holderEmployeeId', 'collectorInstalled'],
       ],
       ['DeviceReturnBodyDto', ['condition', 'conditionNote', 'softwareRemoval'], ['condition', 'softwareRemoval']],
+      ['ConditionChangeBodyDto', ['condition', 'note'], ['condition']],
       ['RetirementBodyDto', ['reason'], ['reason']],
       ['SignatureRecordBodyDto', ['documentId', 'noticeVersionId'], ['documentId', 'noticeVersionId']],
       [

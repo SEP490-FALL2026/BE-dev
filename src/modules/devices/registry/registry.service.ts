@@ -10,10 +10,8 @@ import type { AssetDeviceType } from '../asset-code/asset-code.policy';
 import { AssetCodeService } from '../asset-code/asset-code.service';
 import { byUser, devicesEvent } from '../devices-audit-event.mapper';
 import { judgeDeviceActor } from '../devices-custody.policy';
-import { DeviceNotFoundError, DeviceNotInChargeError } from '../public/devices.errors';
-import { RegistrationEndService } from './registration-end.service';
+import { DeviceNotInChargeError } from '../public/devices.errors';
 import {
-  DeviceAlreadyRetiredError,
   DeviceAssetCodeTakenError,
   DeviceHandoverDateInvalidError,
   DeviceHandoverWithoutHolderError,
@@ -38,17 +36,14 @@ export interface DeviceCreateInput {
 }
 
 /**
- * The register of company machines: a machine may start in stock or be registered to one holder, and a registration
- * ends when the holder changes or the machine is retired.
+ * The register of company machines: a machine may start in stock or be registered to one holder.
  *
  * Lock order on creation: asset-code counter (tier 0c), employee FOR SHARE (tier 1), then machine and registration.
- * Lock order on holder change or retirement: employee FOR SHARE (tier 1), machine (tier 2b), then registration.
  */
 @Injectable()
 export class RegistryService {
   constructor(
     private readonly repo: RegistryRepo,
-    private readonly ending: RegistrationEndService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
@@ -161,26 +156,6 @@ export class RegistryService {
     if (!verdict.allowed) throw new DeviceNotInChargeError();
 
     return { holderId: holder.id, validFrom, bySubstitute: verdict.bySubstitute };
-  }
-
-  /** Takes a machine out of use: its open registration ends and it is registered to nobody again. Throws DeviceNotFoundError and DeviceAlreadyRetiredError. */
-  async retire(actor: AuthenticatedPrincipal, deviceId: string, reason: string, now: Date = new Date()): Promise<void> {
-    const organization = await this.requireOrganization();
-    await this.runner.run(async (tx) => {
-      const device = await this.repo.lockDevice(tx, deviceId);
-      if (!device) throw new DeviceNotFoundError();
-      if (device.retiredAt) throw new DeviceAlreadyRetiredError();
-      const open = await this.repo.lockOpenRegistration(tx, deviceId);
-      if (open) await this.ending.end(tx, open, { at: now, cause: 'DEVICE_RETIRED' }, byUser(actor));
-      await this.repo.retireDevice(tx, deviceId, now, reason);
-      await this.audit.record(
-        tx,
-        devicesEvent(byUser(actor), organization.id, 'DEVICE.RETIRED', 'ManagedDevice', deviceId, null, {
-          reason,
-          endedRegistrationId: open?.id ?? null,
-        }),
-      );
-    });
   }
 
   /** The holder is read under a shared lock so the person cannot leave while the machine is given to them. */

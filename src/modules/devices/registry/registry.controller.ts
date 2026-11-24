@@ -19,18 +19,12 @@ import {
   DevicePageResponseDto,
   DeviceRegistrationListQueryDto,
   DeviceRegistrationPageResponseDto,
-  RetirementBodyDto,
 } from './registry.dto';
 import { REGISTRY_ERROR_EXAMPLES as EXAMPLES, toRegistryApiException } from './registry.http-errors';
 import { RegistryQueryService } from './registry-query.service';
 import { RegistryService } from './registry.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
-const IT_ADMIN_ONLY = {
-  status: HttpStatus.FORBIDDEN,
-  description: 'Only an IT Admin keeps the register of machines.',
-  examples: [FORBIDDEN_EXAMPLE],
-} as const;
 const IT_ADMIN_READS = {
   status: HttpStatus.FORBIDDEN,
   description: 'Only an IT Admin reads the register of machines.',
@@ -154,42 +148,6 @@ export class RegistryController {
   })
   async get(@Param() params: DeviceIdParamDto) {
     try {
-      return await this.queries.get(params.id);
-    } catch (error) {
-      throw toRegistryApiException(error);
-    }
-  }
-
-  @Post(':id/retirements')
-  @ApiOperation({ operationId: 'deviceRetire', summary: 'Take a company machine out of use' })
-  @ApiSuccessResponse(DeviceDetailResponseDto, {
-    status: HttpStatus.CREATED,
-    message: 'DEVICE.RETIRED',
-    description: 'The open registration ends and the machine stays in the register as retired, with the reason.',
-  })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    IT_ADMIN_ONLY,
-    DEVICE_NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description: 'The machine is retired already (DEVICE.ALREADY_RETIRED).',
-      examples: [EXAMPLES.ALREADY_RETIRED],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The request is invalid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
-    },
-  )
-  async retire(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: DeviceIdParamDto,
-    @Body() body: RetirementBodyDto,
-  ) {
-    try {
-      await this.registry.retire(actor, params.id, body.reason);
-
       return await this.queries.get(params.id);
     } catch (error) {
       throw toRegistryApiException(error);

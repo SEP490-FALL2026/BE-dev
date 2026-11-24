@@ -13,10 +13,12 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { DeviceDetailResponseDto, DeviceIdParamDto } from '../registry/registry.dto';
 import { RegistryQueryService } from '../registry/registry-query.service';
+import { ConditionService } from './condition.service';
 import { DeviceReceiptService } from './device-receipt.service';
 import { HolderChangeService } from './holder-change.service';
-import { DeviceReturnBodyDto, HolderChangeBodyDto } from './lifecycle.dto';
+import { ConditionChangeBodyDto, DeviceReturnBodyDto, HolderChangeBodyDto, RetirementBodyDto } from './lifecycle.dto';
 import { LIFECYCLE_ERROR_EXAMPLES as EXAMPLES, toLifecycleApiException } from './lifecycle.http-errors';
+import { RetirementService } from './retirement.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const DEVICE_NOT_FOUND = {
@@ -33,6 +35,8 @@ export class LifecycleController {
   constructor(
     private readonly holderChanges: HolderChangeService,
     private readonly receipts: DeviceReceiptService,
+    private readonly conditions: ConditionService,
+    private readonly retirements: RetirementService,
     private readonly queries: RegistryQueryService,
   ) {}
 
@@ -129,6 +133,89 @@ export class LifecycleController {
   ) {
     try {
       await this.receipts.returnToStock(actor, params.id, body);
+
+      return await this.queries.get(params.id);
+    } catch (error) {
+      throw toLifecycleApiException(error);
+    }
+  }
+
+  @Post(':id/condition-changes')
+  @ApiOperation({ operationId: 'deviceConditionChange', summary: 'Update the physical condition of a machine' })
+  @ApiSuccessResponse(DeviceDetailResponseDto, {
+    status: HttpStatus.CREATED,
+    message: 'DEVICE.CONDITION_CHANGED',
+    description: 'Updates the machine condition without changing its holder or open activations.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an acting IT Admin of the holder or return-task department may change the condition of an assigned or awaiting-return machine (DEVICE.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
+    },
+    DEVICE_NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), or already has that condition (DEVICE.CONDITION_UNCHANGED).',
+      examples: [EXAMPLES.VOIDED, EXAMPLES.ALREADY_RETIRED, EXAMPLES.CONDITION_UNCHANGED],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The request is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
+  )
+  async changeCondition(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: DeviceIdParamDto,
+    @Body() body: ConditionChangeBodyDto,
+  ) {
+    try {
+      await this.conditions.changeCondition(actor, params.id, body);
+
+      return await this.queries.get(params.id);
+    } catch (error) {
+      throw toLifecycleApiException(error);
+    }
+  }
+
+  @Post(':id/retirements')
+  @ApiOperation({ operationId: 'deviceRetire', summary: 'Take a company machine out of use' })
+  @ApiSuccessResponse(DeviceDetailResponseDto, {
+    status: HttpStatus.CREATED,
+    message: 'DEVICE.RETIRED',
+    description: 'The open registration ends and the machine stays in the register as retired, with the reason.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description:
+        'Only an acting IT Admin of the holder department may retire a held machine; any IT Admin may retire an in-stock machine (DEVICE.NOT_IN_CHARGE).',
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.NOT_IN_CHARGE],
+    },
+    DEVICE_NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'The machine is voided (DEVICE.VOIDED) or already retired (DEVICE.ALREADY_RETIRED).',
+      examples: [EXAMPLES.VOIDED, EXAMPLES.ALREADY_RETIRED],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The request is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
+  )
+  async retire(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: DeviceIdParamDto,
+    @Body() body: RetirementBodyDto,
+  ) {
+    try {
+      await this.retirements.retire(actor, params.id, body.reason);
 
       return await this.queries.get(params.id);
     } catch (error) {

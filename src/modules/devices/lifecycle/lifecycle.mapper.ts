@@ -69,3 +69,41 @@ export async function requireLifecycleActor(
 
   return verdict.bySubstitute;
 }
+
+/**
+ * Checks acting IT Admin coverage when acting on a single department (such as an awaiting-return task),
+ * returning whether a substitute acting appointment authorized the action.
+ */
+export async function requireDepartmentActor(
+  tx: DbTx,
+  deps: { organizationReads: OrganizationReadApi; identity: IdentityAccessApi },
+  input: { actorEmployeeId: string; departmentId: string | null },
+): Promise<boolean> {
+  if (!input.departmentId) {
+    const verdict = judgeDeviceActor({
+      holderDepartmentId: null,
+      recipientDepartmentId: null,
+      actingByDepartment: new Map(),
+      actor: input.actorEmployeeId,
+      unplacedRequired: true,
+    });
+    if (!verdict.allowed) throw new DeviceNotInChargeError();
+
+    return verdict.bySubstitute;
+  }
+
+  const actingByDepartment = await deps.organizationReads.itAdminsActingFor(
+    [input.departmentId],
+    (ids) => deps.identity.findUsableItAdminEmployeeIds(ids, tx),
+    tx,
+  );
+  const verdict = judgeDeviceActor({
+    holderDepartmentId: input.departmentId,
+    recipientDepartmentId: null,
+    actingByDepartment,
+    actor: input.actorEmployeeId,
+  });
+  if (!verdict.allowed) throw new DeviceNotInChargeError();
+
+  return verdict.bySubstitute;
+}

@@ -201,4 +201,42 @@ describe('device lifecycle: handover, holder change, and return to stock (integr
     ).rows;
     expect(audits[0]?.after?.bySubstitute).toBe(true);
   });
+
+  it('W2-09 (a)-(b) & H17: updates condition preserving holder, enforces condition unchanged, and guards retirement', async () => {
+    const itDept2 = await createItInDept(dept2Code, 'COND2');
+    await sql().query(`UPDATE departments SET it_admin_employee_id = $2 WHERE id = $1`, [dept2Id, itDept2.employeeId]);
+    const binh = await placedInSeed('BINH-COND');
+    const machine = await h.registered(binh);
+
+    // W2-09 (a): IN_REPAIR preserves holder & unchanged condition is 409 DEVICE.CONDITION_UNCHANGED.
+    const inRepair = h.dataOf<DeviceWire>(
+      await h.changeCondition(machine.id, { condition: 'IN_REPAIR', note: 'Cooling fan' }, h.it1).expect(201),
+    );
+    expect(inRepair).toMatchObject({
+      condition: 'IN_REPAIR',
+      conditionNote: 'Cooling fan',
+      custody: 'ASSIGNED',
+      holder: { id: binh },
+    });
+    expect(h.codeOf(await h.changeCondition(machine.id, { condition: 'IN_REPAIR' }, h.it1).expect(409))).toBe(
+      'DEVICE.CONDITION_UNCHANGED',
+    );
+
+    // H17: another IT Admin cannot change condition or retire an ASSIGNED device.
+    expect(h.codeOf(await h.changeCondition(machine.id, { condition: 'USABLE' }, itDept2.account).expect(403))).toBe(
+      'DEVICE.NOT_IN_CHARGE',
+    );
+    expect(h.codeOf(await h.retire(machine.id, 'Not my dept', itDept2.account).expect(403))).toBe(
+      'DEVICE.NOT_IN_CHARGE',
+    );
+
+    // W2-09 (b): back to USABLE succeeds for acting IT Admin, and retiring succeeds for acting IT Admin.
+    const usable = h.dataOf<DeviceWire>(
+      await h.changeCondition(machine.id, { condition: 'USABLE' }, h.it1).expect(201),
+    );
+    expect(usable).toMatchObject({ condition: 'USABLE', conditionNote: null, holder: { id: binh } });
+
+    const retired = h.dataOf<DeviceWire>(await h.retire(machine.id, 'End of service', h.it1).expect(201));
+    expect(retired).toMatchObject({ custody: 'RETIRED', holder: null });
+  });
 });

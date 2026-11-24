@@ -75353,269 +75353,6 @@
         "tags": ["devices"]
       }
     },
-    "/api/v1/devices/{id}/retirements": {
-      "post": {
-        "operationId": "deviceRetire",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RetirementBodyDto" } } }
-        },
-        "responses": {
-          "201": {
-            "description": "The open registration ends and the machine stays in the register as retired, with the reason.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/DeviceDetailResponseDto" },
-                    { "properties": { "message": { "example": "DEVICE.RETIRED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an IT Admin keeps the register of machines.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The machine is not in the register (DEVICE.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "DEVICE.NOT_FOUND": {
-                    "summary": "The device does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "DEVICE.NOT_FOUND",
-                        "message": "The device does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The machine is retired already (DEVICE.ALREADY_RETIRED).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "DEVICE.ALREADY_RETIRED": {
-                    "summary": "The machine is retired.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "DEVICE.ALREADY_RETIRED",
-                        "message": "The machine is retired.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Take a company machine out of use",
-        "tags": ["devices"]
-      }
-    },
     "/api/v1/devices/{id}/holder-changes": {
       "post": {
         "operationId": "deviceHolderChange",
@@ -76304,6 +76041,587 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Return a company machine to stock",
+        "tags": ["devices"]
+      }
+    },
+    "/api/v1/devices/{id}/condition-changes": {
+      "post": {
+        "operationId": "deviceConditionChange",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConditionChangeBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Updates the machine condition without changing its holder or open activations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DeviceDetailResponseDto" },
+                    { "properties": { "message": { "example": "DEVICE.CONDITION_CHANGED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an acting IT Admin of the holder or return-task department may change the condition of an assigned or awaiting-return machine (DEVICE.NOT_IN_CHARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the holder department may change this device.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the holder department may change this device.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The machine is not in the register (DEVICE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE.NOT_FOUND": {
+                    "summary": "The device does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_FOUND",
+                        "message": "The device does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The machine is voided (DEVICE.VOIDED), retired (DEVICE.ALREADY_RETIRED), or already has that condition (DEVICE.CONDITION_UNCHANGED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE.VOIDED": {
+                    "summary": "The machine record has been voided.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.VOIDED",
+                        "message": "The machine record has been voided.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.ALREADY_RETIRED": {
+                    "summary": "The machine is retired.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.ALREADY_RETIRED",
+                        "message": "The machine is retired.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.CONDITION_UNCHANGED": {
+                    "summary": "The machine already has that condition.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.CONDITION_UNCHANGED",
+                        "message": "The machine already has that condition.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Update the physical condition of a machine",
+        "tags": ["devices"]
+      }
+    },
+    "/api/v1/devices/{id}/retirements": {
+      "post": {
+        "operationId": "deviceRetire",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RetirementBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The open registration ends and the machine stays in the register as retired, with the reason.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DeviceDetailResponseDto" },
+                    { "properties": { "message": { "example": "DEVICE.RETIRED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an acting IT Admin of the holder department may retire a held machine; any IT Admin may retire an in-stock machine (DEVICE.NOT_IN_CHARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.NOT_IN_CHARGE": {
+                    "summary": "Only an acting IT Admin of the holder department may change this device.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_IN_CHARGE",
+                        "message": "Only an acting IT Admin of the holder department may change this device.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The machine is not in the register (DEVICE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE.NOT_FOUND": {
+                    "summary": "The device does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_FOUND",
+                        "message": "The device does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The machine is voided (DEVICE.VOIDED) or already retired (DEVICE.ALREADY_RETIRED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE.VOIDED": {
+                    "summary": "The machine record has been voided.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.VOIDED",
+                        "message": "The machine record has been voided.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEVICE.ALREADY_RETIRED": {
+                    "summary": "The machine is retired.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.ALREADY_RETIRED",
+                        "message": "The machine is retired.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Take a company machine out of use",
         "tags": ["devices"]
       }
     },
@@ -132178,12 +132496,6 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
-      "RetirementBodyDto": {
-        "type": "object",
-        "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 1000 } },
-        "required": ["reason"],
-        "additionalProperties": false
-      },
       "HolderChangeBodyDto": {
         "type": "object",
         "properties": {
@@ -132218,6 +132530,21 @@
           }
         },
         "required": ["condition", "softwareRemoval"],
+        "additionalProperties": false
+      },
+      "ConditionChangeBodyDto": {
+        "type": "object",
+        "properties": {
+          "condition": { "type": "string", "enum": ["USABLE", "IN_REPAIR", "BROKEN"] },
+          "note": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        },
+        "required": ["condition"],
+        "additionalProperties": false
+      },
+      "RetirementBodyDto": {
+        "type": "object",
+        "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "required": ["reason"],
         "additionalProperties": false
       },
       "DeviceAttributesBodyDto": {

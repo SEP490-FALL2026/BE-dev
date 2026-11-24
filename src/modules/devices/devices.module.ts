@@ -24,9 +24,11 @@ import { DeviceEnrollmentController } from './credential/enrollment/device-enrol
 import { CredentialEnrollmentService } from './credential/enrollment/credential-enrollment.service';
 import { DeviceSessionController } from './credential/session/device-session.controller';
 import { CredentialSessionService } from './credential/session/credential-session.service';
-import { LifecycleController } from './lifecycle/lifecycle.controller';
+import { ConditionService } from './lifecycle/condition.service';
 import { DeviceReceiptService } from './lifecycle/device-receipt.service';
 import { HolderChangeService } from './lifecycle/holder-change.service';
+import { LifecycleController } from './lifecycle/lifecycle.controller';
+import { RetirementService } from './lifecycle/retirement.service';
 import { MyDevicesController } from './my-devices/my-devices.controller';
 import { MyDevicesRepo } from './my-devices/my-devices.repo';
 import { MyDevicesService } from './my-devices/my-devices.service';
@@ -89,6 +91,8 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     RegistryService,
     HolderChangeService,
     DeviceReceiptService,
+    ConditionService,
+    RetirementService,
     AssetCodeRepo,
     AssetCodeService,
     DeviceAttributesRepo,

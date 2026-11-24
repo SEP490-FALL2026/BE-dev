@@ -46,3 +46,10 @@ export class DeviceReturnTaskNotInChargeError extends Error {
     this.name = 'DeviceReturnTaskNotInChargeError';
   }
 }
+
+export class DeviceConditionUnchangedError extends Error {
+  constructor() {
+    super('The machine already has that condition.');
+    this.name = 'DeviceConditionUnchangedError';
+  }
+}

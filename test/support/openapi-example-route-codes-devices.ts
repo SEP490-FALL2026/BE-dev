@@ -97,9 +97,15 @@ export const ROUTE_ERROR_CODES_DEVICES: Readonly<Record<string, Partial<Record<R
       '409': ['DEVICE.ALREADY_RETIRED', 'DEVICE.NOT_HELD', 'DEVICE.VOIDED'],
       '422': ['DEVICE.SOFTWARE_REMOVAL_NOTE_REQUIRED'],
     },
-    deviceRetire: {
+    deviceConditionChange: {
+      '403': ['DEVICE.NOT_IN_CHARGE'],
       '404': ['DEVICE.NOT_FOUND'],
-      '409': ['DEVICE.ALREADY_RETIRED'],
+      '409': ['DEVICE.ALREADY_RETIRED', 'DEVICE.CONDITION_UNCHANGED', 'DEVICE.VOIDED'],
+    },
+    deviceRetire: {
+      '403': ['DEVICE.NOT_IN_CHARGE'],
+      '404': ['DEVICE.NOT_FOUND'],
+      '409': ['DEVICE.ALREADY_RETIRED', 'DEVICE.VOIDED'],
     },
     deviceSessionGet: {
       '401': ['DEVICE.CREDENTIAL_EXPIRED', 'DEVICE.CREDENTIAL_INVALID', 'DEVICE.CREDENTIAL_REVOKED'],
