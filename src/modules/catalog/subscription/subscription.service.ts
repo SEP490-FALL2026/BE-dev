@@ -327,6 +327,7 @@ export class SubscriptionService {
       kind,
       applicationKind: plan.applicationKind,
       planProvisioningType: plan.provisioningType,
+      planKeyBinding: plan.keyBinding,
       ...state,
     });
   }

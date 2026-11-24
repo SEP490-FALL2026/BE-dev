@@ -72,6 +72,7 @@ const lockedPlan: LockedPlan = {
   applicationStatus: 'APPROVED',
   pricingModel: 'PER_SEAT',
   provisioningType: 'K2',
+  keyBinding: null,
   sharingPolicy: null,
   hasAdminConsole: true,
 };

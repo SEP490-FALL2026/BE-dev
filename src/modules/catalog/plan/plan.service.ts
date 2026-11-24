@@ -36,9 +36,11 @@ import {
 import { planAuditSnapshot as snapshot } from './plan.mapper';
 import { PlanRepo } from './plan.repo';
 import { assertAdminConsoleApplicable } from './plan-vendor-admins.policy';
+import { assertDeviceBundledShape, keyBindingOf } from './plan-key-binding.policy';
 import { PlanWorkspaceService } from './plan-workspace.service';
 import type {
   ControlLevel,
+  KeyBinding,
   PlanChanges,
   PlanRecord,
   PlanSummaryRecord,
@@ -53,6 +55,8 @@ export interface DeclarePlanInput {
   applicationId: string;
   name: string;
   provisioningType: ProvisioningType;
+  /** A K4 plan only: how it is bound once bought. A K4 plan that gives none is bound to an account; any other kind that gives one is refused. */
+  keyBinding?: KeyBinding;
   pricingModel?: PricingModel;
   controlLevel?: ControlLevel;
   revocationNote?: string | null;
@@ -67,6 +71,7 @@ export interface DeclarePlanInput {
 export interface UpdatePlanInput {
   name?: string;
   provisioningType?: ProvisioningType;
+  keyBinding?: KeyBinding;
   pricingModel?: PricingModel | null;
   controlLevel?: ControlLevel | null;
   revocationNote?: string | null;
@@ -97,6 +102,7 @@ export class PlanService {
   async list(query: {
     applicationId?: string;
     provisioningType?: ProvisioningType;
+    keyBinding?: KeyBinding;
     functionalGroupId?: string;
     status?: 'APPROVED' | 'RETIRED';
     search?: string;
@@ -106,6 +112,7 @@ export class PlanService {
     const { items, total } = await this.plans.list({
       ...(query.applicationId ? { applicationId: query.applicationId } : {}),
       ...(query.provisioningType ? { provisioningType: query.provisioningType } : {}),
+      ...(query.keyBinding ? { keyBinding: query.keyBinding } : {}),
       ...(query.functionalGroupId ? { functionalGroupId: query.functionalGroupId } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.search ? { search: query.search } : {}),
@@ -149,6 +156,7 @@ export class PlanService {
           applicationId: application.id,
           name,
           provisioningType: input.provisioningType,
+          keyBinding: keyBindingOf(input.provisioningType, input.keyBinding, null),
           pricingModel: input.pricingModel ?? derivedPricingModel(input.provisioningType),
           controlLevel: input.controlLevel ?? null,
           revocationNote,
@@ -161,6 +169,7 @@ export class PlanService {
         assertPricingModelDerived(input.provisioningType, input.pricingModel);
         assertAdminConsoleApplicable(plan.provisioningType, input.hasAdminConsole);
         assertReferencePrice(plan.provisioningType, referencePrice);
+        assertDeviceBundledShape(plan.keyBinding, referencePrice, plan.hasAdminConsole);
 
         const created = await this.plans.insert(tx, plan);
         await this.audit.record(
@@ -200,6 +209,7 @@ export class PlanService {
         const next = {
           name: name ?? current.name,
           provisioningType: input.provisioningType ?? current.provisioningType,
+          keyBinding: keyBindingOf(input.provisioningType ?? current.provisioningType, input.keyBinding, current),
           pricingModel: this.pricingModelOf(current, input),
           controlLevel: input.controlLevel === undefined ? current.controlLevel : input.controlLevel,
           revocationNote: revocationNote === undefined ? current.revocationNote : revocationNote,
@@ -215,6 +225,7 @@ export class PlanService {
         assertPricingModelDerived(next.provisioningType, input.pricingModel);
         assertAdminConsoleApplicable(next.provisioningType, input.hasAdminConsole);
         assertReferencePrice(next.provisioningType, next.referencePrice);
+        assertDeviceBundledShape(next.keyBinding, next.referencePrice, next.hasAdminConsole);
         if (
           next.provisioningType !== current.provisioningType &&
           next.provisioningType !== 'K2' &&
@@ -224,16 +235,7 @@ export class PlanService {
           throw new PlanWorkspaceProfileBlocksTypeChangeError();
         }
 
-        const changes: PlanChanges = {};
-        if (next.name !== current.name) changes.name = next.name;
-        if (next.provisioningType !== current.provisioningType) changes.provisioningType = next.provisioningType;
-        if (next.pricingModel !== current.pricingModel) changes.pricingModel = next.pricingModel;
-        if (next.controlLevel !== current.controlLevel) changes.controlLevel = next.controlLevel;
-        if (next.revocationNote !== current.revocationNote) changes.revocationNote = next.revocationNote;
-        if (next.dataLossOnRemoval !== current.dataLossOnRemoval) changes.dataLossOnRemoval = next.dataLossOnRemoval;
-        if (next.sharingPolicy !== current.sharingPolicy) changes.sharingPolicy = next.sharingPolicy;
-        if (next.hasAdminConsole !== current.hasAdminConsole) changes.hasAdminConsole = next.hasAdminConsole;
-        if (!samePrice(next.referencePrice, current.referencePrice)) changes.referencePrice = next.referencePrice;
+        const changes = changesOf(current, next);
         if (Object.keys(changes).length === 0) return current;
 
         const updated = await this.plans.update(tx, id, changes);
@@ -326,6 +328,9 @@ const CHANGE_BLOCKS: readonly PlanChangeBlock[] = [
   'PERPETUAL_SUBSCRIPTIONS',
   'TERM_SUBSCRIPTIONS',
   'CONTRACT_LINKS',
+  'KEY_BINDING_PURCHASES',
+  'KEY_BINDING_ASSIGNMENTS',
+  'DEVICE_ACTIVATIONS',
   'SUBSCRIPTIONS',
 ];
 
@@ -339,3 +344,23 @@ function changeBlockOf(error: unknown): PlanChangeBlock | null {
 
 const samePrice = (a: ReferencePrice | null, b: ReferencePrice | null): boolean =>
   a === null || b === null ? a === b : a.amountMinor === b.amountMinor && a.currency === b.currency;
+
+/** What a plan becomes after an update, every field given. */
+type PlanState = Required<PlanChanges>;
+
+/** The fields an update changes, each as the plan will have it; none when nothing differs. */
+function changesOf(current: PlanRecord, next: PlanState): PlanChanges {
+  const changes: PlanChanges = {};
+  if (next.name !== current.name) changes.name = next.name;
+  if (next.provisioningType !== current.provisioningType) changes.provisioningType = next.provisioningType;
+  if (next.keyBinding !== current.keyBinding) changes.keyBinding = next.keyBinding;
+  if (next.pricingModel !== current.pricingModel) changes.pricingModel = next.pricingModel;
+  if (next.controlLevel !== current.controlLevel) changes.controlLevel = next.controlLevel;
+  if (next.revocationNote !== current.revocationNote) changes.revocationNote = next.revocationNote;
+  if (next.dataLossOnRemoval !== current.dataLossOnRemoval) changes.dataLossOnRemoval = next.dataLossOnRemoval;
+  if (next.sharingPolicy !== current.sharingPolicy) changes.sharingPolicy = next.sharingPolicy;
+  if (next.hasAdminConsole !== current.hasAdminConsole) changes.hasAdminConsole = next.hasAdminConsole;
+  if (!samePrice(next.referencePrice, current.referencePrice)) changes.referencePrice = next.referencePrice;
+
+  return changes;
+}

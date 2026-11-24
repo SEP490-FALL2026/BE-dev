@@ -28,6 +28,8 @@ export interface SeatTarget {
   applicationName: string;
   applicationKind: 'SAAS' | 'LICENSED' | 'INTERNAL';
   provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  /** How a K4 plan is bound once bought (to an account, to a machine by a key, or bundled with the machine); null for every other kind. */
+  keyBinding: 'ACCOUNT' | 'DEVICE_KEY' | 'DEVICE_BUNDLED' | null;
   /** Whether the application of the plan is still in the catalog; a retired one takes no seat. */
   applicationStatus: 'APPROVED' | 'RETIRED';
   /** The state of the subscription; null for a plan that has none. A draft takes no seat (`US-04-03` AC-6). */

@@ -13,6 +13,7 @@ import type {
   ApplicationKind,
   MissingItem,
   NoticeSource,
+  PlanKeyBinding,
   PlanPricingModel,
   ProvisioningType,
   SubscriptionKind,
@@ -110,6 +111,8 @@ export interface ShapeInput {
   kind: SubscriptionKind;
   applicationKind: ApplicationKind;
   planProvisioningType: ProvisioningType;
+  /** How the K4 plan is bound; a plan bundled with the machine is not bought, so it has no subscription. Absent where the plan is not at hand. */
+  planKeyBinding?: PlanKeyBinding | null;
   startDate: BusinessDate | null;
   endDate: BusinessDate | null;
   renewalDate: BusinessDate | null;
@@ -126,6 +129,7 @@ export interface ShapeInput {
  */
 export function assertSubscriptionShape(input: ShapeInput): void {
   if (input.planProvisioningType === 'K5') throw new SubscriptionPlanHasNoSubscriptionError();
+  if (input.planKeyBinding === 'DEVICE_BUNDLED') throw new SubscriptionPlanHasNoSubscriptionError();
   if (input.kind === 'PERPETUAL') {
     if (input.applicationKind !== 'LICENSED' && input.planProvisioningType !== 'K4')
       throw new SubscriptionPerpetualNeedsLicensedApplicationError();

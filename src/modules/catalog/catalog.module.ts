@@ -10,6 +10,7 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
 import { OrganizationModule } from '../organization/organization.module';
 import { CatalogApi } from './public/catalog.api';
 import { CatalogContractApi } from './public/catalog-contract.api';
+import { CatalogPlanTermsApi } from './public/catalog-plan-terms.api';
 import { CatalogResponsibilityApi } from './public/catalog-responsibility.api';
 import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
 import { ApplicationIntakeController } from './application-intake/application-intake.controller';
@@ -194,6 +195,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRetirementRepo,
     ApplicationRetirementService,
     CatalogApi,
+    CatalogPlanTermsApi,
     CatalogContractApi,
     CatalogResponsibilityApi,
     SubscriptionPeriodApi,
@@ -207,6 +209,7 @@ import { VendorRepo } from './vendor/vendor.repo';
   // (`public/catalog-responsibility.api.ts`), and the facade `usage` reads the applications of a contract through (`public/catalog-contract.api.ts`); the capability services and repos stay private.
   exports: [
     CatalogApi,
+    CatalogPlanTermsApi,
     CatalogContractApi,
     CatalogResponsibilityApi,
     SubscriptionPeriodApi,
