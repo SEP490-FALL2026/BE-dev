@@ -59,6 +59,7 @@ import { RegistryQueryService } from './registry/registry-query.service';
 import { RegistryRepo } from './registry/registry.repo';
 import { RegistryService } from './registry/registry.service';
 import { DeviceReturnTaskController } from './return-task/device-return-task.controller';
+import { DeviceReturnTaskOpenWorkReader } from './return-task/department-open-work.listener';
 import { DeviceReturnOverdueSweeper } from './return-task/device-return-task.job';
 import { DeviceReturnTaskNotifier } from './return-task/device-return-task-notifier.service';
 import { DeviceReturnTaskQueryService } from './return-task/device-return-task-query.service';
@@ -136,6 +137,7 @@ import { StopRequestSweepService } from './stop-request/stop-request-sweep.servi
     DeviceAttributesService,
     RegistrationEndService,
     DeviceReturnTaskRepo,
+    DeviceReturnTaskOpenWorkReader,
     DeviceReturnTaskNotifier,
     DeviceReturnTaskQueryService,
     DeviceReturnTaskService,
