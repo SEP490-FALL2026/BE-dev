@@ -220,7 +220,7 @@ describe('device replacement (integration, real PostgreSQL)', () => {
     expect(creds.rows[0]?.revoked_at).not.toBeNull();
 
     const audits = await h.ctx.sql.query<{ after: { movedCount: number; bySubstitute?: boolean } }>(
-      `SELECT after FROM audit_events WHERE target_id = $1 AND action = 'DEVICE.REPLACED'`,
+      `SELECT after FROM audit_events WHERE resource_id = $1 AND action = 'DEVICE.REPLACED'`,
       [oldDevice.id],
     );
     expect(audits.rows[0]?.after).toMatchObject({ movedCount: 1, bySubstitute: true });

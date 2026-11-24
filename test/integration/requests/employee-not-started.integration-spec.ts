@@ -41,8 +41,7 @@ describe('BF-5 rejecting future-placed employees (integration, real PostgreSQL)'
     internalPlanId = await declarePlan(h.ctx, h.it1.accessToken, {
       applicationId: appId,
       name: unique('Standard'),
-      provisioningType: 'K1',
-      pricingModel: 'NONE',
+      provisioningType: 'K5',
       controlLevel: 'FULL',
     });
   }, 240000);

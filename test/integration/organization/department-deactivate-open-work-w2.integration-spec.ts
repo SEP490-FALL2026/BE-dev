@@ -44,7 +44,7 @@ describe('departmentDeactivate open work checks: return tasks, SaaS issues, ghos
     const deviceId = (
       await h.ctx.sql.query<{ id: string }>(
         `INSERT INTO managed_devices (id, organization_id, asset_code, normalized_asset_code, hostname, os, device_type, asset_code_origin, created_by_app_user_id, updated_at)
-         VALUES (gen_random_uuid(), $1, $2, lower($2), 'host-f22', 'Windows 11', 'LAP', 'SYSTEM', $3, now())
+         VALUES (gen_random_uuid(), $1, $2, lower($2), 'host-f22', 'Windows 11', 'LAP', 'GENERATED', $3, now())
          RETURNING id`,
         [orgId, assetCode, actorAppUserId],
       )
@@ -126,8 +126,8 @@ describe('departmentDeactivate open work checks: return tasks, SaaS issues, ghos
     });
 
     await h.ctx.sql.query(
-      `UPDATE saas_issues SET state = 'RESOLVED', resolution = 'Resolved', resolved_at = now(), reopen_until = $2::date WHERE id = $1`,
-      [issueId, today],
+      `UPDATE saas_issues SET assigned_it_admin_employee_id = $3, state = 'RESOLVED', resolution = 'Resolved', resolved_at = now(), reopen_until = $2::date WHERE id = $1`,
+      [issueId, today, h.it1.employeeId],
     );
     await h.ctx.sql.query(`UPDATE saas_issues SET state = 'CLOSED', closed_at = now() WHERE id = $1`, [issueId]);
 
@@ -159,8 +159,8 @@ describe('departmentDeactivate open work checks: return tasks, SaaS issues, ghos
     ).rows[0].id;
     const recId = (
       await h.ctx.sql.query<{ id: string }>(
-        `INSERT INTO ghost_seat_recommendations (id, organization_id, "group", state, application_id, plan_id, subscription_id, assignment_id, seat_chain_id, employee_id, department_id, evidence, created_run_id)
-         VALUES (gen_random_uuid(), $1, 'G2', 'OPEN', $2, $3, $4, $5, $5, $6, $7, '{}'::jsonb, $8)
+        `INSERT INTO ghost_seat_recommendations (id, organization_id, "group", state, tier, application_id, plan_id, subscription_id, assignment_id, seat_chain_id, employee_id, department_id, evidence, created_run_id)
+         VALUES (gen_random_uuid(), $1, 'G2', 'OPEN', 'ACTION', $2, $3, $4, $5, $5, $6, $7, '{}'::jsonb, $8)
          RETURNING id`,
         [orgId, applicationId, planId, subscriptionId, assignmentId, holderId, dept.id, runId],
       )
