@@ -712,6 +712,8 @@ model SubscriptionRenewal {
   // Savings at renewal, only from an outcome the vendor confirmed and only when the new period costs less (QĐ-66w).
   realisedSavingsMinor        BigInt?                @map("realised_savings_minor")
   realisedSavingsCurrency     String?                @map("realised_savings_currency") @db.Char(3)
+  realisedSavingsRecordedAt   DateTime?              @map("realised_savings_recorded_at") @db.Timestamptz(3)
+  realisedSavingsInvoiceId    String?                @map("realised_savings_invoice_id") @db.Uuid
   createdAt                   DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                   DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 

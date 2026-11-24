@@ -53,6 +53,7 @@ import { ExpiryReminderSweeper } from './expiry/expiry-reminder.job';
 import { ExpiryRenewalWindowSweeper } from './expiry/expiry-renewal-window.job';
 import { ExpiryRenewalWindowRepo } from './expiry/expiry-renewal-window.repo';
 import { ExpiryRenewalWindowService } from './expiry/expiry-renewal-window.service';
+import { RenewalSavingsRepo } from './subscription-renewal/savings/renewal-savings.repo';
 import { ExpiryRevocationRepo } from './expiry/expiry-revocation.repo';
 import { ExpiryRevocationService } from './expiry/expiry-revocation.service';
 import { ExpiryRevocationSweeper } from './expiry/expiry-revocation.job';
@@ -294,6 +295,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     MySoftwareService,
     SubscriptionRenewalRepo,
     SubscriptionRenewalSeatRepo,
+    RenewalSavingsRepo,
     RenewalPartiesService,
     RenewalRankingService,
     RenewalSeatsNeededService,

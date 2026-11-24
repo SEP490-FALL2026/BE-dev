@@ -23,6 +23,7 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   budget_version_history: ['INSERT', 'SELECT'],
   // An invoice Finance recorded is evidence of what was spent: added to and never changed or deleted.
   invoices: ['INSERT', 'SELECT'],
+  invoice_pool_variance_resolutions: ['INSERT', 'SELECT'],
   // The files that came with a purchase invoice are evidence added with it and never changed (its trigger refuses it first).
   purchase_invoice_documents: ['INSERT', 'SELECT'],
   // The notice, the signed record and the acknowledgement of a machine are evidence: added to and never changed.

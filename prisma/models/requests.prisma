@@ -1278,6 +1278,7 @@ enum InvoiceDiscrepancyState {
 enum InvoiceDiscrepancyOutcome {
   EXPLAINED
   OUT_OF_PROCESS_SUSPECTED
+  EXCHANGE_RATE_LINE_PRICE_UPDATED
 }
 
 // The case Finance works from a purchase invoice whose count of seats or price of one (in the currency the invoice states) differs from what was

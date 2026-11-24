@@ -296,6 +296,10 @@ enum CommitmentReleaseReason {
   GRANTED_FROM_POOL
   // The holder moved to another department: what the seat would cost from the day the transfer takes effect goes back (`QĐ-111bg`).
   TRANSFER_EFFECTIVE
+  // Monthly pooled-quota seat-month reconciliation released an unspent remainder of this month's share.
+  MONTH_END
+  // Year-end reconciliation released remaining unapplied pool shares across seat-months.
+  YEAR_END_SEAT_MONTHS
 }
 
 // The electronic record of the decision of the spending approver on a version (US-06-11 AC-1): who, in which role, what,
@@ -365,10 +369,29 @@ model BudgetCommitment {
   invoices        Invoice[]
   seatMonths      SeatMonthCharge[]
   seatMonthReversals BudgetCommitmentSeatMonthReversal[]
+  months          BudgetCommitmentMonth[]
 
   @@unique([requestId, year])
   @@index([costCenterId, year, state])
   @@map("budget_commitments")
+}
+
+/// Monthly slice of a K2 pooled-quota commitment across its service months (`share_minor`, `applied_minor`, `released_minor`).
+/// Composite key (`commitmentId`, `month`); `commitmentId`, `month`, `seatCount` and `shareMinor` are immutable after insert.
+model BudgetCommitmentMonth {
+  commitmentId  String    @map("commitment_id") @db.Uuid
+  month         DateTime  @db.Date
+  seatCount     Int       @map("seat_count")
+  shareMinor    BigInt    @map("share_minor")
+  appliedMinor  BigInt    @default(0) @map("applied_minor")
+  releasedMinor BigInt    @default(0) @map("released_minor")
+  settledAt     DateTime? @map("settled_at") @db.Timestamptz(3)
+
+  commitment BudgetCommitment @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+
+  @@id([commitmentId, month])
+  @@index([month, settledAt])
+  @@map("budget_commitment_months")
 }
 
 /// What went back to the budget from a commitment, one row for each time (US-06-06): how much, why, and who, when a person
@@ -433,18 +456,35 @@ model Invoice {
   // Both null for any other invoice; the CHECK `invoices_unallocated_check` keeps them together and the invoice with no other place.
   unallocatedReason     String?            @map("unallocated_reason")
   departmentId          String?            @map("department_id") @db.Uuid
+  poolExpectedMinor     BigInt?            @map("pool_expected_minor")
+  poolVarianceMinor     BigInt?            @map("pool_variance_minor")
+  poolVarianceMonth     DateTime?          @map("pool_variance_month") @db.Date
+  poolVarianceInReview  Boolean            @default(false) @map("pool_variance_in_review")
 
-  organization   Organization     @relation(fields: [organizationId], references: [id])
-  commitment     BudgetCommitment? @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
-  vendor         Vendor           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-  currencyRecord Currency         @relation("InvoiceCurrency", fields: [currency], references: [code], onDelete: Restrict)
-  recordedBy     Employee         @relation("InvoiceRecorder", fields: [recordedByEmployeeId], references: [id], onDelete: Restrict)
+  organization           Organization                 @relation(fields: [organizationId], references: [id])
+  commitment             BudgetCommitment?            @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+  vendor                 Vendor                       @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  currencyRecord         Currency                     @relation("InvoiceCurrency", fields: [currency], references: [code], onDelete: Restrict)
+  recordedBy             Employee                     @relation("InvoiceRecorder", fields: [recordedByEmployeeId], references: [id], onDelete: Restrict)
+  poolVarianceResolution InvoicePoolVarianceResolution?
 
   @@unique([organizationId, vendorId, number])
   @@index([commitmentId, recordedAt])
   @@index([costCenterId, serviceMonth])
   @@index([subscriptionId, serviceMonth])
+  @@index([poolVarianceMonth])
   @@map("invoices")
+}
+
+/// Append-only record marking that an invoice's `pool_variance_in_review` discrepancy case was closed (`W3-05`),
+/// keeping `invoices` strictly append-only (`INSERT`, `SELECT`) under H7 runtime role rules.
+model InvoicePoolVarianceResolution {
+  invoiceId  String   @id @map("invoice_id") @db.Uuid
+  resolvedAt DateTime @default(now()) @map("resolved_at") @db.Timestamptz(3)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@map("invoice_pool_variance_resolutions")
 }
 
 enum BudgetVersionHistoryKind {
@@ -644,12 +684,17 @@ model BudgetReviewPeriod {
   signedAt                   DateTime? @map("signed_at") @db.Timestamptz(3)
   note                       String?
   // What the company spent in the year up to the close, the shared pool in it (MG-03), and the line of the pool against the reserve of the cycle.
-  companySpentMinor          BigInt    @map("company_spent_minor")
-  sharedPoolUnallocatedMinor BigInt    @map("shared_pool_unallocated_minor")
-  sharedPoolReserveMinor     BigInt?   @map("shared_pool_reserve_minor")
-  annualCeilingMinor         BigInt?   @map("annual_ceiling_minor")
+  companySpentMinor                       BigInt    @map("company_spent_minor")
+  sharedPoolUnallocatedMinor              BigInt    @map("shared_pool_unallocated_minor")
+  sharedPoolReserveMinor                  BigInt?   @map("shared_pool_reserve_minor")
+  annualCeilingMinor                      BigInt?   @map("annual_ceiling_minor")
+  sharedPoolIdleMinor             BigInt?   @map("shared_pool_idle_minor")
+  sharedPoolDeviceLotMinor        BigInt?   @map("shared_pool_device_lot_minor")
+  sharedPoolReplacementMinor      BigInt?   @map("shared_pool_replacement_minor")
+  sharedPoolVarianceMinor         BigInt?   @map("shared_pool_variance_minor")
+  sharedPoolVarianceInReviewMinor BigInt?   @map("shared_pool_variance_in_review_minor")
   // RV-3: the last day the heads of departments are asked to explain a quarter by (the fifth working day from the close); null for a month and for a quarter closed before RV-3.
-  explanationsDueOn          DateTime? @map("explanations_due_on") @db.Date
+  explanationsDueOn                       DateTime? @map("explanations_due_on") @db.Date
 
   lines BudgetReviewLine[]
 
@@ -667,9 +712,10 @@ model BudgetReviewLine {
   baseMinor          BigInt  @map("base_minor")
   reserveMinor       BigInt  @map("reserve_minor")
   // Through the end of the month closed, by the month each invoice or seat-month pays for (FIX-RV1 RV1-03); what was already recorded for later months is `spentAfterMonthMinor`.
-  spentMinor         BigInt  @map("spent_minor")
-  spentAfterMonthMinor BigInt @default(0) @map("spent_after_month_minor")
-  committedMinor     BigInt  @map("committed_minor")
+  spentMinor             BigInt @map("spent_minor")
+  spentAfterMonthMinor   BigInt @default(0) @map("spent_after_month_minor")
+  priorYearReleasedMinor BigInt @default(0) @map("prior_year_released_minor")
+  committedMinor         BigInt @map("committed_minor")
   pendingSpendMinor  BigInt  @map("pending_spend_minor")
   remainingMinor     BigInt  @map("remaining_minor")
   // The price in the commitments of what the invoices of a commitment took down (their `applied`; named for what it held before FIX-RV1): the basis of k.

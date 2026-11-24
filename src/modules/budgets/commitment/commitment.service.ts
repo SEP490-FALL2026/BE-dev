@@ -136,7 +136,7 @@ export class CommitmentService {
     const items = rows.map((row): ReleaseWire => ({
       id: row.id,
       amount: money(row.amountMinor),
-      reason: row.reason,
+      reason: row.reason as ReleaseWire['reason'],
       reasonText: row.reasonText,
       releasedBy: row.releasedByEmployeeId ? (people.get(row.releasedByEmployeeId) ?? null) : null,
       releasedAt: row.releasedAt.toISOString(),

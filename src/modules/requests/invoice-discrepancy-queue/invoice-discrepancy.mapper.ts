@@ -36,7 +36,7 @@ export function toSummary(row: InvoiceDiscrepancyRow, units: MinorUnitsOf): Invo
     state: row.state,
     mismatches: row.mismatches as InvoiceDiscrepancySummaryWire['mismatches'],
     openedAt: row.openedAt.toISOString(),
-    outcome: row.outcome,
+    outcome: row.outcome as InvoiceDiscrepancySummaryWire['outcome'],
     purchaseInvoice: {
       id: invoice.id,
       vendorId: invoice.vendorId,

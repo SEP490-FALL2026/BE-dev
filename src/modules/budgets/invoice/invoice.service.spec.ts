@@ -45,6 +45,10 @@ const stored = (id: string, over: Partial<InvoiceRecord> = {}): InvoiceRecord =>
   recordedAt: new Date('2027-01-06T01:00:00.000Z'),
   serviceMonth: null,
   purchaseInvoiceId: null,
+  poolExpectedMinor: null,
+  poolVarianceMinor: null,
+  poolVarianceMonth: null,
+  poolVarianceInReview: false,
   ...over,
 });
 

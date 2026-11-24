@@ -31,6 +31,13 @@ export interface NewInvoice {
   outOfProcessCaseId?: string | null;
   /** The line of the Cost Center not allocated: why, and the department of the user it is shown with (both or neither). */
   unallocated?: { reason: 'K1_GRANT_FAILED'; departmentId: string } | null;
+  /** Pool variance figures captured for a monthly pooled-quota seat purchase invoice (`SBF-11a` / K2). */
+  poolFigures?: {
+    expectedMinor: bigint | null;
+    varianceMinor: bigint;
+    varianceMonth: BusinessDate;
+    inReview: boolean;
+  } | null;
 }
 
 export interface InvoiceRecord {
@@ -50,6 +57,10 @@ export interface InvoiceRecord {
   recordedAt: Date;
   serviceMonth: BusinessDate | null;
   purchaseInvoiceId: string | null;
+  poolExpectedMinor: bigint | null;
+  poolVarianceMinor: bigint | null;
+  poolVarianceMonth: BusinessDate | null;
+  poolVarianceInReview: boolean;
 }
 
 /** What the invoices of one commitment cost, how many there are, and whether one is flagged as more than the commitment allowed. */
@@ -59,7 +70,7 @@ export interface InvoiceFigures {
   flagged: boolean;
 }
 
-const toRecord = (row: Prisma.InvoiceGetPayload<object>): InvoiceRecord => ({
+const toRecord = (row: Prisma.InvoiceGetPayload<object>, resolved = false): InvoiceRecord => ({
   id: row.id,
   commitmentId: row.commitmentId,
   number: row.number,
@@ -75,6 +86,43 @@ const toRecord = (row: Prisma.InvoiceGetPayload<object>): InvoiceRecord => ({
   recordedAt: row.recordedAt,
   serviceMonth: row.serviceMonth ? fromDateColumn(row.serviceMonth) : null,
   purchaseInvoiceId: row.purchaseInvoiceId,
+  poolExpectedMinor: row.poolExpectedMinor,
+  poolVarianceMinor: row.poolVarianceMinor,
+  poolVarianceMonth: row.poolVarianceMonth ? fromDateColumn(row.poolVarianceMonth) : null,
+  poolVarianceInReview: row.poolVarianceInReview && !resolved,
+});
+
+const toPoolColumns = (poolFigures: NewInvoice['poolFigures']) => ({
+  poolExpectedMinor: poolFigures?.expectedMinor ?? null,
+  poolVarianceMinor: poolFigures?.varianceMinor ?? null,
+  poolVarianceMonth: poolFigures ? toDateColumn(poolFigures.varianceMonth) : null,
+  poolVarianceInReview: poolFigures?.inReview ?? false,
+});
+
+const toCreateData = (input: NewInvoice) => ({
+  organizationId: input.organizationId,
+  commitmentId: input.commitmentId,
+  vendorId: input.vendorId,
+  number: input.number,
+  issuedOn: toDateColumn(input.issuedOn),
+  currency: input.currency,
+  netMinor: input.netMinor,
+  deductibleTaxMinor: input.deductibleTaxMinor,
+  nonDeductibleTaxMinor: input.nonDeductibleTaxMinor,
+  actualCostMinor: input.actualCostMinor,
+  appliedMinor: input.appliedMinor,
+  matchResult: input.matchResult,
+  note: input.note,
+  recordedByEmployeeId: input.recordedByEmployeeId,
+  recordedAt: input.now,
+  serviceMonth: input.serviceMonth ? toDateColumn(input.serviceMonth) : null,
+  purchaseInvoiceId: input.purchaseInvoiceId ?? null,
+  subscriptionId: input.subscriptionId ?? null,
+  costCenterId: input.costCenterId ?? null,
+  outOfProcessCaseId: input.outOfProcessCaseId ?? null,
+  unallocatedReason: input.unallocated?.reason ?? null,
+  departmentId: input.unallocated?.departmentId ?? null,
+  ...toPoolColumns(input.poolFigures),
 });
 
 /**
@@ -86,34 +134,35 @@ export class InvoiceRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   async insert(tx: DbTx, input: NewInvoice): Promise<InvoiceRecord> {
-    const created = await tx.invoice.create({
-      data: {
-        organizationId: input.organizationId,
-        commitmentId: input.commitmentId,
-        vendorId: input.vendorId,
-        number: input.number,
-        issuedOn: toDateColumn(input.issuedOn),
-        currency: input.currency,
-        netMinor: input.netMinor,
-        deductibleTaxMinor: input.deductibleTaxMinor,
-        nonDeductibleTaxMinor: input.nonDeductibleTaxMinor,
-        actualCostMinor: input.actualCostMinor,
-        appliedMinor: input.appliedMinor,
-        matchResult: input.matchResult,
-        note: input.note,
-        recordedByEmployeeId: input.recordedByEmployeeId,
-        recordedAt: input.now,
-        serviceMonth: input.serviceMonth ? toDateColumn(input.serviceMonth) : null,
-        purchaseInvoiceId: input.purchaseInvoiceId ?? null,
-        subscriptionId: input.subscriptionId ?? null,
-        costCenterId: input.costCenterId ?? null,
-        outOfProcessCaseId: input.outOfProcessCaseId ?? null,
-        unallocatedReason: input.unallocated?.reason ?? null,
-        departmentId: input.unallocated?.departmentId ?? null,
-      },
-    });
+    const created = await tx.invoice.create({ data: toCreateData(input) });
 
     return toRecord(created);
+  }
+
+  async findByPurchaseInvoiceId(purchaseInvoiceId: string, tx?: DbTx): Promise<InvoiceRecord | null> {
+    const row = await (tx ?? this.prisma).invoice.findUnique({
+      where: { purchaseInvoiceId },
+      include: { poolVarianceResolution: { select: { invoiceId: true } } },
+    });
+    return row ? toRecord(row, row.poolVarianceResolution !== null) : null;
+  }
+
+  /**
+   * Appends a resolution row for an invoice whose `pool_variance_in_review` discrepancy case closed,
+   * keeping `invoices` strictly append-only (`INSERT`, `SELECT`). Idempotent via `skipDuplicates`.
+   */
+  async markPoolVarianceResolved(
+    tx: DbTx,
+    purchaseInvoiceId: string,
+    resolvedAt: Date = new Date(),
+  ): Promise<InvoiceRecord | null> {
+    const row = await tx.invoice.findUnique({ where: { purchaseInvoiceId } });
+    if (!row || !row.poolVarianceInReview) return null;
+    await tx.invoicePoolVarianceResolution.createMany({
+      data: [{ invoiceId: row.id, resolvedAt }],
+      skipDuplicates: true,
+    });
+    return toRecord(row, true);
   }
 
   /**
@@ -144,7 +193,7 @@ export class InvoiceRepo {
           take,
         });
 
-        return { rows: rows.map(toRecord), total: await tx.invoice.count({ where: { commitmentId } }) };
+        return { rows: rows.map((row) => toRecord(row)), total: await tx.invoice.count({ where: { commitmentId } }) };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );

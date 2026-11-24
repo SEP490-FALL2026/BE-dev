@@ -33,7 +33,9 @@ import {
   PurchaseInvoiceFactsHook,
 } from './public/budgets.extension-points';
 import { BudgetCommitmentsController } from './commitment/budget-commitments.controller';
+import { CommitmentMonthRepo } from './commitment/month/commitment-month.repo';
 import { CommitmentService } from './commitment/commitment.service';
+import { SharedPoolLineRepo } from './shared-pool-line/shared-pool-line.repo';
 import { BudgetInvoicesController } from './invoice/budget-invoices.controller';
 import { BudgetCyclesController } from './cycle/budget-cycles.controller';
 import { BaselineService } from './cycle/baseline.service';
@@ -249,6 +251,8 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BudgetSpendingApproverGrantCheck,
     SpendingApproverWaitListener,
     CommitmentService,
+    CommitmentMonthRepo,
+    SharedPoolLineRepo,
     InvoiceService,
     PurchaseInvoiceRecorderService,
     OutOfProcessSpendRecorderService,
